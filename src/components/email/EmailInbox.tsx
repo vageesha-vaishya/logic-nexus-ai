@@ -182,26 +182,26 @@ export function EmailInbox() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">Email Inbox</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Button variant="outline" size="sm" onClick={fetchEmails}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            <RefreshCw className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Button variant="outline" size="sm" onClick={syncEmails} disabled={syncing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            Sync
+            <RefreshCw className={`w-4 h-4 sm:mr-2 ${syncing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Sync</span>
           </Button>
           <Button size="sm" onClick={() => setShowCompose(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Compose
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Compose</span>
           </Button>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
+        <div className="relative w-full lg:flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search emails..."
@@ -210,8 +210,8 @@ export function EmailInbox() {
             className="pl-10"
           />
         </div>
-        <Tabs value={selectedFolder} onValueChange={setSelectedFolder}>
-          <TabsList>
+        <Tabs value={selectedFolder} onValueChange={setSelectedFolder} className="w-full lg:w-auto">
+          <TabsList className="w-full lg:w-auto grid grid-cols-5">
             <TabsTrigger value="inbox">Inbox</TabsTrigger>
             <TabsTrigger value="sent">Sent</TabsTrigger>
             <TabsTrigger value="drafts">Drafts</TabsTrigger>
