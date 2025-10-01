@@ -42,18 +42,12 @@ export default function Users() {
         userIds = roles?.map(r => r.user_id) || [];
       }
 
-      // Build the main query with tenant and franchise names
+      // Build the main query
       let query = supabase
         .from('profiles')
         .select(`
           *,
-          user_roles!user_id(
-            role, 
-            tenant_id,
-            franchise_id,
-            tenants(name),
-            franchises(name)
-          )
+          user_roles!user_id(role, tenant_id, franchise_id)
         `);
 
       // Apply filter if we have specific user IDs
@@ -62,10 +56,29 @@ export default function Users() {
       }
       // Platform admin has no filters - can see all users
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data: profilesData, error: profilesError } = await query.order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUsers(data || []);
+      if (profilesError) throw profilesError;
+
+      // Fetch all tenants and franchises to map names
+      const { data: tenantsData } = await supabase.from('tenants').select('id, name');
+      const { data: franchisesData } = await supabase.from('franchises').select('id, name');
+
+      // Create lookup maps
+      const tenantsMap = new Map(tenantsData?.map(t => [t.id, t.name]) || []);
+      const franchisesMap = new Map(franchisesData?.map(f => [f.id, f.name]) || []);
+
+      // Enrich user data with tenant and franchise names
+      const enrichedUsers = profilesData?.map(user => ({
+        ...user,
+        user_roles: user.user_roles?.map((role: any) => ({
+          ...role,
+          tenant_name: role.tenant_id ? tenantsMap.get(role.tenant_id) : null,
+          franchise_name: role.franchise_id ? franchisesMap.get(role.franchise_id) : null,
+        }))
+      })) || [];
+
+      setUsers(enrichedUsers);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -141,10 +154,10 @@ export default function Users() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {user.user_roles?.[0]?.tenants?.name || '-'}
+                        {user.user_roles?.[0]?.tenant_name || '-'}
                       </TableCell>
                       <TableCell>
-                        {user.user_roles?.[0]?.franchises?.name || '-'}
+                        {user.user_roles?.[0]?.franchise_name || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.is_active ? 'default' : 'secondary'}>

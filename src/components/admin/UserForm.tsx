@@ -184,8 +184,8 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         toast({
           title: 'Success',
           description: values.must_change_password 
-            ? 'User created successfully. They will need to change their password on first login.'
-            : 'User created successfully.',
+            ? 'User created successfully. They will need to change their password on first login. Email verification is disabled - they can log in immediately.'
+            : 'User created successfully. Email verification is disabled - they can log in immediately.',
         });
         
         navigate('/dashboard/users');
