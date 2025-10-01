@@ -185,16 +185,30 @@ serve(async (req) => {
             const from = headers.from || "";
             const to = headers.to || "";
             const date = headers.date || new Date().toISOString();
+            
+            // Extract additional email metadata
+            const priority = headers['x-priority'] || headers['priority'] || 'normal';
+            const importance = headers['importance'] || 'normal';
+            const inReplyTo = headers['in-reply-to'] || null;
+            const references = headers['references'] ? headers['references'].split(/\s+/) : [];
+            const messageId = headers['message-id'] || msgData.id;
 
-            // Extract body
+            // Extract body and check for inline images
             let bodyText = "";
             let bodyHtml = "";
+            let hasInlineImages = false;
             
             const getBody = (part: any): void => {
               if (part.mimeType === "text/plain" && part.body?.data) {
                 bodyText = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
               } else if (part.mimeType === "text/html" && part.body?.data) {
                 bodyHtml = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+                // Check for inline images
+                if (bodyHtml.includes('cid:') || bodyHtml.includes('data:image/')) {
+                  hasInlineImages = true;
+                }
+              } else if (part.mimeType?.startsWith('image/') && part.headers?.find((h: any) => h.name === 'Content-ID')) {
+                hasInlineImages = true;
               } else if (part.parts) {
                 part.parts.forEach(getBody);
               }
@@ -214,7 +228,7 @@ serve(async (req) => {
               continue;
             }
 
-            // Insert email
+            // Insert email with enhanced fields
             const emailPayload = {
               account_id: account.id,
               tenant_id: account.tenant_id ?? null,
@@ -249,6 +263,17 @@ serve(async (req) => {
               opportunity_id: null,
               sent_at: null,
               received_at: new Date(date).toISOString(),
+              // New enhanced fields
+              priority,
+              importance,
+              in_reply_to: inReplyTo,
+              email_references: references,
+              size_bytes: msgData.sizeEstimate || null,
+              raw_headers: headers,
+              conversation_id: msgData.threadId,
+              internet_message_id: messageId,
+              has_inline_images: hasInlineImages,
+              last_sync_attempt: new Date().toISOString(),
             };
 
             const { error: insertError } = await supabase
@@ -257,12 +282,34 @@ serve(async (req) => {
 
             if (insertError) {
               console.error(`Error inserting email ${msgData.id}:`, insertError);
+              // Log sync error to database
+              await supabase.from("emails").upsert({
+                ...emailPayload,
+                sync_error: insertError.message,
+              }, { onConflict: 'message_id' });
             } else {
               syncedCount++;
               console.log(`Synced email: ${subject}`);
             }
           } catch (msgError: any) {
             console.error(`Error processing message ${msg.id}:`, msgError.message);
+            // Attempt to log the error
+            try {
+              await supabase.from("emails").insert({
+                account_id: account.id,
+                tenant_id: account.tenant_id ?? null,
+                franchise_id: account.franchise_id ?? null,
+                message_id: msg.id,
+                subject: "(Error Processing)",
+                from_email: "error@sync.local",
+                from_name: "Sync Error",
+                to_emails: [],
+                direction: "inbound",
+                status: "error",
+                sync_error: msgError.message,
+                last_sync_attempt: new Date().toISOString(),
+              });
+            } catch {}
           }
         }
       }
@@ -365,6 +412,10 @@ serve(async (req) => {
           "ConversationId",
           "ReceivedDateTime",
           "SentDateTime",
+          "Importance",
+          "Flag",
+          "InternetMessageId",
+          "InReplyTo",
         ].join(","),
         "$orderby": "ReceivedDateTime desc",
       }).toString();
@@ -414,6 +465,11 @@ serve(async (req) => {
 
           const receivedAt = m.ReceivedDateTime || new Date().toISOString();
           const sentAt = m.SentDateTime || null;
+          
+          // Extract Office 365 specific metadata
+          const priority = m.Importance?.toLowerCase() || 'normal';
+          const hasInlineImages = bodyHtml?.includes('cid:') || bodyHtml?.includes('data:image/') || false;
+          const internetMessageId = m.InternetMessageId || m.Id;
 
           // Check if exists
           const { data: existing } = await supabase
@@ -448,7 +504,7 @@ serve(async (req) => {
             direction: "inbound",
             status: "received",
             is_read: !!m.IsRead,
-            is_starred: false,
+            is_starred: m.Flag?.FlagStatus === "Flagged" || false,
             is_archived: false,
             is_spam: false,
             is_deleted: false,
@@ -461,16 +517,54 @@ serve(async (req) => {
             opportunity_id: null,
             sent_at: sentAt,
             received_at: receivedAt,
+            // Enhanced Office 365 fields
+            priority,
+            importance: priority,
+            in_reply_to: m.InReplyTo || null,
+            email_references: [],
+            size_bytes: null,
+            raw_headers: {
+              subject: m.Subject,
+              from: fromAddr,
+              importance: m.Importance,
+              conversationId: m.ConversationId,
+            },
+            conversation_id: m.ConversationId,
+            internet_message_id: internetMessageId,
+            has_inline_images: hasInlineImages,
+            last_sync_attempt: new Date().toISOString(),
           };
 
           const { error: insertErr } = await supabase.from("emails").insert(emailPayload);
           if (insertErr) {
             console.error("Error inserting Office365 email:", insertErr);
+            // Log sync error
+            await supabase.from("emails").upsert({
+              ...emailPayload,
+              sync_error: insertErr.message,
+            }, { onConflict: 'message_id' });
           } else {
             syncedCount++;
           }
         } catch (msgErr: any) {
           console.error("Error processing Office365 message:", msgErr?.message || msgErr);
+          // Attempt to log the error
+          try {
+            await supabase.from("emails").insert({
+              account_id: account.id,
+              tenant_id: account.tenant_id ?? null,
+              franchise_id: account.franchise_id ?? null,
+              message_id: m.Id,
+              subject: "(Error Processing)",
+              from_email: "error@sync.local",
+              from_name: "Sync Error",
+              to_emails: [],
+              direction: "inbound",
+              status: "error",
+              sync_error: msgErr?.message || String(msgErr),
+              last_sync_attempt: new Date().toISOString(),
+            });
+          } catch {}
         }
       }
     }

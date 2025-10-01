@@ -570,29 +570,40 @@ export type Database = {
           category: string | null
           cc_emails: Json | null
           contact_id: string | null
+          conversation_id: string | null
           created_at: string | null
           direction: string
+          email_references: string[] | null
           folder: string | null
           franchise_id: string | null
           from_email: string
           from_name: string | null
           has_attachments: boolean | null
+          has_inline_images: boolean | null
           id: string
+          importance: string | null
+          in_reply_to: string | null
+          internet_message_id: string | null
           is_archived: boolean | null
           is_deleted: boolean | null
           is_read: boolean | null
           is_spam: boolean | null
           is_starred: boolean | null
           labels: Json | null
+          last_sync_attempt: string | null
           lead_id: string | null
           message_id: string
           opportunity_id: string | null
+          priority: string | null
+          raw_headers: Json | null
           received_at: string | null
           reply_to: string | null
           sent_at: string | null
+          size_bytes: number | null
           snippet: string | null
           status: string | null
           subject: string
+          sync_error: string | null
           tenant_id: string | null
           thread_id: string | null
           to_emails: Json
@@ -608,29 +619,40 @@ export type Database = {
           category?: string | null
           cc_emails?: Json | null
           contact_id?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           direction: string
+          email_references?: string[] | null
           folder?: string | null
           franchise_id?: string | null
           from_email: string
           from_name?: string | null
           has_attachments?: boolean | null
+          has_inline_images?: boolean | null
           id?: string
+          importance?: string | null
+          in_reply_to?: string | null
+          internet_message_id?: string | null
           is_archived?: boolean | null
           is_deleted?: boolean | null
           is_read?: boolean | null
           is_spam?: boolean | null
           is_starred?: boolean | null
           labels?: Json | null
+          last_sync_attempt?: string | null
           lead_id?: string | null
           message_id: string
           opportunity_id?: string | null
+          priority?: string | null
+          raw_headers?: Json | null
           received_at?: string | null
           reply_to?: string | null
           sent_at?: string | null
+          size_bytes?: number | null
           snippet?: string | null
           status?: string | null
           subject: string
+          sync_error?: string | null
           tenant_id?: string | null
           thread_id?: string | null
           to_emails?: Json
@@ -646,29 +668,40 @@ export type Database = {
           category?: string | null
           cc_emails?: Json | null
           contact_id?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           direction?: string
+          email_references?: string[] | null
           folder?: string | null
           franchise_id?: string | null
           from_email?: string
           from_name?: string | null
           has_attachments?: boolean | null
+          has_inline_images?: boolean | null
           id?: string
+          importance?: string | null
+          in_reply_to?: string | null
+          internet_message_id?: string | null
           is_archived?: boolean | null
           is_deleted?: boolean | null
           is_read?: boolean | null
           is_spam?: boolean | null
           is_starred?: boolean | null
           labels?: Json | null
+          last_sync_attempt?: string | null
           lead_id?: string | null
           message_id?: string
           opportunity_id?: string | null
+          priority?: string | null
+          raw_headers?: Json | null
           received_at?: string | null
           reply_to?: string | null
           sent_at?: string | null
+          size_bytes?: number | null
           snippet?: string | null
           status?: string | null
           subject?: string
+          sync_error?: string | null
           tenant_id?: string | null
           thread_id?: string | null
           to_emails?: Json
