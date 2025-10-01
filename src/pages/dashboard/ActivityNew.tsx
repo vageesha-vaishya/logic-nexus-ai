@@ -19,9 +19,9 @@ export default function ActivityNew() {
           ...formData,
           tenant_id: context.tenantId,
           franchise_id: context.franchiseId,
-          account_id: formData.account_id || null,
-          contact_id: formData.contact_id || null,
-          lead_id: formData.lead_id || null,
+          account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
+          contact_id: formData.contact_id === 'none' ? null : (formData.contact_id || null),
+          lead_id: formData.lead_id === 'none' ? null : (formData.lead_id || null),
         })
         .select()
         .single();
