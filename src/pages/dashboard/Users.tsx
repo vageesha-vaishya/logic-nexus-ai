@@ -8,10 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Users2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCRM } from '@/hooks/useCRM';
 
 export default function Users() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context } = useCRM();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,13 +23,34 @@ export default function Users() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select(`
           *,
           user_roles!user_id(role, tenant_id, franchise_id)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      // Apply filters based on user role
+      if (context.isTenantAdmin && context.tenantId) {
+        // Tenant admin can see all users in their tenant (including all franchises)
+        query = query.in('id', 
+          supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('tenant_id', context.tenantId)
+        );
+      } else if (context.isFranchiseAdmin && context.franchiseId) {
+        // Franchise admin can only see users in their franchise
+        query = query.in('id',
+          supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('franchise_id', context.franchiseId)
+        );
+      }
+      // Platform admin has no filters - can see all users
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setUsers(data || []);

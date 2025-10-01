@@ -2,23 +2,29 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCRM } from '@/hooks/useCRM';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   first_name: z.string().min(2, 'First name must be at least 2 characters'),
   last_name: z.string().min(2, 'Last name must be at least 2 characters'),
   phone: z.string().optional(),
   avatar_url: z.string().url().optional().or(z.literal('')),
   is_active: z.boolean().default(true),
   must_change_password: z.boolean().default(false),
+  role: z.enum(['platform_admin', 'tenant_admin', 'franchise_admin', 'user']),
+  tenant_id: z.string().optional(),
+  franchise_id: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
@@ -31,21 +37,76 @@ interface UserFormProps {
 export function UserForm({ user, onSuccess }: UserFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context } = useCRM();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<UserFormValues | null>(null);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>(user?.user_roles?.[0]?.role || '');
+  const [selectedTenantId, setSelectedTenantId] = useState<string>(user?.user_roles?.[0]?.tenant_id || '');
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
       email: user?.email || '',
+      password: '',
       first_name: user?.first_name || '',
       last_name: user?.last_name || '',
       phone: user?.phone || '',
       avatar_url: user?.avatar_url || '',
       is_active: user?.is_active ?? true,
       must_change_password: user?.must_change_password ?? false,
+      role: user?.user_roles?.[0]?.role || 'user',
+      tenant_id: user?.user_roles?.[0]?.tenant_id || '',
+      franchise_id: user?.user_roles?.[0]?.franchise_id || '',
     },
   });
+
+  useEffect(() => {
+    fetchTenants();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTenantId) {
+      fetchFranchises(selectedTenantId);
+    }
+  }, [selectedTenantId]);
+
+  const fetchTenants = async () => {
+    try {
+      let query = supabase.from('tenants').select('*').eq('is_active', true);
+      
+      if (context.isTenantAdmin && context.tenantId) {
+        query = query.eq('id', context.tenantId);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      setTenants(data || []);
+    } catch (error: any) {
+      console.error('Error fetching tenants:', error);
+    }
+  };
+
+  const fetchFranchises = async (tenantId: string) => {
+    try {
+      let query = supabase
+        .from('franchises')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true);
+      
+      if (context.isFranchiseAdmin && context.franchiseId) {
+        query = query.eq('id', context.franchiseId);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      setFranchises(data || []);
+    } catch (error: any) {
+      console.error('Error fetching franchises:', error);
+    }
+  };
 
   const handleFormSubmit = (values: UserFormValues) => {
     setPendingData(values);
@@ -63,12 +124,32 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   const onSubmit = async (values: UserFormValues) => {
     try {
       if (user) {
-        const { error } = await supabase
+        // Update profile
+        const { error: profileError } = await supabase
           .from('profiles')
-          .update(values)
+          .update({
+            first_name: values.first_name,
+            last_name: values.last_name,
+            phone: values.phone,
+            avatar_url: values.avatar_url,
+            is_active: values.is_active,
+            must_change_password: values.must_change_password,
+          })
           .eq('id', user.id);
 
-        if (error) throw error;
+        if (profileError) throw profileError;
+
+        // Update role if changed
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .update({
+            role: values.role,
+            tenant_id: values.tenant_id || null,
+            franchise_id: values.franchise_id || null,
+          })
+          .eq('user_id', user.id);
+
+        if (roleError) throw roleError;
 
         toast({
           title: 'Success',
@@ -76,13 +157,35 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         });
         onSuccess?.();
       } else {
-        // For new users, we'd typically create them via auth
-        // This is a simplified version - in production, you'd use proper user creation
-        toast({
-          title: 'Info',
-          description: 'User creation requires authentication setup',
-          variant: 'destructive',
+        // Create new user via edge function
+        if (!values.password) {
+          throw new Error('Password is required for new users');
+        }
+
+        const { data, error } = await supabase.functions.invoke('create-user', {
+          body: {
+            email: values.email,
+            password: values.password,
+            first_name: values.first_name,
+            last_name: values.last_name,
+            phone: values.phone,
+            avatar_url: values.avatar_url,
+            is_active: values.is_active,
+            role: values.role,
+            tenant_id: values.tenant_id || null,
+            franchise_id: values.franchise_id || null,
+          },
         });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        toast({
+          title: 'Success',
+          description: 'User created successfully. They will need to change their password on first login.',
+        });
+        
+        navigate('/dashboard/users');
       }
     } catch (error: any) {
       toast({
@@ -110,6 +213,22 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             </FormItem>
           )}
         />
+
+        {!user && (
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Temporary Password *</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Min 6 characters" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
@@ -211,8 +330,101 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
           )}
         />
 
+        <FormField
+          control={form.control}
+          name="role"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Role *</FormLabel>
+              <Select 
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  setSelectedRole(value);
+                }} 
+                defaultValue={field.value}
+                disabled={!context.isPlatformAdmin && field.value === 'platform_admin'}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {context.isPlatformAdmin && (
+                    <SelectItem value="platform_admin">Platform Admin</SelectItem>
+                  )}
+                  <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
+                  <SelectItem value="franchise_admin">Franchise Admin</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {(selectedRole === 'tenant_admin' || selectedRole === 'franchise_admin' || selectedRole === 'user') && (
+          <FormField
+            control={form.control}
+            name="tenant_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tenant *</FormLabel>
+                <Select 
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    setSelectedTenantId(value);
+                  }} 
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a tenant" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {tenants.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {(selectedRole === 'franchise_admin' || selectedRole === 'user') && selectedTenantId && (
+          <FormField
+            control={form.control}
+            name="franchise_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Franchise *</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a franchise" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {franchises.map((franchise) => (
+                      <SelectItem key={franchise.id} value={franchise.id}>
+                        {franchise.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="flex gap-4">
-          <Button type="submit" className="flex-1" disabled={!user}>
+          <Button type="submit" className="flex-1">
             {user ? 'Update' : 'Create'} User
           </Button>
           <Button
@@ -229,9 +441,10 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Update</AlertDialogTitle>
+            <AlertDialogTitle>Confirm {user ? 'Update' : 'Creation'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to update this user?
+              Are you sure you want to {user ? 'update' : 'create'} this user?
+              {!user && ' The user will be required to change their password on first login.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
