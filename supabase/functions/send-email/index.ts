@@ -55,7 +55,52 @@ serve(async (req) => {
     } else if (account.provider === "gmail") {
       // Use Gmail API
       console.log("Sending via Gmail API");
-      // TODO: Implement Gmail API integration
+      
+      // Create MIME email message
+      const toList = to.join(", ");
+      const ccList = cc ? cc.join(", ") : "";
+      const boundary = "boundary_" + Date.now();
+      
+      let message = [
+        `From: ${account.email_address}`,
+        `To: ${toList}`,
+        ccList ? `Cc: ${ccList}` : "",
+        `Subject: ${subject}`,
+        "MIME-Version: 1.0",
+        `Content-Type: text/plain; charset=UTF-8`,
+        "",
+        body
+      ].filter(line => line !== "").join("\r\n");
+
+      // Base64url encode the message
+      const encodedMessage = btoa(unescape(encodeURIComponent(message)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      // Send via Gmail API
+      const gmailResponse = await fetch(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${account.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            raw: encodedMessage,
+          }),
+        }
+      );
+
+      if (!gmailResponse.ok) {
+        const error = await gmailResponse.text();
+        console.error("Gmail API error:", error);
+        throw new Error(`Failed to send email via Gmail: ${error}`);
+      }
+
+      const gmailData = await gmailResponse.json();
+      messageId = gmailData.id || messageId;
       emailSent = true;
     } else if (account.provider === "office365") {
       // Use Microsoft Graph API
