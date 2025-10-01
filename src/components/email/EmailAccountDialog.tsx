@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
+import { initiateGoogleOAuth, initiateMicrosoftOAuth, handleOAuthCallback } from "@/lib/oauth";
 
 interface EmailAccountDialogProps {
   open: boolean;
@@ -33,6 +34,91 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { context } = useCRM();
+
+  // Handle OAuth callback on component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("code")) {
+      handleOAuthCallbackFlow();
+    }
+  }, []);
+
+  const handleOAuthCallbackFlow = async () => {
+    try {
+      const { code, provider } = await handleOAuthCallback();
+      
+      // Exchange code for tokens via edge function
+      const { data, error } = await supabase.functions.invoke("exchange-oauth-token", {
+        body: {
+          code,
+          provider,
+          userId: context.userId,
+          emailAddress,
+          displayName,
+          isPrimary,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Email account connected successfully",
+      });
+
+      // Clean up URL and close dialog
+      window.history.replaceState({}, document.title, window.location.pathname);
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGoogleConnect = async () => {
+    if (!emailAddress) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await initiateGoogleOAuth(context.userId);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMicrosoftConnect = async () => {
+    if (!emailAddress) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await initiateMicrosoftOAuth(context.userId);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (account) {
@@ -178,7 +264,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                 <Switch checked={isPrimary} onCheckedChange={setIsPrimary} />
                 <Label>Set as primary account</Label>
               </div>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={handleGoogleConnect}>
                 Connect with Google
               </Button>
             </div>
@@ -210,7 +296,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                 <Switch checked={isPrimary} onCheckedChange={setIsPrimary} />
                 <Label>Set as primary account</Label>
               </div>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={handleMicrosoftConnect}>
                 Connect with Microsoft
               </Button>
             </div>
