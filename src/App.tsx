@@ -23,6 +23,15 @@ import LeadDetail from "./pages/dashboard/LeadDetail";
 import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
 import Settings from "./pages/dashboard/Settings";
+import Tenants from "./pages/dashboard/Tenants";
+import TenantNew from "./pages/dashboard/TenantNew";
+import TenantDetail from "./pages/dashboard/TenantDetail";
+import Franchises from "./pages/dashboard/Franchises";
+import FranchiseNew from "./pages/dashboard/FranchiseNew";
+import FranchiseDetail from "./pages/dashboard/FranchiseDetail";
+import Users from "./pages/dashboard/Users";
+import UserNew from "./pages/dashboard/UserNew";
+import UserDetail from "./pages/dashboard/UserDetail";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +148,78 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/tenants" 
+              element={
+                <ProtectedRoute requiredRole="platform_admin">
+                  <Tenants />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/tenants/new" 
+              element={
+                <ProtectedRoute requiredRole="platform_admin">
+                  <TenantNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/tenants/:id" 
+              element={
+                <ProtectedRoute requiredRole="platform_admin">
+                  <TenantDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/franchises" 
+              element={
+                <ProtectedRoute>
+                  <Franchises />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/franchises/new" 
+              element={
+                <ProtectedRoute>
+                  <FranchiseNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/franchises/:id" 
+              element={
+                <ProtectedRoute>
+                  <FranchiseDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/users" 
+              element={
+                <ProtectedRoute>
+                  <Users />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/users/new" 
+              element={
+                <ProtectedRoute>
+                  <UserNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/users/:id" 
+              element={
+                <ProtectedRoute>
+                  <UserDetail />
                 </ProtectedRoute>
               } 
             />
