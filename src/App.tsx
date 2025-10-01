@@ -12,9 +12,16 @@ import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import Accounts from "./pages/dashboard/Accounts";
+import AccountNew from "./pages/dashboard/AccountNew";
+import AccountDetail from "./pages/dashboard/AccountDetail";
 import Contacts from "./pages/dashboard/Contacts";
+import ContactNew from "./pages/dashboard/ContactNew";
+import ContactDetail from "./pages/dashboard/ContactDetail";
 import Leads from "./pages/dashboard/Leads";
+import LeadNew from "./pages/dashboard/LeadNew";
+import LeadDetail from "./pages/dashboard/LeadDetail";
 import Activities from "./pages/dashboard/Activities";
+import ActivityNew from "./pages/dashboard/ActivityNew";
 import Settings from "./pages/dashboard/Settings";
 
 const queryClient = new QueryClient();
@@ -48,10 +55,42 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/accounts/new" 
+              element={
+                <ProtectedRoute>
+                  <AccountNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/accounts/:id" 
+              element={
+                <ProtectedRoute>
+                  <AccountDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/contacts" 
               element={
                 <ProtectedRoute>
                   <Contacts />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/contacts/new" 
+              element={
+                <ProtectedRoute>
+                  <ContactNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/contacts/:id" 
+              element={
+                <ProtectedRoute>
+                  <ContactDetail />
                 </ProtectedRoute>
               } 
             />
@@ -64,10 +103,34 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/leads/new" 
+              element={
+                <ProtectedRoute>
+                  <LeadNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/leads/:id" 
+              element={
+                <ProtectedRoute>
+                  <LeadDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/activities" 
               element={
                 <ProtectedRoute>
                   <Activities />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/activities/new" 
+              element={
+                <ProtectedRoute>
+                  <ActivityNew />
                 </ProtectedRoute>
               } 
             />
