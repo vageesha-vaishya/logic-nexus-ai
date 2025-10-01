@@ -36,8 +36,9 @@ export function EmailInbox() {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [showCompose, setShowCompose] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
-
+ 
   const fetchEmails = async () => {
     try {
       setLoading(true);
@@ -130,6 +131,47 @@ export function EmailInbox() {
     }
   };
 
+  const syncEmails = async () => {
+    try {
+      setSyncing(true);
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+
+      const { data: accounts, error: accErr } = await supabase
+        .from("email_accounts")
+        .select("id, is_primary")
+        .eq("user_id", userId)
+        .order("is_primary", { ascending: false })
+        .limit(1);
+      if (accErr) throw accErr;
+      if (!accounts || accounts.length === 0) {
+        toast({
+          title: "No email account",
+          description: "Please add an email account first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const accountId = accounts[0].id as string;
+      const { data, error } = await supabase.functions.invoke("sync-emails", {
+        body: { accountId },
+      });
+      if (error) throw error as any;
+      toast({
+        title: "Synced",
+        description: data?.message || "Email sync complete.",
+      });
+      await fetchEmails();
+    } catch (error: any) {
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleEmailClick = (email: Email) => {
     setSelectedEmail(email);
     setShowDetail(true);
@@ -165,6 +207,10 @@ export function EmailInbox() {
           <Button variant="outline" size="sm" onClick={fetchEmails}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={syncEmails} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            Sync
           </Button>
           <Button size="sm" onClick={() => setShowCompose(true)}>
             <Plus className="w-4 h-4 mr-2" />
