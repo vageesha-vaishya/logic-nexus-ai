@@ -183,26 +183,7 @@ export function EmailInbox() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search emails..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Tabs value={selectedFolder} onValueChange={setSelectedFolder}>
-            <TabsList>
-              <TabsTrigger value="inbox">Inbox</TabsTrigger>
-              <TabsTrigger value="sent">Sent</TabsTrigger>
-              <TabsTrigger value="drafts">Drafts</TabsTrigger>
-              <TabsTrigger value="archive">Archive</TabsTrigger>
-              <TabsTrigger value="trash">Trash</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        <h2 className="text-lg font-semibold">Email Inbox</h2>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={fetchEmails}>
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -217,6 +198,27 @@ export function EmailInbox() {
             Compose
           </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search emails..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Tabs value={selectedFolder} onValueChange={setSelectedFolder}>
+          <TabsList>
+            <TabsTrigger value="inbox">Inbox</TabsTrigger>
+            <TabsTrigger value="sent">Sent</TabsTrigger>
+            <TabsTrigger value="drafts">Drafts</TabsTrigger>
+            <TabsTrigger value="archive">Archive</TabsTrigger>
+            <TabsTrigger value="trash">Trash</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <Card>
