@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-logistics.jpg";
 
 export const HeroSection = () => {
@@ -40,16 +41,23 @@ export const HeroSection = () => {
             <Button 
               size="lg" 
               className="bg-gradient-primary hover:shadow-primary transition-all duration-300 group"
+              asChild
             >
-              Get Started
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <Link to="/auth">
+                Sign In
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </Button>
             <Button 
               size="lg" 
               variant="outline"
               className="border-primary/30 hover:bg-primary/10 transition-all"
+              asChild
             >
-              Watch Demo
+              <Link to="/setup-admin">
+                <Shield className="mr-2 w-4 h-4" />
+                Setup Admin
+              </Link>
             </Button>
           </div>
 
