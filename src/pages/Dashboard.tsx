@@ -1,33 +1,84 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, UserPlus, CheckSquare } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+interface DashboardStats {
+  accounts: number;
+  leads: number;
+  contacts: number;
+  activities: number;
+}
 
 export default function Dashboard() {
-  const stats = [
+  const [stats, setStats] = useState<DashboardStats>({
+    accounts: 0,
+    leads: 0,
+    contacts: 0,
+    activities: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      
+      const [accountsResult, leadsResult, contactsResult, activitiesResult] = await Promise.all([
+        supabase.from('accounts').select('*', { count: 'exact', head: true }),
+        supabase.from('leads').select('*', { count: 'exact', head: true }),
+        supabase.from('contacts').select('*', { count: 'exact', head: true }),
+        supabase.from('activities').select('*', { count: 'exact', head: true })
+      ]);
+
+      setStats({
+        accounts: accountsResult.count || 0,
+        leads: leadsResult.count || 0,
+        contacts: contactsResult.count || 0,
+        activities: activitiesResult.count || 0
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load dashboard statistics',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statCards = [
     {
       title: 'Total Accounts',
-      value: '0',
+      value: loading ? '-' : stats.accounts.toString(),
       icon: Building2,
       change: '+0%',
       trend: 'up'
     },
     {
       title: 'Active Leads',
-      value: '0',
+      value: loading ? '-' : stats.leads.toString(),
       icon: UserPlus,
       change: '+0%',
       trend: 'up'
     },
     {
       title: 'Contacts',
-      value: '0',
+      value: loading ? '-' : stats.contacts.toString(),
       icon: Users,
       change: '+0%',
       trend: 'up'
     },
     {
       title: 'Activities',
-      value: '0',
+      value: loading ? '-' : stats.activities.toString(),
       icon: CheckSquare,
       change: '+0%',
       trend: 'up'
@@ -43,7 +94,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => {
+          {statCards.map((stat) => {
             const Icon = stat.icon;
             return (
               <Card key={stat.title}>
