@@ -385,7 +385,7 @@ export type Database = {
           smtp_use_tls: boolean | null
           smtp_username: string | null
           sync_frequency: number | null
-          tenant_id: string
+          tenant_id: string | null
           token_expires_at: string | null
           updated_at: string | null
           user_id: string
@@ -415,7 +415,7 @@ export type Database = {
           smtp_use_tls?: boolean | null
           smtp_username?: string | null
           sync_frequency?: number | null
-          tenant_id: string
+          tenant_id?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id: string
@@ -445,7 +445,7 @@ export type Database = {
           smtp_use_tls?: boolean | null
           smtp_username?: string | null
           sync_frequency?: number | null
-          tenant_id?: string
+          tenant_id?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id?: string
