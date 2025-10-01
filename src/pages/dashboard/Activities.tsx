@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Phone, Mail, Calendar, CheckSquare, FileText } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Calendar, CheckSquare, FileText, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
 
 interface Activity {
   id: string;
@@ -18,14 +19,20 @@ interface Activity {
   subject: string;
   description: string | null;
   due_date: string | null;
+  completed_at: string | null;
   created_at: string;
+  account_id: string | null;
+  contact_id: string | null;
+  lead_id: string | null;
 }
 
 export default function Activities() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
   const { supabase } = useCRM();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchActivities();
@@ -48,9 +55,77 @@ export default function Activities() {
     }
   };
 
-  const filteredActivities = activities.filter(activity =>
+  const handleMarkComplete = async (activityId: string) => {
+    try {
+      const { error } = await supabase
+        .from('activities')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', activityId);
+
+      if (error) throw error;
+
+      toast.success('Activity marked as completed');
+      fetchActivities();
+    } catch (error: any) {
+      toast.error('Failed to update activity');
+      console.error('Error:', error);
+    }
+  };
+
+  const filterActivitiesByTab = (activities: Activity[]) => {
+    const now = startOfDay(new Date());
+    
+    switch (activeTab) {
+      case 'overdue':
+        return activities.filter(
+          a => a.status !== 'completed' && a.status !== 'cancelled' && 
+          a.due_date && isPast(new Date(a.due_date)) && !isToday(new Date(a.due_date))
+        );
+      case 'today':
+        return activities.filter(
+          a => a.status !== 'completed' && a.status !== 'cancelled' &&
+          a.due_date && isToday(new Date(a.due_date))
+        );
+      case 'upcoming':
+        return activities.filter(
+          a => a.status !== 'completed' && a.status !== 'cancelled' &&
+          a.due_date && isFuture(new Date(a.due_date)) && !isToday(new Date(a.due_date))
+        );
+      case 'completed':
+        return activities.filter(a => a.status === 'completed');
+      default:
+        return activities;
+    }
+  };
+
+  const filteredActivities = filterActivitiesByTab(activities).filter(activity =>
     activity.subject.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getTabCounts = () => {
+    const now = startOfDay(new Date());
+    return {
+      all: activities.length,
+      overdue: activities.filter(
+        a => a.status !== 'completed' && a.status !== 'cancelled' &&
+        a.due_date && isPast(new Date(a.due_date)) && !isToday(new Date(a.due_date))
+      ).length,
+      today: activities.filter(
+        a => a.status !== 'completed' && a.status !== 'cancelled' &&
+        a.due_date && isToday(new Date(a.due_date))
+      ).length,
+      upcoming: activities.filter(
+        a => a.status !== 'completed' && a.status !== 'cancelled' &&
+        a.due_date && isFuture(new Date(a.due_date)) && !isToday(new Date(a.due_date))
+      ).length,
+      completed: activities.filter(a => a.status === 'completed').length,
+    };
+  };
+
+  const counts = getTabCounts();
 
   const getActivityIcon = (type: string) => {
     const icons: Record<string, any> = {
@@ -99,15 +174,70 @@ export default function Activities() {
         </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search activities..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search activities..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="all" className="relative">
+                All
+                {counts.all > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                    {counts.all}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="overdue" className="relative">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                Overdue
+                {counts.overdue > 0 && (
+                  <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-xs">
+                    {counts.overdue}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="today" className="relative">
+                <Clock className="h-4 w-4 mr-1" />
+                Today
+                {counts.today > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                    {counts.today}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="upcoming" className="relative">
+                Upcoming
+                {counts.upcoming > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                    {counts.upcoming}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="relative">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Completed
+                {counts.completed > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                    {counts.completed}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <div className="text-center py-12">
@@ -135,16 +265,31 @@ export default function Activities() {
         <div className="space-y-4">
           {filteredActivities.map((activity) => {
             const Icon = getActivityIcon(activity.activity_type);
+            const isOverdue = activity.status !== 'completed' && activity.status !== 'cancelled' &&
+              activity.due_date && isPast(new Date(activity.due_date)) && !isToday(new Date(activity.due_date));
+            
             return (
-              <Card key={activity.id} className="hover:shadow-md transition-shadow">
+              <Card 
+                key={activity.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
                       <div className="p-2 rounded-lg bg-primary/10">
                         <Icon className="h-5 w-5 text-primary" />
                       </div>
-                      <div className="space-y-1">
-                        <CardTitle className="text-lg">{activity.subject}</CardTitle>
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">{activity.subject}</CardTitle>
+                          {isOverdue && (
+                            <Badge variant="destructive" className="text-xs">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Overdue
+                            </Badge>
+                          )}
+                        </div>
                         {activity.description && (
                           <CardDescription className="line-clamp-2">
                             {activity.description}
@@ -152,7 +297,7 @@ export default function Activities() {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap justify-end">
                       <Badge className={getStatusColor(activity.status)}>
                         {activity.status.replace('_', ' ')}
                       </Badge>
@@ -163,18 +308,33 @@ export default function Activities() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      {activity.due_date ? (
-                        <span>{format(new Date(activity.due_date), 'MMM dd, yyyy')}</span>
-                      ) : (
-                        <span>No due date</span>
-                      )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {activity.due_date ? (
+                          <span>{format(new Date(activity.due_date), 'MMM dd, yyyy HH:mm')}</span>
+                        ) : (
+                          <span>No due date</span>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {activity.activity_type}
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {activity.activity_type}
-                    </Badge>
+                    {activity.status !== 'completed' && activity.status !== 'cancelled' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkComplete(activity.id);
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Mark Complete
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

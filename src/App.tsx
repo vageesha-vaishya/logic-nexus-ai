@@ -22,6 +22,7 @@ import LeadNew from "./pages/dashboard/LeadNew";
 import LeadDetail from "./pages/dashboard/LeadDetail";
 import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
+import ActivityDetail from "./pages/dashboard/ActivityDetail";
 import Settings from "./pages/dashboard/Settings";
 import Tenants from "./pages/dashboard/Tenants";
 import TenantNew from "./pages/dashboard/TenantNew";
@@ -144,6 +145,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ActivityNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/activities/:id" 
+              element={
+                <ProtectedRoute>
+                  <ActivityDetail />
                 </ProtectedRoute>
               } 
             />
