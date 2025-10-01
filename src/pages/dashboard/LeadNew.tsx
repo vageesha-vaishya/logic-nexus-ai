@@ -20,6 +20,7 @@ export default function LeadNew() {
           tenant_id: context.tenantId,
           franchise_id: context.franchiseId,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
+          expected_close_date: formData.expected_close_date || null,
         })
         .select()
         .single();
