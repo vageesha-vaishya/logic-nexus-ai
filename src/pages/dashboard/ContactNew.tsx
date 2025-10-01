@@ -13,12 +13,19 @@ export default function ContactNew() {
 
   const handleCreate = async (formData: any) => {
     try {
+      const tenant_id = context.isPlatformAdmin ? formData.tenant_id : context.tenantId;
+      
+      if (!tenant_id) {
+        toast.error('Tenant is required');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('contacts')
         .insert({
           ...formData,
-          tenant_id: context.tenantId,
-          franchise_id: context.franchiseId,
+          tenant_id,
+          franchise_id: formData.franchise_id || context.franchiseId,
           account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
         })
         .select()

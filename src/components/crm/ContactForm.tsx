@@ -23,6 +23,8 @@ const contactSchema = z.object({
   account_id: z.string().optional(),
   is_primary: z.boolean().default(false),
   notes: z.string().optional(),
+  tenant_id: z.string().optional(),
+  franchise_id: z.string().optional(),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -34,8 +36,10 @@ interface ContactFormProps {
 }
 
 export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProps) {
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<ContactFormData | null>(null);
 
@@ -52,12 +56,20 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
       account_id: initialData?.account_id || '',
       is_primary: initialData?.is_primary || false,
       notes: initialData?.notes || '',
+      tenant_id: initialData?.tenant_id || '',
+      franchise_id: initialData?.franchise_id || '',
     },
   });
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+    if (context.isPlatformAdmin) {
+      fetchTenants();
+    }
+    if (context.isPlatformAdmin || context.isTenantAdmin) {
+      fetchFranchises();
+    }
+  }, [context]);
 
   const fetchAccounts = async () => {
     const { data } = await supabase
@@ -65,6 +77,29 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
       .select('id, name')
       .order('name');
     if (data) setAccounts(data);
+  };
+
+  const fetchTenants = async () => {
+    const { data } = await supabase
+      .from('tenants')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    if (data) setTenants(data);
+  };
+
+  const fetchFranchises = async () => {
+    let query = supabase
+      .from('franchises')
+      .select('id, name, code')
+      .eq('is_active', true);
+    
+    if (context.isTenantAdmin && context.tenantId) {
+      query = query.eq('tenant_id', context.tenantId);
+    }
+    
+    const { data } = await query.order('name');
+    if (data) setFranchises(data);
   };
 
   const { isSubmitting } = form.formState;
@@ -249,6 +284,60 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
               </FormItem>
             )}
           />
+
+          {context.isPlatformAdmin && (
+            <FormField
+              control={form.control}
+              name="tenant_id"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Tenant *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select tenant" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {tenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {(context.isPlatformAdmin || context.isTenantAdmin) && franchises.length > 0 && (
+            <FormField
+              control={form.control}
+              name="franchise_id"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Franchise (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select franchise" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {franchises.map((franchise) => (
+                        <SelectItem key={franchise.id} value={franchise.id}>
+                          {franchise.code} - {franchise.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
 
         <div className="flex justify-end gap-3">
