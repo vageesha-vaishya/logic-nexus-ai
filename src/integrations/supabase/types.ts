@@ -593,7 +593,7 @@ export type Database = {
           snippet: string | null
           status: string | null
           subject: string
-          tenant_id: string
+          tenant_id: string | null
           thread_id: string | null
           to_emails: Json
           updated_at: string | null
@@ -631,7 +631,7 @@ export type Database = {
           snippet?: string | null
           status?: string | null
           subject: string
-          tenant_id: string
+          tenant_id?: string | null
           thread_id?: string | null
           to_emails?: Json
           updated_at?: string | null
@@ -669,7 +669,7 @@ export type Database = {
           snippet?: string | null
           status?: string | null
           subject?: string
-          tenant_id?: string
+          tenant_id?: string | null
           thread_id?: string | null
           to_emails?: Json
           updated_at?: string | null
