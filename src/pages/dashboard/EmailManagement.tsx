@@ -22,7 +22,7 @@ export default function EmailManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="flex flex-wrap items-center gap-2">
             <TabsTrigger value="inbox" className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
               <span>Inbox</span>

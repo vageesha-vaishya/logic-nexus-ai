@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
 import { format } from "date-fns";
@@ -38,26 +39,43 @@ export function EmailInbox() {
   const [showDetail, setShowDetail] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
+  const { roles } = useAuth();
+
+  const getTenantId = () => {
+    const tenantAdmin = roles.find((r) => r.role === "tenant_admin" && r.tenant_id);
+    return tenantAdmin?.tenant_id || roles.find((r) => r.tenant_id)?.tenant_id || null;
+  };
  
   const fetchEmails = async () => {
     try {
       setLoading(true);
-      
-      let query = supabase
-        .from("emails")
-        .select("*")
-        .eq("folder", selectedFolder)
-        .order("received_at", { ascending: false })
-        .limit(50);
 
-      if (searchQuery) {
-        query = query.or(`subject.ilike.%${searchQuery}%,from_email.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%`);
+      const looksLikeEmail = /@/.test(searchQuery.trim());
+      const tenantId = getTenantId();
+
+      if (searchQuery && looksLikeEmail) {
+        const direction = selectedFolder === "inbox" ? "inbound" : selectedFolder === "sent" ? "outbound" : undefined;
+        const { data, error } = await supabase.functions.invoke("search-emails", {
+          body: { email: searchQuery.trim(), tenantId, direction, page: 1, pageSize: 50 },
+        });
+        if (error) throw error as any;
+        setEmails((data?.data as Email[]) || []);
+      } else {
+        let query = supabase
+          .from("emails")
+          .select("*")
+          .eq("folder", selectedFolder)
+          .order("received_at", { ascending: false })
+          .limit(50);
+
+        if (searchQuery) {
+          query = query.or(`subject.ilike.%${searchQuery}%,from_email.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setEmails(data || []);
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setEmails(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -172,6 +190,26 @@ export function EmailInbox() {
     }
   };
 
+  const syncAllMailboxes = async () => {
+    try {
+      setSyncing(true);
+      const tenantId = getTenantId();
+      if (!tenantId) {
+        throw new Error("No tenant found for current user");
+      }
+      const { data, error } = await supabase.functions.invoke("sync-all-mailboxes", {
+        body: { tenantId, limit: 100 },
+      });
+      if (error) throw error as any;
+      toast({ title: "Sync triggered", description: `Processed ${data?.accountsProcessed || 0} accounts` });
+      await fetchEmails();
+    } catch (error: any) {
+      toast({ title: "Sync all failed", description: error.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleEmailClick = (email: Email) => {
     setSelectedEmail(email);
     setShowDetail(true);
@@ -192,6 +230,10 @@ export function EmailInbox() {
           <Button variant="outline" size="sm" onClick={syncEmails} disabled={syncing}>
             <RefreshCw className={`w-4 h-4 sm:mr-2 ${syncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Sync</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={syncAllMailboxes} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 sm:mr-2 ${syncing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Sync All</span>
           </Button>
           <Button size="sm" onClick={() => setShowCompose(true)}>
             <Plus className="w-4 h-4 sm:mr-2" />
@@ -240,7 +282,7 @@ export function EmailInbox() {
                 key={email.id}
                 className={`p-4 hover:bg-accent/5 cursor-pointer transition-colors ${
                   !email.is_read ? "bg-primary/5" : ""
-                }`}
+                } overflow-x-hidden`}
                 onClick={() => handleEmailClick(email)}
               >
                 <div className="flex items-start gap-4">
@@ -262,8 +304,8 @@ export function EmailInbox() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${!email.is_read ? "font-bold" : ""}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`font-medium ${!email.is_read ? "font-bold" : ""} truncate`}>
                           {email.from_name || email.from_email}
                         </span>
                         {email.has_attachments && (
@@ -275,7 +317,7 @@ export function EmailInbox() {
                       </span>
                     </div>
 
-                    <div className={`text-sm mb-1 ${!email.is_read ? "font-semibold" : ""}`}>
+                    <div className={`text-sm mb-1 ${!email.is_read ? "font-semibold" : ""} truncate`}> 
                       {email.subject}
                     </div>
 
@@ -294,7 +336,7 @@ export function EmailInbox() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"

@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Reply, Forward, Archive, Trash2, Star, Paperclip } from "lucide-react";
+import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
@@ -30,6 +30,16 @@ interface EmailDetailDialogProps {
 
 export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: EmailDetailDialogProps) {
   const [showReply, setShowReply] = useState(false);
+  const [showFullBody, setShowFullBody] = useState(false);
+  const [showFullDetails, setShowFullDetails] = useState(false);
+  const clampStyle = showFullBody
+    ? {}
+    : {
+        display: "-webkit-box",
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: "vertical" as const,
+        overflow: "hidden",
+      };
 
   return (
     <>
@@ -38,8 +48,8 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <DialogTitle className="text-2xl mb-2">{email.subject}</DialogTitle>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <DialogTitle className="text-2xl mb-2 break-words overflow-x-hidden">{email.subject}</DialogTitle>
+                <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
                   <span className="font-medium">{email.from_name || email.from_email}</span>
                   <span>•</span>
                   <span>{format(new Date(email.received_at), "MMM d, yyyy 'at' h:mm a")}</span>
@@ -56,20 +66,58 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
           <Separator />
 
           {email.labels && email.labels.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              {email.labels.map((label, idx) => (
-                <Badge key={idx} variant="outline">
-                  {label}
-                </Badge>
-              ))}
+            <div className={showFullDetails ? "flex gap-2 flex-wrap" : "relative max-h-12 overflow-hidden"}>
+              <div className="flex gap-2 flex-wrap">
+                {email.labels.map((label, idx) => (
+                  <Badge key={idx} variant="outline">
+                    {label}
+                  </Badge>
+                ))}
+              </div>
+              {!showFullDetails && (
+                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent" />
+              )}
             </div>
           )}
 
-          <div className="prose prose-sm max-w-none">
+          {email.labels && email.labels.length > 6 && (
+            <div className="mt-2 flex justify-end">
+              {showFullDetails ? (
+                <Button variant="ghost" size="sm" onClick={() => setShowFullDetails(false)}>
+                  <ChevronUp className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setShowFullDetails(true)}>
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className={showFullBody ? "email-content prose prose-sm max-w-none break-words overflow-x-hidden" : "email-content prose prose-sm max-w-none break-words overflow-x-hidden relative"}>
             {email.body_html ? (
-              <div dangerouslySetInnerHTML={{ __html: email.body_html }} />
+              <div style={clampStyle} dangerouslySetInnerHTML={{ __html: email.body_html }} />
+            ) : showFullBody ? (
+              <pre className="whitespace-pre-wrap font-sans break-words overflow-x-hidden">{email.body_text}</pre>
             ) : (
-              <pre className="whitespace-pre-wrap font-sans">{email.body_text}</pre>
+              <div className="font-sans" style={{ whiteSpace: "pre-wrap", ...clampStyle }}>
+                {email.body_text}
+              </div>
+            )}
+            {!showFullBody && (
+              <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent" />
+            )}
+          </div>
+
+          <div className="mt-2 flex justify-end">
+            {showFullBody ? (
+              <Button variant="ghost" size="sm" onClick={() => setShowFullBody(false)}>
+                <ChevronUp className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => setShowFullBody(true)}>
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
             )}
           </div>
 

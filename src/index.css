@@ -112,6 +112,32 @@ All colors MUST be HSL.
   }
 }
 
+/* Email content hardening to prevent horizontal overflow and ensure responsive HTML */
+@layer components {
+  .email-content {
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .email-content img {
+    max-width: 100%;
+    height: auto;
+  }
+  .email-content table {
+    width: 100%;
+    display: block;
+    overflow-x: auto;
+  }
+  .email-content pre,
+  .email-content code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .email-content a {
+    word-break: break-all;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -222,9 +222,9 @@ serve(async (req) => {
               message_id: msgData.id,
               thread_id: msgData.threadId,
               subject,
-              from_email: from.match(/<(.+)>/)?.[1] || from,
+              from_email: (from.match(/<(.+)>/)?.[1] || from).toLowerCase(),
               from_name: from.replace(/<.+>/, "").trim(),
-              to_emails: [{ email: to.match(/<(.+)>/)?.[1] || to }],
+              to_emails: [{ email: (to.match(/<(.+)>/)?.[1] || to).toLowerCase() }],
               cc_emails: [],
               bcc_emails: [],
               reply_to: headers["reply-to"] || null,
@@ -267,10 +267,212 @@ serve(async (req) => {
         }
       }
     } else if (account.provider === "office365") {
-      // Use Microsoft Graph API
-      console.log("Syncing via Microsoft Graph API");
-      // TODO: Implement Microsoft Graph API integration
-      syncedCount = 0;
+      // Use Microsoft Outlook REST API (v2.0) with OAuth v2 tokens
+      console.log("Syncing via Office365 (Outlook API) for:", account.email_address);
+
+      const refreshOfficeToken = async (): Promise<{ accessToken?: string }> => {
+        try {
+          if (!account.refresh_token) {
+            console.warn("No refresh token available for Office365 account");
+            return {};
+          }
+
+          const { data: oauthCfg, error: oauthErr } = await supabase
+            .from("oauth_configurations")
+            .select("client_id, client_secret, tenant_id_provider")
+            .eq("provider", "office365")
+            .eq("user_id", account.user_id)
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (oauthErr || !oauthCfg) {
+            console.error("OAuth configuration not found for Office365 refresh:", oauthErr);
+            return {};
+          }
+
+          const tenant = oauthCfg.tenant_id_provider || "common";
+          const tokenResp = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: oauthCfg.client_id,
+              client_secret: oauthCfg.client_secret,
+              grant_type: "refresh_token",
+              refresh_token: account.refresh_token!,
+              scope: [
+                "https://outlook.office.com/Mail.Read",
+                "https://outlook.office.com/Mail.ReadWrite",
+                "offline_access",
+              ].join(" "),
+            }),
+          });
+
+          if (!tokenResp.ok) {
+            const t = await tokenResp.text();
+            console.error("Failed to refresh Office365 access token:", t);
+            return {};
+          }
+
+          const tData = await tokenResp.json();
+          const accessToken = tData.access_token as string;
+
+          // Persist updated token and expiry
+          await supabase
+            .from("email_accounts")
+            .update({
+              access_token: accessToken,
+              token_expires_at: new Date(Date.now() + (tData.expires_in ?? 3600) * 1000).toISOString(),
+            })
+            .eq("id", account.id);
+
+          return { accessToken };
+        } catch (e) {
+          console.error("Office365 token refresh error", e);
+          return {};
+        }
+      };
+
+      // Ensure we have a valid token (refresh if expired/missing)
+      let officeToken = account.access_token as string | undefined;
+      if (!officeToken || (account.token_expires_at && new Date(account.token_expires_at) < new Date())) {
+        const { accessToken } = await refreshOfficeToken();
+        officeToken = accessToken || officeToken;
+        if (!officeToken) {
+          throw new Error("No access token available for Office365 account");
+        }
+      }
+
+      // List messages from Inbox using Outlook REST API
+      // Using select to reduce payload; adjust as needed
+      const baseUrl = "https://outlook.office.com/api/v2.0/me/messages";
+      const query = new URLSearchParams({
+        "$top": "20",
+        "$select": [
+          "Id",
+          "Subject",
+          "From",
+          "Sender",
+          "ToRecipients",
+          "CcRecipients",
+          "BccRecipients",
+          "BodyPreview",
+          "Body",
+          "HasAttachments",
+          "IsRead",
+          "Categories",
+          "ConversationId",
+          "ReceivedDateTime",
+          "SentDateTime",
+        ].join(","),
+        "$orderby": "ReceivedDateTime desc",
+      }).toString();
+
+      const listUrl = `${baseUrl}?${query}`;
+      let listRes = await fetch(listUrl, {
+        headers: { Authorization: `Bearer ${officeToken}` },
+      });
+
+      if (!listRes.ok) {
+        const errTxt = await listRes.text();
+        console.error("Office365 list error:", errTxt);
+        if (listRes.status === 401) {
+          const { accessToken } = await refreshOfficeToken();
+          if (accessToken) {
+            officeToken = accessToken;
+            listRes = await fetch(listUrl, {
+              headers: { Authorization: `Bearer ${officeToken}` },
+            });
+          }
+        }
+      }
+
+      if (!listRes.ok) {
+        const errTxt = await listRes.text();
+        throw new Error(`Office365 API error: ${listRes.status} - ${errTxt}`);
+      }
+
+      const listJson = await listRes.json();
+      const messages = listJson.value || [];
+      console.log(`Found ${messages.length} Office365 messages`);
+
+      for (const m of messages) {
+        try {
+          const subject = m.Subject || "(No Subject)";
+          const fromAddr = m.From?.EmailAddress?.Address || m.Sender?.EmailAddress?.Address || "";
+          const fromName = m.From?.EmailAddress?.Name || m.Sender?.EmailAddress?.Name || fromAddr;
+
+          const toRecipients = (m.ToRecipients || []).map((r: any) => ({ email: r.EmailAddress?.Address || "" }));
+          const ccRecipients = (m.CcRecipients || []).map((r: any) => ({ email: r.EmailAddress?.Address || "" }));
+          const bccRecipients = (m.BccRecipients || []).map((r: any) => ({ email: r.EmailAddress?.Address || "" }));
+
+          const bodyContentType = m.Body?.ContentType || "Text";
+          const bodyContent = m.Body?.Content || "";
+          const bodyText = bodyContentType === "HTML" ? bodyContent.replace(/<[^>]*>/g, "") : bodyContent;
+          const bodyHtml = bodyContentType === "HTML" ? bodyContent : bodyContent;
+
+          const receivedAt = m.ReceivedDateTime || new Date().toISOString();
+          const sentAt = m.SentDateTime || null;
+
+          // Check if exists
+          const { data: existing } = await supabase
+            .from("emails")
+            .select("id")
+            .eq("message_id", m.Id)
+            .eq("account_id", account.id)
+            .single();
+
+          if (existing) {
+            continue;
+          }
+
+          const emailPayload = {
+            account_id: account.id,
+            tenant_id: account.tenant_id ?? null,
+            franchise_id: account.franchise_id ?? null,
+            message_id: m.Id,
+            thread_id: m.ConversationId ?? null,
+            subject,
+            from_email: fromAddr,
+            from_name: fromName,
+            to_emails: toRecipients,
+            cc_emails: ccRecipients,
+            bcc_emails: bccRecipients,
+            reply_to: null,
+            body_text: bodyText,
+            body_html: bodyHtml,
+            snippet: m.BodyPreview || "",
+            has_attachments: !!m.HasAttachments,
+            attachments: [],
+            direction: "inbound",
+            status: "received",
+            is_read: !!m.IsRead,
+            is_starred: false,
+            is_archived: false,
+            is_spam: false,
+            is_deleted: false,
+            folder: "inbox",
+            labels: Array.isArray(m.Categories) ? m.Categories : [],
+            category: null,
+            lead_id: null,
+            contact_id: null,
+            account_id_crm: null,
+            opportunity_id: null,
+            sent_at: sentAt,
+            received_at: receivedAt,
+          };
+
+          const { error: insertErr } = await supabase.from("emails").insert(emailPayload);
+          if (insertErr) {
+            console.error("Error inserting Office365 email:", insertErr);
+          } else {
+            syncedCount++;
+          }
+        } catch (msgErr: any) {
+          console.error("Error processing Office365 message:", msgErr?.message || msgErr);
+        }
+      }
     }
 
     console.log(`Total emails synced: ${syncedCount}`);
