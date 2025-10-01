@@ -9,7 +9,9 @@ import { LeadForm } from '@/components/crm/LeadForm';
 import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
 import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
-import { ArrowLeft, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch } from 'lucide-react';
+import { ManualAssignment } from '@/components/assignment/ManualAssignment';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -23,6 +25,7 @@ export default function LeadDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showConversionDialog, setShowConversionDialog] = useState(false);
+  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
 
   useEffect(() => {
     if (id) fetchLead();
@@ -135,6 +138,30 @@ export default function LeadDetail() {
           </div>
           {!isEditing && !lead.converted_at && (
             <div className="flex gap-2">
+              <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <UsersIcon className="mr-2 h-4 w-4" />
+                    Assign Lead
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Assign Lead</DialogTitle>
+                    <DialogDescription>
+                      Manually assign this lead to a user
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ManualAssignment
+                    leadId={lead.id}
+                    currentOwnerId={lead.owner_id}
+                    onAssigned={() => {
+                      setShowAssignmentDialog(false);
+                      fetchLead();
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
               <Button onClick={() => setShowConversionDialog(true)}>
                 <GitBranch className="mr-2 h-4 w-4" />
                 Convert Lead

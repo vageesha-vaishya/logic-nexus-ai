@@ -1140,6 +1140,10 @@ export type Database = {
         Args: { lead_id: string }
         Returns: number
       }
+      decrement_user_lead_count: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: undefined
+      }
       get_user_franchise_id: {
         Args: { check_user_id: string }
         Returns: string
@@ -1154,6 +1158,10 @@ export type Database = {
           check_user_id: string
         }
         Returns: boolean
+      }
+      increment_user_lead_count: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: undefined
       }
       is_platform_admin: {
         Args: { check_user_id: string }

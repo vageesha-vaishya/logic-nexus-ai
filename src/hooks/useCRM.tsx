@@ -17,6 +17,7 @@ export function useCRM() {
       isUser: !!regularUser,
       tenantId: tenantAdmin?.tenant_id || franchiseAdmin?.tenant_id || regularUser?.tenant_id,
       franchiseId: franchiseAdmin?.franchise_id || regularUser?.franchise_id,
+      userId: user?.id,
     };
   };
 

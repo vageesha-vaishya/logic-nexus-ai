@@ -32,6 +32,7 @@ export function AppSidebar() {
   ];
 
   const adminItems = [
+    { title: 'Lead Assignment', url: '/dashboard/lead-assignment', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'] },
     { title: 'Lead Routing', url: '/dashboard/lead-routing', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'] },
     { title: 'Tenants', url: '/dashboard/tenants', icon: FileText, roles: ['platform_admin'] },
     { title: 'Franchises', url: '/dashboard/franchises', icon: Package, roles: ['platform_admin', 'tenant_admin'] },

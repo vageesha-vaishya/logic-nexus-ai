@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp, Upload } from 'lucide-react';
+import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp, Upload, Users as UsersIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +92,10 @@ export default function Leads() {
           <p className="text-muted-foreground">Track and convert potential customers</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/dashboard/lead-assignment')}>
+            <UsersIcon className="mr-2 h-4 w-4" />
+            Lead Assignment
+          </Button>
           <Button variant="outline" onClick={() => navigate('/dashboard/leads/import-export')}>
             <Upload className="mr-2 h-4 w-4" />
             Import / Export

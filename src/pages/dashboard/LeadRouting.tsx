@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Trash2, ArrowUpDown } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, Trash2, ArrowUpDown, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
@@ -20,6 +22,7 @@ interface AssignmentRule {
 }
 
 export default function LeadRouting() {
+  const navigate = useNavigate();
   const { supabase, context } = useCRM();
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -159,6 +162,21 @@ export default function LeadRouting() {
           <h1 className="text-3xl font-bold">Lead Routing</h1>
           <p className="text-muted-foreground">Configure automatic lead assignment rules</p>
         </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Looking for advanced assignment features? Check out the new{' '}
+            <Button
+              variant="link"
+              className="p-0 h-auto font-semibold"
+              onClick={() => navigate('/dashboard/lead-assignment')}
+            >
+              Lead Assignment
+            </Button>
+            {' '}module with territories, capacity management, and automated workflows.
+          </AlertDescription>
+        </Alert>
 
         <Card>
           <CardHeader>

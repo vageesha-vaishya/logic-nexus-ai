@@ -2,3 +2,6 @@ project_id = "pqptgpntbthrisnuwwzi"
 
 [functions.seed-platform-admin]
 verify_jwt = false
+
+[functions.process-lead-assignments]
+verify_jwt = true
