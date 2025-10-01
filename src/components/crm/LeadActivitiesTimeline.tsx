@@ -5,8 +5,18 @@ import { Button } from '@/components/ui/button';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Phone, Mail, Calendar, CheckCircle2, Clock } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Plus, Phone, Mail, Calendar, CheckCircle2, Clock, Pencil, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Activity {
   id: string;
@@ -25,8 +35,11 @@ interface LeadActivitiesTimelineProps {
 
 export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) {
   const { supabase } = useCRM();
+  const navigate = useNavigate();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchActivities();
@@ -89,6 +102,33 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
     }
   };
 
+  const handleDeleteClick = (activityId: string) => {
+    setActivityToDelete(activityId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!activityToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('activities')
+        .delete()
+        .eq('id', activityToDelete);
+
+      if (error) throw error;
+
+      toast.success('Activity deleted successfully');
+      setActivities(activities.filter(a => a.id !== activityToDelete));
+    } catch (error: any) {
+      toast.error('Failed to delete activity');
+      console.error('Error:', error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setActivityToDelete(null);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -107,11 +147,9 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
             <CardTitle>Activity Timeline</CardTitle>
             <CardDescription>Track all interactions with this lead</CardDescription>
           </div>
-          <Button asChild size="sm">
-            <Link to="/dashboard/activities/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Activity
-            </Link>
+          <Button size="sm" onClick={() => navigate(`/dashboard/activities/new?leadId=${leadId}`)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Activity
           </Button>
         </div>
       </CardHeader>
@@ -120,11 +158,9 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
           <div className="text-center py-8">
             <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
             <p className="text-muted-foreground">No activities recorded yet</p>
-            <Button asChild size="sm" className="mt-4">
-              <Link to="/dashboard/activities/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Log First Activity
-              </Link>
+            <Button size="sm" className="mt-4" onClick={() => navigate(`/dashboard/activities/new?leadId=${leadId}`)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Log First Activity
             </Button>
           </div>
         ) : (
@@ -153,13 +189,29 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
                         {format(new Date(activity.created_at), 'PPp')}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-start">
                       <Badge className={getStatusColor(activity.status)} variant="outline">
                         {activity.status}
                       </Badge>
                       <Badge className={getPriorityColor(activity.priority)} variant="outline">
                         {activity.priority}
                       </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteClick(activity.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                   {activity.due_date && (
@@ -180,6 +232,21 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this activity? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

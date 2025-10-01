@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,10 @@ import { toast } from 'sonner';
 
 export default function ActivityNew() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { supabase, context } = useCRM();
+  
+  const leadId = searchParams.get('leadId');
 
   const handleCreate = async (formData: any) => {
     try {
@@ -98,8 +101,9 @@ export default function ActivityNew() {
           </CardHeader>
           <CardContent>
             <ActivityForm
+              initialData={leadId ? { lead_id: leadId } : undefined}
               onSubmit={handleCreate}
-              onCancel={() => navigate('/dashboard/activities')}
+              onCancel={() => navigate(leadId ? `/dashboard/leads/${leadId}` : '/dashboard/activities')}
             />
           </CardContent>
         </Card>
