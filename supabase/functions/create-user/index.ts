@@ -18,13 +18,13 @@ Deno.serve(async (req) => {
       }
     );
 
-    const { email, password, first_name, last_name, phone, avatar_url, is_active, must_change_password, role, tenant_id, franchise_id } = await req.json();
+    const { email, password, first_name, last_name, phone, avatar_url, is_active, must_change_password, email_verified, role, tenant_id, franchise_id } = await req.json();
 
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: email_verified ?? true,
       user_metadata: { first_name, last_name }
     });
 

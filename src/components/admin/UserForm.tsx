@@ -22,6 +22,7 @@ const userSchema = z.object({
   avatar_url: z.string().url().optional().or(z.literal('')),
   is_active: z.boolean().default(true),
   must_change_password: z.boolean().default(false),
+  email_verified: z.boolean().default(true),
   role: z.enum(['platform_admin', 'tenant_admin', 'franchise_admin', 'user']),
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
@@ -56,6 +57,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       avatar_url: user?.avatar_url || '',
       is_active: user?.is_active ?? true,
       must_change_password: user?.must_change_password ?? false,
+      email_verified: true,
       role: user?.user_roles?.[0]?.role || 'user',
       tenant_id: user?.user_roles?.[0]?.tenant_id || '',
       franchise_id: user?.user_roles?.[0]?.franchise_id || '',
@@ -172,6 +174,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             avatar_url: values.avatar_url,
             is_active: values.is_active,
             must_change_password: values.must_change_password,
+            email_verified: values.email_verified,
             role: values.role,
             tenant_id: values.tenant_id || null,
             franchise_id: values.franchise_id || null,
@@ -181,11 +184,19 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
+        const messages = [];
+        if (values.must_change_password) {
+          messages.push('They will need to change their password on first login.');
+        }
+        if (!values.email_verified) {
+          messages.push('They must verify their email before logging in.');
+        } else {
+          messages.push('Email verification bypassed - they can log in immediately.');
+        }
+
         toast({
           title: 'Success',
-          description: values.must_change_password 
-            ? 'User created successfully. They will need to change their password on first login. Email verification is disabled - they can log in immediately.'
-            : 'User created successfully. Email verification is disabled - they can log in immediately.',
+          description: `User created successfully. ${messages.join(' ')}`,
         });
         
         navigate('/dashboard/users');
@@ -332,6 +343,29 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             </FormItem>
           )}
         />
+
+        {!user && (
+          <FormField
+            control={form.control}
+            name="email_verified"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Override Email Verification</FormLabel>
+                  <div className="text-sm text-muted-foreground">
+                    Skip email verification - user can log in immediately
+                  </div>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        )}
 
         <FormField
           control={form.control}
