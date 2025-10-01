@@ -42,12 +42,18 @@ export default function Users() {
         userIds = roles?.map(r => r.user_id) || [];
       }
 
-      // Build the main query
+      // Build the main query with tenant and franchise names
       let query = supabase
         .from('profiles')
         .select(`
           *,
-          user_roles!user_id(role, tenant_id, franchise_id)
+          user_roles!user_id(
+            role, 
+            tenant_id,
+            franchise_id,
+            tenants(name),
+            franchises(name)
+          )
         `);
 
       // Apply filter if we have specific user IDs
@@ -106,7 +112,9 @@ export default function Users() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead>Roles</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Franchise</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                   </TableRow>
@@ -127,10 +135,16 @@ export default function Users() {
                         <div className="flex gap-1 flex-wrap">
                           {user.user_roles?.map((role: any, idx: number) => (
                             <Badge key={idx} variant="outline" className="text-xs">
-                              {role.role}
+                              {role.role.replace('_', ' ')}
                             </Badge>
                           ))}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.user_roles?.[0]?.tenants?.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {user.user_roles?.[0]?.franchises?.name || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.is_active ? 'default' : 'secondary'}>
