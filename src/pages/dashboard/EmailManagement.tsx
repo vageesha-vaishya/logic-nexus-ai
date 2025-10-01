@@ -5,7 +5,8 @@ import { EmailInbox } from "@/components/email/EmailInbox";
 import { EmailAccounts } from "@/components/email/EmailAccounts";
 import { EmailFilters } from "@/components/email/EmailFilters";
 import { EmailTemplates } from "@/components/email/EmailTemplates";
-import { Mail, Settings, Filter, FileText } from "lucide-react";
+import { OAuthSettings } from "@/components/email/OAuthSettings";
+import { Mail, Settings, Filter, FileText, Key } from "lucide-react";
 
 export default function EmailManagement() {
   const [activeTab, setActiveTab] = useState("inbox");
@@ -21,7 +22,7 @@ export default function EmailManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="inbox" className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
               <span>Inbox</span>
@@ -29,6 +30,10 @@ export default function EmailManagement() {
             <TabsTrigger value="accounts" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               <span>Accounts</span>
+            </TabsTrigger>
+            <TabsTrigger value="oauth" className="flex items-center gap-2">
+              <Key className="w-4 h-4" />
+              <span>OAuth</span>
             </TabsTrigger>
             <TabsTrigger value="filters" className="flex items-center gap-2">
               <Filter className="w-4 h-4" />
@@ -46,6 +51,10 @@ export default function EmailManagement() {
 
           <TabsContent value="accounts">
             <EmailAccounts />
+          </TabsContent>
+
+          <TabsContent value="oauth">
+            <OAuthSettings />
           </TabsContent>
 
           <TabsContent value="filters">
