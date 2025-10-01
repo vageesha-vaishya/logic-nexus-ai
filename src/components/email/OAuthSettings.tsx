@@ -50,18 +50,17 @@ export function OAuthSettings() {
   const fetchOAuthConfigs = async () => {
     try {
       setLoading(true);
-      const response: any = await supabase
+      const { data, error } = await supabase
         .from("oauth_configurations" as any)
         .select("*")
         .eq("user_id", context.userId)
         .in("provider", ["office365", "gmail"]);
 
-      if (response.error) throw response.error;
+      if (error) throw error;
 
-      if (response.data) {
-        const configs: any[] = response.data;
-        const office365 = configs.find((c: any) => c.provider === "office365");
-        const gmail = configs.find((c: any) => c.provider === "gmail");
+      if (data && Array.isArray(data)) {
+        const office365: any = data.find((c: any) => c.provider === "office365");
+        const gmail: any = data.find((c: any) => c.provider === "gmail");
 
         if (office365) {
           setOffice365Config({
