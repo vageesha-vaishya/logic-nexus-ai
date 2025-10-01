@@ -23,6 +23,26 @@ export default function Users() {
 
   const fetchUsers = async () => {
     try {
+      // First, get the user IDs based on role context
+      let userIds: string[] | null = null;
+
+      if (context.isTenantAdmin && context.tenantId) {
+        // Tenant admin can see all users in their tenant (including all franchises)
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('tenant_id', context.tenantId);
+        userIds = roles?.map(r => r.user_id) || [];
+      } else if (context.isFranchiseAdmin && context.franchiseId) {
+        // Franchise admin can only see users in their franchise
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('franchise_id', context.franchiseId);
+        userIds = roles?.map(r => r.user_id) || [];
+      }
+
+      // Build the main query
       let query = supabase
         .from('profiles')
         .select(`
@@ -30,23 +50,9 @@ export default function Users() {
           user_roles!user_id(role, tenant_id, franchise_id)
         `);
 
-      // Apply filters based on user role
-      if (context.isTenantAdmin && context.tenantId) {
-        // Tenant admin can see all users in their tenant (including all franchises)
-        query = query.in('id', 
-          supabase
-            .from('user_roles')
-            .select('user_id')
-            .eq('tenant_id', context.tenantId)
-        );
-      } else if (context.isFranchiseAdmin && context.franchiseId) {
-        // Franchise admin can only see users in their franchise
-        query = query.in('id',
-          supabase
-            .from('user_roles')
-            .select('user_id')
-            .eq('franchise_id', context.franchiseId)
-        );
+      // Apply filter if we have specific user IDs
+      if (userIds !== null) {
+        query = query.in('id', userIds);
       }
       // Platform admin has no filters - can see all users
 

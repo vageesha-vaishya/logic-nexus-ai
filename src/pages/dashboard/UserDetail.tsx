@@ -34,7 +34,10 @@ export default function UserDetail() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          user_roles!user_id(role, tenant_id, franchise_id)
+        `)
         .eq('id', id)
         .single();
 
