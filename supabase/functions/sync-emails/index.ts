@@ -54,21 +54,101 @@ serve(async (req) => {
       // Use Gmail API
       console.log("Syncing via Gmail API for account:", account.email_address);
       
-      if (!account.access_token) {
-        throw new Error("No access token available for Gmail account");
+      // Helper to refresh Gmail access token using stored refresh_token and oauth config
+      const refreshGmailToken = async (): Promise<boolean> => {
+        try {
+          if (!account.refresh_token) {
+            console.warn("No refresh token available for Gmail account");
+            return false;
+          }
+
+          const { data: oauthCfg, error: oauthErr } = await supabase
+            .from("oauth_configurations")
+            .select("client_id, client_secret")
+            .eq("provider", "gmail")
+            .eq("user_id", account.user_id)
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (oauthErr || !oauthCfg) {
+            console.error("OAuth configuration not found for Gmail refresh:", oauthErr);
+            return false;
+          }
+
+          const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: oauthCfg.client_id,
+              client_secret: oauthCfg.client_secret,
+              grant_type: "refresh_token",
+              refresh_token: account.refresh_token!,
+            }),
+          });
+
+          if (!tokenResp.ok) {
+            const t = await tokenResp.text();
+            console.error("Failed to refresh Gmail access token:", t);
+            return false;
+          }
+
+          const tokenJson = await tokenResp.json();
+          const newAccess = tokenJson.access_token as string | undefined;
+          const expiresIn = (tokenJson.expires_in as number | undefined) ?? 3600;
+          if (!newAccess) {
+            console.error("Token refresh response missing access_token:", tokenJson);
+            return false;
+          }
+
+          const expiryIso = new Date(Date.now() + expiresIn * 1000).toISOString();
+          await supabase
+            .from("email_accounts")
+            .update({ access_token: newAccess, token_expires_at: expiryIso })
+            .eq("id", account.id);
+
+          account.access_token = newAccess;
+          account.token_expires_at = expiryIso;
+          console.log("Gmail access token refreshed");
+          return true;
+        } catch (e) {
+          console.error("Exception while refreshing Gmail token:", (e as any)?.message);
+          return false;
+        }
+      };
+
+      // Ensure we have a valid token (refresh if expired/missing)
+      if (!account.access_token || (account.token_expires_at && new Date(account.token_expires_at) < new Date())) {
+        const ok = await refreshGmailToken();
+        if (!ok && !account.access_token) {
+          throw new Error("No access token available for Gmail account");
+        }
       }
 
       // Fetch messages from Gmail API
       const gmailApiUrl = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=INBOX";
-      const listResponse = await fetch(gmailApiUrl, {
-        headers: {
-          Authorization: `Bearer ${account.access_token}`,
-        },
+      let listResponse = await fetch(gmailApiUrl, {
+        headers: { Authorization: `Bearer ${account.access_token}` },
       });
 
       if (!listResponse.ok) {
         const errorText = await listResponse.text();
         console.error("Gmail API list error:", errorText);
+        if (listResponse.status === 401) {
+          // Try refresh once and retry
+          const refreshed = await refreshGmailToken();
+          if (refreshed) {
+            listResponse = await fetch(gmailApiUrl, {
+              headers: { Authorization: `Bearer ${account.access_token}` },
+            });
+          }
+        }
+      }
+
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        console.error("Gmail API list error (after refresh if attempted):", errorText);
         throw new Error(`Gmail API error: ${listResponse.status} - ${errorText}`);
       }
 
