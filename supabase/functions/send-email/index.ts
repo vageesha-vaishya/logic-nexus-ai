@@ -56,10 +56,62 @@ serve(async (req) => {
       // Use Gmail API
       console.log("Sending via Gmail API");
       
+      // Check if we have a valid access token
+      if (!account.access_token) {
+        throw new Error("Gmail account is not properly connected. Please reconnect your Gmail account.");
+      }
+
+      // Check if token is expired and refresh if needed
+      let accessToken = account.access_token;
+      if (account.token_expires_at && new Date(account.token_expires_at) < new Date()) {
+        if (!account.refresh_token) {
+          throw new Error("Gmail access token expired and no refresh token available. Please reconnect your Gmail account.");
+        }
+
+        // Refresh the token
+        const { data: oauthConfig } = await supabase
+          .from("oauth_configurations")
+          .select("client_id, client_secret")
+          .eq("user_id", account.user_id)
+          .eq("provider", "gmail")
+          .eq("is_active", true)
+          .single();
+
+        if (!oauthConfig) {
+          throw new Error("OAuth configuration not found. Please reconnect your Gmail account.");
+        }
+
+        const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: oauthConfig.client_id,
+            client_secret: oauthConfig.client_secret,
+            refresh_token: account.refresh_token,
+            grant_type: "refresh_token",
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          throw new Error("Failed to refresh Gmail access token. Please reconnect your Gmail account.");
+        }
+
+        const tokenData = await tokenResponse.json();
+        accessToken = tokenData.access_token;
+
+        // Update the access token in database
+        await supabase
+          .from("email_accounts")
+          .update({
+            access_token: accessToken,
+            token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+          })
+          .eq("id", accountId);
+      }
+      
       // Create MIME email message
       const toList = to.join(", ");
       const ccList = cc ? cc.join(", ") : "";
-      const boundary = "boundary_" + Date.now();
       
       let message = [
         `From: ${account.email_address}`,
@@ -84,7 +136,7 @@ serve(async (req) => {
         {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${account.access_token}`,
+            "Authorization": `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
