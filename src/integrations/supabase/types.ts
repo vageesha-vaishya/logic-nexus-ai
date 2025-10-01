@@ -542,6 +542,7 @@ export type Database = {
           converted_contact_id: string | null
           created_at: string | null
           created_by: string | null
+          custom_fields: Json | null
           description: string | null
           email: string | null
           estimated_value: number | null
@@ -570,6 +571,7 @@ export type Database = {
           converted_contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          custom_fields?: Json | null
           description?: string | null
           email?: string | null
           estimated_value?: number | null
@@ -598,6 +600,7 @@ export type Database = {
           converted_contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          custom_fields?: Json | null
           description?: string | null
           email?: string | null
           estimated_value?: number | null

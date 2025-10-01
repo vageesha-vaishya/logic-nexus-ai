@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp } from 'lucide-react';
+import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,7 @@ interface Lead {
 }
 
 export default function Leads() {
+  const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,12 +91,18 @@ export default function Leads() {
           <h1 className="text-3xl font-bold">Leads</h1>
           <p className="text-muted-foreground">Track and convert potential customers</p>
         </div>
-        <Button asChild>
-          <Link to="/dashboard/leads/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Lead
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/dashboard/leads/import-export')}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import / Export
+          </Button>
+          <Button asChild>
+            <Link to="/dashboard/leads/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Lead
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-4">

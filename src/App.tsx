@@ -20,6 +20,7 @@ import ContactDetail from "./pages/dashboard/ContactDetail";
 import Leads from "./pages/dashboard/Leads";
 import LeadNew from "./pages/dashboard/LeadNew";
 import LeadDetail from "./pages/dashboard/LeadDetail";
+import LeadsImportExport from "./pages/dashboard/LeadsImportExport";
 import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
 import ActivityDetail from "./pages/dashboard/ActivityDetail";
@@ -133,7 +134,15 @@ const App = () => (
               } 
             />
             <Route 
-              path="/dashboard/activities" 
+              path="/dashboard/leads/import-export" 
+              element={
+                <ProtectedRoute>
+                  <LeadsImportExport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/activities"
               element={
                 <ProtectedRoute>
                   <Activities />
