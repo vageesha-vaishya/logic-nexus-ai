@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-logistics.jpg";
+import sosLogo from "@/assets/sos-logo.png";
 
 export const HeroSection = () => {
   return (
@@ -22,13 +23,17 @@ export const HeroSection = () => {
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto text-center">
+          <div className="flex justify-center mb-6">
+            <img src={sosLogo} alt="SOS Logistic Pro Enterprise" className="h-24 w-24 mb-4" />
+          </div>
+          
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-6 border border-primary/20">
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-primary">AI-Powered Logistics Intelligence</span>
           </div>
           
           <h1 className="text-5xl md:text-7xl font-bold mb-6 text-primary-foreground leading-tight">
-            SOSLogicPro
+            SOS Logistic Pro
             <span className="block text-primary mt-2">Enterprise</span>
           </h1>
           

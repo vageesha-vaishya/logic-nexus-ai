@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Package } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import sosLogo from '@/assets/sos-logo.png';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -67,11 +68,9 @@ export default function Auth() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Package className="h-8 w-8 text-primary" />
-            </div>
+            <img src={sosLogo} alt="SOS Logistic Pro Enterprise" className="h-20 w-20" />
           </div>
-          <CardTitle className="text-2xl font-bold">SOSLogicPro</CardTitle>
+          <CardTitle className="text-2xl font-bold">SOS Logistic Pro Enterprise</CardTitle>
           <CardDescription>
             Sign in to your account to continue
           </CardDescription>

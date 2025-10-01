@@ -1,6 +1,7 @@
 import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import sosLogo from '@/assets/sos-logo.png';
 import {
   Sidebar,
   SidebarContent,
@@ -43,7 +44,14 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
-            {!collapsed && <span>SOSLogicPro</span>}
+            {collapsed ? (
+              <img src={sosLogo} alt="Logo" className="h-8 w-8 mx-auto" />
+            ) : (
+              <div className="flex items-center gap-2">
+                <img src={sosLogo} alt="Logo" className="h-8 w-8" />
+                <span className="font-semibold">SOS Logistic Pro</span>
+              </div>
+            )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>

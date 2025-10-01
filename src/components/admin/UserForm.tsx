@@ -171,6 +171,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             phone: values.phone,
             avatar_url: values.avatar_url,
             is_active: values.is_active,
+            must_change_password: values.must_change_password,
             role: values.role,
             tenant_id: values.tenant_id || null,
             franchise_id: values.franchise_id || null,
@@ -182,7 +183,9 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
         toast({
           title: 'Success',
-          description: 'User created successfully. They will need to change their password on first login.',
+          description: values.must_change_password 
+            ? 'User created successfully. They will need to change their password on first login.'
+            : 'User created successfully.',
         });
         
         navigate('/dashboard/users');
