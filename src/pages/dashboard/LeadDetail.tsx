@@ -305,12 +305,14 @@ export default function LeadDetail() {
           </div>
         )}
 
-        <LeadConversionDialog
-          open={showConversionDialog}
-          onOpenChange={setShowConversionDialog}
-          lead={lead}
-          onConversionComplete={fetchLead}
-        />
+        {lead && (
+          <LeadConversionDialog
+            open={showConversionDialog}
+            onOpenChange={setShowConversionDialog}
+            lead={lead}
+            onConversionComplete={fetchLead}
+          />
+        )}
 
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>

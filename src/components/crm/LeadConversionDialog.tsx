@@ -25,6 +25,9 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
   const [createOpportunity, setCreateOpportunity] = useState(true);
   const [opportunityName, setOpportunityName] = useState('');
 
+  // Guard against null lead
+  if (!lead) return null;
+
   const handleConvert = async () => {
     setLoading(true);
     try {
