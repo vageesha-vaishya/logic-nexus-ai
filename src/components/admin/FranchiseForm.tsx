@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
@@ -35,6 +36,8 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   const { context } = useCRM();
   const [tenants, setTenants] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingData, setPendingData] = useState<FranchiseFormValues | null>(null);
 
   const form = useForm<FranchiseFormValues>({
     resolver: zodResolver(franchiseSchema),
@@ -61,6 +64,19 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   const fetchManagers = async () => {
     const { data } = await supabase.from('profiles').select('id, first_name, last_name, email');
     setManagers(data || []);
+  };
+
+  const handleFormSubmit = (values: FranchiseFormValues) => {
+    setPendingData(values);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!pendingData) return;
+    setShowConfirmDialog(false);
+    
+    await onSubmit(pendingData);
+    setPendingData(null);
   };
 
   const onSubmit = async (values: FranchiseFormValues) => {
@@ -110,8 +126,9 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="name"
@@ -242,7 +259,23 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
             Cancel
           </Button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm {franchise ? 'Update' : 'Create'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {franchise ? 'update' : 'create'} this franchise?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

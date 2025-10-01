@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 
@@ -35,6 +36,8 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingData, setPendingData] = useState<ActivityFormData | null>(null);
 
   const form = useForm<ActivityFormData>({
     resolver: zodResolver(activitySchema),
@@ -69,9 +72,23 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
 
   const { isSubmitting } = form.formState;
 
+  const handleFormSubmit = (data: ActivityFormData) => {
+    setPendingData(data);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirm = async () => {
+    if (pendingData) {
+      setShowConfirmDialog(false);
+      await onSubmit(pendingData);
+      setPendingData(null);
+    }
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -280,7 +297,23 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
             {initialData?.id ? 'Update Activity' : 'Create Activity'}
           </Button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm {initialData?.id ? 'Update' : 'Create'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {initialData?.id ? 'update' : 'create'} this activity?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -1,11 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 
 const leadSchema = z.object({
@@ -32,6 +34,9 @@ interface LeadFormProps {
 }
 
 export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingData, setPendingData] = useState<LeadFormData | null>(null);
+  
   const form = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema),
     defaultValues: {
@@ -52,9 +57,23 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
 
   const { isSubmitting } = form.formState;
 
+  const handleFormSubmit = (data: LeadFormData) => {
+    setPendingData(data);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirm = async () => {
+    if (pendingData) {
+      setShowConfirmDialog(false);
+      await onSubmit(pendingData);
+      setPendingData(null);
+    }
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -268,7 +287,23 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             {initialData?.id ? 'Update Lead' : 'Create Lead'}
           </Button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm {initialData?.id ? 'Update' : 'Create'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {initialData?.id ? 'update' : 'create'} this lead?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

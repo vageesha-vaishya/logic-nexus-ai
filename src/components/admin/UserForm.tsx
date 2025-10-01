@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,6 +31,8 @@ interface UserFormProps {
 export function UserForm({ user, onSuccess }: UserFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingData, setPendingData] = useState<UserFormValues | null>(null);
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -42,6 +46,19 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       must_change_password: user?.must_change_password ?? false,
     },
   });
+
+  const handleFormSubmit = (values: UserFormValues) => {
+    setPendingData(values);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!pendingData) return;
+    setShowConfirmDialog(false);
+    
+    await onSubmit(pendingData);
+    setPendingData(null);
+  };
 
   const onSubmit = async (values: UserFormValues) => {
     try {
@@ -77,8 +94,9 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="email"
@@ -205,7 +223,23 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             Cancel
           </Button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Update</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to update this user?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

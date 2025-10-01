@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
@@ -35,6 +36,8 @@ interface ContactFormProps {
 export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProps) {
   const { supabase } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingData, setPendingData] = useState<ContactFormData | null>(null);
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
@@ -66,9 +69,23 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
 
   const { isSubmitting } = form.formState;
 
+  const handleFormSubmit = (data: ContactFormData) => {
+    setPendingData(data);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirm = async () => {
+    if (pendingData) {
+      setShowConfirmDialog(false);
+      await onSubmit(pendingData);
+      setPendingData(null);
+    }
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -245,5 +262,21 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
         </div>
       </form>
     </Form>
+
+    <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm {initialData?.id ? 'Update' : 'Create'}</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to {initialData?.id ? 'update' : 'create'} this contact?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

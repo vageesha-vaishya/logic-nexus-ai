@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,6 +32,8 @@ interface TenantFormProps {
 export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingData, setPendingData] = useState<TenantFormValues | null>(null);
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantSchema),
@@ -43,6 +47,19 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       settings: tenant?.settings ? JSON.stringify(tenant.settings, null, 2) : '',
     },
   });
+
+  const handleFormSubmit = (values: TenantFormValues) => {
+    setPendingData(values);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!pendingData) return;
+    setShowConfirmDialog(false);
+    
+    await onSubmit(pendingData);
+    setPendingData(null);
+  };
 
   const onSubmit = async (values: TenantFormValues) => {
     try {
@@ -92,8 +109,9 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="name"
@@ -216,7 +234,23 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
             Cancel
           </Button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm {tenant ? 'Update' : 'Create'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {tenant ? 'update' : 'create'} this tenant?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
