@@ -32,6 +32,9 @@ import FranchiseDetail from "./pages/dashboard/FranchiseDetail";
 import Users from "./pages/dashboard/Users";
 import UserNew from "./pages/dashboard/UserNew";
 import UserDetail from "./pages/dashboard/UserDetail";
+import Opportunities from "./pages/dashboard/Opportunities";
+import OpportunityNew from "./pages/dashboard/OpportunityNew";
+import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
 
 const queryClient = new QueryClient();
 
@@ -220,6 +223,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UserDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/opportunities" 
+              element={
+                <ProtectedRoute>
+                  <Opportunities />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/opportunities/new" 
+              element={
+                <ProtectedRoute>
+                  <OpportunityNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/opportunities/:id" 
+              element={
+                <ProtectedRoute>
+                  <OpportunityDetail />
                 </ProtectedRoute>
               } 
             />

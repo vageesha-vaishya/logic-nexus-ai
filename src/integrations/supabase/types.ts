@@ -582,6 +582,109 @@ export type Database = {
           },
         ]
       }
+      opportunities: {
+        Row: {
+          account_id: string | null
+          amount: number | null
+          campaign_id: string | null
+          close_date: string | null
+          closed_at: string | null
+          competitors: string | null
+          contact_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expected_revenue: number | null
+          forecast_category: string | null
+          franchise_id: string | null
+          id: string
+          lead_id: string | null
+          lead_source: Database["public"]["Enums"]["lead_source"] | null
+          name: string
+          next_step: string | null
+          owner_id: string | null
+          probability: number | null
+          stage: Database["public"]["Enums"]["opportunity_stage"]
+          tenant_id: string
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          amount?: number | null
+          campaign_id?: string | null
+          close_date?: string | null
+          closed_at?: string | null
+          competitors?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expected_revenue?: number | null
+          forecast_category?: string | null
+          franchise_id?: string | null
+          id?: string
+          lead_id?: string | null
+          lead_source?: Database["public"]["Enums"]["lead_source"] | null
+          name: string
+          next_step?: string | null
+          owner_id?: string | null
+          probability?: number | null
+          stage?: Database["public"]["Enums"]["opportunity_stage"]
+          tenant_id: string
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number | null
+          campaign_id?: string | null
+          close_date?: string | null
+          closed_at?: string | null
+          competitors?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expected_revenue?: number | null
+          forecast_category?: string | null
+          franchise_id?: string | null
+          id?: string
+          lead_id?: string | null
+          lead_source?: Database["public"]["Enums"]["lead_source"] | null
+          name?: string
+          next_step?: string | null
+          owner_id?: string | null
+          probability?: number | null
+          stage?: Database["public"]["Enums"]["opportunity_stage"]
+          tenant_id?: string
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -766,6 +869,15 @@ export type Database = {
         | "negotiation"
         | "won"
         | "lost"
+      opportunity_stage:
+        | "prospecting"
+        | "qualification"
+        | "needs_analysis"
+        | "value_proposition"
+        | "proposal"
+        | "negotiation"
+        | "closed_won"
+        | "closed_lost"
       priority_level: "low" | "medium" | "high" | "urgent"
     }
     CompositeTypes: {
@@ -916,6 +1028,16 @@ export const Constants = {
         "negotiation",
         "won",
         "lost",
+      ],
+      opportunity_stage: [
+        "prospecting",
+        "qualification",
+        "needs_analysis",
+        "value_proposition",
+        "proposal",
+        "negotiation",
+        "closed_won",
+        "closed_lost",
       ],
       priority_level: ["low", "medium", "high", "urgent"],
     },

@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut } from 'lucide-react';
+import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import sosLogo from '@/assets/sos-logo.png';
@@ -27,6 +27,7 @@ export function AppSidebar() {
     { title: 'Accounts', url: '/dashboard/accounts', icon: Building2 },
     { title: 'Contacts', url: '/dashboard/contacts', icon: Users },
     { title: 'Leads', url: '/dashboard/leads', icon: UserPlus },
+    { title: 'Opportunities', url: '/dashboard/opportunities', icon: TrendingUp },
     { title: 'Activities', url: '/dashboard/activities', icon: CheckSquare },
   ];
 
