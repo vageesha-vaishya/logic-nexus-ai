@@ -464,41 +464,162 @@ export type Database = {
           },
         ]
       }
+      lead_assignment_history: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_from: string | null
+          assigned_to: string
+          assignment_method: string
+          franchise_id: string | null
+          id: string
+          lead_id: string
+          reason: string | null
+          rule_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_from?: string | null
+          assigned_to: string
+          assignment_method: string
+          franchise_id?: string | null
+          id?: string
+          lead_id: string
+          reason?: string | null
+          rule_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_from?: string | null
+          assigned_to?: string
+          assignment_method?: string
+          franchise_id?: string | null
+          id?: string
+          lead_id?: string
+          reason?: string | null
+          rule_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_assignment_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_assignment_history_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "lead_assignment_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_assignment_queue: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          franchise_id: string | null
+          id: string
+          lead_id: string
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          franchise_id?: string | null
+          id?: string
+          lead_id: string
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          franchise_id?: string | null
+          id?: string
+          lead_id?: string
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_assignment_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_assignment_rules: {
         Row: {
           assigned_to: string | null
+          assignment_type: string | null
           created_at: string | null
           criteria: Json
           id: string
           is_active: boolean | null
+          max_leads_per_user: number | null
           priority: number | null
           rule_name: string
           tenant_id: string
+          territory_id: string | null
           updated_at: string | null
         }
         Insert: {
           assigned_to?: string | null
+          assignment_type?: string | null
           created_at?: string | null
           criteria: Json
           id?: string
           is_active?: boolean | null
+          max_leads_per_user?: number | null
           priority?: number | null
           rule_name: string
           tenant_id: string
+          territory_id?: string | null
           updated_at?: string | null
         }
         Update: {
           assigned_to?: string | null
+          assignment_type?: string | null
           created_at?: string | null
           criteria?: Json
           id?: string
           is_active?: boolean | null
+          max_leads_per_user?: number | null
           priority?: number | null
           rule_name?: string
           tenant_id?: string
+          territory_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_assignment_rules_territory_id_fkey"
+            columns: ["territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_scoring_rules: {
         Row: {
@@ -844,6 +965,110 @@ export type Database = {
           slug?: string
           subscription_tier?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      territories: {
+        Row: {
+          created_at: string | null
+          criteria: Json | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          criteria?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          criteria?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      territory_assignments: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          territory_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          territory_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          territory_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territory_assignments_territory_id_fkey"
+            columns: ["territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_capacity: {
+        Row: {
+          created_at: string | null
+          current_leads: number | null
+          franchise_id: string | null
+          id: string
+          is_available: boolean | null
+          last_assigned_at: string | null
+          max_leads: number | null
+          tenant_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_leads?: number | null
+          franchise_id?: string | null
+          id?: string
+          is_available?: boolean | null
+          last_assigned_at?: string | null
+          max_leads?: number | null
+          tenant_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_leads?: number | null
+          franchise_id?: string | null
+          id?: string
+          is_available?: boolean | null
+          last_assigned_at?: string | null
+          max_leads?: number | null
+          tenant_id?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

@@ -38,6 +38,7 @@ import Opportunities from "./pages/dashboard/Opportunities";
 import OpportunityNew from "./pages/dashboard/OpportunityNew";
 import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
 import LeadRouting from "./pages/dashboard/LeadRouting";
+import LeadAssignment from "./pages/dashboard/LeadAssignment";
 
 const queryClient = new QueryClient();
 
@@ -274,6 +275,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <LeadRouting />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/lead-assignment" 
+              element={
+                <ProtectedRoute>
+                  <LeadAssignment />
                 </ProtectedRoute>
               } 
             />
