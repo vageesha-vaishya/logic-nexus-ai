@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
+import { useCRM } from '@/hooks/useCRM';
 
 const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -23,6 +24,8 @@ const leadSchema = z.object({
   expected_close_date: z.string().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
+  tenant_id: z.string().optional(),
+  franchise_id: z.string().optional(),
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
@@ -36,6 +39,9 @@ interface LeadFormProps {
 export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<LeadFormData | null>(null);
+  const { supabase, context } = useCRM();
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
   
   const form = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema),
@@ -52,8 +58,33 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       expected_close_date: initialData?.expected_close_date || '',
       description: initialData?.description || '',
       notes: initialData?.notes || '',
+      tenant_id: initialData?.tenant_id || '',
+      franchise_id: initialData?.franchise_id || '',
     },
   });
+
+  useEffect(() => {
+    if (context.isPlatformAdmin) {
+      fetchTenants();
+    } else if (context.isTenantAdmin) {
+      fetchFranchises();
+    }
+  }, [context.isPlatformAdmin, context.isTenantAdmin]);
+
+  const fetchTenants = async () => {
+    const { data } = await supabase.from('tenants').select('id, name').order('name');
+    if (data) setTenants(data);
+  };
+
+  const fetchFranchises = async () => {
+    if (!context.tenantId) return;
+    const { data } = await supabase
+      .from('franchises')
+      .select('id, name')
+      .eq('tenant_id', context.tenantId)
+      .order('name');
+    if (data) setFranchises(data);
+  };
 
   const { isSubmitting } = form.formState;
 
@@ -75,6 +106,60 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
+          {context.isPlatformAdmin && (
+            <FormField
+              control={form.control}
+              name="tenant_id"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Tenant *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select tenant" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {tenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {context.isTenantAdmin && franchises.length > 0 && (
+            <FormField
+              control={form.control}
+              name="franchise_id"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Franchise</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select franchise" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {franchises.map((franchise) => (
+                        <SelectItem key={franchise.id} value={franchise.id}>
+                          {franchise.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           <FormField
             control={form.control}
             name="first_name"

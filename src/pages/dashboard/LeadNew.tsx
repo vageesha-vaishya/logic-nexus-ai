@@ -13,12 +13,21 @@ export default function LeadNew() {
 
   const handleCreate = async (formData: any) => {
     try {
+      const tenantId = context.isPlatformAdmin 
+        ? formData.tenant_id 
+        : context.tenantId;
+
+      if (!tenantId) {
+        toast.error('Please select a tenant');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('leads')
         .insert({
           ...formData,
-          tenant_id: context.tenantId,
-          franchise_id: context.franchiseId,
+          tenant_id: tenantId,
+          franchise_id: formData.franchise_id || context.franchiseId,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
           expected_close_date: formData.expected_close_date || null,
         })
