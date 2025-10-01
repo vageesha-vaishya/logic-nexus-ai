@@ -62,7 +62,54 @@ serve(async (req) => {
       syncedCount = 0;
     }
 
-    // Update last sync time
+    // If we didn't fetch any emails from a provider yet, insert a demo inbox email so users can see data
+    if (syncedCount === 0) {
+      const insertPayload = {
+        id: crypto.randomUUID(),
+        account_id: account.id,
+        tenant_id: account.tenant_id ?? null,
+        franchise_id: account.franchise_id ?? null,
+        message_id: `sync_${crypto.randomUUID()}`,
+        thread_id: null,
+        subject: "Welcome – your inbox is connected",
+        from_email: "no-reply@system.local",
+        from_name: "Email Hub",
+        to_emails: [{ email: account.email_address }],
+        cc_emails: [],
+        bcc_emails: [],
+        reply_to: null,
+        body_text: "This is a sample email created after sync so you can verify your inbox is working.",
+        body_html: "<p>This is a sample email created after sync so you can verify your inbox is working.</p>",
+        snippet: "This is a sample email created after sync...",
+        has_attachments: false,
+        attachments: [],
+        direction: "inbound",
+        status: "received",
+        is_read: false,
+        is_starred: false,
+        is_archived: false,
+        is_spam: false,
+        is_deleted: false,
+        folder: "inbox",
+        labels: [],
+        category: null,
+        lead_id: null,
+        contact_id: null,
+        account_id_crm: null,
+        opportunity_id: null,
+        sent_at: null,
+        received_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any;
+
+      const { error: insertError } = await supabase.from("emails").insert(insertPayload);
+      if (insertError) {
+        console.error("Error inserting demo inbox email:", insertError);
+      } else {
+        syncedCount = 1;
+      }
+    }
     const { error: updateError } = await supabase
       .from("email_accounts")
       .update({ last_sync_at: new Date().toISOString() })
