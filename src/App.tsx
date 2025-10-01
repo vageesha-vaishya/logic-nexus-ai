@@ -35,6 +35,7 @@ import UserDetail from "./pages/dashboard/UserDetail";
 import Opportunities from "./pages/dashboard/Opportunities";
 import OpportunityNew from "./pages/dashboard/OpportunityNew";
 import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
+import LeadRouting from "./pages/dashboard/LeadRouting";
 
 const queryClient = new QueryClient();
 
@@ -247,6 +248,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <OpportunityDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/lead-routing" 
+              element={
+                <ProtectedRoute>
+                  <LeadRouting />
                 </ProtectedRoute>
               } 
             />

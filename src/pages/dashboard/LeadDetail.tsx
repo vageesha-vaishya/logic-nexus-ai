@@ -6,7 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { LeadForm } from '@/components/crm/LeadForm';
-import { ArrowLeft, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2 } from 'lucide-react';
+import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
+import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
+import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
+import { ArrowLeft, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -19,6 +22,7 @@ export default function LeadDetail() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showConversionDialog, setShowConversionDialog] = useState(false);
 
   useEffect(() => {
     if (id) fetchLead();
@@ -129,8 +133,12 @@ export default function LeadDetail() {
               <p className="text-muted-foreground">Lead Details</p>
             </div>
           </div>
-          {!isEditing && (
+          {!isEditing && !lead.converted_at && (
             <div className="flex gap-2">
+              <Button onClick={() => setShowConversionDialog(true)}>
+                <GitBranch className="mr-2 h-4 w-4" />
+                Convert Lead
+              </Button>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
@@ -140,6 +148,11 @@ export default function LeadDetail() {
                 Delete
               </Button>
             </div>
+          )}
+          {lead.converted_at && (
+            <Badge className="bg-green-500/10 text-green-500">
+              Converted on {format(new Date(lead.converted_at), 'PPP')}
+            </Badge>
           )}
         </div>
 
@@ -158,6 +171,14 @@ export default function LeadDetail() {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
+            <LeadScoringCard
+              score={lead.lead_score || 0}
+              status={lead.status}
+              estimatedValue={lead.estimated_value}
+              lastActivityDate={lead.last_activity_date}
+              source={lead.source}
+            />
+            
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -266,6 +287,10 @@ export default function LeadDetail() {
               </Card>
             )}
 
+            <div className="md:col-span-2">
+              <LeadActivitiesTimeline leadId={lead.id} />
+            </div>
+
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle>Metadata</CardTitle>
@@ -273,10 +298,19 @@ export default function LeadDetail() {
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 <div>Created: {format(new Date(lead.created_at), 'PPpp')}</div>
                 <div>Last Updated: {format(new Date(lead.updated_at), 'PPpp')}</div>
+                {lead.lead_score && <div>Lead Score: {lead.lead_score}/100</div>}
+                {lead.qualification_status && <div>Qualification: {lead.qualification_status}</div>}
               </CardContent>
             </Card>
           </div>
         )}
+
+        <LeadConversionDialog
+          open={showConversionDialog}
+          onOpenChange={setShowConversionDialog}
+          lead={lead}
+          onConversionComplete={fetchLead}
+        />
 
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, UserPlus, DollarSign, Calendar } from 'lucide-react';
+import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
@@ -20,12 +21,16 @@ interface Lead {
   source: string;
   estimated_value: number | null;
   created_at: string;
+  lead_score: number | null;
+  qualification_status: string | null;
 }
 
 export default function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [scoreFilter, setScoreFilter] = useState<string>('all');
   const { supabase } = useCRM();
 
   useEffect(() => {
@@ -49,10 +54,19 @@ export default function Leads() {
     }
   };
 
-  const filteredLeads = leads.filter(lead =>
-    `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    lead.company?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+    
+    const matchesScore = scoreFilter === 'all' || 
+      (scoreFilter === 'high' && (lead.lead_score || 0) >= 70) ||
+      (scoreFilter === 'medium' && (lead.lead_score || 0) >= 40 && (lead.lead_score || 0) < 70) ||
+      (scoreFilter === 'low' && (lead.lead_score || 0) < 40);
+    
+    return matchesSearch && matchesStatus && matchesScore;
+  });
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -83,14 +97,46 @@ export default function Leads() {
         </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search leads..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      <div className="flex flex-wrap gap-4">
+        <div className="relative flex-1 min-w-[300px]">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search leads..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <Filter className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="new">New</SelectItem>
+            <SelectItem value="contacted">Contacted</SelectItem>
+            <SelectItem value="qualified">Qualified</SelectItem>
+            <SelectItem value="proposal">Proposal</SelectItem>
+            <SelectItem value="negotiation">Negotiation</SelectItem>
+            <SelectItem value="won">Won</SelectItem>
+            <SelectItem value="lost">Lost</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={scoreFilter} onValueChange={setScoreFilter}>
+          <SelectTrigger className="w-[180px]">
+            <TrendingUp className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Score" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Scores</SelectItem>
+            <SelectItem value="high">High (70+)</SelectItem>
+            <SelectItem value="medium">Medium (40-69)</SelectItem>
+            <SelectItem value="low">Low (&lt;40)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (
@@ -135,16 +181,29 @@ export default function Leads() {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {lead.estimated_value && (
-                    <div className="flex items-center gap-2 text-sm font-medium text-green-600">
-                      <DollarSign className="h-4 w-4" />
-                      <span>${lead.estimated_value.toLocaleString()}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between">
+                    {lead.estimated_value && (
+                      <div className="flex items-center gap-2 text-sm font-medium text-green-600">
+                        <DollarSign className="h-4 w-4" />
+                        <span>${lead.estimated_value.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {lead.lead_score !== null && (
+                      <div className="flex items-center gap-1 text-sm font-medium">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        <span>{lead.lead_score}</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Badge variant="outline" className="text-xs">
                       {lead.source}
                     </Badge>
+                    {lead.qualification_status && (
+                      <Badge variant="outline" className="text-xs">
+                        {lead.qualification_status}
+                      </Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>

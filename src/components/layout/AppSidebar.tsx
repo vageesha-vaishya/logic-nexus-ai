@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp } from 'lucide-react';
+import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import sosLogo from '@/assets/sos-logo.png';
@@ -32,6 +32,7 @@ export function AppSidebar() {
   ];
 
   const adminItems = [
+    { title: 'Lead Routing', url: '/dashboard/lead-routing', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'] },
     { title: 'Tenants', url: '/dashboard/tenants', icon: FileText, roles: ['platform_admin'] },
     { title: 'Franchises', url: '/dashboard/franchises', icon: Package, roles: ['platform_admin', 'tenant_admin'] },
     { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['platform_admin', 'tenant_admin', 'franchise_admin'] },
