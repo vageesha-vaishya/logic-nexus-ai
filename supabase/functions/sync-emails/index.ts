@@ -53,6 +53,7 @@ serve(async (req) => {
     } else if (account.provider === "gmail") {
       // Use Gmail API
       console.log("Syncing via Gmail API");
+      console.log("Account details:", JSON.stringify(account, null, 2));
       // TODO: Implement Gmail API integration
       syncedCount = 0;
     } else if (account.provider === "office365") {
@@ -62,8 +63,11 @@ serve(async (req) => {
       syncedCount = 0;
     }
 
+    console.log("Synced count before demo email:", syncedCount);
+
     // If we didn't fetch any emails from a provider yet, insert a demo inbox email so users can see data
     if (syncedCount === 0) {
+      console.log("Creating demo inbox email...");
       const insertPayload = {
         id: crypto.randomUUID(),
         account_id: account.id,
@@ -107,8 +111,11 @@ serve(async (req) => {
       if (insertError) {
         console.error("Error inserting demo inbox email:", insertError);
       } else {
+        console.log("Successfully inserted demo inbox email");
         syncedCount = 1;
       }
+    } else {
+      console.log("Skipping demo email creation, syncedCount:", syncedCount);
     }
     const { error: updateError } = await supabase
       .from("email_accounts")
