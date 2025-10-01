@@ -50,17 +50,18 @@ export function OAuthSettings() {
   const fetchOAuthConfigs = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("oauth_configurations")
+      const response: any = await supabase
+        .from("oauth_configurations" as any)
         .select("*")
         .eq("user_id", context.userId)
         .in("provider", ["office365", "gmail"]);
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
-      if (data) {
-        const office365 = data.find(c => c.provider === "office365");
-        const gmail = data.find(c => c.provider === "gmail");
+      if (response.data) {
+        const configs: any[] = response.data;
+        const office365 = configs.find((c: any) => c.provider === "office365");
+        const gmail = configs.find((c: any) => c.provider === "gmail");
 
         if (office365) {
           setOffice365Config({
@@ -68,7 +69,7 @@ export function OAuthSettings() {
             id: office365.id,
             client_id: office365.client_id || "",
             client_secret: office365.client_secret || "",
-            tenant_id: office365.tenant_id || "",
+            tenant_id: office365.tenant_id_provider || "",
             is_active: office365.is_active,
           });
         }
@@ -129,13 +130,13 @@ export function OAuthSettings() {
       let error;
       if (config.id) {
         const { error: updateError } = await supabase
-          .from("oauth_configurations")
+          .from("oauth_configurations" as any)
           .update(configData)
           .eq("id", config.id);
         error = updateError;
       } else {
         const { error: insertError } = await supabase
-          .from("oauth_configurations")
+          .from("oauth_configurations" as any)
           .insert(configData);
         error = insertError;
       }

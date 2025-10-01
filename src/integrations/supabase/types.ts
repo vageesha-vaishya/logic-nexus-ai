@@ -1140,6 +1140,59 @@ export type Database = {
           },
         ]
       }
+      oauth_configurations: {
+        Row: {
+          client_id: string
+          client_secret: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          provider: string
+          redirect_uri: string
+          scopes: Json | null
+          tenant_id: string | null
+          tenant_id_provider: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          client_secret: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider: string
+          redirect_uri: string
+          scopes?: Json | null
+          tenant_id?: string | null
+          tenant_id_provider?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          client_secret?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          redirect_uri?: string
+          scopes?: Json | null
+          tenant_id?: string | null
+          tenant_id_provider?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_configurations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunities: {
         Row: {
           account_id: string | null
