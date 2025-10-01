@@ -80,6 +80,24 @@ serve(async (req) => {
 
     const tokens = await tokenResponse.json();
 
+    // If Gmail, fetch user profile to ensure we have email/name
+    let resolvedEmail = emailAddress;
+    let resolvedName = displayName;
+    if (provider === "gmail") {
+      try {
+        const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          resolvedEmail = resolvedEmail || profile.email || "";
+          resolvedName = resolvedName || profile.name || "";
+        }
+      } catch (e) {
+        console.log("Gmail userinfo fetch failed", e);
+      }
+    }
+
     // Get user's tenant and franchise IDs
     const { data: userRole } = await supabase
       .from("user_roles")
@@ -87,24 +105,45 @@ serve(async (req) => {
       .eq("user_id", userId)
       .single();
 
-    // Store email account with tokens
-    const { data: account, error: accountError } = await supabase
+    // Upsert existing account for this user/provider/email
+    let account;
+    let accountError;
+    const { data: existing } = await supabase
       .from("email_accounts")
-      .insert({
-        user_id: userId,
-        tenant_id: userRole?.tenant_id,
-        franchise_id: userRole?.franchise_id,
-        provider,
-        email_address: emailAddress,
-        display_name: displayName,
-        is_primary: isPrimary,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-        is_active: true,
-      })
-      .select()
-      .single();
+      .select("id")
+      .eq("user_id", userId)
+      .eq("provider", provider)
+      .eq("email_address", resolvedEmail || emailAddress || "")
+      .maybeSingle();
+
+    const payload = {
+      user_id: userId,
+      tenant_id: userRole?.tenant_id,
+      franchise_id: userRole?.franchise_id,
+      provider,
+      email_address: resolvedEmail || emailAddress || "",
+      display_name: resolvedName || displayName || null,
+      is_primary: isPrimary,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || null,
+      token_expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+      is_active: true,
+    };
+
+    if (existing?.id) {
+      ({ data: account, error: accountError } = await supabase
+        .from("email_accounts")
+        .update(payload)
+        .eq("id", existing.id)
+        .select()
+        .single());
+    } else {
+      ({ data: account, error: accountError } = await supabase
+        .from("email_accounts")
+        .insert(payload)
+        .select()
+        .single());
+    }
 
     if (accountError) {
       throw accountError;

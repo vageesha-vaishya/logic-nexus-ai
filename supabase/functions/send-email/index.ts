@@ -108,13 +108,33 @@ serve(async (req) => {
           })
           .eq("id", accountId);
       }
+
+      // Resolve sender email if missing
+      let senderEmail = account.email_address;
+      if (!senderEmail) {
+        try {
+          const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            senderEmail = profile.email || senderEmail;
+            // Persist if we learned it
+            if (senderEmail && !account.email_address) {
+              await supabase.from("email_accounts").update({ email_address: senderEmail }).eq("id", accountId);
+            }
+          }
+        } catch (e) {
+          console.log("Failed to resolve Gmail sender email", e);
+        }
+      }
       
       // Create MIME email message
       const toList = to.join(", ");
       const ccList = cc ? cc.join(", ") : "";
       
       let message = [
-        `From: ${account.email_address}`,
+        senderEmail ? `From: ${senderEmail}` : "",
         `To: ${toList}`,
         ccList ? `Cc: ${ccList}` : "",
         `Subject: ${subject}`,
@@ -172,8 +192,8 @@ serve(async (req) => {
       franchise_id: account.franchise_id,
       message_id: messageId,
       subject,
-      from_email: account.email_address,
-      from_name: account.display_name || account.email_address,
+      from_email: account.email_address || null,
+      from_name: account.display_name || account.email_address || null,
       to_emails: to.map((email: string) => ({ email })),
       cc_emails: cc ? cc.map((email: string) => ({ email })) : [],
       bcc_emails: bcc ? bcc.map((email: string) => ({ email })) : [],

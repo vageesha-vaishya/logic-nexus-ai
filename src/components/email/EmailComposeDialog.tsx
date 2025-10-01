@@ -55,7 +55,8 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
       if (error) throw error;
       setAccounts(data || []);
       if (data && data.length > 0) {
-        setSelectedAccount(data[0].id);
+        const connected = data.find((a: any) => (a.provider === "gmail" ? (a.access_token || a.refresh_token) : true));
+        setSelectedAccount((connected || data[0])?.id || "");
       }
     } catch (error: any) {
       toast({
@@ -78,6 +79,11 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
 
     setSending(true);
     try {
+      const selected = accounts.find((a) => a.id === selectedAccount);
+      if (selected?.provider === "gmail" && !selected?.access_token && !selected?.refresh_token) {
+        throw new Error("Selected Gmail account is not connected. Please connect it in Accounts.");
+      }
+
       // Call edge function to send email
       const { data, error } = await supabase.functions.invoke("send-email", {
         body: {
@@ -89,7 +95,17 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        let description = error.message;
+        const ctx = (error as any)?.context;
+        if (ctx) {
+          try {
+            const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
+            description = parsed?.error || parsed?.message || description;
+          } catch {}
+        }
+        throw new Error(description);
+      }
 
       toast({
         title: "Success",
