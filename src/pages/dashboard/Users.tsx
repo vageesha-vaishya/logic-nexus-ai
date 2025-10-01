@@ -25,7 +25,7 @@ export default function Users() {
         .from('profiles')
         .select(`
           *,
-          user_roles(role, tenant_id, franchise_id)
+          user_roles!user_id(role, tenant_id, franchise_id)
         `)
         .order('created_at', { ascending: false });
 
