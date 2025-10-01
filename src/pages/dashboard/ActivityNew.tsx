@@ -13,12 +13,55 @@ export default function ActivityNew() {
 
   const handleCreate = async (formData: any) => {
     try {
+      let tenantId = context.tenantId;
+      let franchiseId = context.franchiseId;
+
+      // For platform admins, get tenant_id from related entity
+      if (!tenantId) {
+        if (formData.lead_id && formData.lead_id !== 'none') {
+          const { data: lead } = await supabase
+            .from('leads')
+            .select('tenant_id, franchise_id')
+            .eq('id', formData.lead_id)
+            .single();
+          if (lead) {
+            tenantId = lead.tenant_id;
+            franchiseId = lead.franchise_id;
+          }
+        } else if (formData.account_id && formData.account_id !== 'none') {
+          const { data: account } = await supabase
+            .from('accounts')
+            .select('tenant_id, franchise_id')
+            .eq('id', formData.account_id)
+            .single();
+          if (account) {
+            tenantId = account.tenant_id;
+            franchiseId = account.franchise_id;
+          }
+        } else if (formData.contact_id && formData.contact_id !== 'none') {
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('tenant_id, franchise_id')
+            .eq('id', formData.contact_id)
+            .single();
+          if (contact) {
+            tenantId = contact.tenant_id;
+            franchiseId = contact.franchise_id;
+          }
+        }
+      }
+
+      if (!tenantId) {
+        toast.error('Please select a related lead, account, or contact');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('activities')
         .insert({
           ...formData,
-          tenant_id: context.tenantId,
-          franchise_id: context.franchiseId,
+          tenant_id: tenantId,
+          franchise_id: franchiseId,
           account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
           contact_id: formData.contact_id === 'none' ? null : (formData.contact_id || null),
           lead_id: formData.lead_id === 'none' ? null : (formData.lead_id || null),
