@@ -39,6 +39,7 @@ import OpportunityNew from "./pages/dashboard/OpportunityNew";
 import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
 import LeadRouting from "./pages/dashboard/LeadRouting";
 import LeadAssignment from "./pages/dashboard/LeadAssignment";
+import EmailManagement from "./pages/dashboard/EmailManagement";
 
 const queryClient = new QueryClient();
 
@@ -283,6 +284,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <LeadAssignment />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/email-management" 
+              element={
+                <ProtectedRoute>
+                  <EmailManagement />
                 </ProtectedRoute>
               } 
             />

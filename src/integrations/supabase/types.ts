@@ -359,6 +359,359 @@ export type Database = {
           },
         ]
       }
+      email_accounts: {
+        Row: {
+          access_token: string | null
+          auto_sync_enabled: boolean | null
+          created_at: string | null
+          display_name: string | null
+          email_address: string
+          franchise_id: string | null
+          id: string
+          imap_host: string | null
+          imap_password: string | null
+          imap_port: number | null
+          imap_use_ssl: boolean | null
+          imap_username: string | null
+          is_active: boolean | null
+          is_primary: boolean | null
+          last_sync_at: string | null
+          provider: string
+          refresh_token: string | null
+          settings: Json | null
+          smtp_host: string | null
+          smtp_password: string | null
+          smtp_port: number | null
+          smtp_use_tls: boolean | null
+          smtp_username: string | null
+          sync_frequency: number | null
+          tenant_id: string
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          display_name?: string | null
+          email_address: string
+          franchise_id?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_use_ssl?: boolean | null
+          imap_username?: string | null
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_sync_at?: string | null
+          provider: string
+          refresh_token?: string | null
+          settings?: Json | null
+          smtp_host?: string | null
+          smtp_password?: string | null
+          smtp_port?: number | null
+          smtp_use_tls?: boolean | null
+          smtp_username?: string | null
+          sync_frequency?: number | null
+          tenant_id: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          display_name?: string | null
+          email_address?: string
+          franchise_id?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_use_ssl?: boolean | null
+          imap_username?: string | null
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token?: string | null
+          settings?: Json | null
+          smtp_host?: string | null
+          smtp_password?: string | null
+          smtp_port?: number | null
+          smtp_use_tls?: boolean | null
+          smtp_username?: string | null
+          sync_frequency?: number | null
+          tenant_id?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      email_filters: {
+        Row: {
+          account_id: string | null
+          actions: Json
+          conditions: Json
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          priority: number | null
+          tenant_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          actions?: Json
+          conditions?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          priority?: number | null
+          tenant_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          actions?: Json
+          conditions?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          priority?: number | null
+          tenant_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_filters_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          body_html: string | null
+          body_text: string | null
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          franchise_id: string | null
+          id: string
+          is_active: boolean | null
+          is_shared: boolean | null
+          name: string
+          subject: string
+          tenant_id: string
+          updated_at: string | null
+          variables: Json | null
+        }
+        Insert: {
+          body_html?: string | null
+          body_text?: string | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          franchise_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_shared?: boolean | null
+          name: string
+          subject: string
+          tenant_id: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          franchise_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_shared?: boolean | null
+          name?: string
+          subject?: string
+          tenant_id?: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
+      emails: {
+        Row: {
+          account_id: string
+          account_id_crm: string | null
+          attachments: Json | null
+          bcc_emails: Json | null
+          body_html: string | null
+          body_text: string | null
+          category: string | null
+          cc_emails: Json | null
+          contact_id: string | null
+          created_at: string | null
+          direction: string
+          folder: string | null
+          franchise_id: string | null
+          from_email: string
+          from_name: string | null
+          has_attachments: boolean | null
+          id: string
+          is_archived: boolean | null
+          is_deleted: boolean | null
+          is_read: boolean | null
+          is_spam: boolean | null
+          is_starred: boolean | null
+          labels: Json | null
+          lead_id: string | null
+          message_id: string
+          opportunity_id: string | null
+          received_at: string | null
+          reply_to: string | null
+          sent_at: string | null
+          snippet: string | null
+          status: string | null
+          subject: string
+          tenant_id: string
+          thread_id: string | null
+          to_emails: Json
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          account_id_crm?: string | null
+          attachments?: Json | null
+          bcc_emails?: Json | null
+          body_html?: string | null
+          body_text?: string | null
+          category?: string | null
+          cc_emails?: Json | null
+          contact_id?: string | null
+          created_at?: string | null
+          direction: string
+          folder?: string | null
+          franchise_id?: string | null
+          from_email: string
+          from_name?: string | null
+          has_attachments?: boolean | null
+          id?: string
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
+          is_read?: boolean | null
+          is_spam?: boolean | null
+          is_starred?: boolean | null
+          labels?: Json | null
+          lead_id?: string | null
+          message_id: string
+          opportunity_id?: string | null
+          received_at?: string | null
+          reply_to?: string | null
+          sent_at?: string | null
+          snippet?: string | null
+          status?: string | null
+          subject: string
+          tenant_id: string
+          thread_id?: string | null
+          to_emails?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          account_id_crm?: string | null
+          attachments?: Json | null
+          bcc_emails?: Json | null
+          body_html?: string | null
+          body_text?: string | null
+          category?: string | null
+          cc_emails?: Json | null
+          contact_id?: string | null
+          created_at?: string | null
+          direction?: string
+          folder?: string | null
+          franchise_id?: string | null
+          from_email?: string
+          from_name?: string | null
+          has_attachments?: boolean | null
+          id?: string
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
+          is_read?: boolean | null
+          is_spam?: boolean | null
+          is_starred?: boolean | null
+          labels?: Json | null
+          lead_id?: string | null
+          message_id?: string
+          opportunity_id?: string | null
+          received_at?: string | null
+          reply_to?: string | null
+          sent_at?: string | null
+          snippet?: string | null
+          status?: string | null
+          subject?: string
+          tenant_id?: string
+          thread_id?: string | null
+          to_emails?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_account_id_crm_fkey"
+            columns: ["account_id_crm"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       franchises: {
         Row: {
           address: Json | null
