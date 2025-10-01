@@ -111,99 +111,133 @@ export function EmailAccounts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Email Accounts</h2>
-          <p className="text-muted-foreground">
-            Connect and manage your email accounts
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">Connected Accounts</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage and sync your email accounts across multiple providers
           </p>
         </div>
-        <Button onClick={() => setShowDialog(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Account
+        <Button onClick={() => setShowDialog(true)} size="lg" className="gap-2">
+          <Plus className="w-4 h-4" />
+          Connect Account
         </Button>
       </div>
 
       {loading ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Loading accounts...
+        <Card className="border-2">
+          <CardContent className="flex items-center justify-center p-12">
+            <div className="text-center space-y-3">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin text-primary" />
+              <p className="text-muted-foreground">Loading your accounts...</p>
+            </div>
           </CardContent>
         </Card>
       ) : accounts.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground mb-4">No email accounts connected</p>
-            <Button onClick={() => setShowDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Your First Account
+        <Card className="border-2 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center p-16">
+            <div className="p-4 rounded-full bg-primary/10 mb-4">
+              <Mail className="w-12 h-12 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No Accounts Connected</h3>
+            <p className="text-muted-foreground text-center mb-6 max-w-md">
+              Get started by connecting your first email account. Support for Gmail, Office 365, and SMTP/IMAP.
+            </p>
+            <Button onClick={() => setShowDialog(true)} size="lg" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Connect Your First Account
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {accounts.map((account) => (
-            <Card key={account.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-lg">
+            <Card key={account.id} className="border-2 hover:shadow-lg transition-shadow duration-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-start gap-4">
+                  <div className={`p-3 rounded-lg ${
+                    account.provider === 'gmail' ? 'bg-red-500/10' :
+                    account.provider === 'office365' ? 'bg-blue-500/10' :
+                    'bg-purple-500/10'
+                  }`}>
+                    <Mail className={`w-5 h-5 ${
+                      account.provider === 'gmail' ? 'text-red-500' :
+                      account.provider === 'office365' ? 'text-blue-500' :
+                      'text-purple-500'
+                    }`} />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-lg truncate">
                         {account.display_name || account.email_address}
                       </CardTitle>
                       {account.is_primary && (
-                        <Badge variant="default">Primary</Badge>
+                        <Badge className="bg-primary/20 text-primary hover:bg-primary/30">
+                          Primary
+                        </Badge>
                       )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge
                         variant="outline"
-                        className={getProviderBadge(account.provider)}
+                        className={`${getProviderBadge(account.provider)} border-0 font-medium`}
                       >
                         {account.provider.replace("_", " ").toUpperCase()}
                       </Badge>
-                      <Badge variant={account.is_active ? "default" : "secondary"}>
+                      <Badge 
+                        variant="outline"
+                        className={account.is_active 
+                          ? "bg-green-500/10 text-green-600 border-green-200" 
+                          : "bg-gray-500/10 text-gray-600 border-gray-200"
+                        }
+                      >
                         {account.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground truncate">
                       {account.email_address}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => syncAccount(account.id)}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedAccount(account);
-                        setShowDialog(true);
-                      }}
-                    >
-                      <Settings className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(account.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
                 </div>
               </CardHeader>
-              {account.last_sync_at && (
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
+              <CardContent className="space-y-3">
+                {account.last_sync_at && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                    <RefreshCw className="w-3 h-3" />
                     Last synced: {format(new Date(account.last_sync_at), "MMM d, yyyy 'at' h:mm a")}
-                  </p>
-                </CardContent>
-              )}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncAccount(account.id)}
+                    className="flex-1"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-2" />
+                    Sync
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedAccount(account);
+                      setShowDialog(true);
+                    }}
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(account.id)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>

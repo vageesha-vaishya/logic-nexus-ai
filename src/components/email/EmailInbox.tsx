@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Mail, Search, RefreshCw, Star, Archive, Trash2, 
-  Plus, Reply, Forward, MoreVertical, Paperclip 
+  Plus, Paperclip 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -220,123 +220,151 @@ export function EmailInbox() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Email Inbox</h2>
+      {/* Action Bar */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border">
+        <div className="flex items-center gap-2">
+          <div className="p-2 rounded-md bg-primary/10">
+            <Mail className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm">Your Inbox</h3>
+            <p className="text-xs text-muted-foreground">{emails.length} messages</p>
+          </div>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={fetchEmails}>
-            <RefreshCw className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
+          <Button variant="outline" size="sm" onClick={fetchEmails} className="gap-2">
+            <RefreshCw className="w-3 h-3" />
+            Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={syncEmails} disabled={syncing}>
-            <RefreshCw className={`w-4 h-4 sm:mr-2 ${syncing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Sync</span>
+          <Button variant="outline" size="sm" onClick={syncEmails} disabled={syncing} className="gap-2">
+            <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+            Sync One
           </Button>
-          <Button variant="outline" size="sm" onClick={syncAllMailboxes} disabled={syncing}>
-            <RefreshCw className={`w-4 h-4 sm:mr-2 ${syncing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Sync All</span>
+          <Button variant="outline" size="sm" onClick={syncAllMailboxes} disabled={syncing} className="gap-2">
+            <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+            Sync All
           </Button>
-          <Button size="sm" onClick={() => setShowCompose(true)}>
-            <Plus className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Compose</span>
+          <Button size="sm" onClick={() => setShowCompose(true)} className="gap-2">
+            <Plus className="w-3 h-3" />
+            Compose
           </Button>
         </div>
       </div>
 
+      {/* Search and Filter Bar */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
-        <div className="relative w-full lg:flex-1 lg:max-w-md">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search emails..."
+            placeholder="Search by subject, sender, or content..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-10 border-2"
           />
         </div>
         <div className="w-full lg:w-auto overflow-x-auto">
           <Tabs value={selectedFolder} onValueChange={setSelectedFolder} className="min-w-max">
-            <TabsList className="flex w-full lg:w-auto whitespace-nowrap">
-              <TabsTrigger value="inbox">Inbox</TabsTrigger>
-              <TabsTrigger value="sent">Sent</TabsTrigger>
-              <TabsTrigger value="drafts">Drafts</TabsTrigger>
-              <TabsTrigger value="archive">Archive</TabsTrigger>
-              <TabsTrigger value="trash">Trash</TabsTrigger>
+            <TabsList className="grid grid-cols-5 h-10">
+              <TabsTrigger value="inbox" className="text-xs">Inbox</TabsTrigger>
+              <TabsTrigger value="sent" className="text-xs">Sent</TabsTrigger>
+              <TabsTrigger value="drafts" className="text-xs">Drafts</TabsTrigger>
+              <TabsTrigger value="archive" className="text-xs">Archive</TabsTrigger>
+              <TabsTrigger value="trash" className="text-xs">Trash</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       </div>
 
-      <Card>
+      {/* Email List */}
+      <Card className="border-2">
         {loading ? (
-          <div className="p-8 text-center text-muted-foreground">
-            Loading emails...
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center space-y-3">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading emails...</p>
+            </div>
           </div>
         ) : emails.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No emails found</p>
+          <div className="flex flex-col items-center justify-center p-16">
+            <div className="p-4 rounded-full bg-muted mb-4">
+              <Mail className="w-12 h-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No Emails Found</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-md">
+              {searchQuery 
+                ? "Try adjusting your search query or filters"
+                : "Your inbox is empty. Start by syncing your email accounts."
+              }
+            </p>
           </div>
         ) : (
           <div className="divide-y">
             {emails.map((email) => (
               <div
                 key={email.id}
-                className={`p-4 hover:bg-accent/5 cursor-pointer transition-colors ${
-                  !email.is_read ? "bg-primary/5" : ""
-                } overflow-x-hidden`}
+                className={`group p-4 hover:bg-muted/50 cursor-pointer transition-all duration-150 ${
+                  !email.is_read ? "bg-primary/5 border-l-4 border-l-primary" : ""
+                }`}
                 onClick={() => handleEmailClick(email)}
               >
-                <div className="flex items-start gap-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleStar(email.id, email.is_starred);
-                      }}
-                      className="text-muted-foreground hover:text-warning transition-colors"
-                    >
-                      <Star
-                        className={`w-4 h-4 ${
-                          email.is_starred ? "fill-warning text-warning" : ""
-                        }`}
-                      />
-                    </button>
-                  </div>
+                <div className="flex items-start gap-3">
+                  {/* Star Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleStar(email.id, email.is_starred);
+                    }}
+                    className="mt-1 text-muted-foreground hover:text-warning transition-colors"
+                  >
+                    <Star
+                      className={`w-4 h-4 ${
+                        email.is_starred ? "fill-warning text-warning" : ""
+                      }`}
+                    />
+                  </button>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
+                  {/* Email Content */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className={`font-medium ${!email.is_read ? "font-bold" : ""} truncate`}>
+                        <span className={`text-sm truncate ${!email.is_read ? "font-bold" : "font-medium"}`}>
                           {email.from_name || email.from_email}
                         </span>
                         {email.has_attachments && (
-                          <Paperclip className="w-4 h-4 text-muted-foreground" />
+                          <Paperclip className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {format(new Date(email.received_at), "MMM d, h:mm a")}
                       </span>
                     </div>
 
-                    <div className={`text-sm mb-1 ${!email.is_read ? "font-semibold" : ""} truncate`}> 
-                      {email.subject}
+                    <div className={`text-sm truncate ${!email.is_read ? "font-semibold text-foreground" : "text-muted-foreground"}`}> 
+                      {email.subject || "(No Subject)"}
                     </div>
 
-                    <div className="text-sm text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground line-clamp-2">
                       {email.snippet}
                     </div>
 
                     {email.labels && email.labels.length > 0 && (
-                      <div className="flex gap-1 mt-2">
-                        {email.labels.map((label, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
+                      <div className="flex gap-1 mt-2 flex-wrap">
+                        {email.labels.slice(0, 3).map((label: any, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-[10px] px-2 py-0">
                             {label}
                           </Badge>
                         ))}
+                        {email.labels.length > 3 && (
+                          <Badge variant="secondary" className="text-[10px] px-2 py-0">
+                            +{email.labels.length - 3}
+                          </Badge>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -344,8 +372,9 @@ export function EmailInbox() {
                         e.stopPropagation();
                         moveToFolder(email.id, "archive");
                       }}
+                      className="h-7 w-7 p-0"
                     >
-                      <Archive className="w-4 h-4" />
+                      <Archive className="w-3 h-3" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -354,8 +383,9 @@ export function EmailInbox() {
                         e.stopPropagation();
                         moveToFolder(email.id, "trash");
                       }}
+                      className="h-7 w-7 p-0 hover:text-destructive"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
