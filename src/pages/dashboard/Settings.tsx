@@ -1,0 +1,86 @@
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Settings as SettingsIcon, User, Bell, Shield, Database } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+
+export default function Settings() {
+  const { profile, roles } = useAuth();
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Settings</h1>
+          <p className="text-muted-foreground">Manage your account and application settings</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                <CardTitle>Profile Information</CardTitle>
+              </div>
+              <CardDescription>Your account details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Name</p>
+                <p className="text-sm">{profile?.first_name} {profile?.last_name}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Email</p>
+                <p className="text-sm">{profile?.email}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <CardTitle>Roles & Permissions</CardTitle>
+              </div>
+              <CardDescription>Your access levels</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {roles.map((role) => (
+                <div key={role.role} className="text-sm">
+                  <span className="font-medium capitalize">{role.role.replace('_', ' ')}</span>
+                  {role.tenant_id && <span className="text-muted-foreground"> • Tenant scoped</span>}
+                  {role.franchise_id && <span className="text-muted-foreground"> • Franchise scoped</span>}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" />
+                <CardTitle>Notifications</CardTitle>
+              </div>
+              <CardDescription>Configure notification preferences</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Notification settings coming soon</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-primary" />
+                <CardTitle>Data Management</CardTitle>
+              </div>
+              <CardDescription>Export and backup options</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Data management tools coming soon</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

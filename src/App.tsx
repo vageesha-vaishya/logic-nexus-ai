@@ -11,6 +11,11 @@ import Auth from "./pages/Auth";
 import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import Accounts from "./pages/dashboard/Accounts";
+import Contacts from "./pages/dashboard/Contacts";
+import Leads from "./pages/dashboard/Leads";
+import Activities from "./pages/dashboard/Activities";
+import Settings from "./pages/dashboard/Settings";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +36,46 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/accounts" 
+              element={
+                <ProtectedRoute>
+                  <Accounts />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/contacts" 
+              element={
+                <ProtectedRoute>
+                  <Contacts />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/leads" 
+              element={
+                <ProtectedRoute>
+                  <Leads />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/activities" 
+              element={
+                <ProtectedRoute>
+                  <Activities />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/settings" 
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               } 
             />

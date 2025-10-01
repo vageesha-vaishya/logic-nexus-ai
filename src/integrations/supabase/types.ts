@@ -14,6 +14,211 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          account_type: Database["public"]["Enums"]["account_type"] | null
+          annual_revenue: number | null
+          billing_address: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          email: string | null
+          employee_count: number | null
+          franchise_id: string | null
+          id: string
+          industry: string | null
+          name: string
+          owner_id: string | null
+          phone: string | null
+          shipping_address: Json | null
+          status: Database["public"]["Enums"]["account_status"] | null
+          tenant_id: string
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
+          annual_revenue?: number | null
+          billing_address?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          email?: string | null
+          employee_count?: number | null
+          franchise_id?: string | null
+          id?: string
+          industry?: string | null
+          name: string
+          owner_id?: string | null
+          phone?: string | null
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["account_status"] | null
+          tenant_id: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_type?: Database["public"]["Enums"]["account_type"] | null
+          annual_revenue?: number | null
+          billing_address?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          email?: string | null
+          employee_count?: number | null
+          franchise_id?: string | null
+          id?: string
+          industry?: string | null
+          name?: string
+          owner_id?: string | null
+          phone?: string | null
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["account_status"] | null
+          tenant_id?: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activities: {
+        Row: {
+          account_id: string | null
+          activity_type: Database["public"]["Enums"]["activity_type"]
+          assigned_to: string | null
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          franchise_id: string | null
+          id: string
+          lead_id: string | null
+          priority: Database["public"]["Enums"]["priority_level"] | null
+          status: Database["public"]["Enums"]["activity_status"] | null
+          subject: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          activity_type: Database["public"]["Enums"]["activity_type"]
+          assigned_to?: string | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          franchise_id?: string | null
+          id?: string
+          lead_id?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"] | null
+          status?: Database["public"]["Enums"]["activity_status"] | null
+          subject: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          activity_type?: Database["public"]["Enums"]["activity_type"]
+          assigned_to?: string | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          franchise_id?: string | null
+          id?: string
+          lead_id?: string | null
+          priority?: Database["public"]["Enums"]["priority_level"] | null
+          status?: Database["public"]["Enums"]["activity_status"] | null
+          subject?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -51,6 +256,105 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          account_id: string | null
+          address: Json | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          first_name: string
+          franchise_id: string | null
+          id: string
+          is_primary: boolean | null
+          last_name: string
+          linkedin_url: string | null
+          mobile: string | null
+          notes: string | null
+          owner_id: string | null
+          phone: string | null
+          tenant_id: string
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          address?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          first_name: string
+          franchise_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          last_name: string
+          linkedin_url?: string | null
+          mobile?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          tenant_id: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          address?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          first_name?: string
+          franchise_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          last_name?: string
+          linkedin_url?: string | null
+          mobile?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -153,6 +457,124 @@ export type Database = {
           },
           {
             foreignKeyName: "invitations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          company: string | null
+          converted_account_id: string | null
+          converted_at: string | null
+          converted_contact_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          email: string | null
+          estimated_value: number | null
+          expected_close_date: string | null
+          first_name: string
+          franchise_id: string | null
+          id: string
+          last_name: string
+          notes: string | null
+          owner_id: string | null
+          phone: string | null
+          source: Database["public"]["Enums"]["lead_source"] | null
+          status: Database["public"]["Enums"]["lead_status"] | null
+          tenant_id: string
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          converted_account_id?: string | null
+          converted_at?: string | null
+          converted_contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          email?: string | null
+          estimated_value?: number | null
+          expected_close_date?: string | null
+          first_name: string
+          franchise_id?: string | null
+          id?: string
+          last_name: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          source?: Database["public"]["Enums"]["lead_source"] | null
+          status?: Database["public"]["Enums"]["lead_status"] | null
+          tenant_id: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          converted_account_id?: string | null
+          converted_at?: string | null
+          converted_contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          email?: string | null
+          estimated_value?: number | null
+          expected_close_date?: string | null
+          first_name?: string
+          franchise_id?: string | null
+          id?: string
+          last_name?: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string | null
+          source?: Database["public"]["Enums"]["lead_source"] | null
+          status?: Database["public"]["Enums"]["lead_status"] | null
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_converted_account_id_fkey"
+            columns: ["converted_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_contact_id_fkey"
+            columns: ["converted_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -323,7 +745,28 @@ export type Database = {
       }
     }
     Enums: {
+      account_status: "active" | "inactive" | "pending"
+      account_type: "prospect" | "customer" | "partner" | "vendor"
+      activity_status: "planned" | "in_progress" | "completed" | "cancelled"
+      activity_type: "call" | "email" | "meeting" | "task" | "note"
       app_role: "platform_admin" | "tenant_admin" | "franchise_admin" | "user"
+      lead_source:
+        | "website"
+        | "referral"
+        | "email"
+        | "phone"
+        | "social"
+        | "event"
+        | "other"
+      lead_status:
+        | "new"
+        | "contacted"
+        | "qualified"
+        | "proposal"
+        | "negotiation"
+        | "won"
+        | "lost"
+      priority_level: "low" | "medium" | "high" | "urgent"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -451,7 +894,30 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_status: ["active", "inactive", "pending"],
+      account_type: ["prospect", "customer", "partner", "vendor"],
+      activity_status: ["planned", "in_progress", "completed", "cancelled"],
+      activity_type: ["call", "email", "meeting", "task", "note"],
       app_role: ["platform_admin", "tenant_admin", "franchise_admin", "user"],
+      lead_source: [
+        "website",
+        "referral",
+        "email",
+        "phone",
+        "social",
+        "event",
+        "other",
+      ],
+      lead_status: [
+        "new",
+        "contacted",
+        "qualified",
+        "proposal",
+        "negotiation",
+        "won",
+        "lost",
+      ],
+      priority_level: ["low", "medium", "high", "urgent"],
     },
   },
 } as const
