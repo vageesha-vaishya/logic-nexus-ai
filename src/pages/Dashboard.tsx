@@ -2,6 +2,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, UserPlus, CheckSquare } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,6 +14,7 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     accounts: 0,
     leads: 0,
@@ -60,28 +62,32 @@ export default function Dashboard() {
       value: loading ? '-' : stats.accounts.toString(),
       icon: Building2,
       change: '+0%',
-      trend: 'up'
+      trend: 'up',
+      path: '/dashboard/accounts'
     },
     {
       title: 'Active Leads',
       value: loading ? '-' : stats.leads.toString(),
       icon: UserPlus,
       change: '+0%',
-      trend: 'up'
+      trend: 'up',
+      path: '/dashboard/leads'
     },
     {
       title: 'Contacts',
       value: loading ? '-' : stats.contacts.toString(),
       icon: Users,
       change: '+0%',
-      trend: 'up'
+      trend: 'up',
+      path: '/dashboard/contacts'
     },
     {
       title: 'Activities',
       value: loading ? '-' : stats.activities.toString(),
       icon: CheckSquare,
       change: '+0%',
-      trend: 'up'
+      trend: 'up',
+      path: '/dashboard/activities'
     }
   ];
 
@@ -97,7 +103,11 @@ export default function Dashboard() {
           {statCards.map((stat) => {
             const Icon = stat.icon;
             return (
-              <Card key={stat.title}>
+              <Card 
+                key={stat.title} 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(stat.path)}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
                     {stat.title}
