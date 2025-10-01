@@ -126,18 +126,18 @@ const App = () => (
               } 
             />
             <Route 
-              path="/dashboard/leads/:id" 
-              element={
-                <ProtectedRoute>
-                  <LeadDetail />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/dashboard/leads/import-export" 
               element={
                 <ProtectedRoute>
                   <LeadsImportExport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/leads/:id" 
+              element={
+                <ProtectedRoute>
+                  <LeadDetail />
                 </ProtectedRoute>
               } 
             />
