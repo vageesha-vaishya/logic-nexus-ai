@@ -13,11 +13,21 @@ export default function AccountNew() {
 
   const handleCreate = async (formData: any) => {
     try {
+      // For platform admins, use the tenant_id from form, otherwise use context
+      const tenantId = context.isPlatformAdmin 
+        ? (formData.tenant_id || null)
+        : context.tenantId;
+
+      if (!tenantId) {
+        toast.error('Please select a tenant');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('accounts')
         .insert({
           ...formData,
-          tenant_id: context.tenantId,
+          tenant_id: tenantId,
           franchise_id: context.franchiseId,
           annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
           employee_count: formData.employee_count ? parseInt(formData.employee_count) : null,

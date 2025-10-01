@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,8 @@ const accountSchema = z.object({
   annual_revenue: z.string().optional(),
   employee_count: z.string().optional(),
   description: z.string().optional(),
+  tenant_id: z.string().optional(),
+  franchise_id: z.string().optional(),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
@@ -35,6 +37,9 @@ interface AccountFormProps {
 export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<AccountFormData | null>(null);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
+  const { supabase, context } = useCRM();
   
   const form = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -49,10 +54,43 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
       annual_revenue: initialData?.annual_revenue || '',
       employee_count: initialData?.employee_count || '',
       description: initialData?.description || '',
+      tenant_id: '',
+      franchise_id: '',
     },
   });
 
   const { isSubmitting } = form.formState;
+
+  useEffect(() => {
+    if (context.isPlatformAdmin) {
+      loadTenants();
+    } else if (context.isTenantAdmin) {
+      loadFranchises();
+    }
+  }, [context]);
+
+  const loadTenants = async () => {
+    const { data } = await supabase
+      .from('tenants')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (data) setTenants(data);
+  };
+
+  const loadFranchises = async () => {
+    if (!context.tenantId) return;
+    
+    const { data } = await supabase
+      .from('franchises')
+      .select('id, name')
+      .eq('tenant_id', context.tenantId)
+      .eq('is_active', true)
+      .order('name');
+    
+    if (data) setFranchises(data);
+  };
 
   const handleFormSubmit = (data: AccountFormData) => {
     setPendingData(data);
@@ -132,6 +170,60 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
               </FormItem>
             )}
           />
+
+          {context.isPlatformAdmin && (
+            <FormField
+              control={form.control}
+              name="tenant_id"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Tenant *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select tenant" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {tenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {(context.isPlatformAdmin || context.isTenantAdmin) && franchises.length > 0 && (
+            <FormField
+              control={form.control}
+              name="franchise_id"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Franchise (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select franchise" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {franchises.map((franchise) => (
+                        <SelectItem key={franchise.id} value={franchise.id}>
+                          {franchise.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
           <FormField
             control={form.control}
