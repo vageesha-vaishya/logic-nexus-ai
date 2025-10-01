@@ -464,9 +464,79 @@ export type Database = {
           },
         ]
       }
+      lead_assignment_rules: {
+        Row: {
+          assigned_to: string | null
+          created_at: string | null
+          criteria: Json
+          id: string
+          is_active: boolean | null
+          priority: number | null
+          rule_name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string | null
+          criteria: Json
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          rule_name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string | null
+          criteria?: Json
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          rule_name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      lead_scoring_rules: {
+        Row: {
+          created_at: string | null
+          criteria_type: string
+          criteria_value: string
+          id: string
+          is_active: boolean | null
+          score_points: number
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          criteria_type: string
+          criteria_value: string
+          id?: string
+          is_active?: boolean | null
+          score_points: number
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          criteria_type?: string
+          criteria_value?: string
+          id?: string
+          is_active?: boolean | null
+          score_points?: number
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           company: string | null
+          conversion_probability: number | null
           converted_account_id: string | null
           converted_at: string | null
           converted_contact_id: string | null
@@ -479,10 +549,13 @@ export type Database = {
           first_name: string
           franchise_id: string | null
           id: string
+          last_activity_date: string | null
           last_name: string
+          lead_score: number | null
           notes: string | null
           owner_id: string | null
           phone: string | null
+          qualification_status: string | null
           source: Database["public"]["Enums"]["lead_source"] | null
           status: Database["public"]["Enums"]["lead_status"] | null
           tenant_id: string
@@ -491,6 +564,7 @@ export type Database = {
         }
         Insert: {
           company?: string | null
+          conversion_probability?: number | null
           converted_account_id?: string | null
           converted_at?: string | null
           converted_contact_id?: string | null
@@ -503,10 +577,13 @@ export type Database = {
           first_name: string
           franchise_id?: string | null
           id?: string
+          last_activity_date?: string | null
           last_name: string
+          lead_score?: number | null
           notes?: string | null
           owner_id?: string | null
           phone?: string | null
+          qualification_status?: string | null
           source?: Database["public"]["Enums"]["lead_source"] | null
           status?: Database["public"]["Enums"]["lead_status"] | null
           tenant_id: string
@@ -515,6 +592,7 @@ export type Database = {
         }
         Update: {
           company?: string | null
+          conversion_probability?: number | null
           converted_account_id?: string | null
           converted_at?: string | null
           converted_contact_id?: string | null
@@ -527,10 +605,13 @@ export type Database = {
           first_name?: string
           franchise_id?: string | null
           id?: string
+          last_activity_date?: string | null
           last_name?: string
+          lead_score?: number | null
           notes?: string | null
           owner_id?: string | null
           phone?: string | null
+          qualification_status?: string | null
           source?: Database["public"]["Enums"]["lead_source"] | null
           status?: Database["public"]["Enums"]["lead_status"] | null
           tenant_id?: string
@@ -827,6 +908,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_lead_score: {
+        Args: { lead_id: string }
+        Returns: number
+      }
       get_user_franchise_id: {
         Args: { check_user_id: string }
         Returns: string
