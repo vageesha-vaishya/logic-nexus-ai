@@ -1,8 +1,7 @@
 import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, Mail } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-// import sosLogo from '@/assets/sos-logo.png';
-import ShieldLogo from '@/components/branding/ShieldLogo';
+import Logo from '@/components/branding/Logo';
 import { APP_MENU } from '@/config/navigation';
 import {
   Sidebar,
@@ -49,10 +48,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>
             {collapsed ? (
               <div className="flex justify-center">
-                <ShieldLogo size={32} variant="monochrome" tile="navy" hoverGlow={false} />
+                <Logo size={32} />
               </div>
             ) : (
-              <ShieldLogo size={36} variant="golden" glowStrength="strong" showWordmark wordmarkClassName="hidden sm:block" />
+              <Logo size={36} showWordmark wordmarkClassName="hidden sm:block" />
             )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
