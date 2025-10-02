@@ -50,6 +50,7 @@ import Groups from "./pages/dashboard/Groups";
 import Calendar from "./pages/dashboard/Calendar";
 import Dashboards from "./pages/dashboard/Dashboards";
 import More from "./pages/dashboard/More";
+import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
 
 const queryClient = new QueryClient();
 
@@ -185,6 +186,14 @@ const App = () => (
                   <Settings />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/dashboard/permissions" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.users.manage"]}>
+                  <PermissionsMatrix />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/dashboard/tenants" 
