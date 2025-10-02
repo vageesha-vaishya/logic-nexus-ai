@@ -65,6 +65,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data || [];
   };
 
+  const fetchCustomPermissions = async (userId: string): Promise<Permission[]> => {
+    const { data, error } = await supabase
+      .rpc('get_user_custom_permissions', { check_user_id: userId });
+
+    if (error) {
+      console.error('Error fetching custom permissions:', error);
+      return [];
+    }
+    return (data || []).map((row: any) => row.permission_key as Permission);
+  };
+
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
@@ -85,10 +96,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(profileData);
       const rolesData = await fetchUserRoles(user.id);
       setRoles(rolesData);
-      const perms = unionPermissions(
+      
+      // Combine standard role permissions with custom role permissions
+      const standardPerms = unionPermissions(
         ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
       );
-      setPermissions(perms);
+      const customPerms = await fetchCustomPermissions(user.id);
+      const allPerms = unionPermissions(standardPerms, customPerms);
+      
+      setPermissions(allPerms);
     }
   };
 
@@ -102,12 +118,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (currentSession?.user) {
           setTimeout(() => {
             fetchProfile(currentSession.user.id).then(setProfile);
-            fetchUserRoles(currentSession.user.id).then((rolesData) => {
+            fetchUserRoles(currentSession.user.id).then(async (rolesData) => {
               setRoles(rolesData);
-              const perms = unionPermissions(
+              const standardPerms = unionPermissions(
                 ...rolesData.map((r) => ROLE_PERMISSIONS[r.role])
               );
-              setPermissions(perms);
+              const customPerms = await fetchCustomPermissions(currentSession.user.id);
+              const allPerms = unionPermissions(standardPerms, customPerms);
+              setPermissions(allPerms);
             });
           }, 0);
         } else {
@@ -125,14 +143,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentSession?.user) {
         Promise.all([
           fetchProfile(currentSession.user.id),
-          fetchUserRoles(currentSession.user.id)
-        ]).then(([profileData, rolesData]) => {
+          fetchUserRoles(currentSession.user.id),
+          fetchCustomPermissions(currentSession.user.id)
+        ]).then(([profileData, rolesData, customPerms]) => {
           setProfile(profileData);
           setRoles(rolesData);
-          const perms = unionPermissions(
+          const standardPerms = unionPermissions(
             ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
           );
-          setPermissions(perms);
+          const allPerms = unionPermissions(standardPerms, customPerms);
+          setPermissions(allPerms);
           setLoading(false);
         });
       } else {
@@ -146,11 +166,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Recompute permissions any time roles change
   useEffect(() => {
-    const perms = unionPermissions(
-      ...roles.map((r) => ROLE_PERMISSIONS[r.role])
-    );
-    setPermissions(perms);
-  }, [roles]);
+    if (user) {
+      const standardPerms = unionPermissions(
+        ...roles.map((r) => ROLE_PERMISSIONS[r.role])
+      );
+      fetchCustomPermissions(user.id).then(customPerms => {
+        const allPerms = unionPermissions(standardPerms, customPerms);
+        setPermissions(allPerms);
+      });
+    }
+  }, [roles, user]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
