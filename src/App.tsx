@@ -51,6 +51,7 @@ import Calendar from "./pages/dashboard/Calendar";
 import Dashboards from "./pages/dashboard/Dashboards";
 import More from "./pages/dashboard/More";
 import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
+import CustomRoles from "./pages/dashboard/CustomRoles";
 
 const queryClient = new QueryClient();
 
@@ -333,6 +334,7 @@ const App = () => (
             <Route path="/dashboard/calendar" element={<ProtectedRoute requiredPermissions={["calendar.view"]}><Calendar /></ProtectedRoute>} />
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
+            <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </TooltipProvider>

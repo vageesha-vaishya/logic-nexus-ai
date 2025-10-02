@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { UserForm } from '@/components/admin/UserForm';
+import { UserRoleAssignment } from '@/components/roles/UserRoleAssignment';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users2, Trash2, ArrowLeft } from 'lucide-react';
@@ -95,7 +96,7 @@ export default function UserDetail() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/users')}>
@@ -129,17 +130,21 @@ export default function UserDetail() {
           </AlertDialog>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users2 className="h-5 w-5" />
-              User Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <UserForm user={user} onSuccess={fetchUser} />
-          </CardContent>
-        </Card>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users2 className="h-5 w-5" />
+                User Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <UserForm user={user} onSuccess={fetchUser} />
+            </CardContent>
+          </Card>
+
+          <UserRoleAssignment userId={user.id} />
+        </div>
       </div>
     </DashboardLayout>
   );
