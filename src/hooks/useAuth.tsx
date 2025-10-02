@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -145,11 +145,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const mergedPerms = unionPermissions(standardPerms, granted);
               const finalPerms = mergedPerms.filter(p => !denied.includes(p));
               setPermissions(finalPerms);
+              setLoading(false);
             });
           }, 0);
         } else {
           setProfile(null);
           setRoles([]);
+          setPermissions([]);
+          setLoading(false);
         }
       }
     );
@@ -158,24 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-
-      if (currentSession?.user) {
-        Promise.all([
-          fetchProfile(currentSession.user.id),
-          fetchUserRoles(currentSession.user.id),
-          fetchCustomPermissions(currentSession.user.id)
-        ]).then(([profileData, rolesData, { granted, denied }]) => {
-          setProfile(profileData);
-          setRoles(rolesData);
-          const standardPerms = unionPermissions(
-            ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
-          );
-          const mergedPerms = unionPermissions(standardPerms, granted);
-          const finalPerms = mergedPerms.filter(p => !denied.includes(p));
-          setPermissions(finalPerms);
-          setLoading(false);
-        });
-      } else {
+      if (!currentSession?.user) {
         setPermissions([]);
         setLoading(false);
       }
