@@ -102,7 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (currentSession?.user) {
           setTimeout(() => {
             fetchProfile(currentSession.user.id).then(setProfile);
-            fetchUserRoles(currentSession.user.id).then(setRoles);
+            fetchUserRoles(currentSession.user.id).then((rolesData) => {
+              setRoles(rolesData);
+              const perms = unionPermissions(
+                ...rolesData.map((r) => ROLE_PERMISSIONS[r.role])
+              );
+              setPermissions(perms);
+            });
           }, 0);
         } else {
           setProfile(null);
@@ -137,6 +143,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Recompute permissions any time roles change
+  useEffect(() => {
+    const perms = unionPermissions(
+      ...roles.map((r) => ROLE_PERMISSIONS[r.role])
+    );
+    setPermissions(perms);
+  }, [roles]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
