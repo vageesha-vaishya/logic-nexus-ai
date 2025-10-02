@@ -35,7 +35,10 @@ const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   description: z.string().optional(),
   is_active: z.boolean().default(true),
-  permissions: z.array(z.string()).min(1, "Select at least one permission"),
+  permissions: z.array(z.object({
+    key: z.string(),
+    access_type: z.enum(['grant', 'deny']),
+  })).min(1, "Select at least one permission"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -76,7 +79,10 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
         name: role.name,
         description: role.description || "",
         is_active: role.is_active,
-        permissions: role.custom_role_permissions?.map((p: any) => p.permission_key) || [],
+        permissions: role.custom_role_permissions?.map((p: any) => ({
+          key: p.permission_key,
+          access_type: p.access_type || 'grant'
+        })) || [],
       });
     } else {
       form.reset({
@@ -118,7 +124,8 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
             .insert(
               data.permissions.map((perm) => ({
                 role_id: role.id,
-                permission_key: perm,
+                permission_key: perm.key,
+                access_type: perm.access_type,
               }))
             );
 
@@ -146,7 +153,8 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
             .insert(
               data.permissions.map((perm) => ({
                 role_id: newRole.id,
-                permission_key: perm,
+                permission_key: perm.key,
+                access_type: perm.access_type,
               }))
             );
 
@@ -240,40 +248,62 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
                   <div className="mb-4">
                     <FormLabel>Permissions</FormLabel>
                     <FormDescription>
-                      Select the permissions this role should have
+                      Grant or deny permissions to override default role permissions
                     </FormDescription>
                   </div>
                   <ScrollArea className="h-[300px] rounded-md border p-4">
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       {allPermissions.map((permission) => (
                         <FormField
                           key={permission}
                           control={form.control}
                           name="permissions"
                           render={({ field }) => {
+                            const existingPerm = field.value?.find(p => p.key === permission);
+                            const isGranted = existingPerm?.access_type === 'grant';
+                            const isDenied = existingPerm?.access_type === 'deny';
+                            
                             return (
-                              <FormItem
+                              <div
                                 key={permission}
-                                className="flex flex-row items-start space-x-3 space-y-0"
+                                className="flex items-center justify-between p-2 rounded hover:bg-accent"
                               >
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(permission)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...field.value, permission])
-                                        : field.onChange(
-                                            field.value?.filter(
-                                              (value) => value !== permission
-                                            )
-                                          );
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal cursor-pointer">
+                                <FormLabel className="font-normal flex-1 cursor-pointer">
                                   {permission}
                                 </FormLabel>
-                              </FormItem>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={isGranted ? "default" : "outline"}
+                                    onClick={() => {
+                                      const newPerms = field.value?.filter(p => p.key !== permission) || [];
+                                      if (!isGranted) {
+                                        field.onChange([...newPerms, { key: permission, access_type: 'grant' as const }]);
+                                      } else {
+                                        field.onChange(newPerms);
+                                      }
+                                    }}
+                                  >
+                                    Grant
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={isDenied ? "destructive" : "outline"}
+                                    onClick={() => {
+                                      const newPerms = field.value?.filter(p => p.key !== permission) || [];
+                                      if (!isDenied) {
+                                        field.onChange([...newPerms, { key: permission, access_type: 'deny' as const }]);
+                                      } else {
+                                        field.onChange(newPerms);
+                                      }
+                                    }}
+                                  >
+                                    Deny
+                                  </Button>
+                                </div>
+                              </div>
                             );
                           }}
                         />

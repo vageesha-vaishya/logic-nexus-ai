@@ -65,15 +65,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data || [];
   };
 
-  const fetchCustomPermissions = async (userId: string): Promise<Permission[]> => {
+  const fetchCustomPermissions = async (userId: string): Promise<{ granted: Permission[], denied: Permission[] }> => {
     const { data, error } = await supabase
       .rpc('get_user_custom_permissions', { check_user_id: userId });
 
     if (error) {
       console.error('Error fetching custom permissions:', error);
-      return [];
+      return { granted: [], denied: [] };
     }
-    return (data || []).map((row: any) => row.permission_key as Permission);
+    
+    const granted: Permission[] = [];
+    const denied: Permission[] = [];
+    
+    (data || []).forEach((row: any) => {
+      const perm = row.permission_key as Permission;
+      if (row.access_type === 'grant') {
+        granted.push(perm);
+      } else if (row.access_type === 'deny') {
+        denied.push(perm);
+      }
+    });
+    
+    return { granted, denied };
   };
 
   const fetchProfile = async (userId: string) => {
@@ -101,10 +114,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const standardPerms = unionPermissions(
         ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
       );
-      const customPerms = await fetchCustomPermissions(user.id);
-      const allPerms = unionPermissions(standardPerms, customPerms);
+      const { granted, denied } = await fetchCustomPermissions(user.id);
       
-      setPermissions(allPerms);
+      // Merge granted permissions with standard permissions
+      const mergedPerms = unionPermissions(standardPerms, granted);
+      
+      // Remove denied permissions (custom roles override)
+      const finalPerms = mergedPerms.filter(p => !denied.includes(p));
+      
+      setPermissions(finalPerms);
     }
   };
 
@@ -123,9 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const standardPerms = unionPermissions(
                 ...rolesData.map((r) => ROLE_PERMISSIONS[r.role])
               );
-              const customPerms = await fetchCustomPermissions(currentSession.user.id);
-              const allPerms = unionPermissions(standardPerms, customPerms);
-              setPermissions(allPerms);
+              const { granted, denied } = await fetchCustomPermissions(currentSession.user.id);
+              const mergedPerms = unionPermissions(standardPerms, granted);
+              const finalPerms = mergedPerms.filter(p => !denied.includes(p));
+              setPermissions(finalPerms);
             });
           }, 0);
         } else {
@@ -145,14 +164,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchProfile(currentSession.user.id),
           fetchUserRoles(currentSession.user.id),
           fetchCustomPermissions(currentSession.user.id)
-        ]).then(([profileData, rolesData, customPerms]) => {
+        ]).then(([profileData, rolesData, { granted, denied }]) => {
           setProfile(profileData);
           setRoles(rolesData);
           const standardPerms = unionPermissions(
             ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
           );
-          const allPerms = unionPermissions(standardPerms, customPerms);
-          setPermissions(allPerms);
+          const mergedPerms = unionPermissions(standardPerms, granted);
+          const finalPerms = mergedPerms.filter(p => !denied.includes(p));
+          setPermissions(finalPerms);
           setLoading(false);
         });
       } else {
@@ -170,9 +190,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const standardPerms = unionPermissions(
         ...roles.map((r) => ROLE_PERMISSIONS[r.role])
       );
-      fetchCustomPermissions(user.id).then(customPerms => {
-        const allPerms = unionPermissions(standardPerms, customPerms);
-        setPermissions(allPerms);
+      fetchCustomPermissions(user.id).then(({ granted, denied }) => {
+        const mergedPerms = unionPermissions(standardPerms, granted);
+        const finalPerms = mergedPerms.filter(p => !denied.includes(p));
+        setPermissions(finalPerms);
       });
     }
   }, [roles, user]);

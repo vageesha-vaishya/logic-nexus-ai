@@ -361,18 +361,21 @@ export type Database = {
       }
       custom_role_permissions: {
         Row: {
+          access_type: string
           created_at: string | null
           id: string
           permission_key: string
           role_id: string
         }
         Insert: {
+          access_type?: string
           created_at?: string | null
           id?: string
           permission_key: string
           role_id: string
         }
         Update: {
+          access_type?: string
           created_at?: string | null
           id?: string
           permission_key?: string
@@ -1689,6 +1692,7 @@ export type Database = {
       get_user_custom_permissions: {
         Args: { check_user_id: string }
         Returns: {
+          access_type: string
           permission_key: string
         }[]
       }
