@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import type { Permission } from '@/config/permissions';
 
 type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
@@ -8,14 +9,16 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: AppRole;
   requireAuth?: boolean;
+  requiredPermissions?: Permission[]; // Optional permissions gate (ANY match)
 }
 
 export function ProtectedRoute({ 
   children, 
   requiredRole,
-  requireAuth = true 
+  requireAuth = true,
+  requiredPermissions
 }: ProtectedRouteProps) {
-  const { user, loading, hasRole } = useAuth();
+  const { user, loading, hasRole, hasPermission } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -32,6 +35,13 @@ export function ProtectedRoute({
 
   if (requiredRole && !hasRole(requiredRole)) {
     return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    const hasAny = requiredPermissions.some(p => hasPermission(p));
+    if (!hasAny) {
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   return <>{children}</>;

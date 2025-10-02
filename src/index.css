@@ -55,6 +55,17 @@ All colors MUST be HSL.
 
     /* Custom design tokens */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(197 71% 52%) 100%);
+    /* Golden shaded brand gradient for logo marks */
+    --gradient-brand-golden: linear-gradient(
+      135deg,
+      hsl(45 96% 62%) 0%,
+      hsl(40 94% 58%) 35%,
+      hsl(35 88% 48%) 100%
+    );
+    /* Brand gold tones for icon strokes/fills */
+    --brand-gold: 40 94% 58%;
+    --brand-gold-light: 48 96% 70%;
+    --brand-gold-dark: 35 88% 48%;
     --gradient-hero: linear-gradient(135deg, hsl(222 47% 11%) 0%, hsl(217 32% 17%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 71% 55%) 100%);
     --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
@@ -114,6 +125,43 @@ All colors MUST be HSL.
 
 /* Email content hardening to prevent horizontal overflow and ensure responsive HTML */
 @layer components {
+  /* Mild glow pulse animation for shield boundary */
+  .animate-glow-pulse {
+    animation: glow-pulse 2.2s ease-in-out infinite;
+  }
+
+  /* Hover-only animation hooks for ShieldLogo */
+  .shield-logo:hover .glow-stroke--subtle {
+    animation: glow-pulse 2.2s ease-in-out infinite;
+  }
+  .shield-logo:hover .glow-stroke--strong {
+    animation: glow-pulse-strong 2s ease-in-out infinite;
+  }
+
+  @keyframes glow-pulse {
+    0% {
+      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
+    }
+    50% {
+      filter: drop-shadow(0 0 8px hsl(var(--glow-color) / 0.35));
+    }
+    100% {
+      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
+    }
+  }
+
+  /* Stronger glow variant for hover-only use */
+  @keyframes glow-pulse-strong {
+    0% {
+      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
+    }
+    50% {
+      filter: drop-shadow(0 0 12px hsl(var(--glow-color) / 0.45));
+    }
+    100% {
+      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
+    }
+  }
   .email-content {
     max-width: 100%;
     word-break: break-word;

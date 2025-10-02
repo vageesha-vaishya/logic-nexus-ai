@@ -1,3 +1,5 @@
+/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
+/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,16 +14,36 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const requireEnv = (name: string) => {
+      const v = Deno.env.get(name);
+      if (!v) throw new Error(`Missing environment variable: ${name}`);
+      return v;
+    };
 
-    const { tenantId, franchiseId, limit = 50 } = await req.json();
+    const baseUrl = requireEnv("SUPABASE_URL");
+    const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(baseUrl, serviceKey);
+
+    let payload: any;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    let { tenantId, franchiseId, limit = 50 } = payload || {};
 
     if (!tenantId) {
       throw new Error("Missing required field: tenantId");
     }
+
+    // Normalize and clamp limit
+    limit = Number(limit);
+    if (!Number.isFinite(limit)) limit = 50;
+    limit = Math.max(1, Math.min(500, limit));
 
     // Fetch active accounts for tenant
     let q = supabase
@@ -36,8 +58,6 @@ serve(async (req) => {
     const { data: accounts, error } = await q;
     if (error) throw error;
 
-    const baseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const syncUrl = `${baseUrl}/functions/v1/sync-emails`;
 
     let synced = 0;

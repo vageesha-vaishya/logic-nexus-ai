@@ -1,3 +1,4 @@
+/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,12 +13,28 @@ serve(async (req) => {
   }
 
   try {
+    const requireEnv = (name: string) => {
+      const v = Deno.env.get(name);
+      if (!v) throw new Error(`Missing environment variable: ${name}`);
+      return v;
+    };
+
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      requireEnv("SUPABASE_URL"),
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    const { email, tenantId, accountId, direction, page = 1, pageSize = 25 } = await req.json();
+    let payload: any;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    let { email, tenantId, accountId, direction, page = 1, pageSize = 25 } = payload || {};
 
     if (!email) {
       throw new Error("Missing required field: email");
@@ -34,13 +51,18 @@ serve(async (req) => {
     if (accountId) baseQuery = baseQuery.eq("account_id", accountId);
     if (direction) baseQuery = baseQuery.eq("direction", direction);
 
-    // Paging
+    // Paging with guardrails
+    page = Number(page);
+    pageSize = Number(pageSize);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+    if (!Number.isFinite(pageSize)) pageSize = 25;
+    pageSize = Math.max(1, Math.min(100, pageSize));
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
     // 1) From address direct match
     const { data: fromMatches, error: fromErr } = await baseQuery
-      .ilike("from_email", targetEmail)
+      .ilike("from_email", `%${targetEmail}%`)
       .order("received_at", { ascending: false })
       .range(from, to);
 

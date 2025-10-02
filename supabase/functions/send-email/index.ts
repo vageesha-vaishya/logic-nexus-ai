@@ -1,3 +1,4 @@
+/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,12 +13,26 @@ serve(async (req) => {
   }
 
   try {
+    const requireEnv = (name: string) => {
+      const v = Deno.env.get(name);
+      if (!v) throw new Error(`Missing environment variable: ${name}`);
+      return v;
+    };
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      requireEnv("SUPABASE_URL"),
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    const { accountId, to, cc, bcc, subject, body, attachments } = await req.json();
+    let payload: any;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const { accountId, to, cc, bcc, subject, body, attachments } = payload || {};
 
     if (!accountId || !to || !subject) {
       throw new Error("Missing required fields: accountId, to, subject");

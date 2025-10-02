@@ -1,7 +1,9 @@
 import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, Mail } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import sosLogo from '@/assets/sos-logo.png';
+// import sosLogo from '@/assets/sos-logo.png';
+import ShieldLogo from '@/components/branding/ShieldLogo';
+import { APP_MENU } from '@/config/navigation';
 import {
   Sidebar,
   SidebarContent,
@@ -22,23 +24,19 @@ export function AppSidebar() {
   const { signOut, profile } = useAuth();
   const collapsed = state === 'collapsed';
 
-  const mainItems = [
-    { title: 'Dashboard', url: '/dashboard', icon: Home },
-    { title: 'Accounts', url: '/dashboard/accounts', icon: Building2 },
-    { title: 'Contacts', url: '/dashboard/contacts', icon: Users },
-    { title: 'Leads', url: '/dashboard/leads', icon: UserPlus },
-    { title: 'Opportunities', url: '/dashboard/opportunities', icon: TrendingUp },
-    { title: 'Activities', url: '/dashboard/activities', icon: CheckSquare },
-    { title: 'Email', url: '/dashboard/email-management', icon: Mail },
-    { title: 'Themes', url: '/dashboard/themes', icon: Settings },
-  ];
+  // Use Salesforce-style order from navigation config
+  const mainItems = (APP_MENU.find((m) => m.label === 'Sales')?.items ?? []).map((i) => ({
+    title: i.name,
+    url: i.path,
+    icon: i.icon,
+  }));
 
   const adminItems = [
-    { title: 'Lead Assignment', url: '/dashboard/lead-assignment', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'] },
-    { title: 'Lead Routing', url: '/dashboard/lead-routing', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'] },
-    { title: 'Tenants', url: '/dashboard/tenants', icon: FileText, roles: ['platform_admin'] },
-    { title: 'Franchises', url: '/dashboard/franchises', icon: Package, roles: ['platform_admin', 'tenant_admin'] },
-    { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['platform_admin', 'tenant_admin', 'franchise_admin'] },
+    { title: 'Lead Assignment', url: '/dashboard/lead-assignment', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.lead_assignment.manage'] },
+    { title: 'Lead Routing', url: '/dashboard/lead-routing', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.lead_routing.manage'] },
+    { title: 'Tenants', url: '/dashboard/tenants', icon: FileText, roles: ['platform_admin'], permissions: ['admin.tenants.manage'] },
+    { title: 'Franchises', url: '/dashboard/franchises', icon: Package, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.franchises.manage'] },
+    { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['platform_admin', 'tenant_admin', 'franchise_admin'], permissions: ['admin.users.manage'] },
   ];
 
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
@@ -50,12 +48,11 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>
             {collapsed ? (
-              <img src={sosLogo} alt="Logo" className="h-8 w-8 mx-auto" />
-            ) : (
-              <div className="flex items-center gap-2">
-                <img src={sosLogo} alt="Logo" className="h-8 w-8" />
-                <span className="font-semibold">SOS Logistic Pro</span>
+              <div className="flex justify-center">
+                <ShieldLogo size={32} variant="monochrome" tile="navy" hoverGlow={false} />
               </div>
+            ) : (
+              <ShieldLogo size={36} variant="golden" glowStrength="strong" showWordmark wordmarkClassName="hidden sm:block" />
             )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -81,7 +78,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {adminItems.map((item) => (
-                <RoleGuard key={item.title} roles={item.roles as any}>
+                <RoleGuard key={item.title} roles={item.roles as any} permissions={item.permissions as any}>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
                       <NavLink to={item.url} className={getNavClass}>
@@ -92,14 +89,16 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 </RoleGuard>
               ))}
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/dashboard/settings" className={getNavClass}>
-                    <Settings className="h-4 w-4" />
-                    {!collapsed && <span>Settings</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <RoleGuard roles={["platform_admin","tenant_admin","franchise_admin"] as any} permissions={["admin.settings.manage"] as any}>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/dashboard/settings" className={getNavClass}>
+                      <Settings className="h-4 w-4" />
+                      {!collapsed && <span>Settings</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </RoleGuard>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

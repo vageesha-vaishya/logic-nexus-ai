@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { ROLE_PERMISSIONS, unionPermissions, type Permission } from '@/config/permissions';
 
 type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
@@ -28,11 +29,13 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   roles: UserRole[];
+  permissions: Permission[];
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, metadata?: any) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  hasPermission: (permission: Permission) => boolean;
   isPlatformAdmin: () => boolean;
   isTenantAdmin: () => boolean;
   isFranchiseAdmin: () => boolean;
@@ -46,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchUserRoles = async (userId: string) => {
@@ -81,6 +85,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(profileData);
       const rolesData = await fetchUserRoles(user.id);
       setRoles(rolesData);
+      const perms = unionPermissions(
+        ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
+      );
+      setPermissions(perms);
     }
   };
 
@@ -115,9 +123,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]).then(([profileData, rolesData]) => {
           setProfile(profileData);
           setRoles(rolesData);
+          const perms = unionPermissions(
+            ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
+          );
+          setPermissions(perms);
           setLoading(false);
         });
       } else {
+        setPermissions([]);
         setLoading(false);
       }
     });
@@ -152,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setPermissions([]);
   };
 
   const hasRole = (role: AppRole) => {
@@ -162,23 +176,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isTenantAdmin = () => hasRole('tenant_admin');
   const isFranchiseAdmin = () => hasRole('franchise_admin');
 
+  const hasPermission = (permission: Permission) => permissions.includes(permission);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         session,
         profile,
-        roles,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        hasRole,
-        isPlatformAdmin,
-        isTenantAdmin,
-        isFranchiseAdmin,
-        refreshProfile
-      }}
+      roles,
+      permissions,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      hasRole,
+      hasPermission,
+      isPlatformAdmin,
+      isTenantAdmin,
+      isFranchiseAdmin,
+      refreshProfile
+    }}
     >
       {children}
     </AuthContext.Provider>

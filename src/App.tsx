@@ -42,6 +42,14 @@ import LeadAssignment from "./pages/dashboard/LeadAssignment";
 import EmailManagement from "./pages/dashboard/EmailManagement";
 import ThemeManagement from "./pages/dashboard/ThemeManagement";
 import { ThemeProvider } from "./hooks/useTheme";
+import Files from "./pages/dashboard/Files";
+import Campaigns from "./pages/dashboard/Campaigns";
+import Reports from "./pages/dashboard/Reports";
+import Chatter from "./pages/dashboard/Chatter";
+import Groups from "./pages/dashboard/Groups";
+import Calendar from "./pages/dashboard/Calendar";
+import Dashboards from "./pages/dashboard/Dashboards";
+import More from "./pages/dashboard/More";
 
 const queryClient = new QueryClient();
 
@@ -69,7 +77,7 @@ const App = () => (
             <Route 
               path="/dashboard/accounts" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["accounts.view"]}>
                   <Accounts />
                 </ProtectedRoute>
               } 
@@ -77,7 +85,7 @@ const App = () => (
             <Route 
               path="/dashboard/accounts/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["accounts.create"]}>
                   <AccountNew />
                 </ProtectedRoute>
               } 
@@ -85,7 +93,7 @@ const App = () => (
             <Route 
               path="/dashboard/accounts/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["accounts.view"]}>
                   <AccountDetail />
                 </ProtectedRoute>
               } 
@@ -93,7 +101,7 @@ const App = () => (
             <Route 
               path="/dashboard/contacts" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["contacts.view"]}>
                   <Contacts />
                 </ProtectedRoute>
               } 
@@ -101,7 +109,7 @@ const App = () => (
             <Route 
               path="/dashboard/contacts/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["contacts.create"]}>
                   <ContactNew />
                 </ProtectedRoute>
               } 
@@ -109,7 +117,7 @@ const App = () => (
             <Route 
               path="/dashboard/contacts/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["contacts.view"]}>
                   <ContactDetail />
                 </ProtectedRoute>
               } 
@@ -117,7 +125,7 @@ const App = () => (
             <Route 
               path="/dashboard/leads" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["leads.view"]}>
                   <Leads />
                 </ProtectedRoute>
               } 
@@ -125,7 +133,7 @@ const App = () => (
             <Route 
               path="/dashboard/leads/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["leads.create"]}>
                   <LeadNew />
                 </ProtectedRoute>
               } 
@@ -133,7 +141,7 @@ const App = () => (
             <Route 
               path="/dashboard/leads/import-export" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["leads.import_export"]}>
                   <LeadsImportExport />
                 </ProtectedRoute>
               } 
@@ -141,7 +149,7 @@ const App = () => (
             <Route 
               path="/dashboard/leads/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["leads.view"]}>
                   <LeadDetail />
                 </ProtectedRoute>
               } 
@@ -149,7 +157,7 @@ const App = () => (
             <Route 
               path="/dashboard/activities"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["activities.view"]}>
                   <Activities />
                 </ProtectedRoute>
               } 
@@ -157,7 +165,7 @@ const App = () => (
             <Route 
               path="/dashboard/activities/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["activities.create"]}>
                   <ActivityNew />
                 </ProtectedRoute>
               } 
@@ -165,7 +173,7 @@ const App = () => (
             <Route 
               path="/dashboard/activities/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["activities.view"]}>
                   <ActivityDetail />
                 </ProtectedRoute>
               } 
@@ -173,7 +181,7 @@ const App = () => (
             <Route 
               path="/dashboard/settings" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
                   <Settings />
                 </ProtectedRoute>
               } 
@@ -181,7 +189,7 @@ const App = () => (
             <Route 
               path="/dashboard/tenants" 
               element={
-                <ProtectedRoute requiredRole="platform_admin">
+                <ProtectedRoute requiredRole="platform_admin" requiredPermissions={["admin.tenants.manage"]}>
                   <Tenants />
                 </ProtectedRoute>
               } 
@@ -189,7 +197,7 @@ const App = () => (
             <Route 
               path="/dashboard/tenants/new" 
               element={
-                <ProtectedRoute requiredRole="platform_admin">
+                <ProtectedRoute requiredRole="platform_admin" requiredPermissions={["admin.tenants.manage"]}>
                   <TenantNew />
                 </ProtectedRoute>
               } 
@@ -197,7 +205,7 @@ const App = () => (
             <Route 
               path="/dashboard/tenants/:id" 
               element={
-                <ProtectedRoute requiredRole="platform_admin">
+                <ProtectedRoute requiredRole="platform_admin" requiredPermissions={["admin.tenants.manage"]}>
                   <TenantDetail />
                 </ProtectedRoute>
               } 
@@ -205,7 +213,7 @@ const App = () => (
             <Route 
               path="/dashboard/franchises" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.franchises.manage"]}>
                   <Franchises />
                 </ProtectedRoute>
               } 
@@ -213,7 +221,7 @@ const App = () => (
             <Route 
               path="/dashboard/franchises/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.franchises.manage"]}>
                   <FranchiseNew />
                 </ProtectedRoute>
               } 
@@ -221,7 +229,7 @@ const App = () => (
             <Route 
               path="/dashboard/franchises/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.franchises.manage"]}>
                   <FranchiseDetail />
                 </ProtectedRoute>
               } 
@@ -229,7 +237,7 @@ const App = () => (
             <Route 
               path="/dashboard/users" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.users.manage"]}>
                   <Users />
                 </ProtectedRoute>
               } 
@@ -237,7 +245,7 @@ const App = () => (
             <Route 
               path="/dashboard/users/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.users.manage"]}>
                   <UserNew />
                 </ProtectedRoute>
               } 
@@ -245,7 +253,7 @@ const App = () => (
             <Route 
               path="/dashboard/users/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.users.manage"]}>
                   <UserDetail />
                 </ProtectedRoute>
               } 
@@ -253,7 +261,7 @@ const App = () => (
             <Route 
               path="/dashboard/opportunities" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["opportunities.view"]}>
                   <Opportunities />
                 </ProtectedRoute>
               } 
@@ -261,7 +269,7 @@ const App = () => (
             <Route 
               path="/dashboard/opportunities/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["opportunities.create"]}>
                   <OpportunityNew />
                 </ProtectedRoute>
               } 
@@ -269,7 +277,7 @@ const App = () => (
             <Route 
               path="/dashboard/opportunities/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["opportunities.view"]}>
                   <OpportunityDetail />
                 </ProtectedRoute>
               } 
@@ -277,7 +285,7 @@ const App = () => (
             <Route 
               path="/dashboard/lead-routing" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>
                   <LeadRouting />
                 </ProtectedRoute>
               } 
@@ -285,7 +293,7 @@ const App = () => (
             <Route 
               path="/dashboard/lead-assignment" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.lead_assignment.manage"]}>
                   <LeadAssignment />
                 </ProtectedRoute>
               } 
@@ -293,7 +301,7 @@ const App = () => (
             <Route 
               path="/dashboard/email-management" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
                   <EmailManagement />
                 </ProtectedRoute>
               } 
@@ -301,12 +309,21 @@ const App = () => (
             <Route 
               path="/dashboard/themes" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
                   <ThemeManagement />
                 </ProtectedRoute>
               } 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            {/* Salesforce-style navigation placeholder routes */}
+            <Route path="/dashboard/files" element={<ProtectedRoute requiredPermissions={["files.view"]}><Files /></ProtectedRoute>} />
+            <Route path="/dashboard/campaigns" element={<ProtectedRoute requiredPermissions={["campaigns.view"]}><Campaigns /></ProtectedRoute>} />
+            <Route path="/dashboard/reports" element={<ProtectedRoute requiredPermissions={["reports.view"]}><Reports /></ProtectedRoute>} />
+            <Route path="/dashboard/chatter" element={<ProtectedRoute requiredPermissions={["chatter.view"]}><Chatter /></ProtectedRoute>} />
+            <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
+            <Route path="/dashboard/calendar" element={<ProtectedRoute requiredPermissions={["calendar.view"]}><Calendar /></ProtectedRoute>} />
+            <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
+            <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </TooltipProvider>

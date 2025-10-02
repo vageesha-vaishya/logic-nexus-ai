@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import type { Permission } from '@/config/permissions';
 
 type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
@@ -6,14 +7,16 @@ interface RoleGuardProps {
   children: React.ReactNode;
   roles: AppRole[];
   fallback?: React.ReactNode;
+  permissions?: Permission[]; // Optional permissions gate (ANY match)
 }
 
-export function RoleGuard({ children, roles, fallback = null }: RoleGuardProps) {
-  const { hasRole } = useAuth();
+export function RoleGuard({ children, roles, fallback = null, permissions }: RoleGuardProps) {
+  const { hasRole, hasPermission } = useAuth();
 
-  const hasRequiredRole = roles.some(role => hasRole(role));
+  const hasRequiredRole = roles.length === 0 || roles.some(role => hasRole(role));
+  const hasRequiredPermission = !permissions || permissions.length === 0 || permissions.some(p => hasPermission(p));
 
-  if (!hasRequiredRole) {
+  if (!hasRequiredRole || !hasRequiredPermission) {
     return <>{fallback}</>;
   }
 

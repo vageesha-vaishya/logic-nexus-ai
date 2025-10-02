@@ -1,3 +1,4 @@
+/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -12,12 +13,34 @@ serve(async (req) => {
   }
 
   try {
+    const requireEnv = (name: string) => {
+      const v = Deno.env.get(name);
+      if (!v) throw new Error(`Missing environment variable: ${name}`);
+      return v;
+    };
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      requireEnv("SUPABASE_URL"),
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    const { code, provider, userId, emailAddress, displayName, isPrimary } = await req.json();
+    let payload: any;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const { code, provider, userId, emailAddress, displayName, isPrimary } = payload || {};
+
+    if (!code || !provider || !userId) {
+      throw new Error("Missing required fields: code, provider, userId");
+    }
+
+    if (!["gmail", "office365"].includes(String(provider))) {
+      throw new Error("Unsupported provider");
+    }
 
     // Fetch OAuth configuration
     const { data: config, error: configError } = await supabase
