@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -184,19 +184,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Recompute permissions any time roles change
-  useEffect(() => {
-    if (user) {
-      const standardPerms = unionPermissions(
-        ...roles.map((r) => ROLE_PERMISSIONS[r.role])
-      );
-      fetchCustomPermissions(user.id).then(({ granted, denied }) => {
-        const mergedPerms = unionPermissions(standardPerms, granted);
-        const finalPerms = mergedPerms.filter(p => !denied.includes(p));
-        setPermissions(finalPerms);
-      });
-    }
-  }, [roles, user]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
