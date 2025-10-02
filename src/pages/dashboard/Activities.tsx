@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Phone, Mail, Calendar, CheckSquare, FileText, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCRM } from '@/hooks/useCRM';
+import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,6 +26,7 @@ interface Activity {
   account_id: string | null;
   contact_id: string | null;
   lead_id: string | null;
+  assigned_to: string | null;
 }
 
 export default function Activities() {
@@ -31,11 +34,35 @@ export default function Activities() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
+  const { fetchAssignableUsers, formatLabel } = useAssignableUsers();
+  const [typeFilter, setTypeFilter] = useState<'any' | 'email' | 'call' | 'task' | 'meeting' | 'note'>('any');
+  const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me' | string>('any');
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [showHelp, setShowHelp] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchActivities();
+  }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data } = await fetchAssignableUsers({
+        search: '',
+        limit: 100,
+      });
+      setAssignableUsers(data || []);
+    };
+    fetchUsers();
+  }, [fetchAssignableUsers]);
+
+  useEffect(() => {
+    const firstTimeKey = 'activitiesHelpShown';
+    const hasSeen = localStorage.getItem(firstTimeKey);
+    if (!hasSeen) {
+      setShowHelp(true);
+    }
   }, []);
 
   const fetchActivities = async () => {
@@ -101,9 +128,15 @@ export default function Activities() {
     }
   };
 
-  const filteredActivities = filterActivitiesByTab(activities).filter(activity =>
-    activity.subject.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredActivities = filterActivitiesByTab(activities)
+    .filter(activity => activity.subject.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(activity => typeFilter === 'any' ? true : activity.activity_type === typeFilter)
+    .filter(activity => {
+      if (ownerFilter === 'any') return true;
+      if (ownerFilter === 'unassigned') return activity.assigned_to === null;
+      if (ownerFilter === 'me') return activity.assigned_to === (context?.userId || null);
+      return activity.assigned_to === ownerFilter;
+    });
 
   const getTabCounts = () => {
     const now = startOfDay(new Date());
@@ -166,17 +199,49 @@ export default function Activities() {
           <h1 className="text-3xl font-bold">Activities</h1>
           <p className="text-muted-foreground">Manage your tasks and activities</p>
         </div>
-        <Button asChild>
-          <Link to="/dashboard/activities/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Activity
-          </Link>
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/activities/new?type=email">
+              <Mail className="mr-2 h-4 w-4" />
+              Email
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/activities/new?type=call">
+              <Phone className="mr-2 h-4 w-4" />
+              Call
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/activities/new?type=task">
+              <CheckSquare className="mr-2 h-4 w-4" />
+              Task
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/activities/new?type=event">
+              <Calendar className="mr-2 h-4 w-4" />
+              Event
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/dashboard/activities/new?type=note">
+              <FileText className="mr-2 h-4 w-4" />
+              Note
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to="/dashboard/activities/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -186,9 +251,65 @@ export default function Activities() {
                 className="pl-10"
               />
             </div>
+            <div className="flex items-center gap-3">
+              <div className="w-40">
+                <div className="text-xs text-muted-foreground mb-1">Type</div>
+                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any Type</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="call">Call</SelectItem>
+                    <SelectItem value="task">Task</SelectItem>
+                    <SelectItem value="meeting">Event</SelectItem>
+                    <SelectItem value="note">Note</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-56">
+                <div className="text-xs text-muted-foreground mb-1">Owner</div>
+                <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Owner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any Owner</SelectItem>
+                    <SelectItem value="me">My Activities</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {assignableUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{formatLabel(u)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
+          {showHelp && (
+            <div className="mb-4 rounded-md border p-3 bg-muted/30 flex items-start gap-3">
+              <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div className="flex-1">
+                <div className="text-sm font-medium">Tip: Quickly manage activities</div>
+                <div className="text-sm text-muted-foreground">
+                  Use the <span className="font-medium">Type</span> and <span className="font-medium">Owner</span> filters to refine the list. 
+                  Use the quick <span className="font-medium">New</span> buttons to instantly create Email, Call, Task, Event, or Note.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  localStorage.setItem('activitiesHelpShown', '1');
+                  setShowHelp(false);
+                }}
+              >
+                Got it
+              </Button>
+            </div>
+          )}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="all" className="relative">

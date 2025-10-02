@@ -30,6 +30,7 @@ export function AppSidebar() {
     { title: 'Opportunities', url: '/dashboard/opportunities', icon: TrendingUp },
     { title: 'Activities', url: '/dashboard/activities', icon: CheckSquare },
     { title: 'Email', url: '/dashboard/email-management', icon: Mail },
+    { title: 'Themes', url: '/dashboard/themes', icon: Settings },
   ];
 
   const adminItems = [

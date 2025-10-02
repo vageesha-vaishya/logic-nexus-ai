@@ -40,6 +40,8 @@ import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
 import LeadRouting from "./pages/dashboard/LeadRouting";
 import LeadAssignment from "./pages/dashboard/LeadAssignment";
 import EmailManagement from "./pages/dashboard/EmailManagement";
+import ThemeManagement from "./pages/dashboard/ThemeManagement";
+import { ThemeProvider } from "./hooks/useTheme";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +49,8 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <AuthProvider>
-        <TooltipProvider>
+        <ThemeProvider>
+          <TooltipProvider>
           <Toaster />
           <Sonner />
           <Routes>
@@ -295,10 +298,19 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/dashboard/themes" 
+              element={
+                <ProtectedRoute>
+                  <ThemeManagement />
+                </ProtectedRoute>
+              } 
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </TooltipProvider>
+          </TooltipProvider>
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   </QueryClientProvider>
