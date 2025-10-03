@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Mail, Search, RefreshCw, Star, Archive, Trash2, 
   Plus, Reply, Forward, MoreVertical, Paperclip 
@@ -38,6 +39,8 @@ export function EmailInbox() {
   const [showCompose, setShowCompose] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const { toast } = useToast();
   const { roles } = useAuth();
 
@@ -56,7 +59,7 @@ export function EmailInbox() {
       if (searchQuery && looksLikeEmail) {
         const direction = selectedFolder === "inbox" ? "inbound" : selectedFolder === "sent" ? "outbound" : undefined;
         const { data, error } = await supabase.functions.invoke("search-emails", {
-          body: { email: searchQuery.trim(), tenantId, direction, page: 1, pageSize: 50 },
+          body: { email: searchQuery.trim(), tenantId, accountId: selectedAccountId || undefined, direction, page: 1, pageSize: 50 },
         });
         if (error) throw error as any;
         setEmails((data?.data as Email[]) || []);
@@ -68,6 +71,9 @@ export function EmailInbox() {
           .order("received_at", { ascending: false })
           .limit(50);
 
+        if (selectedAccountId) {
+          query = query.eq("account_id", selectedAccountId);
+        }
         if (searchQuery) {
           query = query.or(`subject.ilike.%${searchQuery}%,from_email.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%`);
         }
@@ -89,7 +95,30 @@ export function EmailInbox() {
 
   useEffect(() => {
     fetchEmails();
-  }, [selectedFolder, searchQuery]);
+  }, [selectedFolder, searchQuery, selectedAccountId]);
+
+  const fetchAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("email_accounts")
+        .select("id, email_address, provider, is_primary")
+        .eq("is_active", true)
+        .order("is_primary", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setAccounts(data || []);
+      if (data && data.length > 0) {
+        const primary = data.find((a: any) => a.is_primary);
+        setSelectedAccountId((primary || data[0]).id);
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
 
   const markAsRead = async (emailId: string) => {
     try {
@@ -156,24 +185,21 @@ export function EmailInbox() {
       if (authErr) throw authErr;
       const userId = authData.user?.id;
       if (!userId) throw new Error("Not authenticated");
-
-      const { data: accounts, error: accErr } = await supabase
-        .from("email_accounts")
-        .select("id, is_primary")
-        .eq("user_id", userId)
-        .order("is_primary", { ascending: false })
-        .limit(1);
-      if (accErr) throw accErr;
-      if (!accounts || accounts.length === 0) {
-        toast({
-          title: "No email account",
-          description: "Please add an email account first.",
-          variant: "destructive",
-        });
-        return;
+      let accountId = selectedAccountId as string | null;
+      if (!accountId) {
+        const { data: accs, error: accErr } = await supabase
+          .from("email_accounts")
+          .select("id, is_primary")
+          .eq("user_id", userId)
+          .order("is_primary", { ascending: false })
+          .limit(1);
+        if (accErr) throw accErr;
+        if (!accs || accs.length === 0) {
+          toast({ title: "No email account", description: "Please add an email account first.", variant: "destructive" });
+          return;
+        }
+        accountId = accs[0].id as string;
       }
-
-      const accountId = accounts[0].id as string;
       const { data, error } = await supabase.functions.invoke("sync-emails", {
         body: { accountId },
       });
@@ -251,6 +277,26 @@ export function EmailInbox() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
+        </div>
+        <div className="w-full lg:w-[280px]">
+          <Select onValueChange={(v) => setSelectedAccountId(v)} defaultValue={selectedAccountId ?? undefined}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select mailbox" />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  No accounts
+                </SelectItem>
+              ) : (
+                accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.email_address} {a.is_primary ? "(Primary)" : ""}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
         <div className="w-full lg:w-auto overflow-x-auto">
           <Tabs value={selectedFolder} onValueChange={setSelectedFolder} className="min-w-max">

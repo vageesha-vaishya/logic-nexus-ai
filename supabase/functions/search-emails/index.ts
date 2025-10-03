@@ -1,5 +1,6 @@
-// /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-ignore
+declare const Deno: any;
+// @ts-ignore - suppress editor diagnostics for URL imports in edge functions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -71,20 +72,23 @@ serve(async (req) => {
     }
 
     // 2) To/CC/BCC contains target
-    const { data: toMatches, error: toErr } = await supabase
-      .from("emails")
-      .select("*")
-      .contains("to_emails", [{ email: targetEmail }]);
+    let toQuery = supabase.from("emails").select("*");
+    if (tenantId) toQuery = toQuery.eq("tenant_id", tenantId);
+    if (accountId) toQuery = toQuery.eq("account_id", accountId);
+    if (direction) toQuery = toQuery.eq("direction", direction);
+    const { data: toMatches, error: toErr } = await toQuery.contains("to_emails", [{ email: targetEmail }]);
 
-    const { data: ccMatches, error: ccErr } = await supabase
-      .from("emails")
-      .select("*")
-      .contains("cc_emails", [{ email: targetEmail }]);
+    let ccQuery = supabase.from("emails").select("*");
+    if (tenantId) ccQuery = ccQuery.eq("tenant_id", tenantId);
+    if (accountId) ccQuery = ccQuery.eq("account_id", accountId);
+    if (direction) ccQuery = ccQuery.eq("direction", direction);
+    const { data: ccMatches, error: ccErr } = await ccQuery.contains("cc_emails", [{ email: targetEmail }]);
 
-    const { data: bccMatches, error: bccErr } = await supabase
-      .from("emails")
-      .select("*")
-      .contains("bcc_emails", [{ email: targetEmail }]);
+    let bccQuery = supabase.from("emails").select("*");
+    if (tenantId) bccQuery = bccQuery.eq("tenant_id", tenantId);
+    if (accountId) bccQuery = bccQuery.eq("account_id", accountId);
+    if (direction) bccQuery = bccQuery.eq("direction", direction);
+    const { data: bccMatches, error: bccErr } = await bccQuery.contains("bcc_emails", [{ email: targetEmail }]);
 
     if (toErr || ccErr || bccErr) {
       throw new Error(

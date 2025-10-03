@@ -279,7 +279,6 @@ Deno.serve(async (req: any) => {
           ToRecipients: toRecipients,
           CcRecipients: ccRecipients,
           BccRecipients: bccRecipients,
-          From: senderEmail ? { EmailAddress: { Address: senderEmail } } : undefined,
         },
         SaveToSentItems: true,
       };
@@ -294,7 +293,11 @@ Deno.serve(async (req: any) => {
       });
 
       if (!outlookResponse.ok) {
-        const errorText = await outlookResponse.text();
+        let errorText = await outlookResponse.text();
+        try {
+          const j = JSON.parse(errorText);
+          errorText = j?.error?.message || j?.message || errorText;
+        } catch {}
         console.error("Office 365 SendMail error:", errorText);
         throw new Error(`Failed to send email via Office 365: ${errorText}`);
       }
