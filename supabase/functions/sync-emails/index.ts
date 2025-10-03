@@ -566,7 +566,7 @@ serve(async (req) => {
 
       if (!listRes.ok) {
         const errTxt = await listRes.text();
-        console.error("Office365 list error:", errTxt);
+        // If unauthorized, try to refresh once
         if (listRes.status === 401) {
           const { accessToken } = await refreshOfficeToken();
           if (accessToken) {
@@ -574,15 +574,24 @@ serve(async (req) => {
             listRes = await fetch(listUrl, {
               headers: { Authorization: `Bearer ${officeToken}` },
             });
+          } else {
+            return new Response(
+              JSON.stringify({ success: false, error: "Authorization required. Please re-authorize your Office 365 account.", code: "AUTH_REQUIRED" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+            );
+          }
+        } else {
+          // Non-401 failure: return a structured error without re-reading body later
+          if (!listRes.ok) {
+            return new Response(
+              JSON.stringify({ success: false, error: `Office365 API error: ${listRes.status} - ${errTxt}`, code: "PROVIDER_ERROR" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+            );
           }
         }
       }
 
-      if (!listRes.ok) {
-        const errTxt = await listRes.text();
-        throw new Error(`Office365 API error: ${listRes.status} - ${errTxt}`);
-      }
-
+      // Successful response at this point
       const listJson = await listRes.json();
       const messages = listJson.value || [];
       console.log(`Found ${messages.length} Office365 messages`);
