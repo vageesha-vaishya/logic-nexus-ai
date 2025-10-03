@@ -69,9 +69,13 @@ serve(async (req) => {
         grant_type: "authorization_code",
       };
     } else if (provider === "office365") {
+      // Detect Microsoft personal accounts (MSA) and use "consumers" tenant
       const lowerEmail = String(emailAddress || "").toLowerCase();
       const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
       const tenantId = isMSA ? "consumers" : (config.tenant_id_provider || "common");
+      
+      console.log(`Exchanging token for ${emailAddress} using tenant: ${tenantId}`);
+      
       tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
       tokenBody = {
         code,
@@ -79,15 +83,15 @@ serve(async (req) => {
         client_secret: config.client_secret,
         redirect_uri: config.redirect_uri,
         grant_type: "authorization_code",
-         scope: [
-           "https://graph.microsoft.com/Mail.Read",
-           "https://graph.microsoft.com/Mail.Send",
-           "https://graph.microsoft.com/Mail.ReadWrite",
-           "offline_access",
-           "openid",
-           "profile",
-           "email",
-         ].join(" "),
+        scope: [
+          "https://graph.microsoft.com/Mail.Read",
+          "https://graph.microsoft.com/Mail.Send",
+          "https://graph.microsoft.com/Mail.ReadWrite",
+          "offline_access",
+          "openid",
+          "profile",
+          "email",
+        ].join(" "),
       };
     } else {
       throw new Error("Unsupported provider");
