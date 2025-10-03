@@ -530,9 +530,9 @@ serve(async (req) => {
         }
       }
 
-      // List messages from Inbox using Outlook REST API
+      // List messages from Inbox using Microsoft Graph API
       // Using select to reduce payload; adjust as needed
-      const baseUrl = "https://outlook.office.com/api/v2.0/me/messages";
+      const baseUrl = "https://graph.microsoft.com/v1.0/me/messages";
       const query = new URLSearchParams({
         "$top": "20",
         "$select": [
