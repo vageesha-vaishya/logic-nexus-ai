@@ -142,7 +142,7 @@ export function EmailAccounts() {
             </div>
             <h3 className="text-xl font-semibold mb-2">No Accounts Connected</h3>
             <p className="text-muted-foreground text-center mb-6 max-w-md">
-              Get started by connecting your first email account. Support for Gmail, Office 365, and SMTP/IMAP.
+              Connect Gmail or Office 365 via OAuth for full email functionality (send & receive). SMTP/IMAP can only receive emails.
             </p>
             <Button onClick={() => setShowDialog(true)} size="lg" className="gap-2">
               <Plus className="w-4 h-4" />

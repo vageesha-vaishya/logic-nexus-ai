@@ -198,8 +198,8 @@ export const EmailClientSettings: React.FC = () => {
     try {
       if (String(account.provider) === 'smtp_imap') {
         toast({
-          title: 'SMTP not supported from server',
-          description: 'Direct SMTP is blocked in the server environment. Please connect your Microsoft/Gmail account via the Accounts tab (OAuth), then try again.',
+          title: 'SMTP/IMAP Not Supported',
+          description: 'Direct SMTP/IMAP is blocked in cloud environments. Please use Gmail or Office 365 OAuth connection from the Accounts tab for full email functionality (send & receive).',
           variant: 'destructive',
         });
         return;

@@ -303,6 +303,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
           </TabsContent>
 
           <TabsContent value="smtp_imap" className="space-y-4">
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 mb-4">
+              <p className="text-sm text-yellow-600 dark:text-yellow-500 font-medium">
+                ⚠️ SMTP/IMAP Limitation: Direct SMTP sending is blocked in cloud environments. This configuration can only receive emails (IMAP). For full send/receive capabilities, use Gmail or Office 365 OAuth above.
+              </p>
+            </div>
             <div className="space-y-4">
               <div>
                 <Label>Email Address *</Label>
