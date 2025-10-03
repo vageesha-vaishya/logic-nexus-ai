@@ -32,7 +32,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const { code, provider, userId, emailAddress, displayName, isPrimary } = payload || {};
+    const { code, provider, userId, emailAddress, displayName, isPrimary, accountIdHint } = payload || {};
 
     if (!code || !provider || !userId) {
       throw new Error("Missing required fields: code, provider, userId");
@@ -131,20 +131,57 @@ serve(async (req) => {
     // Upsert existing account for this user/provider/email
     let account;
     let accountError;
-    const { data: existing } = await supabase
-      .from("email_accounts")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("provider", provider)
-      .eq("email_address", resolvedEmail || emailAddress || "")
-      .maybeSingle();
+
+    // Prefer updating the hinted account id (the one user clicked Re-authorize on)
+    let existingId: string | null = null;
+    if (accountIdHint) {
+      const { data: existingById } = await supabase
+        .from("email_accounts")
+        .select("id, user_id, email_address")
+        .eq("id", accountIdHint)
+        .eq("user_id", userId)
+        .maybeSingle();
+      existingId = existingById?.id ?? null;
+      // If no email was provided by provider, reuse existing row email
+      if (existingById?.email_address && !(resolvedEmail || emailAddress)) {
+        resolvedEmail = existingById.email_address;
+      }
+    }
+
+    // If no hinted row, try matching by exact email
+    if (!existingId && (resolvedEmail || emailAddress)) {
+      const { data: existingByEmail } = await supabase
+        .from("email_accounts")
+        .select("id, email_address")
+        .eq("user_id", userId)
+        .eq("provider", provider)
+        .eq("email_address", (resolvedEmail || emailAddress) as string)
+        .maybeSingle();
+      existingId = existingByEmail?.id ?? null;
+    }
+
+    // Fallback: pick most recent account for this provider
+    if (!existingId) {
+      const { data: existingAny } = await supabase
+        .from("email_accounts")
+        .select("id, email_address")
+        .eq("user_id", userId)
+        .eq("provider", provider)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      existingId = existingAny?.id ?? null;
+      if (existingAny?.email_address && !(resolvedEmail || emailAddress)) {
+        resolvedEmail = existingAny.email_address;
+      }
+    }
 
     const emailAccountPayload = {
       user_id: userId,
       tenant_id: userRole?.tenant_id,
       franchise_id: userRole?.franchise_id,
       provider,
-      email_address: resolvedEmail || emailAddress || "",
+      email_address: (resolvedEmail || emailAddress || "") as string,
       display_name: resolvedName || displayName || null,
       is_primary: isPrimary,
       access_token: tokens.access_token,
@@ -153,11 +190,11 @@ serve(async (req) => {
       is_active: true,
     };
 
-    if (existing?.id) {
+    if (existingId) {
       ({ data: account, error: accountError } = await supabase
         .from("email_accounts")
         .update(emailAccountPayload)
-        .eq("id", existing.id)
+        .eq("id", existingId)
         .select()
         .single());
     } else {

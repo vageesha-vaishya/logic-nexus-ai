@@ -26,6 +26,7 @@ export default function OAuthCallback() {
         const emailAddress = sessionStorage.getItem("oauth_hint_email") || undefined;
         const displayName = sessionStorage.getItem("oauth_hint_name") || undefined;
         const isPrimary = sessionStorage.getItem("oauth_hint_is_primary") === "true" || undefined;
+        const accountIdHint = sessionStorage.getItem("oauth_account_id") || undefined;
 
         // Exchange code for tokens
         const { data, error } = await supabase.functions.invoke("exchange-oauth-token", {
@@ -36,6 +37,7 @@ export default function OAuthCallback() {
             emailAddress,
             displayName,
             isPrimary,
+            accountIdHint,
           },
         });
 
@@ -51,6 +53,7 @@ export default function OAuthCallback() {
         sessionStorage.removeItem("oauth_hint_email");
         sessionStorage.removeItem("oauth_hint_name");
         sessionStorage.removeItem("oauth_hint_is_primary");
+        sessionStorage.removeItem("oauth_account_id");
 
         // Redirect to email management page after a short delay
         setTimeout(() => {

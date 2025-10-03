@@ -119,6 +119,7 @@ export function EmailAccounts() {
       sessionStorage.setItem("oauth_hint_email", account.email_address || "");
       sessionStorage.setItem("oauth_hint_name", account.display_name || "");
       sessionStorage.setItem("oauth_hint_is_primary", String(account.is_primary || false));
+      sessionStorage.setItem("oauth_account_id", account.id);
 
       if (account.provider === 'gmail') {
         const { initiateGoogleOAuth } = await import('@/lib/oauth');
