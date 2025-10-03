@@ -52,6 +52,7 @@ import Dashboards from "./pages/dashboard/Dashboards";
 import More from "./pages/dashboard/More";
 import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
 import CustomRoles from "./pages/dashboard/CustomRoles";
+import OAuthCallback from "./pages/OAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
+            <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route 
               path="/dashboard" 

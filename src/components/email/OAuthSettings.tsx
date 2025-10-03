@@ -26,7 +26,7 @@ export function OAuthSettings() {
     client_id: "",
     client_secret: "",
     tenant_id: "",
-    redirect_uri: `${window.location.origin}/dashboard/email-management`,
+    redirect_uri: `${window.location.origin}/oauth/callback`,
     is_active: true,
   });
 
@@ -34,7 +34,7 @@ export function OAuthSettings() {
     provider: "gmail",
     client_id: "",
     client_secret: "",
-    redirect_uri: `${window.location.origin}/dashboard/email-management`,
+    redirect_uri: `${window.location.origin}/oauth/callback`,
     is_active: true,
   });
 
