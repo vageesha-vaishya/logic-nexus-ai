@@ -1,5 +1,7 @@
-/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Ambient Deno typing for editors without Deno type support
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
+// @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -50,6 +52,7 @@ serve(async (req) => {
     }
 
     let emailSent = false;
+    let verified = false;
     let messageId = `${Date.now()}@${account.email_address}`;
 
     // Send email based on provider
@@ -190,10 +193,148 @@ serve(async (req) => {
       messageId = gmailData.id || messageId;
       emailSent = true;
     } else if (account.provider === "office365") {
-      // Use Microsoft Graph API
-      console.log("Sending via Microsoft Graph API");
-      // TODO: Implement Microsoft Graph API integration
+      // Use Microsoft Outlook REST API (matches configured scopes)
+      console.log("Sending via Microsoft Outlook REST API");
+
+      // Validate token
+      if (!account.access_token) {
+        throw new Error("Office 365 account is not properly connected. Please reconnect your Microsoft account.");
+      }
+
+      // Refresh token if expired
+      let accessToken = account.access_token as string;
+      if (account.token_expires_at && new Date(account.token_expires_at) < new Date()) {
+        if (!account.refresh_token) {
+          throw new Error("Office 365 access token expired and no refresh token available. Please reconnect your Microsoft account.");
+        }
+
+        const { data: oauthConfig } = await supabase
+          .from("oauth_configurations")
+          .select("client_id, client_secret, tenant_id_provider")
+          .eq("user_id", account.user_id)
+          .eq("provider", "office365")
+          .eq("is_active", true)
+          .single();
+
+        if (!oauthConfig) {
+          throw new Error("OAuth configuration not found. Please configure Office 365 OAuth settings.");
+        }
+
+        const tenantId = oauthConfig.tenant_id_provider || "common";
+        const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: oauthConfig.client_id,
+            client_secret: oauthConfig.client_secret,
+            refresh_token: account.refresh_token,
+            grant_type: "refresh_token",
+            scope: [
+              "https://outlook.office.com/Mail.Read",
+              "https://outlook.office.com/Mail.Send",
+              "https://outlook.office.com/Mail.ReadWrite",
+              "offline_access",
+            ].join(" "),
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          const errTxt = await tokenResponse.text();
+          throw new Error(`Failed to refresh Office 365 token: ${errTxt}`);
+        }
+
+        const tokenData = await tokenResponse.json();
+        accessToken = tokenData.access_token;
+
+        // Update the access token in database
+        await supabase
+          .from("email_accounts")
+          .update({
+            access_token: accessToken,
+            token_expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+          })
+          .eq("id", accountId);
+      }
+
+      // Resolve sender email if missing
+      let senderEmail: string | null = account.email_address || null;
+      if (!senderEmail) {
+        try {
+          const profileRes = await fetch("https://outlook.office.com/api/v2.0/me", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            senderEmail = profile?.Mailbox?.Address || profile?.EmailAddress || profile?.UserPrincipalName || senderEmail;
+            if (senderEmail && !account.email_address) {
+              await supabase.from("email_accounts").update({ email_address: senderEmail }).eq("id", accountId);
+            }
+          }
+        } catch (e) {
+          console.log("Failed to resolve Office 365 sender email", e);
+        }
+      }
+
+      // Build REST API payload
+      const toRecipients = (to as string[]).map((addr) => ({ EmailAddress: { Address: addr } }));
+      const ccRecipients = (cc as string[] | undefined)?.map((addr) => ({ EmailAddress: { Address: addr } })) || [];
+      const bccRecipients = (bcc as string[] | undefined)?.map((addr) => ({ EmailAddress: { Address: addr } })) || [];
+
+      const sendBody = {
+        Message: {
+          Subject: subject,
+          Body: { ContentType: "HTML", Content: body },
+          ToRecipients: toRecipients,
+          CcRecipients: ccRecipients,
+          BccRecipients: bccRecipients,
+          From: senderEmail ? { EmailAddress: { Address: senderEmail } } : undefined,
+        },
+        SaveToSentItems: true,
+      };
+
+      const outlookResponse = await fetch("https://outlook.office.com/api/v2.0/me/sendmail", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(sendBody),
+      });
+
+      if (!outlookResponse.ok) {
+        const errorText = await outlookResponse.text();
+        console.error("Office 365 SendMail error:", errorText);
+        throw new Error(`Failed to send email via Office 365: ${errorText}`);
+      }
+
+      // No message id returned; keep generated fallback
       emailSent = true;
+
+      // Attempt verification by inspecting Sent Items
+      try {
+        const sentItemsRes = await fetch(
+          "https://outlook.office.com/api/v2.0/me/MailFolders/SentItems/messages?$top=10&$orderby=ReceivedDateTime%20desc",
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        if (sentItemsRes.ok) {
+          const list = await sentItemsRes.json();
+          const messages: any[] = Array.isArray(list?.value) ? list.value : [];
+          const normalizedSubject = String(subject || "").trim().toLowerCase();
+          const toSet = new Set((to as string[]).map((a) => a.toLowerCase()));
+
+          verified = messages.some((m) => {
+            const subj = String(m?.Subject || "").trim().toLowerCase();
+            if (subj !== normalizedSubject) return false;
+            const msgTo = (Array.isArray(m?.ToRecipients) ? m.ToRecipients : []).map((r: any) => String(r?.EmailAddress?.Address || "").toLowerCase());
+            // Confirm at least one of provided recipients is in message
+            return msgTo.some((addr: string) => toSet.has(addr));
+          });
+        }
+      } catch (verErr) {
+        console.log("Office 365 verification check failed:", verErr);
+      }
     }
 
     if (!emailSent) {
@@ -224,11 +365,15 @@ serve(async (req) => {
       console.error("Error storing email:", insertError);
     }
 
+    const verificationCheckedAt = new Date().toISOString();
     return new Response(
       JSON.stringify({
         success: true,
         messageId,
         message: "Email sent successfully",
+        verified,
+        verificationMethod: account.provider === "office365" ? "outlook_sent_items" : undefined,
+        verificationCheckedAt,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
