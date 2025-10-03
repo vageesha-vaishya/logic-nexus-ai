@@ -212,7 +212,9 @@ Deno.serve(async (req: any) => {
           throw new Error("OAuth configuration not found. Please configure Office 365 OAuth settings.");
         }
 
-        const tenantId = oauthConfig.tenant_id_provider || "common";
+        const lowerEmail = String(account.email_address || "").toLowerCase();
+        const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
+        const tenantId = isMSA ? "consumers" : (oauthConfig.tenant_id_provider || "common");
         const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -226,6 +228,9 @@ Deno.serve(async (req: any) => {
               "https://graph.microsoft.com/Mail.Send",
               "https://graph.microsoft.com/Mail.ReadWrite",
               "offline_access",
+              "openid",
+              "profile",
+              "email",
             ].join(" "),
           }),
         });
