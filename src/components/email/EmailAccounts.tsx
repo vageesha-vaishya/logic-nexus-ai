@@ -85,9 +85,15 @@ export function EmailAccounts() {
         body: { accountId },
       });
 
+      // If edge function returned non-2xx, error is set
       if (error) {
-        const msg = (data as any)?.error || error.message;
-        if (msg?.includes("Authorization") || msg?.includes("access token")) {
+        throw new Error(error.message);
+      }
+
+      // If function handled errors itself with success=false
+      if (data && (data as any).success === false) {
+        const msg = (data as any).error || "Sync failed";
+        if ((data as any).code === "AUTH_REQUIRED") {
           toast({
             title: "Authorization Required",
             description: "Please re-authorize your account using the 'Re-authorize' button below.",
@@ -99,15 +105,16 @@ export function EmailAccounts() {
         throw new Error(msg);
       }
 
+      const count = (data as any)?.syncedCount ?? (data as any)?.emailCount ?? 0;
       toast({
-        title: "Success",
-        description: `Synced ${data?.emailCount || 0} emails`,
+        title: "Sync Complete",
+        description: `Synced ${count} emails`,
       });
       fetchAccounts();
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message ?? "Edge function failed",
         variant: "destructive",
       });
     }

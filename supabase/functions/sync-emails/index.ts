@@ -523,7 +523,10 @@ serve(async (req) => {
         const { accessToken } = await refreshOfficeToken();
         officeToken = accessToken || officeToken;
         if (!officeToken) {
-          throw new Error("No access token available for Office365 account");
+          return new Response(
+            JSON.stringify({ success: false, error: "Authorization required. Please re-authorize your Office 365 account.", code: "AUTH_REQUIRED" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+          );
         }
       }
 
@@ -735,7 +738,7 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: 200,
       }
     );
   }
