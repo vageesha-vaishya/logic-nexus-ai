@@ -77,29 +77,38 @@ export async function initiateMicrosoftOAuth(userId: string) {
     sessionStorage.setItem("oauth_state", state);
     sessionStorage.setItem("oauth_provider", "office365");
 
-    // Build Microsoft OAuth URL
-    const params = new URLSearchParams({
-      client_id: oauthConfig.client_id,
-      redirect_uri: oauthConfig.redirect_uri,
-      response_type: "code",
-      scope: [
-        "https://graph.microsoft.com/Mail.Read",
-        "https://graph.microsoft.com/Mail.Send",
-        "https://graph.microsoft.com/Mail.ReadWrite",
-        "offline_access",
-        "openid",
-        "profile",
-        "email",
-      ].join(" "),
-      prompt: "consent",
-      state,
-    });
+  // Determine tenant based on email hint to avoid tenant mismatch on token exchange
+  const hintEmail = sessionStorage.getItem("oauth_hint_email") || "";
+  const lowerEmail = hintEmail.toLowerCase();
+  const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
+  const tenantId = isMSA ? "consumers" : (oauthConfig.tenant_id_provider || "common");
 
-    const tenantId = oauthConfig.tenant_id_provider || "common";
-    const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params.toString()}`;
-    
-    // Redirect to Microsoft OAuth
-    window.location.href = authUrl;
+  // Build Microsoft OAuth URL
+  const params = new URLSearchParams({
+    client_id: oauthConfig.client_id,
+    redirect_uri: oauthConfig.redirect_uri,
+    response_type: "code",
+    scope: [
+      "https://graph.microsoft.com/Mail.Read",
+      "https://graph.microsoft.com/Mail.Send",
+      "https://graph.microsoft.com/Mail.ReadWrite",
+      "offline_access",
+      "openid",
+      "profile",
+      "email",
+    ].join(" "),
+    prompt: "consent",
+    state,
+  });
+
+  if (hintEmail) {
+    params.set("login_hint", hintEmail);
+  }
+
+  const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params.toString()}`;
+  
+  // Redirect to Microsoft OAuth
+  window.location.href = authUrl;
   } catch (error: any) {
     throw new Error(error.message || "Failed to initiate Microsoft OAuth");
   }

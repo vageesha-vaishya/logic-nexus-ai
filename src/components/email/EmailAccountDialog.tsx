@@ -89,6 +89,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
     }
 
     try {
+      // Persist hints for callback and for MSA tenant detection
+      sessionStorage.setItem("oauth_hint_email", emailAddress);
+      sessionStorage.setItem("oauth_hint_name", displayName || "");
+      sessionStorage.setItem("oauth_hint_is_primary", String(isPrimary));
+      sessionStorage.removeItem("oauth_account_id");
       await initiateGoogleOAuth(context.userId);
     } catch (error: any) {
       toast({
@@ -110,6 +115,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
     }
 
     try {
+      // Persist hints for callback and for MSA tenant detection in authorize step
+      sessionStorage.setItem("oauth_hint_email", emailAddress);
+      sessionStorage.setItem("oauth_hint_name", displayName || "");
+      sessionStorage.setItem("oauth_hint_is_primary", String(isPrimary));
+      sessionStorage.removeItem("oauth_account_id");
       await initiateMicrosoftOAuth(context.userId);
     } catch (error: any) {
       toast({
