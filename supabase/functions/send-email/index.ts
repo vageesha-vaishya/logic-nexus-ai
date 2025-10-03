@@ -3,6 +3,8 @@
 declare const Deno: any;
 // @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-ignore Using esm.sh for nodemailer
+import nodemailer from "https://esm.sh/nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,89 +60,47 @@ Deno.serve(async (req: any) => {
 
     // Send email based on provider
     if (account.provider === "smtp_imap") {
-      // Use SMTP to send email
-      const smtpConfig = {
-        hostname: account.smtp_host,
+      // Use SMTP to send email via nodemailer
+      console.log("Sending via SMTP:", {
+        host: account.smtp_host,
         port: account.smtp_port,
-        username: account.smtp_username,
-        password: account.smtp_password,
-        tls: account.smtp_use_tls,
-      };
-
-      console.log("Sending via SMTP:", smtpConfig);
+        secure: account.smtp_use_tls && account.smtp_port === 465,
+      });
 
       try {
-        // Connect to SMTP server
-        const conn = account.smtp_use_tls 
-          ? await Deno.connectTls({ hostname: smtpConfig.hostname, port: smtpConfig.port })
-          : await Deno.connect({ hostname: smtpConfig.hostname, port: smtpConfig.port });
+        // Create nodemailer transporter
+        const transporter = nodemailer.createTransport({
+          host: account.smtp_host,
+          port: account.smtp_port,
+          secure: account.smtp_port === 465, // true for 465, false for other ports like 587
+          auth: {
+            user: account.smtp_username,
+            pass: account.smtp_password,
+          },
+          tls: {
+            rejectUnauthorized: false, // Accept self-signed certificates
+          },
+        });
 
-        const encoder = new TextEncoder();
-        const decoder = new TextDecoder();
+        // Verify connection
+        await transporter.verify();
+        console.log("SMTP connection verified");
 
-        // Helper to read server response
-        const readResponse = async () => {
-          const buffer = new Uint8Array(1024);
-          const n = await conn.read(buffer);
-          if (n === null) throw new Error("Connection closed");
-          return decoder.decode(buffer.subarray(0, n));
-        };
+        // Send mail
+        const info = await transporter.sendMail({
+          from: `"${account.display_name || ""}" <${account.email_address}>`,
+          to: (to as string[]).join(", "),
+          cc: cc ? (cc as string[]).join(", ") : undefined,
+          bcc: bcc ? (bcc as string[]).join(", ") : undefined,
+          subject: subject,
+          text: body,
+          html: body,
+          messageId: messageId,
+        });
 
-        // Helper to send command
-        const sendCommand = async (cmd: string) => {
-          await conn.write(encoder.encode(cmd + "\r\n"));
-          return await readResponse();
-        };
-
-        // SMTP conversation
-        await readResponse(); // Read greeting
-        await sendCommand(`EHLO ${smtpConfig.hostname}`);
-        
-        // Authenticate
-        await sendCommand("AUTH LOGIN");
-        await sendCommand(btoa(smtpConfig.username));
-        const authResp = await sendCommand(btoa(smtpConfig.password));
-        
-        if (!authResp.startsWith("235")) {
-          throw new Error(`SMTP authentication failed: ${authResp}`);
-        }
-
-        // Send email
-        await sendCommand(`MAIL FROM:<${account.email_address}>`);
-        
-        for (const recipient of to as string[]) {
-          await sendCommand(`RCPT TO:<${recipient}>`);
-        }
-        
-        if (cc) {
-          for (const recipient of cc as string[]) {
-            await sendCommand(`RCPT TO:<${recipient}>`);
-          }
-        }
-
-        await sendCommand("DATA");
-
-        // Build email message
-        const message = [
-          `From: ${account.email_address}`,
-          `To: ${(to as string[]).join(", ")}`,
-          cc && cc.length > 0 ? `Cc: ${(cc as string[]).join(", ")}` : "",
-          `Subject: ${subject}`,
-          `Date: ${new Date().toUTCString()}`,
-          `Message-ID: <${messageId}>`,
-          "MIME-Version: 1.0",
-          "Content-Type: text/plain; charset=UTF-8",
-          "",
-          body,
-          ".",
-        ].filter(line => line !== "").join("\r\n");
-
-        await sendCommand(message);
-        await sendCommand("QUIT");
-
-        conn.close();
+        console.log("Email sent successfully:", info.messageId);
         emailSent = true;
-        console.log("Email sent successfully via SMTP");
+        messageId = info.messageId || messageId;
       } catch (smtpError: any) {
         console.error("SMTP error:", smtpError);
         throw new Error(`Failed to send email via SMTP: ${smtpError.message}`);
