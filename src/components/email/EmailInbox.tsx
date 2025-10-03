@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,16 @@ export function EmailInbox() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const { toast } = useToast();
   const { roles } = useAuth();
+
+  const autoSyncedRef = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (selectedAccountId && !autoSyncedRef.current[selectedAccountId]) {
+      autoSyncedRef.current[selectedAccountId] = true;
+      // Trigger a one-time auto sync when an account is selected
+      syncEmails();
+    }
+  }, [selectedAccountId]);
 
   const getTenantId = () => {
     const tenantAdmin = roles.find((r) => r.role === "tenant_admin" && r.tenant_id);
