@@ -86,8 +86,8 @@ export function EmailAccounts() {
       });
 
       if (error) {
-        // Check if it's an authorization error
-        if (error.message?.includes("Authorization required") || error.message?.includes("access token")) {
+        const msg = (data as any)?.error || error.message;
+        if (msg?.includes("Authorization") || msg?.includes("access token")) {
           toast({
             title: "Authorization Required",
             description: "Please re-authorize your account using the 'Re-authorize' button below.",
@@ -96,7 +96,7 @@ export function EmailAccounts() {
           fetchAccounts();
           return;
         }
-        throw error;
+        throw new Error(msg);
       }
 
       toast({
@@ -115,6 +115,11 @@ export function EmailAccounts() {
 
   const handleReauthorize = async (account: EmailAccount) => {
     try {
+      // Store hints for the callback (used when provider doesn't return profile info)
+      sessionStorage.setItem("oauth_hint_email", account.email_address || "");
+      sessionStorage.setItem("oauth_hint_name", account.display_name || "");
+      sessionStorage.setItem("oauth_hint_is_primary", String(account.is_primary || false));
+
       if (account.provider === 'gmail') {
         const { initiateGoogleOAuth } = await import('@/lib/oauth');
         await initiateGoogleOAuth(account.user_id);
@@ -136,7 +141,7 @@ export function EmailAccounts() {
       office365: "bg-blue-500/10 text-blue-500",
       gmail: "bg-red-500/10 text-red-500",
       smtp_imap: "bg-purple-500/10 text-purple-500",
-      other: "bg-gray-500/10 text-gray-500",
+      other: "bg-foreground/10 text-foreground/80",
     };
     return colors[provider] || colors.other;
   };
@@ -151,7 +156,7 @@ export function EmailAccounts() {
             Manage and sync your email accounts across multiple providers
           </p>
         </div>
-        <Button onClick={() => setShowDialog(true)} size="lg" className="gap-2">
+        <Button onClick={() => setShowDialog(true)} size="lg" className="gap-2" aria-label="Connect Account">
           <Plus className="w-4 h-4" />
           Connect Account
         </Button>

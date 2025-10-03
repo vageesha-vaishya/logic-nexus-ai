@@ -22,12 +22,20 @@ export default function OAuthCallback() {
           throw new Error("User not authenticated");
         }
 
+        // Pull optional hints from session storage
+        const emailAddress = sessionStorage.getItem("oauth_hint_email") || undefined;
+        const displayName = sessionStorage.getItem("oauth_hint_name") || undefined;
+        const isPrimary = sessionStorage.getItem("oauth_hint_is_primary") === "true" || undefined;
+
         // Exchange code for tokens
         const { data, error } = await supabase.functions.invoke("exchange-oauth-token", {
           body: {
             code,
             provider,
             userId: user.id,
+            emailAddress,
+            displayName,
+            isPrimary,
           },
         });
 
@@ -39,10 +47,15 @@ export default function OAuthCallback() {
           description: `Your ${provider === "gmail" ? "Gmail" : "Office 365"} account has been successfully connected.`,
         });
 
+        // Clean hints to avoid leaking between attempts
+        sessionStorage.removeItem("oauth_hint_email");
+        sessionStorage.removeItem("oauth_hint_name");
+        sessionStorage.removeItem("oauth_hint_is_primary");
+
         // Redirect to email management page after a short delay
         setTimeout(() => {
           navigate("/dashboard/email-management");
-        }, 1500);
+        }, 1200);
       } catch (error: any) {
         console.error("OAuth callback error:", error);
         setStatus("error");
