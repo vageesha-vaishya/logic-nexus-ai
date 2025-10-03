@@ -1,4 +1,4 @@
-/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
+// /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -139,7 +139,7 @@ serve(async (req) => {
       .eq("email_address", resolvedEmail || emailAddress || "")
       .maybeSingle();
 
-    const payload = {
+    const emailAccountPayload = {
       user_id: userId,
       tenant_id: userRole?.tenant_id,
       franchise_id: userRole?.franchise_id,
@@ -156,14 +156,14 @@ serve(async (req) => {
     if (existing?.id) {
       ({ data: account, error: accountError } = await supabase
         .from("email_accounts")
-        .update(payload)
+        .update(emailAccountPayload)
         .eq("id", existing.id)
         .select()
         .single());
     } else {
       ({ data: account, error: accountError } = await supabase
         .from("email_accounts")
-        .insert(payload)
+        .insert(emailAccountPayload)
         .select()
         .single());
     }

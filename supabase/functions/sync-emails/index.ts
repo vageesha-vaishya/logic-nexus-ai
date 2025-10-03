@@ -1,4 +1,4 @@
-/// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
+// /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -63,8 +63,129 @@ serve(async (req) => {
       };
 
       console.log("Syncing via IMAP:", imapConfig);
-      // TODO: Implement actual IMAP syncing
-      syncedCount = 0;
+
+      try {
+        // Connect to IMAP server
+        const conn = imapConfig.ssl
+          ? await Deno.connectTls({ hostname: imapConfig.hostname, port: imapConfig.port })
+          : await Deno.connect({ hostname: imapConfig.hostname, port: imapConfig.port });
+
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        // Helper to read server response
+        const readResponse = async () => {
+          const buffer = new Uint8Array(4096);
+          const n = await conn.read(buffer);
+          if (n === null) throw new Error("Connection closed");
+          return decoder.decode(buffer.subarray(0, n));
+        };
+
+        // Helper to send command
+        const sendCommand = async (tag: string, cmd: string) => {
+          await conn.write(encoder.encode(`${tag} ${cmd}\r\n`));
+          let response = "";
+          while (true) {
+            const chunk = await readResponse();
+            response += chunk;
+            if (response.includes(`${tag} OK`) || response.includes(`${tag} NO`) || response.includes(`${tag} BAD`)) {
+              break;
+            }
+          }
+          return response;
+        };
+
+        // IMAP conversation
+        await readResponse(); // Read greeting
+        
+        // Login
+        const loginResp = await sendCommand("A1", `LOGIN ${imapConfig.username} ${imapConfig.password}`);
+        if (!loginResp.includes("A1 OK")) {
+          throw new Error(`IMAP login failed: ${loginResp}`);
+        }
+
+        // Select INBOX
+        await sendCommand("A2", "SELECT INBOX");
+
+        // Search for recent messages (last 20)
+        const searchResp = await sendCommand("A3", "SEARCH 1:20");
+        const messageIds = searchResp.match(/\* SEARCH (.+)/)?.[1]?.split(" ").filter(id => id && id !== "A3") || [];
+
+        console.log(`Found ${messageIds.length} messages in IMAP inbox`);
+
+        // Fetch each message
+        for (const msgId of messageIds.slice(0, 20)) {
+          try {
+            const fetchResp = await sendCommand("A4", `FETCH ${msgId} (FLAGS BODY[HEADER] BODY[TEXT])`);
+            
+            // Parse email headers and body (basic parsing)
+            const headerMatch = fetchResp.match(/BODY\[HEADER\] \{[\d]+\}\r\n([\s\S]+?)\r\n\r\n/);
+            const bodyMatch = fetchResp.match(/BODY\[TEXT\] \{[\d]+\}\r\n([\s\S]+?)\r\n\)/);
+            
+            if (!headerMatch) continue;
+
+            const headers = headerMatch[1];
+            const bodyText = bodyMatch?.[1] || "";
+
+            // Extract header fields
+            const subject = headers.match(/^Subject: (.+)$/mi)?.[1] || "(No Subject)";
+            const from = headers.match(/^From: (.+)$/mi)?.[1] || "";
+            const to = headers.match(/^To: (.+)$/mi)?.[1] || "";
+            const date = headers.match(/^Date: (.+)$/mi)?.[1] || new Date().toISOString();
+            const messageIdHeader = headers.match(/^Message-ID: <(.+)>$/mi)?.[1] || `imap-${msgId}-${Date.now()}`;
+
+            // Check if email already exists
+            const { data: existing } = await supabase
+              .from("emails")
+              .select("id")
+              .eq("message_id", messageIdHeader)
+              .single();
+
+            if (existing) {
+              console.log(`Email ${messageIdHeader} already exists, skipping`);
+              continue;
+            }
+
+            // Insert email
+            const { error: insertError } = await supabase.from("emails").insert({
+              account_id: account.id,
+              tenant_id: account.tenant_id ?? null,
+              franchise_id: account.franchise_id ?? null,
+              message_id: messageIdHeader,
+              subject,
+              from_email: (from.match(/<(.+)>/)?.[1] || from).toLowerCase(),
+              from_name: from.replace(/<.+>/, "").trim(),
+              to_emails: [{ email: (to.match(/<(.+)>/)?.[1] || to).toLowerCase() }],
+              body_text: bodyText,
+              body_html: bodyText,
+              snippet: bodyText.substring(0, 200),
+              direction: "inbound",
+              status: "received",
+              is_read: fetchResp.includes("\\Seen"),
+              folder: "inbox",
+              received_at: new Date(date).toISOString(),
+            });
+
+            if (insertError) {
+              console.error(`Error inserting email ${messageIdHeader}:`, insertError);
+            } else {
+              syncedCount++;
+              console.log(`Synced email: ${subject}`);
+            }
+          } catch (msgError: any) {
+            console.error(`Error processing IMAP message ${msgId}:`, msgError.message);
+          }
+        }
+
+        // Logout
+        await sendCommand("A99", "LOGOUT");
+        conn.close();
+
+        console.log(`IMAP sync completed: ${syncedCount} emails synced`);
+      } catch (imapError: any) {
+        console.error("IMAP error:", imapError);
+        throw new Error(`Failed to sync via IMAP: ${imapError.message}`);
+      }
     } else if (account.provider === "gmail") {
       // Use Gmail API
       console.log("Syncing via Gmail API for account:", account.email_address);

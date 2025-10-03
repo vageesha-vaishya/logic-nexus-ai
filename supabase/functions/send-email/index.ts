@@ -9,7 +9,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
+// @ts-ignore Deno serve types
+Deno.serve(async (req: any) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -66,10 +67,84 @@ Deno.serve(async (req) => {
         tls: account.smtp_use_tls,
       };
 
-      // TODO: Implement actual SMTP sending
-      // For now, we'll just log the configuration
       console.log("Sending via SMTP:", smtpConfig);
-      emailSent = true;
+
+      try {
+        // Connect to SMTP server
+        const conn = account.smtp_use_tls 
+          ? await Deno.connectTls({ hostname: smtpConfig.hostname, port: smtpConfig.port })
+          : await Deno.connect({ hostname: smtpConfig.hostname, port: smtpConfig.port });
+
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        // Helper to read server response
+        const readResponse = async () => {
+          const buffer = new Uint8Array(1024);
+          const n = await conn.read(buffer);
+          if (n === null) throw new Error("Connection closed");
+          return decoder.decode(buffer.subarray(0, n));
+        };
+
+        // Helper to send command
+        const sendCommand = async (cmd: string) => {
+          await conn.write(encoder.encode(cmd + "\r\n"));
+          return await readResponse();
+        };
+
+        // SMTP conversation
+        await readResponse(); // Read greeting
+        await sendCommand(`EHLO ${smtpConfig.hostname}`);
+        
+        // Authenticate
+        await sendCommand("AUTH LOGIN");
+        await sendCommand(btoa(smtpConfig.username));
+        const authResp = await sendCommand(btoa(smtpConfig.password));
+        
+        if (!authResp.startsWith("235")) {
+          throw new Error(`SMTP authentication failed: ${authResp}`);
+        }
+
+        // Send email
+        await sendCommand(`MAIL FROM:<${account.email_address}>`);
+        
+        for (const recipient of to as string[]) {
+          await sendCommand(`RCPT TO:<${recipient}>`);
+        }
+        
+        if (cc) {
+          for (const recipient of cc as string[]) {
+            await sendCommand(`RCPT TO:<${recipient}>`);
+          }
+        }
+
+        await sendCommand("DATA");
+
+        // Build email message
+        const message = [
+          `From: ${account.email_address}`,
+          `To: ${(to as string[]).join(", ")}`,
+          cc && cc.length > 0 ? `Cc: ${(cc as string[]).join(", ")}` : "",
+          `Subject: ${subject}`,
+          `Date: ${new Date().toUTCString()}`,
+          `Message-ID: <${messageId}>`,
+          "MIME-Version: 1.0",
+          "Content-Type: text/plain; charset=UTF-8",
+          "",
+          body,
+          ".",
+        ].filter(line => line !== "").join("\r\n");
+
+        await sendCommand(message);
+        await sendCommand("QUIT");
+
+        conn.close();
+        emailSent = true;
+        console.log("Email sent successfully via SMTP");
+      } catch (smtpError: any) {
+        console.error("SMTP error:", smtpError);
+        throw new Error(`Failed to send email via SMTP: ${smtpError.message}`);
+      }
     } else if (account.provider === "gmail") {
       // Use Gmail API
       console.log("Sending via Gmail API");
