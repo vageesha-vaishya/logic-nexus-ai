@@ -186,7 +186,7 @@ Deno.serve(async (req: any) => {
       emailSent = true;
     } else if (account.provider === "office365") {
       // Use Microsoft Outlook REST API (matches configured scopes)
-      console.log("Sending via Microsoft Outlook REST API");
+      console.log("Sending via Microsoft Graph API");
 
       // Validate token
       if (!account.access_token) {
@@ -222,9 +222,9 @@ Deno.serve(async (req: any) => {
             refresh_token: account.refresh_token,
             grant_type: "refresh_token",
             scope: [
-              "https://outlook.office.com/Mail.Read",
-              "https://outlook.office.com/Mail.Send",
-              "https://outlook.office.com/Mail.ReadWrite",
+              "https://graph.microsoft.com/Mail.Read",
+              "https://graph.microsoft.com/Mail.Send",
+              "https://graph.microsoft.com/Mail.ReadWrite",
               "offline_access",
             ].join(" "),
           }),
@@ -252,12 +252,12 @@ Deno.serve(async (req: any) => {
       let senderEmail: string | null = account.email_address || null;
       if (!senderEmail) {
         try {
-          const profileRes = await fetch("https://outlook.office.com/api/v2.0/me", {
+          const profileRes = await fetch("https://graph.microsoft.com/v1.0/me", {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (profileRes.ok) {
             const profile = await profileRes.json();
-            senderEmail = profile?.Mailbox?.Address || profile?.EmailAddress || profile?.UserPrincipalName || senderEmail;
+            senderEmail = profile?.mail || profile?.userPrincipalName || senderEmail;
             if (senderEmail && !account.email_address) {
               await supabase.from("email_accounts").update({ email_address: senderEmail }).eq("id", accountId);
             }
@@ -267,23 +267,23 @@ Deno.serve(async (req: any) => {
         }
       }
 
-      // Build REST API payload
-      const toRecipients = (to as string[]).map((addr) => ({ EmailAddress: { Address: addr } }));
-      const ccRecipients = (cc as string[] | undefined)?.map((addr) => ({ EmailAddress: { Address: addr } })) || [];
-      const bccRecipients = (bcc as string[] | undefined)?.map((addr) => ({ EmailAddress: { Address: addr } })) || [];
+      // Build Graph API payload
+      const toRecipients = (to as string[]).map((addr) => ({ emailAddress: { address: addr } }));
+      const ccRecipients = (cc as string[] | undefined)?.map((addr) => ({ emailAddress: { address: addr } })) || [];
+      const bccRecipients = (bcc as string[] | undefined)?.map((addr) => ({ emailAddress: { address: addr } })) || [];
 
       const sendBody = {
-        Message: {
-          Subject: subject,
-          Body: { ContentType: "HTML", Content: body },
-          ToRecipients: toRecipients,
-          CcRecipients: ccRecipients,
-          BccRecipients: bccRecipients,
+        message: {
+          subject: subject,
+          body: { contentType: "HTML", content: body },
+          toRecipients,
+          ccRecipients,
+          bccRecipients,
         },
-        SaveToSentItems: true,
+        saveToSentItems: true,
       };
 
-      const outlookResponse = await fetch("https://outlook.office.com/api/v2.0/me/sendmail", {
+      const graphResponse = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -292,23 +292,23 @@ Deno.serve(async (req: any) => {
         body: JSON.stringify(sendBody),
       });
 
-      if (!outlookResponse.ok) {
-        let errorText = await outlookResponse.text();
+      if (!graphResponse.ok) {
+        let errorText = await graphResponse.text();
         try {
           const j = JSON.parse(errorText);
           errorText = j?.error?.message || j?.message || errorText;
         } catch {}
-        console.error("Office 365 SendMail error:", errorText);
+        console.error("Microsoft Graph SendMail error:", errorText);
         throw new Error(`Failed to send email via Office 365: ${errorText}`);
       }
 
       // No message id returned; keep generated fallback
       emailSent = true;
 
-      // Attempt verification by inspecting Sent Items
+      // Attempt verification by inspecting Sent Items (Microsoft Graph)
       try {
         const sentItemsRes = await fetch(
-          "https://outlook.office.com/api/v2.0/me/MailFolders/SentItems/messages?$top=10&$orderby=ReceivedDateTime%20desc",
+          "https://graph.microsoft.com/v1.0/me/mailFolders/SentItems/messages?$top=10&$orderby=receivedDateTime%20desc",
           {
             headers: { Authorization: `Bearer ${accessToken}` },
           }
@@ -320,9 +320,9 @@ Deno.serve(async (req: any) => {
           const toSet = new Set((to as string[]).map((a) => a.toLowerCase()));
 
           verified = messages.some((m) => {
-            const subj = String(m?.Subject || "").trim().toLowerCase();
+            const subj = String(m?.subject || "").trim().toLowerCase();
             if (subj !== normalizedSubject) return false;
-            const msgTo = (Array.isArray(m?.ToRecipients) ? m.ToRecipients : []).map((r: any) => String(r?.EmailAddress?.Address || "").toLowerCase());
+            const msgTo = (Array.isArray(m?.toRecipients) ? m.toRecipients : []).map((r: any) => String(r?.emailAddress?.address || "").toLowerCase());
             // Confirm at least one of provided recipients is in message
             return msgTo.some((addr: string) => toSet.has(addr));
           });
@@ -367,7 +367,7 @@ Deno.serve(async (req: any) => {
         messageId,
         message: "Email sent successfully",
         verified,
-        verificationMethod: account.provider === "office365" ? "outlook_sent_items" : undefined,
+        verificationMethod: account.provider === "office365" ? "graph_sent_items" : undefined,
         verificationCheckedAt,
       }),
       {
@@ -384,7 +384,7 @@ Deno.serve(async (req: any) => {
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: 200,
       }
     );
   }
