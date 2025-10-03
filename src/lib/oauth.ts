@@ -83,9 +83,9 @@ export async function initiateMicrosoftOAuth(userId: string) {
       redirect_uri: oauthConfig.redirect_uri,
       response_type: "code",
       scope: [
-        "https://outlook.office.com/Mail.Read",
-        "https://outlook.office.com/Mail.Send",
-        "https://outlook.office.com/Mail.ReadWrite",
+        "https://graph.microsoft.com/Mail.Read",
+        "https://graph.microsoft.com/Mail.Send",
+        "https://graph.microsoft.com/Mail.ReadWrite",
         "offline_access",
         "openid",
         "profile",

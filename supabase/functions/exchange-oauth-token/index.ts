@@ -77,12 +77,12 @@ serve(async (req) => {
         client_secret: config.client_secret,
         redirect_uri: config.redirect_uri,
         grant_type: "authorization_code",
-        scope: [
-          "https://outlook.office.com/Mail.Read",
-          "https://outlook.office.com/Mail.Send",
-          "https://outlook.office.com/Mail.ReadWrite",
-          "offline_access",
-        ].join(" "),
+         scope: [
+           "https://graph.microsoft.com/Mail.Read",
+           "https://graph.microsoft.com/Mail.Send",
+           "https://graph.microsoft.com/Mail.ReadWrite",
+           "offline_access",
+         ].join(" "),
       };
     } else {
       throw new Error("Unsupported provider");
