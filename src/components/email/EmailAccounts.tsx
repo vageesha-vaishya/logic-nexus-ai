@@ -17,6 +17,8 @@ interface EmailAccount {
   is_active: boolean;
   last_sync_at: string;
   created_at: string;
+  access_token: string | null;
+  user_id: string;
 }
 
 export function EmailAccounts() {
@@ -79,17 +81,47 @@ export function EmailAccounts() {
 
   const syncAccount = async (accountId: string) => {
     try {
-      const { error } = await supabase.functions.invoke("sync-emails", {
+      const { data, error } = await supabase.functions.invoke("sync-emails", {
         body: { accountId },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's an authorization error
+        if (error.message?.includes("Authorization required") || error.message?.includes("access token")) {
+          toast({
+            title: "Authorization Required",
+            description: "Please re-authorize your account using the 'Re-authorize' button below.",
+            variant: "destructive",
+          });
+          fetchAccounts();
+          return;
+        }
+        throw error;
+      }
 
       toast({
         title: "Success",
-        description: "Email sync started",
+        description: `Synced ${data?.emailCount || 0} emails`,
       });
       fetchAccounts();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReauthorize = async (account: EmailAccount) => {
+    try {
+      if (account.provider === 'gmail') {
+        const { initiateGoogleOAuth } = await import('@/lib/oauth');
+        await initiateGoogleOAuth(account.user_id);
+      } else if (account.provider === 'office365') {
+        const { initiateMicrosoftOAuth } = await import('@/lib/oauth');
+        await initiateMicrosoftOAuth(account.user_id);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -202,6 +234,13 @@ export function EmailAccounts() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                {!account.access_token && (account.provider === 'gmail' || account.provider === 'office365') && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-md p-3 mb-2">
+                    <p className="text-xs text-yellow-600 dark:text-yellow-500 font-medium">
+                      ⚠️ Authorization Required: Click 'Re-authorize' to complete OAuth setup
+                    </p>
+                  </div>
+                )}
                 {account.last_sync_at && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
                     <RefreshCw className="w-3 h-3" />
@@ -209,15 +248,27 @@ export function EmailAccounts() {
                   </div>
                 )}
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncAccount(account.id)}
-                    className="flex-1"
-                  >
-                    <RefreshCw className="w-3 h-3 mr-2" />
-                    Sync
-                  </Button>
+                  {!account.access_token && (account.provider === 'gmail' || account.provider === 'office365') ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleReauthorize(account)}
+                      className="flex-1"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-2" />
+                      Re-authorize
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => syncAccount(account.id)}
+                      className="flex-1"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-2" />
+                      Sync
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
