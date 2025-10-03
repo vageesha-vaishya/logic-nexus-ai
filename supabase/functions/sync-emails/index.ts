@@ -475,7 +475,13 @@ serve(async (req) => {
             return {};
           }
 
-          const tenant = oauthCfg.tenant_id_provider || "common";
+          // Detect Microsoft personal accounts (MSA) and use "consumers" tenant
+          const lowerEmail = String(account.email_address || "").toLowerCase();
+          const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
+          const tenant = isMSA ? "consumers" : (oauthCfg.tenant_id_provider || "common");
+          
+          console.log(`Refreshing token for ${account.email_address} using tenant: ${tenant}`);
+          
           const tokenResp = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -485,9 +491,13 @@ serve(async (req) => {
               grant_type: "refresh_token",
               refresh_token: account.refresh_token!,
               scope: [
-                "https://outlook.office.com/Mail.Read",
-                "https://outlook.office.com/Mail.ReadWrite",
+                "https://graph.microsoft.com/Mail.Read",
+                "https://graph.microsoft.com/Mail.Send",
+                "https://graph.microsoft.com/Mail.ReadWrite",
                 "offline_access",
+                "openid",
+                "profile",
+                "email",
               ].join(" "),
             }),
           });
