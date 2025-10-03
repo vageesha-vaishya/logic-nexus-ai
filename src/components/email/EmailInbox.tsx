@@ -220,14 +220,47 @@ export function EmailInbox() {
     try {
       setSyncing(true);
       const tenantId = getTenantId();
-      if (!tenantId) {
-        throw new Error("No tenant found for current user");
+
+      if (tenantId) {
+        const { data, error } = await supabase.functions.invoke("sync-all-mailboxes", {
+          body: { tenantId, limit: 100 },
+        });
+        if (error) throw error as any;
+        toast({ title: "Sync triggered", description: `Processed ${data?.accountsProcessed || 0} accounts` });
+        await fetchEmails();
+        return;
       }
-      const { data, error } = await supabase.functions.invoke("sync-all-mailboxes", {
-        body: { tenantId, limit: 100 },
-      });
-      if (error) throw error as any;
-      toast({ title: "Sync triggered", description: `Processed ${data?.accountsProcessed || 0} accounts` });
+
+      // Fallback: sync all active accounts for current user when no tenant role is set
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) throw authErr;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Not authenticated");
+
+      const { data: userAccounts, error: accErr } = await supabase
+        .from("email_accounts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("is_active", true);
+      if (accErr) throw accErr;
+      if (!userAccounts || userAccounts.length === 0) {
+        toast({ title: "No accounts", description: "Add an email account first.", variant: "destructive" });
+        return;
+      }
+
+      let totalSynced = 0;
+      for (const acc of userAccounts) {
+        const { data, error } = await supabase.functions.invoke("sync-emails", {
+          body: { accountId: acc.id },
+        });
+        if (error) {
+          console.error("Sync error for account", acc.id, error);
+          continue;
+        }
+        totalSynced += data?.syncedCount || 0;
+      }
+
+      toast({ title: "Sync complete", description: `Processed ${userAccounts.length} accounts. Total emails: ${totalSynced}` });
       await fetchEmails();
     } catch (error: any) {
       toast({ title: "Sync all failed", description: error.message, variant: "destructive" });
