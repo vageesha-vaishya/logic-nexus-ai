@@ -196,6 +196,14 @@ export const EmailClientSettings: React.FC = () => {
 
   const sendTestEmail = async (account: EmailAccountRow) => {
     try {
+      if (String(account.provider) === 'smtp_imap') {
+        toast({
+          title: 'SMTP not supported from server',
+          description: 'Direct SMTP is blocked in the server environment. Please connect your Microsoft/Gmail account via the Accounts tab (OAuth), then try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
       setTestingId(account.id as string);
       const { data, error } = await supabase.functions.invoke("send-email", {
         body: {
@@ -204,7 +212,7 @@ export const EmailClientSettings: React.FC = () => {
           cc: [],
           bcc: [],
           subject: "Test Email",
-          body: "This is a test email to verify SMTP/IMAP configuration.",
+          body: "This is a test email to verify configuration.",
         },
       });
       if (error) throw error as any;
@@ -222,7 +230,8 @@ export const EmailClientSettings: React.FC = () => {
           : `Sent to ${account.email_address}. Waiting for provider confirmation...`,
       });
     } catch (error: any) {
-      toast({ title: "Failed to send test", description: error.message, variant: "destructive" });
+      const msg = error?.message || 'Failed to send test';
+      toast({ title: "Failed to send test", description: msg, variant: "destructive" });
     } finally {
       setTestingId(null);
     }

@@ -3,8 +3,6 @@
 declare const Deno: any;
 // @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// @ts-ignore Using esm.sh for nodemailer
-import nodemailer from "https://esm.sh/nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,51 +58,10 @@ Deno.serve(async (req: any) => {
 
     // Send email based on provider
     if (account.provider === "smtp_imap") {
-      // Use SMTP to send email via nodemailer
-      console.log("Sending via SMTP:", {
-        host: account.smtp_host,
-        port: account.smtp_port,
-        secure: account.smtp_use_tls && account.smtp_port === 465,
-      });
-
-      try {
-        // Create nodemailer transporter
-        const transporter = nodemailer.createTransport({
-          host: account.smtp_host,
-          port: account.smtp_port,
-          secure: account.smtp_port === 465, // true for 465, false for other ports like 587
-          auth: {
-            user: account.smtp_username,
-            pass: account.smtp_password,
-          },
-          tls: {
-            rejectUnauthorized: false, // Accept self-signed certificates
-          },
-        });
-
-        // Verify connection
-        await transporter.verify();
-        console.log("SMTP connection verified");
-
-        // Send mail
-        const info = await transporter.sendMail({
-          from: `"${account.display_name || ""}" <${account.email_address}>`,
-          to: (to as string[]).join(", "),
-          cc: cc ? (cc as string[]).join(", ") : undefined,
-          bcc: bcc ? (bcc as string[]).join(", ") : undefined,
-          subject: subject,
-          text: body,
-          html: body,
-          messageId: messageId,
-        });
-
-        console.log("Email sent successfully:", info.messageId);
-        emailSent = true;
-        messageId = info.messageId || messageId;
-      } catch (smtpError: any) {
-        console.error("SMTP error:", smtpError);
-        throw new Error(`Failed to send email via SMTP: ${smtpError.message}`);
-      }
+      console.log("SMTP/IMAP send requested, but direct SMTP is not supported from Edge functions.");
+      throw new Error(
+        "Direct SMTP (ports 25/465/587) is blocked in the Edge runtime. Please connect your account via OAuth in Email Management → Accounts (Gmail or Office 365), or set up a Resend API key and verified domain."
+      );
     } else if (account.provider === "gmail") {
       // Use Gmail API
       console.log("Sending via Gmail API");
