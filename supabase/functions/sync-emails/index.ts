@@ -564,7 +564,6 @@ serve(async (req) => {
           "Importance",
           "Flag",
           "InternetMessageId",
-          "InReplyTo",
         ].join(","),
         "$orderby": "ReceivedDateTime desc",
       }).toString();
