@@ -32,11 +32,12 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
     setLoading(true);
     try {
       // Resolve tenant and franchise IDs. RLS requires franchise_id for inserts.
+      // For platform admins, use lead's tenant/franchise; for others use context
       const effectiveTenantId = context.tenantId || lead.tenant_id;
       const effectiveFranchiseId = context.franchiseId || lead.franchise_id;
 
-      if (!effectiveTenantId || !effectiveFranchiseId) {
-        throw new Error('Missing tenant or franchise context for conversion');
+      if (!effectiveTenantId) {
+        throw new Error('Missing tenant context for conversion');
       }
 
       let accountId: string | null = null;
