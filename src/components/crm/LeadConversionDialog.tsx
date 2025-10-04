@@ -31,6 +31,14 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
   const handleConvert = async () => {
     setLoading(true);
     try {
+      // Resolve tenant and franchise IDs. RLS requires franchise_id for inserts.
+      const effectiveTenantId = context.tenantId || lead.tenant_id;
+      const effectiveFranchiseId = context.franchiseId || lead.franchise_id;
+
+      if (!effectiveTenantId || !effectiveFranchiseId) {
+        throw new Error('Missing tenant or franchise context for conversion');
+      }
+
       let accountId: string | null = null;
       let contactId: string | null = null;
       let opportunityId: string | null = null;
@@ -41,8 +49,8 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
           .from('accounts')
           .insert({
             name: lead.company,
-            tenant_id: context.tenantId,
-            franchise_id: context.franchiseId,
+            tenant_id: effectiveTenantId,
+            franchise_id: effectiveFranchiseId,
             email: lead.email,
             phone: lead.phone,
             status: 'active',
@@ -65,8 +73,8 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
             phone: lead.phone,
             title: lead.title,
             account_id: accountId,
-            tenant_id: context.tenantId,
-            franchise_id: context.franchiseId,
+            tenant_id: effectiveTenantId,
+            franchise_id: effectiveFranchiseId,
           })
           .select()
           .single();
@@ -86,8 +94,8 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
             stage: 'prospecting',
             amount: lead.estimated_value,
             close_date: lead.expected_close_date,
-            tenant_id: context.tenantId,
-            franchise_id: context.franchiseId,
+            tenant_id: effectiveTenantId,
+            franchise_id: effectiveFranchiseId,
             lead_source: lead.source,
           })
           .select()

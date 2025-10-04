@@ -12,11 +12,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-14 border-b flex items-center px-4 gap-3 bg-background sticky top-0 z-10">
+          <header className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10">
             <SidebarTrigger />
             <ObjectMenu />
           </header>
-          <main className="flex-1 p-6 bg-muted/30" style={{ backgroundImage: 'var(--app-background, none)' }}>
+          <main className="flex-1 p-4 bg-muted/30" style={{ backgroundImage: 'var(--app-background, none)' }}>
             {children}
           </main>
         </div>
