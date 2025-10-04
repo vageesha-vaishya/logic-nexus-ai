@@ -541,31 +541,31 @@ serve(async (req) => {
       }
 
       // List messages from Inbox using Microsoft Graph API
-      // Using select to reduce payload; adjust as needed
+      // Using lowerCamelCase field names as per Microsoft Graph API spec
       const baseUrl = "https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages";
       const query = new URLSearchParams({
         "$top": "20",
         "$select": [
-          "Id",
-          "Subject",
-          "From",
-          "Sender",
-          "ToRecipients",
-          "CcRecipients",
-          "BccRecipients",
-          "BodyPreview",
-          "Body",
-          "HasAttachments",
-          "IsRead",
-          "Categories",
-          "ConversationId",
-          "ReceivedDateTime",
-          "SentDateTime",
-          "Importance",
-          "Flag",
-          "InternetMessageId",
+          "id",
+          "subject",
+          "from",
+          "sender",
+          "toRecipients",
+          "ccRecipients",
+          "bccRecipients",
+          "bodyPreview",
+          "body",
+          "hasAttachments",
+          "isRead",
+          "categories",
+          "conversationId",
+          "receivedDateTime",
+          "sentDateTime",
+          "importance",
+          "flag",
+          "internetMessageId",
         ].join(","),
-        "$orderby": "ReceivedDateTime desc",
+        "$orderby": "receivedDateTime desc",
       }).toString();
 
       const listUrl = `${baseUrl}?${query}`;
@@ -605,38 +605,53 @@ serve(async (req) => {
       const messages = listJson.value || [];
       console.log(`Found ${messages.length} Office365 messages`);
 
+      // Debug: log structure of first message
+      if (messages.length > 0) {
+        console.log("First message keys:", Object.keys(messages[0]));
+      }
+
       for (const m of messages) {
         try {
-          const subject = m.Subject || "(No Subject)";
-          const fromAddr = m.From?.EmailAddress?.Address || m.Sender?.EmailAddress?.Address || "";
-          const fromName = m.From?.EmailAddress?.Name || m.Sender?.EmailAddress?.Name || fromAddr;
+          // Use lowerCamelCase properties as returned by Microsoft Graph API
+          const messageId = m.id || m.internetMessageId;
+          
+          // Skip if no valid message ID
+          if (!messageId) {
+            console.warn("Skipping message with no id or internetMessageId");
+            continue;
+          }
 
-          const toRecipients = (m.ToRecipients || []).map((r: any) => ({ email: r.EmailAddress?.Address || "" }));
-          const ccRecipients = (m.CcRecipients || []).map((r: any) => ({ email: r.EmailAddress?.Address || "" }));
-          const bccRecipients = (m.BccRecipients || []).map((r: any) => ({ email: r.EmailAddress?.Address || "" }));
+          const subject = m.subject || "(No Subject)";
+          const fromAddr = m.from?.emailAddress?.address || m.sender?.emailAddress?.address || "";
+          const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddr;
 
-          const bodyContentType = m.Body?.ContentType || "Text";
-          const bodyContent = m.Body?.Content || "";
-          const bodyText = bodyContentType === "HTML" ? bodyContent.replace(/<[^>]*>/g, "") : bodyContent;
-          const bodyHtml = bodyContentType === "HTML" ? bodyContent : bodyContent;
+          const toRecipients = (m.toRecipients || []).map((r: any) => ({ email: r.emailAddress?.address || "" }));
+          const ccRecipients = (m.ccRecipients || []).map((r: any) => ({ email: r.emailAddress?.address || "" }));
+          const bccRecipients = (m.bccRecipients || []).map((r: any) => ({ email: r.emailAddress?.address || "" }));
 
-          const receivedAt = m.ReceivedDateTime || new Date().toISOString();
-          const sentAt = m.SentDateTime || null;
+          const bodyContentType = m.body?.contentType || "text";
+          const bodyContent = m.body?.content || "";
+          const bodyText = bodyContentType.toLowerCase() === "html" ? bodyContent.replace(/<[^>]*>/g, "") : bodyContent;
+          const bodyHtml = bodyContentType.toLowerCase() === "html" ? bodyContent : "";
+
+          const receivedAt = m.receivedDateTime || new Date().toISOString();
+          const sentAt = m.sentDateTime || null;
           
           // Extract Office 365 specific metadata
-          const priority = m.Importance?.toLowerCase() || 'normal';
+          const priority = m.importance?.toLowerCase() || 'normal';
           const hasInlineImages = bodyHtml?.includes('cid:') || bodyHtml?.includes('data:image/') || false;
-          const internetMessageId = m.InternetMessageId || m.Id;
+          const internetMessageId = m.internetMessageId || m.id;
 
           // Check if exists
           const { data: existing } = await supabase
             .from("emails")
             .select("id")
-            .eq("message_id", m.Id)
+            .eq("message_id", messageId)
             .eq("account_id", account.id)
             .single();
 
           if (existing) {
+            console.log(`Email ${messageId} already exists, skipping`);
             continue;
           }
 
@@ -644,8 +659,8 @@ serve(async (req) => {
             account_id: account.id,
             tenant_id: account.tenant_id ?? null,
             franchise_id: account.franchise_id ?? null,
-            message_id: m.Id,
-            thread_id: m.ConversationId ?? null,
+            message_id: messageId,
+            thread_id: m.conversationId ?? null,
             subject,
             from_email: fromAddr,
             from_name: fromName,
@@ -655,18 +670,18 @@ serve(async (req) => {
             reply_to: null,
             body_text: bodyText,
             body_html: bodyHtml,
-            snippet: m.BodyPreview || "",
-            has_attachments: !!m.HasAttachments,
+            snippet: m.bodyPreview || "",
+            has_attachments: !!m.hasAttachments,
             attachments: [],
             direction: "inbound",
             status: "received",
-            is_read: !!m.IsRead,
-            is_starred: m.Flag?.FlagStatus === "Flagged" || false,
+            is_read: !!m.isRead,
+            is_starred: m.flag?.flagStatus === "flagged" || false,
             is_archived: false,
             is_spam: false,
             is_deleted: false,
             folder: "inbox",
-            labels: Array.isArray(m.Categories) ? m.Categories : [],
+            labels: Array.isArray(m.categories) ? m.categories : [],
             category: null,
             lead_id: null,
             contact_id: null,
@@ -677,16 +692,16 @@ serve(async (req) => {
             // Enhanced Office 365 fields
             priority,
             importance: priority,
-            in_reply_to: m.InReplyTo || null,
+            in_reply_to: null,
             email_references: [],
             size_bytes: null,
             raw_headers: {
-              subject: m.Subject,
+              subject: m.subject,
               from: fromAddr,
-              importance: m.Importance,
-              conversationId: m.ConversationId,
+              importance: m.importance,
+              conversationId: m.conversationId,
             },
-            conversation_id: m.ConversationId,
+            conversation_id: m.conversationId,
             internet_message_id: internetMessageId,
             has_inline_images: hasInlineImages,
             last_sync_attempt: new Date().toISOString(),
@@ -695,33 +710,12 @@ serve(async (req) => {
           const { error: insertErr } = await supabase.from("emails").insert(emailPayload);
           if (insertErr) {
             console.error("Error inserting Office365 email:", insertErr);
-            // Log sync error
-            await supabase.from("emails").upsert({
-              ...emailPayload,
-              sync_error: insertErr.message,
-            }, { onConflict: 'message_id' });
           } else {
             syncedCount++;
+            console.log(`Successfully synced email: ${subject}`);
           }
         } catch (msgErr: any) {
           console.error("Error processing Office365 message:", msgErr?.message || msgErr);
-          // Attempt to log the error
-          try {
-            await supabase.from("emails").insert({
-              account_id: account.id,
-              tenant_id: account.tenant_id ?? null,
-              franchise_id: account.franchise_id ?? null,
-              message_id: m.Id,
-              subject: "(Error Processing)",
-              from_email: "error@sync.local",
-              from_name: "Sync Error",
-              to_emails: [],
-              direction: "inbound",
-              status: "error",
-              sync_error: msgErr?.message || String(msgErr),
-              last_sync_attempt: new Date().toISOString(),
-            });
-          } catch {}
         }
       }
     }
