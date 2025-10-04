@@ -139,20 +139,32 @@ Deno.serve(async (req: any) => {
         }
       }
       
-      // Create MIME email message
+      // Create MIME email message (multipart/alternative with text and HTML)
       const toList = to.join(", ");
       const ccList = cc ? cc.join(", ") : "";
-      
+      const boundary = `mixed_boundary_${Date.now()}`;
+      const plainBody = (body || "").replace(/<[^>]+>/g, "");
+
       let message = [
         senderEmail ? `From: ${senderEmail}` : "",
         `To: ${toList}`,
         ccList ? `Cc: ${ccList}` : "",
         `Subject: ${subject}`,
         "MIME-Version: 1.0",
+        `Content-Type: multipart/alternative; boundary=\"${boundary}\"`,
+        "",
+        `--${boundary}`,
         `Content-Type: text/plain; charset=UTF-8`,
         "",
-        body
-      ].filter(line => line !== "").join("\r\n");
+        plainBody,
+        "",
+        `--${boundary}`,
+        `Content-Type: text/html; charset=UTF-8`,
+        "",
+        body,
+        "",
+        `--${boundary}--`
+      ].filter(line => line !== null && line !== undefined).join("\r\n");
 
       // Base64url encode the message
       const encodedMessage = btoa(unescape(encodeURIComponent(message)))

@@ -4,6 +4,7 @@ import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { useCRM } from "@/hooks/useCRM";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +38,13 @@ interface EmailAccountForm {
   imap: IMAPSettings;
   is_primary: boolean;
 }
+
+type ClientSettings = {
+  compose_default_font?: string;
+  compose_default_size_pt?: number;
+  compose_ribbon_enabled?: boolean;
+  signature_html?: string;
+};
 
 const PRESETS: Record<ProviderPreset, { smtp: Partial<SMTPSettings>; imap: Partial<IMAPSettings> }> = {
   gmail: {
@@ -99,6 +107,13 @@ export const EmailClientSettings: React.FC = () => {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [verification, setVerification] = useState<Record<string, { verified: boolean; method?: string; checkedAt?: string }>>({});
   const [form, setForm] = useState<EmailAccountForm>(emptyForm());
+  const [targetAccountId, setTargetAccountId] = useState<string | null>(null);
+  const [clientSettings, setClientSettings] = useState<ClientSettings>({
+    compose_default_font: "Calibri, Segoe UI, Arial, sans-serif",
+    compose_default_size_pt: 11,
+    compose_ribbon_enabled: true,
+    signature_html: "",
+  });
 
   const canEdit = useMemo(() => !!context?.tenantId || context?.isPlatformAdmin, [context]);
 
@@ -118,6 +133,18 @@ export const EmailClientSettings: React.FC = () => {
         return;
       }
       setAccounts((data as EmailAccountRow[]) || []);
+      // Select primary or first account for client settings editing
+      const primary = (data as EmailAccountRow[])?.find((a) => a.is_primary) || (data as EmailAccountRow[])?.[0];
+      setTargetAccountId(primary?.id || null);
+      // Load existing client settings if present
+      const existing = primary as any;
+      const existingSettings = (existing?.settings || {}) as ClientSettings;
+      setClientSettings((prev) => ({
+        compose_default_font: existingSettings.compose_default_font ?? prev.compose_default_font,
+        compose_default_size_pt: existingSettings.compose_default_size_pt ?? prev.compose_default_size_pt,
+        compose_ribbon_enabled: existingSettings.compose_ribbon_enabled ?? prev.compose_ribbon_enabled,
+        signature_html: existingSettings.signature_html ?? prev.signature_html,
+      }));
     };
     loadAccounts();
   }, []);
@@ -351,6 +378,114 @@ export const EmailClientSettings: React.FC = () => {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Outlook Client Defaults</CardTitle>
+          <CardDescription>Set default compose font, size, ribbon, and signature.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {accounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Add or connect an account to configure client defaults.</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>Apply to Account</Label>
+                <Select value={targetAccountId ?? ""} onValueChange={(v) => {
+                  setTargetAccountId(v);
+                  const acc = accounts.find((a) => a.id === v) as any;
+                  const s = (acc?.settings || {}) as ClientSettings;
+                  setClientSettings({
+                    compose_default_font: s.compose_default_font ?? "Calibri, Segoe UI, Arial, sans-serif",
+                    compose_default_size_pt: s.compose_default_size_pt ?? 11,
+                    compose_ribbon_enabled: s.compose_ribbon_enabled ?? true,
+                    signature_html: s.signature_html ?? "",
+                  });
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id as string}>
+                        {(a.display_name || a.email_address) + (a.is_primary ? " (Primary)" : "")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Default Font</Label>
+                  <Select value={clientSettings.compose_default_font || "Calibri, Segoe UI, Arial, sans-serif"} onValueChange={(v) => setClientSettings((s) => ({ ...s, compose_default_font: v }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select font" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Calibri, Segoe UI, Arial, sans-serif">Calibri</SelectItem>
+                      <SelectItem value="Segoe UI, Calibri, Arial, sans-serif">Segoe UI</SelectItem>
+                      <SelectItem value="Arial, Helvetica, sans-serif">Arial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Default Size (pt)</Label>
+                  <Select value={String(clientSettings.compose_default_size_pt ?? 11)} onValueChange={(v) => setClientSettings((s) => ({ ...s, compose_default_size_pt: Number(v) }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="11">11</SelectItem>
+                      <SelectItem value="12">12</SelectItem>
+                      <SelectItem value="14">14</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch checked={clientSettings.compose_ribbon_enabled ?? true} onCheckedChange={(v) => setClientSettings((s) => ({ ...s, compose_ribbon_enabled: v }))} />
+                <Label>Enable Outlook-style compose ribbon</Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Default Signature (HTML allowed)</Label>
+                <Textarea value={clientSettings.signature_html || ""} onChange={(e) => setClientSettings((s) => ({ ...s, signature_html: e.target.value }))} placeholder="Enter signature HTML or plain text" rows={4} />
+              </div>
+
+              <div>
+                <Button
+                  disabled={!targetAccountId}
+                  onClick={async () => {
+                    if (!targetAccountId) return;
+                    try {
+                      const { error } = await supabase
+                        .from("email_accounts")
+                        .update({ settings: clientSettings })
+                        .eq("id", targetAccountId);
+                      if (error) throw error;
+                      toast({ title: "Client defaults saved", description: "Outlook-style settings applied to selected account." });
+                      // Refresh accounts to reflect settings
+                      const { data } = await supabase
+                        .from("email_accounts")
+                        .select("*")
+                        .eq("is_active", true)
+                        .order("created_at", { ascending: false });
+                      setAccounts((data as EmailAccountRow[]) || []);
+                    } catch (err: any) {
+                      toast({ title: "Failed to save defaults", description: err.message, variant: "destructive" });
+                    }
+                  }}
+                >
+                  Save Client Defaults
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

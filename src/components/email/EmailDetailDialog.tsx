@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp } from "lucide-react";
+import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
@@ -32,6 +32,7 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
   const [showReply, setShowReply] = useState(false);
   const [showFullBody, setShowFullBody] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const clampStyle = showFullBody
     ? {}
     : {
@@ -44,7 +45,10 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className={`${expanded ? "max-w-[95vw] max-h-[95vh]" : "max-w-4xl max-h-[85vh]"} overflow-auto min-w-[320px] min-h-[320px] font-outlook`}
+          style={{ resize: "both" }}
+        >
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -56,6 +60,9 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
                 </div>
               </div>
               <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)} title={expanded ? "Reduce view size" : "Enlarge view area"}>
+                  {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </Button>
                 <Button variant="ghost" size="sm">
                   <Star className={`w-4 h-4 ${email.is_starred ? "fill-warning text-warning" : ""}`} />
                 </Button>
