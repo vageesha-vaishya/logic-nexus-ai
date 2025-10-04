@@ -1,4 +1,8 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+// Ambient Deno typing for editors without Deno type support
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
+// @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,6 +128,79 @@ Deno.serve(async (req) => {
             p_user_id: assignedUserId,
             p_tenant_id: queueItem.tenant_id
           });
+
+          // Notify assigned user via email (best-effort, non-blocking)
+          try {
+            // Get assigned user profile for email
+            const { data: profile, error: profileErr } = await supabase
+              .from('profiles')
+              .select('id, email, first_name, last_name')
+              .eq('id', assignedUserId)
+              .single();
+
+            if (profileErr) throw profileErr;
+            if (!profile?.email) throw new Error('Assigned user has no email');
+
+            // Pick a tenant/franchise email account to send from
+            let accountQuery = supabase
+              .from('email_accounts')
+              .select('id, email_address, is_primary')
+              .eq('is_active', true)
+              .limit(1);
+
+            if (queueItem.franchise_id) {
+              accountQuery = accountQuery.eq('franchise_id', queueItem.franchise_id);
+            } else if (queueItem.tenant_id) {
+              accountQuery = accountQuery.eq('tenant_id', queueItem.tenant_id);
+            }
+
+            const { data: emailAccount, error: acctErr } = await accountQuery.single();
+            if (acctErr) throw acctErr;
+            if (!emailAccount?.id) throw new Error('No active email account configured');
+
+            const subject = `New Lead Assigned: ${lead.first_name} ${lead.last_name}`;
+            const appBaseUrl = Deno.env.get('APP_BASE_URL') || '';
+            const displayName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+            const bodyHtml = `
+              <p>Hi ${displayName},</p>
+              <p>You have been assigned a new lead:</p>
+              <ul>
+                <li><strong>Name:</strong> ${lead.first_name} ${lead.last_name}</li>
+                ${lead.company ? `<li><strong>Company:</strong> ${lead.company}</li>` : ''}
+                ${lead.email ? `<li><strong>Email:</strong> ${lead.email}</li>` : ''}
+                ${lead.phone ? `<li><strong>Phone:</strong> ${lead.phone}</li>` : ''}
+                <li><strong>Status:</strong> ${lead.status}</li>
+              </ul>
+              <p><a href="${appBaseUrl}/dashboard/leads/${queueItem.lead_id}">View Lead</a></p>
+            `;
+
+            // Invoke send-email function via Functions endpoint using service role
+            const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
+            const functionsUrl = `${supabaseUrl}/functions/v1/send-email`;
+            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+            const resp = await fetch(functionsUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${serviceKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                accountId: emailAccount.id,
+                to: [profile.email],
+                cc: [],
+                subject,
+                body: bodyHtml
+              })
+            });
+
+            if (!resp.ok) {
+              const txt = await resp.text();
+              console.warn('Failed to send assignment email:', resp.status, txt);
+            }
+          } catch (notifyErr) {
+            console.warn('Assignment email skipped:', notifyErr?.message || notifyErr);
+          }
 
           // Mark queue item as assigned
           await supabase

@@ -24,6 +24,7 @@ interface Lead {
   created_at: string;
   lead_score: number | null;
   qualification_status: string | null;
+  owner_id?: string | null;
 }
 
 export default function Leads() {
@@ -33,7 +34,8 @@ export default function Leads() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [scoreFilter, setScoreFilter] = useState<string>('all');
-  const { supabase } = useCRM();
+  const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me'>('any');
+  const { supabase, context } = useCRM();
 
   useEffect(() => {
     fetchLeads();
@@ -67,7 +69,14 @@ export default function Leads() {
       (scoreFilter === 'medium' && (lead.lead_score || 0) >= 40 && (lead.lead_score || 0) < 70) ||
       (scoreFilter === 'low' && (lead.lead_score || 0) < 40);
     
-    return matchesSearch && matchesStatus && matchesScore;
+    const matchesOwner =
+      ownerFilter === 'any'
+        ? true
+        : ownerFilter === 'unassigned'
+        ? !lead.owner_id
+        : lead.owner_id === (context?.userId || null);
+
+    return matchesSearch && matchesStatus && matchesScore && matchesOwner;
   });
 
   const getStatusColor = (status: string) => {
@@ -147,6 +156,18 @@ export default function Leads() {
             <SelectItem value="high">High (70+)</SelectItem>
             <SelectItem value="medium">Medium (40-69)</SelectItem>
             <SelectItem value="low">Low (&lt;40)</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as any)}>
+          <SelectTrigger className="w-[180px]">
+            <UsersIcon className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Owner" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any Owner</SelectItem>
+            <SelectItem value="me">Assigned to Me</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
           </SelectContent>
         </Select>
       </div>

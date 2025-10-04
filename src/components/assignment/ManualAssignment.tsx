@@ -66,7 +66,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
       // Get lead details first
       const { data: lead } = await supabase
         .from('leads')
-        .select('tenant_id, franchise_id')
+        .select('id, tenant_id, franchise_id, first_name, last_name, company, email, phone, status')
         .eq('id', leadId)
         .single();
 
@@ -108,6 +108,62 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
         p_user_id: selectedUser,
         p_tenant_id: lead.tenant_id,
       });
+
+      // Send email notification to the assignee (best-effort)
+      try {
+        const { data: assignee, error: assigneeErr } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name')
+          .eq('id', selectedUser)
+          .single();
+
+        if (!assigneeErr && assignee?.email) {
+          // Choose active email account
+          let emailQuery = supabase
+            .from('email_accounts')
+            .select('id, email_address, is_primary')
+            .eq('is_active', true)
+            .limit(1);
+
+          if (lead.franchise_id) {
+            emailQuery = emailQuery.eq('franchise_id', lead.franchise_id);
+          } else if (lead.tenant_id) {
+            emailQuery = emailQuery.eq('tenant_id', lead.tenant_id);
+          }
+
+          const { data: emailAccount } = await emailQuery.single();
+
+          if (emailAccount?.id) {
+            const subject = `New Lead Assigned: ${lead.first_name} ${lead.last_name}`;
+            const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+            const displayName = [assignee.first_name, assignee.last_name].filter(Boolean).join(' ');
+            const bodyHtml = `
+              <p>Hi ${displayName},</p>
+              <p>You have been assigned a new lead:</p>
+              <ul>
+                <li><strong>Name:</strong> ${lead.first_name} ${lead.last_name}</li>
+                ${lead.company ? `<li><strong>Company:</strong> ${lead.company}</li>` : ''}
+                ${lead.email ? `<li><strong>Email:</strong> ${lead.email}</li>` : ''}
+                ${lead.phone ? `<li><strong>Phone:</strong> ${lead.phone}</li>` : ''}
+                <li><strong>Status:</strong> ${lead.status}</li>
+              </ul>
+              <p><a href="${baseUrl}/dashboard/leads/${lead.id}">View Lead</a></p>
+            `;
+
+            await supabase.functions.invoke('send-email', {
+              body: {
+                accountId: emailAccount.id,
+                to: [assignee.email],
+                cc: [],
+                subject,
+                body: bodyHtml,
+              },
+            });
+          }
+        }
+      } catch (notifyErr) {
+        console.warn('Assignment email skipped:', (notifyErr as any)?.message || notifyErr);
+      }
 
       toast.success('Lead assigned successfully');
       onAssigned?.();
