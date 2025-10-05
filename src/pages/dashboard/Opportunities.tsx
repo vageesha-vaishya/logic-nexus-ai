@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, TrendingUp } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 
 const stageColors: Record<string, string> = {
   prospecting: 'bg-slate-500',
@@ -36,6 +37,7 @@ export default function Opportunities() {
   const { supabase, context } = useCRM();
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
     fetchOpportunities();
@@ -88,10 +90,16 @@ export default function Opportunities() {
             <h1 className="text-3xl font-bold">Opportunities</h1>
             <p className="text-muted-foreground">Manage your sales pipeline</p>
           </div>
-          <Button onClick={() => navigate('/dashboard/opportunities/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Opportunity
-          </Button>
+          <div className="flex gap-2 items-center">
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+            <Button variant="outline" onClick={() => navigate('/dashboard/opportunities/pipeline')}>
+              Pipeline View
+            </Button>
+            <Button onClick={() => navigate('/dashboard/opportunities/new')}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Opportunity
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -135,18 +143,26 @@ export default function Opportunities() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>All Opportunities</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
+        {loading ? (
+          <Card>
+            <CardContent>
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
-            ) : opportunities.length === 0 ? (
+            </CardContent>
+          </Card>
+        ) : opportunities.length === 0 ? (
+          <Card>
+            <CardContent>
               <div className="text-center py-8 text-muted-foreground">
                 No opportunities yet. Create your first opportunity to get started.
               </div>
-            ) : (
+            </CardContent>
+          </Card>
+        ) : viewMode === 'list' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>All Opportunities</CardTitle>
+            </CardHeader>
+            <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -166,9 +182,7 @@ export default function Opportunities() {
                       onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}
                     >
                       <TableCell className="font-medium">{opportunity.name}</TableCell>
-                      <TableCell>
-                        {opportunity.accounts?.name || '-'}
-                      </TableCell>
+                      <TableCell>{opportunity.accounts?.name || '-'}</TableCell>
                       <TableCell>
                         <Badge className={stageColors[opportunity.stage]}>
                           {stageLabels[opportunity.stage]}
@@ -181,9 +195,55 @@ export default function Opportunities() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : viewMode === 'grid' ? (
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {opportunities.map((opportunity) => (
+              <Card key={opportunity.id} className="hover:shadow transition-shadow cursor-pointer" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base truncate">{opportunity.name}</CardTitle>
+                    <Badge className={stageColors[opportunity.stage]}>{stageLabels[opportunity.stage]}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground flex items-center justify-between">
+                  <span className="truncate">{opportunity.accounts?.name || '-'}</span>
+                  <span>{formatCurrency(opportunity.amount)}</span>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {opportunities.map((opportunity) => (
+              <Card key={opportunity.id} className="hover:shadow-lg transition-shadow cursor-pointer h-full" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <Badge className={stageColors[opportunity.stage]}> {stageLabels[opportunity.stage]} </Badge>
+                    <Badge variant="outline">{opportunity.accounts?.name || '-'}</Badge>
+                  </div>
+                  <CardTitle className="mt-4">{opportunity.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span>Amount</span>
+                    <span className="font-medium">{formatCurrency(opportunity.amount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Close Date</span>
+                    <span>{formatDate(opportunity.close_date)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Probability</span>
+                    <span>{opportunity.probability ? `${opportunity.probability}%` : '-'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      }
       </div>
     </DashboardLayout>
   );

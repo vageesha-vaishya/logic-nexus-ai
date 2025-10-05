@@ -129,6 +129,28 @@ Deno.serve(async (req) => {
             p_tenant_id: queueItem.tenant_id
           });
 
+          // Auto-link unlinked tasks assigned to this user within the same scope (best-effort)
+          try {
+            let linkQuery = supabase
+              .from('activities')
+              .update({ lead_id: queueItem.lead_id })
+              .eq('assigned_to', assignedUserId)
+              .is('lead_id', null)
+              .eq('activity_type', 'task')
+              .eq('tenant_id', queueItem.tenant_id);
+
+            if (queueItem.franchise_id) {
+              linkQuery = linkQuery.eq('franchise_id', queueItem.franchise_id);
+            }
+
+            const { error: linkErr } = await linkQuery;
+            if (linkErr) {
+              console.warn('Auto-link tasks skipped:', linkErr.message || linkErr);
+            }
+          } catch (linkErr: any) {
+            console.warn('Auto-link tasks skipped:', linkErr?.message || linkErr);
+          }
+
           // Notify assigned user via email (best-effort, non-blocking)
           try {
             // Get assigned user profile for email

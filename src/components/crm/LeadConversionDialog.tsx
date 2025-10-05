@@ -31,10 +31,28 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
   const handleConvert = async () => {
     setLoading(true);
     try {
-      // Resolve tenant and franchise IDs. RLS requires franchise_id for inserts.
-      // For platform admins, use lead's tenant/franchise; for others use context
-      const effectiveTenantId = context.tenantId || lead.tenant_id;
-      const effectiveFranchiseId = context.franchiseId || lead.franchise_id;
+      // Resolve tenant and franchise IDs.
+      // Tenant is required; franchise is optional in schemas but may be used by RLS.
+      let effectiveTenantId: string | undefined = context.tenantId || lead.tenant_id || undefined;
+      let effectiveFranchiseId: string | null = context.franchiseId || lead.franchise_id || null;
+
+      // Fallback to RPC to get tenant/franchise when missing
+      if (!effectiveTenantId && context.userId) {
+        const { data: tenantRpc, error: tenantErr } = await supabase
+          .rpc('get_user_tenant_id', { check_user_id: context.userId });
+        if (tenantErr) {
+          console.warn('tenant rpc error', tenantErr);
+        }
+        if (tenantRpc) effectiveTenantId = tenantRpc as string;
+      }
+      if (!effectiveFranchiseId && context.userId) {
+        const { data: franchiseRpc, error: franchiseErr } = await supabase
+          .rpc('get_user_franchise_id', { check_user_id: context.userId });
+        if (franchiseErr) {
+          console.warn('franchise rpc error', franchiseErr);
+        }
+        if (franchiseRpc) effectiveFranchiseId = franchiseRpc as string;
+      }
 
       if (!effectiveTenantId) {
         throw new Error('Missing tenant context for conversion');
@@ -93,11 +111,12 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
             account_id: accountId,
             contact_id: contactId,
             stage: 'prospecting',
-            amount: lead.estimated_value,
+            amount: lead.estimated_value != null ? Number(lead.estimated_value) : null,
             close_date: lead.expected_close_date,
             tenant_id: effectiveTenantId,
             franchise_id: effectiveFranchiseId,
             lead_source: lead.source,
+            lead_id: lead.id,
           })
           .select()
           .single();
@@ -128,8 +147,9 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
         navigate(`/dashboard/opportunities/${opportunityId}`);
       }
     } catch (error: any) {
-      toast.error('Failed to convert lead');
-      console.error('Error:', error);
+      const message = error?.message || 'Failed to convert lead';
+      toast.error(message);
+      console.error('Convert lead error:', error);
     } finally {
       setLoading(false);
     }

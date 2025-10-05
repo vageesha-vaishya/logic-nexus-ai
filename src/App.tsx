@@ -37,6 +37,7 @@ import UserDetail from "./pages/dashboard/UserDetail";
 import Opportunities from "./pages/dashboard/Opportunities";
 import OpportunityNew from "./pages/dashboard/OpportunityNew";
 import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
+import OpportunitiesPipeline from "./pages/dashboard/OpportunitiesPipeline";
 import LeadRouting from "./pages/dashboard/LeadRouting";
 import LeadAssignment from "./pages/dashboard/LeadAssignment";
 import EmailManagement from "./pages/dashboard/EmailManagement";
@@ -52,7 +53,6 @@ import Dashboards from "./pages/dashboard/Dashboards";
 import More from "./pages/dashboard/More";
 import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
 import CustomRoles from "./pages/dashboard/CustomRoles";
-import OAuthCallback from "./pages/OAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -68,7 +68,6 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
-            <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route 
               path="/dashboard" 
@@ -275,6 +274,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["opportunities.view"]}>
                   <Opportunities />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/opportunities/pipeline" 
+              element={
+                <ProtectedRoute requiredPermissions={["opportunities.view"]}>
+                  <OpportunitiesPipeline />
                 </ProtectedRoute>
               } 
             />

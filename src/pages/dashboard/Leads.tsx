@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
@@ -35,6 +37,7 @@ export default function Leads() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [scoreFilter, setScoreFilter] = useState<string>('all');
   const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me'>('any');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase, context } = useCRM();
 
   useEffect(() => {
@@ -100,7 +103,8 @@ export default function Leads() {
           <h1 className="text-3xl font-bold">Leads</h1>
           <p className="text-muted-foreground">Track and convert potential customers</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <ViewToggle value={viewMode} onChange={setViewMode} />
           <Button variant="outline" onClick={() => navigate('/dashboard/lead-assignment')}>
             <UsersIcon className="mr-2 h-4 w-4" />
             Lead Assignment

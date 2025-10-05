@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRM } from '@/hooks/useCRM';
 
@@ -87,10 +87,10 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
         .order('name');
       if (accountsData) setAccounts(accountsData);
 
-      // Fetch contacts
+      // Fetch contacts (include account_id for filtering)
       const { data: contactsData } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, account_id')
         .order('first_name');
       if (contactsData) setContacts(contactsData);
 
@@ -129,6 +129,23 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
 
     fetchData();
   }, [context]);
+
+  // Filter contacts by selected account
+  const selectedAccountId = form.watch('account_id');
+  const filteredContacts = useMemo(() => {
+    if (!selectedAccountId) return contacts;
+    return contacts.filter((c) => c.account_id === selectedAccountId);
+  }, [selectedAccountId, contacts]);
+
+  // Reset contact if it no longer matches the selected account
+  useEffect(() => {
+    const currentContactId = form.getValues('contact_id');
+    if (!currentContactId) return;
+    const current = contacts.find((c) => c.id === currentContactId);
+    if (selectedAccountId && current && current.account_id !== selectedAccountId) {
+      form.setValue('contact_id', '');
+    }
+  }, [selectedAccountId, contacts]);
 
   return (
     <Form {...form}>
@@ -253,7 +270,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {contacts.map((contact) => (
+                    {filteredContacts.map((contact) => (
                       <SelectItem key={contact.id} value={contact.id}>
                         {contact.first_name} {contact.last_name}
                       </SelectItem>
@@ -303,13 +320,12 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="web">Web</SelectItem>
+                    <SelectItem value="website">Website</SelectItem>
                     <SelectItem value="phone">Phone</SelectItem>
                     <SelectItem value="email">Email</SelectItem>
                     <SelectItem value="referral">Referral</SelectItem>
-                    <SelectItem value="partner">Partner</SelectItem>
-                    <SelectItem value="advertisement">Advertisement</SelectItem>
-                    <SelectItem value="trade_show">Trade Show</SelectItem>
+                    <SelectItem value="social">Social</SelectItem>
+                    <SelectItem value="event">Event</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>

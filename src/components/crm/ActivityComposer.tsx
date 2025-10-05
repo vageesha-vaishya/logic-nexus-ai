@@ -226,12 +226,12 @@ export function ActivityComposer({ defaultTab = 'task', related, onCreated }: Ac
     }
     const call = await insertActivity({
       activity_type: 'call',
-      status: 'completed',
+      status: 'planned',
       priority: 'medium',
       subject: values.subject,
       description: values.description || null,
       due_date: null,
-      completed_at: new Date().toISOString(),
+      completed_at: null,
       tenant_id: tenantId,
       franchise_id: franchiseId,
       account_id: values.account_id === 'none' ? null : (values.account_id || null),
@@ -267,12 +267,12 @@ export function ActivityComposer({ defaultTab = 'task', related, onCreated }: Ac
     }
     const created = await insertActivity({
       activity_type: 'email',
-      status: 'completed',
+      status: 'planned',
       priority: 'medium',
       subject: values.subject,
       description: values.email_body || values.description || null,
       due_date: null,
-      completed_at: new Date().toISOString(),
+      completed_at: null,
       tenant_id: tenantId,
       franchise_id: franchiseId,
       account_id: values.account_id === 'none' ? null : (values.account_id || null),
@@ -658,12 +658,12 @@ export function ActivityComposer({ defaultTab = 'task', related, onCreated }: Ac
                   }
                   const created = await insertActivity({
                     activity_type: 'note',
-                    status: 'completed',
+                    status: 'planned',
                     priority: 'low',
                     subject: values.subject,
                     description: values.description || null,
                     due_date: null,
-                    completed_at: new Date().toISOString(),
+                    completed_at: null,
                     tenant_id: tenantId,
                     franchise_id: franchiseId,
                     account_id: values.account_id === 'none' ? null : (values.account_id || null),

@@ -21,9 +21,9 @@ import {
 interface Activity {
   id: string;
   activity_type: string;
-  subject: string;
-  status: string;
-  priority: string;
+  subject: string | null;
+  status: string | null;
+  priority: string | null;
   due_date: string | null;
   completed_at: string | null;
   created_at: string;
@@ -76,7 +76,7 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'completed':
         return 'bg-green-500/10 text-green-500';
@@ -89,7 +89,7 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string | null) => {
     switch (priority) {
       case 'high':
         return 'bg-red-500/10 text-red-500';
@@ -191,10 +191,10 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
                     </div>
                     <div className="flex gap-2 items-start">
                       <Badge className={getStatusColor(activity.status)} variant="outline">
-                        {activity.status}
+                        {activity.status ?? 'planned'}
                       </Badge>
                       <Badge className={getPriorityColor(activity.priority)} variant="outline">
-                        {activity.priority}
+                        {activity.priority ?? 'medium'}
                       </Badge>
                       <Button
                         variant="ghost"

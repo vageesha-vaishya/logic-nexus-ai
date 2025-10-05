@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
@@ -25,6 +27,7 @@ export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase } = useCRM();
 
   useEffect(() => {
@@ -61,12 +64,15 @@ export default function Contacts() {
           <h1 className="text-3xl font-bold">Contacts</h1>
           <p className="text-muted-foreground">Manage your business contacts</p>
         </div>
-        <Button asChild>
-          <Link to="/dashboard/contacts/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Contact
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+          <Button asChild>
+            <Link to="/dashboard/contacts/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Contact
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="relative max-w-md">
@@ -102,45 +108,98 @@ export default function Contacts() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredContacts.map((contact) => (
-            <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <User className="h-10 w-10 text-primary" />
-                  </div>
-                  <CardTitle className="mt-4">
-                    {contact.first_name} {contact.last_name}
-                  </CardTitle>
-                  {contact.title && (
-                    <CardDescription>{contact.title}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {contact.accounts && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Building2 className="h-4 w-4" />
-                      <span>{contact.accounts.name}</span>
+        viewMode === 'list' ? (
+          <Card>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredContacts.map((contact) => (
+                    <TableRow key={contact.id} className="cursor-pointer" onClick={() => {}}>
+                      <TableCell>
+                        <Link className="font-medium hover:underline" to={`/dashboard/contacts/${contact.id}`}>
+                          {contact.first_name} {contact.last_name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{contact.title || '-'}</TableCell>
+                      <TableCell>{contact.accounts?.name || '-'}</TableCell>
+                      <TableCell>{contact.email || '-'}</TableCell>
+                      <TableCell>{contact.phone || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : viewMode === 'grid' ? (
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {filteredContacts.map((contact) => (
+              <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
+                <Card className="hover:shadow transition-shadow cursor-pointer">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base truncate">
+                      {contact.first_name} {contact.last_name}
+                    </CardTitle>
+                    {contact.title && (
+                      <CardDescription className="truncate">{contact.title}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    {contact.accounts?.name || '-'}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredContacts.map((contact) => (
+              <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <User className="h-10 w-10 text-primary" />
                     </div>
-                  )}
-                  {contact.email && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{contact.email}</span>
-                    </div>
-                  )}
-                  {contact.phone && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{contact.phone}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                    <CardTitle className="mt-4">
+                      {contact.first_name} {contact.last_name}
+                    </CardTitle>
+                    {contact.title && (
+                      <CardDescription>{contact.title}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {contact.accounts && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Building2 className="h-4 w-4" />
+                        <span>{contact.accounts.name}</span>
+                      </div>
+                    )}
+                    {contact.email && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="h-4 w-4" />
+                        <span className="truncate">{contact.email}</span>
+                      </div>
+                    )}
+                    {contact.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        <span>{contact.phone}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )
       )}
     </div>
     </DashboardLayout>

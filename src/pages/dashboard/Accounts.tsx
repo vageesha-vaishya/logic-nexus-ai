@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
@@ -25,6 +27,7 @@ export default function Accounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase } = useCRM();
 
   useEffect(() => {
@@ -80,12 +83,15 @@ export default function Accounts() {
           <h1 className="text-3xl font-bold">Accounts</h1>
           <p className="text-muted-foreground">Manage your company accounts</p>
         </div>
-        <Button asChild>
-          <Link to="/dashboard/accounts/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Account
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+          <Button asChild>
+            <Link to="/dashboard/accounts/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Account
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -123,51 +129,102 @@ export default function Accounts() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAccounts.map((account) => (
-            <Link key={account.id} to={`/dashboard/accounts/${account.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <Building2 className="h-10 w-10 text-primary" />
-                    <div className="flex gap-2">
-                      <Badge className={getStatusColor(account.status)}>
-                        {account.status}
-                      </Badge>
-                      <Badge className={getTypeColor(account.account_type)}>
-                        {account.account_type}
-                      </Badge>
+        viewMode === 'list' ? (
+          <Card>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Industry</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Email</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAccounts.map((account) => (
+                    <TableRow key={account.id} className="cursor-pointer" onClick={() => {}}>
+                      <TableCell>
+                        <Link className="font-medium hover:underline" to={`/dashboard/accounts/${account.id}`}>{account.name}</Link>
+                      </TableCell>
+                      <TableCell>{account.account_type}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(account.status)}>{account.status}</Badge>
+                      </TableCell>
+                      <TableCell>{account.industry || '-'}</TableCell>
+                      <TableCell>{account.phone || '-'}</TableCell>
+                      <TableCell>{account.email || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : viewMode === 'grid' ? (
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {filteredAccounts.map((account) => (
+              <Link key={account.id} to={`/dashboard/accounts/${account.id}`}>
+                <Card className="hover:shadow transition-shadow cursor-pointer">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base truncate">{account.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between">
+                    <Badge className={getTypeColor(account.account_type)}>{account.account_type}</Badge>
+                    <Badge className={getStatusColor(account.status)}>{account.status}</Badge>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredAccounts.map((account) => (
+              <Link key={account.id} to={`/dashboard/accounts/${account.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <Building2 className="h-10 w-10 text-primary" />
+                      <div className="flex gap-2">
+                        <Badge className={getStatusColor(account.status)}>
+                          {account.status}
+                        </Badge>
+                        <Badge className={getTypeColor(account.account_type)}>
+                          {account.account_type}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                  <CardTitle className="mt-4">{account.name}</CardTitle>
-                  {account.industry && (
-                    <CardDescription>{account.industry}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {account.phone && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{account.phone}</span>
-                    </div>
-                  )}
-                  {account.email && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{account.email}</span>
-                    </div>
-                  )}
-                  {account.website && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Globe className="h-4 w-4" />
-                      <span className="truncate">{account.website}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                    <CardTitle className="mt-4">{account.name}</CardTitle>
+                    {account.industry && (
+                      <CardDescription>{account.industry}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {account.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        <span>{account.phone}</span>
+                      </div>
+                    )}
+                    {account.email && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="h-4 w-4" />
+                        <span className="truncate">{account.email}</span>
+                      </div>
+                    )}
+                    {account.website && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Globe className="h-4 w-4" />
+                        <span className="truncate">{account.website}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )
       )}
     </div>
     </DashboardLayout>

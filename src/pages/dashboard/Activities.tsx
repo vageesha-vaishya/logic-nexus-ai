@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCRM } from '@/hooks/useCRM';
 import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
@@ -40,6 +42,8 @@ export default function Activities() {
   const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me' | string>('any');
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [leadNamesById, setLeadNamesById] = useState<Record<string, string>>({});
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -74,6 +78,31 @@ export default function Activities() {
 
       if (error) throw error;
       setActivities(data || []);
+
+      // Fetch lead names referenced by activities for grouping headers
+      const leadIds = Array.from(
+        new Set(
+          (data || [])
+            .map((a: any) => a.lead_id)
+            .filter((id: any): id is string => !!id)
+        )
+      );
+      if (leadIds.length > 0) {
+        const { data: leadRefs, error: leadErr } = await supabase
+          .from('leads')
+          .select('id, first_name, last_name, company')
+          .in('id', leadIds);
+        if (!leadErr && leadRefs) {
+          const map: Record<string, string> = {};
+          for (const l of leadRefs) {
+            const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ').trim();
+            map[l.id] = fullName || l.company || 'Lead';
+          }
+          setLeadNamesById(map);
+        }
+      } else {
+        setLeadNamesById({});
+      }
     } catch (error: any) {
       toast.error('Failed to load activities');
       console.error('Error:', error);
@@ -99,6 +128,26 @@ export default function Activities() {
     } catch (error: any) {
       toast.error('Failed to update activity');
       console.error('Error:', error);
+    }
+  };
+
+  const assignActivityOwner = async (
+    activityId: string,
+    newOwnerId: string | 'none'
+  ) => {
+    try {
+      const assigned_to = newOwnerId === 'none' ? null : newOwnerId;
+      const { error } = await supabase
+        .from('activities')
+        .update({ assigned_to })
+        .eq('id', activityId);
+      if (error) throw error;
+      // Optimistically update local list
+      setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, assigned_to } : a)));
+      toast.success('Assignment updated');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || 'Failed to update assignment');
     }
   };
 
@@ -199,7 +248,8 @@ export default function Activities() {
           <h1 className="text-3xl font-bold">Activities</h1>
           <p className="text-muted-foreground">Manage your tasks and activities</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <ViewToggle value={viewMode} onChange={setViewMode} />
           <Button asChild variant="outline" size="sm">
             <Link to="/dashboard/activities/new?type=email">
               <Mail className="mr-2 h-4 w-4" />
@@ -384,81 +434,123 @@ export default function Activities() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredActivities.map((activity) => {
-            const Icon = getActivityIcon(activity.activity_type);
-            const isOverdue = activity.status !== 'completed' && activity.status !== 'cancelled' &&
-              activity.due_date && isPast(new Date(activity.due_date)) && !isToday(new Date(activity.due_date));
-            
+          {Object.entries(
+            filteredActivities.reduce<Record<string, Activity[]>>((acc, a) => {
+              const key = a.lead_id ?? 'none';
+              (acc[key] ||= []).push(a);
+              return acc;
+            }, {})
+          ).map(([groupId, items]) => {
+            const isNone = groupId === 'none';
+            const headerLabel = isNone ? 'No Lead' : (leadNamesById[groupId] ?? 'Lead');
             return (
-              <Card 
-                key={activity.id} 
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">{activity.subject}</CardTitle>
-                          {isOverdue && (
-                            <Badge variant="destructive" className="text-xs">
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                              Overdue
-                            </Badge>
-                          )}
-                        </div>
-                        {activity.description && (
-                          <CardDescription className="line-clamp-2">
-                            {activity.description}
-                          </CardDescription>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap justify-end">
-                      <Badge className={getStatusColor(activity.status)}>
-                        {activity.status.replace('_', ' ')}
-                      </Badge>
-                      <Badge className={getPriorityColor(activity.priority)}>
-                        {activity.priority}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {activity.due_date ? (
-                          <span>{format(new Date(activity.due_date), 'MMM dd, yyyy HH:mm')}</span>
-                        ) : (
-                          <span>No due date</span>
-                        )}
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {activity.activity_type}
-                      </Badge>
-                    </div>
-                    {activity.status !== 'completed' && activity.status !== 'cancelled' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMarkComplete(activity.id);
-                        }}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Mark Complete
-                      </Button>
+              <div key={groupId} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {isNone ? (
+                      headerLabel
+                    ) : (
+                      <Link to={`/dashboard/leads/${groupId}`} className="hover:underline">
+                        {headerLabel}
+                      </Link>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <ul className="space-y-3">
+                  {items.map((activity) => {
+                    const Icon = getActivityIcon(activity.activity_type);
+                    const isOverdue = activity.status !== 'completed' && activity.status !== 'cancelled' &&
+                      activity.due_date && isPast(new Date(activity.due_date)) && !isToday(new Date(activity.due_date));
+                    return (
+                      <Card 
+                        key={activity.id} 
+                        className="hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-4">
+                              <div className="p-2 rounded-lg bg-primary/10">
+                                <Icon className="h-5 w-5 text-primary" />
+                              </div>
+                              <div className="space-y-1 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <CardTitle className="text-lg">{activity.subject}</CardTitle>
+                                  {isOverdue && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      <AlertCircle className="h-3 w-3 mr-1" />
+                                      Overdue
+                                    </Badge>
+                                  )}
+                                </div>
+                                {activity.description && (
+                                  <CardDescription className="line-clamp-2">
+                                    {activity.description}
+                                  </CardDescription>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-wrap justify-end items-center">
+                              <Badge className={getStatusColor(activity.status)}>
+                                {activity.status.replace('_', ' ')}
+                              </Badge>
+                              <Badge className={getPriorityColor(activity.priority)}>
+                                {activity.priority}
+                              </Badge>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Select
+                                  onValueChange={(v) => assignActivityOwner(activity.id, v as any)}
+                                  defaultValue={activity.assigned_to ?? 'none'}
+                                >
+                                  <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Assign To" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Unassigned</SelectItem>
+                                    {assignableUsers.map((u) => (
+                                      <SelectItem key={u.id} value={u.id}>{formatLabel(u)}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {activity.due_date ? (
+                                  <span>{format(new Date(activity.due_date), 'MMM dd, yyyy HH:mm')}</span>
+                                ) : (
+                                  <span>No due date</span>
+                                )}
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {activity.activity_type}
+                              </Badge>
+                            </div>
+                            {activity.status !== 'completed' && activity.status !== 'cancelled' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkComplete(activity.id);
+                                }}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Mark Complete
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </ul>
+              </div>
             );
           })}
         </div>

@@ -29,6 +29,7 @@ export default function AccountNew() {
           ...formData,
           tenant_id: tenantId,
           franchise_id: context.franchiseId,
+          parent_account_id: formData.parent_account_id === 'none' ? null : (formData.parent_account_id || null),
           annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
           employee_count: formData.employee_count ? parseInt(formData.employee_count) : null,
         })

@@ -109,6 +109,28 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
         p_tenant_id: lead.tenant_id,
       });
 
+      // Auto-link existing unlinked tasks assigned to the new owner within the same scope (best-effort)
+      try {
+        let linkQuery = supabase
+          .from('activities')
+          .update({ lead_id: leadId })
+          .eq('assigned_to', selectedUser)
+          .is('lead_id', null)
+          .eq('activity_type', 'task')
+          .eq('tenant_id', lead.tenant_id);
+
+        if (lead.franchise_id) {
+          linkQuery = linkQuery.eq('franchise_id', lead.franchise_id);
+        }
+
+        const { error: linkErr } = await linkQuery;
+        if (linkErr) {
+          console.warn('Auto-link tasks skipped:', linkErr.message || linkErr);
+        }
+      } catch (linkErr: any) {
+        console.warn('Auto-link tasks skipped:', linkErr?.message || linkErr);
+      }
+
       // Send email notification to the assignee (best-effort)
       try {
         const { data: assignee, error: assigneeErr } = await supabase

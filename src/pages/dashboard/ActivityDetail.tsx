@@ -52,8 +52,8 @@ export default function ActivityDetail() {
 
   const handleUpdate = async (formData: any) => {
     try {
-      let tenantId = context.tenantId;
-      let franchiseId = context.franchiseId;
+      let tenantId = context.tenantId || activity?.tenant_id || null;
+      let franchiseId = context.franchiseId || activity?.franchise_id || null;
 
       // For platform admins, get tenant_id from related entity
       if (!tenantId) {
@@ -90,16 +90,20 @@ export default function ActivityDetail() {
         }
       }
 
+      // Normalize payload to avoid NOT NULL and type errors
+      const normalized = {
+        ...formData,
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
+        contact_id: formData.contact_id === 'none' ? null : (formData.contact_id || null),
+        lead_id: formData.lead_id === 'none' ? null : (formData.lead_id || null),
+        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+      };
+
       const { error } = await supabase
         .from('activities')
-        .update({
-          ...formData,
-          tenant_id: tenantId,
-          franchise_id: franchiseId,
-          account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
-          contact_id: formData.contact_id === 'none' ? null : (formData.contact_id || null),
-          lead_id: formData.lead_id === 'none' ? null : (formData.lead_id || null),
-        })
+        .update(normalized)
         .eq('id', id);
 
       if (error) throw error;
