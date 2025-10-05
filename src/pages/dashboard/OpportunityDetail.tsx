@@ -4,6 +4,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
@@ -50,6 +52,8 @@ export default function OpportunityDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sfIdInput, setSfIdInput] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     fetchOpportunity();
@@ -70,6 +74,8 @@ export default function OpportunityDetail() {
 
       if (error) throw error;
       setOpportunity(data);
+      // Cast to any for newly added fields not yet in generated Supabase types
+      setSfIdInput((data as any)?.salesforce_opportunity_id || '');
     } catch (error: any) {
       toast.error('Failed to load opportunity', {
         description: error.message,
@@ -114,6 +120,38 @@ export default function OpportunityDetail() {
       toast.error('Failed to update opportunity', {
         description: error.message,
       });
+    }
+  };
+
+  const saveSalesforceId = async () => {
+    try {
+      const { error } = await supabase
+        .from('opportunities')
+        // Cast payload to any since generated types may not include new column yet
+        .update({ salesforce_opportunity_id: sfIdInput || null } as any)
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('SOS Opportunity ID saved');
+      fetchOpportunity();
+    } catch (error: any) {
+      toast.error('Failed to save SOS ID', { description: error.message });
+    }
+  };
+
+  const syncSalesforce = async () => {
+    try {
+      setSyncing(true);
+      const { data, error } = await supabase.functions.invoke('salesforce-sync-opportunity', {
+        body: { opportunity_id: id },
+      });
+      if (error) throw error;
+      toast.success('SOS sync completed');
+      fetchOpportunity();
+    } catch (error: any) {
+      toast.error('SOS sync failed', { description: error.message });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -186,6 +224,7 @@ export default function OpportunityDetail() {
         </div>
 
         {isEditing ? (
+          <>
           <Card>
             <CardHeader>
               <CardTitle>Edit Opportunity</CardTitle>
@@ -198,6 +237,48 @@ export default function OpportunityDetail() {
               />
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>SOS</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Sync Status</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {opportunity.salesforce_sync_status || 'pending'}
+                    </Badge>
+                    {opportunity.salesforce_last_synced && (
+                      <span className="text-xs text-muted-foreground">
+                        Last: {formatDate(opportunity.salesforce_last_synced)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="sf-id">SOS Opportunity ID</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input id="sf-id" value={sfIdInput} onChange={(e) => setSfIdInput(e.target.value)} placeholder="006XXXXXXXXXXXX" />
+                    <Button variant="outline" onClick={saveSalesforceId}>Save</Button>
+                  </div>
+                </div>
+              </div>
+              {opportunity.salesforce_error && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Last Error</p>
+                  <p className="mt-1 text-sm text-red-600 break-words">{opportunity.salesforce_error}</p>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button onClick={syncSalesforce} disabled={!sfIdInput || syncing}>
+                  {syncing ? 'Syncing…' : 'Sync to SOS'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          </>
         ) : (
           <>
             <Card>

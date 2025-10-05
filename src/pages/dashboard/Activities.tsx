@@ -432,6 +432,89 @@ export default function Activities() {
             )}
           </CardContent>
         </Card>
+      ) : viewMode === 'list' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>All Activities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Due Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredActivities.map((activity) => (
+                  <TableRow
+                    key={activity.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
+                  >
+                    <TableCell className="font-medium">{activity.subject}</TableCell>
+                    <TableCell className="capitalize">{activity.activity_type}</TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(activity.status)}>
+                        {activity.status.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getPriorityColor(activity.priority)}>
+                        {activity.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {activity.due_date ? (
+                        format(new Date(activity.due_date), 'MMM dd, yyyy HH:mm')
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : viewMode === 'grid' ? (
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {filteredActivities.map((activity) => {
+            const Icon = getActivityIcon(activity.activity_type);
+            const isOverdue = activity.status !== 'completed' && activity.status !== 'cancelled' &&
+              activity.due_date && isPast(new Date(activity.due_date)) && !isToday(new Date(activity.due_date));
+            return (
+              <Card
+                key={activity.id}
+                className="hover:shadow transition-shadow cursor-pointer"
+                onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base truncate">{activity.subject}</CardTitle>
+                    <Badge className={getStatusColor(activity.status)}>{activity.status.replace('_', ' ')}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground flex items-center justify-between">
+                  <span className="flex items-center gap-2 truncate">
+                    <Icon className="h-4 w-4" />
+                    {activity.activity_type}
+                  </span>
+                  <span>
+                    {activity.due_date ? (
+                      format(new Date(activity.due_date), 'MMM dd, yyyy HH:mm')
+                    ) : (
+                      'No due date'
+                    )}
+                  </span>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <div className="space-y-4">
           {Object.entries(

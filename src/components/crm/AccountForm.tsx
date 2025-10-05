@@ -50,15 +50,15 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
       account_type: initialData?.account_type || 'prospect',
       status: initialData?.status || 'active',
       industry: initialData?.industry || '',
-      website: initialData?.website || '',
-      phone: initialData?.phone || '',
-      email: initialData?.email || '',
-      annual_revenue: initialData?.annual_revenue || '',
-      employee_count: initialData?.employee_count || '',
+      website: initialData?.website ?? '',
+      phone: initialData?.phone ?? '',
+      email: initialData?.email ?? '',
+      annual_revenue: initialData?.annual_revenue != null ? String(initialData?.annual_revenue) : '',
+      employee_count: initialData?.employee_count != null ? String(initialData?.employee_count) : '',
       description: initialData?.description || '',
-      tenant_id: '',
-      franchise_id: '',
-      parent_account_id: initialData?.parent_account_id || '',
+      tenant_id: initialData?.tenant_id ?? undefined,
+      franchise_id: initialData?.franchise_id ?? undefined,
+      parent_account_id: initialData?.parent_account_id ?? 'none',
     },
   });
 
@@ -157,7 +157,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
@@ -181,7 +181,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Status *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
@@ -265,7 +265,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">None (Top-level account)</SelectItem>
+                    <SelectItem value="none">None (Top-level account)</SelectItem>
                     {parentAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.name}
