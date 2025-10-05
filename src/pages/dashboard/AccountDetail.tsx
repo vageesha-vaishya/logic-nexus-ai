@@ -37,7 +37,7 @@ export default function AccountDetail() {
           parent:parent_account_id(id, name)
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setAccount(data);
