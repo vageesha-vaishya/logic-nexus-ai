@@ -18,7 +18,7 @@ interface AssignmentRule {
   criteria: any;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
               const txt = await resp.text();
               console.warn('Failed to send assignment email:', resp.status, txt);
             }
-          } catch (notifyErr) {
+          } catch (notifyErr: any) {
             console.warn('Assignment email skipped:', notifyErr?.message || notifyErr);
           }
 

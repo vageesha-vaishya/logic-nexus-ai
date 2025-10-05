@@ -29,6 +29,7 @@ export type Database = {
           industry: string | null
           name: string
           owner_id: string | null
+          parent_account_id: string | null
           phone: string | null
           shipping_address: Json | null
           status: Database["public"]["Enums"]["account_status"] | null
@@ -50,6 +51,7 @@ export type Database = {
           industry?: string | null
           name: string
           owner_id?: string | null
+          parent_account_id?: string | null
           phone?: string | null
           shipping_address?: Json | null
           status?: Database["public"]["Enums"]["account_status"] | null
@@ -71,6 +73,7 @@ export type Database = {
           industry?: string | null
           name?: string
           owner_id?: string | null
+          parent_account_id?: string | null
           phone?: string | null
           shipping_address?: Json | null
           status?: Database["public"]["Enums"]["account_status"] | null
@@ -105,6 +108,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_parent_account"
+            columns: ["parent_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]

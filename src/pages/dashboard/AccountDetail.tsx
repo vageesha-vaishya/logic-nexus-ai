@@ -23,6 +23,8 @@ export default function AccountDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [relatedContacts, setRelatedContacts] = useState<any[]>([]);
   const [relatedOpps, setRelatedOpps] = useState<any[]>([]);
+  const [parentAccount, setParentAccount] = useState<any>(null);
+  const [childAccounts, setChildAccounts] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) fetchAccount();
@@ -38,9 +40,21 @@ export default function AccountDetail() {
 
       if (error) throw error;
       setAccount(data);
+      
+      // Fetch parent account if exists
+      if (data?.parent_account_id) {
+        const { data: parentData } = await supabase
+          .from('accounts')
+          .select('id, name')
+          .eq('id', data.parent_account_id)
+          .maybeSingle();
+        if (parentData) setParentAccount(parentData);
+      }
+      
       await Promise.all([
         fetchRelatedContacts(id as string),
         fetchRelatedOpportunities(id as string),
+        fetchChildAccounts(id as string),
       ]);
     } catch (error: any) {
       toast.error('Failed to load account');
@@ -75,6 +89,20 @@ export default function AccountDetail() {
       setRelatedOpps(data || []);
     } catch (err) {
       console.error('Failed to load related opportunities', err);
+    }
+  };
+
+  const fetchChildAccounts = async (accountId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, name, account_type, status')
+        .eq('parent_account_id', accountId)
+        .order('name');
+      if (error) throw error;
+      setChildAccounts(data || []);
+    } catch (err) {
+      console.error('Failed to load child accounts', err);
     }
   };
 
@@ -199,6 +227,18 @@ export default function AccountDetail() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {parentAccount && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium text-muted-foreground">Parent Account</p>
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto text-primary"
+                          onClick={() => navigate(`/dashboard/accounts/${parentAccount.id}`)}
+                        >
+                          {parentAccount.name}
+                        </Button>
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Type</p>
                       <Badge className="mt-1">{account.account_type}</Badge>
@@ -207,16 +247,6 @@ export default function AccountDetail() {
                       <p className="text-sm font-medium text-muted-foreground">Status</p>
                       <Badge className="mt-1">{account.status}</Badge>
                     </div>
-                    {account.parent?.name && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Parent Account</p>
-                        <p className="text-sm">
-                          <Link to={`/dashboard/accounts/${account.parent.id}`} className="text-primary hover:underline">
-                            {account.parent.name}
-                          </Link>
-                        </p>
-                      </div>
-                    )}
                     {account.industry && (
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Industry</p>
@@ -305,6 +335,35 @@ export default function AccountDetail() {
 
             <TabsContent value="related">
               <div className="grid gap-6 md:grid-cols-2">
+                {childAccounts.length > 0 && (
+                  <Card className="md:col-span-2">
+                    <CardHeader>
+                      <CardTitle>Child Accounts</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {childAccounts.map((child) => (
+                          <div key={child.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-lg">
+                            <div>
+                              <p className="font-medium">{child.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {child.account_type} • {child.status}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/dashboard/accounts/${child.id}`)}
+                            >
+                              View
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Card className="md:col-span-2">
                   <CardHeader>
                     <CardTitle>Duplicates</CardTitle>

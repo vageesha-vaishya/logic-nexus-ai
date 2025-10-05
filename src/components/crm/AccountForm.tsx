@@ -24,6 +24,7 @@ const accountSchema = z.object({
   description: z.string().optional(),
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
+  parent_account_id: z.string().optional(),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
@@ -39,6 +40,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   const [pendingData, setPendingData] = useState<AccountFormData | null>(null);
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
+  const [parentAccounts, setParentAccounts] = useState<any[]>([]);
   const { supabase, context } = useCRM();
   
   const form = useForm<AccountFormData>({
@@ -56,6 +58,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
       description: initialData?.description || '',
       tenant_id: '',
       franchise_id: '',
+      parent_account_id: initialData?.parent_account_id || '',
     },
   });
 
@@ -67,6 +70,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
     } else if (context.isTenantAdmin) {
       loadFranchises();
     }
+    loadParentAccounts();
   }, [context]);
 
   const loadTenants = async () => {
@@ -90,6 +94,29 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
       .order('name');
     
     if (data) setFranchises(data);
+  };
+
+  const loadParentAccounts = async () => {
+    let query = supabase
+      .from('accounts')
+      .select('id, name')
+      .eq('status', 'active')
+      .order('name');
+
+    // Filter by tenant/franchise based on user role
+    if (context.franchiseId) {
+      query = query.eq('franchise_id', context.franchiseId);
+    } else if (context.tenantId) {
+      query = query.eq('tenant_id', context.tenantId);
+    }
+
+    // Exclude current account when editing
+    if (initialData?.id) {
+      query = query.neq('id', initialData.id);
+    }
+
+    const { data } = await query;
+    if (data) setParentAccounts(data);
   };
 
   const handleFormSubmit = (data: AccountFormData) => {
@@ -224,6 +251,32 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
               )}
             />
           )}
+
+          <FormField
+            control={form.control}
+            name="parent_account_id"
+            render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>Parent Account (Optional)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="None (Top-level account)" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="">None (Top-level account)</SelectItem>
+                    {parentAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}
