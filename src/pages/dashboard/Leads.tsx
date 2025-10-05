@@ -198,8 +198,65 @@ export default function Leads() {
             )}
           </CardContent>
         </Card>
+      ) : viewMode === 'list' ? (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Score</TableHead>
+                <TableHead>Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredLeads.map((lead) => (
+                <TableRow 
+                  key={lead.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/dashboard/leads/${lead.id}`)}
+                >
+                  <TableCell className="font-medium">
+                    {lead.first_name} {lead.last_name}
+                  </TableCell>
+                  <TableCell>{lead.company || '-'}</TableCell>
+                  <TableCell>{lead.email || '-'}</TableCell>
+                  <TableCell>{lead.phone || '-'}</TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(lead.status)}>
+                      {lead.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{lead.source}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {lead.lead_score !== null ? (
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        {lead.lead_score}
+                      </div>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {lead.estimated_value ? (
+                      <div className="flex items-center gap-1 text-green-600">
+                        <DollarSign className="h-4 w-4" />
+                        ${lead.estimated_value.toLocaleString()}
+                      </div>
+                    ) : '-'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
           {filteredLeads.map((lead) => (
             <Link key={lead.id} to={`/dashboard/leads/${lead.id}`}>
               <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
