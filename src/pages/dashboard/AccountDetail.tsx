@@ -25,8 +25,12 @@ export default function AccountDetail() {
   const [relatedOpps, setRelatedOpps] = useState<any[]>([]);
   const [parentAccount, setParentAccount] = useState<any>(null);
   const [childAccounts, setChildAccounts] = useState<any[]>([]);
+  const [tab, setTab] = useState<'details' | 'related' | 'news'>('details');
 
   useEffect(() => {
+    // Reset UI state when navigating between accounts
+    setIsEditing(false);
+    setTab('details');
     if (id) fetchAccount();
   }, [id]);
 
@@ -207,7 +211,7 @@ export default function AccountDetail() {
           )}
         </div>
 
-        <Tabs defaultValue="details" key={id}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'details' | 'related' | 'news')} key={id}>
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="related">Related</TabsTrigger>
