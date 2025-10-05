@@ -60,6 +60,8 @@ import Warehouses from "./pages/dashboard/Warehouses";
 import WarehouseNew from "./pages/dashboard/WarehouseNew";
 import Vehicles from "./pages/dashboard/Vehicles";
 import VehicleNew from "./pages/dashboard/VehicleNew";
+import SubscriptionManagement from "./pages/dashboard/SubscriptionManagement";
+import TenantSubscription from "./pages/dashboard/TenantSubscription";
 
 const queryClient = new QueryClient();
 
@@ -359,6 +361,9 @@ const App = () => (
             <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles" element={<ProtectedRoute><Vehicles /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles/new" element={<ProtectedRoute><VehicleNew /></ProtectedRoute>} />
+            {/* Subscription & Billing Routes */}
+            <Route path="/dashboard/subscriptions" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
+            <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </TooltipProvider>

@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign } from 'lucide-react';
 
 export type MenuScreen = {
   name: string;
@@ -56,6 +56,13 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Shipments', path: '/dashboard/shipments', icon: Package, description: 'Track shipments' },
       { name: 'Warehouses', path: '/dashboard/warehouses', icon: Warehouse, description: 'Manage warehouses' },
       { name: 'Vehicles', path: '/dashboard/vehicles', icon: Truck, description: 'Fleet management' },
+    ],
+  },
+  {
+    label: 'Billing',
+    items: [
+      { name: 'My Subscription', path: '/dashboard/subscriptions', icon: CreditCard, description: 'Manage subscription' },
+      { name: 'Tenant Plans', path: '/dashboard/tenant-subscriptions', icon: DollarSign, description: 'Assign tenant plans' },
     ],
   },
 ];
