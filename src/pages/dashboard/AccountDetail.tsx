@@ -210,10 +210,10 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs defaultValue="details">
+          <Tabs defaultValue="details" key={id}>
             <TabsList>
-              <TabsTrigger value="related">Related</TabsTrigger>
               <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="related">Related</TabsTrigger>
               <TabsTrigger value="news">News</TabsTrigger>
             </TabsList>
 
