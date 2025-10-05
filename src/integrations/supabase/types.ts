@@ -437,6 +437,62 @@ export type Database = {
         }
         Relationships: []
       }
+      customs_documents: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          document_number: string | null
+          document_type: string
+          document_url: string | null
+          expiry_date: string | null
+          id: string
+          issue_date: string | null
+          issuing_authority: string | null
+          notes: string | null
+          shipment_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          document_number?: string | null
+          document_type: string
+          document_url?: string | null
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string | null
+          notes?: string | null
+          shipment_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          document_number?: string | null
+          document_type?: string
+          document_url?: string | null
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string | null
+          notes?: string | null
+          shipment_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customs_documents_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_accounts: {
         Row: {
           access_token: string | null
@@ -1446,6 +1502,410 @@ export type Database = {
         }
         Relationships: []
       }
+      routes: {
+        Row: {
+          created_at: string | null
+          destination_warehouse_id: string | null
+          distance_km: number | null
+          estimated_duration_hours: number | null
+          franchise_id: string | null
+          id: string
+          is_active: boolean | null
+          origin_warehouse_id: string | null
+          route_code: string
+          route_name: string
+          tenant_id: string
+          updated_at: string | null
+          waypoints: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          destination_warehouse_id?: string | null
+          distance_km?: number | null
+          estimated_duration_hours?: number | null
+          franchise_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          origin_warehouse_id?: string | null
+          route_code: string
+          route_name: string
+          tenant_id: string
+          updated_at?: string | null
+          waypoints?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          destination_warehouse_id?: string | null
+          distance_km?: number | null
+          estimated_duration_hours?: number | null
+          franchise_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          origin_warehouse_id?: string | null
+          route_code?: string
+          route_name?: string
+          tenant_id?: string
+          updated_at?: string | null
+          waypoints?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routes_destination_warehouse_id_fkey"
+            columns: ["destination_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routes_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routes_origin_warehouse_id_fkey"
+            columns: ["origin_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipment_items: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          description: string
+          dimensions: Json | null
+          hazard_class: string | null
+          hs_code: string | null
+          id: string
+          is_hazardous: boolean | null
+          item_number: number
+          package_type: string | null
+          quantity: number
+          shipment_id: string
+          special_handling: string | null
+          updated_at: string | null
+          value: number | null
+          volume_cbm: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          description: string
+          dimensions?: Json | null
+          hazard_class?: string | null
+          hs_code?: string | null
+          id?: string
+          is_hazardous?: boolean | null
+          item_number: number
+          package_type?: string | null
+          quantity?: number
+          shipment_id: string
+          special_handling?: string | null
+          updated_at?: string | null
+          value?: number | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          description?: string
+          dimensions?: Json | null
+          hazard_class?: string | null
+          hs_code?: string | null
+          id?: string
+          is_hazardous?: boolean | null
+          item_number?: number
+          package_type?: string | null
+          quantity?: number
+          shipment_id?: string
+          special_handling?: string | null
+          updated_at?: string | null
+          value?: number | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_items_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          account_id: string | null
+          actual_delivery_date: string | null
+          assigned_to: string | null
+          contact_id: string | null
+          container_number: string | null
+          container_type: Database["public"]["Enums"]["container_type"] | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          current_location: Json | null
+          current_status_description: string | null
+          customs_charges: number | null
+          customs_required: boolean | null
+          declared_value: number | null
+          destination_address: Json
+          destination_warehouse_id: string | null
+          driver_id: string | null
+          estimated_delivery_date: string | null
+          franchise_id: string | null
+          freight_charges: number | null
+          id: string
+          insurance_charges: number | null
+          insurance_required: boolean | null
+          invoice_number: string | null
+          origin_address: Json
+          origin_warehouse_id: string | null
+          other_charges: number | null
+          pickup_date: string | null
+          priority_level: string | null
+          purchase_order_number: string | null
+          reference_number: string | null
+          service_level: string | null
+          shipment_number: string
+          shipment_type: Database["public"]["Enums"]["shipment_type"]
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["shipment_status"] | null
+          tenant_id: string
+          total_charges: number | null
+          total_packages: number | null
+          total_volume_cbm: number | null
+          total_weight_kg: number | null
+          updated_at: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          actual_delivery_date?: string | null
+          assigned_to?: string | null
+          contact_id?: string | null
+          container_number?: string | null
+          container_type?: Database["public"]["Enums"]["container_type"] | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          current_location?: Json | null
+          current_status_description?: string | null
+          customs_charges?: number | null
+          customs_required?: boolean | null
+          declared_value?: number | null
+          destination_address?: Json
+          destination_warehouse_id?: string | null
+          driver_id?: string | null
+          estimated_delivery_date?: string | null
+          franchise_id?: string | null
+          freight_charges?: number | null
+          id?: string
+          insurance_charges?: number | null
+          insurance_required?: boolean | null
+          invoice_number?: string | null
+          origin_address?: Json
+          origin_warehouse_id?: string | null
+          other_charges?: number | null
+          pickup_date?: string | null
+          priority_level?: string | null
+          purchase_order_number?: string | null
+          reference_number?: string | null
+          service_level?: string | null
+          shipment_number: string
+          shipment_type: Database["public"]["Enums"]["shipment_type"]
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["shipment_status"] | null
+          tenant_id: string
+          total_charges?: number | null
+          total_packages?: number | null
+          total_volume_cbm?: number | null
+          total_weight_kg?: number | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          actual_delivery_date?: string | null
+          assigned_to?: string | null
+          contact_id?: string | null
+          container_number?: string | null
+          container_type?: Database["public"]["Enums"]["container_type"] | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          current_location?: Json | null
+          current_status_description?: string | null
+          customs_charges?: number | null
+          customs_required?: boolean | null
+          declared_value?: number | null
+          destination_address?: Json
+          destination_warehouse_id?: string | null
+          driver_id?: string | null
+          estimated_delivery_date?: string | null
+          franchise_id?: string | null
+          freight_charges?: number | null
+          id?: string
+          insurance_charges?: number | null
+          insurance_required?: boolean | null
+          invoice_number?: string | null
+          origin_address?: Json
+          origin_warehouse_id?: string | null
+          other_charges?: number | null
+          pickup_date?: string | null
+          priority_level?: string | null
+          purchase_order_number?: string | null
+          reference_number?: string | null
+          service_level?: string | null
+          shipment_number?: string
+          shipment_type?: Database["public"]["Enums"]["shipment_type"]
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["shipment_status"] | null
+          tenant_id?: string
+          total_charges?: number | null
+          total_packages?: number | null
+          total_volume_cbm?: number | null
+          total_weight_kg?: number | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_destination_warehouse_id_fkey"
+            columns: ["destination_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_origin_warehouse_id_fkey"
+            columns: ["origin_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipping_rates: {
+        Row: {
+          base_rate: number | null
+          created_at: string | null
+          currency: string | null
+          destination_country: string | null
+          destination_zone: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          max_weight_kg: number | null
+          min_weight_kg: number | null
+          origin_country: string | null
+          origin_zone: string | null
+          rate_per_kg: number | null
+          service_level: string | null
+          shipment_type: Database["public"]["Enums"]["shipment_type"]
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          base_rate?: number | null
+          created_at?: string | null
+          currency?: string | null
+          destination_country?: string | null
+          destination_zone?: string | null
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_weight_kg?: number | null
+          min_weight_kg?: number | null
+          origin_country?: string | null
+          origin_zone?: string | null
+          rate_per_kg?: number | null
+          service_level?: string | null
+          shipment_type: Database["public"]["Enums"]["shipment_type"]
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          base_rate?: number | null
+          created_at?: string | null
+          currency?: string | null
+          destination_country?: string | null
+          destination_zone?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_weight_kg?: number | null
+          min_weight_kg?: number | null
+          origin_country?: string | null
+          origin_zone?: string | null
+          rate_per_kg?: number | null
+          service_level?: string | null
+          shipment_type?: Database["public"]["Enums"]["shipment_type"]
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_rates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_features: {
         Row: {
           created_at: string | null
@@ -1799,6 +2259,56 @@ export type Database = {
           },
         ]
       }
+      tracking_events: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          event_date: string
+          event_type: Database["public"]["Enums"]["tracking_event_type"]
+          id: string
+          is_milestone: boolean | null
+          location: Json | null
+          location_name: string | null
+          notes: string | null
+          shipment_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          event_date?: string
+          event_type: Database["public"]["Enums"]["tracking_event_type"]
+          id?: string
+          is_milestone?: boolean | null
+          location?: Json | null
+          location_name?: string | null
+          notes?: string | null
+          shipment_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          event_date?: string
+          event_type?: Database["public"]["Enums"]["tracking_event_type"]
+          id?: string
+          is_milestone?: boolean | null
+          location?: Json | null
+          location_name?: string | null
+          notes?: string | null
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_records: {
         Row: {
           created_at: string | null
@@ -1992,6 +2502,228 @@ export type Database = {
           },
         ]
       }
+      vehicles: {
+        Row: {
+          capacity_cbm: number | null
+          capacity_kg: number | null
+          created_at: string | null
+          current_location: Json | null
+          driver_id: string | null
+          franchise_id: string | null
+          id: string
+          insurance_expiry: string | null
+          is_active: boolean | null
+          last_maintenance_date: string | null
+          make: string | null
+          model: string | null
+          next_maintenance_date: string | null
+          registration_expiry: string | null
+          status: Database["public"]["Enums"]["vehicle_status"] | null
+          tenant_id: string
+          updated_at: string | null
+          vehicle_number: string
+          vehicle_type: string
+          year: number | null
+        }
+        Insert: {
+          capacity_cbm?: number | null
+          capacity_kg?: number | null
+          created_at?: string | null
+          current_location?: Json | null
+          driver_id?: string | null
+          franchise_id?: string | null
+          id?: string
+          insurance_expiry?: string | null
+          is_active?: boolean | null
+          last_maintenance_date?: string | null
+          make?: string | null
+          model?: string | null
+          next_maintenance_date?: string | null
+          registration_expiry?: string | null
+          status?: Database["public"]["Enums"]["vehicle_status"] | null
+          tenant_id: string
+          updated_at?: string | null
+          vehicle_number: string
+          vehicle_type: string
+          year?: number | null
+        }
+        Update: {
+          capacity_cbm?: number | null
+          capacity_kg?: number | null
+          created_at?: string | null
+          current_location?: Json | null
+          driver_id?: string | null
+          franchise_id?: string | null
+          id?: string
+          insurance_expiry?: string | null
+          is_active?: boolean | null
+          last_maintenance_date?: string | null
+          make?: string | null
+          model?: string | null
+          next_maintenance_date?: string | null
+          registration_expiry?: string | null
+          status?: Database["public"]["Enums"]["vehicle_status"] | null
+          tenant_id?: string
+          updated_at?: string | null
+          vehicle_number?: string
+          vehicle_type?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_inventory: {
+        Row: {
+          created_at: string | null
+          expected_dispatch_date: string | null
+          id: string
+          item_description: string
+          location_in_warehouse: string | null
+          quantity: number
+          received_date: string | null
+          shipment_id: string | null
+          status: string | null
+          updated_at: string | null
+          volume_cbm: number | null
+          warehouse_id: string
+          weight_kg: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          expected_dispatch_date?: string | null
+          id?: string
+          item_description: string
+          location_in_warehouse?: string | null
+          quantity?: number
+          received_date?: string | null
+          shipment_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          volume_cbm?: number | null
+          warehouse_id: string
+          weight_kg?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          expected_dispatch_date?: string | null
+          id?: string
+          item_description?: string
+          location_in_warehouse?: string | null
+          quantity?: number
+          received_date?: string | null
+          shipment_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          volume_cbm?: number | null
+          warehouse_id?: string
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_inventory_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_inventory_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouses: {
+        Row: {
+          address: Json | null
+          capacity_sqft: number | null
+          code: string
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          current_utilization: number | null
+          facilities: Json | null
+          franchise_id: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          operating_hours: Json | null
+          tenant_id: string
+          updated_at: string | null
+          warehouse_type: string | null
+        }
+        Insert: {
+          address?: Json | null
+          capacity_sqft?: number | null
+          code: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          current_utilization?: number | null
+          facilities?: Json | null
+          franchise_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          operating_hours?: Json | null
+          tenant_id: string
+          updated_at?: string | null
+          warehouse_type?: string | null
+        }
+        Update: {
+          address?: Json | null
+          capacity_sqft?: number | null
+          code?: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          current_utilization?: number | null
+          facilities?: Json | null
+          franchise_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          operating_hours?: Json | null
+          tenant_id?: string
+          updated_at?: string | null
+          warehouse_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouses_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2059,6 +2791,15 @@ export type Database = {
       activity_type: "call" | "email" | "meeting" | "task" | "note"
       app_role: "platform_admin" | "tenant_admin" | "franchise_admin" | "user"
       billing_period: "monthly" | "annual"
+      container_type:
+        | "20ft_standard"
+        | "40ft_standard"
+        | "40ft_high_cube"
+        | "45ft_high_cube"
+        | "reefer"
+        | "open_top"
+        | "flat_rack"
+        | "tank"
       lead_source:
         | "website"
         | "referral"
@@ -2086,6 +2827,23 @@ export type Database = {
         | "closed_lost"
       plan_type: "crm_base" | "service_addon" | "bundle"
       priority_level: "low" | "medium" | "high" | "urgent"
+      shipment_status:
+        | "draft"
+        | "confirmed"
+        | "in_transit"
+        | "customs"
+        | "out_for_delivery"
+        | "delivered"
+        | "cancelled"
+        | "on_hold"
+        | "returned"
+      shipment_type:
+        | "ocean_freight"
+        | "air_freight"
+        | "inland_trucking"
+        | "railway_transport"
+        | "courier"
+        | "movers_packers"
       subscription_status:
         | "active"
         | "trial"
@@ -2093,6 +2851,20 @@ export type Database = {
         | "canceled"
         | "expired"
       subscription_tier: "starter" | "professional" | "business" | "enterprise"
+      tracking_event_type:
+        | "created"
+        | "confirmed"
+        | "picked_up"
+        | "in_transit"
+        | "customs_clearance"
+        | "customs_released"
+        | "arrived_at_hub"
+        | "out_for_delivery"
+        | "delivered"
+        | "delayed"
+        | "exception"
+        | "returned"
+      vehicle_status: "available" | "in_use" | "maintenance" | "out_of_service"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2226,6 +2998,16 @@ export const Constants = {
       activity_type: ["call", "email", "meeting", "task", "note"],
       app_role: ["platform_admin", "tenant_admin", "franchise_admin", "user"],
       billing_period: ["monthly", "annual"],
+      container_type: [
+        "20ft_standard",
+        "40ft_standard",
+        "40ft_high_cube",
+        "45ft_high_cube",
+        "reefer",
+        "open_top",
+        "flat_rack",
+        "tank",
+      ],
       lead_source: [
         "website",
         "referral",
@@ -2256,6 +3038,25 @@ export const Constants = {
       ],
       plan_type: ["crm_base", "service_addon", "bundle"],
       priority_level: ["low", "medium", "high", "urgent"],
+      shipment_status: [
+        "draft",
+        "confirmed",
+        "in_transit",
+        "customs",
+        "out_for_delivery",
+        "delivered",
+        "cancelled",
+        "on_hold",
+        "returned",
+      ],
+      shipment_type: [
+        "ocean_freight",
+        "air_freight",
+        "inland_trucking",
+        "railway_transport",
+        "courier",
+        "movers_packers",
+      ],
       subscription_status: [
         "active",
         "trial",
@@ -2264,6 +3065,21 @@ export const Constants = {
         "expired",
       ],
       subscription_tier: ["starter", "professional", "business", "enterprise"],
+      tracking_event_type: [
+        "created",
+        "confirmed",
+        "picked_up",
+        "in_transit",
+        "customs_clearance",
+        "customs_released",
+        "arrived_at_hub",
+        "out_for_delivery",
+        "delivered",
+        "delayed",
+        "exception",
+        "returned",
+      ],
+      vehicle_status: ["available", "in_use", "maintenance", "out_of_service"],
     },
   },
 } as const
