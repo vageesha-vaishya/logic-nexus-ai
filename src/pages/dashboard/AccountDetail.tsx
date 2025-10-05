@@ -196,28 +196,28 @@ export default function AccountDetail() {
           )}
         </div>
 
-        {isEditing ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Account</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AccountForm
-                initialData={account}
-                onSubmit={handleUpdate}
-                onCancel={() => setIsEditing(false)}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <Tabs defaultValue="details" key={id}>
-            <TabsList>
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="related">Related</TabsTrigger>
-              <TabsTrigger value="news">News</TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="details" key={id}>
+          <TabsList>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="related">Related</TabsTrigger>
+            <TabsTrigger value="news">News</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="details">
+          <TabsContent value="details">
+            {isEditing ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Edit Account</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccountForm
+                    initialData={account}
+                    onSubmit={handleUpdate}
+                    onCancel={() => setIsEditing(false)}
+                  />
+                </CardContent>
+              </Card>
+            ) : (
               <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                   <CardHeader>
@@ -331,9 +331,24 @@ export default function AccountDetail() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
+            )}
+          </TabsContent>
 
-            <TabsContent value="related">
+          <TabsContent value="related">
+            {isEditing ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Edit Account</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccountForm
+                    initialData={account}
+                    onSubmit={handleUpdate}
+                    onCancel={() => setIsEditing(false)}
+                  />
+                </CardContent>
+              </Card>
+            ) : (
               <div className="grid gap-6 md:grid-cols-2">
                 {childAccounts.length > 0 && (
                   <Card className="md:col-span-2">
@@ -421,9 +436,24 @@ export default function AccountDetail() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
+            )}
+          </TabsContent>
 
-            <TabsContent value="news">
+          <TabsContent value="news">
+            {isEditing ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Edit Account</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccountForm
+                    initialData={account}
+                    onSubmit={handleUpdate}
+                    onCancel={() => setIsEditing(false)}
+                  />
+                </CardContent>
+              </Card>
+            ) : (
               <Card>
                 <CardHeader>
                   <CardTitle>News</CardTitle>
@@ -432,9 +462,9 @@ export default function AccountDetail() {
                   <p className="text-sm text-muted-foreground">Company/industry news will appear here.</p>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
-        )}
+            )}
+          </TabsContent>
+        </Tabs>
 
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
