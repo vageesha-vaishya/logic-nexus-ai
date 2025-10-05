@@ -33,12 +33,21 @@ export default function Quotes() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchQuotes();
-  }, [profile]);
+    if (roles && roles.length) {
+      setIsLoading(true);
+      fetchQuotes();
+    } else {
+      setIsLoading(false);
+    }
+  }, [roles]);
 
   const fetchQuotes = async () => {
-    const tenantId = roles[0]?.tenant_id;
-    if (!tenantId) return;
+    const tenantId = roles?.[0]?.tenant_id;
+    if (!tenantId) {
+      setIsLoading(false);
+      return;
+    }
+
 
     try {
       const { data, error } = await supabase
