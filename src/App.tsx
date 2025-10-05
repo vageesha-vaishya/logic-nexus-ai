@@ -53,6 +53,13 @@ import Dashboards from "./pages/dashboard/Dashboards";
 import More from "./pages/dashboard/More";
 import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
 import CustomRoles from "./pages/dashboard/CustomRoles";
+import Shipments from "./pages/dashboard/Shipments";
+import ShipmentNew from "./pages/dashboard/ShipmentNew";
+import ShipmentDetail from "./pages/dashboard/ShipmentDetail";
+import Warehouses from "./pages/dashboard/Warehouses";
+import WarehouseNew from "./pages/dashboard/WarehouseNew";
+import Vehicles from "./pages/dashboard/Vehicles";
+import VehicleNew from "./pages/dashboard/VehicleNew";
 
 const queryClient = new QueryClient();
 
@@ -344,6 +351,14 @@ const App = () => (
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            {/* Logistics Routes */}
+            <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
+            <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
+            <Route path="/dashboard/shipments/:id" element={<ProtectedRoute><ShipmentDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
+            <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />
+            <Route path="/dashboard/vehicles" element={<ProtectedRoute><Vehicles /></ProtectedRoute>} />
+            <Route path="/dashboard/vehicles/new" element={<ProtectedRoute><VehicleNew /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </TooltipProvider>

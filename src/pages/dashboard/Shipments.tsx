@@ -1,0 +1,278 @@
+import { useState, useEffect } from 'react';
+import { Plus, Search, Package, Filter } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
+import { useCRM } from '@/hooks/useCRM';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { ShipmentStats } from '@/components/logistics/ShipmentStats';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+
+interface Shipment {
+  id: string;
+  shipment_number: string;
+  shipment_type: string;
+  status: string;
+  origin_address: any;
+  destination_address: any;
+  pickup_date: string | null;
+  estimated_delivery_date: string | null;
+  total_packages: number | null;
+  priority_level: string;
+  created_at: string;
+  account_id: string | null;
+  accounts?: { name: string } | null;
+}
+
+export default function Shipments() {
+  const navigate = useNavigate();
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const { supabase, context } = useCRM();
+
+  useEffect(() => {
+    fetchShipments();
+  }, []);
+
+  const fetchShipments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*, accounts(name)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setShipments(data || []);
+    } catch (error: any) {
+      toast.error('Failed to load shipments');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredShipments = shipments.filter(shipment => {
+    const matchesSearch = shipment.shipment_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.accounts?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
+    const matchesType = typeFilter === 'all' || shipment.shipment_type === typeFilter;
+
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const totalShipments = shipments.length;
+  const inTransit = shipments.filter(s => s.status === 'in_transit').length;
+  const delivered = shipments.filter(s => s.status === 'delivered').length;
+  const pending = shipments.filter(s => ['draft', 'confirmed'].includes(s.status)).length;
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-gray-500/10 text-gray-500',
+      confirmed: 'bg-blue-500/10 text-blue-500',
+      in_transit: 'bg-purple-500/10 text-purple-500',
+      customs: 'bg-yellow-500/10 text-yellow-500',
+      out_for_delivery: 'bg-orange-500/10 text-orange-500',
+      delivered: 'bg-green-500/10 text-green-500',
+      cancelled: 'bg-red-500/10 text-red-500',
+      on_hold: 'bg-gray-600/10 text-gray-600',
+      returned: 'bg-red-400/10 text-red-400',
+    };
+    return colors[status] || 'bg-gray-500/10 text-gray-500';
+  };
+
+  const formatShipmentType = (type: string) => {
+    return type.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Shipments</h1>
+            <p className="text-muted-foreground">Track and manage all shipments</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+            <Button asChild>
+              <Link to="/dashboard/shipments/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Shipment
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <ShipmentStats
+          totalShipments={totalShipments}
+          inTransit={inTransit}
+          delivered={delivered}
+          pending={pending}
+        />
+
+        <div className="flex flex-wrap gap-4">
+          <div className="relative flex-1 min-w-[300px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search shipments..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="in_transit">In Transit</SelectItem>
+              <SelectItem value="customs">Customs</SelectItem>
+              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="on_hold">On Hold</SelectItem>
+              <SelectItem value="returned">Returned</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Package className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="ocean_freight">Ocean Freight</SelectItem>
+              <SelectItem value="air_freight">Air Freight</SelectItem>
+              <SelectItem value="inland_trucking">Inland Trucking</SelectItem>
+              <SelectItem value="railway_transport">Railway Transport</SelectItem>
+              <SelectItem value="courier">Courier</SelectItem>
+              <SelectItem value="movers_packers">Movers & Packers</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading shipments...</p>
+          </div>
+        ) : filteredShipments.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No shipments found</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery ? 'Try adjusting your search' : 'Start tracking your first shipment'}
+              </p>
+              {!searchQuery && (
+                <Button asChild>
+                  <Link to="/dashboard/shipments/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Shipment
+                  </Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : viewMode === 'list' ? (
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Shipment #</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Packages</TableHead>
+                  <TableHead>ETA</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredShipments.map((shipment) => (
+                  <TableRow 
+                    key={shipment.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/dashboard/shipments/${shipment.id}`)}
+                  >
+                    <TableCell className="font-medium">{shipment.shipment_number}</TableCell>
+                    <TableCell>{formatShipmentType(shipment.shipment_type)}</TableCell>
+                    <TableCell>{shipment.accounts?.name || '-'}</TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(shipment.status)}>
+                        {shipment.status.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{shipment.priority_level}</Badge>
+                    </TableCell>
+                    <TableCell>{shipment.total_packages || '-'}</TableCell>
+                    <TableCell>
+                      {shipment.estimated_delivery_date 
+                        ? format(new Date(shipment.estimated_delivery_date), 'MMM dd, yyyy')
+                        : '-'
+                      }
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        ) : (
+          <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
+            {filteredShipments.map((shipment) => (
+              <Link key={shipment.id} to={`/dashboard/shipments/${shipment.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <Package className="h-10 w-10 text-primary" />
+                      <Badge className={getStatusColor(shipment.status)}>
+                        {shipment.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <CardTitle className="mt-4">{shipment.shipment_number}</CardTitle>
+                    <CardDescription>{formatShipmentType(shipment.shipment_type)}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {shipment.accounts?.name && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Customer: </span>
+                        <span className="font-medium">{shipment.accounts.name}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline">{shipment.priority_level}</Badge>
+                      {shipment.total_packages && (
+                        <span className="text-sm text-muted-foreground">
+                          {shipment.total_packages} packages
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}

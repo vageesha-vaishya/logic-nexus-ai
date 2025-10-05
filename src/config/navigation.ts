@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck } from 'lucide-react';
 
 export type MenuScreen = {
   name: string;
@@ -19,7 +19,6 @@ export type MenuModule = {
   items: MenuItem[];
 };
 
-// Salesforce-style navigation derived from the provided screenshot
 export const APP_MENU: MenuModule[] = [
   {
     label: 'Sales',
@@ -49,6 +48,14 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Groups', path: '/dashboard/groups', icon: UsersRound, description: 'Team groups' },
       { name: 'Calendar', path: '/dashboard/calendar', icon: CalendarDays, description: 'Events and schedules' },
       { name: 'More', path: '/dashboard/more', icon: MoreHorizontal, description: 'Additional tools' },
+    ],
+  },
+  {
+    label: 'Logistics',
+    items: [
+      { name: 'Shipments', path: '/dashboard/shipments', icon: Package, description: 'Track shipments' },
+      { name: 'Warehouses', path: '/dashboard/warehouses', icon: Warehouse, description: 'Manage warehouses' },
+      { name: 'Vehicles', path: '/dashboard/vehicles', icon: Truck, description: 'Fleet management' },
     ],
   },
 ];
