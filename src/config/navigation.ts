@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck } from 'lucide-react';
 
 export type MenuScreen = {
   name: string;
@@ -25,6 +25,7 @@ export const APP_MENU: MenuModule[] = [
     items: [
       { name: 'Home', path: '/dashboard', icon: Home, description: 'Overview homepage' },
       { name: 'Opportunities', path: '/dashboard/opportunities', icon: TrendingUp, description: 'Deals and pipeline' },
+      { name: 'Quotes', path: '/dashboard/quotes', icon: FileCheck, description: 'Sales quotes and proposals' },
       {
         name: 'Leads',
         path: '/dashboard/leads',

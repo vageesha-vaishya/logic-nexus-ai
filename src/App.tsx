@@ -62,6 +62,9 @@ import Vehicles from "./pages/dashboard/Vehicles";
 import VehicleNew from "./pages/dashboard/VehicleNew";
 import SubscriptionManagement from "./pages/dashboard/SubscriptionManagement";
 import TenantSubscription from "./pages/dashboard/TenantSubscription";
+import Quotes from "./pages/dashboard/Quotes";
+import QuoteNew from "./pages/dashboard/QuoteNew";
+import QuoteDetail from "./pages/dashboard/QuoteDetail";
 
 const queryClient = new QueryClient();
 
@@ -311,6 +314,30 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/quotes" 
+              element={
+                <ProtectedRoute>
+                  <Quotes />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/quotes/new" 
+              element={
+                <ProtectedRoute>
+                  <QuoteNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/quotes/:id" 
+              element={
+                <ProtectedRoute>
+                  <QuoteDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route
               path="/dashboard/lead-routing" 
               element={
                 <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>

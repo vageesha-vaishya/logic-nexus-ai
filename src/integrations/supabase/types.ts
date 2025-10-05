@@ -1502,6 +1502,161 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_items: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          line_number: number
+          line_total: number
+          product_name: string
+          quantity: number
+          quote_id: string
+          tax_amount: number | null
+          tax_percent: number | null
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          line_number: number
+          line_total?: number
+          product_name: string
+          quantity?: number
+          quote_id: string
+          tax_amount?: number | null
+          tax_percent?: number | null
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          line_number?: number
+          line_total?: number
+          product_name?: string
+          quantity?: number
+          quote_id?: string
+          tax_amount?: number | null
+          tax_percent?: number | null
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          accepted_at: string | null
+          account_id: string | null
+          billing_address: Json | null
+          contact_id: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          description: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          franchise_id: string | null
+          id: string
+          notes: string | null
+          opportunity_id: string | null
+          owner_id: string | null
+          quote_number: string
+          rejected_at: string | null
+          shipping_address: Json | null
+          shipping_amount: number | null
+          status: string
+          subtotal: number | null
+          tax_amount: number | null
+          tax_percent: number | null
+          tenant_id: string
+          terms_conditions: string | null
+          title: string
+          total_amount: number | null
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          account_id?: string | null
+          billing_address?: Json | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          franchise_id?: string | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          owner_id?: string | null
+          quote_number: string
+          rejected_at?: string | null
+          shipping_address?: Json | null
+          shipping_amount?: number | null
+          status?: string
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_percent?: number | null
+          tenant_id: string
+          terms_conditions?: string | null
+          title: string
+          total_amount?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          account_id?: string | null
+          billing_address?: Json | null
+          contact_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          franchise_id?: string | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          owner_id?: string | null
+          quote_number?: string
+          rejected_at?: string | null
+          shipping_address?: Json | null
+          shipping_amount?: number | null
+          status?: string
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_percent?: number | null
+          tenant_id?: string
+          terms_conditions?: string | null
+          title?: string
+          total_amount?: number | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       routes: {
         Row: {
           created_at: string | null
