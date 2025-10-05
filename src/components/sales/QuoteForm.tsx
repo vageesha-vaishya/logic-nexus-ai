@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,13 +9,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
 const quoteSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
+  service_type: z.enum(['ocean', 'air', 'trucking', 'courier', 'moving']).optional(),
+  service_id: z.string().optional(),
+  incoterms: z.string().optional(),
+  carrier: z.string().optional(),
   account_id: z.string().optional(),
   contact_id: z.string().optional(),
   opportunity_id: z.string().optional(),
@@ -37,11 +40,13 @@ type QuoteItem = {
 };
 
 export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: () => void }) {
-  const { profile, roles } = useAuth();
+  const { context, supabase, user } = useCRM();
   const [items, setItems] = useState<QuoteItem[]>([
     { line_number: 1, product_name: '', quantity: 1, unit_price: 0, discount_percent: 0 },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedServiceType, setSelectedServiceType] = useState<string>('');
 
   const form = useForm<z.infer<typeof quoteSchema>>({
     resolver: zodResolver(quoteSchema),
@@ -49,6 +54,27 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       status: 'draft',
     },
   });
+
+  useEffect(() => {
+    fetchServices();
+  }, []);
+
+  const fetchServices = async () => {
+    if (!context.tenantId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('tenant_id', context.tenantId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setServices(data || []);
+    } catch (error: any) {
+      console.error('Failed to fetch services:', error);
+    }
+  };
 
   const addItem = () => {
     setItems([
@@ -83,10 +109,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   };
 
   const onSubmit = async (values: z.infer<typeof quoteSchema>) => {
-    const tenantId = roles[0]?.tenant_id;
-    const franchiseId = roles[0]?.franchise_id;
-
-    if (!tenantId) {
+    if (!context.tenantId) {
       toast.error('Tenant information not found');
       return;
     }
@@ -101,15 +124,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         quote_number: quoteNumber,
         title: values.title,
         description: values.description || null,
+        service_type: values.service_type || null,
+        service_id: values.service_id || null,
+        incoterms: values.incoterms || null,
         account_id: values.account_id || null,
         contact_id: values.contact_id || null,
         opportunity_id: values.opportunity_id || null,
         status: values.status,
         valid_until: values.valid_until || null,
-        tenant_id: tenantId,
-        franchise_id: franchiseId || null,
-        owner_id: profile?.id || null,
-        created_by: profile?.id || null,
+        tenant_id: context.tenantId,
+        franchise_id: context.franchiseId || null,
+        owner_id: user?.id || null,
+        created_by: user?.id || null,
         subtotal,
         tax_amount: taxAmount,
         tax_percent: parseFloat(values.tax_percent || '0'),
@@ -117,6 +143,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         total_amount: total,
         terms_conditions: values.terms_conditions || null,
         notes: values.notes || null,
+        compliance_status: 'pending',
       };
 
       const { data: quote, error: quoteError } = await supabase
@@ -181,6 +208,110 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="service_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Type</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedServiceType(value);
+                      }} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="ocean">Ocean Freight</SelectItem>
+                        <SelectItem value="air">Air Freight</SelectItem>
+                        <SelectItem value="trucking">Trucking</SelectItem>
+                        <SelectItem value="courier">Courier</SelectItem>
+                        <SelectItem value="moving">Moving & Packing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="service_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {services
+                          .filter(s => !selectedServiceType || s.service_type === selectedServiceType)
+                          .map((service) => (
+                            <SelectItem key={service.id} value={service.id}>
+                              {service.service_name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="incoterms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Incoterms</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select incoterms" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="FOB">FOB - Free On Board</SelectItem>
+                        <SelectItem value="CIF">CIF - Cost, Insurance & Freight</SelectItem>
+                        <SelectItem value="EXW">EXW - Ex Works</SelectItem>
+                        <SelectItem value="FCA">FCA - Free Carrier</SelectItem>
+                        <SelectItem value="CPT">CPT - Carriage Paid To</SelectItem>
+                        <SelectItem value="CIP">CIP - Carriage & Insurance Paid</SelectItem>
+                        <SelectItem value="DAP">DAP - Delivered At Place</SelectItem>
+                        <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="carrier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Carrier</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Enter carrier name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

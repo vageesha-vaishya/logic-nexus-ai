@@ -270,6 +270,182 @@ export type Database = {
           },
         ]
       }
+      carrier_rates: {
+        Row: {
+          accessorial_fees: Json | null
+          base_rate: number
+          carrier_name: string
+          created_at: string | null
+          currency: string | null
+          destination_location: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          origin_location: string | null
+          rate_type: string
+          service_id: string | null
+          surcharges: Json | null
+          tenant_id: string
+          updated_at: string | null
+          valid_from: string
+          valid_until: string | null
+          weight_break_max: number | null
+          weight_break_min: number | null
+        }
+        Insert: {
+          accessorial_fees?: Json | null
+          base_rate: number
+          carrier_name: string
+          created_at?: string | null
+          currency?: string | null
+          destination_location?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          origin_location?: string | null
+          rate_type: string
+          service_id?: string | null
+          surcharges?: Json | null
+          tenant_id: string
+          updated_at?: string | null
+          valid_from: string
+          valid_until?: string | null
+          weight_break_max?: number | null
+          weight_break_min?: number | null
+        }
+        Update: {
+          accessorial_fees?: Json | null
+          base_rate?: number
+          carrier_name?: string
+          created_at?: string | null
+          currency?: string | null
+          destination_location?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          origin_location?: string | null
+          rate_type?: string
+          service_id?: string | null
+          surcharges?: Json | null
+          tenant_id?: string
+          updated_at?: string | null
+          valid_from?: string
+          valid_until?: string | null
+          weight_break_max?: number | null
+          weight_break_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_rates_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carrier_rates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_checks: {
+        Row: {
+          check_details: Json | null
+          check_status: string
+          checked_at: string | null
+          checked_by: string | null
+          id: string
+          quote_id: string
+          rule_id: string | null
+        }
+        Insert: {
+          check_details?: Json | null
+          check_status: string
+          checked_at?: string | null
+          checked_by?: string | null
+          id?: string
+          quote_id: string
+          rule_id?: string | null
+        }
+        Update: {
+          check_details?: Json | null
+          check_status?: string
+          checked_at?: string | null
+          checked_by?: string | null
+          id?: string
+          quote_id?: string
+          rule_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_checks_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_checks_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_rules: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          regulation_agency: string | null
+          required_documents: Json | null
+          rule_description: string | null
+          rule_name: string
+          service_type: string | null
+          tenant_id: string
+          updated_at: string | null
+          validation_criteria: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          regulation_agency?: string | null
+          required_documents?: Json | null
+          rule_description?: string | null
+          rule_name: string
+          service_type?: string | null
+          tenant_id: string
+          updated_at?: string | null
+          validation_criteria: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          regulation_agency?: string | null
+          required_documents?: Json | null
+          rule_description?: string | null
+          rule_name?: string
+          service_type?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+          validation_criteria?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           account_id: string | null
@@ -489,6 +665,53 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates: {
+        Row: {
+          created_at: string | null
+          document_type: string
+          id: string
+          is_active: boolean | null
+          required_fields: Json | null
+          service_type: string | null
+          template_content: string
+          template_name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_type: string
+          id?: string
+          is_active?: boolean | null
+          required_fields?: Json | null
+          service_type?: string | null
+          template_content: string
+          template_name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_type?: string
+          id?: string
+          is_active?: boolean | null
+          required_fields?: Json | null
+          service_type?: string | null
+          template_content?: string
+          template_name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -1502,6 +1725,44 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_documents: {
+        Row: {
+          document_data: Json | null
+          document_type: string
+          document_url: string | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          quote_id: string
+        }
+        Insert: {
+          document_data?: Json | null
+          document_type: string
+          document_url?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          quote_id: string
+        }
+        Update: {
+          document_data?: Json | null
+          document_type?: string
+          document_url?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          quote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_documents_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           created_at: string | null
@@ -1566,22 +1827,32 @@ export type Database = {
           accepted_at: string | null
           account_id: string | null
           billing_address: Json | null
+          cargo_details: Json | null
+          carrier_id: string | null
+          compliance_status: string | null
           contact_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
           description: string | null
+          destination_location: Json | null
           discount_amount: number | null
           discount_percent: number | null
           franchise_id: string | null
           id: string
+          incoterms: string | null
           notes: string | null
           opportunity_id: string | null
+          origin_location: Json | null
           owner_id: string | null
           quote_number: string
+          regulatory_data: Json | null
           rejected_at: string | null
+          service_id: string | null
+          service_type: string | null
           shipping_address: Json | null
           shipping_amount: number | null
+          special_handling: Json | null
           status: string
           subtotal: number | null
           tax_amount: number | null
@@ -1597,22 +1868,32 @@ export type Database = {
           accepted_at?: string | null
           account_id?: string | null
           billing_address?: Json | null
+          cargo_details?: Json | null
+          carrier_id?: string | null
+          compliance_status?: string | null
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          destination_location?: Json | null
           discount_amount?: number | null
           discount_percent?: number | null
           franchise_id?: string | null
           id?: string
+          incoterms?: string | null
           notes?: string | null
           opportunity_id?: string | null
+          origin_location?: Json | null
           owner_id?: string | null
           quote_number: string
+          regulatory_data?: Json | null
           rejected_at?: string | null
+          service_id?: string | null
+          service_type?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
+          special_handling?: Json | null
           status?: string
           subtotal?: number | null
           tax_amount?: number | null
@@ -1628,22 +1909,32 @@ export type Database = {
           accepted_at?: string | null
           account_id?: string | null
           billing_address?: Json | null
+          cargo_details?: Json | null
+          carrier_id?: string | null
+          compliance_status?: string | null
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          destination_location?: Json | null
           discount_amount?: number | null
           discount_percent?: number | null
           franchise_id?: string | null
           id?: string
+          incoterms?: string | null
           notes?: string | null
           opportunity_id?: string | null
+          origin_location?: Json | null
           owner_id?: string | null
           quote_number?: string
+          regulatory_data?: Json | null
           rejected_at?: string | null
+          service_id?: string | null
+          service_type?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
+          special_handling?: Json | null
           status?: string
           subtotal?: number | null
           tax_amount?: number | null
@@ -1655,7 +1946,76 @@ export type Database = {
           updated_at?: string | null
           valid_until?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quotes_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rate_calculations: {
+        Row: {
+          applied_discounts: Json | null
+          applied_surcharges: Json | null
+          calculated_at: string | null
+          calculated_by: string | null
+          calculation_breakdown: Json
+          carrier_rate_id: string | null
+          final_rate: number
+          id: string
+          quote_id: string
+          service_id: string | null
+        }
+        Insert: {
+          applied_discounts?: Json | null
+          applied_surcharges?: Json | null
+          calculated_at?: string | null
+          calculated_by?: string | null
+          calculation_breakdown: Json
+          carrier_rate_id?: string | null
+          final_rate: number
+          id?: string
+          quote_id: string
+          service_id?: string | null
+        }
+        Update: {
+          applied_discounts?: Json | null
+          applied_surcharges?: Json | null
+          calculated_at?: string | null
+          calculated_by?: string | null
+          calculation_breakdown?: Json
+          carrier_rate_id?: string | null
+          final_rate?: number
+          id?: string
+          quote_id?: string
+          service_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_calculations_carrier_rate_id_fkey"
+            columns: ["carrier_rate_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_rates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rate_calculations_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rate_calculations_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       routes: {
         Row: {
@@ -1727,6 +2087,62 @@ export type Database = {
           },
           {
             foreignKeyName: "routes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          base_price: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          pricing_unit: string | null
+          service_code: string
+          service_name: string
+          service_type: string
+          tenant_id: string
+          transit_time_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          pricing_unit?: string | null
+          service_code: string
+          service_name: string
+          service_type: string
+          tenant_id: string
+          transit_time_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          pricing_unit?: string | null
+          service_code?: string
+          service_name?: string
+          service_type?: string
+          tenant_id?: string
+          transit_time_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
