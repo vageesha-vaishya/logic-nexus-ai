@@ -49,7 +49,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [services, setServices] = useState<any[]>([]);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  
 
   const form = useForm<z.infer<typeof quoteSchema>>({
     resolver: zodResolver(quoteSchema),
@@ -61,7 +61,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   useEffect(() => {
     if (context.tenantId || roles?.[0]?.tenant_id) {
       fetchServices();
-      setIsLoading(false);
     }
   }, [context.tenantId, roles]);
 
@@ -83,13 +82,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
 
   const addItem = () => {
     setItems([
