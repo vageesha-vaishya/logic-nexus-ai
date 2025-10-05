@@ -32,10 +32,7 @@ export default function AccountDetail() {
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .select(`
-          *,
-          parent:parent_account_id(id, name)
-        `)
+        .select('*')
         .eq('id', id)
         .maybeSingle();
 
