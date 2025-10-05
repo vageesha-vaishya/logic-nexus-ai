@@ -108,14 +108,25 @@ export default function AccountDetail() {
 
   const handleUpdate = async (formData: any) => {
     try {
+      // Normalize and avoid overwriting with empty strings
+      const payload: any = {
+        ...formData,
+        parent_account_id:
+          formData.parent_account_id === 'none' || formData.parent_account_id === ''
+            ? null
+            : formData.parent_account_id || null,
+        annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
+        employee_count: formData.employee_count ? parseInt(formData.employee_count) : null,
+      };
+
+      // Remove empty string fields so we don't try to set invalid UUIDs or empty values
+      ['tenant_id', 'franchise_id', 'website', 'phone', 'email', 'industry', 'description'].forEach((key) => {
+        if (payload[key] === '') delete payload[key];
+      });
+
       const { error } = await supabase
         .from('accounts')
-        .update({
-          ...formData,
-          parent_account_id: formData.parent_account_id === 'none' ? null : (formData.parent_account_id || null),
-          annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
-          employee_count: formData.employee_count ? parseInt(formData.employee_count) : null,
-        })
+        .update(payload)
         .eq('id', id);
 
       if (error) throw error;
