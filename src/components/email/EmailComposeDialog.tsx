@@ -178,20 +178,31 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
       toast({ title: "Missing fields", description: "Recipient and subject are required.", variant: "destructive" });
       return;
     }
+    if (!selectedAccount) {
+      toast({ title: "Missing account", description: "Please select an email account.", variant: "destructive" });
+      return;
+    }
     try {
       setSending(true);
-      const { error } = await supabase.from("email_outbox").insert([
-        {
-          from_account_id: selectedAccount,
-          to,
-          cc: cc || null,
+      
+      // Parse recipients
+      const toRecipients = to.split(',').map(e => e.trim()).filter(Boolean);
+      const ccRecipients = cc ? cc.split(',').map(e => e.trim()).filter(Boolean) : [];
+      
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          accountId: selectedAccount,
+          to: toRecipients,
+          cc: ccRecipients.length > 0 ? ccRecipients : undefined,
           subject,
-          body_html: editorHtml || null,
-          tenant_id: context?.tenantId,
-        },
-      ]);
+          body: editorHtml || '',
+        }
+      });
+
       if (error) throw error;
-      toast({ title: "Queued", description: "Email queued for sending." });
+      if (data?.error) throw new Error(data.error);
+      
+      toast({ title: "Sent", description: "Email sent successfully." });
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
