@@ -1446,40 +1446,289 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_features: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          feature_category: string
+          feature_key: string
+          feature_name: string
+          id: string
+          is_usage_based: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          feature_category: string
+          feature_key: string
+          feature_name: string
+          id?: string
+          is_usage_based?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          feature_category?: string
+          feature_key?: string
+          feature_name?: string
+          id?: string
+          is_usage_based?: boolean
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscription_invoices: {
+        Row: {
+          amount_due: number
+          amount_paid: number | null
+          billing_reason: string | null
+          created_at: string | null
+          currency: string
+          due_date: string | null
+          id: string
+          invoice_number: string | null
+          invoice_pdf_url: string | null
+          metadata: Json | null
+          paid_at: string | null
+          status: string
+          stripe_invoice_id: string | null
+          subscription_id: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_due: number
+          amount_paid?: number | null
+          billing_reason?: string | null
+          created_at?: string | null
+          currency?: string
+          due_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          metadata?: Json | null
+          paid_at?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number | null
+          billing_reason?: string | null
+          created_at?: string | null
+          currency?: string
+          due_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          metadata?: Json | null
+          paid_at?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          billing_period: Database["public"]["Enums"]["billing_period"]
+          created_at: string | null
+          currency: string
+          description: string | null
+          features: Json
+          id: string
+          is_active: boolean
+          limits: Json
+          name: string
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          price_annual: number | null
+          price_monthly: number
+          slug: string
+          sort_order: number | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          billing_period?: Database["public"]["Enums"]["billing_period"]
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean
+          limits?: Json
+          name: string
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          price_annual?: number | null
+          price_monthly: number
+          slug: string
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          billing_period?: Database["public"]["Enums"]["billing_period"]
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean
+          limits?: Json
+          name?: string
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          price_annual?: number | null
+          price_monthly?: number
+          slug?: string
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tenant_subscriptions: {
+        Row: {
+          auto_renew: boolean
+          canceled_at: string | null
+          created_at: string | null
+          current_period_end: string
+          current_period_start: string
+          ended_at: string | null
+          id: string
+          metadata: Json | null
+          plan_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tenant_id: string
+          trial_end: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_renew?: boolean
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end: string
+          current_period_start?: string
+          ended_at?: string | null
+          id?: string
+          metadata?: Json | null
+          plan_id: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id: string
+          trial_end?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_renew?: boolean
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          ended_at?: string | null
+          id?: string
+          metadata?: Json | null
+          plan_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id?: string
+          trial_end?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
+          billing_address: Json | null
+          billing_email: string | null
           created_at: string | null
           domain: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
           name: string
+          payment_method: Json | null
           settings: Json | null
           slug: string
+          stripe_customer_id: string | null
           subscription_tier: string | null
           updated_at: string | null
         }
         Insert: {
+          billing_address?: Json | null
+          billing_email?: string | null
           created_at?: string | null
           domain?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
           name: string
+          payment_method?: Json | null
           settings?: Json | null
           slug: string
+          stripe_customer_id?: string | null
           subscription_tier?: string | null
           updated_at?: string | null
         }
         Update: {
+          billing_address?: Json | null
+          billing_email?: string | null
           created_at?: string | null
           domain?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
           name?: string
+          payment_method?: Json | null
           settings?: Json | null
           slug?: string
+          stripe_customer_id?: string | null
           subscription_tier?: string | null
           updated_at?: string | null
         }
@@ -1546,6 +1795,63 @@ export type Database = {
             columns: ["territory_id"]
             isOneToOne: false
             referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_records: {
+        Row: {
+          created_at: string | null
+          feature_key: string
+          id: string
+          limit_count: number | null
+          metadata: Json | null
+          period_end: string
+          period_start: string
+          subscription_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          usage_count: number
+        }
+        Insert: {
+          created_at?: string | null
+          feature_key: string
+          id?: string
+          limit_count?: number | null
+          metadata?: Json | null
+          period_end: string
+          period_start: string
+          subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+          usage_count?: number
+        }
+        Update: {
+          created_at?: string | null
+          feature_key?: string
+          id?: string
+          limit_count?: number | null
+          metadata?: Json | null
+          period_end?: string
+          period_start?: string
+          subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_records_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -1695,9 +2001,17 @@ export type Database = {
         Args: { lead_id: string }
         Returns: number
       }
+      check_usage_limit: {
+        Args: { _feature_key: string; _tenant_id: string }
+        Returns: boolean
+      }
       decrement_user_lead_count: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
+      }
+      get_tenant_plan_tier: {
+        Args: { _tenant_id: string }
+        Returns: Database["public"]["Enums"]["subscription_tier"]
       }
       get_user_custom_permissions: {
         Args: { check_user_id: string }
@@ -1721,12 +2035,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_feature_usage: {
+        Args: { _feature_key: string; _increment?: number; _tenant_id: string }
+        Returns: undefined
+      }
       increment_user_lead_count: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
       is_platform_admin: {
         Args: { check_user_id: string }
+        Returns: boolean
+      }
+      tenant_has_feature: {
+        Args: { _feature_key: string; _tenant_id: string }
         Returns: boolean
       }
     }
@@ -1736,6 +2058,7 @@ export type Database = {
       activity_status: "planned" | "in_progress" | "completed" | "cancelled"
       activity_type: "call" | "email" | "meeting" | "task" | "note"
       app_role: "platform_admin" | "tenant_admin" | "franchise_admin" | "user"
+      billing_period: "monthly" | "annual"
       lead_source:
         | "website"
         | "referral"
@@ -1761,7 +2084,15 @@ export type Database = {
         | "negotiation"
         | "closed_won"
         | "closed_lost"
+      plan_type: "crm_base" | "service_addon" | "bundle"
       priority_level: "low" | "medium" | "high" | "urgent"
+      subscription_status:
+        | "active"
+        | "trial"
+        | "past_due"
+        | "canceled"
+        | "expired"
+      subscription_tier: "starter" | "professional" | "business" | "enterprise"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1894,6 +2225,7 @@ export const Constants = {
       activity_status: ["planned", "in_progress", "completed", "cancelled"],
       activity_type: ["call", "email", "meeting", "task", "note"],
       app_role: ["platform_admin", "tenant_admin", "franchise_admin", "user"],
+      billing_period: ["monthly", "annual"],
       lead_source: [
         "website",
         "referral",
@@ -1922,7 +2254,16 @@ export const Constants = {
         "closed_won",
         "closed_lost",
       ],
+      plan_type: ["crm_base", "service_addon", "bundle"],
       priority_level: ["low", "medium", "high", "urgent"],
+      subscription_status: [
+        "active",
+        "trial",
+        "past_due",
+        "canceled",
+        "expired",
+      ],
+      subscription_tier: ["starter", "professional", "business", "enterprise"],
     },
   },
 } as const
