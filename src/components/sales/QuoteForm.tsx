@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 const quoteSchema = z.object({
@@ -41,6 +42,7 @@ type QuoteItem = {
 
 export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: () => void }) {
   const { context, supabase, user } = useCRM();
+  const { roles } = useAuth();
   const [items, setItems] = useState<QuoteItem[]>([
     { line_number: 1, product_name: '', quantity: 1, unit_price: 0, discount_percent: 0 },
   ]);
@@ -57,20 +59,21 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   });
 
   useEffect(() => {
-    if (context.tenantId) {
+    if (context.tenantId || roles?.[0]?.tenant_id) {
       fetchServices();
       setIsLoading(false);
     }
-  }, [context.tenantId]);
+  }, [context.tenantId, roles]);
 
   const fetchServices = async () => {
-    if (!context.tenantId) return;
+    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+    if (!tenantId) return;
 
     try {
       const { data, error } = await supabase
         .from('services')
         .select('*')
-        .eq('tenant_id', context.tenantId)
+        .eq('tenant_id', tenantId)
         .eq('is_active', true);
 
       if (error) throw error;
@@ -80,7 +83,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     }
   };
 
-  if (isLoading || !context.tenantId) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <p className="text-muted-foreground">Loading...</p>
@@ -121,8 +124,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   };
 
   const onSubmit = async (values: z.infer<typeof quoteSchema>) => {
-    if (!context.tenantId) {
-      toast.error('Tenant information not found');
+    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+    const franchiseId = context.franchiseId || roles?.[0]?.franchise_id || null;
+
+    if (!tenantId) {
+      toast.error('No tenant selected. Please ensure your account is linked to a tenant.');
       return;
     }
 
@@ -144,8 +150,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         opportunity_id: values.opportunity_id || null,
         status: values.status,
         valid_until: values.valid_until || null,
-        tenant_id: context.tenantId,
-        franchise_id: context.franchiseId || null,
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
         owner_id: user?.id || null,
         created_by: user?.id || null,
         subtotal,
