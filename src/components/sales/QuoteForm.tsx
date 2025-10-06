@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
@@ -287,6 +287,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service</FormLabel>
+                    <FormDescription>Select service</FormDescription>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -301,6 +302,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                               {service.service_name}
                             </SelectItem>
                           ))}
+                        {services.length === 0 && (
+                          <SelectItem disabled value="__no_services__">No services found</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -316,6 +320,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Account</FormLabel>
+                    <FormDescription>Select account</FormDescription>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -328,6 +333,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             {account.name}
                           </SelectItem>
                         ))}
+                        {accounts.length === 0 && (
+                          <SelectItem disabled value="__no_accounts__">No accounts found</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -341,6 +349,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contact</FormLabel>
+                    <FormDescription>Select contact</FormDescription>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -353,6 +362,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             {contact.first_name} {contact.last_name}
                           </SelectItem>
                         ))}
+                        {contacts.length === 0 && (
+                          <SelectItem disabled value="__no_contacts__">No contacts found</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -366,6 +378,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Opportunity</FormLabel>
+                    <FormDescription>Select opportunity</FormDescription>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -378,6 +391,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             {opp.name}
                           </SelectItem>
                         ))}
+                        {opportunities.length === 0 && (
+                          <SelectItem disabled value="__no_opportunities__">No opportunities found</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

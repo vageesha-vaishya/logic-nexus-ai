@@ -7,6 +7,7 @@ import { IncotermForm } from "@/components/logistics/IncotermForm";
 import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 export default function Incoterms() {
   const { supabase, context } = useCRM();
@@ -14,26 +15,68 @@ export default function Incoterms() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId) {
+    if (context.isPlatformAdmin || context.tenantId) {
       fetchIncoterms();
     }
-  }, [context.tenantId]);
+  }, [context.isPlatformAdmin, context.tenantId]);
 
   const fetchIncoterms = async () => {
-    if (!context.tenantId) return;
+    const isPlatform = context.isPlatformAdmin;
+    const tenantId = context.tenantId;
+    if (!isPlatform && !tenantId) return;
 
-    const { data, error } = await supabase
-      .from("incoterms")
-      .select("*")
-      .eq("tenant_id", context.tenantId)
-      .order("incoterm_code");
+    let query = supabase.from("incoterms").select("*");
+    if (!isPlatform) {
+      query = query.eq("tenant_id", tenantId as string);
+    }
+    const { data, error } = await query.order("incoterm_code");
 
     if (error) {
       console.error("Error fetching incoterms:", error);
       return;
     }
 
-    setIncoterms(data || []);
+    const rows = data || [];
+    // Dev-only: auto-seed demo incoterms if none exist (only when tenant scoped)
+    if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+      try {
+        await supabase.from("incoterms").insert([
+          {
+            tenant_id: tenantId,
+            incoterm_code: "FOB",
+            incoterm_name: "Free On Board",
+            description: "Seller delivers goods on board the vessel at the named port of shipment.",
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            incoterm_code: "CIF",
+            incoterm_name: "Cost, Insurance and Freight",
+            description: "Seller covers cost, insurance, and freight to port of destination.",
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            incoterm_code: "EXW",
+            incoterm_name: "Ex Works",
+            description: "Buyer bears all costs and risks involved in taking goods from seller's premises to desired destination.",
+            is_active: false,
+          },
+        ]);
+        toast.success("Seeded demo incoterms");
+        const { data: seeded } = await supabase
+          .from("incoterms")
+          .select("*")
+          .eq("tenant_id", tenantId as string)
+          .order("incoterm_code");
+        setIncoterms(seeded || []);
+      } catch (seedErr: any) {
+        console.warn("Incoterms seed failed:", seedErr?.message || seedErr);
+        setIncoterms([]);
+      }
+    } else {
+      setIncoterms(rows);
+    }
   };
 
   return (

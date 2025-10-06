@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteForm } from '@/components/sales/QuoteForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 
 export default function QuoteDetail() {
   const { id } = useParams();
@@ -44,8 +45,23 @@ export default function QuoteDetail() {
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Edit Quote</h1>
+        <div className="space-y-2">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard/quotes">Quotes</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbItem>
+                <BreadcrumbLink href={`/dashboard/quotes/${id}`}>Edit</BreadcrumbLink>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Edit Quote</h1>
+          </div>
         </div>
         <QuoteForm quoteId={id} onSuccess={handleSuccess} />
       </div>

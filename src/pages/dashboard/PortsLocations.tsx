@@ -28,29 +28,81 @@ export default function PortsLocations() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId || roles?.[0]?.tenant_id) {
+    if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
       fetchPorts();
     } else {
       setLoading(false);
     }
-  }, [context.tenantId, roles]);
+  }, [context.isPlatformAdmin, context.tenantId, roles]);
 
   const fetchPorts = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-    if (!tenantId) {
+    const isPlatform = context.isPlatformAdmin;
+    if (!isPlatform && !tenantId) {
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('ports_locations')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('location_name');
+        .select('*');
+      if (!isPlatform) {
+        query = query.eq('tenant_id', tenantId as string);
+      }
+      const { data, error } = await query.order('location_name');
 
       if (error) throw error;
-      setPorts(data || []);
+      const rows = data || [];
+      // Dev-only: auto-seed demo ports/locations if none exist (only when tenant scoped)
+      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+        try {
+          await supabase.from('ports_locations').insert([
+            {
+              tenant_id: tenantId,
+              location_name: 'Port of Los Angeles',
+              location_code: 'USLAX',
+              location_type: 'seaport',
+              country: 'United States',
+              city: 'Los Angeles',
+              customs_available: true,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              location_name: 'Singapore Changi Airport',
+              location_code: 'SIN',
+              location_type: 'airport',
+              country: 'Singapore',
+              city: 'Singapore',
+              customs_available: true,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              location_name: 'Mumbai Inland Port',
+              location_code: 'INBOM-IP',
+              location_type: 'inland_port',
+              country: 'India',
+              city: 'Mumbai',
+              customs_available: false,
+              is_active: true,
+            },
+          ]);
+          toast.success('Seeded demo ports/locations');
+          const { data: seeded } = await supabase
+            .from('ports_locations')
+            .select('*')
+            .eq('tenant_id', tenantId as string)
+            .order('location_name');
+          setPorts(seeded || []);
+        } catch (seedErr: any) {
+          console.warn('Ports/locations seed failed:', seedErr?.message || seedErr);
+          setPorts([]);
+        }
+      } else {
+        setPorts(rows);
+      }
     } catch (error: any) {
       toast.error('Failed to load ports/locations', {
         description: error.message,

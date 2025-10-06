@@ -28,29 +28,78 @@ export default function Consignees() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId || roles?.[0]?.tenant_id) {
+    if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
       fetchConsignees();
     } else {
       setLoading(false);
     }
-  }, [context.tenantId, roles]);
+  }, [context.isPlatformAdmin, context.tenantId, roles]);
 
   const fetchConsignees = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-    if (!tenantId) {
+    const isPlatform = context.isPlatformAdmin;
+    if (!isPlatform && !tenantId) {
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('consignees')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('company_name');
+        .select('*');
+      if (!isPlatform) {
+        query = query.eq('tenant_id', tenantId as string);
+      }
+      const { data, error } = await query.order('company_name');
 
       if (error) throw error;
-      setConsignees(data || []);
+      const rows = data || [];
+      // Dev-only: auto-seed demo consignees if none exist (only when tenant scoped)
+      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+        try {
+          await supabase.from('consignees').insert([
+            {
+              tenant_id: tenantId,
+              company_name: 'Acme Imports',
+              contact_person: 'Jamie Rivera',
+              contact_email: 'jamie@acme-imports.example',
+              tax_id: 'ACM-12345',
+              customs_id: 'CUS-98765',
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              company_name: 'Global Retail Ltd',
+              contact_person: 'Priya Singh',
+              contact_email: 'priya@globalretail.example',
+              tax_id: 'GRL-67890',
+              customs_id: 'CUS-24680',
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              company_name: 'Pacific Pharmaceuticals',
+              contact_person: 'Ethan Wu',
+              contact_email: 'ethan@pacpharma.example',
+              tax_id: 'PPH-11223',
+              customs_id: 'CUS-13579',
+              is_active: false,
+            },
+          ]);
+          toast.success('Seeded demo consignees');
+          const { data: seeded } = await supabase
+            .from('consignees')
+            .select('*')
+            .eq('tenant_id', tenantId as string)
+            .order('company_name');
+          setConsignees(seeded || []);
+        } catch (seedErr: any) {
+          console.warn('Consignee seed failed:', seedErr?.message || seedErr);
+          setConsignees([]);
+        }
+      } else {
+        setConsignees(rows);
+      }
     } catch (error: any) {
       toast.error('Failed to load consignees', {
         description: error.message,

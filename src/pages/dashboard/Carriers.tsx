@@ -28,29 +28,95 @@ export default function Carriers() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId || roles?.[0]?.tenant_id) {
+    if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
       fetchCarriers();
     } else {
       setLoading(false);
     }
-  }, [context.tenantId, roles]);
+  }, [context.isPlatformAdmin, context.tenantId, roles]);
 
   const fetchCarriers = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-    if (!tenantId) {
+    const isPlatform = context.isPlatformAdmin;
+    if (!isPlatform && !tenantId) {
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('carriers')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('carrier_name');
+        .select('*');
+      if (!isPlatform) {
+        query = query.eq('tenant_id', tenantId as string);
+      }
+      const { data, error } = await query.order('carrier_name');
 
       if (error) throw error;
-      setCarriers(data || []);
+      const rows = data || [];
+      // Dev-only: auto-seed a few demo carriers if none exist (only when tenant scoped)
+      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+        try {
+          await supabase.from('carriers').insert([
+            {
+              tenant_id: tenantId,
+              carrier_name: 'Maersk',
+              carrier_code: 'MAEU',
+              carrier_type: 'ocean',
+              contact_person: 'Alex Jensen',
+              contact_email: 'alex@maersk.example',
+              contact_phone: '+1-555-3001',
+              rating: 4.6,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              carrier_name: 'DHL Express',
+              carrier_code: 'DHL',
+              carrier_type: 'courier',
+              contact_person: 'Taylor Reed',
+              contact_email: 'taylor@dhl.example',
+              contact_phone: '+1-555-3002',
+              rating: 4.4,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              carrier_name: 'United Cargo',
+              carrier_code: 'UA',
+              carrier_type: 'air',
+              contact_person: 'Jordan Kim',
+              contact_email: 'jordan@united.example',
+              contact_phone: '+1-555-3003',
+              rating: 4.2,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              carrier_name: 'Swift Trucking',
+              carrier_code: 'SWFT',
+              carrier_type: 'trucking',
+              contact_person: 'Morgan Lee',
+              contact_email: 'morgan@swift.example',
+              contact_phone: '+1-555-3004',
+              rating: 4.0,
+              is_active: true,
+            },
+          ]);
+          toast.success('Seeded demo carriers');
+          const { data: seeded } = await supabase
+            .from('carriers')
+            .select('*')
+            .eq('tenant_id', tenantId as string)
+            .order('carrier_name');
+          setCarriers(seeded || []);
+        } catch (seedErr: any) {
+          console.warn('Carrier seed failed:', seedErr?.message || seedErr);
+          setCarriers([]);
+        }
+      } else {
+        setCarriers(rows);
+      }
     } catch (error: any) {
       toast.error('Failed to load carriers', {
         description: error.message,

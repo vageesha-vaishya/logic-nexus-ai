@@ -7,6 +7,7 @@ import { PackageSizeForm } from "@/components/logistics/PackageSizeForm";
 import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 export default function PackageSizes() {
   const { supabase, context } = useCRM();
@@ -14,26 +15,77 @@ export default function PackageSizes() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId) {
+    if (context.isPlatformAdmin || context.tenantId) {
       fetchSizes();
     }
-  }, [context.tenantId]);
+  }, [context.isPlatformAdmin, context.tenantId]);
 
   const fetchSizes = async () => {
-    if (!context.tenantId) return;
+    const isPlatform = context.isPlatformAdmin;
+    const tenantId = context.tenantId;
+    if (!isPlatform && !tenantId) return;
 
-    const { data, error } = await supabase
-      .from("package_sizes")
-      .select("*")
-      .eq("tenant_id", context.tenantId)
-      .order("size_name");
+    let query = supabase.from("package_sizes").select("*");
+    if (!isPlatform) {
+      query = query.eq("tenant_id", tenantId as string);
+    }
+    const { data, error } = await query.order("size_name");
 
     if (error) {
       console.error("Error fetching package sizes:", error);
       return;
     }
 
-    setSizes(data || []);
+    const rows = data || [];
+    // Dev-only: auto-seed demo sizes if none exist (only when tenant scoped)
+    if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+      try {
+        await supabase.from("package_sizes").insert([
+          {
+            tenant_id: tenantId,
+            size_name: "20ft Container",
+            size_code: "20FT",
+            length_ft: 20,
+            width_ft: 8,
+            height_ft: 8.5,
+            max_weight_kg: 28200,
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            size_name: "40ft Container",
+            size_code: "40FT",
+            length_ft: 40,
+            width_ft: 8,
+            height_ft: 8.5,
+            max_weight_kg: 30480,
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            size_name: "Pallet (48x40)",
+            size_code: "PAL48x40",
+            length_ft: 4,
+            width_ft: 3.33,
+            height_ft: null,
+            max_weight_kg: 1000,
+            is_active: false,
+          },
+        ]);
+        toast.success("Seeded demo package sizes");
+        const { data: seeded } = await supabase
+          .from("package_sizes")
+          .select("*")
+          .eq("tenant_id", tenantId as string)
+          .order("size_name");
+        setSizes(seeded || []);
+      } catch (seedErr: any) {
+        console.warn("Package sizes seed failed:", seedErr?.message || seedErr);
+        setSizes([]);
+      }
+    } else {
+      setSizes(rows);
+    }
   };
 
   return (

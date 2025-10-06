@@ -7,6 +7,7 @@ import { PackageCategoryForm } from "@/components/logistics/PackageCategoryForm"
 import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 export default function PackageCategories() {
   const { supabase, context } = useCRM();
@@ -14,26 +15,68 @@ export default function PackageCategories() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId) {
+    if (context.isPlatformAdmin || context.tenantId) {
       fetchCategories();
     }
-  }, [context.tenantId]);
+  }, [context.isPlatformAdmin, context.tenantId]);
 
   const fetchCategories = async () => {
-    if (!context.tenantId) return;
+    const isPlatform = context.isPlatformAdmin;
+    const tenantId = context.tenantId;
+    if (!isPlatform && !tenantId) return;
 
-    const { data, error } = await supabase
-      .from("package_categories")
-      .select("*")
-      .eq("tenant_id", context.tenantId)
-      .order("category_name");
+    let query = supabase.from("package_categories").select("*");
+    if (!isPlatform) {
+      query = query.eq("tenant_id", tenantId as string);
+    }
+    const { data, error } = await query.order("category_name");
 
     if (error) {
       console.error("Error fetching package categories:", error);
       return;
     }
 
-    setCategories(data || []);
+    const rows = data || [];
+    // Dev-only: auto-seed demo categories if none exist (only when tenant scoped)
+    if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+      try {
+        await supabase.from("package_categories").insert([
+          {
+            tenant_id: tenantId,
+            category_name: "Container",
+            category_code: "CONT",
+            description: "Standard shipping containers",
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            category_name: "Palletized",
+            category_code: "PAL",
+            description: "Goods packed on pallets",
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            category_name: "Loose",
+            category_code: "LOOSE",
+            description: "Loose cargo items",
+            is_active: false,
+          },
+        ]);
+        toast.success("Seeded demo package categories");
+        const { data: seeded } = await supabase
+          .from("package_categories")
+          .select("*")
+          .eq("tenant_id", tenantId as string)
+          .order("category_name");
+        setCategories(seeded || []);
+      } catch (seedErr: any) {
+        console.warn("Package categories seed failed:", seedErr?.message || seedErr);
+        setCategories([]);
+      }
+    } else {
+      setCategories(rows);
+    }
   };
 
   return (

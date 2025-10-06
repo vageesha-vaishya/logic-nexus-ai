@@ -1,5 +1,6 @@
 import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, Mail } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/branding/Logo';
 import { APP_MENU } from '@/config/navigation';
@@ -22,6 +23,41 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut, profile } = useAuth();
   const collapsed = state === 'collapsed';
+  const location = useLocation();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Restore saved scroll position on mount
+  useEffect(() => {
+    const saved = sessionStorage.getItem('sidebar:scrollTop');
+    const el = scrollRef.current;
+    if (el && saved) {
+      el.scrollTop = Number(saved);
+    }
+  }, []);
+
+  // Persist scroll position during scrolling
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = () => sessionStorage.setItem('sidebar:scrollTop', String(el.scrollTop));
+    el.addEventListener('scroll', handler);
+    return () => el.removeEventListener('scroll', handler);
+  }, []);
+
+  // Ensure active item stays in view after navigation
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const activeLink = container.querySelector('a[aria-current="page"]') as HTMLElement | null;
+    if (activeLink) {
+      const linkRect = activeLink.getBoundingClientRect();
+      const contRect = container.getBoundingClientRect();
+      const outOfView = linkRect.top < contRect.top || linkRect.bottom > contRect.bottom;
+      if (outOfView) {
+        activeLink.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [location]);
 
   // Use Salesforce-style order from navigation config
   const salesItems = (APP_MENU.find((m) => m.label === 'Sales')?.items ?? []).map((i) => ({
@@ -55,7 +91,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible="icon">
-      <SidebarContent>
+      <SidebarContent ref={scrollRef}>
         <SidebarGroup>
           <SidebarGroupLabel>
             {collapsed ? (

@@ -6,6 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useCRM } from '@/hooks/useCRM';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Quotes() {
   const navigate = useNavigate();
@@ -54,27 +57,70 @@ export default function Quotes() {
     fetchQuotes();
   }, []);
 
+  const currency = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
+
+  const statusVariant = (status?: string) => {
+    switch ((status || '').toLowerCase()) {
+      case 'accepted':
+        return 'success';
+      case 'sent':
+        return 'secondary';
+      case 'rejected':
+        return 'destructive';
+      case 'draft':
+        return 'outline';
+      default:
+        return 'outline';
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Quotes</h1>
-            <p className="text-muted-foreground">Manage customer quotations</p>
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/dashboard/quotes">Quotes</BreadcrumbLink>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <div>
+              <h1 className="text-3xl font-bold">Quotes</h1>
+              <p className="text-muted-foreground">Manage customer quotations</p>
+            </div>
           </div>
           <Button onClick={() => navigate('/dashboard/quotes/new')}>New Quote</Button>
         </div>
 
         {loading ? (
           <Card>
+            <CardHeader>
+              <CardTitle>All Quotes</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <div className="space-y-2">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="grid grid-cols-9 gap-4 items-center">
+                    {[...Array(9)].map((__, j) => (
+                      <Skeleton key={`${i}-${j}`} className="h-4 w-full" />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         ) : quotes.length === 0 ? (
           <Card>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">No quotes yet</div>
+              <div className="text-center py-10 space-y-3">
+                <p className="text-muted-foreground">No quotes yet</p>
+                <Button onClick={() => navigate('/dashboard/quotes/new')} size="sm">Create your first quote</Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -108,20 +154,13 @@ export default function Quotes() {
                       <TableCell>{q.opportunities?.name || '-'}</TableCell>
                       <TableCell>{q.carriers?.carrier_name || '-'}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          q.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                          q.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                          q.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {q.status}
-                        </span>
+                        <Badge variant={statusVariant(q.status)} className="capitalize">{q.status || 'unknown'}</Badge>
                       </TableCell>
-                      <TableCell className="font-medium">${q.sell_price?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell className="font-medium">{q.sell_price != null ? currency.format(q.sell_price) : currency.format(0)}</TableCell>
                       <TableCell>
                         {q.sell_price && q.cost_price ? (
                           <span className={`${(q.sell_price - q.cost_price) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            ${(q.sell_price - q.cost_price).toFixed(2)}
+                            {currency.format((q.sell_price - q.cost_price))}
                           </span>
                         ) : '-'}
                       </TableCell>

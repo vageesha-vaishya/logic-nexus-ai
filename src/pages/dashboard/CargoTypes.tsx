@@ -8,6 +8,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CargoTypes() {
   const { supabase, context } = useCRM();
@@ -15,26 +16,82 @@ export default function CargoTypes() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (context.tenantId) {
+    if (context.isPlatformAdmin || context.tenantId) {
       fetchCargoTypes();
     }
-  }, [context.tenantId]);
+  }, [context.isPlatformAdmin, context.tenantId]);
 
   const fetchCargoTypes = async () => {
-    if (!context.tenantId) return;
+    const isPlatform = context.isPlatformAdmin;
+    const tenantId = context.tenantId;
+    if (!isPlatform && !tenantId) return;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("cargo_types")
-      .select("*")
-      .eq("tenant_id", context.tenantId)
-      .order("cargo_type_name");
+      .select("*");
+    if (!isPlatform) {
+      query = query.eq("tenant_id", tenantId as string);
+    }
+    const { data, error } = await query.order("cargo_type_name");
 
     if (error) {
       console.error("Error fetching cargo types:", error);
       return;
     }
 
-    setCargoTypes(data || []);
+    const rows = data || [];
+    // Dev-only: auto-seed demo cargo types if none exist (only when tenant scoped)
+    if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+      try {
+        await supabase.from("cargo_types").insert([
+          {
+            tenant_id: tenantId,
+            cargo_type_name: "General Cargo",
+            cargo_code: "GEN",
+            requires_special_handling: false,
+            temperature_controlled: false,
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            cargo_type_name: "Perishable Goods",
+            cargo_code: "PER",
+            requires_special_handling: true,
+            temperature_controlled: true,
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            cargo_type_name: "Hazardous Materials",
+            cargo_code: "HAZ",
+            requires_special_handling: true,
+            temperature_controlled: false,
+            hazmat_class: "Class 3",
+            is_active: true,
+          },
+          {
+            tenant_id: tenantId,
+            cargo_type_name: "Oversized Machinery",
+            cargo_code: "OVS",
+            requires_special_handling: true,
+            temperature_controlled: false,
+            is_active: false,
+          },
+        ]);
+        toast.success("Seeded demo cargo types");
+        const { data: seeded } = await supabase
+          .from("cargo_types")
+          .select("*")
+          .eq("tenant_id", tenantId as string)
+          .order("cargo_type_name");
+        setCargoTypes(seeded || []);
+      } catch (seedErr: any) {
+        console.warn("Cargo types seed failed:", seedErr?.message || seedErr);
+        setCargoTypes([]);
+      }
+    } else {
+      setCargoTypes(rows);
+    }
   };
 
   return (
