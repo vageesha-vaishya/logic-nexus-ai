@@ -1,4 +1,4 @@
-import { type LucideIcon, Building2, Users, UserPlus, TrendingUp, CheckSquare, Mail, Settings, FileText, Package, GitBranch, Palette, Home } from 'lucide-react';
+import { type LucideIcon, Building2, Users, UserPlus, TrendingUp, CheckSquare, Mail, Settings, FileText, Package, GitBranch, Palette, Home, Shield } from 'lucide-react';
 
 export type ObjectMenuItem = {
   name: string;
@@ -39,6 +39,7 @@ export const OBJECT_GROUPS: ObjectGroup[] = [
       { name: 'Tenants', to: '/dashboard/tenants', icon: FileText, description: 'Multi-tenant administration' },
       { name: 'Franchises', to: '/dashboard/franchises', icon: Package, description: 'Franchise entities' },
       { name: 'Users', to: '/dashboard/users', icon: Users, description: 'Manage users and roles' },
+      { name: 'Security Overview', to: '/dashboard/security-overview', icon: Shield, description: 'RLS policies and security' },
       { name: 'Settings', to: '/dashboard/settings', icon: Settings, description: 'Global and app settings' },
     ],
   },

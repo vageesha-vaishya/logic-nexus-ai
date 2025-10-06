@@ -3699,6 +3699,31 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
+      get_database_enums: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          enum_type: string
+          labels: string
+        }[]
+      }
+      get_rls_policies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          command: string
+          policy_name: string
+          roles: string
+          table_name: string
+          using_expression: string
+        }[]
+      }
+      get_rls_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          policy_count: number
+          rls_enabled: boolean
+          table_name: string
+        }[]
+      }
       get_tenant_plan_tier: {
         Args: { _tenant_id: string }
         Returns: Database["public"]["Enums"]["subscription_tier"]

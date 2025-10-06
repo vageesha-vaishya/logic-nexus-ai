@@ -72,6 +72,7 @@ import PackageCategories from "./pages/dashboard/PackageCategories";
 import PackageSizes from "./pages/dashboard/PackageSizes";
 import CargoTypes from "./pages/dashboard/CargoTypes";
 import Incoterms from "./pages/dashboard/Incoterms";
+import SecurityOverview from "./pages/dashboard/SecurityOverview";
 
 const queryClient = new QueryClient();
 
@@ -397,6 +398,7 @@ const App = () => (
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            <Route path="/dashboard/security-overview" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><SecurityOverview /></ProtectedRoute>} />
             {/* Logistics Routes */}
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />

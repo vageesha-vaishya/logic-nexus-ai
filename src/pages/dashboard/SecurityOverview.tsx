@@ -12,27 +12,27 @@ export default function SecurityOverview() {
   const { data: enums, isLoading: enumsLoading } = useQuery({
     queryKey: ['security-enums'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_database_enums');
+      const { data, error } = await supabase.rpc('get_database_enums' as any);
       if (error) throw error;
-      return data as Array<{ enum_type: string; labels: string }>;
+      return data as unknown as Array<{ enum_type: string; labels: string }>;
     }
   });
 
   const { data: rlsStatus, isLoading: rlsLoading } = useQuery({
     queryKey: ['rls-status'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_rls_status');
+      const { data, error } = await supabase.rpc('get_rls_status' as any);
       if (error) throw error;
-      return data as Array<{ table_name: string; rls_enabled: boolean; policy_count: number }>;
+      return data as unknown as Array<{ table_name: string; rls_enabled: boolean; policy_count: number }>;
     }
   });
 
   const { data: policies, isLoading: policiesLoading } = useQuery({
     queryKey: ['rls-policies'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_rls_policies');
+      const { data, error } = await supabase.rpc('get_rls_policies' as any);
       if (error) throw error;
-      return data as Array<{
+      return data as unknown as Array<{
         table_name: string;
         policy_name: string;
         command: string;
