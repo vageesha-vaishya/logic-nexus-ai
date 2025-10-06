@@ -19,7 +19,10 @@ const quoteSchema = z.object({
   service_type: z.enum(['ocean', 'air', 'trucking', 'courier', 'moving']).optional(),
   service_id: z.string().optional(),
   incoterms: z.string().optional(),
-  carrier: z.string().optional(),
+  carrier_id: z.string().optional(),
+  consignee_id: z.string().optional(),
+  origin_port_id: z.string().optional(),
+  destination_port_id: z.string().optional(),
   account_id: z.string().optional(),
   contact_id: z.string().optional(),
   opportunity_id: z.string().optional(),
@@ -48,6 +51,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [services, setServices] = useState<any[]>([]);
+  const [carriers, setCarriers] = useState<any[]>([]);
+  const [consignees, setConsignees] = useState<any[]>([]);
+  const [ports, setPorts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   
 
@@ -60,25 +69,42 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   useEffect(() => {
     if (context.tenantId || roles?.[0]?.tenant_id) {
-      fetchServices();
+      fetchData();
     }
   }, [context.tenantId, roles]);
 
-  const fetchServices = async () => {
+  const fetchData = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
     if (!tenantId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('is_active', true);
+      const [servicesRes, carriersRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
+        supabase.from('services').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+        supabase.from('carriers').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+        supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+        supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+        supabase.from('accounts').select('id, name').eq('tenant_id', tenantId),
+        supabase.from('contacts').select('id, first_name, last_name').eq('tenant_id', tenantId),
+        supabase.from('opportunities').select('id, name').eq('tenant_id', tenantId),
+      ]);
 
-      if (error) throw error;
-      setServices(data || []);
+      if (servicesRes.error) throw servicesRes.error;
+      if (carriersRes.error) throw carriersRes.error;
+      if (consigneesRes.error) throw consigneesRes.error;
+      if (portsRes.error) throw portsRes.error;
+      if (accountsRes.error) throw accountsRes.error;
+      if (contactsRes.error) throw contactsRes.error;
+      if (opportunitiesRes.error) throw opportunitiesRes.error;
+
+      setServices(servicesRes.data || []);
+      setCarriers(carriersRes.data || []);
+      setConsignees(consigneesRes.data || []);
+      setPorts(portsRes.data || []);
+      setAccounts(accountsRes.data || []);
+      setContacts(contactsRes.data || []);
+      setOpportunities(opportunitiesRes.data || []);
     } catch (error: any) {
-      console.error('Failed to fetch services:', error);
+      console.error('Failed to fetch data:', error);
     }
   };
 
@@ -137,6 +163,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         service_type: values.service_type || null,
         service_id: values.service_id || null,
         incoterms: values.incoterms || null,
+        carrier_id: values.carrier_id || null,
+        consignee_id: values.consignee_id || null,
+        origin_port_id: values.origin_port_id || null,
+        destination_port_id: values.destination_port_id || null,
         account_id: values.account_id || null,
         contact_id: values.contact_id || null,
         opportunity_id: values.opportunity_id || null,
@@ -279,6 +309,187 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="account_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contact_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select contact" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {contacts.map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            {contact.first_name} {contact.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="opportunity_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opportunity</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select opportunity" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {opportunities.map((opp) => (
+                          <SelectItem key={opp.id} value={opp.id}>
+                            {opp.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="carrier_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Carrier</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select carrier" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {carriers.map((carrier) => (
+                          <SelectItem key={carrier.id} value={carrier.id}>
+                            {carrier.carrier_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="consignee_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Consignee</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select consignee" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {consignees.map((consignee) => (
+                          <SelectItem key={consignee.id} value={consignee.id}>
+                            {consignee.company_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="origin_port_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Origin Port/Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select origin" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ports.map((port) => (
+                          <SelectItem key={port.id} value={port.id}>
+                            {port.location_name} ({port.location_code || 'N/A'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="destination_port_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Destination Port/Location</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select destination" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ports.map((port) => (
+                          <SelectItem key={port.id} value={port.id}>
+                            {port.location_name} ({port.location_code || 'N/A'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -308,19 +519,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="carrier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Carrier</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter carrier name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

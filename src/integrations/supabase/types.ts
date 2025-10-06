@@ -351,6 +351,63 @@ export type Database = {
           },
         ]
       }
+      carriers: {
+        Row: {
+          address: Json | null
+          carrier_code: string | null
+          carrier_name: string
+          carrier_type: string | null
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          rating: number | null
+          service_routes: Json | null
+          tenant_id: string
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: Json | null
+          carrier_code?: string | null
+          carrier_name: string
+          carrier_type?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          rating?: number | null
+          service_routes?: Json | null
+          tenant_id: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: Json | null
+          carrier_code?: string | null
+          carrier_name?: string
+          carrier_type?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          rating?: number | null
+          service_routes?: Json | null
+          tenant_id?: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       compliance_checks: {
         Row: {
           check_details: Json | null
@@ -445,6 +502,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      consignees: {
+        Row: {
+          address: Json | null
+          company_name: string
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          customs_id: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          tax_id: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          address?: Json | null
+          company_name: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          customs_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          tax_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: Json | null
+          company_name?: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          customs_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          tax_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       contacts: {
         Row: {
@@ -1686,6 +1791,66 @@ export type Database = {
           },
         ]
       }
+      ports_locations: {
+        Row: {
+          city: string | null
+          coordinates: Json | null
+          country: string | null
+          created_at: string | null
+          customs_available: boolean | null
+          facilities: Json | null
+          id: string
+          is_active: boolean | null
+          location_code: string | null
+          location_name: string
+          location_type: string | null
+          notes: string | null
+          operating_hours: string | null
+          postal_code: string | null
+          state_province: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          city?: string | null
+          coordinates?: Json | null
+          country?: string | null
+          created_at?: string | null
+          customs_available?: boolean | null
+          facilities?: Json | null
+          id?: string
+          is_active?: boolean | null
+          location_code?: string | null
+          location_name: string
+          location_type?: string | null
+          notes?: string | null
+          operating_hours?: string | null
+          postal_code?: string | null
+          state_province?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          city?: string | null
+          coordinates?: Json | null
+          country?: string | null
+          created_at?: string | null
+          customs_available?: boolean | null
+          facilities?: Json | null
+          id?: string
+          is_active?: boolean | null
+          location_code?: string | null
+          location_name?: string
+          location_type?: string | null
+          notes?: string | null
+          operating_hours?: string | null
+          postal_code?: string | null
+          state_province?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1830,12 +1995,14 @@ export type Database = {
           cargo_details: Json | null
           carrier_id: string | null
           compliance_status: string | null
+          consignee_id: string | null
           contact_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
           description: string | null
           destination_location: Json | null
+          destination_port_id: string | null
           discount_amount: number | null
           discount_percent: number | null
           franchise_id: string | null
@@ -1844,6 +2011,7 @@ export type Database = {
           notes: string | null
           opportunity_id: string | null
           origin_location: Json | null
+          origin_port_id: string | null
           owner_id: string | null
           quote_number: string
           regulatory_data: Json | null
@@ -1871,12 +2039,14 @@ export type Database = {
           cargo_details?: Json | null
           carrier_id?: string | null
           compliance_status?: string | null
+          consignee_id?: string | null
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
           destination_location?: Json | null
+          destination_port_id?: string | null
           discount_amount?: number | null
           discount_percent?: number | null
           franchise_id?: string | null
@@ -1885,6 +2055,7 @@ export type Database = {
           notes?: string | null
           opportunity_id?: string | null
           origin_location?: Json | null
+          origin_port_id?: string | null
           owner_id?: string | null
           quote_number: string
           regulatory_data?: Json | null
@@ -1912,12 +2083,14 @@ export type Database = {
           cargo_details?: Json | null
           carrier_id?: string | null
           compliance_status?: string | null
+          consignee_id?: string | null
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
           destination_location?: Json | null
+          destination_port_id?: string | null
           discount_amount?: number | null
           discount_percent?: number | null
           franchise_id?: string | null
@@ -1926,6 +2099,7 @@ export type Database = {
           notes?: string | null
           opportunity_id?: string | null
           origin_location?: Json | null
+          origin_port_id?: string | null
           owner_id?: string | null
           quote_number?: string
           regulatory_data?: Json | null
@@ -1947,6 +2121,27 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "quotes_consignee_id_fkey"
+            columns: ["consignee_id"]
+            isOneToOne: false
+            referencedRelation: "consignees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_destination_port_id_fkey"
+            columns: ["destination_port_id"]
+            isOneToOne: false
+            referencedRelation: "ports_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_origin_port_id_fkey"
+            columns: ["origin_port_id"]
+            isOneToOne: false
+            referencedRelation: "ports_locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotes_service_id_fkey"
             columns: ["service_id"]
