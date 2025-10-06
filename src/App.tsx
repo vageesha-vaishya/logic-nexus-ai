@@ -68,6 +68,10 @@ import QuoteDetail from "./pages/dashboard/QuoteDetail";
 import Carriers from "./pages/dashboard/Carriers";
 import Consignees from "./pages/dashboard/Consignees";
 import PortsLocations from "./pages/dashboard/PortsLocations";
+import PackageCategories from "./pages/dashboard/PackageCategories";
+import PackageSizes from "./pages/dashboard/PackageSizes";
+import CargoTypes from "./pages/dashboard/CargoTypes";
+import Incoterms from "./pages/dashboard/Incoterms";
 
 const queryClient = new QueryClient();
 
@@ -394,6 +398,10 @@ const App = () => (
             <Route path="/dashboard/carriers" element={<ProtectedRoute><Carriers /></ProtectedRoute>} />
             <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
             <Route path="/dashboard/ports-locations" element={<ProtectedRoute><PortsLocations /></ProtectedRoute>} />
+            <Route path="/dashboard/package-categories" element={<ProtectedRoute><PackageCategories /></ProtectedRoute>} />
+            <Route path="/dashboard/package-sizes" element={<ProtectedRoute><PackageSizes /></ProtectedRoute>} />
+            <Route path="/dashboard/cargo-types" element={<ProtectedRoute><CargoTypes /></ProtectedRoute>} />
+            <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
             {/* Subscription & Billing Routes */}
             <Route path="/dashboard/subscriptions" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />

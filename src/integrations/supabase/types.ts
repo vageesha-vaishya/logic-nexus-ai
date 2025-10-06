@@ -270,6 +270,48 @@ export type Database = {
           },
         ]
       }
+      cargo_types: {
+        Row: {
+          cargo_code: string | null
+          cargo_type_name: string
+          created_at: string | null
+          description: string | null
+          hazmat_class: string | null
+          id: string
+          is_active: boolean | null
+          requires_special_handling: boolean | null
+          temperature_controlled: boolean | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cargo_code?: string | null
+          cargo_type_name: string
+          created_at?: string | null
+          description?: string | null
+          hazmat_class?: string | null
+          id?: string
+          is_active?: boolean | null
+          requires_special_handling?: boolean | null
+          temperature_controlled?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cargo_code?: string | null
+          cargo_type_name?: string
+          created_at?: string | null
+          description?: string | null
+          hazmat_class?: string | null
+          id?: string
+          is_active?: boolean | null
+          requires_special_handling?: boolean | null
+          temperature_controlled?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       carrier_rates: {
         Row: {
           accessorial_fees: Json | null
@@ -1251,6 +1293,39 @@ export type Database = {
           },
         ]
       }
+      incoterms: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          incoterm_code: string
+          incoterm_name: string
+          is_active: boolean | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          incoterm_code: string
+          incoterm_name: string
+          is_active?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          incoterm_code?: string
+          incoterm_name?: string
+          is_active?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -1791,6 +1866,84 @@ export type Database = {
           },
         ]
       }
+      package_categories: {
+        Row: {
+          category_code: string | null
+          category_name: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          category_code?: string | null
+          category_name: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          category_code?: string | null
+          category_name?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      package_sizes: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          height_ft: number | null
+          id: string
+          is_active: boolean | null
+          length_ft: number | null
+          max_weight_kg: number | null
+          size_code: string | null
+          size_name: string
+          tenant_id: string
+          updated_at: string | null
+          width_ft: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          height_ft?: number | null
+          id?: string
+          is_active?: boolean | null
+          length_ft?: number | null
+          max_weight_kg?: number | null
+          size_code?: string | null
+          size_name: string
+          tenant_id: string
+          updated_at?: string | null
+          width_ft?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          height_ft?: number | null
+          id?: string
+          is_active?: boolean | null
+          length_ft?: number | null
+          max_weight_kg?: number | null
+          size_code?: string | null
+          size_name?: string
+          tenant_id?: string
+          updated_at?: string | null
+          width_ft?: number | null
+        }
+        Relationships: []
+      }
       ports_locations: {
         Row: {
           city: string | null
@@ -1930,6 +2083,7 @@ export type Database = {
       }
       quote_items: {
         Row: {
+          cargo_type_id: string | null
           created_at: string | null
           description: string | null
           discount_amount: number | null
@@ -1937,15 +2091,21 @@ export type Database = {
           id: string
           line_number: number
           line_total: number
+          package_category_id: string | null
+          package_size_id: string | null
           product_name: string
           quantity: number
           quote_id: string
+          special_instructions: string | null
           tax_amount: number | null
           tax_percent: number | null
           unit_price: number
           updated_at: string | null
+          volume_cbm: number | null
+          weight_kg: number | null
         }
         Insert: {
+          cargo_type_id?: string | null
           created_at?: string | null
           description?: string | null
           discount_amount?: number | null
@@ -1953,15 +2113,21 @@ export type Database = {
           id?: string
           line_number: number
           line_total?: number
+          package_category_id?: string | null
+          package_size_id?: string | null
           product_name: string
           quantity?: number
           quote_id: string
+          special_instructions?: string | null
           tax_amount?: number | null
           tax_percent?: number | null
           unit_price?: number
           updated_at?: string | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
         }
         Update: {
+          cargo_type_id?: string | null
           created_at?: string | null
           description?: string | null
           discount_amount?: number | null
@@ -1969,13 +2135,18 @@ export type Database = {
           id?: string
           line_number?: number
           line_total?: number
+          package_category_id?: string | null
+          package_size_id?: string | null
           product_name?: string
           quantity?: number
           quote_id?: string
+          special_instructions?: string | null
           tax_amount?: number | null
           tax_percent?: number | null
           unit_price?: number
           updated_at?: string | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
         }
         Relationships: [
           {
@@ -1991,12 +2162,14 @@ export type Database = {
         Row: {
           accepted_at: string | null
           account_id: string | null
+          additional_costs: Json | null
           billing_address: Json | null
           cargo_details: Json | null
           carrier_id: string | null
           compliance_status: string | null
           consignee_id: string | null
           contact_id: string | null
+          cost_price: number | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -2007,15 +2180,20 @@ export type Database = {
           discount_percent: number | null
           franchise_id: string | null
           id: string
+          incoterm_id: string | null
           incoterms: string | null
+          margin_amount: number | null
+          margin_percentage: number | null
           notes: string | null
           opportunity_id: string | null
           origin_location: Json | null
           origin_port_id: string | null
           owner_id: string | null
+          payment_terms: string | null
           quote_number: string
           regulatory_data: Json | null
           rejected_at: string | null
+          sell_price: number | null
           service_id: string | null
           service_type: string | null
           shipping_address: Json | null
@@ -2035,12 +2213,14 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           account_id?: string | null
+          additional_costs?: Json | null
           billing_address?: Json | null
           cargo_details?: Json | null
           carrier_id?: string | null
           compliance_status?: string | null
           consignee_id?: string | null
           contact_id?: string | null
+          cost_price?: number | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -2051,15 +2231,20 @@ export type Database = {
           discount_percent?: number | null
           franchise_id?: string | null
           id?: string
+          incoterm_id?: string | null
           incoterms?: string | null
+          margin_amount?: number | null
+          margin_percentage?: number | null
           notes?: string | null
           opportunity_id?: string | null
           origin_location?: Json | null
           origin_port_id?: string | null
           owner_id?: string | null
+          payment_terms?: string | null
           quote_number: string
           regulatory_data?: Json | null
           rejected_at?: string | null
+          sell_price?: number | null
           service_id?: string | null
           service_type?: string | null
           shipping_address?: Json | null
@@ -2079,12 +2264,14 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           account_id?: string | null
+          additional_costs?: Json | null
           billing_address?: Json | null
           cargo_details?: Json | null
           carrier_id?: string | null
           compliance_status?: string | null
           consignee_id?: string | null
           contact_id?: string | null
+          cost_price?: number | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -2095,15 +2282,20 @@ export type Database = {
           discount_percent?: number | null
           franchise_id?: string | null
           id?: string
+          incoterm_id?: string | null
           incoterms?: string | null
+          margin_amount?: number | null
+          margin_percentage?: number | null
           notes?: string | null
           opportunity_id?: string | null
           origin_location?: Json | null
           origin_port_id?: string | null
           owner_id?: string | null
+          payment_terms?: string | null
           quote_number?: string
           regulatory_data?: Json | null
           rejected_at?: string | null
+          sell_price?: number | null
           service_id?: string | null
           service_type?: string | null
           shipping_address?: Json | null

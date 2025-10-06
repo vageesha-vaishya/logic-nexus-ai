@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2 } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe } from 'lucide-react';
 
 export type MenuScreen = {
   name: string;
@@ -60,6 +60,10 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Carriers', path: '/dashboard/carriers', icon: Ship, description: 'Shipping carriers' },
       { name: 'Consignees', path: '/dashboard/consignees', icon: Users2, description: 'Shipping receivers' },
       { name: 'Ports & Locations', path: '/dashboard/ports-locations', icon: MapPin, description: 'Ports and facilities' },
+      { name: 'Package Categories', path: '/dashboard/package-categories', icon: Box, description: 'Container types' },
+      { name: 'Package Sizes', path: '/dashboard/package-sizes', icon: Ruler, description: 'Container dimensions' },
+      { name: 'Cargo Types', path: '/dashboard/cargo-types', icon: PackageCheck, description: 'Cargo classifications' },
+      { name: 'Incoterms', path: '/dashboard/incoterms', icon: Globe, description: 'Trade terms' },
     ],
   },
   {
