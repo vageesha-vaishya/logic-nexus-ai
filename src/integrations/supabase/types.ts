@@ -3699,6 +3699,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
+      execute_sql_query: {
+        Args: { query_text: string }
+        Returns: Json
+      }
       get_database_enums: {
         Args: Record<PropertyKey, never>
         Returns: {
