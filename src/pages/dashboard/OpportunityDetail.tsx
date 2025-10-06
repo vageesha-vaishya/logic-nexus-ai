@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { OpportunityItemsEditor } from '@/components/crm/OpportunityItemsEditor';
 
 const stageColors: Record<string, string> = {
   prospecting: 'bg-slate-500',
@@ -54,6 +55,8 @@ export default function OpportunityDetail() {
   const [loading, setLoading] = useState(true);
   const [sfIdInput, setSfIdInput] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [quotesLoading, setQuotesLoading] = useState(true);
 
   useEffect(() => {
     fetchOpportunity();
@@ -170,6 +173,46 @@ export default function OpportunityDetail() {
       toast.error('Failed to delete opportunity', {
         description: error.message,
       });
+    }
+  };
+
+  useEffect(() => {
+    const fetchQuotes = async () => {
+      if (!id) return;
+      try {
+        const { data, error } = await supabase
+          .from('quotes')
+          .select('*')
+          .eq('opportunity_id', id)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setQuotes(data || []);
+      } catch (err: any) {
+        console.error('Failed to load related quotes:', err.message);
+      } finally {
+        setQuotesLoading(false);
+      }
+    };
+    fetchQuotes();
+  }, [id]);
+
+  const makePrimary = async (quoteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ is_primary: true, opportunity_id: id } as any)
+        .eq('id', quoteId);
+      if (error) throw error;
+      toast.success('Primary quote updated');
+      await fetchOpportunity();
+      const { data } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('opportunity_id', id)
+        .order('created_at', { ascending: false });
+      setQuotes(data || []);
+    } catch (err: any) {
+      toast.error('Failed to set primary quote', { description: err.message });
     }
   };
 
@@ -353,6 +396,42 @@ export default function OpportunityDetail() {
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="flex items-center justify-between">
+                <CardTitle>Quotes</CardTitle>
+                <Button size="sm" onClick={() => navigate('/dashboard/quotes/new')}>New Quote</Button>
+              </CardHeader>
+              <CardContent>
+                {quotesLoading ? (
+                  <div className="text-sm text-muted-foreground">Loading quotes...</div>
+                ) : quotes.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No quotes linked to this opportunity.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {quotes.map((q) => (
+                      <div key={q.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
+                          <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total ?? q.total_amount ?? 0)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {q.is_primary ? (
+                            <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
+                          )}
+                          <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Opportunity Items Editor */}
+            <OpportunityItemsEditor opportunityId={id!} />
 
             <Card>
               <CardHeader>
