@@ -3710,6 +3710,32 @@ export type Database = {
           labels: string
         }[]
       }
+      get_database_schema: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          column_default: string
+          column_name: string
+          data_type: string
+          is_foreign_key: boolean
+          is_nullable: boolean
+          is_primary_key: boolean
+          references_column: string
+          references_table: string
+          table_name: string
+        }[]
+      }
+      get_database_tables: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          column_count: number
+          index_count: number
+          policy_count: number
+          rls_enabled: boolean
+          row_estimate: number
+          table_name: string
+          table_type: string
+        }[]
+      }
       get_rls_policies: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3725,6 +3751,25 @@ export type Database = {
         Returns: {
           policy_count: number
           rls_enabled: boolean
+          table_name: string
+        }[]
+      }
+      get_table_constraints: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          constraint_details: string
+          constraint_name: string
+          constraint_type: string
+          table_name: string
+        }[]
+      }
+      get_table_indexes: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          index_columns: string
+          index_definition: string
+          index_name: string
+          is_unique: boolean
           table_name: string
         }[]
       }
