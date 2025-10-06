@@ -65,6 +65,9 @@ import TenantSubscription from "./pages/dashboard/TenantSubscription";
 import Quotes from "./pages/dashboard/Quotes";
 import QuoteNew from "./pages/dashboard/QuoteNew";
 import QuoteDetail from "./pages/dashboard/QuoteDetail";
+import Carriers from "./pages/dashboard/Carriers";
+import Consignees from "./pages/dashboard/Consignees";
+import PortsLocations from "./pages/dashboard/PortsLocations";
 
 const queryClient = new QueryClient();
 
@@ -388,6 +391,9 @@ const App = () => (
             <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles" element={<ProtectedRoute><Vehicles /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles/new" element={<ProtectedRoute><VehicleNew /></ProtectedRoute>} />
+            <Route path="/dashboard/carriers" element={<ProtectedRoute><Carriers /></ProtectedRoute>} />
+            <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
+            <Route path="/dashboard/ports-locations" element={<ProtectedRoute><PortsLocations /></ProtectedRoute>} />
             {/* Subscription & Billing Routes */}
             <Route path="/dashboard/subscriptions" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
