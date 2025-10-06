@@ -77,6 +77,71 @@ export default function SecurityOverview() {
     }
   });
 
+  const { data: schema, isLoading: schemaLoading } = useQuery({
+    queryKey: ['database-schema'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_database_schema' as any);
+      if (error) throw error;
+      return data as unknown as Array<{
+        table_name: string;
+        column_name: string;
+        data_type: string;
+        is_nullable: boolean;
+        column_default: string | null;
+        is_primary_key: boolean;
+        is_foreign_key: boolean;
+        references_table: string | null;
+        references_column: string | null;
+      }>;
+    }
+  });
+
+  const { data: schemaTables, isLoading: schemaTablesLoading } = useQuery({
+    queryKey: ['database-tables'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_database_tables' as any);
+      if (error) throw error;
+      return data as unknown as Array<{
+        table_name: string;
+        table_type: string;
+        rls_enabled: boolean | null;
+        policy_count: number;
+        column_count: number;
+        index_count: number;
+        row_estimate: number | null;
+      }>;
+    }
+  });
+
+  const { data: schemaConstraints, isLoading: schemaConstraintsLoading } = useQuery({
+    queryKey: ['database-constraints'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_table_constraints' as any);
+      if (error) throw error;
+      return data as unknown as Array<{
+        table_name: string;
+        constraint_name: string;
+        constraint_type: string;
+        constraint_details: string;
+      }>;
+    }
+  });
+
+  const { data: schemaIndexes, isLoading: schemaIndexesLoading } = useQuery({
+    queryKey: ['database-indexes'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_table_indexes' as any);
+      if (error) throw error;
+      return data as unknown as Array<{
+        table_name: string;
+        index_name: string;
+        is_unique: boolean;
+        index_columns: string;
+        index_definition: string;
+      }>;
+    }
+  });
+
   return (
     <RoleGuard roles={['platform_admin', 'tenant_admin']} fallback={<div>Access denied</div>}>
       <DashboardLayout>
@@ -95,6 +160,7 @@ export default function SecurityOverview() {
               <TabsTrigger value="rls">RLS Status</TabsTrigger>
               <TabsTrigger value="policies">Policies</TabsTrigger>
               <TabsTrigger value="enums">Enums</TabsTrigger>
+              <TabsTrigger value="schema">Schema</TabsTrigger>
             </TabsList>
 
             <TabsContent value="sql" className="space-y-4">
@@ -203,6 +269,121 @@ export default function SecurityOverview() {
                     <div>Loading...</div>
                   ) : (
                     <div className="space-y-6">
+                      <div className="border rounded-lg">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <span className="font-semibold">Tables</span>
+                        </div>
+                        <div className="p-3 overflow-x-auto">
+                          {schemaTablesLoading ? (
+                            <div>Loading...</div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>RLS</TableHead>
+                                  <TableHead>Policies</TableHead>
+                                  <TableHead>Columns</TableHead>
+                                  <TableHead>Indexes</TableHead>
+                                  <TableHead>Row Estimate</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {schemaTables?.map((t) => (
+                                  <TableRow key={t.table_name}>
+                                    <TableCell className="font-medium">{t.table_name}</TableCell>
+                                    <TableCell><Badge variant="outline">{t.table_type}</Badge></TableCell>
+                                    <TableCell>
+                                      {t.rls_enabled === null ? (
+                                        <span className="text-muted-foreground">—</span>
+                                      ) : (
+                                        <Badge variant={t.rls_enabled ? 'default' : 'destructive'}>
+                                          {t.rls_enabled ? 'Enabled' : 'Disabled'}
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>{t.policy_count}</TableCell>
+                                    <TableCell>{t.column_count}</TableCell>
+                                    <TableCell>{t.index_count}</TableCell>
+                                    <TableCell>{t.row_estimate ?? '—'}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="border rounded-lg">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <span className="font-semibold">Constraints</span>
+                        </div>
+                        <div className="p-3 overflow-x-auto">
+                          {schemaConstraintsLoading ? (
+                            <div>Loading...</div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Table</TableHead>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Details</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {schemaConstraints?.map((c, idx) => (
+                                  <TableRow key={`${c.table_name}-${c.constraint_name}-${idx}`}>
+                                    <TableCell className="font-medium">{c.table_name}</TableCell>
+                                    <TableCell>{c.constraint_name}</TableCell>
+                                    <TableCell><Badge variant="outline">{c.constraint_type}</Badge></TableCell>
+                                    <TableCell className="text-xs break-all">{c.constraint_details}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="border rounded-lg">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <span className="font-semibold">Indexes</span>
+                        </div>
+                        <div className="p-3 overflow-x-auto">
+                          {schemaIndexesLoading ? (
+                            <div>Loading...</div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Table</TableHead>
+                                  <TableHead>Index</TableHead>
+                                  <TableHead>Unique</TableHead>
+                                  <TableHead>Columns</TableHead>
+                                  <TableHead>Definition</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {schemaIndexes?.map((i, idx) => (
+                                  <TableRow key={`${i.table_name}-${i.index_name}-${idx}`}>
+                                    <TableCell className="font-medium">{i.table_name}</TableCell>
+                                    <TableCell>{i.index_name}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={i.is_unique ? 'default' : 'secondary'}>
+                                        {i.is_unique ? 'Yes' : 'No'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-xs">{i.index_columns}</TableCell>
+                                    <TableCell className="text-xs break-all">{i.index_definition}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
                       {Object.entries(
                         policies?.reduce((acc, policy) => {
                           if (!acc[policy.table_name]) acc[policy.table_name] = [];
@@ -271,6 +452,87 @@ export default function SecurityOverview() {
                         ))}
                       </TableBody>
                     </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="schema" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Database Schema
+                  </CardTitle>
+                  <CardDescription>
+                    Tables and columns with keys and references
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {schemaLoading ? (
+                    <div>Loading...</div>
+                  ) : (
+                    <div className="space-y-6">
+                      {Object.entries(
+                        (schema || []).reduce((acc, col) => {
+                          if (!acc[col.table_name]) acc[col.table_name] = [];
+                          acc[col.table_name].push(col);
+                          return acc;
+                        }, {} as Record<string, typeof schema>)
+                      ).map(([tableName, columns]) => (
+                        <div key={tableName} className="border rounded-lg">
+                          <div className="px-4 py-3 border-b bg-muted/30">
+                            <span className="font-semibold">{tableName}</span>
+                          </div>
+                          <div className="p-3 overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Column</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Nullable</TableHead>
+                                  <TableHead>Default</TableHead>
+                                  <TableHead>Keys</TableHead>
+                                  <TableHead>References</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {columns?.map((col, idx) => (
+                                  <TableRow key={`${tableName}-${col.column_name}-${idx}`}>
+                                    <TableCell className="font-medium">{col.column_name}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline">{col.data_type}</Badge>
+                                    </TableCell>
+                                    <TableCell>{col.is_nullable ? 'YES' : 'NO'}</TableCell>
+                                    <TableCell className="text-xs break-all">{col.column_default ?? ''}</TableCell>
+                                    <TableCell>
+                                      <div className="flex gap-1 flex-wrap">
+                                        {col.is_primary_key && (
+                                          <Badge variant="default">PK</Badge>
+                                        )}
+                                        {col.is_foreign_key && (
+                                          <Badge variant="secondary">FK</Badge>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      {col.references_table ? (
+                                        <div className="flex items-center gap-1">
+                                          <Badge variant="outline">{col.references_table}</Badge>
+                                          <span className="text-xs text-muted-foreground">{col.references_column}</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
