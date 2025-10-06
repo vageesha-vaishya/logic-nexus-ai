@@ -1,14 +1,49 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Database, Lock } from 'lucide-react';
+import { Shield, Database, Lock, Terminal } from 'lucide-react';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SecurityOverview() {
+  const { toast } = useToast();
+  const [sqlQuery, setSqlQuery] = useState('SELECT * FROM leads LIMIT 10;');
+  const [queryResult, setQueryResult] = useState<any>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
+
+  const executeQuery = async () => {
+    setIsExecuting(true);
+    try {
+      const { data, error } = await supabase.rpc('execute_sql_query' as any, { 
+        query_text: sqlQuery 
+      });
+      
+      if (error) throw error;
+      
+      setQueryResult(data);
+      toast({
+        title: 'Query executed',
+        description: `Returned ${Array.isArray(data) ? data.length : 0} rows`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Query failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setQueryResult({ error: error.message });
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   const { data: enums, isLoading: enumsLoading } = useQuery({
     queryKey: ['security-enums'],
     queryFn: async () => {
@@ -54,12 +89,61 @@ export default function SecurityOverview() {
             </div>
           </div>
 
-          <Tabs defaultValue="rls" className="w-full">
+          <Tabs defaultValue="sql" className="w-full">
             <TabsList>
+              <TabsTrigger value="sql">SQL Editor</TabsTrigger>
               <TabsTrigger value="rls">RLS Status</TabsTrigger>
               <TabsTrigger value="policies">Policies</TabsTrigger>
               <TabsTrigger value="enums">Enums</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="sql" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Terminal className="h-5 w-5" />
+                    SQL Query Editor
+                  </CardTitle>
+                  <CardDescription>
+                    Execute read-only SQL queries (SELECT only)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Textarea
+                      value={sqlQuery}
+                      onChange={(e) => setSqlQuery(e.target.value)}
+                      placeholder="Enter your SQL query here..."
+                      className="font-mono min-h-[200px]"
+                    />
+                  </div>
+                  <Button 
+                    onClick={executeQuery} 
+                    disabled={isExecuting}
+                    className="w-full"
+                  >
+                    {isExecuting ? 'Executing...' : 'Execute Query'}
+                  </Button>
+                  
+                  {queryResult && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-2">Results:</h4>
+                      {queryResult.error ? (
+                        <div className="bg-destructive/10 text-destructive p-4 rounded-lg">
+                          {queryResult.error}
+                        </div>
+                      ) : (
+                        <div className="border rounded-lg overflow-auto max-h-[400px]">
+                          <pre className="p-4 text-xs">
+                            {JSON.stringify(queryResult, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="rls" className="space-y-4">
               <Card>
