@@ -18,17 +18,33 @@ export default function Quotes() {
       try {
         const { data, error } = await supabase
           .from('quotes')
-          .select(`
-            *,
-            accounts:account_id(name),
-            contacts:contact_id(first_name, last_name),
-            opportunities:opportunity_id(name),
-            carriers:carrier_id(carrier_name)
-          `)
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(50);
+        
         if (error) throw error;
-        setQuotes(data || []);
+
+        // Fetch related data separately
+        const quotesWithRelations = await Promise.all(
+          (data || []).map(async (quote) => {
+            const [account, contact, opportunity, carrier] = await Promise.all([
+              quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,
+              quote.contact_id ? supabase.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
+              quote.opportunity_id ? supabase.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
+              quote.carrier_id ? supabase.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
+            ]);
+
+            return {
+              ...quote,
+              accounts: account?.data || null,
+              contacts: contact?.data || null,
+              opportunities: opportunity?.data || null,
+              carriers: carrier?.data || null,
+            };
+          })
+        );
+
+        setQuotes(quotesWithRelations);
       } catch (err: any) {
         toast.error('Failed to load quotes', { description: err.message });
       } finally {
