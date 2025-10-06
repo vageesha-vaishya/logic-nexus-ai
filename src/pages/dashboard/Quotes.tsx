@@ -18,7 +18,13 @@ export default function Quotes() {
       try {
         const { data, error } = await supabase
           .from('quotes')
-          .select('*')
+          .select(`
+            *,
+            accounts:account_id(name),
+            contacts:contact_id(first_name, last_name),
+            opportunities:opportunity_id(name),
+            carriers:carrier_id(carrier_name)
+          `)
           .order('created_at', { ascending: false })
           .limit(50);
         if (error) throw error;
@@ -66,8 +72,12 @@ export default function Quotes() {
                   <TableRow>
                     <TableHead>Quote #</TableHead>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Opportunity</TableHead>
+                    <TableHead>Carrier</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Sell Price</TableHead>
+                    <TableHead>Margin</TableHead>
                     <TableHead>Created</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -75,9 +85,30 @@ export default function Quotes() {
                   {quotes.map((q) => (
                     <TableRow key={q.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
                       <TableCell className="font-medium">{q.quote_number || q.id.slice(0,8)}</TableCell>
-                      <TableCell>{q.customer_id || '-'}</TableCell>
-                      <TableCell className="capitalize">{q.status}</TableCell>
-                      <TableCell>{q.total ?? 0}</TableCell>
+                      <TableCell>{q.accounts?.name || '-'}</TableCell>
+                      <TableCell>
+                        {q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : '-'}
+                      </TableCell>
+                      <TableCell>{q.opportunities?.name || '-'}</TableCell>
+                      <TableCell>{q.carriers?.carrier_name || '-'}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          q.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                          q.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                          q.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {q.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">${q.sell_price?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell>
+                        {q.sell_price && q.cost_price ? (
+                          <span className={`${(q.sell_price - q.cost_price) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ${(q.sell_price - q.cost_price).toFixed(2)}
+                          </span>
+                        ) : '-'}
+                      </TableCell>
                       <TableCell>{new Date(q.created_at).toLocaleDateString()}</TableCell>
                     </TableRow>
                   ))}

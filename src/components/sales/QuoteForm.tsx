@@ -43,7 +43,7 @@ type QuoteItem = {
   discount_percent: number;
 };
 
-export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: () => void }) {
+export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: (quoteId: string) => void }) {
   const { context, supabase, user } = useCRM();
   const { roles } = useAuth();
   const [items, setItems] = useState<QuoteItem[]>([
@@ -205,7 +205,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       if (itemsError) throw itemsError;
 
       toast.success('Quote created successfully');
-      onSuccess?.();
+      onSuccess?.(quote.id);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create quote');
     } finally {
