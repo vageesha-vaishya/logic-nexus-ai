@@ -39,28 +39,15 @@ export default function SubscriptionManagement() {
   const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const { supabase, context } = useCRM();
+  const { supabase, context, user } = useCRM();
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [context.tenantId]);
 
   const fetchData = async () => {
     try {
-      // Fetch current subscription
-      const { data: subData, error: subError } = await supabase
-        .from('tenant_subscriptions')
-        .select('*, subscription_plans(*)')
-        .eq('tenant_id', context.tenantId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (subError) throw subError;
-      setCurrentSubscription(subData);
-
-      // Fetch available plans
+      // Fetch available plans first (public read)
       const { data: plansData, error: plansError } = await supabase
         .from('subscription_plans')
         .select('*')
@@ -70,8 +57,30 @@ export default function SubscriptionManagement() {
 
       if (plansError) throw plansError;
       setAvailablePlans(plansData || []);
+
+      // Fetch current subscription (may be restricted by RLS for non-admins)
+      if (context.tenantId) {
+        const { data: subData, error: subError } = await supabase
+          .from('tenant_subscriptions')
+          .select('*, subscription_plans(*)')
+          .eq('tenant_id', context.tenantId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (subError) {
+          // Soft-fail: keep page usable even without subscription visibility
+          console.warn('Subscription fetch blocked or failed:', subError.message);
+          setCurrentSubscription(null);
+        } else {
+          setCurrentSubscription(subData);
+        }
+      } else {
+        setCurrentSubscription(null);
+      }
     } catch (error: any) {
-      toast.error('Failed to load subscription data');
+      toast.error('Failed to load plans');
       console.error('Error:', error);
     } finally {
       setLoading(false);
@@ -82,6 +91,21 @@ export default function SubscriptionManagement() {
     try {
       const selectedPlan = availablePlans.find(p => p.id === planId);
       if (!selectedPlan) return;
+
+      // Resolve tenant_id robustly
+      let effectiveTenantId: string | undefined = context.tenantId;
+      if (!effectiveTenantId && user?.id) {
+        const { data: tid, error: tidError } = await supabase.rpc('get_user_tenant_id', { check_user_id: user.id });
+        if (tidError) {
+          console.warn('Failed to resolve tenant_id via RPC:', tidError.message);
+        }
+        effectiveTenantId = tid as string | undefined;
+      }
+
+      if (!effectiveTenantId) {
+        toast.error('No tenant context found. Switch to a tenant to subscribe.');
+        return;
+      }
 
       // Cancel current subscription
       if (currentSubscription) {
@@ -95,7 +119,7 @@ export default function SubscriptionManagement() {
       const { error } = await supabase
         .from('tenant_subscriptions')
         .insert([{
-          tenant_id: context.tenantId,
+          tenant_id: effectiveTenantId,
           plan_id: planId,
           status: 'active',
           current_period_start: new Date().toISOString(),
