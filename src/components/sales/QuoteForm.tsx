@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,9 +17,10 @@ import { toast } from 'sonner';
 const quoteSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  service_type: z.enum(['ocean', 'air', 'trucking', 'courier', 'moving']).optional(),
+  service_type: z.enum(['ocean', 'air', 'trucking', 'courier', 'moving', 'railway_transport']).optional(),
   service_id: z.string().optional(),
   incoterms: z.string().optional(),
+  trade_direction: z.enum(['import', 'export']).optional(),
   carrier_id: z.string().optional(),
   consignee_id: z.string().optional(),
   origin_port_id: z.string().optional(),
@@ -46,6 +48,7 @@ type QuoteItem = {
 export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: (quoteId: string) => void }) {
   const { context, supabase, user } = useCRM();
   const { roles } = useAuth();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<QuoteItem[]>([
     { line_number: 1, product_name: '', quantity: 1, unit_price: 0, discount_percent: 0 },
   ]);
@@ -64,6 +67,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     resolver: zodResolver(quoteSchema),
     defaultValues: {
       status: 'draft',
+      opportunity_id: searchParams.get('opportunityId') || undefined,
     },
   });
 
@@ -163,6 +167,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         service_type: values.service_type || null,
         service_id: values.service_id || null,
         incoterms: values.incoterms || null,
+        regulatory_data: values.trade_direction ? { trade_direction: values.trade_direction } : null,
         carrier_id: values.carrier_id || null,
         consignee_id: values.consignee_id || null,
         origin_port_id: values.origin_port_id || null,
@@ -274,6 +279,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         <SelectItem value="trucking">Trucking</SelectItem>
                         <SelectItem value="courier">Courier</SelectItem>
                         <SelectItem value="moving">Moving & Packing</SelectItem>
+                        <SelectItem value="railway_transport">Railways</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -314,6 +320,28 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             </div>
 
             <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="trade_direction"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Import/Export</FormLabel>
+                    <FormDescription>Select trade direction</FormDescription>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select direction" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="import">Import</SelectItem>
+                        <SelectItem value="export">Export</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="account_id"
