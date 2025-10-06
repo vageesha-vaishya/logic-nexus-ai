@@ -1,10 +1,13 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <DashboardLayout>
@@ -77,6 +80,22 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Data management tools coming soon</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <CardTitle>Subscription</CardTitle>
+              </div>
+              <CardDescription>Manage your plan and usage</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">View current plan, switch tiers, and track usage.</p>
+              <Button variant="default" onClick={() => navigate('/dashboard/settings/subscription')}>
+                Manage
+              </Button>
             </CardContent>
           </Card>
         </div>

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { matchText, TextOp } from '@/lib/utils';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
@@ -57,6 +59,15 @@ export default function OpportunityDetail() {
   const [syncing, setSyncing] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [quotesLoading, setQuotesLoading] = useState(true);
+
+  // Advanced quote filters
+  const [quoteNumberQuery, setQuoteNumberQuery] = useState('');
+  const [quoteNumberOp, setQuoteNumberOp] = useState<TextOp>('contains');
+  const [quoteStatus, setQuoteStatus] = useState<string>('');
+  const [quoteMinTotal, setQuoteMinTotal] = useState<string>('');
+  const [quoteMaxTotal, setQuoteMaxTotal] = useState<string>('');
+  const [quoteStartDate, setQuoteStartDate] = useState<string>('');
+  const [quoteEndDate, setQuoteEndDate] = useState<string>('');
 
   useEffect(() => {
     fetchOpportunity();
@@ -228,6 +239,28 @@ export default function OpportunityDetail() {
     if (!date) return '-';
     return new Date(date).toLocaleDateString();
   };
+
+  // Derived list: apply advanced filters to related quotes
+  const filteredQuotesAdvanced = quotes.filter((q) => {
+    const matchesNumber = matchText(
+      (q.quote_number || (q.id ? String(q.id).slice(0, 8) : '')),
+      quoteNumberQuery,
+      quoteNumberOp
+    );
+
+    const statusVal = (q.status || '').toLowerCase();
+    const matchesStatus = quoteStatus && quoteStatus !== 'any' ? statusVal === quoteStatus : true;
+
+    const totalNum = Number(q.total ?? q.total_amount ?? 0);
+    const matchesMin = quoteMinTotal ? totalNum >= Number(quoteMinTotal) : true;
+    const matchesMax = quoteMaxTotal ? totalNum <= Number(quoteMaxTotal) : true;
+
+    const created = q.created_at ? new Date(q.created_at) : null;
+    const startOk = quoteStartDate ? (created ? created >= new Date(quoteStartDate) : false) : true;
+    const endOk = quoteEndDate ? (created ? created <= new Date(quoteEndDate) : false) : true;
+
+    return matchesNumber && matchesStatus && matchesMin && matchesMax && startOk && endOk;
+  });
 
   if (loading) {
     return (
@@ -408,23 +441,80 @@ export default function OpportunityDetail() {
                 ) : quotes.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No quotes linked to this opportunity.</div>
                 ) : (
-                  <div className="space-y-3">
-                    {quotes.map((q) => (
-                      <div key={q.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
-                          <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total ?? q.total_amount ?? 0)}</p>
+                  <div className="space-y-4">
+                    <div className="space-y-3 p-3 border rounded-md">
+                      <p className="text-sm text-muted-foreground">Filter related quotes by number, status, total, and date.</p>
+                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label>Quote number</Label>
+                          <div className="flex gap-2">
+                            <Select value={quoteNumberOp} onValueChange={(v) => setQuoteNumberOp(v as TextOp)}>
+                              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="contains">Contains</SelectItem>
+                                <SelectItem value="startsWith">Starts With</SelectItem>
+                                <SelectItem value="equals">Equals</SelectItem>
+                                <SelectItem value="endsWith">Ends With</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input placeholder="Search number" value={quoteNumberQuery} onChange={(e) => setQuoteNumberQuery(e.target.value)} />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {q.is_primary ? (
-                            <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
-                          )}
-                          <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
+
+                        <div className="space-y-2">
+                          <Label>Status</Label>
+                          <Select value={quoteStatus} onValueChange={setQuoteStatus}>
+                            <SelectTrigger><SelectValue placeholder="Any status" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">Any</SelectItem>
+                              <SelectItem value="draft">Draft</SelectItem>
+                              <SelectItem value="sent">Sent</SelectItem>
+                              <SelectItem value="accepted">Accepted</SelectItem>
+                              <SelectItem value="rejected">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Total amount</Label>
+                          <div className="flex gap-2">
+                            <Input type="number" placeholder="Min" value={quoteMinTotal} onChange={(e) => setQuoteMinTotal(e.target.value)} />
+                            <Input type="number" placeholder="Max" value={quoteMaxTotal} onChange={(e) => setQuoteMaxTotal(e.target.value)} />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Created range</Label>
+                          <div className="flex gap-2">
+                            <Input type="date" value={quoteStartDate} onChange={(e) => setQuoteStartDate(e.target.value)} />
+                            <Input type="date" value={quoteEndDate} onChange={(e) => setQuoteEndDate(e.target.value)} />
+                          </div>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {filteredQuotesAdvanced.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No matching quotes.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredQuotesAdvanced.map((q) => (
+                          <div key={q.id} className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
+                              <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total ?? q.total_amount ?? 0)}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {q.is_primary ? (
+                                <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
+                              )}
+                              <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

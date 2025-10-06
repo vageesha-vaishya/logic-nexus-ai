@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,6 +12,20 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
+// Safely convert Supabase JSON/text to an object record
+const toRecord = (value: any): Record<string, any> => {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object') return value as Record<string, any>;
+  return {};
+};
 const portLocationSchema = z.object({
   location_name: z.string().min(1, 'Location name is required'),
   location_code: z.string().optional(),
@@ -31,6 +45,7 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
   const { context, supabase } = useCRM();
   const { roles } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof portLocationSchema>>({
     resolver: zodResolver(portLocationSchema),
@@ -48,6 +63,48 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
       longitude: '',
     },
   });
+
+  useEffect(() => {
+    const loadLocation = async () => {
+      if (!locationId) return;
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('ports_locations')
+          .select('*')
+          .eq('id', locationId)
+          .single();
+        if (error) throw error;
+        if (data) {
+          const typeOptions = ['seaport', 'airport', 'inland_port', 'warehouse', 'terminal'] as const;
+          const typeValue = typeOptions.includes(data.location_type as any)
+            ? (data.location_type as (typeof typeOptions)[number])
+            : undefined;
+          const coords = toRecord(data.coordinates);
+          form.reset({
+            location_name: data.location_name || '',
+            location_code: data.location_code || '',
+            location_type: typeValue,
+            country: data.country || '',
+            city: data.city || '',
+            state_province: data.state_province || '',
+            postal_code: data.postal_code || '',
+            operating_hours: data.operating_hours || '',
+            customs_available: !!data.customs_available,
+            notes: data.notes || '',
+            latitude: typeof coords.latitude === 'number' || typeof coords.latitude === 'string' ? String(coords.latitude) : '',
+            longitude: typeof coords.longitude === 'number' || typeof coords.longitude === 'string' ? String(coords.longitude) : '',
+          });
+        }
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to load port/location');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationId]);
 
   const onSubmit = async (values: z.infer<typeof portLocationSchema>) => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
@@ -77,13 +134,20 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
         tenant_id: tenantId,
       };
 
-      const { error } = await supabase.from('ports_locations').insert([locationData]);
-
-      if (error) throw error;
-
-      toast.success('Port/Location created successfully');
+      if (locationId) {
+        const { error } = await supabase
+          .from('ports_locations')
+          .update(locationData)
+          .eq('id', locationId);
+        if (error) throw error;
+        toast.success('Port/Location updated successfully');
+      } else {
+        const { error } = await supabase.from('ports_locations').insert([locationData]);
+        if (error) throw error;
+        toast.success('Port/Location created successfully');
+        form.reset();
+      }
       onSuccess?.();
-      form.reset();
     } catch (error: any) {
       toast.error(error.message || 'Failed to create port/location');
     } finally {
@@ -285,8 +349,8 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Port/Location'}
+        <Button type="submit" disabled={isSubmitting || isLoading}>
+          {isSubmitting ? (locationId ? 'Updating...' : 'Creating...') : (locationId ? 'Update Port/Location' : 'Create Port/Location')}
         </Button>
       </form>
     </Form>

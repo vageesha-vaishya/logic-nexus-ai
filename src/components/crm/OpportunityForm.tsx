@@ -20,7 +20,8 @@ const opportunitySchema = z.object({
   account_id: z.string().optional(),
   contact_id: z.string().optional(),
   lead_id: z.string().optional(),
-  lead_source: z.enum(['web', 'phone', 'email', 'referral', 'partner', 'advertisement', 'trade_show', 'other']).optional(),
+  // Align lead_source options with the shared enum used across Leads and Opportunities
+  lead_source: z.enum(['website', 'referral', 'email', 'phone', 'social', 'event', 'other']).optional(),
   next_step: z.string().optional(),
   competitors: z.string().optional(),
   type: z.string().optional(),

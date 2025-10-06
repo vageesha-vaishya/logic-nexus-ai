@@ -12,6 +12,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { matchText, TextOp } from '@/lib/utils';
 
 interface Lead {
   id: string;
@@ -39,6 +40,26 @@ export default function Leads() {
   const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me'>('any');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase, context } = useCRM();
+
+  // Advanced per-column filters
+  const [nameQuery, setNameQuery] = useState('');
+  const [nameOp, setNameOp] = useState<TextOp>('contains');
+  const [companyQuery, setCompanyQuery] = useState('');
+  const [companyOp, setCompanyOp] = useState<TextOp>('contains');
+  const [emailQuery, setEmailQuery] = useState('');
+  const [emailOp, setEmailOp] = useState<TextOp>('contains');
+  const [phoneQuery, setPhoneQuery] = useState('');
+  const [phoneOp, setPhoneOp] = useState<TextOp>('contains');
+  const [sourceQuery, setSourceQuery] = useState('');
+  const [sourceOp, setSourceOp] = useState<TextOp>('contains');
+  const [qualificationQuery, setQualificationQuery] = useState('');
+  const [qualificationOp, setQualificationOp] = useState<TextOp>('contains');
+  const [scoreMin, setScoreMin] = useState<string>('');
+  const [scoreMax, setScoreMax] = useState<string>('');
+  const [valueMin, setValueMin] = useState<string>('');
+  const [valueMax, setValueMax] = useState<string>('');
+  const [createdStart, setCreatedStart] = useState<string>('');
+  const [createdEnd, setCreatedEnd] = useState<string>('');
 
   useEffect(() => {
     fetchLeads();
@@ -79,7 +100,56 @@ export default function Leads() {
         ? !lead.owner_id
         : lead.owner_id === (context?.userId || null);
 
-    return matchesSearch && matchesStatus && matchesScore && matchesOwner;
+    // Advanced per-column text filters
+    const fullName = `${lead.first_name} ${lead.last_name}`.trim();
+    const matchesName = matchText(fullName, nameQuery, nameOp);
+    const matchesCompany = matchText(lead.company ?? '', companyQuery, companyOp);
+    const matchesEmail = matchText(lead.email ?? '', emailQuery, emailOp);
+    const matchesPhone = matchText(lead.phone ?? '', phoneQuery, phoneOp);
+    const matchesSource = matchText(lead.source ?? '', sourceQuery, sourceOp);
+    const matchesQualification = matchText(lead.qualification_status ?? '', qualificationQuery, qualificationOp);
+
+    // Numeric ranges (inclusive)
+    const scoreVal = lead.lead_score ?? undefined;
+    const sMin = scoreMin ? Number(scoreMin) : undefined;
+    const sMax = scoreMax ? Number(scoreMax) : undefined;
+    const matchesScoreRange = (
+      (sMin === undefined || (scoreVal !== undefined && scoreVal >= sMin)) &&
+      (sMax === undefined || (scoreVal !== undefined && scoreVal <= sMax))
+    );
+
+    const valueVal = lead.estimated_value ?? undefined;
+    const vMin = valueMin ? Number(valueMin) : undefined;
+    const vMax = valueMax ? Number(valueMax) : undefined;
+    const matchesValueRange = (
+      (vMin === undefined || (valueVal !== undefined && valueVal >= vMin)) &&
+      (vMax === undefined || (valueVal !== undefined && valueVal <= vMax))
+    );
+
+    // Date range (created_at)
+    const created = lead.created_at ? new Date(lead.created_at) : null;
+    const cStart = createdStart ? new Date(createdStart) : null;
+    const cEnd = createdEnd ? new Date(createdEnd) : null;
+    const matchesCreatedRange = (
+      (!cStart || (created && created >= cStart)) &&
+      (!cEnd || (created && created <= cEnd))
+    );
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesScore &&
+      matchesOwner &&
+      matchesName &&
+      matchesCompany &&
+      matchesEmail &&
+      matchesPhone &&
+      matchesSource &&
+      matchesQualification &&
+      matchesScoreRange &&
+      matchesValueRange &&
+      matchesCreatedRange
+    );
   });
 
   const getStatusColor = (status: string) => {
@@ -119,6 +189,27 @@ export default function Leads() {
               New Lead
             </Link>
           </Button>
+        </div>
+      </div>
+
+      {/* Advanced per-column filters */}
+      <div className="flex flex-wrap gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <Select value={nameOp} onValueChange={(v) => setNameOp(v as TextOp)}>
+            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Name op" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contains">Contains</SelectItem>
+              <SelectItem value="equals">Equals</SelectItem>
+              <SelectItem value="startsWith">Starts With</SelectItem>
+              <SelectItem value="endsWith">Ends With</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="Name"
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
+            className="w-[180px]"
+          />
         </div>
       </div>
 
@@ -174,6 +265,101 @@ export default function Leads() {
             <SelectItem value="unassigned">Unassigned</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            placeholder="Score min"
+            value={scoreMin}
+            onChange={(e) => setScoreMin(e.target.value)}
+            className="w-[130px]"
+          />
+          <Input
+            type="number"
+            placeholder="Score max"
+            value={scoreMax}
+            onChange={(e) => setScoreMax(e.target.value)}
+            className="w-[130px]"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            placeholder="Value min"
+            value={valueMin}
+            onChange={(e) => setValueMin(e.target.value)}
+            className="w-[140px]"
+          />
+          <Input
+            type="number"
+            placeholder="Value max"
+            value={valueMax}
+            onChange={(e) => setValueMax(e.target.value)}
+            className="w-[140px]"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            placeholder="Created from"
+            value={createdStart}
+            onChange={(e) => setCreatedStart(e.target.value)}
+            className="w-[170px]"
+          />
+          <Input
+            type="date"
+            placeholder="Created to"
+            value={createdEnd}
+            onChange={(e) => setCreatedEnd(e.target.value)}
+            className="w-[170px]"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <Select value={companyOp} onValueChange={(v) => setCompanyOp(v as TextOp)}>
+            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Company op" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contains">Contains</SelectItem>
+              <SelectItem value="equals">Equals</SelectItem>
+              <SelectItem value="startsWith">Starts With</SelectItem>
+              <SelectItem value="endsWith">Ends With</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="Company"
+            value={companyQuery}
+            onChange={(e) => setCompanyQuery(e.target.value)}
+            className="w-[180px]"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select value={emailOp} onValueChange={(v) => setEmailOp(v as TextOp)}>
+            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Email op" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contains">Contains</SelectItem>
+              <SelectItem value="equals">Equals</SelectItem>
+              <SelectItem value="startsWith">Starts With</SelectItem>
+              <SelectItem value="endsWith">Ends With</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="Email"
+            value={emailQuery}
+            onChange={(e) => setEmailQuery(e.target.value)}
+            className="w-[200px]"
+          />
+        </div>
       </div>
 
       {loading ? (

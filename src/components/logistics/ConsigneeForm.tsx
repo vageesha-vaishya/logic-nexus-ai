@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,6 +10,20 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
+// Safely convert Supabase JSON/text to an object record
+const toRecord = (value: any): Record<string, any> => {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object') return value as Record<string, any>;
+  return {};
+};
 const consigneeSchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
   contact_person: z.string().optional(),
@@ -29,6 +43,7 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
   const { context, supabase } = useCRM();
   const { roles } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof consigneeSchema>>({
     resolver: zodResolver(consigneeSchema),
@@ -40,8 +55,51 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
       tax_id: '',
       customs_id: '',
       notes: '',
+      street: '',
+      city: '',
+      state: '',
+      country: '',
+      postal_code: '',
     },
   });
+
+  useEffect(() => {
+    const loadConsignee = async () => {
+      if (!consigneeId) return;
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('consignees')
+          .select('*')
+          .eq('id', consigneeId)
+          .single();
+        if (error) throw error;
+        if (data) {
+          const addr = toRecord(data.address);
+          form.reset({
+            company_name: data.company_name || '',
+            contact_person: data.contact_person || '',
+            contact_email: data.contact_email || '',
+            contact_phone: data.contact_phone || '',
+            tax_id: data.tax_id || '',
+            customs_id: data.customs_id || '',
+            notes: data.notes || '',
+            street: typeof addr.street === 'string' ? addr.street : '',
+            city: typeof addr.city === 'string' ? addr.city : '',
+            state: typeof addr.state === 'string' ? addr.state : '',
+            country: typeof addr.country === 'string' ? addr.country : '',
+            postal_code: typeof addr.postal_code === 'string' ? addr.postal_code : '',
+          });
+        }
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to load consignee');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadConsignee();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consigneeId]);
 
   const onSubmit = async (values: z.infer<typeof consigneeSchema>) => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
@@ -71,13 +129,20 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
         tenant_id: tenantId,
       };
 
-      const { error } = await supabase.from('consignees').insert([consigneeData]);
-
-      if (error) throw error;
-
-      toast.success('Consignee created successfully');
+      if (consigneeId) {
+        const { error } = await supabase
+          .from('consignees')
+          .update(consigneeData)
+          .eq('id', consigneeId);
+        if (error) throw error;
+        toast.success('Consignee updated successfully');
+      } else {
+        const { error } = await supabase.from('consignees').insert([consigneeData]);
+        if (error) throw error;
+        toast.success('Consignee created successfully');
+        form.reset();
+      }
       onSuccess?.();
-      form.reset();
     } catch (error: any) {
       toast.error(error.message || 'Failed to create consignee');
     } finally {
@@ -265,8 +330,8 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Consignee'}
+        <Button type="submit" disabled={isSubmitting || isLoading}>
+          {isSubmitting ? (consigneeId ? 'Updating...' : 'Creating...') : (consigneeId ? 'Update Consignee' : 'Create Consignee')}
         </Button>
       </form>
     </Form>

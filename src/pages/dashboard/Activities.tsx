@@ -14,6 +14,7 @@ import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
+import { matchText, TextOp } from '@/lib/utils';
 
 interface Activity {
   id: string;
@@ -46,6 +47,15 @@ export default function Activities() {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const navigate = useNavigate();
 
+  // Advanced per-column filters
+  const [subjectQuery, setSubjectQuery] = useState('');
+  const [subjectOp, setSubjectOp] = useState<TextOp>('contains');
+  const [descriptionQuery, setDescriptionQuery] = useState('');
+  const [descriptionOp, setDescriptionOp] = useState<TextOp>('contains');
+  const [statusAdv, setStatusAdv] = useState<'any' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending'>('any');
+  const [priorityAdv, setPriorityAdv] = useState<'any' | 'low' | 'medium' | 'high' | 'urgent'>('any');
+  const [dueStart, setDueStart] = useState<string>('');
+  const [dueEnd, setDueEnd] = useState<string>('');
   useEffect(() => {
     fetchActivities();
   }, []);
@@ -185,6 +195,20 @@ export default function Activities() {
       if (ownerFilter === 'unassigned') return activity.assigned_to === null;
       if (ownerFilter === 'me') return activity.assigned_to === (context?.userId || null);
       return activity.assigned_to === ownerFilter;
+    });
+
+  const filteredActivitiesAdvanced = filteredActivities
+    .filter((activity) => matchText(activity.subject ?? '', subjectQuery, subjectOp))
+    .filter((activity) => matchText(activity.description ?? '', descriptionQuery, descriptionOp))
+    .filter((activity) => (statusAdv === 'any' ? true : activity.status === statusAdv))
+    .filter((activity) => (priorityAdv === 'any' ? true : activity.priority === priorityAdv))
+    .filter((activity) => {
+      if (!dueStart && !dueEnd) return true;
+      if (!activity.due_date) return false;
+      const due = new Date(activity.due_date);
+      const startOk = dueStart ? due >= new Date(dueStart) : true;
+      const endOk = dueEnd ? due <= new Date(dueEnd) : true;
+      return startOk && endOk;
     });
 
   const getTabCounts = () => {
@@ -357,9 +381,95 @@ export default function Activities() {
                 }}
               >
                 Got it
-              </Button>
-            </div>
-          )}
+          </Button>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <Select value={subjectOp} onValueChange={(v) => setSubjectOp(v as TextOp)}>
+            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Subject op" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contains">Contains</SelectItem>
+              <SelectItem value="equals">Equals</SelectItem>
+              <SelectItem value="startsWith">Starts With</SelectItem>
+              <SelectItem value="endsWith">Ends With</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="Subject"
+            value={subjectQuery}
+            onChange={(e) => setSubjectQuery(e.target.value)}
+            className="w-[220px]"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select value={descriptionOp} onValueChange={(v) => setDescriptionOp(v as TextOp)}>
+            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Description op" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contains">Contains</SelectItem>
+              <SelectItem value="equals">Equals</SelectItem>
+              <SelectItem value="startsWith">Starts With</SelectItem>
+              <SelectItem value="endsWith">Ends With</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            placeholder="Description"
+            value={descriptionQuery}
+            onChange={(e) => setDescriptionQuery(e.target.value)}
+            className="w-[260px]"
+          />
+        </div>
+
+        <div className="w-[180px]">
+          <div className="text-xs text-muted-foreground mb-1">Status</div>
+          <Select value={statusAdv} onValueChange={(v) => setStatusAdv(v as any)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              <SelectItem value="planned">Planned</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-[180px]">
+          <div className="text-xs text-muted-foreground mb-1">Priority</div>
+          <Select value={priorityAdv} onValueChange={(v) => setPriorityAdv(v as any)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            placeholder="Due from"
+            value={dueStart}
+            onChange={(e) => setDueStart(e.target.value)}
+            className="w-[170px]"
+          />
+          <Input
+            type="date"
+            placeholder="Due to"
+            value={dueEnd}
+            onChange={(e) => setDueEnd(e.target.value)}
+            className="w-[170px]"
+          />
+        </div>
+      </div>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="all" className="relative">
@@ -414,7 +524,7 @@ export default function Activities() {
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading activities...</p>
         </div>
-      ) : filteredActivities.length === 0 ? (
+      ) : filteredActivitiesAdvanced.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <CheckSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -449,7 +559,7 @@ export default function Activities() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredActivities.map((activity) => (
+                {filteredActivitiesAdvanced.map((activity) => (
                   <TableRow
                     key={activity.id}
                     className="cursor-pointer hover:bg-muted/50"
@@ -482,7 +592,7 @@ export default function Activities() {
         </Card>
       ) : viewMode === 'grid' ? (
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {filteredActivities.map((activity) => {
+          {filteredActivitiesAdvanced.map((activity) => {
             const Icon = getActivityIcon(activity.activity_type);
             const isOverdue = activity.status !== 'completed' && activity.status !== 'cancelled' &&
               activity.due_date && isPast(new Date(activity.due_date)) && !isToday(new Date(activity.due_date));
@@ -518,7 +628,7 @@ export default function Activities() {
       ) : (
         <div className="space-y-4">
           {Object.entries(
-            filteredActivities.reduce<Record<string, Activity[]>>((acc, a) => {
+            filteredActivitiesAdvanced.reduce<Record<string, Activity[]>>((acc, a) => {
               const key = a.lead_id ?? 'none';
               (acc[key] ||= []).push(a);
               return acc;

@@ -13,6 +13,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ShipmentStats } from '@/components/logistics/ShipmentStats';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { matchText, TextOp } from '@/lib/utils';
 
 interface Shipment {
   id: string;
@@ -40,6 +41,18 @@ export default function Shipments() {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase, context } = useCRM();
 
+  // Advanced per-column filters
+  const [filterShipmentNo, setFilterShipmentNo] = useState('');
+  const [filterShipmentNoOp, setFilterShipmentNoOp] = useState<TextOp>('contains');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [filterCustomerOp, setFilterCustomerOp] = useState<TextOp>('contains');
+  const [filterPriority, setFilterPriority] = useState('');
+  const [filterPriorityOp, setFilterPriorityOp] = useState<TextOp>('contains');
+  const [packagesMin, setPackagesMin] = useState<string>('');
+  const [packagesMax, setPackagesMax] = useState<string>('');
+  const [etaStart, setEtaStart] = useState<string>('');
+  const [etaEnd, setEtaEnd] = useState<string>('');
+
   useEffect(() => {
     fetchShipments();
   }, []);
@@ -62,13 +75,41 @@ export default function Shipments() {
   };
 
   const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch = shipment.shipment_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.accounts?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const globalQuery = searchQuery.trim().toLowerCase();
+    const matchesGlobal = !globalQuery || [
+      shipment.shipment_number,
+      shipment.accounts?.name || '',
+      shipment.priority_level || '',
+      shipment.shipment_type || '',
+      shipment.status || ''
+    ].some(v => (v || '').toLowerCase().includes(globalQuery));
+
     const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
     const matchesType = typeFilter === 'all' || shipment.shipment_type === typeFilter;
 
-    return matchesSearch && matchesStatus && matchesType;
+    const matchesShipmentNo = matchText(shipment.shipment_number, filterShipmentNo, filterShipmentNoOp);
+    const matchesCustomer = matchText(shipment.accounts?.name ?? '', filterCustomer, filterCustomerOp);
+    const matchesPriority = matchText(shipment.priority_level, filterPriority, filterPriorityOp);
+
+    const min = packagesMin ? Number(packagesMin) : undefined;
+    const max = packagesMax ? Number(packagesMax) : undefined;
+    const total = shipment.total_packages ?? undefined;
+    const matchesPackages = (
+      (min === undefined || (total !== undefined && total >= min)) &&
+      (max === undefined || (total !== undefined && total <= max))
+    );
+
+    const eta = shipment.estimated_delivery_date ? new Date(shipment.estimated_delivery_date) : null;
+    const start = etaStart ? new Date(etaStart) : null;
+    const end = etaEnd ? new Date(etaEnd) : null;
+    const matchesETA = (
+      (!start || (eta && eta >= start)) &&
+      (!end || (eta && eta <= end))
+    );
+
+    return matchesGlobal && matchesStatus && matchesType &&
+      matchesShipmentNo && matchesCustomer && matchesPriority &&
+      matchesPackages && matchesETA;
   });
 
   const totalShipments = shipments.length;
@@ -168,6 +209,95 @@ export default function Shipments() {
               <SelectItem value="movers_packers">Movers & Packers</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Advanced per-column filters */}
+          <div className="flex items-center gap-2">
+            <Select value={filterShipmentNoOp} onValueChange={(v) => setFilterShipmentNoOp(v as TextOp)}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Shipment # op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Shipment #"
+              value={filterShipmentNo}
+              onChange={(e) => setFilterShipmentNo(e.target.value)}
+              className="w-[180px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={filterCustomerOp} onValueChange={(v) => setFilterCustomerOp(v as TextOp)}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Customer op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Customer"
+              value={filterCustomer}
+              onChange={(e) => setFilterCustomer(e.target.value)}
+              className="w-[180px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={filterPriorityOp} onValueChange={(v) => setFilterPriorityOp(v as TextOp)}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Priority op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Priority"
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className="w-[160px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              placeholder="Packages min"
+              value={packagesMin}
+              onChange={(e) => setPackagesMin(e.target.value)}
+              className="w-[140px]"
+            />
+            <Input
+              type="number"
+              placeholder="Packages max"
+              value={packagesMax}
+              onChange={(e) => setPackagesMax(e.target.value)}
+              className="w-[140px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              placeholder="ETA from"
+              value={etaStart}
+              onChange={(e) => setEtaStart(e.target.value)}
+              className="w-[160px]"
+            />
+            <Input
+              type="date"
+              placeholder="ETA to"
+              value={etaEnd}
+              onChange={(e) => setEtaEnd(e.target.value)}
+              className="w-[160px]"
+            />
+          </div>
         </div>
 
         {loading ? (

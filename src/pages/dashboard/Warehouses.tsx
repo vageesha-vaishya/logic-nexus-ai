@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
+import { matchText, TextOp } from '@/lib/utils';
 
 interface Warehouse {
   id: string;
@@ -32,6 +34,21 @@ export default function Warehouses() {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase } = useCRM();
 
+  // Advanced filters
+  const [filterName, setFilterName] = useState('');
+  const [filterNameOp, setFilterNameOp] = useState<TextOp>('contains');
+  const [filterCode, setFilterCode] = useState('');
+  const [filterCodeOp, setFilterCodeOp] = useState<TextOp>('contains');
+  const [filterType, setFilterType] = useState('');
+  const [filterTypeOp, setFilterTypeOp] = useState<TextOp>('contains');
+  const [filterContact, setFilterContact] = useState('');
+  const [filterContactOp, setFilterContactOp] = useState<TextOp>('contains');
+  const [capacityMin, setCapacityMin] = useState<string>('');
+  const [capacityMax, setCapacityMax] = useState<string>('');
+  const [utilMin, setUtilMin] = useState<string>('');
+  const [utilMax, setUtilMax] = useState<string>('');
+  const [statusActive, setStatusActive] = useState<string>('all');
+
   useEffect(() => {
     fetchWarehouses();
   }, []);
@@ -53,10 +70,40 @@ export default function Warehouses() {
     }
   };
 
-  const filteredWarehouses = warehouses.filter(warehouse =>
-    warehouse.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    warehouse.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredWarehouses = warehouses.filter(warehouse => {
+    const globalQuery = searchQuery.trim().toLowerCase();
+    const matchesGlobal = !globalQuery || [
+      warehouse.name,
+      warehouse.code,
+      warehouse.warehouse_type || '',
+      warehouse.contact_person || ''
+    ].some(v => (v || '').toLowerCase().includes(globalQuery));
+
+    const matchesName = matchText(warehouse.name, filterName, filterNameOp);
+    const matchesCode = matchText(warehouse.code, filterCode, filterCodeOp);
+    const matchesType = matchText(warehouse.warehouse_type ?? '', filterType, filterTypeOp);
+    const matchesContact = matchText(warehouse.contact_person ?? '', filterContact, filterContactOp);
+
+    const capMin = capacityMin ? Number(capacityMin) : undefined;
+    const capMax = capacityMax ? Number(capacityMax) : undefined;
+    const cap = warehouse.capacity_sqft ?? undefined;
+    const matchesCapacity = (
+      (capMin === undefined || (cap !== undefined && cap >= capMin)) &&
+      (capMax === undefined || (cap !== undefined && cap <= capMax))
+    );
+
+    const uMin = utilMin ? Number(utilMin) : undefined;
+    const uMax = utilMax ? Number(utilMax) : undefined;
+    const util = warehouse.current_utilization ?? undefined;
+    const matchesUtil = (
+      (uMin === undefined || (util !== undefined && util >= uMin)) &&
+      (uMax === undefined || (util !== undefined && util <= uMax))
+    );
+
+    const matchesStatus = statusActive === 'all' || (statusActive === 'active' ? warehouse.is_active : !warehouse.is_active);
+
+    return matchesGlobal && matchesName && matchesCode && matchesType && matchesContact && matchesCapacity && matchesUtil && matchesStatus;
+  });
 
   return (
     <DashboardLayout>
@@ -85,6 +132,80 @@ export default function Warehouses() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
+        </div>
+
+        {/* Advanced filters */}
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Select value={filterNameOp} onValueChange={(v) => setFilterNameOp(v as TextOp)}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Name op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input className="w-[170px]" placeholder="Name" value={filterName} onChange={(e) => setFilterName(e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={filterCodeOp} onValueChange={(v) => setFilterCodeOp(v as TextOp)}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Code op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input className="w-[150px]" placeholder="Code" value={filterCode} onChange={(e) => setFilterCode(e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={filterTypeOp} onValueChange={(v) => setFilterTypeOp(v as TextOp)}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input className="w-[170px]" placeholder="Type" value={filterType} onChange={(e) => setFilterType(e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={filterContactOp} onValueChange={(v) => setFilterContactOp(v as TextOp)}>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Contact op" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contains">Contains</SelectItem>
+                <SelectItem value="equals">Equals</SelectItem>
+                <SelectItem value="startsWith">Starts With</SelectItem>
+                <SelectItem value="endsWith">Ends With</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input className="w-[170px]" placeholder="Contact" value={filterContact} onChange={(e) => setFilterContact(e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input type="number" className="w-[140px]" placeholder="Capacity min" value={capacityMin} onChange={(e) => setCapacityMin(e.target.value)} />
+            <Input type="number" className="w-[140px]" placeholder="Capacity max" value={capacityMax} onChange={(e) => setCapacityMax(e.target.value)} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input type="number" className="w-[140px]" placeholder="Utilization min" value={utilMin} onChange={(e) => setUtilMin(e.target.value)} />
+            <Input type="number" className="w-[140px]" placeholder="Utilization max" value={utilMax} onChange={(e) => setUtilMax(e.target.value)} />
+          </div>
+
+          <Select value={statusActive} onValueChange={setStatusActive}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {loading ? (

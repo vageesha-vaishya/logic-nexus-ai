@@ -376,6 +376,16 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+
+            {/* Settings-scoped Subscription route */}
+            <Route 
+              path="/dashboard/settings/subscription" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <SubscriptionManagement />
+                </ProtectedRoute>
+              } 
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* Salesforce-style navigation placeholder routes */}
             <Route path="/dashboard/files" element={<ProtectedRoute requiredPermissions={["files.view"]}><Files /></ProtectedRoute>} />

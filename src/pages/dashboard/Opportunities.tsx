@@ -9,6 +9,10 @@ import { Plus, TrendingUp } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { matchText, TextOp } from '@/lib/utils';
 
 const stageColors: Record<string, string> = {
   prospecting: 'bg-slate-500',
@@ -38,6 +42,19 @@ export default function Opportunities() {
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  // Advanced per-column filters
+  const [nameQuery, setNameQuery] = useState('');
+  const [nameOp, setNameOp] = useState<TextOp>('contains');
+  const [accountQuery, setAccountQuery] = useState('');
+  const [accountOp, setAccountOp] = useState<TextOp>('contains');
+  const [stageAdv, setStageAdv] = useState<string>('');
+  const [amountMin, setAmountMin] = useState<string>('');
+  const [amountMax, setAmountMax] = useState<string>('');
+  const [closeStart, setCloseStart] = useState<string>('');
+  const [closeEnd, setCloseEnd] = useState<string>('');
+  const [probMin, setProbMin] = useState<string>('');
+  const [probMax, setProbMax] = useState<string>('');
 
   useEffect(() => {
     fetchOpportunities();
@@ -81,6 +98,28 @@ export default function Opportunities() {
   const totalValue = opportunities.reduce((sum, opp) => sum + (Number(opp.amount) || 0), 0);
   const openOpportunities = opportunities.filter(opp => !['closed_won', 'closed_lost'].includes(opp.stage));
   const wonOpportunities = opportunities.filter(opp => opp.stage === 'closed_won');
+
+  // Derived list with advanced filters applied
+  const filteredOpportunitiesAdvanced = opportunities.filter((opp) => {
+    if (nameQuery && !matchText(opp.name || '', nameQuery, nameOp)) return false;
+    if (accountQuery && !matchText(opp.accounts?.name || '', accountQuery, accountOp)) return false;
+    if (stageAdv && stageAdv !== 'any' && opp.stage !== stageAdv) return false;
+
+    const amountNum = Number(opp.amount) || 0;
+    if (amountMin && amountNum < Number(amountMin)) return false;
+    if (amountMax && amountNum > Number(amountMax)) return false;
+
+    const closeDate = opp.close_date ? new Date(opp.close_date) : null;
+    if (closeStart && closeDate && closeDate < new Date(closeStart)) return false;
+    if (closeEnd && closeDate && closeDate > new Date(closeEnd)) return false;
+    if ((closeStart || closeEnd) && !closeDate) return false;
+
+    const probNum = Number(opp.probability) || 0;
+    if (probMin && probNum < Number(probMin)) return false;
+    if (probMax && probNum > Number(probMax)) return false;
+
+    return true;
+  });
 
   return (
     <DashboardLayout>
@@ -163,6 +202,88 @@ export default function Opportunities() {
               <CardTitle>All Opportunities</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="space-y-3 mb-4">
+                <p className="text-sm text-muted-foreground">Combine any filters below; results intersect across all criteria.</p>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <div className="flex gap-2">
+                      <Select value={nameOp} onValueChange={(v) => setNameOp(v as TextOp)}>
+                        <SelectTrigger className="w-[160px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="contains">Contains</SelectItem>
+                          <SelectItem value="starts_with">Starts with</SelectItem>
+                          <SelectItem value="equals">Equals</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input placeholder="Search name" value={nameQuery} onChange={(e) => setNameQuery(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Account</Label>
+                    <div className="flex gap-2">
+                      <Select value={accountOp} onValueChange={(v) => setAccountOp(v as TextOp)}>
+                        <SelectTrigger className="w-[160px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="contains">Contains</SelectItem>
+                          <SelectItem value="starts_with">Starts with</SelectItem>
+                          <SelectItem value="equals">Equals</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input placeholder="Search account" value={accountQuery} onChange={(e) => setAccountQuery(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Stage</Label>
+                    <Select value={stageAdv} onValueChange={setStageAdv}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Any stage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="prospecting">Prospecting</SelectItem>
+                        <SelectItem value="qualification">Qualification</SelectItem>
+                        <SelectItem value="needs_analysis">Needs Analysis</SelectItem>
+                        <SelectItem value="value_proposition">Value Proposition</SelectItem>
+                        <SelectItem value="proposal">Proposal</SelectItem>
+                        <SelectItem value="negotiation">Negotiation</SelectItem>
+                        <SelectItem value="closed_won">Closed Won</SelectItem>
+                        <SelectItem value="closed_lost">Closed Lost</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Amount range</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" placeholder="Min" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} />
+                      <Input type="number" placeholder="Max" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Close date range</Label>
+                    <div className="flex gap-2">
+                      <Input type="date" value={closeStart} onChange={(e) => setCloseStart(e.target.value)} />
+                      <Input type="date" value={closeEnd} onChange={(e) => setCloseEnd(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Probability range (%)</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" placeholder="Min" value={probMin} onChange={(e) => setProbMin(e.target.value)} />
+                      <Input type="number" placeholder="Max" value={probMax} onChange={(e) => setProbMax(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -175,7 +296,7 @@ export default function Opportunities() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {opportunities.map((opportunity) => (
+                  {filteredOpportunitiesAdvanced.map((opportunity) => (
                     <TableRow
                       key={opportunity.id}
                       className="cursor-pointer hover:bg-muted/50"
@@ -199,7 +320,7 @@ export default function Opportunities() {
           </Card>
         ) : viewMode === 'grid' ? (
           <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {opportunities.map((opportunity) => (
+            {filteredOpportunitiesAdvanced.map((opportunity) => (
               <Card key={opportunity.id} className="hover:shadow transition-shadow cursor-pointer" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -216,7 +337,7 @@ export default function Opportunities() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {opportunities.map((opportunity) => (
+            {filteredOpportunitiesAdvanced.map((opportunity) => (
               <Card key={opportunity.id} className="hover:shadow-lg transition-shadow cursor-pointer h-full" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
                 <CardHeader>
                   <div className="flex items-start justify-between">

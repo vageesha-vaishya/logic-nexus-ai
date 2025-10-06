@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ConsigneeForm } from '@/components/logistics/ConsigneeForm';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -26,6 +28,13 @@ export default function Consignees() {
   const [consignees, setConsignees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingConsigneeId, setEditingConsigneeId] = useState<string | undefined>(undefined);
+  const [filterName, setFilterName] = useState('');
+  const [filterContact, setFilterContact] = useState('');
+  const [filterTaxId, setFilterTaxId] = useState('');
+  const [filterCustomsId, setFilterCustomsId] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
   useEffect(() => {
     if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
@@ -114,6 +123,37 @@ export default function Consignees() {
     fetchConsignees();
   };
 
+  const handleEditSuccess = () => {
+    setEditDialogOpen(false);
+    setEditingConsigneeId(undefined);
+    fetchConsignees();
+  };
+
+  const onEdit = (id: string) => {
+    setEditingConsigneeId(id);
+    setEditDialogOpen(true);
+  };
+
+  const onDelete = async (id: string) => {
+    try {
+      const { error } = await supabase.from('consignees').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Consignee deleted');
+      fetchConsignees();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete consignee');
+    }
+  };
+
+  const filteredConsignees = consignees.filter((c) => {
+    const nameMatch = !filterName || (c.company_name || '').toLowerCase().includes(filterName.toLowerCase());
+    const contactMatch = !filterContact || ((c.contact_person || '') + ' ' + (c.contact_email || '')).toLowerCase().includes(filterContact.toLowerCase());
+    const taxMatch = !filterTaxId || (c.tax_id || '').toLowerCase().includes(filterTaxId.toLowerCase());
+    const customsMatch = !filterCustomsId || (c.customs_id || '').toLowerCase().includes(filterCustomsId.toLowerCase());
+    const statusMatch = filterStatus === 'all' || (filterStatus === 'active' ? !!c.is_active : !c.is_active);
+    return nameMatch && contactMatch && taxMatch && customsMatch && statusMatch;
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -140,12 +180,51 @@ export default function Consignees() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-5 gap-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Company Name</label>
+                <Input placeholder="Search name" value={filterName} onChange={(e) => setFilterName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Contact/Email</label>
+                <Input placeholder="Search contact" value={filterContact} onChange={(e) => setFilterContact(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Tax ID</label>
+                <Input placeholder="Search tax id" value={filterTaxId} onChange={(e) => setFilterTaxId(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Customs ID</label>
+                <Input placeholder="Search customs id" value={filterCustomsId} onChange={(e) => setFilterCustomsId(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Status</label>
+                <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>All Consignees</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">Loading consignees...</div>
-            ) : consignees.length === 0 ? (
+            ) : filteredConsignees.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No consignees found. Create your first consignee to get started.
               </div>
@@ -158,10 +237,11 @@ export default function Consignees() {
                     <TableHead>Tax ID</TableHead>
                     <TableHead>Customs ID</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {consignees.map((consignee) => (
+                  {filteredConsignees.map((consignee) => (
                     <TableRow key={consignee.id}>
                       <TableCell className="font-medium">{consignee.company_name}</TableCell>
                       <TableCell>
@@ -181,6 +261,16 @@ export default function Consignees() {
                           {consignee.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="icon" onClick={() => onEdit(consignee.id)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="icon" onClick={() => onDelete(consignee.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -188,6 +278,17 @@ export default function Consignees() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Consignee</DialogTitle>
+            </DialogHeader>
+            {editingConsigneeId && (
+              <ConsigneeForm consigneeId={editingConsigneeId} onSuccess={handleEditSuccess} />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
