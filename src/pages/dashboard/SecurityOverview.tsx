@@ -276,6 +276,127 @@ export default function SecurityOverview() {
                         <div className="p-3 overflow-x-auto">
                           {schemaTablesLoading ? (
                             <div>Loading...</div>
+                          ) : !schemaTables || schemaTables.length === 0 ? (
+                            <div className="text-muted-foreground">No tables found</div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>RLS</TableHead>
+                                  <TableHead>Policies</TableHead>
+                                  <TableHead>Columns</TableHead>
+                                  <TableHead>Indexes</TableHead>
+                                  <TableHead>Row Estimate</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {schemaTables?.map((t) => (
+                                  <TableRow key={t.table_name}>
+                                    <TableCell className="font-medium">{t.table_name}</TableCell>
+                                    <TableCell><Badge variant="outline">{t.table_type}</Badge></TableCell>
+                                    <TableCell>
+                                      {t.rls_enabled === null ? (
+                                        <span className="text-muted-foreground">—</span>
+                                      ) : (
+                                        <Badge variant={t.rls_enabled ? 'default' : 'destructive'}>
+                                          {t.rls_enabled ? 'Enabled' : 'Disabled'}
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>{t.policy_count}</TableCell>
+                                    <TableCell>{t.column_count}</TableCell>
+                                    <TableCell>{t.index_count}</TableCell>
+                                    <TableCell>{t.row_estimate ?? '—'}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="border rounded-lg">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <span className="font-semibold">Constraints</span>
+                        </div>
+                        <div className="p-3 overflow-x-auto">
+                          {schemaConstraintsLoading ? (
+                            <div>Loading...</div>
+                          ) : !schemaConstraints || schemaConstraints.length === 0 ? (
+                            <div className="text-muted-foreground">No constraints found</div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Table</TableHead>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Details</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {schemaConstraints?.map((c, idx) => (
+                                  <TableRow key={`${c.table_name}-${c.constraint_name}-${idx}`}>
+                                    <TableCell className="font-medium">{c.table_name}</TableCell>
+                                    <TableCell>{c.constraint_name}</TableCell>
+                                    <TableCell><Badge variant="outline">{c.constraint_type}</Badge></TableCell>
+                                    <TableCell className="text-xs break-all">{c.constraint_details}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="border rounded-lg">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <span className="font-semibold">Indexes</span>
+                        </div>
+                        <div className="p-3 overflow-x-auto">
+                          {schemaIndexesLoading ? (
+                            <div>Loading...</div>
+                          ) : !schemaIndexes || schemaIndexes.length === 0 ? (
+                            <div className="text-muted-foreground">No indexes found</div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Table</TableHead>
+                                  <TableHead>Index</TableHead>
+                                  <TableHead>Unique</TableHead>
+                                  <TableHead>Columns</TableHead>
+                                  <TableHead>Definition</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {schemaIndexes?.map((i, idx) => (
+                                  <TableRow key={`${i.table_name}-${i.index_name}-${idx}`}>
+                                    <TableCell className="font-medium">{i.table_name}</TableCell>
+                                    <TableCell>{i.index_name}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={i.is_unique ? 'default' : 'secondary'}>
+                                        {i.is_unique ? 'Yes' : 'No'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-xs">{i.index_columns}</TableCell>
+                                    <TableCell className="text-xs break-all">{i.index_definition}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      </div>
+                      <div className="border rounded-lg">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <span className="font-semibold">Tables</span>
+                        </div>
+                        <div className="p-3 overflow-x-auto">
+                          {schemaTablesLoading ? (
+                            <div>Loading...</div>
                           ) : (
                             <Table>
                               <TableHeader>
@@ -465,7 +586,7 @@ export default function SecurityOverview() {
                     Database Schema
                   </CardTitle>
                   <CardDescription>
-                    Tables and columns with keys and references
+                    Tables, columns, constraints, and indexes
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
