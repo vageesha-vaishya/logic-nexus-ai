@@ -58,7 +58,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
       description: initialData?.description || '',
       tenant_id: initialData?.tenant_id ?? undefined,
       franchise_id: initialData?.franchise_id ?? undefined,
-      parent_account_id: initialData?.parent_account_id ?? '',
+      parent_account_id: initialData?.parent_account_id ?? 'none',
     },
   });
 
@@ -264,8 +264,8 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
                       <SelectValue placeholder="None (Top-level account)" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
-                    <SelectItem value="">None (Top-level account)</SelectItem>
+                <SelectContent>
+                    <SelectItem value="none">None (Top-level account)</SelectItem>
                     {parentAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.name}

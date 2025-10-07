@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { THEME_PRESETS } from '@/theme/themes';
+import { useCRM } from '@/hooks/useCRM';
 
 export type SavedTheme = {
   name: string;
@@ -22,8 +23,11 @@ export type SavedTheme = {
 type ThemeContextValue = {
   themes: SavedTheme[];
   activeThemeName: string | null;
+  scope: 'platform' | 'tenant' | 'franchise' | 'user';
+  setScope: (s: 'platform' | 'tenant' | 'franchise' | 'user') => void;
   applyTheme: (t: { start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
-  saveTheme: (t: { name: string; start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
+  saveTheme: (t: { name: string; start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => Promise<void>;
+  deleteTheme: (name: string) => Promise<void>;
   setActive: (name: string) => void;
   toggleDark: (enabled: boolean) => void;
 };
@@ -36,7 +40,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themes, setThemes] = useState<SavedTheme[]>([]);
   const [activeThemeName, setActiveThemeName] = useState<string | null>(null);
+  const [scope, setScope] = useState<'platform' | 'tenant' | 'franchise' | 'user'>('user');
   const LS_DARK_KEY = 'soslogicpro.darkMode';
+  const { supabase, context } = useCRM();
 
   useEffect(() => {
     try {
@@ -75,6 +81,63 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
   }, []);
 
+  // Choose default scope based on current context
+  useEffect(() => {
+    if (context?.franchiseId) setScope('franchise');
+    else if (context?.tenantId) setScope('tenant');
+    else setScope('user');
+  }, [context?.tenantId, context?.franchiseId]);
+
+  // Load scoped themes from Supabase when scope or context changes
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!supabase) return;
+        let query = supabase.from('ui_themes').select('name, tokens, is_default, scope');
+        if (scope === 'user' && context?.userId) {
+          query = query.eq('scope', 'user').eq('user_id', context.userId);
+        } else if (scope === 'franchise' && context?.franchiseId) {
+          query = query.eq('scope', 'franchise').eq('franchise_id', context.franchiseId);
+        } else if (scope === 'tenant' && context?.tenantId) {
+          query = query.eq('scope', 'tenant').eq('tenant_id', context.tenantId);
+        } else if (scope === 'platform') {
+          query = query.eq('scope', 'platform');
+        } else {
+          return; // insufficient context for scoped fetch
+        }
+        const { data, error } = await query;
+        if (error) return;
+        if (Array.isArray(data)) {
+          const mapped: SavedTheme[] = data.map((row: any) => ({
+            name: row.name,
+            start: row.tokens.start,
+            end: row.tokens.end,
+            primary: row.tokens.primary,
+            accent: row.tokens.accent,
+            angle: row.tokens.angle,
+            radius: row.tokens.radius,
+            sidebarBackground: row.tokens.sidebarBackground,
+            sidebarAccent: row.tokens.sidebarAccent,
+            dark: row.tokens.dark,
+            bgStart: row.tokens.bgStart,
+            bgEnd: row.tokens.bgEnd,
+            bgAngle: row.tokens.bgAngle,
+            createdAt: new Date().toISOString(),
+          }));
+          setThemes(mapped);
+          const def = data.find((row: any) => row.is_default);
+          if (def) {
+            setActiveThemeName(def.name);
+            const found = mapped.find(t => t.name === def.name);
+            if (found) applyTheme(found);
+          }
+        }
+      } catch {
+        // noop; keep local storage themes
+      }
+    })();
+  }, [scope, context?.userId, context?.tenantId, context?.franchiseId]);
+
   const applyTheme = (t: { start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const root = document.documentElement;
     const angle = t.angle ?? 135;
@@ -106,11 +169,47 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const saveTheme = (t: { name: string; start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
+  const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const saved: SavedTheme = { ...t, createdAt: new Date().toISOString() };
     const next = [saved, ...themes.filter(x => x.name !== t.name)];
     setThemes(next);
     localStorage.setItem(LS_THEMES_KEY, JSON.stringify(next));
+    try {
+      if (!supabase) return;
+      const tokens = {
+        start: t.start,
+        end: t.end,
+        primary: t.primary,
+        accent: t.accent,
+        angle: t.angle,
+        radius: t.radius,
+        sidebarBackground: t.sidebarBackground,
+        sidebarAccent: t.sidebarAccent,
+        dark: t.dark,
+        bgStart: t.bgStart,
+        bgEnd: t.bgEnd,
+        bgAngle: t.bgAngle,
+      };
+      const payload: any = { name: t.name, tokens, scope, is_active: true };
+      if (scope === 'user') payload.user_id = context?.userId;
+      if (scope === 'franchise') payload.franchise_id = context?.franchiseId;
+      if (scope === 'tenant') payload.tenant_id = context?.tenantId;
+      await supabase.from('ui_themes').upsert(payload);
+    } catch {}
+  };
+
+  const deleteTheme = async (name: string) => {
+    const next = themes.filter(x => x.name !== name);
+    setThemes(next);
+    localStorage.setItem(LS_THEMES_KEY, JSON.stringify(next));
+    try {
+      if (!supabase) return;
+      let q = supabase.from('ui_themes').delete().eq('name', name).eq('scope', scope);
+      if (scope === 'user') q = q.eq('user_id', context?.userId);
+      if (scope === 'franchise') q = q.eq('franchise_id', context?.franchiseId);
+      if (scope === 'tenant') q = q.eq('tenant_id', context?.tenantId);
+      await q;
+    } catch {}
   };
 
   const setActive = (name: string) => {
@@ -118,6 +217,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(LS_ACTIVE_KEY, name);
     const found = themes.find(t => t.name === name);
     if (found) applyTheme(found);
+    // Mark default in Supabase for current scope
+    (async () => {
+      try {
+        if (!supabase) return;
+        let clear = supabase.from('ui_themes').update({ is_default: false }).eq('scope', scope);
+        if (scope === 'user') clear = clear.eq('user_id', context?.userId);
+        if (scope === 'franchise') clear = clear.eq('franchise_id', context?.franchiseId);
+        if (scope === 'tenant') clear = clear.eq('tenant_id', context?.tenantId);
+        await clear;
+        let set = supabase.from('ui_themes').update({ is_default: true }).eq('name', name).eq('scope', scope);
+        if (scope === 'user') set = set.eq('user_id', context?.userId);
+        if (scope === 'franchise') set = set.eq('franchise_id', context?.franchiseId);
+        if (scope === 'tenant') set = set.eq('tenant_id', context?.tenantId);
+        await set;
+      } catch {}
+    })();
   };
 
   const toggleDark = (enabled: boolean) => {
@@ -130,7 +245,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(LS_DARK_KEY, String(enabled));
   };
 
-  const value = useMemo<ThemeContextValue>(() => ({ themes, activeThemeName, applyTheme, saveTheme, setActive, toggleDark }), [themes, activeThemeName]);
+  const value = useMemo<ThemeContextValue>(() => ({ themes, activeThemeName, scope, setScope, applyTheme, saveTheme, deleteTheme, setActive, toggleDark }), [themes, activeThemeName, scope]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
