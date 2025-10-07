@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,11 +8,14 @@ import { HslPicker } from '@/components/ui/hsl-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { THEME_PRESETS } from '@/theme/themes';
 import { useTheme } from '@/hooks/useTheme';
+import { useCRM } from '@/hooks/useCRM';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 export default function ThemeManagement() {
-  const { themes, applyTheme, saveTheme, setActive, activeThemeName, toggleDark } = useTheme();
+  const { themes, applyTheme, saveTheme, setActive, activeThemeName, toggleDark, scope, setScope } = useTheme();
+  const { context } = useCRM();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [name, setName] = useState('Custom Theme');
   const [start, setStart] = useState('217 91% 60%');
   const [end, setEnd] = useState('197 71% 52%');
@@ -51,6 +55,22 @@ export default function ThemeManagement() {
     }
   }, [activeThemeName, themes]);
 
+  // Honor scope from query parameter if provided
+  useEffect(() => {
+    const s = searchParams.get('scope');
+    if (s === 'user' || s === 'franchise' || s === 'tenant' || s === 'platform') {
+      setScope(s as any);
+    }
+  }, [searchParams]);
+
+  const canWrite = useMemo(() => {
+    if (scope === 'user') return !!context?.userId;
+    if (scope === 'franchise') return !!context?.isFranchiseAdmin;
+    if (scope === 'tenant') return !!context?.isTenantAdmin;
+    if (scope === 'platform') return !!context?.isPlatformAdmin;
+    return false;
+  }, [scope, context?.userId, context?.isFranchiseAdmin, context?.isTenantAdmin, context?.isPlatformAdmin]);
+
   const allThemes = useMemo(() => {
     return [...THEME_PRESETS, ...themes];
   }, [themes]);
@@ -62,6 +82,37 @@ export default function ThemeManagement() {
           <h1 className="text-3xl font-bold">Theme Management</h1>
           <p className="text-muted-foreground">Create, preview, and apply gradient themes.</p>
         </div>
+
+        <Card>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Label className="mr-2">Scope</Label>
+              <Button
+                variant={scope === 'user' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setScope('user'); setSearchParams({ scope: 'user' }); }}
+              >User</Button>
+              <Button
+                variant={scope === 'franchise' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setScope('franchise'); setSearchParams({ scope: 'franchise' }); }}
+              >Franchise</Button>
+              <Button
+                variant={scope === 'tenant' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setScope('tenant'); setSearchParams({ scope: 'tenant' }); }}
+              >Tenant</Button>
+              <Button
+                variant={scope === 'platform' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setScope('platform'); setSearchParams({ scope: 'platform' }); }}
+              >Platform</Button>
+              {!canWrite && (
+                <span className="ml-3 text-xs text-muted-foreground">View-only for this scope</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -127,7 +178,7 @@ export default function ThemeManagement() {
 
             <div className="mt-6 flex items-center gap-3">
               <Button onClick={() => applyTheme({ start, end, primary, accent, angle, radius, sidebarBackground, sidebarAccent, dark, bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
-              <Button variant="secondary" onClick={() => setOpen(true)}>Save As</Button>
+              <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
               <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
                 <div className="rounded-lg p-3 border bg-card text-card-foreground">Card Preview</div>
@@ -163,7 +214,7 @@ export default function ThemeManagement() {
                           sidebarAccent: p.sidebarAccent ?? sidebarAccent,
                           dark: typeof p.dark === 'boolean' ? p.dark : dark,
                         });
-                        setActive(p.name);
+                        if (canWrite) setActive(p.name);
                       }}>Apply</Button>
                       <Button size="sm" variant="secondary" onClick={() => {
                         setName(`${p.name} Copy`);
@@ -179,7 +230,7 @@ export default function ThemeManagement() {
                         setSidebarBackground(p.sidebarBackground ?? sidebarBackground);
                         setSidebarAccent(p.sidebarAccent ?? sidebarAccent);
                         setDark(p.dark ?? dark);
-                        setOpen(true);
+                        if (canWrite) setOpen(true);
                       }}>Customize</Button>
                     </div>
                   </div>
@@ -198,7 +249,7 @@ export default function ThemeManagement() {
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="New theme name" />
             </div>
             <DialogFooter>
-              <Button onClick={() => {
+              <Button disabled={!canWrite} onClick={() => {
                 saveTheme({ name, start, end, primary, accent, angle, radius, sidebarBackground, sidebarAccent, dark, bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setActive(name);
                 applyTheme({ start, end, primary, accent, angle, radius, sidebarBackground, sidebarAccent, dark, bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });

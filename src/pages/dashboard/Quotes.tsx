@@ -9,12 +9,14 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 
 export default function Quotes() {
   const navigate = useNavigate();
   const { supabase } = useCRM();
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
     const fetchQuotes = async () => {
@@ -94,7 +96,10 @@ export default function Quotes() {
               <p className="text-muted-foreground">Manage customer quotations</p>
             </div>
           </div>
-          <Button onClick={() => navigate('/dashboard/quotes/new')}>New Quote</Button>
+          <div className="flex items-center gap-3">
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+            <Button onClick={() => navigate('/dashboard/quotes/new')}>New Quote</Button>
+          </div>
         </div>
 
         {loading ? (
@@ -123,7 +128,7 @@ export default function Quotes() {
               </div>
             </CardContent>
           </Card>
-        ) : (
+        ) : viewMode === 'list' ? (
           <Card>
             <CardHeader>
               <CardTitle>All Quotes</CardTitle>
@@ -171,6 +176,79 @@ export default function Quotes() {
               </Table>
             </CardContent>
           </Card>
+        ) : viewMode === 'grid' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>All Quotes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {quotes.map((q) => (
+                  <div key={q.id} className="border rounded-lg p-3 hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{q.quote_number || q.id.slice(0,8)}</div>
+                      <Badge variant={statusVariant(q.status)} className="capitalize">{q.status || 'unknown'}</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">{q.accounts?.name || '-'}</div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Sell</div>
+                        <div className="font-medium">{q.sell_price != null ? currency.format(q.sell_price) : currency.format(0)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Margin</div>
+                        <div className={`${(q.sell_price && q.cost_price && (q.sell_price - q.cost_price) > 0) ? 'text-green-600' : 'text-red-600'} font-medium`}>
+                          {q.sell_price && q.cost_price ? currency.format((q.sell_price - q.cost_price)) : '-'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Created</div>
+                        <div className="font-medium">{new Date(q.created_at).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {quotes.map((q) => (
+              <Card key={q.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-xl font-semibold">{q.quote_number || q.id.slice(0,8)}</div>
+                      <Badge variant={statusVariant(q.status)} className="capitalize">{q.status || 'unknown'}</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</div>
+                  </div>
+                  <div className="mt-2 text-muted-foreground">
+                    <div>Customer: <span className="text-foreground">{q.accounts?.name || '-'}</span></div>
+                    <div>Contact: <span className="text-foreground">{q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : '-'}</span></div>
+                    <div>Opportunity: <span className="text-foreground">{q.opportunities?.name || '-'}</span></div>
+                    <div>Carrier: <span className="text-foreground">{q.carriers?.carrier_name || '-'}</span></div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-6">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Sell Price</div>
+                      <div className="font-medium">{q.sell_price != null ? currency.format(q.sell_price) : currency.format(0)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Cost Price</div>
+                      <div className="font-medium">{q.cost_price != null ? currency.format(q.cost_price) : '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Margin</div>
+                      <div className={`${(q.sell_price && q.cost_price && (q.sell_price - q.cost_price) > 0) ? 'text-green-600' : 'text-red-600'} font-medium`}>
+                        {q.sell_price && q.cost_price ? currency.format((q.sell_price - q.cost_price)) : '-'}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </DashboardLayout>

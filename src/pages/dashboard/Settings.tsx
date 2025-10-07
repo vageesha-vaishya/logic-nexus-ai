@@ -1,13 +1,17 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@/hooks/useTheme';
+import { useCRM } from '@/hooks/useCRM';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
   const navigate = useNavigate();
+  const { toggleDark } = useTheme();
+  const { context } = useCRM();
 
   return (
     <DashboardLayout>
@@ -18,6 +22,39 @@ export default function Settings() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Palette className="h-5 w-5 text-primary" />
+                <CardTitle>Theme Management</CardTitle>
+              </div>
+              <CardDescription>Customize colors, gradients, and presets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Open the theme manager to create, save, and apply themes.</p>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => toggleDark(true)}>Enable Dark</Button>
+                    <Button variant="secondary" onClick={() => toggleDark(false)}>Disable Dark</Button>
+                  </div>
+                </div>
+                <Button variant="default" onClick={() => navigate('/dashboard/themes')}>
+                  Open Manager
+                </Button>
+              </div>
+              <div className="mt-4">
+                <p className="text-sm font-medium">Quick Access by Scope</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => navigate('/dashboard/themes?scope=user')}>User Themes</Button>
+                  <Button variant="outline" disabled={!context.isFranchiseAdmin} onClick={() => navigate('/dashboard/themes?scope=franchise')}>Franchise Themes</Button>
+                  <Button variant="outline" disabled={!context.isTenantAdmin} onClick={() => navigate('/dashboard/themes?scope=tenant')}>Tenant Themes</Button>
+                  <Button variant="outline" disabled={!context.isPlatformAdmin} onClick={() => navigate('/dashboard/themes?scope=platform')}>Platform Themes</Button>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">Buttons enable based on your admin permissions.</p>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
