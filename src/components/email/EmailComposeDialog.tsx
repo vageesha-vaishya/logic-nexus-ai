@@ -39,14 +39,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
     signatureHtml: "",
   });
 
-  // Templates state
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-
   useEffect(() => {
     if (open) {
       fetchAccounts();
-      fetchTemplates();
       if (replyTo) {
         setTo(replyTo.to);
         setSubject(replyTo.subject.startsWith("Re:") ? replyTo.subject : `Re: ${replyTo.subject}`);
@@ -93,74 +88,103 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
     } catch {}
   }, [selectedAccount, accounts]);
 
-  // Fetch email accounts
   const fetchAccounts = async () => {
     try {
       const { data, error } = await supabase
         .from("email_accounts")
-        .select("id, email_address, display_name, settings")
-        .eq("tenant_id", context?.tenantId);
+        .select("*")
+        .eq("is_active", true)
+        .order("is_primary", { ascending: false });
+
       if (error) throw error;
       setAccounts(data || []);
-      if (data && data.length > 0) setSelectedAccount(data[0].id);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      if (data && data.length > 0) {
+        const connected = data.find((a: any) => (a.provider === "gmail" ? (a.access_token || a.refresh_token) : true));
+        setSelectedAccount((connected || data[0])?.id || "");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
-  // Fetch templates
-  const fetchTemplates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("email_templates")
-        .select("id, name, subject, body_html, category, is_active")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-      if (error) throw error;
-      setTemplates(data || []);
-    } catch (err: any) {
-      // Soft-fail without toast to avoid noise in compose
-      console.warn("Failed to fetch templates", err.message);
-    }
-  };
-
-  // Apply selected template to subject/body
-  const applyTemplate = () => {
-    const tmpl = templates.find((t) => t.id === selectedTemplateId);
-    if (!tmpl) {
-      toast({ title: "No template selected", description: "Choose a template to apply." });
+  const handleSend = async () => {
+    if (!selectedAccount || !to || !subject) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
       return;
     }
-    try {
-      const acc = accounts.find((a) => a.id === selectedAccount);
-      const senderName = acc?.display_name || acc?.email_address || "";
-      const mergedSubject = (tmpl.subject || "").replace(/\{\{\s*sender_name\s*\}\}/gi, senderName);
-      const mergedHtml = (tmpl.body_html || "")
-        .replace(/\{\{\s*sender_name\s*\}\}/gi, senderName);
 
-      setSubject(mergedSubject);
-      const withSignature = composeDefaults.signatureHtml
-        ? `${mergedHtml}${mergedHtml ? '<br><br>' : ''}${composeDefaults.signatureHtml}`
-        : mergedHtml;
-      if (editorRef.current) {
-        editorRef.current.innerHTML = withSignature || "";
+    setSending(true);
+    try {
+      const selected = accounts.find((a) => a.id === selectedAccount);
+      if (selected?.provider === "gmail" && !selected?.access_token && !selected?.refresh_token) {
+        throw new Error("Selected Gmail account is not connected. Please connect it in Accounts.");
       }
-      setEditorHtml(withSignature || "");
-      toast({ title: "Template applied", description: tmpl.name });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+
+      // Call edge function to send email
+      const { data, error } = await supabase.functions.invoke("send-email", {
+        body: {
+          accountId: selectedAccount,
+          to: to.split(",").map(e => e.trim()),
+          cc: cc ? cc.split(",").map(e => e.trim()) : [],
+          subject,
+          body: editorHtml || plainToHtml(body),
+        },
+      });
+
+      if (error) {
+        let description = error.message;
+        const ctx = (error as any)?.context;
+        if (ctx) {
+          try {
+            const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
+            description = parsed?.error || parsed?.message || description;
+          } catch {}
+        }
+        throw new Error(description);
+      }
+
+      toast({
+        title: "Success",
+        description: "Email sent successfully",
+      });
+
+      onOpenChange(false);
+      resetForm();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
     }
   };
 
-  const exec = (cmd: string, value?: string) => {
+  const resetForm = () => {
+    setTo("");
+    setCc("");
+    setSubject("");
+    setBody("");
+    setEditorHtml("");
+  };
+
+  const exec = (cmd: string, val?: string) => {
     try {
-      document.execCommand(cmd, false, value);
-      setEditorHtml(editorRef.current?.innerHTML || "");
+      document.execCommand(cmd, false, val);
     } catch {}
   };
 
-  const insertLink = () => {
-    const url = prompt("Enter URL");
+  const applyLink = () => {
+    const url = prompt("Enter URL:");
     if (url) exec("createLink", url);
   };
 
@@ -171,44 +195,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
   const plainToHtml = (text: string) => {
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return esc(text).replace(/\n/g, "<br>");
-  };
-
-  const handleSend = async () => {
-    if (!to || !subject) {
-      toast({ title: "Missing fields", description: "Recipient and subject are required.", variant: "destructive" });
-      return;
-    }
-    if (!selectedAccount) {
-      toast({ title: "Missing account", description: "Please select an email account.", variant: "destructive" });
-      return;
-    }
-    try {
-      setSending(true);
-      
-      // Parse recipients
-      const toRecipients = to.split(',').map(e => e.trim()).filter(Boolean);
-      const ccRecipients = cc ? cc.split(',').map(e => e.trim()).filter(Boolean) : [];
-      
-      const { data, error } = await supabase.functions.invoke('send-email', {
-        body: {
-          accountId: selectedAccount,
-          to: toRecipients,
-          cc: ccRecipients.length > 0 ? ccRecipients : undefined,
-          subject,
-          body: editorHtml || '',
-        }
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      
-      toast({ title: "Sent", description: "Email sent successfully." });
-      onOpenChange(false);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setSending(false);
-    }
   };
 
   return (
@@ -253,28 +239,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
             />
           </div>
 
-          {/* Template selection */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-            <div className="md:col-span-2">
-              <Label>Template</Label>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a template" />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}{t.category ? ` — ${t.category}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex md:justify-end">
-              <Button variant="outline" onClick={applyTemplate}>Apply</Button>
-            </div>
-          </div>
-
           <div>
             <Label>Subject *</Label>
             <Input
@@ -296,7 +260,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
               <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyLeft")}> <AlignLeft className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyCenter")}> <AlignCenter className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyRight")}> <AlignRight className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={insertLink}> <LinkIcon className="w-4 h-4" /> </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={applyLink}> <LinkIcon className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={clearFormatting}> <Eraser className="w-4 h-4" /> </Button>
             </div>
             )}

@@ -25,6 +25,7 @@ import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
 import ActivityDetail from "./pages/dashboard/ActivityDetail";
 import Settings from "./pages/dashboard/Settings";
+import SecurityOverview from "./pages/dashboard/SecurityOverview";
 import Tenants from "./pages/dashboard/Tenants";
 import TenantNew from "./pages/dashboard/TenantNew";
 import TenantDetail from "./pages/dashboard/TenantDetail";
@@ -72,7 +73,8 @@ import PackageCategories from "./pages/dashboard/PackageCategories";
 import PackageSizes from "./pages/dashboard/PackageSizes";
 import CargoTypes from "./pages/dashboard/CargoTypes";
 import Incoterms from "./pages/dashboard/Incoterms";
-import SecurityOverview from "./pages/dashboard/SecurityOverview";
+import UIDemoForms from "./pages/dashboard/UIDemoForms";
+import UIDemoAdvanced from "./pages/dashboard/UIDemoAdvanced";
 
 const queryClient = new QueryClient();
 
@@ -208,6 +210,14 @@ const App = () => (
                   <Settings />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/dashboard/security-overview" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <SecurityOverview />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/dashboard/permissions" 
@@ -378,6 +388,24 @@ const App = () => (
               } 
             />
 
+            <Route 
+              path="/dashboard/ui-forms-demo" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <UIDemoForms />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/dashboard/ui-advanced-demo" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <UIDemoAdvanced />
+                </ProtectedRoute>
+              } 
+            />
+
             {/* Settings-scoped Subscription route */}
             <Route 
               path="/dashboard/settings/subscription" 
@@ -398,7 +426,6 @@ const App = () => (
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
-            <Route path="/dashboard/security-overview" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><SecurityOverview /></ProtectedRoute>} />
             {/* Logistics Routes */}
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />

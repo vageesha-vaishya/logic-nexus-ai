@@ -51,11 +51,24 @@ export default function LeadDetail() {
 
   const handleUpdate = async (formData: any) => {
     try {
+      // Extract extras and merge into custom_fields
+      const { service_id, attachments, custom_fields: existingCustom = {}, ...rest } = formData || {};
+      const attachmentNames = Array.isArray(attachments)
+        ? attachments.map((f: File) => f.name)
+        : [];
+      const mergedCustomFields: Record<string, any> = {
+        ...(lead?.custom_fields || {}),
+        ...(existingCustom || {}),
+        ...(service_id ? { service_id } : {}),
+        ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+      };
+
       const { error } = await supabase
         .from('leads')
         .update({
-          ...formData,
+          ...rest,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
+          custom_fields: Object.keys(mergedCustomFields).length ? mergedCustomFields : null,
         })
         .eq('id', id);
 

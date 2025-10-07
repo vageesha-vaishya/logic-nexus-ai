@@ -90,15 +90,27 @@ export default function ActivityDetail() {
         }
       }
 
+      // Extract extras for custom_fields
+      const { service_id, attachments, ...rest } = formData;
+      const attachmentNames = Array.isArray(attachments)
+        ? attachments.map((f: any) => (typeof f?.name === 'string' ? f.name : '')).filter(Boolean)
+        : [];
+      const mergedCustom = {
+        ...(activity?.custom_fields || {}),
+        ...(service_id ? { service_id } : {}),
+        ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+      };
+
       // Normalize payload to avoid NOT NULL and type errors
       const normalized = {
-        ...formData,
+        ...rest,
         tenant_id: tenantId,
         franchise_id: franchiseId,
-        account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
-        contact_id: formData.contact_id === 'none' ? null : (formData.contact_id || null),
-        lead_id: formData.lead_id === 'none' ? null : (formData.lead_id || null),
-        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+        account_id: rest.account_id === 'none' ? null : (rest.account_id || null),
+        contact_id: rest.contact_id === 'none' ? null : (rest.contact_id || null),
+        lead_id: rest.lead_id === 'none' ? null : (rest.lead_id || null),
+        due_date: rest.due_date ? new Date(rest.due_date).toISOString() : null,
+        custom_fields: mergedCustom,
       };
 
       const { error } = await supabase

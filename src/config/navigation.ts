@@ -79,6 +79,8 @@ export const APP_MENU: MenuModule[] = [
       { name: 'System Settings', path: '/dashboard/settings', icon: Cog, description: 'Account and app settings' },
       { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme' },
       { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage' },
+      { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns' },
+      { name: 'UI Advanced Demo', path: '/dashboard/ui-advanced-demo', icon: FileCheck, description: 'Phase 3–5 advanced fields' },
     ],
   },
 ];

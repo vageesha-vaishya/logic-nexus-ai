@@ -5,18 +5,6 @@ export function useCRM() {
   const { user, roles } = useAuth();
 
   const getCurrentContext = () => {
-    if (!roles || roles.length === 0) {
-      return {
-        isPlatformAdmin: false,
-        isTenantAdmin: false,
-        isFranchiseAdmin: false,
-        isUser: false,
-        tenantId: undefined,
-        franchiseId: undefined,
-        userId: user?.id,
-      };
-    }
-
     const platformAdmin = roles.find(r => r.role === 'platform_admin');
     const tenantAdmin = roles.find(r => r.role === 'tenant_admin');
     const franchiseAdmin = roles.find(r => r.role === 'franchise_admin');

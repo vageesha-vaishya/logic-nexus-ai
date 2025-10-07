@@ -22,14 +22,26 @@ export default function LeadNew() {
         return;
       }
 
+      // Extract non-column extras and persist them into custom_fields
+      const { service_id, attachments, ...rest } = formData || {};
+      const attachmentNames = Array.isArray(attachments)
+        ? attachments.map((f: File) => f.name)
+        : [];
+      const customFields: Record<string, any> = {
+        ...(rest?.custom_fields || {}),
+        ...(service_id ? { service_id } : {}),
+        ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+      };
+
       const { data, error } = await supabase
         .from('leads')
         .insert({
-          ...formData,
+          ...rest,
           tenant_id: tenantId,
           franchise_id: formData.franchise_id || context.franchiseId,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
           expected_close_date: formData.expected_close_date || null,
+          custom_fields: Object.keys(customFields).length ? customFields : null,
         })
         .select()
         .single();

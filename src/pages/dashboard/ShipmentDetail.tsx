@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, MapPin, Calendar, Edit } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,10 +15,14 @@ export default function ShipmentDetail() {
   const navigate = useNavigate();
   const [shipment, setShipment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [attachments, setAttachments] = useState<any[]>([]);
   const { supabase } = useCRM();
 
   useEffect(() => {
-    if (id) fetchShipment();
+    if (id) {
+      fetchShipment();
+      fetchAttachments();
+    }
   }, [id]);
 
   const fetchShipment = async () => {
@@ -36,6 +40,26 @@ export default function ShipmentDetail() {
       console.error('Error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAttachments = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('shipment_attachments')
+        .select('*')
+        .eq('shipment_id', id)
+        .order('uploaded_at', { ascending: false });
+      if (error) throw error;
+      const rows = data || [];
+      const withUrls = rows.map((att: any) => {
+        const urlRes = (supabase as any).storage.from('shipments').getPublicUrl(att.path);
+        const resolved = att.public_url || urlRes?.data?.publicUrl || null;
+        return { ...att, resolved_url: resolved };
+      });
+      setAttachments(withUrls);
+    } catch (error: any) {
+      console.warn('Failed to load attachments', error);
     }
   };
 
@@ -202,6 +226,52 @@ export default function ShipmentDetail() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Attachments */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-5 w-5 text-primary" />
+              <CardTitle>Attachments</CardTitle>
+              <CardDescription>Uploaded documents for this shipment</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {attachments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No attachments yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {attachments.map((att) => {
+                  const url = att.resolved_url;
+                  return (
+                    <li key={att.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium leading-tight">{att.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {att.content_type || 'file'} • {att.size ? `${Math.round(att.size / 1024)} KB` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {url && (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 text-primary hover:underline"
+                        >
+                          <Download className="h-4 w-4" />
+                          View
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         {id && <TrackingTimeline shipmentId={id} />}
       </div>

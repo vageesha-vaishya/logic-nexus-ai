@@ -74,12 +74,15 @@ export default function Settings() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-primary" />
-                <CardTitle>Data Management</CardTitle>
+                <CardTitle>Data Management Options</CardTitle>
               </div>
-              <CardDescription>Export and backup options</CardDescription>
+              <CardDescription>Database insights and data tools</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Data management tools coming soon</p>
+            <CardContent className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">View RLS status, policies, and schema details.</p>
+              <Button variant="default" onClick={() => navigate('/dashboard/security-overview')}>
+                Security Overview
+              </Button>
             </CardContent>
           </Card>
 

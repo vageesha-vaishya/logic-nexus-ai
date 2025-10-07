@@ -10,6 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { FormSection, FormGrid } from '@/components/forms/FormLayout';
+import { AsyncComboboxField, FileUploadField } from '@/components/forms/AdvancedFields';
+import { Switch } from '@/components/ui/switch';
 
 const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -26,6 +29,8 @@ const leadSchema = z.object({
   notes: z.string().optional(),
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
+  service_id: z.string().optional(),
+  attachments: z.array(z.any()).default([]),
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
@@ -60,6 +65,8 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       notes: initialData?.notes || '',
       tenant_id: initialData?.tenant_id || '',
       franchise_id: initialData?.franchise_id || '',
+      service_id: (initialData as any)?.custom_fields?.service_id || '',
+      attachments: [],
     },
   });
 
@@ -87,6 +94,8 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   };
 
   const { isSubmitting } = form.formState;
+  const attachments = form.watch('attachments');
+  const [signedUrlEnabled, setSignedUrlEnabled] = useState(false);
 
   const handleFormSubmit = (data: LeadFormData) => {
     setPendingData(data);
@@ -298,6 +307,14 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             )}
           />
 
+          <AsyncComboboxField
+            control={form.control}
+            name="service_id"
+            label="Interested Service"
+            placeholder="Search services..."
+            className="col-span-2"
+          />
+
           <FormField
             control={form.control}
             name="estimated_value"
@@ -362,6 +379,46 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             )}
           />
         </div>
+
+        <FormSection
+          title="Attachments"
+          description="Upload related documents (e.g., proposals, brochures)"
+          actions={
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Switch checked={signedUrlEnabled} onCheckedChange={setSignedUrlEnabled} id="lead-signed-url" />
+                <label htmlFor="lead-signed-url" className="text-sm">Signed URL</label>
+              </div>
+            </div>
+          }
+        >
+          <FormGrid columns={1}>
+            <FileUploadField control={form.control} name="attachments" label="Attachments" />
+            {attachments && Array.isArray(attachments) && attachments.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Selected files:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {attachments.map((f: File, idx: number) => (
+                    <li key={`${f.name}-${idx}`} className="flex items-center justify-between">
+                      <span className="truncate">
+                        <span className="font-medium">{f.name}</span>
+                        <span className="text-muted-foreground"> • {f.type || 'unknown'}</span>
+                      </span>
+                      <span className="text-muted-foreground">{(f.size / 1024).toFixed(1)} KB</span>
+                    </li>
+                  ))}
+                </ul>
+                {signedUrlEnabled && (
+                  <p className="text-xs text-muted-foreground">
+                    Signed URL enabled: in production, generate secure file links via Supabase Storage.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No files selected yet</p>
+            )}
+          </FormGrid>
+        </FormSection>
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>

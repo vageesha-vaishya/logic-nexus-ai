@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { DateField, CurrencyField, ComboboxField, FileUploadField } from '@/components/forms/AdvancedFields';
 
 const shipmentSchema = z.object({
   shipment_number: z.string().min(1, 'Shipment number is required'),
@@ -16,14 +17,14 @@ const shipmentSchema = z.object({
   status: z.enum(['draft', 'confirmed', 'in_transit', 'customs', 'out_for_delivery', 'delivered', 'cancelled', 'on_hold', 'returned']),
   origin_address: z.string().min(1, 'Origin address is required'),
   destination_address: z.string().min(1, 'Destination address is required'),
-  pickup_date: z.string().optional(),
-  estimated_delivery_date: z.string().optional(),
+  pickup_date: z.date().optional(),
+  estimated_delivery_date: z.date().optional(),
   total_weight_kg: z.string().optional(),
   total_volume_cbm: z.string().optional(),
   total_packages: z.string().optional(),
   container_type: z.enum(['20ft_standard', '40ft_standard', '40ft_high_cube', '45ft_high_cube', 'reefer', 'open_top', 'flat_rack', 'tank']).optional(),
   container_number: z.string().optional(),
-  declared_value: z.string().optional(),
+  declared_value: z.coerce.number().optional(),
   service_level: z.string().optional(),
   priority_level: z.enum(['low', 'normal', 'high', 'urgent']),
   special_instructions: z.string().optional(),
@@ -33,6 +34,7 @@ const shipmentSchema = z.object({
   account_id: z.string().optional(),
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
+  attachments: z.array(z.any()).default([]),
 });
 
 type ShipmentFormData = z.infer<typeof shipmentSchema>;
@@ -55,13 +57,13 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
       status: initialData?.status || 'draft',
       origin_address: initialData?.origin_address || '',
       destination_address: initialData?.destination_address || '',
-      pickup_date: initialData?.pickup_date || '',
-      estimated_delivery_date: initialData?.estimated_delivery_date || '',
+      pickup_date: initialData?.pickup_date ? new Date(initialData.pickup_date as any) : undefined,
+      estimated_delivery_date: initialData?.estimated_delivery_date ? new Date(initialData.estimated_delivery_date as any) : undefined,
       total_weight_kg: initialData?.total_weight_kg || '',
       total_volume_cbm: initialData?.total_volume_cbm || '',
       total_packages: initialData?.total_packages || '',
       container_number: initialData?.container_number || '',
-      declared_value: initialData?.declared_value || '',
+      declared_value: initialData?.declared_value ? Number(initialData.declared_value as any) : undefined,
       service_level: initialData?.service_level || '',
       priority_level: initialData?.priority_level || 'normal',
       special_instructions: initialData?.special_instructions || '',
@@ -71,6 +73,7 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
       account_id: initialData?.account_id || '',
       tenant_id: initialData?.tenant_id || '',
       franchise_id: initialData?.franchise_id || '',
+      attachments: [],
     },
   });
 
@@ -182,29 +185,13 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
             )}
           />
 
-          <FormField
+          <ComboboxField
             control={form.control}
             name="account_id"
-            render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>Customer Account</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Customer Account"
+            className="col-span-2"
+            placeholder="Select account"
+            options={accounts.map((a) => ({ label: a.name, value: a.id }))}
           />
 
           <FormField
@@ -235,32 +222,16 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
             )}
           />
 
-          <FormField
+          <DateField
             control={form.control}
             name="pickup_date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Pickup Date</FormLabel>
-                <FormControl>
-                  <Input type="datetime-local" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Pickup Date"
           />
 
-          <FormField
+          <DateField
             control={form.control}
             name="estimated_delivery_date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Estimated Delivery</FormLabel>
-                <FormControl>
-                  <Input type="datetime-local" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Estimated Delivery"
           />
 
           <FormField
@@ -305,6 +276,14 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
             )}
           />
 
+          <CurrencyField
+            control={form.control}
+            name="declared_value"
+            label="Declared Value"
+            placeholder="0.00"
+            className="col-span-2"
+          />
+
           <FormField
             control={form.control}
             name="reference_number"
@@ -331,6 +310,14 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
                 <FormMessage />
               </FormItem>
             )}
+          />
+
+          <FileUploadField
+            control={form.control}
+            name="attachments"
+            label="Attachments"
+            description="Upload related documents (invoices, BOLs, etc.)"
+            className="col-span-2"
           />
         </div>
 
