@@ -3822,6 +3822,10 @@ export type Database = {
         Args: { query_text: string }
         Returns: Json
       }
+      generate_quote_number: {
+        Args: { p_franchise_id?: string; p_tenant_id: string }
+        Returns: string
+      }
       get_database_enums: {
         Args: Record<PropertyKey, never>
         Returns: {
