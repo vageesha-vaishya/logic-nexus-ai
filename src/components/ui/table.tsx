@@ -1,18 +1,28 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
     <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table ref={ref} className={cn("w-full caption-bottom text-sm border-collapse bg-[hsl(var(--table-background))]", className)} {...props} />
     </div>
   ),
 );
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />,
+  ({ className, ...props }, ref) => (
+    <thead
+      ref={ref}
+      className={cn(
+        "bg-[hsl(var(--table-header-background))] border-y border-[hsl(var(--table-header-separator))] [&_th]:text-[hsl(var(--table-header-text))] [&_th]:border-l [&_th]:border-[hsl(var(--table-header-separator))] [&_th:first-child]:border-l-0",
+        className,
+      )}
+      {...props}
+    />
+  ),
 );
 TableHeader.displayName = "TableHeader";
 
@@ -69,4 +79,43 @@ const TableCaption = React.forwardRef<HTMLTableCaptionElement, React.HTMLAttribu
 );
 TableCaption.displayName = "TableCaption";
 
-export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };
+interface SortableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
+  field: string;
+  activeField?: string;
+  direction?: "asc" | "desc";
+  onSort: (field: string) => void;
+  label?: React.ReactNode;
+}
+
+const SortableHead = React.forwardRef<HTMLTableCellElement, SortableHeadProps>(
+  ({ className, field, activeField, direction = "asc", onSort, label, children, ...props }, ref) => {
+    const isActive = activeField === field;
+    const ariaSort = isActive ? (direction === "asc" ? "ascending" : "descending") : "none";
+    return (
+      <TableHead ref={ref as any} className={cn("select-none", className)} aria-sort={ariaSort} {...props}>
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full text-left hover:opacity-80"
+          onClick={() => onSort(field)}
+          title={isActive ? (direction === "asc" ? "Sorted ascending" : "Sorted descending") : "Click to sort"}
+        >
+          <span className="truncate">{label ?? children}</span>
+          <span className="inline-flex items-center">
+            {isActive ? (
+              direction === "asc" ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )
+            ) : (
+              <ChevronsUpDown className="h-4 w-4 opacity-40" />
+            )}
+          </span>
+        </button>
+      </TableHead>
+    );
+  },
+);
+SortableHead.displayName = "SortableHead";
+
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption, SortableHead };

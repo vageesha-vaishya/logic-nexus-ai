@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import TitleStrip from '@/components/ui/title-strip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -123,60 +124,63 @@ export default function OpportunitiesPipeline() {
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Loading pipeline...</div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {grouped.map(({ stage, items }) => (
-              <div key={stage} className="min-w-[300px]">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Badge className={stageColors[stage]}>{stageLabels[stage]}</Badge>
-                      </CardTitle>
-                      <span className="text-xs text-muted-foreground">{items.length}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {items.length === 0 ? (
-                      <div className="text-xs text-muted-foreground py-4">No opportunities</div>
-                    ) : (
-                      items.map((opp) => (
-                        <div key={opp.id} className="border rounded-md p-3 bg-white">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                              <button
-                                className="text-left font-medium hover:underline"
-                                onClick={() => navigate(`/dashboard/opportunities/${opp.id}`)}
-                              >
-                                {opp.name}
-                              </button>
-                              <div className="text-xs text-muted-foreground">
-                                {opp.accounts?.name || '-'}
+          <div className="space-y-2">
+            <TitleStrip label="Opportunities Pipeline" />
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {grouped.map(({ stage, items }) => (
+                <div key={stage} className="min-w-[300px]">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Badge className={stageColors[stage]}>{stageLabels[stage]}</Badge>
+                        </CardTitle>
+                        <span className="text-xs text-muted-foreground">{items.length}</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {items.length === 0 ? (
+                        <div className="text-xs text-muted-foreground py-4">No opportunities</div>
+                      ) : (
+                        items.map((opp) => (
+                          <div key={opp.id} className="border rounded-md p-3 bg-white">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1">
+                                <button
+                                  className="text-left font-medium hover:underline"
+                                  onClick={() => navigate(`/dashboard/opportunities/${opp.id}`)}
+                                >
+                                  {opp.name}
+                                </button>
+                                <div className="text-xs text-muted-foreground">
+                                  {opp.accounts?.name || '-'}
+                                </div>
+                              </div>
+                              <div className="text-sm font-semibold">
+                                {formatCurrency(Number(opp.amount) || 0)}
                               </div>
                             </div>
-                            <div className="text-sm font-semibold">
-                              {formatCurrency(Number(opp.amount) || 0)}
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <div className="text-xs text-muted-foreground">Close: {formatDate(opp.close_date)}</div>
+                              <Select onValueChange={(v) => handleStageChange(opp.id, v as Stage)} defaultValue={opp.stage as Stage}>
+                                <SelectTrigger className="h-8 w-[160px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {stages.map((s) => (
+                                    <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                           </div>
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <div className="text-xs text-muted-foreground">Close: {formatDate(opp.close_date)}</div>
-                            <Select onValueChange={(v) => handleStageChange(opp.id, v as Stage)} defaultValue={opp.stage as Stage}>
-                              <SelectTrigger className="h-8 w-[160px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {stages.map((s) => (
-                                  <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

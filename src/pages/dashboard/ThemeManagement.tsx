@@ -21,6 +21,12 @@ export default function ThemeManagement() {
   const [end, setEnd] = useState('197 71% 52%');
   const [primary, setPrimary] = useState('217 91% 60%');
   const [accent, setAccent] = useState('197 71% 52%');
+  const [titleStrip, setTitleStrip] = useState('197 71% 52%');
+  // Table header tokens
+  const [tableHeaderText, setTableHeaderText] = useState('0 0% 100%');
+  const [tableHeaderSeparator, setTableHeaderSeparator] = useState<string | undefined>(undefined);
+  const [tableHeaderBackground, setTableHeaderBackground] = useState<string | undefined>(undefined);
+  const [tableBackground, setTableBackground] = useState<string | undefined>(undefined);
   const [angle, setAngle] = useState(135);
   // Main page background gradient overrides (default to primary gradient)
   const [bgStart, setBgStart] = useState<string | undefined>(undefined);
@@ -51,6 +57,12 @@ export default function ThemeManagement() {
         setSidebarBackground(found.sidebarBackground || sidebarBackground);
         setSidebarAccent(found.sidebarAccent || sidebarAccent);
         setDark(found.dark ?? dark);
+        // Table header tokens (fallback to accessible defaults by mode)
+        setTableHeaderText((found as any).tableHeaderText || '0 0% 100%');
+        setTableHeaderSeparator((found as any).tableHeaderSeparator || ((found?.dark ?? dark) ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'));
+        // New table header/table background tokens
+        setTableHeaderBackground((found as any).tableHeaderBackground || found.titleStrip || accent || primary);
+        setTableBackground((found as any).tableBackground || ((found?.dark ?? dark) ? '222 47% 11%' : '0 0% 100%'));
       }
     }
   }, [activeThemeName, themes]);
@@ -74,6 +86,36 @@ export default function ThemeManagement() {
   const allThemes = useMemo(() => {
     return [...THEME_PRESETS, ...themes];
   }, [themes]);
+
+  const resetTableDefaults = () => {
+    // Apply theme without explicit table tokens to trigger dynamic defaults
+    applyTheme({
+      start,
+      end,
+      primary,
+      accent,
+      titleStrip,
+      angle,
+      radius,
+      sidebarBackground,
+      sidebarAccent,
+      dark,
+      bgStart: bgStart ?? start,
+      bgEnd: bgEnd ?? end,
+      bgAngle: bgAngle ?? angle,
+    });
+    // Read computed CSS variables set by applyTheme
+    const root = document.documentElement;
+    const readVar = (name: string) => getComputedStyle(root).getPropertyValue(name).trim();
+    const nextHeaderBg = readVar('--table-header-background');
+    const nextTableBg = readVar('--table-background');
+    const nextHeaderText = readVar('--table-header-text');
+    const nextSeparator = readVar('--table-header-separator');
+    if (nextHeaderBg) setTableHeaderBackground(nextHeaderBg);
+    if (nextTableBg) setTableBackground(nextTableBg);
+    if (nextHeaderText) setTableHeaderText(nextHeaderText);
+    if (nextSeparator) setTableHeaderSeparator(nextSeparator);
+  };
 
   return (
     <DashboardLayout>
@@ -119,7 +161,7 @@ export default function ThemeManagement() {
             <CardTitle>Create / Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-6">
               <div className="space-y-2">
                 <label className="text-sm">Theme Name</label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -128,6 +170,14 @@ export default function ThemeManagement() {
               <HslPicker label="Gradient End" value={end} onChange={setEnd} />
               <HslPicker label="Primary" value={primary} onChange={setPrimary} />
               <HslPicker label="Accent" value={accent} onChange={setAccent} />
+              <HslPicker label="List Title Strip" value={titleStrip} onChange={setTitleStrip} />
+              <HslPicker label="Table Header Text" value={tableHeaderText} onChange={setTableHeaderText} />
+              <HslPicker label="Table Header Separator" value={tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2')} onChange={(v) => setTableHeaderSeparator(v)} />
+              <HslPicker label="Table Header Background" value={tableHeaderBackground ?? titleStrip} onChange={(v) => setTableHeaderBackground(v)} />
+              <HslPicker label="Table Background" value={tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%')} onChange={(v) => setTableBackground(v)} />
+              <div className="col-span-full">
+                <Button variant="outline" size="sm" onClick={resetTableDefaults}>Reset Table Defaults</Button>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-4 mt-4">
@@ -177,7 +227,7 @@ export default function ThemeManagement() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              <Button onClick={() => applyTheme({ start, end, primary, accent, angle, radius, sidebarBackground, sidebarAccent, dark, bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
+              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
               <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
               <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
@@ -200,6 +250,7 @@ export default function ThemeManagement() {
                     <div className="font-medium truncate">{p.name}</div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => {
+                        const isDarkPreset = typeof p.dark === 'boolean' ? p.dark : dark;
                         applyTheme({
                           start: p.start,
                           end: p.end,
@@ -212,7 +263,11 @@ export default function ThemeManagement() {
                           radius: p.radius ?? radius,
                           sidebarBackground: p.sidebarBackground ?? sidebarBackground,
                           sidebarAccent: p.sidebarAccent ?? sidebarAccent,
-                          dark: typeof p.dark === 'boolean' ? p.dark : dark,
+                          dark: isDarkPreset,
+                          tableHeaderText: (p as any).tableHeaderText ?? '0 0% 100%',
+                          tableHeaderSeparator: (p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
+                          tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
+                          tableBackground: (p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'),
                         });
                         if (canWrite) setActive(p.name);
                       }}>Apply</Button>
@@ -229,7 +284,12 @@ export default function ThemeManagement() {
                         setRadius(p.radius ?? radius);
                         setSidebarBackground(p.sidebarBackground ?? sidebarBackground);
                         setSidebarAccent(p.sidebarAccent ?? sidebarAccent);
-                        setDark(p.dark ?? dark);
+                        const isDarkPreset = p.dark ?? dark;
+                        setDark(isDarkPreset);
+                        setTableHeaderText((p as any).tableHeaderText ?? '0 0% 100%');
+                        setTableHeaderSeparator((p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'));
+                        setTableHeaderBackground((p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary);
+                        setTableBackground((p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'));
                         if (canWrite) setOpen(true);
                       }}>Customize</Button>
                     </div>
@@ -250,9 +310,9 @@ export default function ThemeManagement() {
             </div>
             <DialogFooter>
               <Button disabled={!canWrite} onClick={() => {
-                saveTheme({ name, start, end, primary, accent, angle, radius, sidebarBackground, sidebarAccent, dark, bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setActive(name);
-                applyTheme({ start, end, primary, accent, angle, radius, sidebarBackground, sidebarAccent, dark, bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setOpen(false);
               }}>Save</Button>
             </DialogFooter>

@@ -4,7 +4,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { useSort } from '@/hooks/useSort';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
+import { usePagination } from '@/hooks/usePagination';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
@@ -112,6 +115,33 @@ export default function Shipments() {
       matchesPackages && matchesETA;
   });
 
+  const { sorted: sortedShipments, sortField, sortDirection, onSort } = useSort<any>(filteredShipments, {
+    accessors: {
+      shipment_number: (s) => s.shipment_number,
+      type: (s) => s.shipment_type,
+      customer: (s) => s.accounts?.name ?? '',
+      status: (s) => s.status,
+      priority: (s) => s.priority_level ?? '',
+      packages: (s) => s.total_packages ?? 0,
+      eta: (s) => s.estimated_delivery_date ?? '',
+    },
+  });
+
+  const {
+    pageItems: pagedShipments,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    currentPage,
+    totalPages,
+    nextPage,
+    prevPage,
+    firstPage,
+    lastPage,
+    canPrev,
+    canNext,
+  } = usePagination(sortedShipments, { initialPageSize: 20 });
+
   const totalShipments = shipments.length;
   const inTransit = shipments.filter(s => s.status === 'in_transit').length;
   const delivered = shipments.filter(s => s.status === 'delivered').length;
@@ -145,6 +175,40 @@ export default function Shipments() {
           <div>
             <h1 className="text-3xl font-bold">Shipments</h1>
             <p className="text-muted-foreground">Track and manage all shipments</p>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-muted-foreground">Cards per page</div>
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Cards" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((opt) => (
+                    <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
           <div className="flex gap-2 items-center">
             <ViewToggle value={viewMode} onChange={setViewMode} />
@@ -325,19 +389,19 @@ export default function Shipments() {
         ) : viewMode === 'list' ? (
           <Card>
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Shipment #</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Packages</TableHead>
-                  <TableHead>ETA</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredShipments.map((shipment) => (
+                <TableHeader>
+                  <TableRow>
+                    <SortableHead field="shipment_number" activeField={sortField} direction={sortDirection} onSort={onSort}>Shipment #</SortableHead>
+                    <SortableHead field="type" activeField={sortField} direction={sortDirection} onSort={onSort}>Type</SortableHead>
+                    <SortableHead field="customer" activeField={sortField} direction={sortDirection} onSort={onSort}>Customer</SortableHead>
+                    <SortableHead field="status" activeField={sortField} direction={sortDirection} onSort={onSort}>Status</SortableHead>
+                    <SortableHead field="priority" activeField={sortField} direction={sortDirection} onSort={onSort}>Priority</SortableHead>
+                    <SortableHead field="packages" activeField={sortField} direction={sortDirection} onSort={onSort}>Packages</SortableHead>
+                    <SortableHead field="eta" activeField={sortField} direction={sortDirection} onSort={onSort}>ETA</SortableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedShipments.map((shipment) => (
                   <TableRow 
                     key={shipment.id} 
                     className="cursor-pointer hover:bg-muted/50"
@@ -365,10 +429,44 @@ export default function Shipments() {
                 ))}
               </TableBody>
             </Table>
+            <div className="p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Rows per page</div>
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Rows" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((opt) => (
+                      <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </Card>
         ) : (
           <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
-            {filteredShipments.map((shipment) => (
+            {pagedShipments.map((shipment) => (
               <Link key={shipment.id} to={`/dashboard/shipments/${shipment.id}`}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                   <CardHeader>

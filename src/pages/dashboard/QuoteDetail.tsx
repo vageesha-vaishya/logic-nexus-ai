@@ -59,7 +59,7 @@ export default function QuoteDetail() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">Edit Quote</h1>
           </div>
         </div>

@@ -4,7 +4,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { useSort } from '@/hooks/useSort';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
+import { usePagination } from '@/hooks/usePagination';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
@@ -104,6 +107,29 @@ export default function Warehouses() {
 
     return matchesGlobal && matchesName && matchesCode && matchesType && matchesContact && matchesCapacity && matchesUtil && matchesStatus;
   });
+
+  const { sorted: sortedWarehouses, sortField, sortDirection, onSort } = useSort<Warehouse>(filteredWarehouses, {
+    accessors: {
+      capacity_sqft: (w) => w.capacity_sqft ?? 0,
+      current_utilization: (w) => w.current_utilization,
+      is_active: (w) => (w.is_active ? 1 : 0),
+    },
+  });
+
+  const {
+    pageItems: pagedWarehouses,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    currentPage,
+    totalPages,
+    nextPage,
+    prevPage,
+    firstPage,
+    lastPage,
+    canPrev,
+    canNext,
+  } = usePagination(sortedWarehouses, { initialPageSize: 20 });
 
   return (
     <DashboardLayout>
@@ -235,17 +261,17 @@ export default function Warehouses() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Capacity</TableHead>
-                  <TableHead>Utilization</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>Name</SortableHead>
+                  <SortableHead field="code" activeField={sortField} direction={sortDirection} onSort={onSort}>Code</SortableHead>
+                  <SortableHead field="warehouse_type" activeField={sortField} direction={sortDirection} onSort={onSort}>Type</SortableHead>
+                  <SortableHead field="contact_person" activeField={sortField} direction={sortDirection} onSort={onSort}>Contact</SortableHead>
+                  <SortableHead field="capacity_sqft" activeField={sortField} direction={sortDirection} onSort={onSort}>Capacity</SortableHead>
+                  <SortableHead field="current_utilization" activeField={sortField} direction={sortDirection} onSort={onSort}>Utilization</SortableHead>
+                  <SortableHead field="is_active" activeField={sortField} direction={sortDirection} onSort={onSort}>Status</SortableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredWarehouses.map((warehouse) => (
+                {pagedWarehouses.map((warehouse) => (
                   <TableRow 
                     key={warehouse.id} 
                     className="cursor-pointer hover:bg-muted/50"
@@ -268,10 +294,45 @@ export default function Warehouses() {
                 ))}
               </TableBody>
             </Table>
+            <div className="p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Rows per page</div>
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Rows" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((opt) => (
+                      <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </Card>
         ) : (
+          <>
           <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
-            {filteredWarehouses.map((warehouse) => (
+            {pagedWarehouses.map((warehouse) => (
               <Link key={warehouse.id} to={`/dashboard/warehouses/${warehouse.id}`}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                   <CardHeader>
@@ -306,6 +367,41 @@ export default function Warehouses() {
               </Link>
             ))}
           </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-muted-foreground">Cards per page</div>
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Cards" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((opt) => (
+                    <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+          </>
         )}
       </div>
     </DashboardLayout>

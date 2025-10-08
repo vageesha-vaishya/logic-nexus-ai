@@ -1,8 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import TitleStrip from '@/components/ui/title-strip';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
+import { useSort } from '@/hooks/useSort';
+import { usePagination } from '@/hooks/usePagination';
 import { useCRM } from '@/hooks/useCRM';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,6 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export default function Quotes() {
   const navigate = useNavigate();
@@ -17,6 +24,33 @@ export default function Quotes() {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  // Filters state and helpers
+  type TextOp = 'contains' | 'startsWith' | 'equals' | 'endsWith';
+
+  const [quoteNumberOp, setQuoteNumberOp] = useState<TextOp>('contains');
+  const [quoteNumberQuery, setQuoteNumberQuery] = useState('');
+
+  const [customerOp, setCustomerOp] = useState<TextOp>('contains');
+  const [customerQuery, setCustomerQuery] = useState('');
+
+  const [contactOp, setContactOp] = useState<TextOp>('contains');
+  const [contactQuery, setContactQuery] = useState('');
+
+  const [opportunityOp, setOpportunityOp] = useState<TextOp>('contains');
+  const [opportunityQuery, setOpportunityQuery] = useState('');
+
+  const [carrierOp, setCarrierOp] = useState<TextOp>('contains');
+  const [carrierQuery, setCarrierQuery] = useState('');
+
+  const [quoteStatus, setQuoteStatus] = useState<string>('any');
+
+  const [minSellPrice, setMinSellPrice] = useState<string>('');
+  const [maxSellPrice, setMaxSellPrice] = useState<string>('');
+  const [minMargin, setMinMargin] = useState<string>('');
+
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   useEffect(() => {
     const fetchQuotes = async () => {
@@ -76,10 +110,107 @@ export default function Quotes() {
     }
   };
 
+  const matchText = (value: string | undefined | null, query: string, op: TextOp) => {
+    if (!query) return true;
+    const v = (value || '').toLowerCase();
+    const q = query.toLowerCase();
+    switch (op) {
+      case 'contains':
+        return v.includes(q);
+      case 'startsWith':
+        return v.startsWith(q);
+      case 'equals':
+        return v === q;
+      case 'endsWith':
+        return v.endsWith(q);
+      default:
+        return true;
+    }
+  };
+
+  const filteredQuotes = quotes.filter((q) => {
+    const quoteNum = q.quote_number || (q.id ? String(q.id).slice(0, 8) : '');
+    const matchesQuoteNum = matchText(quoteNum, quoteNumberQuery, quoteNumberOp);
+
+    const customerName = q.accounts?.name || '';
+    const matchesCustomer = matchText(customerName, customerQuery, customerOp);
+
+    const contactName = q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : '';
+    const matchesContact = matchText(contactName, contactQuery, contactOp);
+
+    const opportunityName = q.opportunities?.name || '';
+    const matchesOpportunity = matchText(opportunityName, opportunityQuery, opportunityOp);
+
+    const carrierName = q.carriers?.carrier_name || '';
+    const matchesCarrier = matchText(carrierName, carrierQuery, carrierOp);
+
+    const statusVal = (q.status || '').toLowerCase();
+    const matchesStatus = quoteStatus && quoteStatus !== 'any' ? statusVal === quoteStatus.toLowerCase() : true;
+
+    const sell = Number(q.sell_price ?? 0);
+    const matchesMinSell = minSellPrice ? sell >= Number(minSellPrice) : true;
+    const matchesMaxSell = maxSellPrice ? sell <= Number(maxSellPrice) : true;
+
+    const margin = (q.sell_price != null && q.cost_price != null) ? Number(q.sell_price) - Number(q.cost_price) : null;
+    const matchesMinMargin = minMargin ? (margin != null ? margin >= Number(minMargin) : false) : true;
+
+    const created = q.created_at ? new Date(q.created_at) : null;
+    const startOk = startDate ? (created ? created >= new Date(startDate) : false) : true;
+    const endOk = endDate ? (created ? created <= new Date(endDate) : false) : true;
+
+    return (
+      matchesQuoteNum &&
+      matchesCustomer &&
+      matchesContact &&
+      matchesOpportunity &&
+      matchesCarrier &&
+      matchesStatus &&
+      matchesMinSell &&
+      matchesMaxSell &&
+      matchesMinMargin &&
+      startOk &&
+      endOk
+    );
+  });
+
+  const { sorted: sortedQuotes, sortField, sortDirection, onSort } = useSort<any>(
+    filteredQuotes,
+    {
+      initialField: 'created_at',
+      initialDirection: 'desc',
+      accessors: {
+        quote_number: (q: any) => q.quote_number || (q.id ? String(q.id).slice(0, 8) : ''),
+        customer: (q: any) => q.accounts?.name || '',
+        contact: (q: any) => (q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : ''),
+        opportunity: (q: any) => q.opportunities?.name || '',
+        carrier: (q: any) => q.carriers?.carrier_name || '',
+        status: (q: any) => q.status || '',
+        sell_price: (q: any) => Number(q.sell_price ?? 0),
+        margin: (q: any) => (q.sell_price != null && q.cost_price != null ? Number(q.sell_price) - Number(q.cost_price) : 0),
+        created_at: (q: any) => (q.created_at ? new Date(q.created_at).getTime() : 0),
+      },
+    }
+  );
+
+  const {
+    pageItems: pagedQuotes,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    currentPage,
+    totalPages,
+    nextPage,
+    prevPage,
+    firstPage,
+    lastPage,
+    canPrev,
+    canNext,
+  } = usePagination(sortedQuotes, { initialPageSize: 20 });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="space-y-2">
             <Breadcrumb>
               <BreadcrumbList>
@@ -101,6 +232,164 @@ export default function Quotes() {
             <Button onClick={() => navigate('/dashboard/quotes/new')}>New Quote</Button>
           </div>
         </div>
+
+        {/* Filters toolbar shown when not loading and there is data */}
+        {!loading && quotes.length > 0 && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Quote number</Label>
+                  <div className="flex gap-2">
+                    <Select value={quoteNumberOp} onValueChange={(v) => setQuoteNumberOp(v as TextOp)}>
+                      <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="startsWith">Starts With</SelectItem>
+                        <SelectItem value="equals">Equals</SelectItem>
+                        <SelectItem value="endsWith">Ends With</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Search number" value={quoteNumberQuery} onChange={(e) => setQuoteNumberQuery(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Customer</Label>
+                  <div className="flex gap-2">
+                    <Select value={customerOp} onValueChange={(v) => setCustomerOp(v as TextOp)}>
+                      <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="startsWith">Starts With</SelectItem>
+                        <SelectItem value="equals">Equals</SelectItem>
+                        <SelectItem value="endsWith">Ends With</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Search customer" value={customerQuery} onChange={(e) => setCustomerQuery(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contact</Label>
+                  <div className="flex gap-2">
+                    <Select value={contactOp} onValueChange={(v) => setContactOp(v as TextOp)}>
+                      <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="startsWith">Starts With</SelectItem>
+                        <SelectItem value="equals">Equals</SelectItem>
+                        <SelectItem value="endsWith">Ends With</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Search contact" value={contactQuery} onChange={(e) => setContactQuery(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Opportunity</Label>
+                  <div className="flex gap-2">
+                    <Select value={opportunityOp} onValueChange={(v) => setOpportunityOp(v as TextOp)}>
+                      <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="startsWith">Starts With</SelectItem>
+                        <SelectItem value="equals">Equals</SelectItem>
+                        <SelectItem value="endsWith">Ends With</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Search opportunity" value={opportunityQuery} onChange={(e) => setOpportunityQuery(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Carrier</Label>
+                  <div className="flex gap-2">
+                    <Select value={carrierOp} onValueChange={(v) => setCarrierOp(v as TextOp)}>
+                      <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="startsWith">Starts With</SelectItem>
+                        <SelectItem value="equals">Equals</SelectItem>
+                        <SelectItem value="endsWith">Ends With</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Search carrier" value={carrierQuery} onChange={(e) => setCarrierQuery(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={quoteStatus} onValueChange={(v) => setQuoteStatus(v)}>
+                    <SelectTrigger><SelectValue placeholder="Any status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="sent">Sent</SelectItem>
+                      <SelectItem value="accepted">Accepted</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Sell price range</Label>
+                  <div className="flex gap-2">
+                    <Input type="number" placeholder="Min" value={minSellPrice} onChange={(e) => setMinSellPrice(e.target.value)} />
+                    <Input type="number" placeholder="Max" value={maxSellPrice} onChange={(e) => setMaxSellPrice(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Min margin</Label>
+                  <Input type="number" placeholder="Min margin" value={minMargin} onChange={(e) => setMinMargin(e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Created date range</Label>
+                  <div className="flex gap-2">
+                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">Cards per page</div>
+                  <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Cards" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((opt) => (
+                        <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Pagination className="justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {loading ? (
           <Card>
@@ -131,25 +420,26 @@ export default function Quotes() {
         ) : viewMode === 'list' ? (
           <Card>
             <CardHeader>
-              <CardTitle>All Quotes</CardTitle>
+              <TitleStrip label="All Quotes" />
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Quote #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Opportunity</TableHead>
-                    <TableHead>Carrier</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Sell Price</TableHead>
-                    <TableHead>Margin</TableHead>
-                    <TableHead>Created</TableHead>
+                    <SortableHead label="Quote #" field="quote_number" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Customer" field="customer" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Contact" field="contact" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Opportunity" field="opportunity" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Carrier" field="carrier" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Status" field="status" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Sell Price" field="sell_price" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Margin" field="margin" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Created" field="created_at" activeField={sortField} direction={sortDirection} onSort={onSort} />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {quotes.map((q) => (
+                  {pagedQuotes.map((q) => (
                     <TableRow key={q.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
                       <TableCell className="font-medium">{q.quote_number || q.id.slice(0,8)}</TableCell>
                       <TableCell>{q.accounts?.name || '-'}</TableCell>
@@ -174,6 +464,41 @@ export default function Quotes() {
                   ))}
                 </TableBody>
               </Table>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">Rows per page</div>
+                  <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Rows" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((opt) => (
+                        <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Pagination className="justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+              </div>
             </CardContent>
           </Card>
         ) : viewMode === 'grid' ? (
@@ -182,8 +507,8 @@ export default function Quotes() {
               <CardTitle>All Quotes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {quotes.map((q) => (
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {pagedQuotes.map((q) => (
                   <div key={q.id} className="border rounded-lg p-3 hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
                     <div className="flex items-center justify-between">
                       <div className="font-medium">{q.quote_number || q.id.slice(0,8)}</div>
@@ -213,7 +538,7 @@ export default function Quotes() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {quotes.map((q) => (
+            {pagedQuotes.map((q) => (
               <Card key={q.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -248,6 +573,40 @@ export default function Quotes() {
                 </CardContent>
               </Card>
             ))}
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Cards per page</div>
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Cards" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((opt) => (
+                      <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </div>
         )}
       </div>

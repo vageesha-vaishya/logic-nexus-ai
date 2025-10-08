@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import TitleStrip from '@/components/ui/title-strip';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -386,19 +387,22 @@ export default function Leads() {
         </Card>
       ) : viewMode === 'list' ? (
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead>Value</TableHead>
-              </TableRow>
-            </TableHeader>
+          <CardHeader className="pb-2">
+            <TitleStrip label="All Leads" />
+          </CardHeader>
+              <Table>
+                <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
+                  <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Value</TableHead>
+                  </TableRow>
+                </TableHeader>
             <TableBody>
               {filteredLeads.map((lead) => (
                 <TableRow 
@@ -442,53 +446,56 @@ export default function Leads() {
           </Table>
         </Card>
       ) : (
-        <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
-          {filteredLeads.map((lead) => (
-            <Link key={lead.id} to={`/dashboard/leads/${lead.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <UserPlus className="h-10 w-10 text-primary" />
-                    <Badge className={getStatusColor(lead.status)}>
-                      {lead.status}
-                    </Badge>
-                  </div>
-                  <CardTitle className="mt-4">
-                    {lead.first_name} {lead.last_name}
-                  </CardTitle>
-                  {lead.company && (
-                    <CardDescription>{lead.company}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    {lead.estimated_value && (
-                      <div className="flex items-center gap-2 text-sm font-medium text-green-600">
-                        <DollarSign className="h-4 w-4" />
-                        <span>${lead.estimated_value.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {lead.lead_score !== null && (
-                      <div className="flex items-center gap-1 text-sm font-medium">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                        <span>{lead.lead_score}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Badge variant="outline" className="text-xs">
-                      {lead.source}
-                    </Badge>
-                    {lead.qualification_status && (
-                      <Badge variant="outline" className="text-xs">
-                        {lead.qualification_status}
+        <div className="space-y-2">
+          <TitleStrip label="All Leads" />
+          <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
+            {filteredLeads.map((lead) => (
+              <Link key={lead.id} to={`/dashboard/leads/${lead.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <UserPlus className="h-10 w-10 text-primary" />
+                      <Badge className={getStatusColor(lead.status)}>
+                        {lead.status}
                       </Badge>
+                    </div>
+                    <CardTitle className="mt-4">
+                      {lead.first_name} {lead.last_name}
+                    </CardTitle>
+                    {lead.company && (
+                      <CardDescription>{lead.company}</CardDescription>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      {lead.estimated_value && (
+                        <div className="flex items-center gap-2 text-sm font-medium text-green-600">
+                          <DollarSign className="h-4 w-4" />
+                          <span>${lead.estimated_value.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {lead.lead_score !== null && (
+                        <div className="flex items-center gap-1 text-sm font-medium">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <span>{lead.lead_score}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Badge variant="outline" className="text-xs">
+                        {lead.source}
+                      </Badge>
+                      {lead.qualification_status && (
+                        <Badge variant="outline" className="text-xs">
+                          {lead.qualification_status}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>

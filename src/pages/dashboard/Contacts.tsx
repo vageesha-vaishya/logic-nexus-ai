@@ -3,8 +3,10 @@ import { Plus, Search, User, Mail, Phone, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import TitleStrip from '@/components/ui/title-strip';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { useSort } from '@/hooks/useSort';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -55,6 +57,16 @@ export default function Contacts() {
     `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const { sorted: sortedContacts, sortField, sortDirection, onSort } = useSort<any>(filteredContacts, {
+    accessors: {
+      name: (c) => `${c.first_name} ${c.last_name}`,
+      title: (c) => c.title ?? '',
+      account: (c) => c.accounts?.name ?? '',
+      email: (c) => c.email ?? '',
+      phone: (c) => c.phone ?? '',
+    },
+  });
 
   return (
     <DashboardLayout>
@@ -110,19 +122,22 @@ export default function Contacts() {
       ) : (
         viewMode === 'list' ? (
           <Card>
+            <CardHeader className="pb-2">
+              <TitleStrip label="All Contacts" />
+            </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredContacts.map((contact) => (
+              <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
+                <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
+                  <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>Name</SortableHead>
+                  <SortableHead field="title" activeField={sortField} direction={sortDirection} onSort={onSort}>Title</SortableHead>
+                  <SortableHead field="account" activeField={sortField} direction={sortDirection} onSort={onSort}>Account</SortableHead>
+                  <SortableHead field="email" activeField={sortField} direction={sortDirection} onSort={onSort}>Email</SortableHead>
+                  <SortableHead field="phone" activeField={sortField} direction={sortDirection} onSort={onSort}>Phone</SortableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedContacts.map((contact) => (
                     <TableRow key={contact.id} className="cursor-pointer" onClick={() => {}}>
                       <TableCell>
                         <Link className="font-medium hover:underline" to={`/dashboard/contacts/${contact.id}`}>
@@ -140,64 +155,70 @@ export default function Contacts() {
             </CardContent>
           </Card>
         ) : viewMode === 'grid' ? (
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {filteredContacts.map((contact) => (
-              <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
-                <Card className="hover:shadow transition-shadow cursor-pointer">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base truncate">
-                      {contact.first_name} {contact.last_name}
-                    </CardTitle>
-                    {contact.title && (
-                      <CardDescription className="truncate">{contact.title}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
-                    {contact.accounts?.name || '-'}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+          <div className="space-y-2">
+            <TitleStrip label="All Contacts" />
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {filteredContacts.map((contact) => (
+                <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
+                  <Card className="hover:shadow transition-shadow cursor-pointer">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base truncate">
+                        {contact.first_name} {contact.last_name}
+                      </CardTitle>
+                      {contact.title && (
+                        <CardDescription className="truncate">{contact.title}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="text-sm text-muted-foreground">
+                      {contact.accounts?.name || '-'}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredContacts.map((contact) => (
-              <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <User className="h-10 w-10 text-primary" />
-                    </div>
-                    <CardTitle className="mt-4">
-                      {contact.first_name} {contact.last_name}
-                    </CardTitle>
-                    {contact.title && (
-                      <CardDescription>{contact.title}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {contact.accounts && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Building2 className="h-4 w-4" />
-                        <span>{contact.accounts.name}</span>
+          <div className="space-y-2">
+            <TitleStrip label="All Contacts" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredContacts.map((contact) => (
+                <Link key={contact.id} to={`/dashboard/contacts/${contact.id}`}>
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <User className="h-10 w-10 text-primary" />
                       </div>
-                    )}
-                    {contact.email && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span className="truncate">{contact.email}</span>
-                      </div>
-                    )}
-                    {contact.phone && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        <span>{contact.phone}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                      <CardTitle className="mt-4">
+                        {contact.first_name} {contact.last_name}
+                      </CardTitle>
+                      {contact.title && (
+                        <CardDescription>{contact.title}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {contact.accounts && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Building2 className="h-4 w-4" />
+                          <span>{contact.accounts.name}</span>
+                        </div>
+                      )}
+                      {contact.email && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                          <span className="truncate">{contact.email}</span>
+                        </div>
+                      )}
+                      {contact.phone && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <span>{contact.phone}</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
           </div>
         )
       )}

@@ -27,7 +27,7 @@ export default function QuoteNew() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">New Quote</h1>
           </div>
         </div>

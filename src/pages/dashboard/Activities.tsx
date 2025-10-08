@@ -4,9 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import TitleStrip from '@/components/ui/title-strip';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { useSort } from '@/hooks/useSort';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
+import { usePagination } from '@/hooks/usePagination';
 import { useCRM } from '@/hooks/useCRM';
 import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -211,6 +215,36 @@ export default function Activities() {
       return startOk && endOk;
     });
 
+  const { sorted: sortedActivities, sortField, sortDirection, onSort } = useSort<Activity>(
+    filteredActivitiesAdvanced,
+    {
+      initialField: 'due_date',
+      initialDirection: 'asc',
+      accessors: {
+        subject: (a) => a.subject || '',
+        activity_type: (a) => a.activity_type || '',
+        status: (a) => a.status || '',
+        priority: (a) => a.priority || '',
+        due_date: (a) => (a.due_date ? new Date(a.due_date).getTime() : 0),
+      },
+    }
+  );
+
+  const {
+    pageItems: pagedActivities,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    currentPage,
+    totalPages,
+    nextPage,
+    prevPage,
+    firstPage,
+    lastPage,
+    canPrev,
+    canNext,
+  } = usePagination(sortedActivities, { initialPageSize: 20 });
+
   const getTabCounts = () => {
     const now = startOfDay(new Date());
     return {
@@ -359,6 +393,40 @@ export default function Activities() {
                 </Select>
               </div>
             </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-muted-foreground">Cards per page</div>
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Cards" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((opt) => (
+                    <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
         </CardHeader>
         <CardContent>
@@ -545,21 +613,21 @@ export default function Activities() {
       ) : viewMode === 'list' ? (
         <Card>
           <CardHeader>
-            <CardTitle>All Activities</CardTitle>
+            <TitleStrip label="All Activities" />
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Due Date</TableHead>
-                </TableRow>
-              </TableHeader>
+              <Table>
+                <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
+                  <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
+                    <SortableHead label="Subject" field="subject" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Type" field="activity_type" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Status" field="status" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Priority" field="priority" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Due Date" field="due_date" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                  </TableRow>
+                </TableHeader>
               <TableBody>
-                {filteredActivitiesAdvanced.map((activity) => (
+                {pagedActivities.map((activity) => (
                   <TableRow
                     key={activity.id}
                     className="cursor-pointer hover:bg-muted/50"
@@ -588,11 +656,47 @@ export default function Activities() {
                 ))}
               </TableBody>
             </Table>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Rows per page</div>
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Rows" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((opt) => (
+                      <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </CardContent>
         </Card>
       ) : viewMode === 'grid' ? (
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {filteredActivitiesAdvanced.map((activity) => {
+        <div className="space-y-2">
+          <TitleStrip label="All Activities" />
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {pagedActivities.map((activity) => {
             const Icon = getActivityIcon(activity.activity_type);
             const isOverdue = activity.status !== 'completed' && activity.status !== 'cancelled' &&
               activity.due_date && isPast(new Date(activity.due_date)) && !isToday(new Date(activity.due_date));
@@ -623,12 +727,14 @@ export default function Activities() {
                 </CardContent>
               </Card>
             );
-          })}
+            })}
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
+          <TitleStrip label="All Activities" />
           {Object.entries(
-            filteredActivitiesAdvanced.reduce<Record<string, Activity[]>>((acc, a) => {
+            sortedActivities.reduce<Record<string, Activity[]>>((acc, a) => {
               const key = a.lead_id ?? 'none';
               (acc[key] ||= []).push(a);
               return acc;

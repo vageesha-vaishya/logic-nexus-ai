@@ -8,6 +8,11 @@ export type SavedTheme = {
   end: string;
   primary?: string;
   accent?: string;
+  titleStrip?: string;
+  tableHeaderText?: string;
+  tableHeaderSeparator?: string;
+  tableHeaderBackground?: string;
+  tableBackground?: string;
   angle?: number; // gradient angle in degrees
   radius?: string; // e.g., "0.75rem"
   sidebarBackground?: string;
@@ -25,8 +30,8 @@ type ThemeContextValue = {
   activeThemeName: string | null;
   scope: 'platform' | 'tenant' | 'franchise' | 'user';
   setScope: (s: 'platform' | 'tenant' | 'franchise' | 'user') => void;
-  applyTheme: (t: { start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
-  saveTheme: (t: { name: string; start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => Promise<void>;
+  applyTheme: (t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
+  saveTheme: (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => Promise<void>;
   deleteTheme: (name: string) => Promise<void>;
   setActive: (name: string) => void;
   toggleDark: (enabled: boolean) => void;
@@ -93,7 +98,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (async () => {
       try {
         if (!supabase) return;
-        let query = supabase.from('ui_themes').select('name, tokens, is_default, scope');
+        // Cast to any to avoid typed relation errors for ui_themes
+        let query: any = (supabase as any).from('ui_themes').select('name, tokens, is_default, scope');
         if (scope === 'user' && context?.userId) {
           query = query.eq('scope', 'user').eq('user_id', context.userId);
         } else if (scope === 'franchise' && context?.franchiseId) {
@@ -114,6 +120,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             end: row.tokens.end,
             primary: row.tokens.primary,
             accent: row.tokens.accent,
+            titleStrip: row.tokens.titleStrip,
+            tableHeaderText: row.tokens.tableHeaderText,
+            tableHeaderSeparator: row.tokens.tableHeaderSeparator,
+            tableHeaderBackground: row.tokens.tableHeaderBackground,
+            tableBackground: row.tokens.tableBackground,
             angle: row.tokens.angle,
             radius: row.tokens.radius,
             sidebarBackground: row.tokens.sidebarBackground,
@@ -138,7 +149,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   }, [scope, context?.userId, context?.tenantId, context?.franchiseId]);
 
-  const applyTheme = (t: { start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
+  const applyTheme = (t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const root = document.documentElement;
     const angle = t.angle ?? 135;
     root.style.setProperty('--gradient-primary', `linear-gradient(${angle}deg, hsl(${t.start}) 0%, hsl(${t.end}) 100%)`);
@@ -156,6 +167,69 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.style.setProperty('--accent', t.accent);
       root.style.setProperty('--sidebar-accent', t.accent);
     }
+    // Title strip color falls back to accent, then primary.
+    const titleStrip = t.titleStrip || t.accent || t.primary;
+    if (titleStrip) {
+      root.style.setProperty('--title-strip', titleStrip);
+    }
+    // Table header / table defaults with dynamic computation
+    const isDark = typeof t.dark === 'boolean' ? t.dark : document.documentElement.classList.contains('dark');
+
+    const parseHsl = (value?: string) => {
+      if (!value) return null as any;
+      const m = value.match(/^(\s*\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%/);
+      if (!m) return null as any;
+      return { h: Number(m[1]), s: Number(m[2]), l: Number(m[3]) };
+    };
+    const composeHsl = (h: number, s: number, l: number) => `${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%`;
+
+    // Compute header background
+    let computedHeaderBg = t.tableHeaderBackground;
+    if (!computedHeaderBg) {
+      if (isDark) {
+        // Dark mode default header background (slate-800 range)
+        computedHeaderBg = '222 47% 17%';
+      } else {
+        // Light mode: pastel tint derived from titleStrip/accent/primary
+        const base = titleStrip || t.accent || t.primary || '197 71% 52%';
+        const parsed = parseHsl(base);
+        if (parsed) {
+          computedHeaderBg = composeHsl(parsed.h, 35, 92);
+        } else {
+          computedHeaderBg = '197 35% 92%';
+        }
+      }
+    }
+    root.style.setProperty('--table-header-background', computedHeaderBg);
+
+    // Compute table background
+    const computedTableBg = t.tableBackground || (isDark ? '222 47% 11%' : '0 0% 100%');
+    root.style.setProperty('--table-background', computedTableBg);
+
+    // Auto-select header text by background lightness if not provided
+    let computedHeaderText = t.tableHeaderText;
+    if (!computedHeaderText) {
+      const p = parseHsl(computedHeaderBg);
+      if (p && p.l > 60) {
+        computedHeaderText = '0 0% 10%';
+      } else {
+        computedHeaderText = '0 0% 100%';
+      }
+    }
+    root.style.setProperty('--table-header-text', computedHeaderText);
+
+    // Separator: opposite color with balanced alpha
+    let computedSeparator = t.tableHeaderSeparator;
+    if (!computedSeparator) {
+      const p = parseHsl(computedHeaderBg);
+      const isLightBg = p ? p.l > 60 : !isDark; // fallback assumption
+      if (isLightBg) {
+        computedSeparator = '0 0% 0% / 0.15'; // subtle black
+      } else {
+        computedSeparator = '0 0% 100% / 0.25'; // subtle white
+      }
+    }
+    root.style.setProperty('--table-header-separator', computedSeparator);
     if (t.sidebarBackground) {
       root.style.setProperty('--sidebar-background', t.sidebarBackground);
     }
@@ -169,7 +243,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
+  const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const saved: SavedTheme = { ...t, createdAt: new Date().toISOString() };
     const next = [saved, ...themes.filter(x => x.name !== t.name)];
     setThemes(next);
@@ -181,6 +255,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         end: t.end,
         primary: t.primary,
         accent: t.accent,
+        titleStrip: t.titleStrip,
+        tableHeaderText: t.tableHeaderText,
+        tableHeaderSeparator: t.tableHeaderSeparator,
+        tableHeaderBackground: t.tableHeaderBackground,
+        tableBackground: t.tableBackground,
         angle: t.angle,
         radius: t.radius,
         sidebarBackground: t.sidebarBackground,
@@ -194,7 +273,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (scope === 'user') payload.user_id = context?.userId;
       if (scope === 'franchise') payload.franchise_id = context?.franchiseId;
       if (scope === 'tenant') payload.tenant_id = context?.tenantId;
-      await supabase.from('ui_themes').upsert(payload);
+      await (supabase as any).from('ui_themes').upsert(payload);
     } catch {}
   };
 
@@ -204,7 +283,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(LS_THEMES_KEY, JSON.stringify(next));
     try {
       if (!supabase) return;
-      let q = supabase.from('ui_themes').delete().eq('name', name).eq('scope', scope);
+      let q: any = (supabase as any).from('ui_themes').delete().eq('name', name).eq('scope', scope);
       if (scope === 'user') q = q.eq('user_id', context?.userId);
       if (scope === 'franchise') q = q.eq('franchise_id', context?.franchiseId);
       if (scope === 'tenant') q = q.eq('tenant_id', context?.tenantId);
@@ -221,12 +300,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (async () => {
       try {
         if (!supabase) return;
-        let clear = supabase.from('ui_themes').update({ is_default: false }).eq('scope', scope);
+        let clear: any = (supabase as any).from('ui_themes').update({ is_default: false }).eq('scope', scope);
         if (scope === 'user') clear = clear.eq('user_id', context?.userId);
         if (scope === 'franchise') clear = clear.eq('franchise_id', context?.franchiseId);
         if (scope === 'tenant') clear = clear.eq('tenant_id', context?.tenantId);
         await clear;
-        let set = supabase.from('ui_themes').update({ is_default: true }).eq('name', name).eq('scope', scope);
+        let set: any = (supabase as any).from('ui_themes').update({ is_default: true }).eq('name', name).eq('scope', scope);
         if (scope === 'user') set = set.eq('user_id', context?.userId);
         if (scope === 'franchise') set = set.eq('franchise_id', context?.franchiseId);
         if (scope === 'tenant') set = set.eq('tenant_id', context?.tenantId);

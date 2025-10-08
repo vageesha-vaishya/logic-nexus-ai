@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CarrierQuotesSection } from './CarrierQuotesSection';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,6 +46,20 @@ type QuoteItem = {
   discount_percent: number;
 };
 
+type Charge = {
+  type: string;
+  amount: number;
+  currency: string;
+  note?: string;
+};
+
+type CarrierQuote = {
+  carrier_id: string;
+  mode?: string;
+  buying_charges: Charge[];
+  selling_charges: Charge[];
+};
+
 export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: (quoteId: string) => void }) {
   const { context, supabase, user } = useCRM();
   const { roles } = useAuth();
@@ -61,6 +76,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [contacts, setContacts] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
+  const [carrierQuotes, setCarrierQuotes] = useState<CarrierQuote[]>([]);
+  const [quoteNumberPreview] = useState<string>(() => `QUO-${Date.now()}`);
   
 
   const form = useForm<z.infer<typeof quoteSchema>>({
@@ -130,6 +147,62 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     setItems(newItems);
   };
 
+  // Carrier quotations helpers
+  const addCarrierQuote = () => {
+    setCarrierQuotes([
+      ...carrierQuotes,
+      {
+        carrier_id: '',
+        mode: selectedServiceType || undefined,
+        buying_charges: [],
+        selling_charges: [],
+      },
+    ]);
+  };
+
+  const removeCarrierQuote = (index: number) => {
+    setCarrierQuotes(carrierQuotes.filter((_, i) => i !== index));
+  };
+
+  const updateCarrierField = (index: number, field: keyof CarrierQuote, value: any) => {
+    const next = [...carrierQuotes];
+    next[index] = { ...next[index], [field]: value };
+    setCarrierQuotes(next);
+  };
+
+  const addCharge = (index: number, side: 'buy' | 'sell') => {
+    const next = [...carrierQuotes];
+    const targetList = side === 'buy' ? next[index].buying_charges : next[index].selling_charges;
+    targetList.push({ type: 'freight', amount: 0, currency: 'USD' });
+    setCarrierQuotes(next);
+  };
+
+  const updateCharge = (
+    index: number,
+    side: 'buy' | 'sell',
+    chargeIndex: number,
+    field: keyof Charge,
+    value: any,
+  ) => {
+    const next = [...carrierQuotes];
+    const targetList = side === 'buy' ? next[index].buying_charges : next[index].selling_charges;
+    targetList[chargeIndex] = { ...targetList[chargeIndex], [field]: value } as Charge;
+    setCarrierQuotes(next);
+  };
+
+  const removeCharge = (index: number, side: 'buy' | 'sell', chargeIndex: number) => {
+    const next = [...carrierQuotes];
+    const targetList = side === 'buy' ? next[index].buying_charges : next[index].selling_charges;
+    next[index] = {
+      ...next[index],
+      [side === 'buy' ? 'buying_charges' : 'selling_charges']:
+        targetList.filter((_, i) => i !== chargeIndex),
+    } as CarrierQuote;
+    setCarrierQuotes(next);
+  };
+
+  const totalCharges = (charges: Charge[]) => charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+
   const calculateTotals = () => {
     const subtotal = items.reduce((sum, item) => {
       const lineTotal = item.quantity * item.unit_price;
@@ -160,6 +233,20 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       
       const quoteNumber = `QUO-${Date.now()}`;
       
+      const regulatory: any = {};
+      if (values.trade_direction) regulatory.trade_direction = values.trade_direction;
+      if (selectedServiceType) regulatory.transport_mode = selectedServiceType;
+      if (carrierQuotes.length > 0) {
+        regulatory.carrier_quotes = carrierQuotes.map((cq) => ({
+          carrier_id: cq.carrier_id,
+          mode: cq.mode || selectedServiceType || null,
+          buying_charges: cq.buying_charges,
+          selling_charges: cq.selling_charges,
+          total_buy: totalCharges(cq.buying_charges),
+          total_sell: totalCharges(cq.selling_charges),
+        }));
+      }
+
       const quoteData: any = {
         quote_number: quoteNumber,
         title: values.title,
@@ -167,7 +254,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         service_type: values.service_type || null,
         service_id: values.service_id || null,
         incoterms: values.incoterms || null,
-        regulatory_data: values.trade_direction ? { trade_direction: values.trade_direction } : null,
+        regulatory_data: Object.keys(regulatory).length ? regulatory : null,
         carrier_id: values.carrier_id || null,
         consignee_id: values.consignee_id || null,
         origin_port_id: values.origin_port_id || null,
@@ -254,7 +341,122 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="account_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account</FormLabel>
+                      <FormDescription>Select account</FormDescription>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select account" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name}
+                            </SelectItem>
+                          ))}
+                          {accounts.length === 0 && (
+                            <SelectItem disabled value="__no_accounts__">No accounts found</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormItem>
+                  <FormLabel>Quotation Number</FormLabel>
+                  <FormDescription>Auto-generated on save</FormDescription>
+                  <FormControl>
+                    <Input value={quoteNumberPreview} readOnly />
+                  </FormControl>
+                </FormItem>
+              </div>
+
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="contact_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact</FormLabel>
+                      <FormDescription>Select contact</FormDescription>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select contact" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {contacts.map((contact) => (
+                            <SelectItem key={contact.id} value={contact.id}>
+                              {contact.first_name} {contact.last_name}
+                            </SelectItem>
+                          ))}
+                          {contacts.length === 0 && (
+                            <SelectItem disabled value="__no_contacts__">No contacts found</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="opportunity_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Opportunity Number</FormLabel>
+                      <FormDescription>Select opportunity</FormDescription>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select opportunity" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {opportunities.map((opp) => (
+                            <SelectItem key={opp.id} value={opp.id}>
+                              {opp.name}
+                            </SelectItem>
+                          ))}
+                          {opportunities.length === 0 && (
+                            <SelectItem disabled value="__no_opportunities__">No opportunities found</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="valid_until"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valid Until</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="service_type"
@@ -319,7 +521,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
                 name="trade_direction"
@@ -342,95 +544,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="account_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account</FormLabel>
-                    <FormDescription>Select account</FormDescription>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name}
-                          </SelectItem>
-                        ))}
-                        {accounts.length === 0 && (
-                          <SelectItem disabled value="__no_accounts__">No accounts found</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="contact_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contact</FormLabel>
-                    <FormDescription>Select contact</FormDescription>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select contact" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {contacts.map((contact) => (
-                          <SelectItem key={contact.id} value={contact.id}>
-                            {contact.first_name} {contact.last_name}
-                          </SelectItem>
-                        ))}
-                        {contacts.length === 0 && (
-                          <SelectItem disabled value="__no_contacts__">No contacts found</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="opportunity_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Opportunity</FormLabel>
-                    <FormDescription>Select opportunity</FormDescription>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select opportunity" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {opportunities.map((opp) => (
-                          <SelectItem key={opp.id} value={opp.id}>
-                            {opp.name}
-                          </SelectItem>
-                        ))}
-                        {opportunities.length === 0 && (
-                          <SelectItem disabled value="__no_opportunities__">No opportunities found</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="carrier_id"
@@ -482,7 +598,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="origin_port_id"
@@ -534,7 +650,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="incoterms"
@@ -565,7 +681,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
                 name="status"
@@ -589,23 +705,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="valid_until"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valid Until</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
           </CardContent>
         </Card>
+
+        {/* Carrier quotations section */}
+        <CarrierQuotesSection
+          carriers={carriers}
+          selectedServiceType={selectedServiceType}
+          carrierQuotes={carrierQuotes}
+          setCarrierQuotes={setCarrierQuotes}
+        />
 
         <Card>
           <CardHeader>
@@ -633,7 +743,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     </Button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     placeholder="Product Name"
                     value={item.product_name}
@@ -680,7 +790,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             <CardTitle>Totals & Additional Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="tax_percent"

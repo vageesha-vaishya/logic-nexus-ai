@@ -4,12 +4,16 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { useSort } from '@/hooks/useSort';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
+import { usePagination } from '@/hooks/usePagination';
 
 interface Vehicle {
   id: string;
@@ -58,6 +62,29 @@ export default function Vehicles() {
     vehicle.vehicle_type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const { sorted: sortedVehicles, sortField, sortDirection, onSort } = useSort<Vehicle>(filteredVehicles, {
+    accessors: {
+      make_model: (v) => `${v.make ?? ''} ${v.model ?? ''}`.trim().toLowerCase(),
+      capacity_kg: (v) => v.capacity_kg ?? 0,
+      is_active: (v) => (v.is_active ? 1 : 0),
+    },
+  });
+
+  const {
+    pageItems: pagedVehicles,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    currentPage,
+    totalPages,
+    nextPage,
+    prevPage,
+    firstPage,
+    lastPage,
+    canPrev,
+    canNext,
+  } = usePagination(sortedVehicles, { initialPageSize: 20 });
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       available: 'bg-green-500/10 text-green-500',
@@ -75,6 +102,40 @@ export default function Vehicles() {
           <div>
             <h1 className="text-3xl font-bold">Vehicles</h1>
             <p className="text-muted-foreground">Manage your fleet and vehicle assignments</p>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-muted-foreground">Cards per page</div>
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Cards" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((opt) => (
+                    <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
           <div className="flex gap-2 items-center">
             <ViewToggle value={viewMode} onChange={setViewMode} />
@@ -124,17 +185,17 @@ export default function Vehicles() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Vehicle #</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Make/Model</TableHead>
-                  <TableHead>Year</TableHead>
-                  <TableHead>Capacity (kg)</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Active</TableHead>
+                  <SortableHead field="vehicle_number" activeField={sortField} direction={sortDirection} onSort={onSort}>Vehicle #</SortableHead>
+                  <SortableHead field="vehicle_type" activeField={sortField} direction={sortDirection} onSort={onSort}>Type</SortableHead>
+                  <SortableHead field="make_model" activeField={sortField} direction={sortDirection} onSort={onSort}>Make/Model</SortableHead>
+                  <SortableHead field="year" activeField={sortField} direction={sortDirection} onSort={onSort}>Year</SortableHead>
+                  <SortableHead field="capacity_kg" activeField={sortField} direction={sortDirection} onSort={onSort}>Capacity (kg)</SortableHead>
+                  <SortableHead field="status" activeField={sortField} direction={sortDirection} onSort={onSort}>Status</SortableHead>
+                  <SortableHead field="is_active" activeField={sortField} direction={sortDirection} onSort={onSort}>Active</SortableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVehicles.map((vehicle) => (
+                {pagedVehicles.map((vehicle) => (
                   <TableRow 
                     key={vehicle.id} 
                     className="cursor-pointer hover:bg-muted/50"
@@ -163,10 +224,44 @@ export default function Vehicles() {
                 ))}
               </TableBody>
             </Table>
+            <div className="p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">Rows per page</div>
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Rows" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((opt) => (
+                      <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Pagination className="justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </Card>
         ) : (
           <div className={viewMode === 'grid' ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
-            {filteredVehicles.map((vehicle) => (
+            {pagedVehicles.map((vehicle) => (
               <Link key={vehicle.id} to={`/dashboard/vehicles/${vehicle.id}`}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                   <CardHeader>

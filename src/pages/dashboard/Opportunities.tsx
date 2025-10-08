@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import TitleStrip from '@/components/ui/title-strip';
+import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
+import { useSort } from '@/hooks/useSort';
 import { Badge } from '@/components/ui/badge';
 import { Plus, TrendingUp } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
@@ -25,7 +27,7 @@ const stageColors: Record<string, string> = {
   closed_lost: 'bg-red-500',
 };
 
-const stageLabels: Record<string, string> = {
+  const stageLabels: Record<string, string> = {
   prospecting: 'Prospecting',
   qualification: 'Qualification',
   needs_analysis: 'Needs Analysis',
@@ -121,6 +123,17 @@ export default function Opportunities() {
     return true;
   });
 
+  const { sorted: sortedOpportunities, sortField, sortDirection, onSort } = useSort<any>(filteredOpportunitiesAdvanced, {
+    accessors: {
+      name: (o) => o.name,
+      account: (o) => o.accounts?.name ?? '',
+      stage: (o) => o.stage,
+      amount: (o) => o.amount ?? 0,
+      close_date: (o) => o.close_date ?? '',
+      probability: (o) => o.probability ?? 0,
+    },
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -199,7 +212,7 @@ export default function Opportunities() {
         ) : viewMode === 'list' ? (
           <Card>
             <CardHeader>
-              <CardTitle>All Opportunities</CardTitle>
+              <TitleStrip label="All Opportunities" />
             </CardHeader>
             <CardContent>
               <div className="space-y-3 mb-4">
@@ -285,18 +298,18 @@ export default function Opportunities() {
                 </div>
               </div>
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Stage</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Close Date</TableHead>
-                    <TableHead>Probability</TableHead>
+                <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
+                  <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
+                    <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>Name</SortableHead>
+                    <SortableHead field="account" activeField={sortField} direction={sortDirection} onSort={onSort}>Account</SortableHead>
+                    <SortableHead field="stage" activeField={sortField} direction={sortDirection} onSort={onSort}>Stage</SortableHead>
+                    <SortableHead field="amount" activeField={sortField} direction={sortDirection} onSort={onSort}>Amount</SortableHead>
+                    <SortableHead field="close_date" activeField={sortField} direction={sortDirection} onSort={onSort}>Close Date</SortableHead>
+                    <SortableHead field="probability" activeField={sortField} direction={sortDirection} onSort={onSort}>Probability</SortableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOpportunitiesAdvanced.map((opportunity) => (
+                  {sortedOpportunities.map((opportunity) => (
                     <TableRow
                       key={opportunity.id}
                       className="cursor-pointer hover:bg-muted/50"
@@ -319,49 +332,55 @@ export default function Opportunities() {
             </CardContent>
           </Card>
         ) : viewMode === 'grid' ? (
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {filteredOpportunitiesAdvanced.map((opportunity) => (
-              <Card key={opportunity.id} className="hover:shadow transition-shadow cursor-pointer" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base truncate">{opportunity.name}</CardTitle>
-                    <Badge className={stageColors[opportunity.stage]}>{stageLabels[opportunity.stage]}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground flex items-center justify-between">
-                  <span className="truncate">{opportunity.accounts?.name || '-'}</span>
-                  <span>{formatCurrency(opportunity.amount)}</span>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-2">
+            <TitleStrip label="All Opportunities" />
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {sortedOpportunities.map((opportunity) => (
+                <Card key={opportunity.id} className="hover:shadow transition-shadow cursor-pointer" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base truncate">{opportunity.name}</CardTitle>
+                      <Badge className={stageColors[opportunity.stage]}>{stageLabels[opportunity.stage]}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground flex items-center justify-between">
+                    <span className="truncate">{opportunity.accounts?.name || '-'}</span>
+                    <span>{formatCurrency(opportunity.amount)}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredOpportunitiesAdvanced.map((opportunity) => (
-              <Card key={opportunity.id} className="hover:shadow-lg transition-shadow cursor-pointer h-full" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <Badge className={stageColors[opportunity.stage]}> {stageLabels[opportunity.stage]} </Badge>
-                    <Badge variant="outline">{opportunity.accounts?.name || '-'}</Badge>
-                  </div>
-                  <CardTitle className="mt-4">{opportunity.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center justify-between">
-                    <span>Amount</span>
-                    <span className="font-medium">{formatCurrency(opportunity.amount)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Close Date</span>
-                    <span>{formatDate(opportunity.close_date)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Probability</span>
-                    <span>{opportunity.probability ? `${opportunity.probability}%` : '-'}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-2">
+            <TitleStrip label="All Opportunities" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredOpportunitiesAdvanced.map((opportunity) => (
+                <Card key={opportunity.id} className="hover:shadow-lg transition-shadow cursor-pointer h-full" onClick={() => navigate(`/dashboard/opportunities/${opportunity.id}`)}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <Badge className={stageColors[opportunity.stage]}> {stageLabels[opportunity.stage]} </Badge>
+                      <Badge variant="outline">{opportunity.accounts?.name || '-'}</Badge>
+                    </div>
+                    <CardTitle className="mt-4">{opportunity.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between">
+                      <span>Amount</span>
+                      <span className="font-medium">{formatCurrency(opportunity.amount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Close Date</span>
+                      <span>{formatDate(opportunity.close_date)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Probability</span>
+                      <span>{opportunity.probability ? `${opportunity.probability}%` : '-'}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )
       }
