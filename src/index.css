@@ -56,6 +56,11 @@ All colors MUST be HSL.
     /* Custom design tokens */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(197 71% 52%) 100%);
     /* Golden shaded brand gradient for logo marks */
+    /* Table defaults to ensure variables always exist; theme can override */
+    --table-background: 0 0% 100%;
+    --table-header-background: 197 35% 92%;
+    --table-header-text: 0 0% 10%;
+    --table-header-separator: 0 0% 0% / 0.15;
     --gradient-brand-golden: linear-gradient(
       135deg,
       hsl(45 96% 62%) 0%,

@@ -77,7 +77,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   const [carrierQuotes, setCarrierQuotes] = useState<CarrierQuote[]>([]);
-  const [quoteNumberPreview] = useState<string>(() => `QUO-${Date.now()}`);
+  // Display-only hint; actual quote_number is generated in DB
+  const [quoteNumberPreview, setQuoteNumberPreview] = useState<string>('Auto-generated on save');
   
 
   const form = useForm<z.infer<typeof quoteSchema>>({
@@ -87,6 +88,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       opportunity_id: searchParams.get('opportunityId') || undefined,
     },
   });
+
+  // Watch selected account to enable contact filtering
+  const accountId = form.watch('account_id');
 
   useEffect(() => {
     if (context.tenantId || roles?.[0]?.tenant_id) {
@@ -105,8 +109,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         supabase.from('accounts').select('id, name').eq('tenant_id', tenantId),
-        supabase.from('contacts').select('id, first_name, last_name').eq('tenant_id', tenantId),
-        supabase.from('opportunities').select('id, name').eq('tenant_id', tenantId),
+        supabase.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
+        supabase.from('opportunities').select('id, name, account_id, contact_id').eq('tenant_id', tenantId),
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
@@ -124,10 +128,53 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       setAccounts(accountsRes.data || []);
       setContacts(contactsRes.data || []);
       setOpportunities(opportunitiesRes.data || []);
+
+      // If an opportunity is preselected (e.g. via URL), auto-fill account/contact
+      try {
+        const preselectedOppId = form.getValues('opportunity_id');
+        if (preselectedOppId) {
+          const opp = (opportunitiesRes.data || []).find((o: any) => o.id === preselectedOppId);
+          if (opp) {
+            if (opp.account_id) form.setValue('account_id', opp.account_id, { shouldDirty: true });
+            if (opp.contact_id) form.setValue('contact_id', opp.contact_id, { shouldDirty: true });
+          }
+        }
+      } catch {}
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
     }
   };
+
+  // Preview next quote number via RPC when context becomes available
+  useEffect(() => {
+    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+    const franchiseId = context.franchiseId || roles?.[0]?.franchise_id || null;
+    if (!tenantId) return;
+    const preview = async () => {
+      try {
+        const { data, error } = await (supabase as any).rpc('preview_next_quote_number', {
+          p_tenant_id: tenantId,
+          p_franchise_id: franchiseId,
+        });
+        if (error) throw error;
+        setQuoteNumberPreview(typeof data === 'string' ? data : 'Auto-generated on save');
+      } catch (err) {
+        // Keep default hint on any error
+        console.warn('Preview quote number failed:', err);
+      }
+    };
+    preview();
+  }, [context.tenantId, context.franchiseId]);
+
+  // When account changes, clear contact if it no longer belongs to the selected account
+  useEffect(() => {
+    if (!accountId) return;
+    const currentContactId = form.getValues('contact_id');
+    const isValid = contacts.some((c: any) => c.id === currentContactId && c.account_id === accountId);
+    if (!isValid) {
+      form.setValue('contact_id', undefined, { shouldDirty: true });
+    }
+  }, [accountId, contacts]);
 
 
   const addItem = () => {
@@ -231,8 +278,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     try {
       const { subtotal, taxAmount, total } = calculateTotals();
       
-      const quoteNumber = `QUO-${Date.now()}`;
-      
       const regulatory: any = {};
       if (values.trade_direction) regulatory.trade_direction = values.trade_direction;
       if (selectedServiceType) regulatory.transport_mode = selectedServiceType;
@@ -248,7 +293,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
 
       const quoteData: any = {
-        quote_number: quoteNumber,
         title: values.title,
         description: values.description || null,
         service_type: values.service_type || null,
@@ -313,33 +357,87 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             <CardTitle>Quote Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Quotation and Opportunity row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Quotation Number */}
+              <FormItem>
+                <FormLabel>Quotation Number</FormLabel>
+                <FormDescription>Auto-generated on save</FormDescription>
+                <FormControl>
+                  <Input readOnly value={quoteNumberPreview} />
+                </FormControl>
+              </FormItem>
+
+              {/* Opportunity Number */}
+              <FormField
+                control={form.control}
+                name="opportunity_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opportunity Number</FormLabel>
+                    <FormDescription>Select opportunity</FormDescription>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        const opp = opportunities.find((o) => o.id === value);
+                        if (opp) {
+                          if (opp.account_id) form.setValue('account_id', opp.account_id, { shouldDirty: true });
+                          if (opp.contact_id) form.setValue('contact_id', opp.contact_id, { shouldDirty: true });
+                        }
+                      }} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select opportunity" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {opportunities.map((opp) => (
+                          <SelectItem key={opp.id} value={opp.id}>
+                            {opp.name}
+                          </SelectItem>
+                        ))}
+                        {opportunities.length === 0 && (
+                          <SelectItem disabled value="__no_opportunities__">No opportunities found</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -352,7 +450,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       <FormDescription>Select account</FormDescription>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select account" />
                           </SelectTrigger>
                         </FormControl>
@@ -372,13 +470,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   )}
                 />
 
-                <FormItem>
-                  <FormLabel>Quotation Number</FormLabel>
-                  <FormDescription>Auto-generated on save</FormDescription>
-                  <FormControl>
-                    <Input value={quoteNumberPreview} readOnly />
-                  </FormControl>
-                </FormItem>
+                {/* Quotation Number moved above next to Opportunity */}
               </div>
 
               <div className="space-y-2">
@@ -391,12 +483,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       <FormDescription>Select contact</FormDescription>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select contact" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
-                          {contacts.map((contact) => (
+                      <SelectContent>
+                          {(accountId ? contacts.filter((c: any) => c.account_id === accountId) : contacts).map((contact) => (
                             <SelectItem key={contact.id} value={contact.id}>
                               {contact.first_name} {contact.last_name}
                             </SelectItem>
@@ -411,34 +503,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="opportunity_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Opportunity Number</FormLabel>
-                      <FormDescription>Select opportunity</FormDescription>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select opportunity" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {opportunities.map((opp) => (
-                            <SelectItem key={opp.id} value={opp.id}>
-                              {opp.name}
-                            </SelectItem>
-                          ))}
-                          {opportunities.length === 0 && (
-                            <SelectItem disabled value="__no_opportunities__">No opportunities found</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Opportunity field moved above next to Quotation */}
 
                 <FormField
                   control={form.control}
@@ -471,7 +536,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       defaultValue={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select service type" />
                         </SelectTrigger>
                       </FormControl>
@@ -498,7 +563,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormDescription>Select service</FormDescription>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select service" />
                         </SelectTrigger>
                       </FormControl>
@@ -531,7 +596,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormDescription>Select trade direction</FormDescription>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select direction" />
                         </SelectTrigger>
                       </FormControl>
@@ -555,7 +620,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Carrier</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select carrier" />
                         </SelectTrigger>
                       </FormControl>
@@ -580,7 +645,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Consignee</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select consignee" />
                         </SelectTrigger>
                       </FormControl>
@@ -607,7 +672,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Origin Port/Location</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select origin" />
                         </SelectTrigger>
                       </FormControl>
@@ -632,7 +697,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Destination Port/Location</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select destination" />
                         </SelectTrigger>
                       </FormControl>
@@ -659,7 +724,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Incoterms</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select incoterms" />
                         </SelectTrigger>
                       </FormControl>
@@ -690,7 +755,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Status</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
@@ -719,7 +784,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <CardTitle>Line Items</CardTitle>
               <Button type="button" onClick={addItem} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
@@ -874,6 +939,65 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             {isSubmitting ? 'Creating...' : 'Create Quote'}
           </Button>
         </div>
+
+        {/* Sticky totals footer for mobile */}
+        {typeof window !== 'undefined' && (localStorage.getItem('quoteStickyTotalsVisible') ?? 'true') === 'true' && (
+          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4" data-sticky-totals>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span className="font-medium">${calculateTotals().subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Tax</span>
+                  <span className="font-medium">${calculateTotals().taxAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold">
+                  <span>Total</span>
+                  <span>${calculateTotals().total.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={(e) => { localStorage.setItem('quoteStickyTotalsVisible', 'false'); const wrapper = (e.currentTarget.closest('[data-sticky-totals]') as HTMLElement | null); if (wrapper) wrapper.remove(); }}>Dismiss</Button>
+                <Button type="submit" disabled={isSubmitting} size="sm">
+                  {isSubmitting ? 'Creating...' : 'Create Quote'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Sticky totals footer for tablet (md to xl) */}
+        {typeof window !== 'undefined' && (localStorage.getItem('quoteStickyTotalsVisible') ?? 'true') === 'true' && (
+        <div className="hidden md:block 2xl:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4" data-sticky-totals>
+          <div className="flex items-center justify-between gap-6">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="font-medium">${calculateTotals().subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span className="font-medium">${parseFloat(form.watch('shipping_amount') || '0').toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span className="font-medium">${calculateTotals().taxAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-base font-bold">
+                <span>Total</span>
+                <span>${calculateTotals().total.toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+            <Button type="button" variant="ghost" onClick={(e) => { localStorage.setItem('quoteStickyTotalsVisible', 'false'); const wrapper = (e.currentTarget.closest('[data-sticky-totals]') as HTMLElement | null); if (wrapper) wrapper.remove(); }}>Dismiss</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Quote'}
+            </Button>
+            </div>
+          </div>
+        </div>
+        )}
       </form>
     </Form>
   );

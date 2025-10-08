@@ -1,10 +1,11 @@
-import { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FormLabel, FormControl } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2 } from 'lucide-react';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 type Charge = {
   type: string;
@@ -31,6 +32,23 @@ export function CarrierQuotesSection({
   carrierQuotes: CarrierQuote[];
   setCarrierQuotes: Dispatch<SetStateAction<CarrierQuote[]>>;
 }) {
+  // Collapsible on mobile, open by default on md+; persist to localStorage
+  const [accordionOpen, setAccordionOpen] = useState<boolean>(true);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('carrierQuotesAccordionOpen');
+      if (saved !== null) {
+        setAccordionOpen(saved === 'true');
+      } else {
+        setAccordionOpen(window.innerWidth >= 768);
+      }
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('carrierQuotesAccordionOpen', String(accordionOpen));
+    }
+  }, [accordionOpen]);
   const addCarrierQuote = () => {
     setCarrierQuotes((prev) => ([
       ...prev,
@@ -92,7 +110,7 @@ export function CarrierQuotesSection({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <CardTitle>Carrier Quotations</CardTitle>
           <Button type="button" onClick={addCarrierQuote} size="sm">
             <Plus className="h-4 w-4 mr-2" />
@@ -100,11 +118,15 @@ export function CarrierQuotesSection({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {carrierQuotes.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No carrier quotations added. Use "Add Carrier Quote" to begin.</div>
-        ) : (
-          carrierQuotes.map((cq, idx) => (
+      <CardContent>
+        <Accordion type="single" collapsible value={accordionOpen ? 'carrier-quotes' : undefined} onValueChange={(v) => setAccordionOpen(!!v)}>
+          <AccordionItem value="carrier-quotes">
+            <AccordionTrigger className="text-base transition-colors duration-200">Charges & breakdown</AccordionTrigger>
+            <AccordionContent className="space-y-4 transition-all duration-300 ease-in-out">
+              {carrierQuotes.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No carrier quotations added. Use "Add Carrier Quote" to begin.</div>
+              ) : (
+                carrierQuotes.map((cq, idx) => (
             <div key={idx} className="border rounded-lg p-4 space-y-4">
               <div className="flex justify-between items-start">
                 <span className="font-medium">Carrier Quote {idx + 1}</span>
@@ -118,7 +140,7 @@ export function CarrierQuotesSection({
                   <FormLabel>Transport Mode</FormLabel>
                   <Select value={cq.mode || ''} onValueChange={(v) => updateCarrierField(idx, 'mode', v)}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select mode" />
                       </SelectTrigger>
                     </FormControl>
@@ -137,7 +159,7 @@ export function CarrierQuotesSection({
                   <FormLabel>Carrier</FormLabel>
                   <Select value={cq.carrier_id} onValueChange={(v) => updateCarrierField(idx, 'carrier_id', v)}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select carrier" />
                       </SelectTrigger>
                     </FormControl>
@@ -170,7 +192,7 @@ export function CarrierQuotesSection({
                           <FormLabel className="text-xs">Type</FormLabel>
                           <Select value={ch.type} onValueChange={(v) => updateCharge(idx, 'buy', cIdx, 'type', v)}>
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Type" />
                               </SelectTrigger>
                             </FormControl>
@@ -226,7 +248,7 @@ export function CarrierQuotesSection({
                           <FormLabel className="text-xs">Type</FormLabel>
                           <Select value={ch.type} onValueChange={(v) => updateCharge(idx, 'sell', cIdx, 'type', v)}>
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Type" />
                               </SelectTrigger>
                             </FormControl>
@@ -268,6 +290,9 @@ export function CarrierQuotesSection({
             </div>
           ))
         )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );

@@ -75,6 +75,7 @@ import CargoTypes from "./pages/dashboard/CargoTypes";
 import Incoterms from "./pages/dashboard/Incoterms";
 import UIDemoForms from "./pages/dashboard/UIDemoForms";
 import UIDemoAdvanced from "./pages/dashboard/UIDemoAdvanced";
+import QuoteNumberSettings from "./pages/dashboard/QuoteNumberSettings";
 
 const queryClient = new QueryClient();
 
@@ -414,6 +415,10 @@ const App = () => (
                   <SubscriptionManagement />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/dashboard/settings/quote-numbers" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuoteNumberSettings /></ProtectedRoute>} 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* Salesforce-style navigation placeholder routes */}
