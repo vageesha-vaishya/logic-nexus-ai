@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRM } from '@/hooks/useCRM';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import SequencesAndPreview from './data-management/SequencesAndPreview';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
@@ -21,7 +23,14 @@ export default function Settings() {
           <p className="text-muted-foreground">Manage your account and application settings</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <Tabs defaultValue="general">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="quote-sequence">Quotation Sequence</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="general" className="mt-4">
+            <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -107,21 +116,29 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-primary" />
-                <CardTitle>Data Management Options</CardTitle>
-              </div>
-              <CardDescription>Database insights and data tools</CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">View RLS status, policies, and schema details.</p>
-              <Button variant="default" onClick={() => navigate('/dashboard/security-overview')}>
-                Security Overview
-              </Button>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-primary" />
+                    <CardTitle>Data Management Options</CardTitle>
+                  </div>
+                  <CardDescription>Database insights and data tools</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm text-muted-foreground">View RLS status, policies, and schema details.</p>
+                    <p className="text-xs text-muted-foreground">Or configure quote numbering and preview sequences.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => navigate('/dashboard/security-overview')}>
+                      Security Overview
+                    </Button>
+                    <Button variant="default" onClick={() => navigate('/dashboard/settings/data-management')}>
+                      Open Data Management
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
           <Card>
             <CardHeader>
@@ -138,7 +155,13 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="quote-sequence" className="mt-4">
+            <SequencesAndPreview />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

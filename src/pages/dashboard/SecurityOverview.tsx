@@ -142,6 +142,25 @@ export default function SecurityOverview() {
     }
   });
 
+  const { data: dbFunctions, isLoading: functionsLoading } = useQuery({
+    queryKey: ['database-functions'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_database_functions' as any);
+      if (error) throw error;
+      return data as unknown as Array<{
+        name: string;
+        schema: string;
+        kind: string;
+        return_type: string;
+        argument_types: string;
+        language: string;
+        volatility: string;
+        security_definer: boolean;
+        description: string | null;
+      }>;
+    }
+  });
+
   return (
     <RoleGuard roles={['platform_admin', 'tenant_admin']} fallback={<div>Access denied</div>}>
       <DashboardLayout>
@@ -159,6 +178,7 @@ export default function SecurityOverview() {
               <TabsTrigger value="sql">SQL Editor</TabsTrigger>
               <TabsTrigger value="rls">RLS Status</TabsTrigger>
               <TabsTrigger value="policies">Policies</TabsTrigger>
+              <TabsTrigger value="functions">Functions</TabsTrigger>
               <TabsTrigger value="enums">Enums</TabsTrigger>
               <TabsTrigger value="schema">Schema</TabsTrigger>
             </TabsList>
@@ -206,6 +226,66 @@ export default function SecurityOverview() {
                         </div>
                       )}
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="functions" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Database Functions & Procedures
+                  </CardTitle>
+                  <CardDescription>
+                    Implemented functions and procedures in the `public` schema
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {functionsLoading ? (
+                    <div>Loading...</div>
+                  ) : !dbFunctions || dbFunctions.length === 0 ? (
+                    <div className="text-muted-foreground">No functions found</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Kind</TableHead>
+                          <TableHead>Return Type</TableHead>
+                          <TableHead>Arguments</TableHead>
+                          <TableHead>Language</TableHead>
+                          <TableHead>Volatility</TableHead>
+                          <TableHead>Security</TableHead>
+                          <TableHead>Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dbFunctions?.map((fn) => (
+                          <TableRow key={`${fn.schema}.${fn.name}(${fn.argument_types})`}>
+                            <TableCell className="font-medium">{fn.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{fn.kind}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{fn.return_type}</TableCell>
+                            <TableCell className="text-xs break-all">{fn.argument_types || '—'}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{fn.language}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{fn.volatility}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={fn.security_definer ? 'default' : 'secondary'}>
+                                {fn.security_definer ? 'SECURITY DEFINER' : 'SECURITY INVOKER'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs break-all">{fn.description ?? '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   )}
                 </CardContent>
               </Card>

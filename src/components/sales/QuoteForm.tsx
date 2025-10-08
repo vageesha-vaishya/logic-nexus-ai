@@ -10,10 +10,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CarrierQuotesSection } from './CarrierQuotesSection';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Search } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import OpportunitySelectDialogList from '@/components/crm/OpportunitySelectDialogList';
+import AccountSelectDialogList from '@/components/crm/AccountSelectDialogList';
+import ContactSelectDialogList from '@/components/crm/ContactSelectDialogList';
 
 const quoteSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -75,6 +78,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [resolvedTenantId, setResolvedTenantId] = useState<string | null>(null);
+  const [resolvedTenantName, setResolvedTenantName] = useState<string | null>(null);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   const [carrierQuotes, setCarrierQuotes] = useState<CarrierQuote[]>([]);
   // Display-only hint; actual quote_number is generated in DB
@@ -85,7 +90,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     resolver: zodResolver(quoteSchema),
     defaultValues: {
       status: 'draft',
-      opportunity_id: searchParams.get('opportunityId') || undefined,
+      opportunity_id: searchParams.get('opportunityId') || '',
     },
   });
 
@@ -108,9 +113,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         supabase.from('carriers').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-        supabase.from('accounts').select('id, name').eq('tenant_id', tenantId),
+        supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
         supabase.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
-        supabase.from('opportunities').select('id, name, account_id, contact_id').eq('tenant_id', tenantId),
+        supabase.from('opportunities').select('id, name, account_id, contact_id, tenant_id').eq('tenant_id', tenantId),
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
@@ -129,14 +134,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       setContacts(contactsRes.data || []);
       setOpportunities(opportunitiesRes.data || []);
 
+      // Seed resolved tenant from current context
+      setResolvedTenantId(tenantId);
+
       // If an opportunity is preselected (e.g. via URL), auto-fill account/contact
       try {
         const preselectedOppId = form.getValues('opportunity_id');
         if (preselectedOppId) {
-          const opp = (opportunitiesRes.data || []).find((o: any) => o.id === preselectedOppId);
+          const opp = (opportunitiesRes.data || []).find((o: any) => String(o.id) === String(preselectedOppId));
           if (opp) {
-            if (opp.account_id) form.setValue('account_id', opp.account_id, { shouldDirty: true });
-            if (opp.contact_id) form.setValue('contact_id', opp.contact_id, { shouldDirty: true });
+            if (opp.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
+            if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
           }
         }
       } catch {}
@@ -175,6 +183,25 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       form.setValue('contact_id', undefined, { shouldDirty: true });
     }
   }, [accountId, contacts]);
+
+  // Resolve tenant from selected account or context
+  useEffect(() => {
+    let nextTenantId: string | null = context.tenantId || roles?.[0]?.tenant_id || null;
+    const acc = accounts.find((a: any) => String(a.id) === String(accountId));
+    if (acc?.tenant_id) nextTenantId = acc.tenant_id;
+    setResolvedTenantId(nextTenantId);
+  }, [accountId, accounts, context.tenantId, roles]);
+
+  // Fetch tenant name for hint when resolved tenant changes
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!resolvedTenantId) { setResolvedTenantName(null); return; }
+        const { data, error } = await supabase.from('tenants').select('name').eq('id', resolvedTenantId).maybeSingle();
+        if (!error) setResolvedTenantName((data as any)?.name ?? null);
+      } catch {}
+    })();
+  }, [resolvedTenantId, supabase]);
 
 
   const addItem = () => {
@@ -224,6 +251,61 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     setCarrierQuotes(next);
   };
 
+  // Opportunity selection dialog state
+  const [oppDialogOpen, setOppDialogOpen] = useState(false);
+  const [accDialogOpen, setAccDialogOpen] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const handleSelectOpportunity = (opp: any) => {
+    try {
+      if (opp?.id) form.setValue('opportunity_id', String(opp.id), { shouldDirty: true });
+      if (opp?.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
+      if (opp?.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
+      // Ensure selected opportunity appears in the dropdown options
+      setOpportunities((prev) => {
+        const exists = prev.some((o: any) => String(o.id) === String(opp.id));
+        return exists ? prev : [opp, ...prev];
+      });
+      // If the dialog provided nested account/contact, ensure they appear in respective dropdowns
+      if (opp?.accounts?.id) {
+        setAccounts((prev) => {
+          const exists = prev.some((a: any) => String(a.id) === String(opp.accounts.id));
+          return exists ? prev : [{ id: opp.accounts.id, name: opp.accounts.name || opp.accounts.account_name || 'Account' }, ...prev];
+        });
+      }
+      if (opp?.contacts?.id) {
+        setContacts((prev) => {
+          const exists = prev.some((c: any) => String(c.id) === String(opp.contacts.id));
+          return exists ? prev : [{ id: opp.contacts.id, first_name: opp.contacts.first_name || '', last_name: opp.contacts.last_name || '', account_id: opp.contacts.account_id }, ...prev];
+        });
+      }
+    } catch {}
+  };
+
+  const handleSelectAccount = (account: any) => {
+    try {
+      if (account?.id) form.setValue('account_id', String(account.id), { shouldDirty: true });
+      // If currently selected contact does not belong, clear it
+      const currentContactId = form.getValues('contact_id');
+      const belongs = contacts.some((c: any) => String(c.id) === String(currentContactId) && String(c.account_id) === String(account.id));
+      if (!belongs) form.setValue('contact_id', '', { shouldDirty: true });
+      setAccounts((prev) => {
+        const exists = prev.some((a: any) => String(a.id) === String(account.id));
+        return exists ? prev : [account, ...prev];
+      });
+    } catch {}
+  };
+
+  const handleSelectContact = (contact: any) => {
+    try {
+      if (contact?.id) form.setValue('contact_id', String(contact.id), { shouldDirty: true });
+      if (contact?.account_id) form.setValue('account_id', String(contact.account_id), { shouldDirty: true });
+      setContacts((prev) => {
+        const exists = prev.some((c: any) => String(c.id) === String(contact.id));
+        return exists ? prev : [contact, ...prev];
+      });
+    } catch {}
+  };
+
   const updateCharge = (
     index: number,
     side: 'buy' | 'sell',
@@ -266,7 +348,33 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   };
 
   const onSubmit = async (values: z.infer<typeof quoteSchema>) => {
-    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+    // Resolve tenant_id from context/role, and fall back to selected account/opportunity
+    let tenantId = context.tenantId || roles?.[0]?.tenant_id;
+    if (!tenantId && values.account_id) {
+      try {
+        const { data: acc } = await supabase
+          .from('accounts')
+          .select('tenant_id')
+          .eq('id', values.account_id)
+          .maybeSingle();
+        tenantId = acc?.tenant_id || tenantId;
+      } catch {}
+    }
+    // As an additional fallback, infer from opportunity if provided
+    if (!tenantId && values.opportunity_id) {
+      try {
+        const { data: opp } = await supabase
+          .from('opportunities')
+          .select('tenant_id, account_id')
+          .eq('id', values.opportunity_id)
+          .maybeSingle();
+        tenantId = (opp as any)?.tenant_id || tenantId;
+        // Backfill account_id from opportunity if missing
+        if (!values.account_id && (opp as any)?.account_id) {
+          form.setValue('account_id', String((opp as any).account_id), { shouldDirty: true });
+        }
+      } catch {}
+    }
     const franchiseId = context.franchiseId || roles?.[0]?.franchise_id || null;
 
     if (!tenantId) {
@@ -292,7 +400,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }));
       }
 
+      // Generate a non-null quote number via RPC (server-side sequence)
+      const { data: genNumber, error: genError } = await (supabase as any).rpc('generate_quote_number', {
+        p_tenant_id: tenantId,
+        p_franchise_id: franchiseId,
+      });
+      if (genError || !genNumber) {
+        throw new Error('Failed to generate quote number');
+      }
+      const quoteNumber = typeof genNumber === 'string' ? genNumber : String(genNumber);
+
       const quoteData: any = {
+        quote_number: quoteNumber,
         title: values.title,
         description: values.description || null,
         service_type: values.service_type || null,
@@ -409,13 +528,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
-                        const opp = opportunities.find((o) => o.id === value);
+                        const opp = opportunities.find((o) => String(o.id) === value);
                         if (opp) {
-                          if (opp.account_id) form.setValue('account_id', opp.account_id, { shouldDirty: true });
-                          if (opp.contact_id) form.setValue('contact_id', opp.contact_id, { shouldDirty: true });
+                          if (opp.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
+                          if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
                         }
                       }} 
-                      defaultValue={field.value}
+                      value={field.value ?? ''}
                     >
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -424,7 +543,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       </FormControl>
                       <SelectContent>
                         {opportunities.map((opp) => (
-                          <SelectItem key={opp.id} value={opp.id}>
+                          <SelectItem key={opp.id} value={String(opp.id)}>
                             {opp.name}
                           </SelectItem>
                         ))}
@@ -433,6 +552,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         )}
                       </SelectContent>
                     </Select>
+                    <div className="mt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setOppDialogOpen(true)}>
+                        <Search className="h-4 w-4 mr-2" /> Browse opportunities
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -448,7 +572,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormItem>
                       <FormLabel>Account</FormLabel>
                       <FormDescription>Select account</FormDescription>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select account" />
@@ -456,7 +580,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </FormControl>
                         <SelectContent>
                           {accounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id}>
+                            <SelectItem key={account.id} value={String(account.id)}>
                               {account.name}
                             </SelectItem>
                           ))}
@@ -465,6 +589,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           )}
                         </SelectContent>
                       </Select>
+                      <div className="mt-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setAccDialogOpen(true)}>
+                          <Search className="h-4 w-4 mr-2" /> Browse accounts
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {resolvedTenantId ? (
+                          <>Tenant: {resolvedTenantName ?? 'Resolving…'}</>
+                        ) : (
+                          <>Tenant: Not resolved</>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -481,7 +617,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormItem>
                       <FormLabel>Contact</FormLabel>
                       <FormDescription>Select contact</FormDescription>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
                         <FormControl>
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select contact" />
@@ -489,7 +625,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </FormControl>
                       <SelectContent>
                           {(accountId ? contacts.filter((c: any) => c.account_id === accountId) : contacts).map((contact) => (
-                            <SelectItem key={contact.id} value={contact.id}>
+                            <SelectItem key={contact.id} value={String(contact.id)}>
                               {contact.first_name} {contact.last_name}
                             </SelectItem>
                           ))}
@@ -498,6 +634,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           )}
                         </SelectContent>
                       </Select>
+                      <div className="mt-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setContactDialogOpen(true)}>
+                          <Search className="h-4 w-4 mr-2" /> Browse contacts
+                        </Button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -939,6 +1080,27 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             {isSubmitting ? 'Creating...' : 'Create Quote'}
           </Button>
         </div>
+
+        {/* Opportunity selection dialog */}
+        <OpportunitySelectDialogList
+          open={oppDialogOpen}
+          onOpenChange={setOppDialogOpen}
+          onSelect={handleSelectOpportunity}
+        />
+
+        {/* Account selection dialog */}
+        <AccountSelectDialogList
+          open={accDialogOpen}
+          onOpenChange={setAccDialogOpen}
+          onSelect={handleSelectAccount}
+        />
+
+        {/* Contact selection dialog */}
+        <ContactSelectDialogList
+          open={contactDialogOpen}
+          onOpenChange={setContactDialogOpen}
+          onSelect={handleSelectContact}
+        />
 
         {/* Sticky totals footer for mobile */}
         {typeof window !== 'undefined' && (localStorage.getItem('quoteStickyTotalsVisible') ?? 'true') === 'true' && (

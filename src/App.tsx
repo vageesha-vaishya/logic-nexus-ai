@@ -76,6 +76,7 @@ import Incoterms from "./pages/dashboard/Incoterms";
 import UIDemoForms from "./pages/dashboard/UIDemoForms";
 import UIDemoAdvanced from "./pages/dashboard/UIDemoAdvanced";
 import QuoteNumberSettings from "./pages/dashboard/QuoteNumberSettings";
+import DataManagement from "./pages/dashboard/DataManagement";
 
 const queryClient = new QueryClient();
 
@@ -419,6 +420,11 @@ const App = () => (
             <Route 
               path="/dashboard/settings/quote-numbers" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuoteNumberSettings /></ProtectedRoute>} 
+            />
+            {/* Settings → Data Management */}
+            <Route 
+              path="/dashboard/settings/data-management" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DataManagement /></ProtectedRoute>} 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* Salesforce-style navigation placeholder routes */}

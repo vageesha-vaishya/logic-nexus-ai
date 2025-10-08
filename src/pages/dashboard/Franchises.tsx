@@ -25,7 +25,9 @@ export default function Franchises() {
     try {
       let query = supabase
         .from('franchises')
-        .select('*, tenants(name)');
+        // Disambiguate embed: direct FK franchises.tenant_id -> tenants.id
+        // Avoid PostgREST error: more than one relationship between franchises and tenants
+        .select('*, tenants:tenants!franchises_tenant_id_fkey(name)');
 
       // Filter by tenant if not platform_admin
       if (!context.isPlatformAdmin && context.tenantId) {
