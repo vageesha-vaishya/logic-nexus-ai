@@ -6,14 +6,41 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
 type SequenceRow = {
-  current_number: number | null;
-  last_reset_bucket: string | null;
+  period_key: string;
+  last_sequence: number;
 };
+
+type TenantConfig = {
+  prefix: string;
+  reset_policy: 'none' | 'daily' | 'monthly' | 'yearly';
+};
+
+type FranchiseConfig = TenantConfig;
+
+function currentPeriodKey(policy: TenantConfig['reset_policy']): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  switch (policy) {
+    case 'daily':
+      return `${year}-${month}-${day}`;
+    case 'monthly':
+      return `${year}-${month}`;
+    case 'yearly':
+      return `${year}`;
+    case 'none':
+    default:
+      return 'none';
+  }
+}
 
 export default function SequencesAndPreview() {
   const { supabase, context } = useCRM();
   const tenantId = context?.tenantId || null;
   const franchiseId = context?.franchiseId || null;
+  const [tenantCfg, setTenantCfg] = useState<TenantConfig | null>(null);
+  const [franchiseCfg, setFranchiseCfg] = useState<FranchiseConfig | null>(null);
   const [tenantSeq, setTenantSeq] = useState<SequenceRow | null>(null);
   const [franchiseSeq, setFranchiseSeq] = useState<SequenceRow | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -25,20 +52,43 @@ export default function SequencesAndPreview() {
     const load = async () => {
       try {
         if (tenantId) {
-          const { data } = await supabase
-            .from('quote_sequences_tenant')
-            .select('current_number,last_reset_bucket')
+          const { data: tcfg, error: tcfgErr } = await supabase
+            .from('quote_number_config_tenant')
+            .select('prefix,reset_policy')
             .eq('tenant_id', tenantId)
             .maybeSingle();
-          if (data) setTenantSeq(data as SequenceRow);
+          if (tcfgErr) throw tcfgErr;
+          if (tcfg) setTenantCfg(tcfg as TenantConfig);
+
+          const periodKey = currentPeriodKey((tcfg as TenantConfig)?.reset_policy || 'none');
+          const { data: tseq } = await supabase
+            .from('quote_number_sequences')
+            .select('period_key,last_sequence')
+            .eq('tenant_id', tenantId)
+            .is('franchise_id', null)
+            .eq('period_key', periodKey)
+            .maybeSingle();
+          if (tseq) setTenantSeq(tseq as SequenceRow);
         }
-        if (franchiseId) {
-          const { data } = await supabase
-            .from('quote_sequences_franchise')
-            .select('current_number,last_reset_bucket')
+
+        if (franchiseId && tenantId) {
+          const { data: fcfg } = await supabase
+            .from('quote_number_config_franchise')
+            .select('prefix,reset_policy')
+            .eq('tenant_id', tenantId)
             .eq('franchise_id', franchiseId)
             .maybeSingle();
-          if (data) setFranchiseSeq(data as SequenceRow);
+          if (fcfg) setFranchiseCfg(fcfg as FranchiseConfig);
+
+          const periodKey = currentPeriodKey((fcfg as FranchiseConfig)?.reset_policy || tenantCfg?.reset_policy || 'none');
+          const { data: fseq } = await supabase
+            .from('quote_number_sequences')
+            .select('period_key,last_sequence')
+            .eq('tenant_id', tenantId)
+            .eq('franchise_id', franchiseId)
+            .eq('period_key', periodKey)
+            .maybeSingle();
+          if (fseq) setFranchiseSeq(fseq as SequenceRow);
         }
       } catch (err: any) {
         toast.error('Failed to load sequences', { description: err.message });
@@ -52,12 +102,11 @@ export default function SequencesAndPreview() {
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc('preview_next_quote_number', {
-        tenant_id: tenantId,
-        franchise_id: franchiseId,
-        customer_id: null,
+        p_tenant_id: tenantId,
+        p_franchise_id: franchiseId,
       });
       if (error) throw error;
-      const next = typeof data === 'string' ? data : (data?.next_quote_number || JSON.stringify(data));
+      const next = typeof data === 'string' ? data : String(data);
       setPreview(next);
       toast.success('Preview generated');
     } catch (err: any) {
@@ -80,14 +129,14 @@ export default function SequencesAndPreview() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableCell className="font-medium">Current Number</TableCell>
-                    <TableCell className="font-medium">Last Reset Bucket</TableCell>
+                    <TableCell className="font-medium">Period</TableCell>
+                    <TableCell className="font-medium">Last Sequence</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow>
-                    <TableCell>{tenantSeq?.current_number ?? '-'}</TableCell>
-                    <TableCell>{tenantSeq?.last_reset_bucket ?? '-'}</TableCell>
+                    <TableCell>{tenantSeq?.period_key ?? '-'}</TableCell>
+                    <TableCell>{tenantSeq?.last_sequence ?? '-'}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -102,14 +151,14 @@ export default function SequencesAndPreview() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableCell className="font-medium">Current Number</TableCell>
-                    <TableCell className="font-medium">Last Reset Bucket</TableCell>
+                    <TableCell className="font-medium">Period</TableCell>
+                    <TableCell className="font-medium">Last Sequence</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow>
-                    <TableCell>{franchiseSeq?.current_number ?? '-'}</TableCell>
-                    <TableCell>{franchiseSeq?.last_reset_bucket ?? '-'}</TableCell>
+                    <TableCell>{franchiseSeq?.period_key ?? '-'}</TableCell>
+                    <TableCell>{franchiseSeq?.last_sequence ?? '-'}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

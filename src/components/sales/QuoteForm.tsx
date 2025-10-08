@@ -400,18 +400,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }));
       }
 
-      // Generate a non-null quote number via RPC (server-side sequence)
+      // Try to generate a quote number via RPC; if it fails, rely on DB trigger
       const { data: genNumber, error: genError } = await (supabase as any).rpc('generate_quote_number', {
         p_tenant_id: tenantId,
         p_franchise_id: franchiseId,
       });
-      if (genError || !genNumber) {
-        throw new Error('Failed to generate quote number');
-      }
-      const quoteNumber = typeof genNumber === 'string' ? genNumber : String(genNumber);
+      const quoteNumber = genError || !genNumber ? null : (typeof genNumber === 'string' ? genNumber : String(genNumber));
 
       const quoteData: any = {
-        quote_number: quoteNumber,
+        ...(quoteNumber ? { quote_number: quoteNumber } : {}),
         title: values.title,
         description: values.description || null,
         service_type: values.service_type || null,
