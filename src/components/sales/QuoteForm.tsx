@@ -156,15 +156,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     (async () => {
       setIsHydrating(true);
       try {
-        // Fetch quote with related opportunity, account, and contact names
         const { data: quote, error: quoteErr } = await supabase
           .from('quotes')
-          .select(`
-            *,
-            opportunity:opportunities(id, name),
-            account:accounts(id, name),
-            contact:contacts(id, first_name, last_name)
-          `)
+          .select('*')
           .eq('id', quoteId)
           .maybeSingle();
         if (quoteErr) throw quoteErr;
@@ -228,16 +222,56 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
         } catch {}
 
-        // Add fetched opportunity, account, contact to their respective arrays if present
-        if ((quote as any).opportunity && !opportunities.some((o: any) => String(o.id) === String((quote as any).opportunity.id))) {
-          setOpportunities((prev) => [(quote as any).opportunity, ...prev]);
+        // Fetch related opportunity, account, and contact data separately
+        const fetchPromises = [];
+        
+        if ((quote as any).opportunity_id) {
+          fetchPromises.push(
+            supabase
+              .from('opportunities')
+              .select('id, name')
+              .eq('id', (quote as any).opportunity_id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data && !opportunities.some((o: any) => String(o.id) === String(data.id))) {
+                  setOpportunities((prev) => [data, ...prev]);
+                }
+              })
+          );
         }
-        if ((quote as any).account && !accounts.some((a: any) => String(a.id) === String((quote as any).account.id))) {
-          setAccounts((prev) => [(quote as any).account, ...prev]);
+        
+        if ((quote as any).account_id) {
+          fetchPromises.push(
+            supabase
+              .from('accounts')
+              .select('id, name')
+              .eq('id', (quote as any).account_id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data && !accounts.some((a: any) => String(a.id) === String(data.id))) {
+                  setAccounts((prev) => [data, ...prev]);
+                }
+              })
+          );
         }
-        if ((quote as any).contact && !contacts.some((c: any) => String(c.id) === String((quote as any).contact.id))) {
-          setContacts((prev) => [(quote as any).contact, ...prev]);
+        
+        if ((quote as any).contact_id) {
+          fetchPromises.push(
+            supabase
+              .from('contacts')
+              .select('id, first_name, last_name')
+              .eq('id', (quote as any).contact_id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data && !contacts.some((c: any) => String(c.id) === String(data.id))) {
+                  setContacts((prev) => [data, ...prev]);
+                }
+              })
+          );
         }
+
+        // Wait for all related data to be fetched
+        await Promise.all(fetchPromises).catch(err => console.warn('Failed to fetch related data:', err));
 
         // Ensure selected lookup values appear in dropdowns even if tenant filters exclude them
         try {
@@ -291,7 +325,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (data) setPorts((prev) => [data, ...prev]);
           }
 
-          // Note: opportunity, account, contact already added above from joined query
+          // Note: opportunity, account, contact already fetched above
         } catch (e) {
           console.warn('Failed to hydrate selected options for edit mode:', e);
         }
