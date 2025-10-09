@@ -35,10 +35,12 @@ function currentPeriodKey(policy: TenantConfig['reset_policy']): string {
   }
 }
 
-export default function SequencesAndPreview() {
+type Props = { tenantIdOverride?: string; franchiseIdOverride?: string };
+
+export default function SequencesAndPreview({ tenantIdOverride, franchiseIdOverride }: Props) {
   const { supabase, context } = useCRM();
-  const tenantId = context?.tenantId || null;
-  const franchiseId = context?.franchiseId || null;
+  const tenantId = tenantIdOverride ?? context?.tenantId ?? null;
+  const franchiseId = franchiseIdOverride ?? context?.franchiseId ?? null;
   const [tenantCfg, setTenantCfg] = useState<TenantConfig | null>(null);
   const [franchiseCfg, setFranchiseCfg] = useState<FranchiseConfig | null>(null);
   const [tenantSeq, setTenantSeq] = useState<SequenceRow | null>(null);

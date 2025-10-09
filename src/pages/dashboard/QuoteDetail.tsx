@@ -11,16 +11,21 @@ export default function QuoteDetail() {
   const navigate = useNavigate();
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(true);
+  const [resolvedId, setResolvedId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkQuote = async () => {
       try {
+        if (!id) throw new Error('Missing quote identifier');
+        // Allow navigating by either UUID id or quote_number (e.g., QT-2025-002)
         const { data, error } = await supabase
           .from('quotes')
           .select('id')
-          .eq('id', id)
+          .or(`id.eq.${id},quote_number.eq.${id}`)
+          .limit(1)
           .single();
         if (error) throw error;
+        setResolvedId((data as any)?.id ?? null);
         setLoading(false);
       } catch (err: any) {
         toast.error('Failed to load quote', { description: err.message });
@@ -55,7 +60,7 @@ export default function QuoteDetail() {
                 <BreadcrumbLink href="/dashboard/quotes">Quotes</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbItem>
-                <BreadcrumbLink href={`/dashboard/quotes/${id}`}>Edit</BreadcrumbLink>
+                <BreadcrumbLink href={`/dashboard/quotes/${resolvedId ?? id}`}>Edit</BreadcrumbLink>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -63,7 +68,7 @@ export default function QuoteDetail() {
             <h1 className="text-3xl font-bold">Edit Quote</h1>
           </div>
         </div>
-        <QuoteForm quoteId={id} onSuccess={handleSuccess} />
+        <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
       </div>
     </DashboardLayout>
   );

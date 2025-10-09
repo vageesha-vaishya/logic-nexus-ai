@@ -22,9 +22,12 @@ type FranchiseConfig = {
 
 const resetPolicies: ResetPolicy[] = ['none', 'daily', 'weekly', 'monthly', 'yearly', 'per_customer'];
 
-export default function FranchiseConfigForm() {
+type Props = { tenantIdOverride?: string; franchiseIdOverride?: string };
+
+export default function FranchiseConfigForm({ tenantIdOverride, franchiseIdOverride }: Props) {
   const { supabase, context } = useCRM();
-  const franchiseId = context?.franchiseId || null;
+  const tenantId = tenantIdOverride ?? context?.tenantId ?? null;
+  const franchiseId = franchiseIdOverride ?? context?.franchiseId ?? null;
 
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState<FranchiseConfig | null>(null);
@@ -46,12 +49,13 @@ export default function FranchiseConfigForm() {
 
   useEffect(() => {
     const load = async () => {
-      if (!franchiseId) return;
+      if (!tenantId || !franchiseId) return;
       setLoading(true);
       try {
         const { data, error } = await supabase
           .from('quote_number_config_franchise')
           .select('*')
+          .eq('tenant_id', tenantId)
           .eq('franchise_id', franchiseId)
           .maybeSingle();
         if (error) throw error;
@@ -81,8 +85,8 @@ export default function FranchiseConfigForm() {
   const onChange = (key: keyof typeof form, value: any) => setForm((f) => ({ ...f, [key]: value }));
 
   const handleSave = async () => {
-    if (!franchiseId) {
-      toast.error('Missing franchise context');
+    if (!tenantId || !franchiseId) {
+      toast.error('Missing tenant or franchise context');
       return;
     }
     setLoading(true);
@@ -91,19 +95,21 @@ export default function FranchiseConfigForm() {
         const { error } = await supabase
           .from('quote_number_config_franchise')
           .update({ ...form })
+          .eq('tenant_id', tenantId)
           .eq('franchise_id', franchiseId);
         if (error) throw error;
         toast.success('Franchise config updated');
       } else {
         const { error } = await supabase
           .from('quote_number_config_franchise')
-          .insert([{ franchise_id: franchiseId, ...form }]);
+          .insert([{ tenant_id: tenantId, franchise_id: franchiseId, ...form }]);
         if (error) throw error;
         toast.success('Franchise config created');
       }
       const { data } = await supabase
         .from('quote_number_config_franchise')
         .select('*')
+        .eq('tenant_id', tenantId)
         .eq('franchise_id', franchiseId)
         .maybeSingle();
       if (data) setConfig(data as FranchiseConfig);
@@ -115,12 +121,13 @@ export default function FranchiseConfigForm() {
   };
 
   const handleDelete = async () => {
-    if (!franchiseId || !config) return;
+    if (!tenantId || !franchiseId || !config) return;
     setLoading(true);
     try {
       const { error } = await supabase
         .from('quote_number_config_franchise')
         .delete()
+        .eq('tenant_id', tenantId)
         .eq('franchise_id', franchiseId);
       if (error) throw error;
       setConfig(null);
@@ -144,8 +151,8 @@ export default function FranchiseConfigForm() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Prefix</Label>
-              <Input value={form.prefix} onChange={(e) => onChange('prefix', e.target.value)} />
+              <Label>Prefix (3 chars)</Label>
+              <Input maxLength={3} value={form.prefix} onChange={(e) => onChange('prefix', e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Suffix</Label>

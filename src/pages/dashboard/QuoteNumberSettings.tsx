@@ -17,10 +17,12 @@ export default function QuoteNumberSettings() {
   const sb: any = supabase;
 
   const [tenantPrefix, setTenantPrefix] = useState('QUO');
-  const [tenantPolicy, setTenantPolicy] = useState<ResetPolicy>('none');
+  const [tenantPolicy, setTenantPolicy] = useState<ResetPolicy>('daily');
   const [franchisePrefix, setFranchisePrefix] = useState('QUO');
-  const [franchisePolicy, setFranchisePolicy] = useState<ResetPolicy>('none');
+  const [franchisePolicy, setFranchisePolicy] = useState<ResetPolicy>('daily');
   const [previewNext, setPreviewNext] = useState<string>('');
+  const [savingTenant, setSavingTenant] = useState(false);
+  const [savingFranchise, setSavingFranchise] = useState(false);
 
   const loadConfig = async () => {
     if (!tenantId) return;
@@ -64,27 +66,77 @@ export default function QuoteNumberSettings() {
 
   const saveTenant = async () => {
     if (!tenantId) return;
-    const { error } = await sb
-      .from('quote_number_config_tenant')
-      .upsert({ tenant_id: tenantId, prefix: tenantPrefix, reset_policy: tenantPolicy }, { onConflict: 'tenant_id' });
-    if (error) {
-      toast.error(error.message || 'Failed to save tenant config');
-    } else {
+    const prefix = (tenantPrefix || '').toUpperCase();
+    if (prefix.length !== 3) {
+      toast.error('Prefix must be exactly 3 characters');
+      return;
+    }
+    setSavingTenant(true);
+    try {
+      const { data: existing, error: loadErr } = await sb
+        .from('quote_number_config_tenant')
+        .select('tenant_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (loadErr) throw loadErr;
+
+      if (existing) {
+        const { error: updErr } = await sb
+          .from('quote_number_config_tenant')
+          .update({ prefix, reset_policy: tenantPolicy })
+          .eq('tenant_id', tenantId);
+        if (updErr) throw updErr;
+      } else {
+        const { error: insErr } = await sb
+          .from('quote_number_config_tenant')
+          .insert([{ tenant_id: tenantId, prefix, reset_policy: tenantPolicy }]);
+        if (insErr) throw insErr;
+      }
       toast.success('Tenant quote numbering saved');
-      loadConfig();
+      await loadConfig();
+    } catch (e: any) {
+      toast.error('Failed to save tenant config', { description: e?.message });
+    } finally {
+      setSavingTenant(false);
     }
   };
 
   const saveFranchise = async () => {
     if (!tenantId || !franchiseId) return;
-    const { error } = await sb
-      .from('quote_number_config_franchise')
-      .upsert({ tenant_id: tenantId, franchise_id: franchiseId, prefix: franchisePrefix, reset_policy: franchisePolicy }, { onConflict: 'tenant_id,franchise_id' });
-    if (error) {
-      toast.error(error.message || 'Failed to save franchise config');
-    } else {
+    const prefix = (franchisePrefix || '').toUpperCase();
+    if (prefix.length !== 3) {
+      toast.error('Prefix must be exactly 3 characters');
+      return;
+    }
+    setSavingFranchise(true);
+    try {
+      const { data: existing, error: loadErr } = await sb
+        .from('quote_number_config_franchise')
+        .select('tenant_id,franchise_id')
+        .eq('tenant_id', tenantId)
+        .eq('franchise_id', franchiseId)
+        .maybeSingle();
+      if (loadErr) throw loadErr;
+
+      if (existing) {
+        const { error: updErr } = await sb
+          .from('quote_number_config_franchise')
+          .update({ prefix, reset_policy: franchisePolicy })
+          .eq('tenant_id', tenantId)
+          .eq('franchise_id', franchiseId);
+        if (updErr) throw updErr;
+      } else {
+        const { error: insErr } = await sb
+          .from('quote_number_config_franchise')
+          .insert([{ tenant_id: tenantId, franchise_id: franchiseId, prefix, reset_policy: franchisePolicy }]);
+        if (insErr) throw insErr;
+      }
       toast.success('Franchise quote numbering saved');
-      loadConfig();
+      await loadConfig();
+    } catch (e: any) {
+      toast.error('Failed to save franchise config', { description: e?.message });
+    } finally {
+      setSavingFranchise(false);
     }
   };
 
@@ -131,7 +183,7 @@ export default function QuoteNumberSettings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={saveTenant}>Save Tenant Settings</Button>
+            <Button onClick={saveTenant} disabled={savingTenant}>Save Tenant Settings</Button>
           </CardContent>
         </Card>
 
@@ -143,8 +195,8 @@ export default function QuoteNumberSettings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prefix (3 chars)</label>
-                <Input maxLength={3} value={franchisePrefix} onChange={(e) => setFranchisePrefix(e.target.value.toUpperCase())} />
+              <label className="text-sm font-medium">Prefix (3 chars)</label>
+              <Input maxLength={3} value={franchisePrefix} onChange={(e) => setFranchisePrefix(e.target.value.toUpperCase())} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Reset policy</label>
@@ -158,7 +210,7 @@ export default function QuoteNumberSettings() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={saveFranchise}>Save Franchise Settings</Button>
+              <Button onClick={saveFranchise} disabled={savingFranchise}>Save Franchise Settings</Button>
             </CardContent>
           </Card>
         )}

@@ -67,6 +67,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const { context, supabase, user } = useCRM();
   const { roles } = useAuth();
   const [searchParams] = useSearchParams();
+  const isEditMode = !!quoteId;
   const [items, setItems] = useState<QuoteItem[]>([
     { line_number: 1, product_name: '', quantity: 1, unit_price: 0, discount_percent: 0 },
   ]);
@@ -102,6 +103,84 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       fetchData();
     }
   }, [context.tenantId, roles]);
+
+  // Load existing quote for edit mode independent of tenant context
+  useEffect(() => {
+    if (!quoteId) return;
+    (async () => {
+      try {
+        const { data: quote, error: quoteErr } = await supabase
+          .from('quotes')
+          .select('*')
+          .eq('id', quoteId)
+          .maybeSingle();
+        if (quoteErr) throw quoteErr;
+        if (!quote) return;
+
+        form.reset({
+          title: (quote as any).title || '',
+          description: (quote as any).description || '',
+          service_type: (quote as any).service_type || undefined,
+          service_id: (quote as any).service_id || undefined,
+          incoterms: (quote as any).incoterms || undefined,
+          trade_direction: (quote as any).regulatory_data?.trade_direction || undefined,
+          carrier_id: (quote as any).carrier_id || undefined,
+          consignee_id: (quote as any).consignee_id || undefined,
+          origin_port_id: (quote as any).origin_port_id || undefined,
+          destination_port_id: (quote as any).destination_port_id || undefined,
+          account_id: (quote as any).account_id ? String((quote as any).account_id) : undefined,
+          contact_id: (quote as any).contact_id ? String((quote as any).contact_id) : undefined,
+          opportunity_id: (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined,
+          status: (quote as any).status || 'draft',
+          valid_until: (quote as any).valid_until || undefined,
+          tax_percent: (quote as any).tax_percent != null ? String((quote as any).tax_percent) : undefined,
+          shipping_amount: (quote as any).shipping_amount != null ? String((quote as any).shipping_amount) : undefined,
+          terms_conditions: (quote as any).terms_conditions || undefined,
+          notes: (quote as any).notes || undefined,
+        });
+        setSelectedServiceType((quote as any).service_type || '');
+        setQuoteNumberPreview((quote as any).quote_number || '—');
+
+        // Load items; tolerate RLS issues by falling back to empty
+        const { data: itemsRes, error: itemsErr } = await supabase
+          .from('quote_items')
+          .select('line_number, product_name, description, quantity, unit_price, discount_percent')
+          .eq('quote_id', quoteId)
+          .order('line_number', { ascending: true });
+        if (!itemsErr && Array.isArray(itemsRes)) {
+          setItems(
+            itemsRes.map((it: any) => ({
+              line_number: it.line_number,
+              product_name: it.product_name || '',
+              description: it.description || '',
+              quantity: Number(it.quantity) || 0,
+              unit_price: Number(it.unit_price) || 0,
+              discount_percent: Number(it.discount_percent) || 0,
+            }))
+          );
+        }
+
+        // Restore carrier quotes if present
+        try {
+          const rq = (quote as any).regulatory_data?.carrier_quotes;
+          if (Array.isArray(rq)) {
+            setCarrierQuotes(
+              rq.map((cq: any) => ({
+                carrier_id: cq.carrier_id || '',
+                mode: cq.mode || (quote as any).service_type || undefined,
+                buying_charges: Array.isArray(cq.buying_charges) ? cq.buying_charges : [],
+                selling_charges: Array.isArray(cq.selling_charges) ? cq.selling_charges : [],
+              }))
+            );
+          }
+        } catch {}
+      } catch (err: any) {
+        console.error('Failed to load existing quote:', err?.message || err);
+        toast.error('Failed to load existing quote', { description: err?.message });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteId]);
 
   const fetchData = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
@@ -148,6 +227,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
         }
       } catch {}
+
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
     }
@@ -158,6 +238,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
     const franchiseId = context.franchiseId || roles?.[0]?.franchise_id || null;
     if (!tenantId) return;
+    // In edit mode, use existing quote number preview and skip RPC
+    if (quoteId) return;
     const preview = async () => {
       try {
         const { data, error } = await (supabase as any).rpc('preview_next_quote_number', {
@@ -177,8 +259,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   // When account changes, clear contact if it no longer belongs to the selected account
   useEffect(() => {
     if (!accountId) return;
+    if (!Array.isArray(contacts) || contacts.length === 0) return; // wait until contacts load
     const currentContactId = form.getValues('contact_id');
-    const isValid = contacts.some((c: any) => c.id === currentContactId && c.account_id === accountId);
+    const isValid = contacts.some(
+      (c: any) => String(c.id) === String(currentContactId) && String(c.account_id) === String(accountId)
+    );
     if (!isValid) {
       form.setValue('contact_id', undefined, { shouldDirty: true });
     }
@@ -400,12 +485,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }));
       }
 
-      // Try to generate a quote number via RPC; if it fails, rely on DB trigger
-      const { data: genNumber, error: genError } = await (supabase as any).rpc('generate_quote_number', {
-        p_tenant_id: tenantId,
-        p_franchise_id: franchiseId,
-      });
-      const quoteNumber = genError || !genNumber ? null : (typeof genNumber === 'string' ? genNumber : String(genNumber));
+      // Only generate a quote number for new quotes
+      let quoteNumber: string | null = null;
+      if (!quoteId) {
+        const { data: genNumber, error: genError } = await (supabase as any).rpc('generate_quote_number', {
+          p_tenant_id: tenantId,
+          p_franchise_id: franchiseId,
+        });
+        quoteNumber = genError || !genNumber ? null : (typeof genNumber === 'string' ? genNumber : String(genNumber));
+      }
 
       const quoteData: any = {
         ...(quoteNumber ? { quote_number: quoteNumber } : {}),
@@ -438,13 +526,25 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         compliance_status: 'pending',
       };
 
-      const { data: quote, error: quoteError } = await supabase
-        .from('quotes')
-        .insert([quoteData])
-        .select()
-        .single();
-
-      if (quoteError) throw quoteError;
+      let quote: any = null;
+      if (quoteId) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('quotes')
+          .update(quoteData)
+          .eq('id', quoteId)
+          .select()
+          .maybeSingle();
+        if (updateErr) throw updateErr;
+        quote = updated || { id: quoteId };
+      } else {
+        const { data: created, error: quoteError } = await supabase
+          .from('quotes')
+          .insert([quoteData])
+          .select()
+          .single();
+        if (quoteError) throw quoteError;
+        quote = created;
+      }
 
       const itemsData = items.map((item) => ({
         quote_id: quote.id,
@@ -452,14 +552,22 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         line_total: item.quantity * item.unit_price * (1 - item.discount_percent / 100),
       }));
 
+      // Replace existing items on edit; insert on create
+      if (quoteId) {
+        const { error: delErr } = await supabase
+          .from('quote_items')
+          .delete()
+          .eq('quote_id', quoteId);
+        if (delErr) throw delErr;
+      }
       const { error: itemsError } = await supabase.from('quote_items').insert(itemsData);
 
       if (itemsError) throw itemsError;
 
-      toast.success('Quote created successfully');
+      toast.success(quoteId ? 'Quote updated successfully' : 'Quote created successfully');
       onSuccess?.(quote.id);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create quote');
+      toast.error(error.message || (quoteId ? 'Failed to update quote' : 'Failed to create quote'));
     } finally {
       setIsSubmitting(false);
     }
@@ -470,7 +578,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Quote Information</CardTitle>
+            <CardTitle>
+              Quote Information
+              {isEditMode && (
+                <span className="ml-2 text-xs text-muted-foreground">Edit Mode</span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -508,7 +621,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               {/* Quotation Number */}
               <FormItem>
                 <FormLabel>Quotation Number</FormLabel>
-                <FormDescription>Auto-generated on save</FormDescription>
+                <FormDescription>{isEditMode ? 'Existing number' : 'Auto-generated on save'}</FormDescription>
                 <FormControl>
                   <Input readOnly value={quoteNumberPreview} />
                 </FormControl>
@@ -621,7 +734,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           </SelectTrigger>
                         </FormControl>
                       <SelectContent>
-                          {(accountId ? contacts.filter((c: any) => c.account_id === accountId) : contacts).map((contact) => (
+                          {(accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts).map((contact) => (
                             <SelectItem key={contact.id} value={String(contact.id)}>
                               {contact.first_name} {contact.last_name}
                             </SelectItem>
@@ -671,10 +784,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         field.onChange(value);
                         setSelectedServiceType(value);
                       }} 
-                      defaultValue={field.value}
+                      value={field.value ?? ''}
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" disabled={isEditMode}>
                           <SelectValue placeholder="Select service type" />
                         </SelectTrigger>
                       </FormControl>
@@ -699,7 +812,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Service</FormLabel>
                     <FormDescription>Select service</FormDescription>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select service" />
@@ -732,7 +845,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Import/Export</FormLabel>
                     <FormDescription>Select trade direction</FormDescription>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select direction" />
@@ -756,7 +869,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Carrier</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select carrier" />
@@ -781,7 +894,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Consignee</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select consignee" />
@@ -808,7 +921,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Origin Port/Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select origin" />
@@ -833,7 +946,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Destination Port/Location</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select destination" />
@@ -860,7 +973,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Incoterms</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select incoterms" />

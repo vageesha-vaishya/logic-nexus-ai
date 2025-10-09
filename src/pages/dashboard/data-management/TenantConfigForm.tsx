@@ -22,9 +22,11 @@ type TenantConfig = {
 
 const resetPolicies: ResetPolicy[] = ['none', 'daily', 'weekly', 'monthly', 'yearly', 'per_customer'];
 
-export default function TenantConfigForm() {
+type Props = { tenantIdOverride?: string };
+
+export default function TenantConfigForm({ tenantIdOverride }: Props) {
   const { supabase, context } = useCRM();
-  const tenantId = context?.tenantId || null;
+  const tenantId = tenantIdOverride ?? context?.tenantId ?? null;
 
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState<TenantConfig | null>(null);
@@ -144,8 +146,8 @@ export default function TenantConfigForm() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Prefix</Label>
-              <Input value={form.prefix} onChange={(e) => onChange('prefix', e.target.value)} />
+              <Label>Prefix (3 chars)</Label>
+              <Input maxLength={3} value={form.prefix} onChange={(e) => onChange('prefix', e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Suffix</Label>
