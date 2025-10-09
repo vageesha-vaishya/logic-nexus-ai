@@ -242,33 +242,56 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
         } catch {}
 
-        // Fetch related opportunity, account, and contact data with proper joins
-        const { data: quoteWithRelations } = await supabase
-          .from('quotes')
-          .select(`
-            opportunity:opportunities(id, name),
-            account:accounts(id, name),
-            contact:contacts(id, first_name, last_name)
-          `)
-          .eq('id', quoteId)
-          .maybeSingle();
-
-        if (quoteWithRelations) {
-          // Add opportunity to list if present
-          if (quoteWithRelations.opportunity && !opportunities.some((o: any) => String(o.id) === String(quoteWithRelations.opportunity.id))) {
-            setOpportunities((prev) => [quoteWithRelations.opportunity, ...prev]);
-          }
-          
-          // Add account to list if present
-          if (quoteWithRelations.account && !accounts.some((a: any) => String(a.id) === String(quoteWithRelations.account.id))) {
-            setAccounts((prev) => [quoteWithRelations.account, ...prev]);
-          }
-          
-          // Add contact to list if present
-          if (quoteWithRelations.contact && !contacts.some((c: any) => String(c.id) === String(quoteWithRelations.contact.id))) {
-            setContacts((prev) => [quoteWithRelations.contact, ...prev]);
-          }
+        // Fetch related opportunity, account, and contact data separately
+        const fetchPromises = [];
+        
+        if ((quote as any).opportunity_id) {
+          fetchPromises.push(
+            supabase
+              .from('opportunities')
+              .select('id, name')
+              .eq('id', (quote as any).opportunity_id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data && !opportunities.some((o: any) => String(o.id) === String(data.id))) {
+                  setOpportunities((prev) => [data, ...prev]);
+                }
+              })
+          );
         }
+        
+        if ((quote as any).account_id) {
+          fetchPromises.push(
+            supabase
+              .from('accounts')
+              .select('id, name')
+              .eq('id', (quote as any).account_id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data && !accounts.some((a: any) => String(a.id) === String(data.id))) {
+                  setAccounts((prev) => [data, ...prev]);
+                }
+              })
+          );
+        }
+        
+        if ((quote as any).contact_id) {
+          fetchPromises.push(
+            supabase
+              .from('contacts')
+              .select('id, first_name, last_name')
+              .eq('id', (quote as any).contact_id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data && !contacts.some((c: any) => String(c.id) === String(data.id))) {
+                  setContacts((prev) => [data, ...prev]);
+                }
+              })
+          );
+        }
+
+        // Wait for all related data to be fetched
+        await Promise.all(fetchPromises).catch(err => console.warn('Failed to fetch related data:', err));
 
         // Ensure selected lookup values appear in dropdowns even if tenant filters exclude them
         try {
