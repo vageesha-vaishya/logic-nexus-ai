@@ -142,12 +142,63 @@ export default function SecurityOverview() {
     }
   });
 
-  const { data: dbFunctions, isLoading: functionsLoading } = useQuery({
+  const { data: dbFunctions, isLoading: functionsLoading, error: functionsError } = useQuery({
     queryKey: ['database-functions'],
     queryFn: async () => {
+      // Primary: use dedicated RPC for listing functions
       const { data, error } = await supabase.rpc('get_database_functions' as any);
-      if (error) throw error;
-      return data as unknown as Array<{
+      if (!error) {
+        return (data ?? []) as unknown as Array<{
+          name: string;
+          schema: string;
+          kind: string;
+          return_type: string;
+          argument_types: string;
+          language: string;
+          volatility: string;
+          security_definer: boolean;
+          description: string | null;
+        }>;
+      }
+
+      // Fallback: query pg_catalog via safe read-only SQL RPC if the function isn’t cached yet
+      const sql = `
+        SELECT
+          p.proname::text AS name,
+          n.nspname::text AS schema,
+          CASE p.prokind 
+            WHEN 'f' THEN 'function' 
+            WHEN 'p' THEN 'procedure' 
+            WHEN 'a' THEN 'aggregate' 
+            WHEN 'w' THEN 'window' 
+            ELSE p.prokind::text 
+          END AS kind,
+          pg_catalog.format_type(p.prorettype, NULL)::text AS return_type,
+          pg_catalog.pg_get_function_identity_arguments(p.oid)::text AS argument_types,
+          l.lanname::text AS language,
+          CASE p.provolatile 
+            WHEN 'i' THEN 'immutable' 
+            WHEN 's' THEN 'stable' 
+            WHEN 'v' THEN 'volatile' 
+            ELSE p.provolatile::text 
+          END AS volatility,
+          p.prosecdef AS security_definer,
+          pg_catalog.obj_description(p.oid, 'pg_proc')::text AS description
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        JOIN pg_language l ON l.oid = p.prolang
+        WHERE n.nspname = 'public'
+        ORDER BY n.nspname, p.proname;
+      `;
+
+      const { data: fallbackData, error: fallbackError } = await supabase.rpc('execute_sql_query' as any, { query_text: sql });
+      if (fallbackError) {
+        // Surface the original error to the UI for clarity
+        throw error;
+      }
+
+      const rows = Array.isArray(fallbackData) ? fallbackData : [];
+      return rows as unknown as Array<{
         name: string;
         schema: string;
         kind: string;
@@ -158,7 +209,9 @@ export default function SecurityOverview() {
         security_definer: boolean;
         description: string | null;
       }>;
-    }
+    },
+    staleTime: 60_000,
+    retry: 1
   });
 
   return (
@@ -245,6 +298,8 @@ export default function SecurityOverview() {
                 <CardContent>
                   {functionsLoading ? (
                     <div>Loading...</div>
+                  ) : functionsError ? (
+                    <div className="text-destructive">Failed to load functions: {(functionsError as any)?.message ?? 'Unknown error'}</div>
                   ) : !dbFunctions || dbFunctions.length === 0 ? (
                     <div className="text-muted-foreground">No functions found</div>
                   ) : (
