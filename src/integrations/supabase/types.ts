@@ -3857,6 +3857,20 @@ export type Database = {
           labels: string
         }[]
       }
+      get_database_functions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          argument_types: string
+          description: string
+          kind: string
+          language: string
+          name: string
+          return_type: string
+          schema: string
+          security_definer: boolean
+          volatility: string
+        }[]
+      }
       get_database_schema: {
         Args: Record<PropertyKey, never>
         Returns: {

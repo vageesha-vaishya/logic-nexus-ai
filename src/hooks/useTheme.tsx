@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { THEME_PRESETS } from '@/theme/themes';
 import { useCRM } from '@/hooks/useCRM';
 
@@ -48,6 +48,89 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [scope, setScope] = useState<'platform' | 'tenant' | 'franchise' | 'user'>('user');
   const LS_DARK_KEY = 'soslogicpro.darkMode';
   const { supabase, context } = useCRM();
+
+  // Define applyTheme before useEffect calls
+  const applyTheme = useCallback((t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
+    const root = document.documentElement;
+    const angle = t.angle ?? 135;
+    root.style.setProperty('--gradient-primary', `linear-gradient(${angle}deg, hsl(${t.start}) 0%, hsl(${t.end}) 100%)`);
+    const bgAngle = t.bgAngle ?? angle;
+    const bgStart = t.bgStart ?? t.start;
+    const bgEnd = t.bgEnd ?? t.end;
+    root.style.setProperty('--app-background', `linear-gradient(${bgAngle}deg, hsl(${bgStart}) 0%, hsl(${bgEnd}) 100%)`);
+    if (t.primary) {
+      root.style.setProperty('--primary', t.primary);
+      root.style.setProperty('--sidebar-primary', t.primary);
+      root.style.setProperty('--ring', t.primary);
+    }
+    if (t.accent) {
+      root.style.setProperty('--accent', t.accent);
+      root.style.setProperty('--sidebar-accent', t.accent);
+    }
+    const titleStrip = t.titleStrip || t.accent || t.primary;
+    if (titleStrip) {
+      root.style.setProperty('--title-strip', titleStrip);
+    }
+    const isDark = typeof t.dark === 'boolean' ? t.dark : document.documentElement.classList.contains('dark');
+    
+    const parseHsl = (value?: string) => {
+      if (!value) return null as any;
+      const m = value.match(/^(\s*\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%/);
+      if (!m) return null;
+      return { h: parseFloat(m[1]), s: parseFloat(m[2]), l: parseFloat(m[3]) };
+    };
+    const lighten = (hsl: { h: number; s: number; l: number }, amount: number) => {
+      const newL = Math.min(100, hsl.l + amount);
+      return `${hsl.h} ${hsl.s}% ${newL}%`;
+    };
+    const darken = (hsl: { h: number; s: number; l: number }, amount: number) => {
+      const newL = Math.max(0, hsl.l - amount);
+      return `${hsl.h} ${hsl.s}% ${newL}%`;
+    };
+    const primaryParsed = parseHsl(t.primary);
+    const accentParsed = parseHsl(t.accent);
+    let thText = t.tableHeaderText;
+    let thSep = t.tableHeaderSeparator;
+    let thBg = t.tableHeaderBackground;
+    let tableBg = t.tableBackground;
+    if (!thText) {
+      thText = isDark ? '210 40% 98%' : '222.2 84% 4.9%';
+    }
+    if (!thSep && primaryParsed) {
+      thSep = isDark ? lighten(primaryParsed, 10) : darken(primaryParsed, 5);
+    }
+    if (!thBg) {
+      if (primaryParsed) {
+        thBg = isDark ? lighten(primaryParsed, 5) : lighten(primaryParsed, 45);
+      }
+    }
+    if (!tableBg) {
+      tableBg = isDark ? '222.2 84% 4.9%' : '0 0% 100%';
+    }
+    if (thText) root.style.setProperty('--table-header-foreground', thText);
+    if (thSep) root.style.setProperty('--table-header-separator', thSep);
+    if (thBg) root.style.setProperty('--table-header-background', thBg);
+    if (tableBg) root.style.setProperty('--table-background', tableBg);
+    if (t.radius) {
+      root.style.setProperty('--radius', t.radius);
+    }
+    if (t.sidebarBackground) {
+      root.style.setProperty('--sidebar-background', t.sidebarBackground);
+    }
+    if (t.sidebarAccent) {
+      root.style.setProperty('--sidebar-accent', t.sidebarAccent);
+    }
+  }, []);
+
+  const toggleDark = useCallback((enabled: boolean) => {
+    const root = document.documentElement;
+    if (enabled) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem(LS_DARK_KEY, String(enabled));
+  }, [LS_DARK_KEY]);
 
   useEffect(() => {
     try {
@@ -147,101 +230,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // noop; keep local storage themes
       }
     })();
-  }, [scope, context?.userId, context?.tenantId, context?.franchiseId]);
-
-  const applyTheme = (t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
-    const root = document.documentElement;
-    const angle = t.angle ?? 135;
-    root.style.setProperty('--gradient-primary', `linear-gradient(${angle}deg, hsl(${t.start}) 0%, hsl(${t.end}) 100%)`);
-    // Main page background gradient variable
-    const bgAngle = t.bgAngle ?? angle;
-    const bgStart = t.bgStart ?? t.start;
-    const bgEnd = t.bgEnd ?? t.end;
-    root.style.setProperty('--app-background', `linear-gradient(${bgAngle}deg, hsl(${bgStart}) 0%, hsl(${bgEnd}) 100%)`);
-    if (t.primary) {
-      root.style.setProperty('--primary', t.primary);
-      root.style.setProperty('--sidebar-primary', t.primary);
-      root.style.setProperty('--ring', t.primary);
-    }
-    if (t.accent) {
-      root.style.setProperty('--accent', t.accent);
-      root.style.setProperty('--sidebar-accent', t.accent);
-    }
-    // Title strip color falls back to accent, then primary.
-    const titleStrip = t.titleStrip || t.accent || t.primary;
-    if (titleStrip) {
-      root.style.setProperty('--title-strip', titleStrip);
-    }
-    // Table header / table defaults with dynamic computation
-    const isDark = typeof t.dark === 'boolean' ? t.dark : document.documentElement.classList.contains('dark');
-
-    const parseHsl = (value?: string) => {
-      if (!value) return null as any;
-      const m = value.match(/^(\s*\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%/);
-      if (!m) return null as any;
-      return { h: Number(m[1]), s: Number(m[2]), l: Number(m[3]) };
-    };
-    const composeHsl = (h: number, s: number, l: number) => `${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%`;
-
-    // Compute header background
-    let computedHeaderBg = t.tableHeaderBackground;
-    if (!computedHeaderBg) {
-      if (isDark) {
-        // Dark mode default header background (slate-800 range)
-        computedHeaderBg = '222 47% 17%';
-      } else {
-        // Light mode: pastel tint derived from titleStrip/accent/primary
-        const base = titleStrip || t.accent || t.primary || '197 71% 52%';
-        const parsed = parseHsl(base);
-        if (parsed) {
-          computedHeaderBg = composeHsl(parsed.h, 35, 92);
-        } else {
-          computedHeaderBg = '197 35% 92%';
-        }
-      }
-    }
-    root.style.setProperty('--table-header-background', computedHeaderBg);
-
-    // Compute table background
-    const computedTableBg = t.tableBackground || (isDark ? '222 47% 11%' : '0 0% 100%');
-    root.style.setProperty('--table-background', computedTableBg);
-
-    // Auto-select header text by background lightness if not provided
-    let computedHeaderText = t.tableHeaderText;
-    if (!computedHeaderText) {
-      const p = parseHsl(computedHeaderBg);
-      if (p && p.l > 60) {
-        computedHeaderText = '0 0% 10%';
-      } else {
-        computedHeaderText = '0 0% 100%';
-      }
-    }
-    root.style.setProperty('--table-header-text', computedHeaderText);
-
-    // Separator: opposite color with balanced alpha
-    let computedSeparator = t.tableHeaderSeparator;
-    if (!computedSeparator) {
-      const p = parseHsl(computedHeaderBg);
-      const isLightBg = p ? p.l > 60 : !isDark; // fallback assumption
-      if (isLightBg) {
-        computedSeparator = '0 0% 0% / 0.15'; // subtle black
-      } else {
-        computedSeparator = '0 0% 100% / 0.25'; // subtle white
-      }
-    }
-    root.style.setProperty('--table-header-separator', computedSeparator);
-    if (t.sidebarBackground) {
-      root.style.setProperty('--sidebar-background', t.sidebarBackground);
-    }
-    if (t.radius) {
-      root.style.setProperty('--radius', t.radius);
-    }
-    root.style.setProperty('--shadow-primary', `0 10px 30px -10px hsl(${t.primary || '217 91% 60%'} / 0.3)`);
-    if (typeof t.dark === 'boolean') {
-      toggleDark(t.dark);
-      localStorage.setItem(LS_DARK_KEY, String(t.dark));
-    }
-  };
+  }, [scope, context?.userId, context?.tenantId, context?.franchiseId, applyTheme]);
 
   const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const saved: SavedTheme = { ...t, createdAt: new Date().toISOString() };
@@ -314,17 +303,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   };
 
-  const toggleDark = (enabled: boolean) => {
-    const root = document.documentElement;
-    if (enabled) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem(LS_DARK_KEY, String(enabled));
-  };
-
-  const value = useMemo<ThemeContextValue>(() => ({ themes, activeThemeName, scope, setScope, applyTheme, saveTheme, deleteTheme, setActive, toggleDark }), [themes, activeThemeName, scope]);
+  const value = useMemo<ThemeContextValue>(() => ({ themes, activeThemeName, scope, setScope, applyTheme, saveTheme, deleteTheme, setActive, toggleDark }), [themes, activeThemeName, scope, applyTheme, toggleDark]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
