@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CarrierQuotesSection } from './CarrierQuotesSection';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -72,6 +72,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     { line_number: 1, product_name: '', quantity: 1, unit_price: 0, discount_percent: 0 },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
   const [services, setServices] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
   const [consignees, setConsignees] = useState<any[]>([]);
@@ -108,6 +109,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   useEffect(() => {
     if (!quoteId) return;
     (async () => {
+      setIsHydrating(true);
       try {
         const { data: quote, error: quoteErr } = await supabase
           .from('quotes')
@@ -121,13 +123,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           title: (quote as any).title || '',
           description: (quote as any).description || '',
           service_type: (quote as any).service_type || undefined,
-          service_id: (quote as any).service_id || undefined,
+          service_id: (quote as any).service_id != null ? String((quote as any).service_id) : undefined,
           incoterms: (quote as any).incoterms || undefined,
           trade_direction: (quote as any).regulatory_data?.trade_direction || undefined,
-          carrier_id: (quote as any).carrier_id || undefined,
-          consignee_id: (quote as any).consignee_id || undefined,
-          origin_port_id: (quote as any).origin_port_id || undefined,
-          destination_port_id: (quote as any).destination_port_id || undefined,
+          carrier_id: (quote as any).carrier_id != null ? String((quote as any).carrier_id) : undefined,
+          consignee_id: (quote as any).consignee_id != null ? String((quote as any).consignee_id) : undefined,
+          origin_port_id: (quote as any).origin_port_id != null ? String((quote as any).origin_port_id) : undefined,
+          destination_port_id: (quote as any).destination_port_id != null ? String((quote as any).destination_port_id) : undefined,
           account_id: (quote as any).account_id ? String((quote as any).account_id) : undefined,
           contact_id: (quote as any).contact_id ? String((quote as any).contact_id) : undefined,
           opportunity_id: (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined,
@@ -174,9 +176,110 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             );
           }
         } catch {}
+
+        // Ensure selected lookup values appear in dropdowns even if tenant filters exclude them
+        try {
+          const selServiceId = (quote as any).service_id;
+          if (selServiceId && !services.some((s: any) => String(s.id) === String(selServiceId))) {
+            const { data } = await supabase
+              .from('services')
+              .select('id, service_name, service_type')
+              .eq('id', selServiceId)
+              .maybeSingle();
+            if (data) setServices((prev) => [data, ...prev]);
+          }
+
+          const selCarrierId = (quote as any).carrier_id;
+          if (selCarrierId && !carriers.some((c: any) => String(c.id) === String(selCarrierId))) {
+            const { data } = await supabase
+              .from('carriers')
+              .select('id, carrier_name')
+              .eq('id', selCarrierId)
+              .maybeSingle();
+            if (data) setCarriers((prev) => [data, ...prev]);
+          }
+
+          const selConsigneeId = (quote as any).consignee_id;
+          if (selConsigneeId && !consignees.some((c: any) => String(c.id) === String(selConsigneeId))) {
+            const { data } = await supabase
+              .from('consignees')
+              .select('id, company_name')
+              .eq('id', selConsigneeId)
+              .maybeSingle();
+            if (data) setConsignees((prev) => [data, ...prev]);
+          }
+
+          const selOriginId = (quote as any).origin_port_id;
+          if (selOriginId && !ports.some((p: any) => String(p.id) === String(selOriginId))) {
+            const { data } = await supabase
+              .from('ports_locations')
+              .select('id, location_name, location_code')
+              .eq('id', selOriginId)
+              .maybeSingle();
+            if (data) setPorts((prev) => [data, ...prev]);
+          }
+
+          const selDestId = (quote as any).destination_port_id;
+          if (selDestId && !ports.some((p: any) => String(p.id) === String(selDestId))) {
+            const { data } = await supabase
+              .from('ports_locations')
+              .select('id, location_name, location_code')
+              .eq('id', selDestId)
+              .maybeSingle();
+            if (data) setPorts((prev) => [data, ...prev]);
+          }
+
+          const selAccountId = (quote as any).account_id;
+          if (selAccountId && !accounts.some((a: any) => String(a.id) === String(selAccountId))) {
+            const { data } = await supabase
+              .from('accounts')
+              .select('id, name, tenant_id')
+              .eq('id', selAccountId)
+              .maybeSingle();
+            if (data) {
+              setAccounts((prev) => [data, ...prev]);
+            } else {
+              // RLS or tenant scoping may block fetch; add a placeholder so the selected ID renders
+              setAccounts((prev) => [{ id: selAccountId, name: 'Selected Account' }, ...prev]);
+            }
+          }
+
+          const selContactId = (quote as any).contact_id;
+          if (selContactId && !contacts.some((c: any) => String(c.id) === String(selContactId))) {
+            const { data } = await supabase
+              .from('contacts')
+              .select('id, first_name, last_name, account_id')
+              .eq('id', selContactId)
+              .maybeSingle();
+            if (data) {
+              setContacts((prev) => [data, ...prev]);
+            } else {
+              setContacts((prev) => [{ id: selContactId, first_name: 'Selected', last_name: 'Contact' }, ...prev]);
+            }
+          }
+
+          const selOppId = (quote as any).opportunity_id;
+          if (selOppId && !opportunities.some((o: any) => String(o.id) === String(selOppId))) {
+            const { data } = await supabase
+              .from('opportunities')
+              .select('id, name, account_id, contact_id, tenant_id')
+              .eq('id', selOppId)
+              .maybeSingle();
+            if (data) {
+              setOpportunities((prev) => [data, ...prev]);
+            } else {
+              setOpportunities((prev) => [{ id: selOppId, name: 'Selected Opportunity' }, ...prev]);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to hydrate selected options for edit mode:', e);
+        }
       } catch (err: any) {
         console.error('Failed to load existing quote:', err?.message || err);
         toast.error('Failed to load existing quote', { description: err?.message });
+      }
+      finally {
+        setIsHydrating(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,6 +331,59 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }
       } catch {}
 
+      // Ensure currently selected CRM IDs appear in dropdowns even if tenant lists exclude them
+      try {
+        const curAccountId = form.getValues('account_id');
+        const accountsList = Array.isArray(accountsRes.data) ? accountsRes.data : [];
+        if (curAccountId && !accountsList.some((a: any) => String(a.id) === String(curAccountId))) {
+          const { data } = await supabase
+            .from('accounts')
+            .select('id, name, tenant_id')
+            .eq('id', curAccountId)
+            .maybeSingle();
+          if (data) setAccounts((prev) => [data, ...prev]);
+        }
+
+        const curContactId = form.getValues('contact_id');
+        const contactsList = Array.isArray(contactsRes.data) ? contactsRes.data : [];
+        if (curContactId && !contactsList.some((c: any) => String(c.id) === String(curContactId))) {
+          const { data } = await supabase
+            .from('contacts')
+            .select('id, first_name, last_name, account_id')
+            .eq('id', curContactId)
+            .maybeSingle();
+          if (data) setContacts((prev) => [data, ...prev]);
+        }
+
+        const curOppId = form.getValues('opportunity_id');
+        const opportunitiesList = Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : [];
+        if (curOppId && !opportunitiesList.some((o: any) => String(o.id) === String(curOppId))) {
+          const { data } = await supabase
+            .from('opportunities')
+            .select('id, name, account_id, contact_id, tenant_id')
+            .eq('id', curOppId)
+            .maybeSingle();
+          if (data) {
+            setOpportunities((prev) => [data, ...prev]);
+          } else {
+            // Fallback: resolve label via Edge Function when direct fetch is blocked by RLS
+            try {
+              const { data: labelData, error: fnError } = await supabase.functions.invoke('get-opportunity-label', {
+                body: { id: curOppId },
+              });
+              if (!fnError && (labelData as any)?.name) {
+                const resolved = { id: (labelData as any).id ?? curOppId, name: (labelData as any).name } as any;
+                setOpportunities((prev) => [resolved, ...prev]);
+              }
+            } catch (fnErr) {
+              console.warn('Opportunity label resolution failed:', fnErr);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('CRM option merge after tenant fetch failed:', e);
+      }
+
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
     }
@@ -261,10 +417,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (!accountId) return;
     if (!Array.isArray(contacts) || contacts.length === 0) return; // wait until contacts load
     const currentContactId = form.getValues('contact_id');
-    const isValid = contacts.some(
-      (c: any) => String(c.id) === String(currentContactId) && String(c.account_id) === String(accountId)
-    );
-    if (!isValid) {
+    // Only clear if the selected contact exists and belongs to a different account.
+    // If the contact is not present (e.g., RLS-hidden and rendered via fallback), keep it.
+    const selected = contacts.find((c: any) => String(c.id) === String(currentContactId));
+    if (selected && String(selected.account_id) !== String(accountId)) {
       form.setValue('contact_id', undefined, { shouldDirty: true });
     }
   }, [accountId, contacts]);
@@ -576,6 +732,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <fieldset disabled={isHydrating} aria-busy={isHydrating}>
         <Card>
           <CardHeader>
             <CardTitle>
@@ -584,6 +741,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 <span className="ml-2 text-xs text-muted-foreground">Edit Mode</span>
               )}
             </CardTitle>
+            {isEditMode && isHydrating && (
+              <div className="mt-1 text-xs text-muted-foreground flex items-center">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Loading saved data…
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -660,6 +822,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         {opportunities.length === 0 && (
                           <SelectItem disabled value="__no_opportunities__">No opportunities found</SelectItem>
                         )}
+                        {field.value && !opportunities.some((o: any) => String(o.id) === String(field.value)) && (
+                          <SelectItem key={`selected-opportunity-${field.value}`} value={String(field.value)}>
+                            Selected Opportunity
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <div className="mt-2">
@@ -696,6 +863,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           ))}
                           {accounts.length === 0 && (
                             <SelectItem disabled value="__no_accounts__">No accounts found</SelectItem>
+                          )}
+                          {field.value && !accounts.some((a: any) => String(a.id) === String(field.value)) && (
+                            <SelectItem key={`selected-account-${field.value}`} value={String(field.value)}>
+                              Selected Account
+                            </SelectItem>
                           )}
                         </SelectContent>
                       </Select>
@@ -741,6 +913,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           ))}
                           {contacts.length === 0 && (
                             <SelectItem disabled value="__no_contacts__">No contacts found</SelectItem>
+                          )}
+                          {field.value && !(
+                            (accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts)
+                              .some((c: any) => String(c.id) === String(field.value))
+                          ) && (
+                            <SelectItem key={`selected-contact-${field.value}`} value={String(field.value)}>
+                              Selected Contact
+                            </SelectItem>
                           )}
                         </SelectContent>
                       </Select>
@@ -822,7 +1002,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         {services
                           .filter(s => !selectedServiceType || s.service_type === selectedServiceType)
                           .map((service) => (
-                            <SelectItem key={service.id} value={service.id}>
+                            <SelectItem key={service.id} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
                           ))}
@@ -877,7 +1057,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       </FormControl>
                       <SelectContent>
                         {carriers.map((carrier) => (
-                          <SelectItem key={carrier.id} value={carrier.id}>
+                          <SelectItem key={carrier.id} value={String(carrier.id)}>
                             {carrier.carrier_name}
                           </SelectItem>
                         ))}
@@ -902,7 +1082,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       </FormControl>
                       <SelectContent>
                         {consignees.map((consignee) => (
-                          <SelectItem key={consignee.id} value={consignee.id}>
+                          <SelectItem key={consignee.id} value={String(consignee.id)}>
                             {consignee.company_name}
                           </SelectItem>
                         ))}
@@ -929,7 +1109,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       </FormControl>
                       <SelectContent>
                         {ports.map((port) => (
-                          <SelectItem key={port.id} value={port.id}>
+                          <SelectItem key={port.id} value={String(port.id)}>
                             {port.location_name} ({port.location_code || 'N/A'})
                           </SelectItem>
                         ))}
@@ -954,7 +1134,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       </FormControl>
                       <SelectContent>
                         {ports.map((port) => (
-                          <SelectItem key={port.id} value={port.id}>
+                          <SelectItem key={port.id} value={String(port.id)}>
                             {port.location_name} ({port.location_code || 'N/A'})
                           </SelectItem>
                         ))}
@@ -1187,7 +1367,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         <div className="flex justify-end gap-4">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create Quote'}
+            {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Save')}
           </Button>
         </div>
 
@@ -1233,7 +1413,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               <div className="flex items-center gap-2">
                 <Button type="button" variant="ghost" size="sm" onClick={(e) => { localStorage.setItem('quoteStickyTotalsVisible', 'false'); const wrapper = (e.currentTarget.closest('[data-sticky-totals]') as HTMLElement | null); if (wrapper) wrapper.remove(); }}>Dismiss</Button>
                 <Button type="submit" disabled={isSubmitting} size="sm">
-                  {isSubmitting ? 'Creating...' : 'Create Quote'}
+                  {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Save')}
                 </Button>
               </div>
             </div>
@@ -1264,12 +1444,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             <div className="flex items-center gap-3">
             <Button type="button" variant="ghost" onClick={(e) => { localStorage.setItem('quoteStickyTotalsVisible', 'false'); const wrapper = (e.currentTarget.closest('[data-sticky-totals]') as HTMLElement | null); if (wrapper) wrapper.remove(); }}>Dismiss</Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Quote'}
+              {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Save')}
             </Button>
             </div>
           </div>
         </div>
         )}
+        </fieldset>
       </form>
     </Form>
   );

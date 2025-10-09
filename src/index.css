@@ -61,6 +61,7 @@ All colors MUST be HSL.
     --table-header-background: 197 35% 92%;
     --table-header-text: 0 0% 10%;
     --table-header-separator: 0 0% 0% / 0.15;
+    --table-foreground: var(--foreground);
     --gradient-brand-golden: linear-gradient(
       135deg,
       hsl(45 96% 62%) 0%,
@@ -102,6 +103,8 @@ All colors MUST be HSL.
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
+    /* Ensure table text follows foreground unless overridden by theme */
+    --table-foreground: var(--foreground);
 
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;

@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRM } from '@/hooks/useCRM';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SequencesAndPreview from './data-management/SequencesAndPreview';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
@@ -26,7 +25,6 @@ export default function Settings() {
         <Tabs defaultValue="general">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="quote-sequence">Quotation Sequence</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="mt-4">
@@ -130,11 +128,8 @@ export default function Settings() {
                     <p className="text-xs text-muted-foreground">Or configure quote numbering and preview sequences.</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => navigate('/dashboard/security-overview')}>
-                      Security Overview
-                    </Button>
-                    <Button variant="default" onClick={() => navigate('/dashboard/settings/data-management')}>
-                      Open Data Management
+                    <Button variant="outline" onClick={() => navigate('/dashboard/security-overview?tab=data-management')}>
+                      Data Management
                     </Button>
                   </div>
                 </CardContent>
@@ -158,9 +153,7 @@ export default function Settings() {
             </div>
           </TabsContent>
 
-          <TabsContent value="quote-sequence" className="mt-4">
-            <SequencesAndPreview />
-          </TabsContent>
+          
         </Tabs>
       </div>
     </DashboardLayout>

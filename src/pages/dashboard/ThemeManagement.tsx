@@ -27,6 +27,7 @@ export default function ThemeManagement() {
   const [tableHeaderSeparator, setTableHeaderSeparator] = useState<string | undefined>(undefined);
   const [tableHeaderBackground, setTableHeaderBackground] = useState<string | undefined>(undefined);
   const [tableBackground, setTableBackground] = useState<string | undefined>(undefined);
+  const [tableForeground, setTableForeground] = useState<string | undefined>(undefined);
   const [angle, setAngle] = useState(135);
   // Main page background gradient overrides (default to primary gradient)
   const [bgStart, setBgStart] = useState<string | undefined>(undefined);
@@ -63,6 +64,7 @@ export default function ThemeManagement() {
         // New table header/table background tokens
         setTableHeaderBackground((found as any).tableHeaderBackground || found.titleStrip || accent || primary);
         setTableBackground((found as any).tableBackground || ((found?.dark ?? dark) ? '222 47% 11%' : '0 0% 100%'));
+        setTableForeground((found as any).tableForeground || ((found?.dark ?? dark) ? '210 40% 98%' : '222.2 84% 4.9%'));
       }
     }
   }, [activeThemeName, themes]);
@@ -111,10 +113,12 @@ export default function ThemeManagement() {
     const nextTableBg = readVar('--table-background');
     const nextHeaderText = readVar('--table-header-text');
     const nextSeparator = readVar('--table-header-separator');
+    const nextTableFg = readVar('--table-foreground');
     if (nextHeaderBg) setTableHeaderBackground(nextHeaderBg);
     if (nextTableBg) setTableBackground(nextTableBg);
     if (nextHeaderText) setTableHeaderText(nextHeaderText);
     if (nextSeparator) setTableHeaderSeparator(nextSeparator);
+    if (nextTableFg) setTableForeground(nextTableFg);
   };
 
   return (
@@ -175,8 +179,48 @@ export default function ThemeManagement() {
               <HslPicker label="Table Header Separator" value={tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2')} onChange={(v) => setTableHeaderSeparator(v)} />
               <HslPicker label="Table Header Background" value={tableHeaderBackground ?? titleStrip} onChange={(v) => setTableHeaderBackground(v)} />
               <HslPicker label="Table Background" value={tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%')} onChange={(v) => setTableBackground(v)} />
+              <HslPicker label="Table Text" value={tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%')} onChange={(v) => setTableForeground(v)} />
               <div className="col-span-full">
                 <Button variant="outline" size="sm" onClick={resetTableDefaults}>Reset Table Defaults</Button>
+              </div>
+            </div>
+
+            {/* Live Table Preview */}
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-2">Table Preview</div>
+              <div
+                className="border rounded-lg overflow-hidden"
+                style={{
+                  ["--table-background" as any]: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'),
+                  ["--table-header-background" as any]: tableHeaderBackground ?? titleStrip ?? accent,
+                  ["--table-header-text" as any]: tableHeaderText ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'),
+                  ["--table-header-separator" as any]: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
+                  ["--table-foreground" as any]: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'),
+                }}
+              >
+                <div className="p-3">
+                  <table className="w-full caption-bottom text-sm border-collapse bg-[hsl(var(--table-background))] text-[hsl(var(--table-foreground))]">
+                    <thead className="bg-[hsl(var(--table-header-background))] border-y border-[hsl(var(--table-header-separator))]">
+                      <tr>
+                        <th className="h-11 px-3 text-left font-medium text-[hsl(var(--table-header-text))]">Column A</th>
+                        <th className="h-11 px-3 text-left font-medium text-[hsl(var(--table-header-text))]">Column B</th>
+                        <th className="h-11 px-3 text-left font-medium text-[hsl(var(--table-header-text))]">Column C</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b">
+                        <td className="p-3">Alpha</td>
+                        <td className="p-3">Bravo</td>
+                        <td className="p-3">Charlie</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="p-3">Delta</td>
+                        <td className="p-3">Echo</td>
+                        <td className="p-3">Foxtrot</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -227,7 +271,7 @@ export default function ThemeManagement() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
+              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
               <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
               <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
@@ -310,9 +354,9 @@ export default function ThemeManagement() {
             </div>
             <DialogFooter>
               <Button disabled={!canWrite} onClick={() => {
-                saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setActive(name);
-                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setOpen(false);
               }}>Save</Button>
             </DialogFooter>

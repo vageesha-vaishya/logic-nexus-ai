@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -10,13 +11,74 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useCRM } from '@/hooks/useCRM';
+import TenantConfigForm from './data-management/TenantConfigForm';
+import FranchiseConfigForm from './data-management/FranchiseConfigForm';
+import SequencesAndPreview from './data-management/SequencesAndPreview';
 
 export default function SecurityOverview() {
   const { toast } = useToast();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const tabParam = params.get('tab');
+  const initialTab = tabParam ?? 'sql';
+  const { supabase: crmSupabase, context } = useCRM();
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM leads LIMIT 10;');
   const [queryResult, setQueryResult] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [minWidthCh, setMinWidthCh] = useState(8);
+  const [maxWidthCh, setMaxWidthCh] = useState(40);
+  const [stickyHeader, setStickyHeader] = useState(true);
+  // Horizontal scroll sync between top scrollbar and the main table container
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const [topScrollWidth, setTopScrollWidth] = useState<number>(0);
+
+  // Data Management local state
+  const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
+  const [franchises, setFranchises] = useState<Array<{ id: string; name: string }>>([]);
+  const [tenantId, setTenantId] = useState<string | undefined>(context?.tenantId || undefined);
+  const [franchiseId, setFranchiseId] = useState<string | undefined>(context?.franchiseId || undefined);
+
+  useEffect(() => {
+    const loadTenants = async () => {
+      const { data } = await crmSupabase.from('tenants').select('id,name').eq('is_active', true).order('name');
+      setTenants(data || []);
+    };
+    loadTenants();
+  }, [crmSupabase]);
+
+  useEffect(() => {
+    const loadFranchises = async () => {
+      if (!tenantId) { setFranchises([]); return; }
+      const { data } = await crmSupabase
+        .from('franchises')
+        .select('id,name')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('name');
+      setFranchises(data || []);
+    };
+    loadFranchises();
+  }, [crmSupabase, tenantId]);
+
+  const onTenantChange = (id: string) => {
+    setTenantId(id);
+    setFranchiseId(undefined);
+  };
+  const onFranchiseChange = (id: string) => setFranchiseId(id);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    // Mirror the table content width to the top scrollbar spacer
+    setTopScrollWidth(el.scrollWidth);
+  }, [queryResult, pageSize, currentPage, minWidthCh, maxWidthCh]);
 
   const executeQuery = async () => {
     setIsExecuting(true);
@@ -28,6 +90,7 @@ export default function SecurityOverview() {
       if (error) throw error;
       
       setQueryResult(data);
+      setCurrentPage(1);
       toast({
         title: 'Query executed',
         description: `Returned ${Array.isArray(data) ? data.length : 0} rows`,
@@ -226,7 +289,7 @@ export default function SecurityOverview() {
             </div>
           </div>
 
-          <Tabs defaultValue="sql" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList>
               <TabsTrigger value="sql">SQL Editor</TabsTrigger>
               <TabsTrigger value="rls">RLS Status</TabsTrigger>
@@ -234,6 +297,7 @@ export default function SecurityOverview() {
               <TabsTrigger value="functions">Functions</TabsTrigger>
               <TabsTrigger value="enums">Enums</TabsTrigger>
               <TabsTrigger value="schema">Schema</TabsTrigger>
+              <TabsTrigger value="data-management">Data Management</TabsTrigger>
             </TabsList>
 
             <TabsContent value="sql" className="space-y-4">
@@ -266,10 +330,169 @@ export default function SecurityOverview() {
                   
                   {queryResult && (
                     <div className="mt-4">
-                      <h4 className="font-semibold mb-2">Results:</h4>
+                      <h4 className="font-semibold mb-2">Database Query Result</h4>
                       {queryResult.error ? (
                         <div className="bg-destructive/10 text-destructive p-4 rounded-lg">
                           {queryResult.error}
+                        </div>
+                      ) : Array.isArray(queryResult) ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="text-sm text-muted-foreground">
+                                Showing {(queryResult.length === 0) ? 0 : Math.min(queryResult.length, (currentPage - 1) * pageSize + queryResult.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize).length)} of {queryResult.length} rows
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage <= 1}>Prev</Button>
+                                <span className="text-sm">Page {currentPage} of {Math.max(1, Math.ceil((queryResult?.length || 0) / pageSize))}</span>
+                                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(Math.ceil((queryResult?.length || 0) / pageSize), p + 1))} disabled={currentPage >= Math.ceil((queryResult?.length || 0) / pageSize)}>Next</Button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Rows per page</span>
+                                <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                                  <SelectTrigger className="w-[100px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="10">10</SelectItem>
+                                    <SelectItem value="25">25</SelectItem>
+                                    <SelectItem value="50">50</SelectItem>
+                                    <SelectItem value="100">100</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Sticky header</span>
+                                <Switch checked={stickyHeader} onCheckedChange={setStickyHeader} />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Min col width</span>
+                                <Select value={String(minWidthCh)} onValueChange={(v) => { setMinWidthCh(Number(v)); }}>
+                                  <SelectTrigger className="w-[100px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="6">6ch</SelectItem>
+                                    <SelectItem value="8">8ch</SelectItem>
+                                    <SelectItem value="10">10ch</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Max col width</span>
+                                <Select value={String(maxWidthCh)} onValueChange={(v) => { setMaxWidthCh(Number(v)); }}>
+                                  <SelectTrigger className="w-[110px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="30">30ch</SelectItem>
+                                    <SelectItem value="40">40ch</SelectItem>
+                                    <SelectItem value="60">60ch</SelectItem>
+                                    <SelectItem value="80">80ch</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                            </div>
+                          </div>
+                          {/* Top horizontal scrollbar synced with the table */}
+                          <div
+                            className="overflow-x-auto h-4 mt-2"
+                            ref={topScrollRef}
+                            onScroll={(e) => {
+                              const src = e.currentTarget;
+                              if (tableScrollRef.current && Math.abs(tableScrollRef.current.scrollLeft - src.scrollLeft) > 1) {
+                                tableScrollRef.current.scrollLeft = src.scrollLeft;
+                              }
+                            }}
+                            aria-label="Horizontal scroll for result table"
+                          >
+                            <div style={{ width: topScrollWidth }} />
+                          </div>
+                          <div
+                            className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[400px]"
+                            ref={tableScrollRef}
+                            onScroll={(e) => {
+                              const src = e.currentTarget;
+                              if (topScrollRef.current && Math.abs(topScrollRef.current.scrollLeft - src.scrollLeft) > 1) {
+                                topScrollRef.current.scrollLeft = src.scrollLeft;
+                              }
+                            }}
+                          >
+                            {(() => {
+                              const rows = queryResult as Array<Record<string, any>>;
+                              const headerSet = new Set<string>();
+                              rows.forEach(r => Object.keys(r || {}).forEach(k => headerSet.add(k)));
+                              const headers = Array.from(headerSet);
+                              const start = (currentPage - 1) * pageSize;
+                              const end = start + pageSize;
+                              const pageRows = rows.slice(start, end);
+
+                              // Compute dynamic column widths (in ch) based on longest content
+                              const minCh = minWidthCh;
+                              const maxCh = maxWidthCh;
+                              const widths: Record<string, number> = {};
+                              headers.forEach(h => {
+                                let longest = String(h).length;
+                                for (const row of rows) {
+                                  const v = row?.[h];
+                                  const s = v === null || v === undefined
+                                    ? ''
+                                    : typeof v === 'object'
+                                      ? JSON.stringify(v)
+                                      : String(v);
+                                  if (s.length > longest) longest = s.length;
+                                }
+                                widths[h] = Math.min(maxCh, Math.max(minCh, longest + 2));
+                              });
+                              return (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      {headers.length === 0 ? (
+                                        <TableHead>—</TableHead>
+                                      ) : headers.map((h) => (
+                                        <TableHead 
+                                          key={h} 
+                                          className={`whitespace-nowrap ${stickyHeader ? 'sticky top-0 z-10 bg-muted' : ''}`}
+                                          style={{ width: `${widths[h]}ch` }}
+                                        >
+                                          {h}
+                                        </TableHead>
+                                      ))}
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {pageRows.length === 0 ? (
+                                      <TableRow>
+                                        <TableCell colSpan={Math.max(1, headers.length)} className="text-center text-muted-foreground">No rows</TableCell>
+                                      </TableRow>
+                                    ) : (
+                                      pageRows.map((row, idx) => (
+                                        <TableRow key={idx}>
+                                          {headers.map((h) => (
+                                            <TableCell 
+                                              key={h} 
+                                              className="text-xs whitespace-nowrap"
+                                              style={{ width: `${widths[h]}ch` }}
+                                            >
+                                              {row[h] === null || row[h] === undefined
+                                                ? '—'
+                                                : typeof row[h] === 'object'
+                                                  ? JSON.stringify(row[h])
+                                                  : String(row[h])}
+                                            </TableCell>
+                                          ))}
+                                        </TableRow>
+                                      ))
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              );
+                            })()}
+                          </div>
                         </div>
                       ) : (
                         <div className="border rounded-lg overflow-auto max-h-[400px]">
@@ -280,6 +503,68 @@ export default function SecurityOverview() {
                       )}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="data-management" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Data Management Options
+                  </CardTitle>
+                  <CardDescription>
+                    Configure quote numbering and preview sequences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Context selectors */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <div className="text-sm font-medium mb-2">Tenant</div>
+                      <Select onValueChange={onTenantChange} value={tenantId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select tenant" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tenants.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium mb-2">Franchise (optional)</div>
+                      <Select onValueChange={onFranchiseChange} value={franchiseId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={tenantId ? 'Select franchise' : 'Select tenant first'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {franchises.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Tabs defaultValue="tenant">
+                    <TabsList>
+                      <TabsTrigger value="tenant">Tenant Config</TabsTrigger>
+                      <TabsTrigger value="franchise">Franchise Config</TabsTrigger>
+                      <TabsTrigger value="preview">Sequences & Preview</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="tenant" className="mt-4">
+                      <TenantConfigForm tenantIdOverride={tenantId} />
+                    </TabsContent>
+                    <TabsContent value="franchise" className="mt-4">
+                      <FranchiseConfigForm tenantIdOverride={tenantId} franchiseIdOverride={franchiseId} />
+                    </TabsContent>
+                    <TabsContent value="preview" className="mt-4">
+                      <SequencesAndPreview tenantIdOverride={tenantId} franchiseIdOverride={franchiseId} />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </TabsContent>

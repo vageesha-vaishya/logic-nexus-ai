@@ -13,6 +13,7 @@ export type SavedTheme = {
   tableHeaderSeparator?: string;
   tableHeaderBackground?: string;
   tableBackground?: string;
+  tableForeground?: string;
   angle?: number; // gradient angle in degrees
   radius?: string; // e.g., "0.75rem"
   sidebarBackground?: string;
@@ -30,8 +31,8 @@ type ThemeContextValue = {
   activeThemeName: string | null;
   scope: 'platform' | 'tenant' | 'franchise' | 'user';
   setScope: (s: 'platform' | 'tenant' | 'franchise' | 'user') => void;
-  applyTheme: (t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
-  saveTheme: (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => Promise<void>;
+  applyTheme: (t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; tableForeground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
+  saveTheme: (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; tableForeground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => Promise<void>;
   deleteTheme: (name: string) => Promise<void>;
   setActive: (name: string) => void;
   toggleDark: (enabled: boolean) => void;
@@ -50,7 +51,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { supabase, context } = useCRM();
 
   // Define applyTheme before useEffect calls
-  const applyTheme = useCallback((t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
+  const applyTheme = useCallback((t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; tableForeground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const root = document.documentElement;
     const angle = t.angle ?? 135;
     root.style.setProperty('--gradient-primary', `linear-gradient(${angle}deg, hsl(${t.start}) 0%, hsl(${t.end}) 100%)`);
@@ -93,6 +94,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let thSep = t.tableHeaderSeparator;
     let thBg = t.tableHeaderBackground;
     let tableBg = t.tableBackground;
+    let tableFg = t.tableForeground;
     if (!thText) {
       thText = isDark ? '210 40% 98%' : '222.2 84% 4.9%';
     }
@@ -107,10 +109,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!tableBg) {
       tableBg = isDark ? '222.2 84% 4.9%' : '0 0% 100%';
     }
-    if (thText) root.style.setProperty('--table-header-foreground', thText);
+    if (!tableFg) {
+      tableFg = isDark ? '210 40% 98%' : '222.2 84% 4.9%';
+    }
+    // Apply CSS variables used by table components
+    if (thText) root.style.setProperty('--table-header-text', thText);
     if (thSep) root.style.setProperty('--table-header-separator', thSep);
     if (thBg) root.style.setProperty('--table-header-background', thBg);
     if (tableBg) root.style.setProperty('--table-background', tableBg);
+    if (tableFg) root.style.setProperty('--table-foreground', tableFg);
     if (t.radius) {
       root.style.setProperty('--radius', t.radius);
     }
@@ -208,6 +215,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             tableHeaderSeparator: row.tokens.tableHeaderSeparator,
             tableHeaderBackground: row.tokens.tableHeaderBackground,
             tableBackground: row.tokens.tableBackground,
+            tableForeground: row.tokens.tableForeground,
             angle: row.tokens.angle,
             radius: row.tokens.radius,
             sidebarBackground: row.tokens.sidebarBackground,
@@ -232,7 +240,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   }, [scope, context?.userId, context?.tenantId, context?.franchiseId, applyTheme]);
 
-  const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
+  const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; tableForeground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const saved: SavedTheme = { ...t, createdAt: new Date().toISOString() };
     const next = [saved, ...themes.filter(x => x.name !== t.name)];
     setThemes(next);
@@ -249,6 +257,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         tableHeaderSeparator: t.tableHeaderSeparator,
         tableHeaderBackground: t.tableHeaderBackground,
         tableBackground: t.tableBackground,
+        tableForeground: t.tableForeground,
         angle: t.angle,
         radius: t.radius,
         sidebarBackground: t.sidebarBackground,
