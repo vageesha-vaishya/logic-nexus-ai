@@ -105,6 +105,51 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     }
   }, [context.tenantId, roles]);
 
+  // Pre-populate with user's last used values for new quotes
+  useEffect(() => {
+    if (quoteId || !user?.id) return; // Skip for edit mode or no user
+    
+    const fetchLastUsedValues = async () => {
+      try {
+        const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+        if (!tenantId) return;
+
+        // Get user's most recent quote to pre-populate fields
+        const { data: lastQuote, error } = await supabase
+          .from('quotes')
+          .select('opportunity_id, account_id, contact_id')
+          .eq('tenant_id', tenantId)
+          .eq('created_by', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error || !lastQuote) return;
+
+        // Pre-populate if values exist and form fields are empty
+        const currentOppId = form.getValues('opportunity_id');
+        const currentAccId = form.getValues('account_id');
+        const currentConId = form.getValues('contact_id');
+
+        if (!currentOppId && lastQuote.opportunity_id) {
+          form.setValue('opportunity_id', String(lastQuote.opportunity_id));
+        }
+        if (!currentAccId && lastQuote.account_id) {
+          form.setValue('account_id', String(lastQuote.account_id));
+        }
+        if (!currentConId && lastQuote.contact_id) {
+          form.setValue('contact_id', String(lastQuote.contact_id));
+        }
+      } catch (error) {
+        console.warn('Failed to fetch last used values:', error);
+      }
+    };
+
+    // Delay to ensure opportunities/accounts/contacts are loaded first
+    const timer = setTimeout(fetchLastUsedValues, 500);
+    return () => clearTimeout(timer);
+  }, [quoteId, user?.id, context.tenantId, roles]);
+
   // Load existing quote for edit mode independent of tenant context
   useEffect(() => {
     if (!quoteId) return;
