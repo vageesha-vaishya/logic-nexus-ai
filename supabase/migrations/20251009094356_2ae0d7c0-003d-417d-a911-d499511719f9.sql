@@ -1,0 +1,61 @@
+-- Seed service types with transportation modes
+INSERT INTO public.service_types (name, description, is_active) VALUES
+('Air Freight', 'Air cargo transportation services', true),
+('Ocean Freight', 'Sea cargo transportation services', true),
+('Road Freight', 'Ground transportation by truck', true),
+('Rail Freight', 'Railway cargo transportation', true),
+('Courier Service', 'Express delivery and courier services', true),
+('Warehousing', 'Storage and distribution services', true),
+('Customs Clearance', 'Import/export customs processing', true),
+('Freight Forwarding', 'Multi-modal logistics coordination', true),
+('Moving Services', 'Residential and commercial moving', true),
+('Trucking', 'Ground transportation by truck', true)
+ON CONFLICT (name) DO NOTHING;
+
+-- Seed services with different modes and types
+DO $$
+DECLARE
+  v_tenant_id uuid := '9e2686ba-ef3c-42df-aea6-dcc880436b9f';
+BEGIN
+  -- Air services
+  INSERT INTO public.services (tenant_id, service_type, service_name, service_code, description, base_price, transit_time_days, is_active) VALUES
+  (v_tenant_id, 'air', 'Air Express', 'AIR-EXP', 'Express air freight service', 500.00, 2, true),
+  (v_tenant_id, 'air', 'Air Standard', 'AIR-STD', 'Standard air freight service', 300.00, 5, true),
+  (v_tenant_id, 'air', 'Air Economy', 'AIR-ECO', 'Economy air freight service', 200.00, 7, true),
+  (v_tenant_id, 'air', 'USA Domestic Air Priority', 'USA-AIR-PRI', 'Priority air service within USA', 250.00, 1, true),
+  (v_tenant_id, 'air', 'USA Domestic Air Standard', 'USA-AIR-STD', 'Standard air service within USA', 150.00, 3, true),
+  (v_tenant_id, 'air', 'International Air Express', 'INTL-AIR-EXP', 'Express international air freight', 800.00, 3, true),
+  (v_tenant_id, 'air', 'International Air Standard', 'INTL-AIR-STD', 'Standard international air freight', 500.00, 7, true)
+  ON CONFLICT (tenant_id, service_code) DO NOTHING;
+
+  -- Ocean services
+  INSERT INTO public.services (tenant_id, service_type, service_name, service_code, description, base_price, transit_time_days, is_active) VALUES
+  (v_tenant_id, 'ocean', 'Ocean FCL', 'OCN-FCL', 'Full Container Load ocean freight', 2000.00, 30, true),
+  (v_tenant_id, 'ocean', 'Ocean LCL', 'OCN-LCL', 'Less than Container Load ocean freight', 800.00, 35, true),
+  (v_tenant_id, 'ocean', 'International Ocean FCL', 'INTL-OCN-FCL', 'International full container ocean freight', 3000.00, 28, true),
+  (v_tenant_id, 'ocean', 'International Ocean LCL', 'INTL-OCN-LCL', 'International less than container ocean freight', 1200.00, 35, true)
+  ON CONFLICT (tenant_id, service_code) DO NOTHING;
+
+  -- Trucking services
+  INSERT INTO public.services (tenant_id, service_type, service_name, service_code, description, base_price, transit_time_days, is_active) VALUES
+  (v_tenant_id, 'trucking', 'Road Express', 'RD-EXP', 'Express road freight service', 150.00, 3, true),
+  (v_tenant_id, 'trucking', 'Road Standard', 'RD-STD', 'Standard road freight service', 100.00, 5, true),
+  (v_tenant_id, 'trucking', 'USA Domestic Trucking', 'USA-TRK-DOM', 'Domestic trucking within USA', 120.00, 4, true)
+  ON CONFLICT (tenant_id, service_code) DO NOTHING;
+
+  -- Courier services
+  INSERT INTO public.services (tenant_id, service_type, service_name, service_code, description, base_price, transit_time_days, is_active) VALUES
+  (v_tenant_id, 'courier', 'Same Day', 'COR-SAME', 'Same day courier delivery', 50.00, 0, true),
+  (v_tenant_id, 'courier', 'Next Day', 'COR-NEXT', 'Next day courier delivery', 30.00, 1, true),
+  (v_tenant_id, 'courier', '2-Day', 'COR-2DAY', '2-day courier delivery', 20.00, 2, true),
+  (v_tenant_id, 'courier', 'International Courier Express', 'INTL-COR-EXP', 'Express international courier', 100.00, 3, true)
+  ON CONFLICT (tenant_id, service_code) DO NOTHING;
+
+  -- Moving services
+  INSERT INTO public.services (tenant_id, service_type, service_name, service_code, description, base_price, transit_time_days, is_active) VALUES
+  (v_tenant_id, 'moving', 'Local Move', 'MOV-LOCAL', 'Local residential or commercial move', 300.00, 1, true),
+  (v_tenant_id, 'moving', 'Long Distance Move', 'MOV-LD', 'Long distance moving service', 1500.00, 5, true),
+  (v_tenant_id, 'moving', 'International Move', 'MOV-INTL', 'International moving service', 5000.00, 30, true)
+  ON CONFLICT (tenant_id, service_code) DO NOTHING;
+  
+END $$;
