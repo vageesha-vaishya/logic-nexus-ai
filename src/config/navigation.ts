@@ -1,4 +1,5 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch } from 'lucide-react';
+import type { Permission } from '@/config/permissions';
 
 export type MenuScreen = {
   name: string;
@@ -12,6 +13,8 @@ export type MenuItem = {
   icon: LucideIcon;
   description?: string;
   screens?: MenuScreen[];
+  roles?: Array<'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user'>;
+  permissions?: Permission[];
 };
 
 export type MenuModule = {
@@ -68,6 +71,9 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Package Sizes', path: '/dashboard/package-sizes', icon: Ruler, description: 'Container dimensions' },
       { name: 'Cargo Types', path: '/dashboard/cargo-types', icon: PackageCheck, description: 'Cargo classifications' },
       { name: 'Incoterms', path: '/dashboard/incoterms', icon: Globe, description: 'Trade terms' },
+      { name: 'Service Types', path: '/dashboard/service-types', icon: Cog, description: 'Define allowed service type values', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
+      { name: 'Services', path: '/dashboard/services', icon: Package, description: 'Manage tenant service catalog', roles: ['tenant_admin','franchise_admin'] },
+      { name: 'Service Type Mappings', path: '/dashboard/service-type-mappings', icon: GitBranch, description: 'Configure type-to-service rules' },
     ],
   },
   {

@@ -108,17 +108,17 @@ export function CarrierQuotesSection({
   const totalCharges = (charges: Charge[]) => charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="ef-card">
+      <CardHeader className="ef-header">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <CardTitle>Carrier Quotations</CardTitle>
-          <Button type="button" onClick={addCarrierQuote} size="sm">
+          <CardTitle className="ef-title">Carrier Quotations</CardTitle>
+          <Button type="button" onClick={addCarrierQuote} size="sm" className="ef-hover">
             <Plus className="h-4 w-4 mr-2" />
             Add Carrier Quote
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <Accordion type="single" collapsible value={accordionOpen ? 'carrier-quotes' : undefined} onValueChange={(v) => setAccordionOpen(!!v)}>
           <AccordionItem value="carrier-quotes">
             <AccordionTrigger className="text-base transition-colors duration-200">Charges & breakdown</AccordionTrigger>
@@ -135,7 +135,7 @@ export function CarrierQuotesSection({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="ef-grid">
                 <div className="space-y-2">
                   <FormLabel>Transport Mode</FormLabel>
                   <Select value={cq.mode || ''} onValueChange={(v) => updateCarrierField(idx, 'mode', v)}>

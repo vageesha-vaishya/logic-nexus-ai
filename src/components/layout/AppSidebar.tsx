@@ -64,18 +64,24 @@ export function AppSidebar() {
     title: i.name,
     url: i.path,
     icon: i.icon,
+    roles: (i as any).roles,
+    permissions: (i as any).permissions,
   }));
 
   const logisticsItems = (APP_MENU.find((m) => m.label === 'Logistics')?.items ?? []).map((i) => ({
     title: i.name,
     url: i.path,
     icon: i.icon,
+    roles: (i as any).roles,
+    permissions: (i as any).permissions,
   }));
 
   const billingItems = (APP_MENU.find((m) => m.label === 'Billing')?.items ?? []).map((i) => ({
     title: i.name,
     url: i.path,
     icon: i.icon,
+    roles: (i as any).roles,
+    permissions: (i as any).permissions,
   }));
 
   const adminItems = [
@@ -124,16 +130,23 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {logisticsItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavClass}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {logisticsItems.map((item) => {
+                const node = (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} className={getNavClass}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+                return item.roles || item.permissions ? (
+                  <RoleGuard key={item.title} roles={(item.roles as any) || []} permissions={item.permissions as any}>
+                    {node}
+                  </RoleGuard>
+                ) : node;
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

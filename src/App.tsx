@@ -77,6 +77,9 @@ import UIDemoForms from "./pages/dashboard/UIDemoForms";
 import UIDemoAdvanced from "./pages/dashboard/UIDemoAdvanced";
 import QuoteNumberSettings from "./pages/dashboard/QuoteNumberSettings";
 import DataManagement from "./pages/dashboard/DataManagement";
+import ServiceTypeMappings from "./pages/dashboard/ServiceTypeMappings";
+import ServiceTypes from "./pages/dashboard/ServiceTypes";
+import Services from "./pages/dashboard/Services";
 
 const queryClient = new QueryClient();
 
@@ -451,7 +454,10 @@ const App = () => (
             <Route path="/dashboard/package-categories" element={<ProtectedRoute><PackageCategories /></ProtectedRoute>} />
             <Route path="/dashboard/package-sizes" element={<ProtectedRoute><PackageSizes /></ProtectedRoute>} />
             <Route path="/dashboard/cargo-types" element={<ProtectedRoute><CargoTypes /></ProtectedRoute>} />
-            <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
+             <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
+             <Route path="/dashboard/service-types" element={<ProtectedRoute><ServiceTypes /></ProtectedRoute>} />
+             <Route path="/dashboard/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
+             <Route path="/dashboard/service-type-mappings" element={<ProtectedRoute><ServiceTypeMappings /></ProtectedRoute>} />
             {/* Subscription & Billing Routes */}
             <Route path="/dashboard/subscriptions" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />

@@ -86,6 +86,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [carrierQuotes, setCarrierQuotes] = useState<CarrierQuote[]>([]);
   // Display-only hint; actual quote_number is generated in DB
   const [quoteNumberPreview, setQuoteNumberPreview] = useState<string>('Auto-generated on save');
+  // Resolved labels for hidden contacts
+  const [resolvedContactLabels, setResolvedContactLabels] = useState<Record<string, string>>({});
   
 
   const form = useForm<z.infer<typeof quoteSchema>>({
@@ -93,6 +95,24 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     defaultValues: {
       status: 'draft',
       opportunity_id: searchParams.get('opportunityId') || '',
+      // Keep inputs controlled from mount
+      title: '',
+      description: '',
+      service_type: undefined,
+      service_id: '',
+      incoterms: '',
+      trade_direction: undefined,
+      carrier_id: '',
+      consignee_id: '',
+      origin_port_id: '',
+      destination_port_id: '',
+      account_id: '',
+      contact_id: '',
+      valid_until: '',
+      tax_percent: '0',
+      shipping_amount: '0',
+      terms_conditions: '',
+      notes: '',
     },
   });
 
@@ -340,6 +360,116 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
+  // Ensure defaults are applied when services state updates outside initial fetch
+  useEffect(() => {
+    try {
+      if (isEditMode) return;
+      const hasServices = Array.isArray(services) && services.length > 0;
+      const currentType = form.getValues('service_type') as (
+        'ocean' | 'air' | 'trucking' | 'courier' | 'moving' | 'railway_transport'
+      ) | undefined;
+      if (!currentType && hasServices) {
+        const oceanService = services.find((s: any) => s.service_type === 'ocean');
+        const rawType: string = oceanService?.service_type ?? services[0].service_type;
+        const allowedTypes = ['ocean','air','trucking','courier','moving','railway_transport'] as const;
+        type ServiceType = typeof allowedTypes[number];
+        const defaultType: ServiceType = allowedTypes.find((t) => t === rawType) ?? 'ocean';
+        form.setValue('service_type', defaultType, { shouldDirty: true });
+        setSelectedServiceType(defaultType);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services, isEditMode]);
+
+  // When service_type changes: ensure service_id matches; prefer mapping default, then fallback (new quotes)
+  useEffect(() => {
+    if (isEditMode) return; // don't disturb existing selections in edit mode
+    (async () => {
+      try {
+        const currentType = form.getValues('service_type');
+        const currentServiceId = form.getValues('service_id');
+        if (!currentType) {
+          // No type selected: clear service
+          if (currentServiceId) form.setValue('service_id', '', { shouldDirty: true });
+          return;
+        }
+
+        const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+        // If a service is selected but doesn't match the type, try mapping default first
+        if (currentServiceId) {
+          const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
+          if (!svc || svc.service_type !== currentType) {
+            try {
+              const { data: mapRows } = await (supabase as any)
+                .from('service_type_mappings')
+                .select('service_id')
+                .eq('tenant_id', tenantId as string)
+                .eq('service_type', currentType)
+                .eq('is_active', true)
+                .order('is_default', { ascending: false })
+                .order('priority', { ascending: false })
+                .limit(1);
+              const mapped = Array.isArray(mapRows) && mapRows[0]?.service_id ? String(mapRows[0].service_id) : null;
+              if (mapped) {
+                // Ensure mapped service is available in the list for selection
+                const exists = services.some((s: any) => String(s.id) === String(mapped));
+                if (!exists) {
+                  const { data: svcData } = await supabase
+                    .from('services')
+                    .select('id, service_name, service_type')
+                    .eq('id', mapped)
+                    .maybeSingle();
+                  if (svcData) setServices((prev) => [svcData, ...prev]);
+                }
+                form.setValue('service_id', mapped, { shouldDirty: true });
+              } else {
+                const def = services.find((s: any) => s.service_type === currentType);
+                form.setValue('service_id', def ? String(def.id) : '', { shouldDirty: true });
+              }
+            } catch {
+              const def = services.find((s: any) => s.service_type === currentType);
+              form.setValue('service_id', def ? String(def.id) : '', { shouldDirty: true });
+            }
+          }
+          return;
+        }
+
+        // If no service selected yet, prefer mapping default, then fallback
+        try {
+          const { data: mapRows } = await (supabase as any)
+            .from('service_type_mappings')
+            .select('service_id')
+            .eq('tenant_id', tenantId as string)
+            .eq('service_type', currentType)
+            .eq('is_active', true)
+            .order('is_default', { ascending: false })
+            .order('priority', { ascending: false })
+            .limit(1);
+          const mapped = Array.isArray(mapRows) && mapRows[0]?.service_id ? String(mapRows[0].service_id) : null;
+          if (mapped) {
+            const exists = services.some((s: any) => String(s.id) === String(mapped));
+            if (!exists) {
+              const { data: svcData } = await supabase
+                .from('services')
+                .select('id, service_name, service_type')
+                .eq('id', mapped)
+                .maybeSingle();
+              if (svcData) setServices((prev) => [svcData, ...prev]);
+            }
+            form.setValue('service_id', mapped, { shouldDirty: true });
+          } else {
+            const def = services.find((s: any) => s.service_type === currentType);
+            if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+          }
+        } catch {
+          const def = services.find((s: any) => s.service_type === currentType);
+          if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+        }
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedServiceType, services, isEditMode]);
+
   const fetchData = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
     if (!tenantId) return;
@@ -374,6 +504,41 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Seed resolved tenant from current context
       setResolvedTenantId(tenantId);
 
+      // Initialize default Service Type and Service for new quotes
+      try {
+        if (!isEditMode) {
+          const currentServiceType = form.getValues('service_type') as (
+            'ocean' | 'air' | 'trucking' | 'courier' | 'moving' | 'railway_transport'
+          ) | undefined;
+          const hasServices = Array.isArray(servicesRes.data) && servicesRes.data.length > 0;
+          if (!currentServiceType && hasServices) {
+            // Prefer 'ocean' if available, otherwise first available type
+            const oceanService = servicesRes.data.find((s: any) => s.service_type === 'ocean');
+            const rawType: string = oceanService?.service_type ?? servicesRes.data[0].service_type;
+            const allowedTypes = ['ocean','air','trucking','courier','moving','railway_transport'] as const;
+            type ServiceType = typeof allowedTypes[number];
+            const defaultType: ServiceType = allowedTypes.find((t) => t === rawType) ?? 'ocean';
+            form.setValue('service_type', defaultType, { shouldDirty: true });
+            setSelectedServiceType(defaultType);
+
+            const defaultService = servicesRes.data.find((s: any) => s.service_type === defaultType);
+            if (defaultService) {
+              form.setValue('service_id', String(defaultService.id), { shouldDirty: true });
+            }
+          } else if (currentServiceType && hasServices) {
+            // Keep state in sync if form already has a value (e.g. restored state)
+            setSelectedServiceType(currentServiceType);
+            const currentServiceId = form.getValues('service_id');
+            if (!currentServiceId) {
+              const def = servicesRes.data.find((s: any) => s.service_type === currentServiceType);
+              if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to initialize default service selections:', e);
+      }
+
       // If an opportunity is preselected (e.g. via URL), auto-fill account/contact
       try {
         const preselectedOppId = form.getValues('opportunity_id');
@@ -396,7 +561,22 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             .select('id, name, tenant_id')
             .eq('id', curAccountId)
             .maybeSingle();
-          if (data) setAccounts((prev) => [data, ...prev]);
+          if (data) {
+            setAccounts((prev) => [data, ...prev]);
+          } else {
+            // Resolve account label via Edge Function when direct fetch is blocked by RLS
+            try {
+              const { data: labelData, error: fnError } = await supabase.functions.invoke('get-account-label', {
+                body: { id: curAccountId },
+              });
+              if (!fnError && (labelData as any)?.name) {
+                const resolved = { id: (labelData as any).id ?? curAccountId, name: (labelData as any).name } as any;
+                setAccounts((prev) => [resolved, ...prev]);
+              }
+            } catch (fnErr) {
+              console.warn('Account label resolution failed:', fnErr);
+            }
+          }
         }
 
         const curContactId = form.getValues('contact_id');
@@ -407,7 +587,39 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             .select('id, first_name, last_name, account_id')
             .eq('id', curContactId)
             .maybeSingle();
-          if (data) setContacts((prev) => [data, ...prev]);
+          if (data) {
+            setContacts((prev) => [data, ...prev]);
+          } else {
+            // Resolve contact label via Edge Function when direct fetch is blocked by RLS
+            try {
+              const { data: labelData, error: fnError } = await supabase.functions.invoke('get-contact-label', {
+                body: { id: curContactId },
+              });
+              const first = (labelData as any)?.first_name;
+              const last = (labelData as any)?.last_name;
+              const resolvedAccId = (labelData as any)?.account_id;
+              if (!fnError && (first || last)) {
+                // Inject the resolved contact into list so it appears under the selected account filter
+                const resolvedContact = {
+                  id: String(curContactId),
+                  first_name: first || '',
+                  last_name: last || '',
+                  account_id: resolvedAccId || form.getValues('account_id') || null,
+                } as any;
+                setContacts((prev) => {
+                  const exists = prev.some((c: any) => String(c.id) === String(curContactId));
+                  return exists ? prev : [resolvedContact, ...prev];
+                });
+                // Keep label map for any fallback rendering paths
+                setResolvedContactLabels((prev) => ({
+                  ...prev,
+                  [String(curContactId)]: [first, last].filter(Boolean).join(' ').trim() || 'Selected Contact',
+                }));
+              }
+            } catch (fnErr) {
+              console.warn('Contact label resolution failed:', fnErr);
+            }
+          }
         }
 
         const curOppId = form.getValues('opportunity_id');
@@ -785,15 +997,16 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   };
 
   return (
-    <Form {...form}>
+    <div className="enterprise-form">
+      <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <fieldset disabled={isHydrating} aria-busy={isHydrating}>
-        <Card>
-          <CardHeader>
-            <CardTitle>
+        <Card className="ef-card">
+          <CardHeader className="ef-header">
+            <CardTitle className="ef-title">
               Quote Information
               {isEditMode && (
-                <span className="ml-2 text-xs text-muted-foreground">Edit Mode</span>
+                <span className="ml-2 ef-subtitle">Edit Mode</span>
               )}
             </CardTitle>
             {isEditMode && isHydrating && (
@@ -803,7 +1016,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="title"
@@ -811,7 +1024,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -825,20 +1038,31 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea {...field} />
+                      <Textarea
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        rows={1}
+                        className="min-h-[2.25rem] overflow-hidden resize-none"
+                        onInput={(e) => {
+                          const el = e.currentTarget;
+                          el.style.height = 'auto';
+                          el.style.height = `${el.scrollHeight}px`;
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+            <div className="ef-divider" />
 
             {/* Quotation and Opportunity row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               {/* Quotation Number */}
               <FormItem>
                 <FormLabel>Quotation Number</FormLabel>
-                <FormDescription>{isEditMode ? 'Existing number' : 'Auto-generated on save'}</FormDescription>
+                <FormDescription className="form-description">{isEditMode ? 'Existing number' : 'Auto-generated on save'}</FormDescription>
                 <FormControl>
                   <Input readOnly value={quoteNumberPreview} />
                 </FormControl>
@@ -894,8 +1118,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 )}
               />
             </div>
+            <div className="ef-divider" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               <div className="space-y-2">
                 <FormField
                   control={form.control}
@@ -974,7 +1199,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                               .some((c: any) => String(c.id) === String(field.value))
                           ) && (
                             <SelectItem key={`selected-contact-${field.value}`} value={String(field.value)}>
-                              Selected Contact
+                              {resolvedContactLabels[String(field.value)] || 'Selected Contact'}
                             </SelectItem>
                           )}
                         </SelectContent>
@@ -998,7 +1223,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormItem>
                       <FormLabel>Valid Until</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" value={field.value ?? ''} onChange={field.onChange} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1006,8 +1231,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 />
               </div>
             </div>
+            <div className="ef-divider" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="service_type"
@@ -1022,7 +1248,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       value={field.value ?? ''}
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full" disabled={isEditMode}>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select service type" />
                         </SelectTrigger>
                       </FormControl>
@@ -1046,21 +1272,24 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service</FormLabel>
-                    <FormDescription>Select service</FormDescription>
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" disabled={!selectedServiceType}>
                           <SelectValue placeholder="Select service" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {services
-                          .filter(s => !selectedServiceType || s.service_type === selectedServiceType)
+                          .filter((s) => !selectedServiceType || s.service_type === selectedServiceType)
                           .map((service) => (
                             <SelectItem key={service.id} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
                           ))}
+                        {/* Fallback when there are services but none match the selected type */}
+                        {selectedServiceType && services.filter((s) => s.service_type === selectedServiceType).length === 0 && (
+                          <SelectItem disabled value="__no_services_for_type__">No services for selected type</SelectItem>
+                        )}
                         {services.length === 0 && (
                           <SelectItem disabled value="__no_services__">No services found</SelectItem>
                         )}
@@ -1097,7 +1326,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="carrier_id"
@@ -1149,7 +1378,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="origin_port_id"
@@ -1201,7 +1430,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="incoterms"
@@ -1268,11 +1497,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           setCarrierQuotes={setCarrierQuotes}
         />
 
-        <Card>
-          <CardHeader>
+        <div className="ef-divider" />
+        <Card className="ef-card">
+          <CardHeader className="ef-header">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <CardTitle>Line Items</CardTitle>
-              <Button type="button" onClick={addItem} size="sm">
+              <CardTitle className="ef-title">Line Items</CardTitle>
+              <Button type="button" onClick={addItem} size="sm" className="ef-hover">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Item
               </Button>
@@ -1294,7 +1524,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     </Button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="ef-grid">
                   <Input
                     placeholder="Product Name"
                     value={item.product_name}
@@ -1336,12 +1566,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Totals & Additional Details</CardTitle>
+        <Card className="ef-card">
+          <CardHeader className="ef-header">
+            <CardTitle className="ef-title">Totals & Additional Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="tax_percent"
@@ -1349,7 +1579,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Tax %</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input type="number" step="0.01" value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1363,7 +1593,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Shipping Amount</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input type="number" step="0.01" value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1397,7 +1627,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 <FormItem>
                   <FormLabel>Terms & Conditions</FormLabel>
                   <FormControl>
-                    <Textarea {...field} />
+                    <Textarea value={field.value ?? ''} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1411,7 +1641,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} />
+                    <Textarea value={field.value ?? ''} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1508,5 +1738,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         </fieldset>
       </form>
     </Form>
+    </div>
   );
 }

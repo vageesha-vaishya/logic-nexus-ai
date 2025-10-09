@@ -133,6 +133,43 @@ All colors MUST be HSL.
 
 /* Email content hardening to prevent horizontal overflow and ensure responsive HTML */
 @layer components {
+  /* Enterprise-grade form typography and layout */
+  .enterprise-form {
+    @apply mx-auto max-w-6xl px-4 md:px-6;
+  }
+  .enterprise-form .ef-card {
+    @apply rounded-xl border bg-background shadow-sm transition-shadow;
+  }
+  .enterprise-form .ef-card:hover {
+    @apply shadow-md;
+  }
+  .enterprise-form .ef-header {
+    @apply pb-2;
+  }
+  .enterprise-form .ef-title {
+    @apply text-xl md:text-2xl font-semibold tracking-tight;
+  }
+  .enterprise-form .ef-subtitle {
+    @apply text-xs text-muted-foreground;
+  }
+  .enterprise-form label {
+    @apply text-xs md:text-sm font-medium text-muted-foreground;
+  }
+  .enterprise-form .form-description {
+    @apply text-[11px] md:text-xs text-muted-foreground;
+  }
+  .enterprise-form .ef-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+  }
+  .enterprise-form .ef-divider {
+    @apply border-t pt-3 mt-2;
+  }
+  .enterprise-form .ef-hover {
+    @apply transition-shadow;
+  }
+  .enterprise-form .ef-hover:hover {
+    @apply shadow-sm;
+  }
   /* Mild glow pulse animation for shield boundary */
   .animate-glow-pulse {
     animation: glow-pulse 2.2s ease-in-out infinite;
