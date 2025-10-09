@@ -40,12 +40,13 @@ export default function Services() {
   const [isActive, setIsActive] = useState(true);
 
   const isTenantAdmin = context.isTenantAdmin;
+  const isPlatform = context.isPlatformAdmin;
   const tenantId = context.tenantId || null;
 
   useEffect(() => {
     fetchTypes();
     fetchServices();
-  }, [tenantId]);
+  }, [tenantId, isPlatform]);
 
   const fetchTypes = async () => {
     try {
@@ -63,12 +64,18 @@ export default function Services() {
 
   const fetchServices = async () => {
     try {
-      if (!tenantId) return;
-      const { data, error } = await supabase
+      // Platform admins can view all services across tenants; others are tenant-scoped
+      let query = supabase
         .from('services')
         .select('id, tenant_id, service_name, service_type, service_code, description, pricing_unit, base_price, transit_time_days, is_active')
-        .eq('tenant_id', tenantId)
         .order('service_name');
+
+      if (!isPlatform) {
+        if (!tenantId) return; // non-admin without tenant context: nothing to show
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setServices((data || []) as any);
     } catch (err: any) {

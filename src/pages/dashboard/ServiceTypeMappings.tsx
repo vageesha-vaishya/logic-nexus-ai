@@ -31,6 +31,8 @@ export default function ServiceTypeMappings() {
   const [services, setServices] = useState<any[]>([]);
   const [typeOptions, setTypeOptions] = useState<{ name: string; is_active: boolean }[]>([]);
   const [open, setOpen] = useState(false);
+  const [tenants, setTenants] = useState<{ id: string; name?: string }[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [newType, setNewType] = useState<string>('');
   const [newServiceId, setNewServiceId] = useState<string>('');
   const [newIsDefault, setNewIsDefault] = useState<boolean>(false);
@@ -47,6 +49,9 @@ export default function ServiceTypeMappings() {
       fetchMappings();
     }
     fetchTypes();
+    if (isPlatform) {
+      fetchTenants();
+    }
   }, [isPlatform, tenantId]);
 
   const fetchServices = async () => {
@@ -54,7 +59,12 @@ export default function ServiceTypeMappings() {
       let query = supabase
         .from('services')
         .select('id, service_name, service_type, tenant_id, is_active');
-      if (!isPlatform) query = query.eq('tenant_id', tenantId as string);
+      if (!isPlatform) {
+        query = query.eq('tenant_id', tenantId as string);
+      } else if (selectedTenantId) {
+        // Scope to selected tenant for admins to reduce payload and ensure correct filtering
+        query = query.eq('tenant_id', selectedTenantId);
+      }
       const { data, error } = await query.order('service_name');
       if (error) throw error;
       setServices(data || []);
@@ -63,6 +73,14 @@ export default function ServiceTypeMappings() {
       toast.error('Failed to fetch services', { description: err?.message });
     }
   };
+
+  useEffect(() => {
+    // When platform admin changes selected tenant, refetch services
+    if (isPlatform && open) {
+      fetchServices();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTenantId]);
 
   const fetchMappings = async () => {
     try {
@@ -94,6 +112,20 @@ export default function ServiceTypeMappings() {
     }
   };
 
+  const fetchTenants = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('tenants')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      setTenants((data || []) as any);
+    } catch (err: any) {
+      console.error('Failed to fetch tenants:', err?.message || err);
+      toast.error('Failed to fetch tenants', { description: err?.message });
+    }
+  };
+
   const serviceById = useMemo(() => {
     const map: Record<string, any> = {};
     services.forEach((s: any) => { map[String(s.id)] = s; });
@@ -102,8 +134,15 @@ export default function ServiceTypeMappings() {
 
   const filteredServicesForType = useMemo(() => {
     if (!newType) return [];
-    return services.filter((s: any) => String(s.service_type) === String(newType));
-  }, [services, newType]);
+    const byType = services.filter((s: any) => String(s.service_type) === String(newType));
+    if (isPlatform) {
+      // When platform admin, scope by selected tenant if provided
+      if (selectedTenantId) return byType.filter((s: any) => String(s.tenant_id) === String(selectedTenantId));
+      // No tenant selected: do not show services to force tenant scoping
+      return [];
+    }
+    return byType;
+  }, [services, newType, isPlatform, selectedTenantId]);
 
   const resetForm = () => {
     setNewType('');
@@ -112,12 +151,13 @@ export default function ServiceTypeMappings() {
     setNewPriority(0);
     setNewConditions('{}');
     setNewIsActive(true);
+    if (isPlatform) setSelectedTenantId('');
   };
 
   const handleCreate = async () => {
     try {
-      const tId = tenantId;
-      if (!isPlatform && !tId) {
+      const tId = isPlatform ? selectedTenantId : (tenantId as string);
+      if (!tId) {
         toast.error('No tenant context found');
         return;
       }
@@ -133,7 +173,7 @@ export default function ServiceTypeMappings() {
         return;
       }
       const payload = {
-        tenant_id: tId as string,
+        tenant_id: tId,
         service_type: newType,
         service_id: newServiceId,
         is_default: newIsDefault,
@@ -221,6 +261,25 @@ export default function ServiceTypeMappings() {
                   <DialogTitle>Create Mapping</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
+                  {isPlatform && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Tenant</label>
+                      <Select value={selectedTenantId} onValueChange={(v) => { setSelectedTenantId(v); setNewServiceId(''); }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a tenant" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tenants.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">No tenants found</div>
+                          ) : (
+                            tenants.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>{t.name || t.id.slice(0,8)}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Service Type</label>
@@ -237,9 +296,9 @@ export default function ServiceTypeMappings() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Service</label>
-                      <Select value={newServiceId} onValueChange={setNewServiceId} disabled={!newType}>
+                      <Select value={newServiceId} onValueChange={setNewServiceId} disabled={!newType || (isPlatform && !selectedTenantId)}>
                         <SelectTrigger>
-                          <SelectValue placeholder={!newType ? 'Choose type first' : 'Select service'} />
+                          <SelectValue placeholder={!newType ? 'Choose type first' : (isPlatform && !selectedTenantId ? 'Choose tenant first' : 'Select service')} />
                         </SelectTrigger>
                         <SelectContent>
                           {filteredServicesForType.length === 0 ? (
