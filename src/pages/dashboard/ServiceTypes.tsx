@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Pencil } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
@@ -25,6 +25,12 @@ export default function ServiceTypes() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<ServiceTypeRow | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
 
   const isPlatform = context.isPlatformAdmin;
 
@@ -50,6 +56,13 @@ export default function ServiceTypes() {
     setName('');
     setDescription('');
     setIsActive(true);
+  };
+
+  const resetEditForm = () => {
+    setEditingRow(null);
+    setEditName('');
+    setEditDescription('');
+    setEditIsActive(true);
   };
 
   const handleCreate = async () => {
@@ -106,6 +119,44 @@ export default function ServiceTypes() {
       fetchTypes();
     } catch (err: any) {
       toast.error('Failed to delete type', { description: err?.message });
+    }
+  };
+
+  const openEdit = (row: ServiceTypeRow) => {
+    setEditingRow(row);
+    setEditName(row.name);
+    setEditDescription(row.description || '');
+    setEditIsActive(row.is_active);
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    try {
+      if (!isPlatform) {
+        toast.error('Only platform admins can update service types');
+        return;
+      }
+      if (!editingRow) return;
+      if (!editName.trim()) {
+        toast.error('Type name is required');
+        return;
+      }
+      const payload = {
+        name: editName.trim(),
+        description: editDescription || null,
+        is_active: editIsActive,
+      } as any;
+      const { error } = await (supabase as any)
+        .from('service_types')
+        .update(payload)
+        .eq('id', editingRow.id);
+      if (error) throw error;
+      toast.success('Service type updated');
+      setEditOpen(false);
+      resetEditForm();
+      fetchTypes();
+    } catch (err: any) {
+      toast.error('Failed to update type', { description: err?.message });
     }
   };
 
@@ -167,31 +218,63 @@ export default function ServiceTypes() {
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {types.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.name}</TableCell>
-                    <TableCell>{row.description || '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={row.is_active ? 'default' : 'secondary'}>
-                        {row.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={row.is_active} onCheckedChange={(v) => handleToggleActive(row, v)} disabled={!isPlatform} />
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(row)} disabled={!isPlatform}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    </DashboardLayout>
+            <TableBody>
+              {types.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-medium">{row.name}</TableCell>
+                  <TableCell>{row.description || '—'}</TableCell>
+                  <TableCell>
+                    <Badge variant={row.is_active ? 'default' : 'secondary'}>
+                      {row.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={row.is_active} onCheckedChange={(v) => handleToggleActive(row, v)} disabled={!isPlatform} />
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(row)} disabled={!isPlatform}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(row)} disabled={!isPlatform}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) resetEditForm(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Service Type</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Active</label>
+              <div className="flex items-center gap-2">
+                <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
+                <span className="text-sm text-muted-foreground">Enabled</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => { setEditOpen(false); resetEditForm(); }}>Cancel</Button>
+              <Button onClick={handleUpdate} disabled={!isPlatform}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  </DashboardLayout>
   );
 }

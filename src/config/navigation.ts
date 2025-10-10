@@ -72,8 +72,8 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Cargo Types', path: '/dashboard/cargo-types', icon: PackageCheck, description: 'Cargo classifications' },
       { name: 'Incoterms', path: '/dashboard/incoterms', icon: Globe, description: 'Trade terms' },
       { name: 'Service Types', path: '/dashboard/service-types', icon: Cog, description: 'Define allowed service type values', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
+      { name: 'Service Type Mappings', path: '/dashboard/service-type-mappings', icon: GitBranch, description: 'Manage service type mappings', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Services', path: '/dashboard/services', icon: Package, description: 'Manage tenant service catalog', roles: ['platform_admin','tenant_admin','franchise_admin'] },
-      { name: 'Service Type Mappings', path: '/dashboard/service-type-mappings', icon: GitBranch, description: 'Configure type-to-service rules' },
     ],
   },
   {

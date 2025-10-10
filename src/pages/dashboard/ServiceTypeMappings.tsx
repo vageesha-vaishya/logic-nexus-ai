@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Pencil } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
@@ -39,6 +39,28 @@ export default function ServiceTypeMappings() {
   const [newPriority, setNewPriority] = useState<number>(0);
   const [newConditions, setNewConditions] = useState<string>('{}');
   const [newIsActive, setNewIsActive] = useState<boolean>(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<MappingRow | null>(null);
+  const [editTenantId, setEditTenantId] = useState<string>('');
+  const [editType, setEditType] = useState<string>('');
+  const [editServiceId, setEditServiceId] = useState<string>('');
+  const [editIsDefault, setEditIsDefault] = useState<boolean>(false);
+  const [editPriority, setEditPriority] = useState<number>(0);
+  const [editConditions, setEditConditions] = useState<string>('{}');
+  const [editIsActive, setEditIsActive] = useState<boolean>(true);
+
+  // Build type options directly from active service_types in DB.
+  const selectTypeOptions = useMemo(() => {
+    const names = (typeOptions.length > 0 ? typeOptions.map(t => t.name) : Array.from(FALLBACK_SERVICE_TYPES));
+    const seen: Record<string,boolean> = {};
+    const opts = names.map((label) => {
+      const value = String(label);
+      if (seen[value]) return null;
+      seen[value] = true;
+      return { value, label };
+    }).filter(Boolean) as { value: string; label: string }[];
+    return opts.length > 0 ? opts : Array.from(FALLBACK_SERVICE_TYPES).map(v => ({ value: v, label: v }));
+  }, [typeOptions]);
 
   const isPlatform = context.isPlatformAdmin;
   const tenantId = context.tenantId || null;
@@ -144,6 +166,16 @@ export default function ServiceTypeMappings() {
     return byType;
   }, [services, newType, isPlatform, selectedTenantId]);
 
+  const filteredEditServicesForType = useMemo(() => {
+    if (!editType) return [];
+    const byType = services.filter((s: any) => String(s.service_type) === String(editType));
+    if (isPlatform) {
+      if (editTenantId) return byType.filter((s: any) => String(s.tenant_id) === String(editTenantId));
+      return [];
+    }
+    return byType;
+  }, [services, editType, isPlatform, editTenantId]);
+
   const resetForm = () => {
     setNewType('');
     setNewServiceId('');
@@ -152,6 +184,17 @@ export default function ServiceTypeMappings() {
     setNewConditions('{}');
     setNewIsActive(true);
     if (isPlatform) setSelectedTenantId('');
+  };
+
+  const resetEditForm = () => {
+    setEditingRow(null);
+    setEditTenantId('');
+    setEditType('');
+    setEditServiceId('');
+    setEditIsDefault(false);
+    setEditPriority(0);
+    setEditConditions('{}');
+    setEditIsActive(true);
   };
 
   const handleCreate = async () => {
@@ -236,6 +279,56 @@ export default function ServiceTypeMappings() {
     }
   };
 
+  const openEdit = (row: MappingRow) => {
+    setEditingRow(row);
+    setEditTenantId(String(row.tenant_id));
+    setEditType(String(row.service_type));
+    setEditServiceId(String(row.service_id));
+    setEditIsDefault(row.is_default);
+    setEditPriority(Number(row.priority) || 0);
+    setEditConditions(JSON.stringify(row.conditions || {}));
+    setEditIsActive(row.is_active);
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    try {
+      if (!editingRow) return;
+      if (!editType || !editServiceId) {
+        toast.error('Please select type and service');
+        return;
+      }
+      let conditionsObj: any = {};
+      try {
+        conditionsObj = JSON.parse(editConditions || '{}');
+      } catch (jsonErr) {
+        toast.error('Conditions must be valid JSON');
+        return;
+      }
+      const payload = {
+        service_type: editType,
+        service_id: editServiceId,
+        is_default: editIsDefault,
+        priority: editPriority,
+        conditions: conditionsObj,
+        is_active: editIsActive,
+      } as any;
+      const { error } = await (supabase as any)
+        .from('service_type_mappings')
+        .update(payload)
+        .eq('id', editingRow.id);
+      if (error) throw error;
+      toast.success('Mapping updated');
+      setEditOpen(false);
+      resetEditForm();
+      fetchMappings();
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      toast.error('Failed to update mapping', { description: msg });
+      fetchMappings();
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -288,8 +381,8 @@ export default function ServiceTypeMappings() {
                           <SelectValue placeholder="Select a type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(typeOptions.length > 0 ? typeOptions.map(t => t.name) : FALLBACK_SERVICE_TYPES).map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          {selectTypeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -382,6 +475,9 @@ export default function ServiceTypeMappings() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Switch checked={row.is_active} onCheckedChange={(v) => handleToggleActive(row, v)} />
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(row)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -394,6 +490,85 @@ export default function ServiceTypeMappings() {
             </Table>
           </CardContent>
         </Card>
+        {/* Edit dialog */}
+        <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) resetEditForm(); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Mapping</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {isPlatform && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Tenant</label>
+                  <Input value={editTenantId} readOnly />
+                  <span className="text-xs text-muted-foreground">Tenant is fixed for existing mapping</span>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Service Type</label>
+                  <Select value={editType} onValueChange={(v) => { setEditType(v); setEditServiceId(''); }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectTypeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Service</label>
+                  <Select value={editServiceId} onValueChange={setEditServiceId} disabled={!editType || (isPlatform && !editTenantId)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={!editType ? 'Choose type first' : (isPlatform && !editTenantId ? 'Tenant required' : 'Select service')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredEditServicesForType.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">No services for selected type</div>
+                      ) : (
+                        filteredEditServicesForType.map((s: any) => (
+                          <SelectItem key={String(s.id)} value={String(s.id)}>
+                            {s.service_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Default for Type</label>
+                  <div className="flex items-center gap-2">
+                    <Switch checked={editIsDefault} onCheckedChange={setEditIsDefault} />
+                    <span className="text-sm text-muted-foreground">One default per type</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Priority</label>
+                  <Input type="number" value={editPriority} onChange={(e) => setEditPriority(Number(e.target.value))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Active</label>
+                  <div className="flex items-center gap-2">
+                    <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
+                    <span className="text-sm text-muted-foreground">Enabled</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Conditions (JSON)</label>
+                <Input value={editConditions} onChange={(e) => setEditConditions(e.target.value)} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setEditOpen(false); resetEditForm(); }}>Cancel</Button>
+                <Button onClick={handleUpdate}>Save</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
