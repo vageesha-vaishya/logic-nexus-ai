@@ -88,6 +88,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [quoteNumberPreview, setQuoteNumberPreview] = useState<string>('Auto-generated on save');
   // Resolved labels for hidden contacts
   const [resolvedContactLabels, setResolvedContactLabels] = useState<Record<string, string>>({});
+  // Resolved labels for services that are not directly visible due to tenant scope/RLS
+  const [resolvedServiceLabels, setResolvedServiceLabels] = useState<Record<string, string>>({});
   
 
   const form = useForm<z.infer<typeof quoteSchema>>({
@@ -124,6 +126,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       fetchData();
     }
   }, [context.tenantId, roles]);
+
+  // Trigger data fetch when tenant is resolved from selected account or other context
+  useEffect(() => {
+    if (resolvedTenantId) {
+      fetchData();
+    }
+  }, [resolvedTenantId]);
 
   // Pre-populate with user's last used values for new quotes
   useEffect(() => {
@@ -178,7 +187,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       try {
         const { data: quote, error: quoteErr } = await supabase
           .from('quotes')
-          .select('*')
+          .select(`
+            *,
+            opportunities:opportunity_id(id, name, account_id, contact_id),
+            contacts:contact_id(id, first_name, last_name, account_id)
+          `)
           .eq('id', quoteId)
           .maybeSingle();
         if (quoteErr) throw quoteErr;
@@ -195,7 +208,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           consignee_id: (quote as any).consignee_id != null ? String((quote as any).consignee_id) : undefined,
           origin_port_id: (quote as any).origin_port_id != null ? String((quote as any).origin_port_id) : undefined,
           destination_port_id: (quote as any).destination_port_id != null ? String((quote as any).destination_port_id) : undefined,
-          account_id: (quote as any).account_id ? String((quote as any).account_id) : undefined,
+          account_id: (quote as any).account_id
+          ? String((quote as any).account_id)
+          : undefined,
           contact_id: (quote as any).contact_id ? String((quote as any).contact_id) : undefined,
           opportunity_id: (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined,
           status: (quote as any).status || 'draft',
@@ -207,6 +222,138 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         });
         setSelectedServiceType((quote as any).service_type || '');
         setQuoteNumberPreview((quote as any).quote_number || '—');
+
+        // Prefer embedded joins for real labels; fallback to placeholders and aggressive Edge Function resolution.
+        try {
+          const selOppId = (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined;
+          const selAccId = (quote as any).account_id
+          ? String((quote as any).account_id)
+          : undefined;
+          const selConId = (quote as any).contact_id ? String((quote as any).contact_id) : undefined;
+
+          // Opportunity label via join
+          const joinedOpp = (quote as any)?.opportunities;
+          if (selOppId) {
+            if (joinedOpp?.name) {
+              setOpportunities((prev) => {
+                const exists = prev.some((o: any) => String(o.id) === selOppId);
+                return exists ? prev : [{ id: selOppId, name: joinedOpp.name, account_id: joinedOpp.account_id, contact_id: joinedOpp.contact_id }, ...prev];
+              });
+            } else {
+              // Placeholder then aggressive resolution
+              setOpportunities((prev) => {
+                const exists = prev.some((o: any) => String(o.id) === selOppId);
+                return exists ? prev : [{ id: selOppId, name: 'Selected Opportunity' }, ...prev];
+              });
+              try {
+                const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-opportunity-label', {
+                  body: { id: selOppId },
+                });
+                if (!fnError && (labelData as any)?.name) {
+                  setOpportunities((prev) => {
+                    const exists = prev.some((o: any) => String(o.id) === selOppId);
+                    return exists ? prev : [{ id: selOppId, name: (labelData as any).name }, ...prev];
+                  });
+                  // Audit: label fallback used
+                  try {
+                    await supabase.from('audit_logs').insert([{ 
+                      user_id: user?.id || null,
+                      action: 'label_fallback_used',
+                      resource_type: 'opportunity',
+                      resource_id: selOppId as any,
+                      details: { method: 'edge_function', reason: 'rls_blocked' },
+                    }]);
+                  } catch {}
+                }
+              } catch {}
+            }
+          }
+
+          // Account label via join
+          const joinedAcc = (quote as any)?.accounts;
+          if (selAccId) {
+            if (joinedAcc?.name) {
+              setAccounts((prev) => {
+                const exists = prev.some((a: any) => String(a.id) === selAccId);
+                return exists ? prev : [{ id: selAccId, name: joinedAcc.name, tenant_id: joinedAcc.tenant_id }, ...prev];
+              });
+            } else {
+              setAccounts((prev) => {
+                const exists = prev.some((a: any) => String(a.id) === selAccId);
+                return exists ? prev : [{ id: selAccId, name: 'Selected Account' }, ...prev];
+              });
+              try {
+                const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-account-label', {
+                  body: { id: selAccId },
+                });
+                if (!fnError && (labelData as any)?.name) {
+                  setAccounts((prev) => {
+                    const exists = prev.some((a: any) => String(a.id) === selAccId);
+                    return exists ? prev : [{ id: selAccId, name: (labelData as any).name }, ...prev];
+                  });
+                  try {
+                    await supabase.from('audit_logs').insert([{ 
+                      user_id: user?.id || null,
+                      action: 'label_fallback_used',
+                      resource_type: 'account',
+                      resource_id: selAccId as any,
+                      details: { method: 'edge_function', reason: 'rls_blocked' },
+                    }]);
+                  } catch {}
+                }
+              } catch {}
+            }
+          }
+
+          // Contact label via join (aggressive resolution to always show real name when possible)
+          const joinedCon = (quote as any)?.contacts;
+          if (selConId) {
+            const joinedName = [joinedCon?.first_name, joinedCon?.last_name].filter(Boolean).join(' ').trim();
+            if (joinedCon && joinedName) {
+              setContacts((prev) => {
+                const exists = prev.some((c: any) => String(c.id) === selConId);
+                return exists ? prev : [{ id: selConId, first_name: joinedCon.first_name || '', last_name: joinedCon.last_name || '', account_id: joinedCon.account_id || selAccId || null }, ...prev];
+              });
+            } else {
+              // Placeholder + immediate Edge Function resolution
+              setContacts((prev) => {
+                const exists = prev.some((c: any) => String(c.id) === selConId);
+                return exists ? prev : [{ id: selConId, first_name: '', last_name: '', account_id: selAccId || null }, ...prev];
+              });
+              setResolvedContactLabels((prev) => ({
+                ...prev,
+                [selConId]: prev[selConId] || 'Selected Contact',
+              }));
+              try {
+                const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-contact-label', {
+                  body: { id: selConId },
+                });
+                const first = (labelData as any)?.first_name;
+                const last = (labelData as any)?.last_name;
+                const resolvedAccId = (labelData as any)?.account_id;
+                if (!fnError && (first || last)) {
+                  setContacts((prev) => {
+                    const exists = prev.some((c: any) => String(c.id) === selConId);
+                    return exists ? prev : [{ id: selConId, first_name: first || '', last_name: last || '', account_id: resolvedAccId || selAccId || null }, ...prev];
+                  });
+                  setResolvedContactLabels((prev) => ({
+                    ...prev,
+                    [selConId]: [first, last].filter(Boolean).join(' ').trim() || 'Selected Contact',
+                  }));
+                  try {
+                    await supabase.from('audit_logs').insert([{ 
+                      user_id: user?.id || null,
+                      action: 'label_fallback_used',
+                      resource_type: 'contact',
+                      resource_id: selConId as any,
+                      details: { method: 'edge_function', reason: 'rls_blocked' },
+                    }]);
+                  } catch {}
+                }
+              } catch {}
+            }
+          }
+        } catch {}
 
         // Load items; tolerate RLS issues by falling back to empty
         const { data: itemsRes, error: itemsErr } = await supabase
@@ -253,23 +400,30 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               .eq('id', (quote as any).opportunity_id)
               .maybeSingle()
               .then(({ data }) => {
-                if (data && !opportunities.some((o: any) => String(o.id) === String(data.id))) {
-                  setOpportunities((prev) => [data, ...prev]);
+                if (data) {
+                  setOpportunities((prev) => {
+                    const exists = prev.some((o: any) => String(o.id) === String(data.id));
+                    return exists ? prev : [data, ...prev];
+                  });
                 }
               })
           );
         }
         
-        if ((quote as any).account_id) {
+        const accIdForFetch = (quote as any).account_id;
+        if (accIdForFetch) {
           fetchPromises.push(
             supabase
               .from('accounts')
               .select('id, name')
-              .eq('id', (quote as any).account_id)
+              .eq('id', accIdForFetch)
               .maybeSingle()
               .then(({ data }) => {
-                if (data && !accounts.some((a: any) => String(a.id) === String(data.id))) {
-                  setAccounts((prev) => [data, ...prev]);
+                if (data) {
+                  setAccounts((prev) => {
+                    const exists = prev.some((a: any) => String(a.id) === String(data.id));
+                    return exists ? prev : [data, ...prev];
+                  });
                 }
               })
           );
@@ -283,8 +437,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               .eq('id', (quote as any).contact_id)
               .maybeSingle()
               .then(({ data }) => {
-                if (data && !contacts.some((c: any) => String(c.id) === String(data.id))) {
-                  setContacts((prev) => [data, ...prev]);
+                if (data) {
+                  setContacts((prev) => {
+                    const exists = prev.some((c: any) => String(c.id) === String(data.id));
+                    return exists ? prev : [data, ...prev];
+                  });
                 }
               })
           );
@@ -414,12 +571,53 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 // Ensure mapped service is available in the list for selection
                 const exists = services.some((s: any) => String(s.id) === String(mapped));
                 if (!exists) {
-                  const { data: svcData } = await supabase
-                    .from('services')
-                    .select('id, service_name, service_type')
-                    .eq('id', mapped)
-                    .maybeSingle();
-                  if (svcData) setServices((prev) => [svcData, ...prev]);
+                  // Try direct fetch first (may be blocked by RLS if service belongs to another scope)
+                  let svcData: any = null;
+                  try {
+                    const { data } = await supabase
+                      .from('services')
+                      .select('id, service_name, service_type')
+                      .eq('id', mapped)
+                      .maybeSingle();
+                    svcData = data;
+                  } catch {}
+                  if (svcData) {
+                    setServices((prev) => [svcData, ...prev]);
+                  } else {
+                    // Fallback to Edge Function to resolve minimal label when RLS prevents direct fetch
+                    try {
+                      const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-service-label', {
+                        body: { id: mapped },
+                      });
+                      const name = (labelData as any)?.service_name || (labelData as any)?.name;
+                      const type = (labelData as any)?.service_type || currentType;
+                      if (!fnError && (name || type)) {
+                        setResolvedServiceLabels((prev) => ({ ...prev, [String(mapped)]: name || 'Selected Service' }));
+                        setServices((prev) => [
+                          { id: mapped, service_name: name || 'Selected Service', service_type: type },
+                          ...prev,
+                        ]);
+                        // Audit: service label fallback used
+                        try {
+                          await supabase.from('audit_logs').insert([{ 
+                            user_id: user?.id || null,
+                            action: 'label_fallback_used',
+                            resource_type: 'service',
+                            resource_id: mapped as any,
+                            details: { method: 'edge_function', reason: 'rls_blocked', service_type: type },
+                          }]);
+                        } catch {}
+                      }
+                    } catch (fnErr) {
+                      console.warn('Service label resolution failed:', fnErr);
+                      // As a last resort, inject a placeholder so selected value renders
+                      setResolvedServiceLabels((prev) => ({ ...prev, [String(mapped)]: 'Selected Service' }));
+                      setServices((prev) => [
+                        { id: mapped, service_name: 'Selected Service', service_type: currentType },
+                        ...prev,
+                      ]);
+                    }
+                  }
                 }
                 form.setValue('service_id', mapped, { shouldDirty: true });
               } else {
@@ -449,12 +647,49 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           if (mapped) {
             const exists = services.some((s: any) => String(s.id) === String(mapped));
             if (!exists) {
-              const { data: svcData } = await supabase
-                .from('services')
-                .select('id, service_name, service_type')
-                .eq('id', mapped)
-                .maybeSingle();
-              if (svcData) setServices((prev) => [svcData, ...prev]);
+              let svcData: any = null;
+              try {
+                const { data } = await supabase
+                  .from('services')
+                  .select('id, service_name, service_type')
+                  .eq('id', mapped)
+                  .maybeSingle();
+                svcData = data;
+              } catch {}
+              if (svcData) {
+                setServices((prev) => [svcData, ...prev]);
+              } else {
+                try {
+                  const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-service-label', {
+                    body: { id: mapped },
+                  });
+                  const name = (labelData as any)?.service_name || (labelData as any)?.name;
+                  const type = (labelData as any)?.service_type || currentType;
+                  if (!fnError && (name || type)) {
+                    setResolvedServiceLabels((prev) => ({ ...prev, [String(mapped)]: name || 'Selected Service' }));
+                    setServices((prev) => [
+                      { id: mapped, service_name: name || 'Selected Service', service_type: type },
+                      ...prev,
+                    ]);
+                    try {
+                      await supabase.from('audit_logs').insert([{ 
+                        user_id: user?.id || null,
+                        action: 'label_fallback_used',
+                        resource_type: 'service',
+                        resource_id: mapped as any,
+                        details: { method: 'edge_function', reason: 'rls_blocked', service_type: type },
+                      }]);
+                    } catch {}
+                  }
+                } catch (fnErr) {
+                  console.warn('Service label resolution failed:', fnErr);
+                  setResolvedServiceLabels((prev) => ({ ...prev, [String(mapped)]: 'Selected Service' }));
+                  setServices((prev) => [
+                    { id: mapped, service_name: 'Selected Service', service_type: currentType },
+                    ...prev,
+                  ]);
+                }
+              }
             }
             form.setValue('service_id', mapped, { shouldDirty: true });
           } else {
@@ -471,7 +706,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   }, [selectedServiceType, services, isEditMode]);
 
   const fetchData = async () => {
-    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+    const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
     if (!tenantId) return;
 
     try {
@@ -572,6 +807,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               if (!fnError && (labelData as any)?.name) {
                 const resolved = { id: (labelData as any).id ?? curAccountId, name: (labelData as any).name } as any;
                 setAccounts((prev) => [resolved, ...prev]);
+                try {
+                  await supabase.from('audit_logs').insert([{ 
+                    user_id: user?.id || null,
+                    action: 'label_fallback_used',
+                    resource_type: 'account',
+                    resource_id: curAccountId as any,
+                    details: { method: 'edge_function', reason: 'rls_blocked' },
+                  }]);
+                } catch {}
               }
             } catch (fnErr) {
               console.warn('Account label resolution failed:', fnErr);
@@ -588,7 +832,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             .eq('id', curContactId)
             .maybeSingle();
           if (data) {
-            setContacts((prev) => [data, ...prev]);
+            setContacts((prev) => {
+              const exists = prev.some((c: any) => String(c.id) === String(data.id));
+              return exists ? prev : [data, ...prev];
+            });
           } else {
             // Resolve contact label via Edge Function when direct fetch is blocked by RLS
             try {
@@ -615,6 +862,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   ...prev,
                   [String(curContactId)]: [first, last].filter(Boolean).join(' ').trim() || 'Selected Contact',
                 }));
+                try {
+                  await supabase.from('audit_logs').insert([{ 
+                    user_id: user?.id || null,
+                    action: 'label_fallback_used',
+                    resource_type: 'contact',
+                    resource_id: curContactId as any,
+                    details: { method: 'edge_function', reason: 'rls_blocked' },
+                  }]);
+                } catch {}
               }
             } catch (fnErr) {
               console.warn('Contact label resolution failed:', fnErr);
@@ -631,7 +887,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             .eq('id', curOppId)
             .maybeSingle();
           if (data) {
-            setOpportunities((prev) => [data, ...prev]);
+            setOpportunities((prev) => {
+              const exists = prev.some((o: any) => String(o.id) === String(data.id));
+              return exists ? prev : [data, ...prev];
+            });
           } else {
             // Fallback: resolve label via Edge Function when direct fetch is blocked by RLS
             try {
@@ -641,6 +900,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               if (!fnError && (labelData as any)?.name) {
                 const resolved = { id: (labelData as any).id ?? curOppId, name: (labelData as any).name } as any;
                 setOpportunities((prev) => [resolved, ...prev]);
+                try {
+                  await supabase.from('audit_logs').insert([{ 
+                    user_id: user?.id || null,
+                    action: 'label_fallback_used',
+                    resource_type: 'opportunity',
+                    resource_id: curOppId as any,
+                    details: { method: 'edge_function', reason: 'rls_blocked' },
+                  }]);
+                } catch {}
               }
             } catch (fnErr) {
               console.warn('Opportunity label resolution failed:', fnErr);
@@ -795,10 +1063,16 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // If currently selected contact does not belong, clear it
       const currentContactId = form.getValues('contact_id');
       const belongs = contacts.some((c: any) => String(c.id) === String(currentContactId) && String(c.account_id) === String(account.id));
-      if (!belongs) form.setValue('contact_id', '', { shouldDirty: true });
+      if (!belongs) form.setValue('contact_id', undefined, { shouldDirty: true });
+      // Normalize injected account shape to ensure label and tenant resolution work
+      const normalized = {
+        id: account.id,
+        name: account.name || account.account_name || 'Account',
+        tenant_id: account.tenant_id ?? null,
+      } as any;
       setAccounts((prev) => {
-        const exists = prev.some((a: any) => String(a.id) === String(account.id));
-        return exists ? prev : [account, ...prev];
+        const exists = prev.some((a: any) => String(a.id) === String(normalized.id));
+        return exists ? prev : [normalized, ...prev];
       });
     } catch {}
   };
@@ -1138,7 +1412,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         <SelectContent>
                           {accounts.map((account) => (
                             <SelectItem key={account.id} value={String(account.id)}>
-                              {account.name}
+                              {account.name || (account as any).account_name || 'Account'}
                             </SelectItem>
                           ))}
                           {accounts.length === 0 && (
@@ -1279,15 +1553,25 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {/* Ensure currently selected service appears even if list is filtered out or RLS-hidden */}
+                        {field.value && !services.some((s) => String(s.id) === String(field.value)) && (
+                          <SelectItem key={`selected-service-${field.value}`} value={String(field.value)}>
+                            {resolvedServiceLabels[String(field.value)] || 'Selected Service'}
+                          </SelectItem>
+                        )}
+                        {/* Helpful hint when tenant not resolved yet */}
+                        {!resolvedTenantId && services.length === 0 && (
+                          <SelectItem disabled value="__tenant_not_resolved__">Select an account to load services</SelectItem>
+                        )}
                         {services
-                          .filter((s) => !selectedServiceType || s.service_type === selectedServiceType)
+                          .filter((s) => !selectedServiceType || canonicalType(s.service_type) === canonicalType(selectedServiceType))
                           .map((service) => (
                             <SelectItem key={service.id} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
                           ))}
                         {/* Fallback when there are services but none match the selected type */}
-                        {selectedServiceType && services.filter((s) => s.service_type === selectedServiceType).length === 0 && (
+                        {selectedServiceType && services.filter((s) => canonicalType(s.service_type) === canonicalType(selectedServiceType)).length === 0 && (
                           <SelectItem disabled value="__no_services_for_type__">No services for selected type</SelectItem>
                         )}
                         {services.length === 0 && (
@@ -1741,3 +2025,24 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     </div>
   );
 }
+  // Helper to normalize service_type values for robust filtering
+  const canonicalType = (t: any) => {
+    const raw = String(t || '').trim().toLowerCase();
+    const map: Record<string, string> = {
+      ocean: 'ocean',
+      'ocean_freight': 'ocean',
+      sea: 'ocean',
+      'sea_freight': 'ocean',
+      air: 'air',
+      'air_freight': 'air',
+      trucking: 'trucking',
+      road: 'trucking',
+      courier: 'courier',
+      parcel: 'courier',
+      moving: 'moving',
+      'movers_packers': 'moving',
+      railway_transport: 'railway_transport',
+      rail: 'railway_transport',
+    };
+    return map[raw] || raw;
+  };

@@ -48,13 +48,56 @@ export default function ServiceTypeMappings() {
   const [editPriority, setEditPriority] = useState<number>(0);
   const [editConditions, setEditConditions] = useState<string>('{}');
   const [editIsActive, setEditIsActive] = useState<boolean>(true);
+  // Search / filter / sort for listing
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inactive'>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [listTenantFilter, setListTenantFilter] = useState<string>('all');
+  const [sortKey, setSortKey] = useState<'priority'|'type'|'service'|'status'|'default'>('priority');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('desc');
 
-  // Build type options directly from active service_types in DB.
+  // Map friendly labels to canonical codes used by services.service_type, else use the label.
+  const toCanonicalType = (name: string) => {
+    const n = String(name || '').trim().toLowerCase();
+    const direct: Record<string,string> = {
+      'ocean': 'ocean',
+      'ocean freight': 'ocean',
+      'sea': 'ocean',
+      'sea freight': 'ocean',
+      'sea cargo': 'ocean',
+      'air': 'air',
+      'air freight': 'air',
+      'air cargo': 'air',
+      'trucking': 'trucking',
+      'inland trucking': 'trucking',
+      'truck': 'trucking',
+      'road': 'trucking',
+      'road transport': 'trucking',
+      'road freight': 'trucking',
+      'courier': 'courier',
+      'courier service': 'courier',
+      'express': 'courier',
+      'express delivery': 'courier',
+      'express_delivery': 'courier',
+      'parcel': 'courier',
+      'moving': 'moving',
+      'moving service': 'moving',
+      'movers': 'moving',
+      'movers packers': 'moving',
+      'packers and movers': 'moving',
+      'rail': 'railway_transport',
+      'railway': 'railway_transport',
+      'railway transport': 'railway_transport',
+      'rail transport': 'railway_transport',
+    };
+    return direct[n] || String(name);
+  };
   const selectTypeOptions = useMemo(() => {
     const names = (typeOptions.length > 0 ? typeOptions.map(t => t.name) : Array.from(FALLBACK_SERVICE_TYPES));
     const seen: Record<string,boolean> = {};
     const opts = names.map((label) => {
-      const value = String(label);
+      const value = toCanonicalType(label);
+      // Deduplicate by value to avoid multiple synonyms
       if (seen[value]) return null;
       seen[value] = true;
       return { value, label };
@@ -153,10 +196,71 @@ export default function ServiceTypeMappings() {
     services.forEach((s: any) => { map[String(s.id)] = s; });
     return map;
   }, [services]);
+  const tenantNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    tenants.forEach((t) => { map[String(t.id)] = String(t.name || t.id?.slice(0,8)); });
+    return map;
+  }, [tenants]);
+
+  const visibleMappings = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = (mappings || []).filter((m) => {
+      const svc = serviceById[String(m.service_id)];
+      const name = String(svc?.service_name || '');
+      const matchesSearch = term === ''
+        ? true
+        : [name, m.service_type].some(v => String(v).toLowerCase().includes(term));
+      const matchesStatus = statusFilter === 'all' ? true : statusFilter === 'active' ? m.is_active : !m.is_active;
+      const matchesType = typeFilter === 'all' ? true : m.service_type === typeFilter;
+      const matchesTenant = !isPlatform ? true : (listTenantFilter === 'all' ? true : m.tenant_id === listTenantFilter);
+      return matchesSearch && matchesStatus && matchesType && matchesTenant;
+    });
+    const cmp = (a: any, b: any) => {
+      let av: any; let bv: any;
+      if (sortKey === 'priority') { av = a.priority; bv = b.priority; }
+      else if (sortKey === 'type') { av = String(a.service_type).toLowerCase(); bv = String(b.service_type).toLowerCase(); }
+      else if (sortKey === 'service') {
+        av = String(serviceById[String(a.service_id)]?.service_name || '').toLowerCase();
+        bv = String(serviceById[String(b.service_id)]?.service_name || '').toLowerCase();
+      } else if (sortKey === 'status') { av = a.is_active ? 1 : 0; bv = b.is_active ? 1 : 0; }
+      else { av = a.is_default ? 1 : 0; bv = b.is_default ? 1 : 0; }
+      const base = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? base : -base;
+    };
+    return filtered.sort(cmp);
+  }, [mappings, serviceById, search, statusFilter, typeFilter, listTenantFilter, sortKey, sortDir, isPlatform]);
+
+  // Candidate canonical service types to show for a selected friendly type label
+  const candidateTypesFor = useMemo(() => {
+    const map: Record<string, string[]> = {
+      'freight forwarding': ['ocean','air','trucking','courier','railway_transport'],
+      'customs clearance': ['ocean','air','trucking','courier','railway_transport'],
+      'inland_waterway': ['ocean','trucking','railway_transport'],
+      'inland waterway': ['ocean','trucking','railway_transport'],
+      'express_delivery': ['courier','air'],
+      'express delivery': ['courier','air'],
+      'warehouse': ['moving','trucking'],
+      'warehousing': ['moving','trucking'],
+      'distribution': ['trucking','courier'],
+      'last mile': ['courier','trucking'],
+    };
+    return map;
+  }, []);
+
+  const resolveCandidateTypes = (labelOrValue: string) => {
+    const key = String(labelOrValue || '').trim().toLowerCase();
+    const direct = candidateTypesFor[key];
+    if (direct && direct.length > 0) return direct;
+    const canonical = toCanonicalType(labelOrValue);
+    if (canonical) return [canonical];
+    // Fallback to all common modes
+    return Array.from(FALLBACK_SERVICE_TYPES);
+  };
 
   const filteredServicesForType = useMemo(() => {
     if (!newType) return [];
-    const byType = services.filter((s: any) => String(s.service_type) === String(newType));
+    const candidates = resolveCandidateTypes(newType);
+    const byType = services.filter((s: any) => candidates.includes(String(s.service_type)));
     if (isPlatform) {
       // When platform admin, scope by selected tenant if provided
       if (selectedTenantId) return byType.filter((s: any) => String(s.tenant_id) === String(selectedTenantId));
@@ -168,7 +272,8 @@ export default function ServiceTypeMappings() {
 
   const filteredEditServicesForType = useMemo(() => {
     if (!editType) return [];
-    const byType = services.filter((s: any) => String(s.service_type) === String(editType));
+    const candidates = resolveCandidateTypes(editType);
+    const byType = services.filter((s: any) => candidates.includes(String(s.service_type)));
     if (isPlatform) {
       if (editTenantId) return byType.filter((s: any) => String(s.tenant_id) === String(editTenantId));
       return [];
@@ -366,7 +471,12 @@ export default function ServiceTypeMappings() {
                             <div className="px-3 py-2 text-sm text-muted-foreground">No tenants found</div>
                           ) : (
                             tenants.map((t) => (
-                              <SelectItem key={t.id} value={t.id}>{t.name || t.id.slice(0,8)}</SelectItem>
+                              <SelectItem key={t.id} value={t.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{t.name || String(t.id).slice(0,8)}</span>
+                                  <span className="text-xs text-muted-foreground">{String(t.id).slice(0,8)}</span>
+                                </div>
+                              </SelectItem>
                             ))
                           )}
                         </SelectContent>
@@ -440,6 +550,68 @@ export default function ServiceTypeMappings() {
             </Dialog>
           </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 mb-4">
+              <Input
+                placeholder="Search service or type"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {selectTypeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isPlatform && (
+                <Select value={listTenantFilter} onValueChange={(v) => setListTenantFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tenants</SelectItem>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name || t.id.slice(0,8)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="priority">Priority</SelectItem>
+                  <SelectItem value="type">Type</SelectItem>
+                  <SelectItem value="service">Service</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                  <SelectItem value="default">Default</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Asc</SelectItem>
+                  <SelectItem value="desc">Desc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -453,11 +625,18 @@ export default function ServiceTypeMappings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappings.map((row) => {
+                {visibleMappings.map((row) => {
                   const svc = serviceById[String(row.service_id)];
                   return (
                     <TableRow key={row.id}>
-                      {isPlatform && <TableCell className="text-xs text-muted-foreground">{row.tenant_id?.slice(0,8)}</TableCell>}
+                      {isPlatform && (
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>{tenantNameById[row.tenant_id] || row.tenant_id?.slice(0,8)}</span>
+                            <span className="text-xs text-muted-foreground">{String(row.tenant_id || '').slice(0,8)}</span>
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium">{row.service_type}</TableCell>
                       <TableCell>{svc?.service_name || row.service_id}</TableCell>
                       <TableCell>
@@ -500,7 +679,10 @@ export default function ServiceTypeMappings() {
               {isPlatform && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Tenant</label>
-                  <Input value={editTenantId} readOnly />
+                  <div className="flex items-center gap-2">
+                    <span>{tenantNameById[editTenantId] || editTenantId}</span>
+                    <span className="text-xs text-muted-foreground">{String(editTenantId || '').slice(0,8)}</span>
+                  </div>
                   <span className="text-xs text-muted-foreground">Tenant is fixed for existing mapping</span>
                 </div>
               )}

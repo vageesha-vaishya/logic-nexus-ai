@@ -58,6 +58,13 @@ export default function Services() {
   const [mappingsCount, setMappingsCount] = useState<number>(0);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const STRICT_DISALLOW_TENANT_CHANGE_WITH_MAPPINGS = false;
+  // Search / filter / sort for listing
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inactive'>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [listTenantFilter, setListTenantFilter] = useState<string>('all');
+  const [sortKey, setSortKey] = useState<'name'|'type'|'tenant'|'price'|'time'|'status'>('name');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
   const isTenantAdmin = context.isTenantAdmin;
   const isPlatform = context.isPlatformAdmin;
@@ -161,7 +168,7 @@ export default function Services() {
         toast.error('Service name is required');
         return;
       }
-      const chosenType = resolvedDefaultServiceType;
+      const chosenType = serviceType || resolvedDefaultServiceType;
       if (!chosenType) {
         toast.error('No active service types available', { description: 'Activate at least one type under Service Types.' });
         return;
@@ -321,6 +328,42 @@ export default function Services() {
   };
 
   const activeTypes = useMemo(() => types.filter(t => t.is_active), [types]);
+  // Map friendly DB type names to canonical codes for services.service_type
+  const toCanonicalType = (name: string) => {
+    const n = String(name || '').trim().toLowerCase();
+    const direct: Record<string,string> = {
+      'ocean': 'ocean',
+      'ocean freight': 'ocean',
+      'sea': 'ocean',
+      'sea freight': 'ocean',
+      'sea cargo': 'ocean',
+      'air': 'air',
+      'air freight': 'air',
+      'air cargo': 'air',
+      'trucking': 'trucking',
+      'inland trucking': 'trucking',
+      'truck': 'trucking',
+      'road': 'trucking',
+      'road transport': 'trucking',
+      'road freight': 'trucking',
+      'courier': 'courier',
+      'courier service': 'courier',
+      'express': 'courier',
+      'express delivery': 'courier',
+      'express_delivery': 'courier',
+      'parcel': 'courier',
+      'moving': 'moving',
+      'moving service': 'moving',
+      'movers': 'moving',
+      'movers packers': 'moving',
+      'packers and movers': 'moving',
+      'rail': 'railway_transport',
+      'railway': 'railway_transport',
+      'railway transport': 'railway_transport',
+      'rail transport': 'railway_transport',
+    };
+    return direct[n] || String(name);
+  };
   const displayTypes = useMemo(() => {
     if (activeTypes.length > 0) return activeTypes;
     // Fallback to common types if none active are found in DB
@@ -328,9 +371,35 @@ export default function Services() {
     return FALLBACK.map((name) => ({ name, is_active: true }));
   }, [activeTypes]);
   const resolvedDefaultServiceType = useMemo(() => {
-    return String(displayTypes[0]?.name || '');
+    const first = String(displayTypes[0]?.name || '');
+    return toCanonicalType(first);
   }, [displayTypes]);
   const tenantNameById = useMemo(() => Object.fromEntries(tenants.map(t => [t.id, t.name])), [tenants]);
+  const visibleServices = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = services.filter((s) => {
+      const matchesSearch = term === ''
+        ? true
+        : [s.service_name, s.service_type, s.service_code || '', s.description || '']
+            .some(v => String(v).toLowerCase().includes(term));
+      const matchesStatus = statusFilter === 'all' ? true : statusFilter === 'active' ? s.is_active : !s.is_active;
+      const matchesType = typeFilter === 'all' ? true : s.service_type === typeFilter;
+      const matchesTenant = !isPlatform ? true : (listTenantFilter === 'all' ? true : s.tenant_id === listTenantFilter);
+      return matchesSearch && matchesStatus && matchesType && matchesTenant;
+    });
+    const cmp = (a: ServiceRow, b: ServiceRow) => {
+      let av: any; let bv: any;
+      if (sortKey === 'name') { av = a.service_name.toLowerCase(); bv = b.service_name.toLowerCase(); }
+      else if (sortKey === 'type') { av = String(a.service_type).toLowerCase(); bv = String(b.service_type).toLowerCase(); }
+      else if (sortKey === 'tenant') { av = String(tenantNameById[a.tenant_id] || a.tenant_id).toLowerCase(); bv = String(tenantNameById[b.tenant_id] || b.tenant_id).toLowerCase(); }
+      else if (sortKey === 'price') { av = a.base_price ?? Number.POSITIVE_INFINITY; bv = b.base_price ?? Number.POSITIVE_INFINITY; }
+      else if (sortKey === 'time') { av = a.transit_time_days ?? Number.POSITIVE_INFINITY; bv = b.transit_time_days ?? Number.POSITIVE_INFINITY; }
+      else { av = a.is_active ? 1 : 0; bv = b.is_active ? 1 : 0; }
+      const base = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? base : -base;
+    };
+    return filtered.sort(cmp);
+  }, [services, search, statusFilter, typeFilter, listTenantFilter, sortKey, sortDir, isPlatform, tenantNameById]);
 
   return (
     <DashboardLayout>
@@ -378,12 +447,28 @@ export default function Services() {
                       </Select>
                     </div>
                   )}
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Service Name</label>
-                      <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="e.g. Ocean Standard" />
-                    </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Service Name</label>
+                    <Input value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="e.g. Ocean Standard" />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Type</label>
+                    <Select value={serviceType} onValueChange={setServiceType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {displayTypes.map((t) => {
+                          const val = toCanonicalType(t.name);
+                          return (
+                            <SelectItem key={val} value={val}>{val}</SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Service Code</label>
@@ -424,6 +509,69 @@ export default function Services() {
             </Dialog>
           </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 mb-4">
+              <Input
+                placeholder="Search name, type, code"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {displayTypes.map((t) => (
+                    <SelectItem key={toCanonicalType(t.name)} value={toCanonicalType(t.name)}>{toCanonicalType(t.name)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isPlatform && (
+                <Select value={listTenantFilter} onValueChange={(v) => setListTenantFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tenants</SelectItem>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="type">Type</SelectItem>
+                  {isPlatform && <SelectItem value="tenant">Tenant</SelectItem>}
+                  <SelectItem value="price">Base Price</SelectItem>
+                  <SelectItem value="time">Transit Days</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Asc</SelectItem>
+                  <SelectItem value="desc">Desc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -438,7 +586,7 @@ export default function Services() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {services.map((row) => (
+                {visibleServices.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.service_name}</TableCell>
                     {isPlatform && (

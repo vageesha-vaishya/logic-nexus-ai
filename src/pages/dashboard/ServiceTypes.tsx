@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Pencil } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
@@ -25,6 +26,11 @@ export default function ServiceTypes() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
+  // Search / filter / sort
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inactive'>('all');
+  const [sortKey, setSortKey] = useState<'name'|'status'|'description'>('name');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<ServiceTypeRow | null>(null);
@@ -160,6 +166,30 @@ export default function ServiceTypes() {
     }
   };
 
+  const visibleTypes = (() => {
+    const term = search.trim().toLowerCase();
+    const filtered = types.filter((t) => {
+      const matchesSearch = term === ''
+        ? true
+        : [t.name, t.description || ''].some(v => String(v).toLowerCase().includes(term));
+      const matchesStatus = statusFilter === 'all'
+        ? true
+        : statusFilter === 'active'
+          ? t.is_active
+          : !t.is_active;
+      return matchesSearch && matchesStatus;
+    });
+    const cmp = (a: ServiceTypeRow, b: ServiceTypeRow) => {
+      let av: any; let bv: any;
+      if (sortKey === 'name') { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
+      else if (sortKey === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
+      else { av = a.is_active ? 1 : 0; bv = b.is_active ? 1 : 0; }
+      const base = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? base : -base;
+    };
+    return filtered.sort(cmp);
+  })();
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -209,6 +239,42 @@ export default function ServiceTypes() {
             </Dialog>
           </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+              <Input
+                placeholder="Search name or description"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="description">Description</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Asc</SelectItem>
+                  <SelectItem value="desc">Desc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -219,7 +285,7 @@ export default function ServiceTypes() {
                 </TableRow>
               </TableHeader>
             <TableBody>
-              {types.map((row) => (
+              {visibleTypes.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{row.description || '—'}</TableCell>
