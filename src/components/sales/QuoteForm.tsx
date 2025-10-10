@@ -204,105 +204,108 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         const selAccId = (quote as any).account_id ? String((quote as any).account_id) : undefined;
         const selConId = (quote as any).contact_id ? String((quote as any).contact_id) : undefined;
 
-        // Hydrate opportunity FIRST using edge function for complete data
+        // Collect all items to add to dropdowns BEFORE any state updates
+        let opportunityToAdd = null;
+        let accountToAdd = null;
+        let contactToAdd = null;
+
+        // Fetch opportunity data with full details
         if (selOppId) {
           try {
             const { data: fullOpp, error: oppError } = await (supabase as any).functions.invoke('get-opportunity-full', {
               body: { id: selOppId },
             });
             if (!oppError && fullOpp) {
-              setOpportunities((prev) => {
-                const exists = prev.some((o: any) => String(o.id) === selOppId);
-                if (exists) return prev;
-                return [{
-                  id: fullOpp.id,
-                  name: fullOpp.name || 'Selected Opportunity',
-                  account_id: fullOpp.account_id,
-                  contact_id: fullOpp.contact_id
-                }, ...prev];
-              });
+              opportunityToAdd = {
+                id: fullOpp.id,
+                name: fullOpp.name || 'Selected Opportunity',
+                account_id: fullOpp.account_id,
+                contact_id: fullOpp.contact_id
+              };
               
-              // Also hydrate account from opportunity if present
+              // Also prepare account from opportunity if not explicitly selected
               if (fullOpp.accounts && !selAccId) {
-                setAccounts((prev) => {
-                  const accId = String(fullOpp.account_id);
-                  const exists = prev.some((a: any) => String(a.id) === accId);
-                  if (exists) return prev;
-                  return [{ id: accId, name: fullOpp.accounts.name || 'Selected Account' }, ...prev];
-                });
+                accountToAdd = { 
+                  id: String(fullOpp.account_id), 
+                  name: fullOpp.accounts.name || 'Selected Account' 
+                };
               }
               
-              // Also hydrate contact from opportunity if present
+              // Also prepare contact from opportunity if not explicitly selected
               if (fullOpp.contacts && !selConId) {
-                setContacts((prev) => {
-                  const conId = String(fullOpp.contact_id);
-                  const exists = prev.some((c: any) => String(c.id) === conId);
-                  if (exists) return prev;
-                  return [{
-                    id: conId,
-                    first_name: fullOpp.contacts.first_name || '',
-                    last_name: fullOpp.contacts.last_name || '',
-                    account_id: fullOpp.account_id
-                  }, ...prev];
-                });
+                contactToAdd = {
+                  id: String(fullOpp.contact_id),
+                  first_name: fullOpp.contacts.first_name || '',
+                  last_name: fullOpp.contacts.last_name || '',
+                  account_id: fullOpp.account_id
+                };
               }
             }
           } catch (oppErr) {
             console.warn('Failed to load full opportunity, using fallback:', oppErr);
-            // Fallback to joined data
             const joinedOpp = (quote as any)?.opportunities;
             if (joinedOpp?.name) {
-              setOpportunities((prev) => {
-                const exists = prev.some((o: any) => String(o.id) === selOppId);
-                return exists ? prev : [{ 
-                  id: selOppId, 
-                  name: joinedOpp.name, 
-                  account_id: joinedOpp.account_id, 
-                  contact_id: joinedOpp.contact_id 
-                }, ...prev];
-              });
+              opportunityToAdd = { 
+                id: selOppId, 
+                name: joinedOpp.name, 
+                account_id: joinedOpp.account_id, 
+                contact_id: joinedOpp.contact_id 
+              };
             }
           }
         }
 
-        // Hydrate account if not already done via opportunity
-        if (selAccId) {
-          const accountAlreadyInList = accounts.some((a: any) => String(a.id) === selAccId);
-          if (!accountAlreadyInList) {
-            try {
-              const { data: accData } = await supabase
-                .from('accounts')
-                .select('id, name')
-                .eq('id', selAccId)
-                .maybeSingle();
-              if (accData) {
-                setAccounts((prev) => {
-                  const exists = prev.some((a: any) => String(a.id) === selAccId);
-                  return exists ? prev : [{ id: accData.id, name: accData.name || 'Selected Account' }, ...prev];
-                });
-              }
-            } catch {}
+        // Fetch account if not already prepared from opportunity
+        if (selAccId && !accountToAdd) {
+          try {
+            const { data: accData } = await supabase
+              .from('accounts')
+              .select('id, name')
+              .eq('id', selAccId)
+              .maybeSingle();
+            if (accData) {
+              accountToAdd = { id: accData.id, name: accData.name || 'Selected Account' };
+            }
+          } catch {}
+        }
+
+        // Fetch contact if not already prepared from opportunity
+        if (selConId && !contactToAdd) {
+          const joinedCon = (quote as any)?.contacts;
+          if (joinedCon) {
+            contactToAdd = {
+              id: selConId,
+              first_name: joinedCon.first_name || '',
+              last_name: joinedCon.last_name || '',
+              account_id: joinedCon.account_id
+            };
           }
         }
 
-        // Hydrate contact if not already done via opportunity  
-        if (selConId) {
-          const contactAlreadyInList = contacts.some((c: any) => String(c.id) === selConId);
-          if (!contactAlreadyInList) {
-            const joinedCon = (quote as any)?.contacts;
-            if (joinedCon) {
-              setContacts((prev) => {
-                const exists = prev.some((c: any) => String(c.id) === selConId);
-                return exists ? prev : [{
-                  id: selConId,
-                  first_name: joinedCon.first_name || '',
-                  last_name: joinedCon.last_name || '',
-                  account_id: joinedCon.account_id
-                }, ...prev];
-              });
-            }
-          }
+        // NOW update all states at once in the correct order
+        if (opportunityToAdd) {
+          setOpportunities((prev) => {
+            const exists = prev.some((o: any) => String(o.id) === String(opportunityToAdd.id));
+            return exists ? prev : [opportunityToAdd, ...prev];
+          });
         }
+        
+        if (accountToAdd) {
+          setAccounts((prev) => {
+            const exists = prev.some((a: any) => String(a.id) === String(accountToAdd.id));
+            return exists ? prev : [accountToAdd, ...prev];
+          });
+        }
+        
+        if (contactToAdd) {
+          setContacts((prev) => {
+            const exists = prev.some((c: any) => String(c.id) === String(contactToAdd.id));
+            return exists ? prev : [contactToAdd, ...prev];
+          });
+        }
+
+        // Small delay to ensure React has processed the state updates
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         // NOW set form values after dropdown lists are hydrated
         form.reset({
