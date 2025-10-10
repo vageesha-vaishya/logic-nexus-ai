@@ -198,6 +198,113 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (quoteErr) throw quoteErr;
         if (!quote) return;
 
+        // CRITICAL: Hydrate dropdown lists BEFORE setting form values
+        // This ensures Select components recognize the values as valid options
+        const selOppId = (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined;
+        const selAccId = (quote as any).account_id ? String((quote as any).account_id) : undefined;
+        const selConId = (quote as any).contact_id ? String((quote as any).contact_id) : undefined;
+
+        // Hydrate opportunity FIRST using edge function for complete data
+        if (selOppId) {
+          try {
+            const { data: fullOpp, error: oppError } = await (supabase as any).functions.invoke('get-opportunity-full', {
+              body: { id: selOppId },
+            });
+            if (!oppError && fullOpp) {
+              setOpportunities((prev) => {
+                const exists = prev.some((o: any) => String(o.id) === selOppId);
+                if (exists) return prev;
+                return [{
+                  id: fullOpp.id,
+                  name: fullOpp.name || 'Selected Opportunity',
+                  account_id: fullOpp.account_id,
+                  contact_id: fullOpp.contact_id
+                }, ...prev];
+              });
+              
+              // Also hydrate account from opportunity if present
+              if (fullOpp.accounts && !selAccId) {
+                setAccounts((prev) => {
+                  const accId = String(fullOpp.account_id);
+                  const exists = prev.some((a: any) => String(a.id) === accId);
+                  if (exists) return prev;
+                  return [{ id: accId, name: fullOpp.accounts.name || 'Selected Account' }, ...prev];
+                });
+              }
+              
+              // Also hydrate contact from opportunity if present
+              if (fullOpp.contacts && !selConId) {
+                setContacts((prev) => {
+                  const conId = String(fullOpp.contact_id);
+                  const exists = prev.some((c: any) => String(c.id) === conId);
+                  if (exists) return prev;
+                  return [{
+                    id: conId,
+                    first_name: fullOpp.contacts.first_name || '',
+                    last_name: fullOpp.contacts.last_name || '',
+                    account_id: fullOpp.account_id
+                  }, ...prev];
+                });
+              }
+            }
+          } catch (oppErr) {
+            console.warn('Failed to load full opportunity, using fallback:', oppErr);
+            // Fallback to joined data
+            const joinedOpp = (quote as any)?.opportunities;
+            if (joinedOpp?.name) {
+              setOpportunities((prev) => {
+                const exists = prev.some((o: any) => String(o.id) === selOppId);
+                return exists ? prev : [{ 
+                  id: selOppId, 
+                  name: joinedOpp.name, 
+                  account_id: joinedOpp.account_id, 
+                  contact_id: joinedOpp.contact_id 
+                }, ...prev];
+              });
+            }
+          }
+        }
+
+        // Hydrate account if not already done via opportunity
+        if (selAccId) {
+          const accountAlreadyInList = accounts.some((a: any) => String(a.id) === selAccId);
+          if (!accountAlreadyInList) {
+            try {
+              const { data: accData } = await supabase
+                .from('accounts')
+                .select('id, name')
+                .eq('id', selAccId)
+                .maybeSingle();
+              if (accData) {
+                setAccounts((prev) => {
+                  const exists = prev.some((a: any) => String(a.id) === selAccId);
+                  return exists ? prev : [{ id: accData.id, name: accData.name || 'Selected Account' }, ...prev];
+                });
+              }
+            } catch {}
+          }
+        }
+
+        // Hydrate contact if not already done via opportunity  
+        if (selConId) {
+          const contactAlreadyInList = contacts.some((c: any) => String(c.id) === selConId);
+          if (!contactAlreadyInList) {
+            const joinedCon = (quote as any)?.contacts;
+            if (joinedCon) {
+              setContacts((prev) => {
+                const exists = prev.some((c: any) => String(c.id) === selConId);
+                return exists ? prev : [{
+                  id: selConId,
+                  first_name: joinedCon.first_name || '',
+                  last_name: joinedCon.last_name || '',
+                  account_id: joinedCon.account_id
+                }, ...prev];
+              });
+            }
+          }
+        }
+
+        // NOW set form values after dropdown lists are hydrated
         form.reset({
           title: (quote as any).title || '',
           description: (quote as any).description || '',
@@ -209,11 +316,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           consignee_id: (quote as any).consignee_id != null ? String((quote as any).consignee_id) : undefined,
           origin_port_id: (quote as any).origin_port_id != null ? String((quote as any).origin_port_id) : undefined,
           destination_port_id: (quote as any).destination_port_id != null ? String((quote as any).destination_port_id) : undefined,
-          account_id: (quote as any).account_id
-          ? String((quote as any).account_id)
-          : undefined,
-          contact_id: (quote as any).contact_id ? String((quote as any).contact_id) : undefined,
-          opportunity_id: (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined,
+          account_id: selAccId || undefined,
+          contact_id: selConId || undefined,
+          opportunity_id: selOppId || undefined,
           status: (quote as any).status || 'draft',
           valid_until: (quote as any).valid_until || undefined,
           tax_percent: (quote as any).tax_percent != null ? String((quote as any).tax_percent) : undefined,
@@ -222,139 +327,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           notes: (quote as any).notes || undefined,
         });
         setSelectedServiceType((quote as any).service_type || '');
-        setQuoteNumberPreview((quote as any).quote_number || '—');
-
-        // Prefer embedded joins for real labels; fallback to placeholders and aggressive Edge Function resolution.
-        try {
-          const selOppId = (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined;
-          const selAccId = (quote as any).account_id
-          ? String((quote as any).account_id)
-          : undefined;
-          const selConId = (quote as any).contact_id ? String((quote as any).contact_id) : undefined;
-
-          // Opportunity label via join
-          const joinedOpp = (quote as any)?.opportunities;
-          if (selOppId) {
-            if (joinedOpp?.name) {
-              setOpportunities((prev) => {
-                const exists = prev.some((o: any) => String(o.id) === selOppId);
-                return exists ? prev : [{ id: selOppId, name: joinedOpp.name, account_id: joinedOpp.account_id, contact_id: joinedOpp.contact_id }, ...prev];
-              });
-            } else {
-              // Placeholder then aggressive resolution
-              setOpportunities((prev) => {
-                const exists = prev.some((o: any) => String(o.id) === selOppId);
-                return exists ? prev : [{ id: selOppId, name: 'Selected Opportunity' }, ...prev];
-              });
-              try {
-                const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-opportunity-label', {
-                  body: { id: selOppId },
-                });
-                if (!fnError && (labelData as any)?.name) {
-                  setOpportunities((prev) => {
-                    const exists = prev.some((o: any) => String(o.id) === selOppId);
-                    return exists ? prev : [{ id: selOppId, name: (labelData as any).name }, ...prev];
-                  });
-                  // Audit: label fallback used
-                  try {
-                    await supabase.from('audit_logs').insert([{ 
-                      user_id: user?.id || null,
-                      action: 'label_fallback_used',
-                      resource_type: 'opportunity',
-                      resource_id: selOppId as any,
-                      details: { method: 'edge_function', reason: 'rls_blocked' },
-                    }]);
-                  } catch {}
-                }
-              } catch {}
-            }
-          }
-
-          // Account label via join
-          const joinedAcc = (quote as any)?.accounts;
-          if (selAccId) {
-            if (joinedAcc?.name) {
-              setAccounts((prev) => {
-                const exists = prev.some((a: any) => String(a.id) === selAccId);
-                return exists ? prev : [{ id: selAccId, name: joinedAcc.name, tenant_id: joinedAcc.tenant_id }, ...prev];
-              });
-            } else {
-              setAccounts((prev) => {
-                const exists = prev.some((a: any) => String(a.id) === selAccId);
-                return exists ? prev : [{ id: selAccId, name: 'Selected Account' }, ...prev];
-              });
-              try {
-                const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-account-label', {
-                  body: { id: selAccId },
-                });
-                if (!fnError && (labelData as any)?.name) {
-                  setAccounts((prev) => {
-                    const exists = prev.some((a: any) => String(a.id) === selAccId);
-                    return exists ? prev : [{ id: selAccId, name: (labelData as any).name }, ...prev];
-                  });
-                  try {
-                    await supabase.from('audit_logs').insert([{ 
-                      user_id: user?.id || null,
-                      action: 'label_fallback_used',
-                      resource_type: 'account',
-                      resource_id: selAccId as any,
-                      details: { method: 'edge_function', reason: 'rls_blocked' },
-                    }]);
-                  } catch {}
-                }
-              } catch {}
-            }
-          }
-
-          // Contact label via join (aggressive resolution to always show real name when possible)
-          const joinedCon = (quote as any)?.contacts;
-          if (selConId) {
-            const joinedName = [joinedCon?.first_name, joinedCon?.last_name].filter(Boolean).join(' ').trim();
-            if (joinedCon && joinedName) {
-              setContacts((prev) => {
-                const exists = prev.some((c: any) => String(c.id) === selConId);
-                return exists ? prev : [{ id: selConId, first_name: joinedCon.first_name || '', last_name: joinedCon.last_name || '', account_id: joinedCon.account_id || selAccId || null }, ...prev];
-              });
-            } else {
-              // Placeholder + immediate Edge Function resolution
-              setContacts((prev) => {
-                const exists = prev.some((c: any) => String(c.id) === selConId);
-                return exists ? prev : [{ id: selConId, first_name: '', last_name: '', account_id: selAccId || null }, ...prev];
-              });
-              setResolvedContactLabels((prev) => ({
-                ...prev,
-                [selConId]: prev[selConId] || 'Selected Contact',
-              }));
-              try {
-                const { data: labelData, error: fnError } = await (supabase as any).functions.invoke('get-contact-label', {
-                  body: { id: selConId },
-                });
-                const first = (labelData as any)?.first_name;
-                const last = (labelData as any)?.last_name;
-                const resolvedAccId = (labelData as any)?.account_id;
-                if (!fnError && (first || last)) {
-                  setContacts((prev) => {
-                    const exists = prev.some((c: any) => String(c.id) === selConId);
-                    return exists ? prev : [{ id: selConId, first_name: first || '', last_name: last || '', account_id: resolvedAccId || selAccId || null }, ...prev];
-                  });
-                  setResolvedContactLabels((prev) => ({
-                    ...prev,
-                    [selConId]: [first, last].filter(Boolean).join(' ').trim() || 'Selected Contact',
-                  }));
-                  try {
-                    await supabase.from('audit_logs').insert([{ 
-                      user_id: user?.id || null,
-                      action: 'label_fallback_used',
-                      resource_type: 'contact',
-                      resource_id: selConId as any,
-                      details: { method: 'edge_function', reason: 'rls_blocked' },
-                    }]);
-                  } catch {}
-                }
-              } catch {}
-            }
-          }
-        } catch {}
+        setQuoteNumberPreview((quote as any).quote_number || '');
 
         // Load items; tolerate RLS issues by falling back to empty
         const { data: itemsRes, error: itemsErr } = await supabase
