@@ -135,8 +135,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   }, [resolvedTenantId]);
 
   // Pre-populate with user's last used values for new quotes
+  // Only runs after opportunities/accounts/contacts data is loaded
   useEffect(() => {
     if (quoteId || !user?.id) return; // Skip for edit mode or no user
+    if (opportunities.length === 0 && accounts.length === 0) return; // Wait for data
     
     const fetchLastUsedValues = async () => {
       try {
@@ -160,13 +162,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         const currentAccId = form.getValues('account_id');
         const currentConId = form.getValues('contact_id');
 
-        if (!currentOppId && lastQuote.opportunity_id) {
+        // Only pre-populate if the items exist in the loaded data
+        if (!currentOppId && lastQuote.opportunity_id && opportunities.find(o => String(o.id) === String(lastQuote.opportunity_id))) {
           form.setValue('opportunity_id', String(lastQuote.opportunity_id));
         }
-        if (!currentAccId && lastQuote.account_id) {
+        if (!currentAccId && lastQuote.account_id && accounts.find(a => String(a.id) === String(lastQuote.account_id))) {
           form.setValue('account_id', String(lastQuote.account_id));
         }
-        if (!currentConId && lastQuote.contact_id) {
+        if (!currentConId && lastQuote.contact_id && contacts.find(c => String(c.id) === String(lastQuote.contact_id))) {
           form.setValue('contact_id', String(lastQuote.contact_id));
         }
       } catch (error) {
@@ -174,10 +177,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
     };
 
-    // Delay to ensure opportunities/accounts/contacts are loaded first
-    const timer = setTimeout(fetchLastUsedValues, 500);
-    return () => clearTimeout(timer);
-  }, [quoteId, user?.id, context.tenantId, roles]);
+    fetchLastUsedValues();
+  }, [quoteId, user?.id, context.tenantId, roles, opportunities, accounts, contacts]);
 
   // Load existing quote for edit mode independent of tenant context
   useEffect(() => {
@@ -392,21 +393,39 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Fetch related opportunity, account, and contact data separately
         const fetchPromises = [];
         
+        // Fetch related opportunity data with full details
         if ((quote as any).opportunity_id) {
           fetchPromises.push(
-            supabase
-              .from('opportunities')
-              .select('id, name')
-              .eq('id', (quote as any).opportunity_id)
-              .maybeSingle()
-              .then(({ data }) => {
-                if (data) {
+            (async () => {
+              try {
+                const { data: fullOpp, error } = await supabase.functions.invoke('get-opportunity-full', {
+                  body: { id: (quote as any).opportunity_id }
+                });
+                
+                if (!error && fullOpp) {
                   setOpportunities((prev) => {
-                    const exists = prev.some((o: any) => String(o.id) === String(data.id));
-                    return exists ? prev : [data, ...prev];
+                    const exists = prev.some((o: any) => String(o.id) === String(fullOpp.id));
+                    return exists ? prev : [fullOpp, ...prev];
                   });
+                  
+                  // Ensure account and contact are in lists
+                  if (fullOpp.accounts) {
+                    setAccounts((prev) => {
+                      const exists = prev.some((a: any) => String(a.id) === String(fullOpp.account_id));
+                      return exists ? prev : [fullOpp.accounts, ...prev];
+                    });
+                  }
+                  if (fullOpp.contacts) {
+                    setContacts((prev) => {
+                      const exists = prev.some((c: any) => String(c.id) === String(fullOpp.contact_id));
+                      return exists ? prev : [fullOpp.contacts, ...prev];
+                    });
+                  }
                 }
-              })
+              } catch (err) {
+                console.error('Error fetching opportunity full data:', err);
+              }
+            })()
           );
         }
         
@@ -1031,30 +1050,70 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [oppDialogOpen, setOppDialogOpen] = useState(false);
   const [accDialogOpen, setAccDialogOpen] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
-  const handleSelectOpportunity = (opp: any) => {
+  const handleSelectOpportunity = async (opp: any) => {
     try {
-      if (opp?.id) form.setValue('opportunity_id', String(opp.id), { shouldDirty: true });
-      if (opp?.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
-      if (opp?.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
-      // Ensure selected opportunity appears in the dropdown options
-      setOpportunities((prev) => {
-        const exists = prev.some((o: any) => String(o.id) === String(opp.id));
-        return exists ? prev : [opp, ...prev];
+      if (!opp?.id) return;
+      
+      form.setValue('opportunity_id', String(opp.id), { shouldDirty: true });
+      
+      // Fetch full opportunity data including account and contact
+      const { data: fullOpp, error } = await supabase.functions.invoke('get-opportunity-full', {
+        body: { id: opp.id }
       });
-      // If the dialog provided nested account/contact, ensure they appear in respective dropdowns
-      if (opp?.accounts?.id) {
-        setAccounts((prev) => {
-          const exists = prev.some((a: any) => String(a.id) === String(opp.accounts.id));
-          return exists ? prev : [{ id: opp.accounts.id, name: opp.accounts.name || opp.accounts.account_name || 'Account' }, ...prev];
+
+      if (!error && fullOpp) {
+        // Auto-populate account if opportunity has one
+        if (fullOpp.account_id) {
+          form.setValue('account_id', String(fullOpp.account_id), { shouldDirty: true });
+          
+          // Ensure account is in the list
+          if (fullOpp.accounts) {
+            setAccounts((prev) => {
+              const exists = prev.some((a: any) => String(a.id) === String(fullOpp.account_id));
+              return exists ? prev : [{ id: fullOpp.accounts.id, name: fullOpp.accounts.name }, ...prev];
+            });
+          }
+        }
+        
+        // Auto-populate contact if opportunity has one
+        if (fullOpp.contact_id) {
+          form.setValue('contact_id', String(fullOpp.contact_id), { shouldDirty: true });
+          
+          // Ensure contact is in the list
+          if (fullOpp.contacts) {
+            setContacts((prev) => {
+              const exists = prev.some((c: any) => String(c.id) === String(fullOpp.contact_id));
+              return exists ? prev : [{ 
+                id: fullOpp.contacts.id, 
+                first_name: fullOpp.contacts.first_name || '', 
+                last_name: fullOpp.contacts.last_name || '', 
+                account_id: fullOpp.account_id 
+              }, ...prev];
+            });
+          }
+        }
+        
+        // Ensure selected opportunity appears in the dropdown
+        setOpportunities((prev) => {
+          const exists = prev.some((o: any) => String(o.id) === String(fullOpp.id));
+          return exists ? prev : [fullOpp, ...prev];
+        });
+      } else {
+        // Fallback to provided data if edge function fails
+        if (opp.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
+        if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
+        
+        setOpportunities((prev) => {
+          const exists = prev.some((o: any) => String(o.id) === String(opp.id));
+          return exists ? prev : [opp, ...prev];
         });
       }
-      if (opp?.contacts?.id) {
-        setContacts((prev) => {
-          const exists = prev.some((c: any) => String(c.id) === String(opp.contacts.id));
-          return exists ? prev : [{ id: opp.contacts.id, first_name: opp.contacts.first_name || '', last_name: opp.contacts.last_name || '', account_id: opp.contacts.account_id }, ...prev];
-        });
-      }
-    } catch {}
+    } catch (err) {
+      console.error('Error selecting opportunity:', err);
+      // Basic fallback
+      if (opp.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
+      if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
+    }
   };
 
   const handleSelectAccount = (account: any) => {
