@@ -761,9 +761,28 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             .eq('service_type', currentServiceType)
             .eq('is_active', true);
           if (carriersRes.error) throw carriersRes.error;
-          const mapped = (carriersRes.data || [])
+          // Map carriers from join and de-duplicate by id to avoid double labels
+          const mappedRaw = (carriersRes.data || [])
             .map((row: any) => row.carriers)
             .filter((c: any) => !!c && c.is_active);
+          const mappedById: Record<string, any> = {};
+          for (const c of mappedRaw) {
+            mappedById[String(c.id)] = c;
+          }
+          let mapped = Object.values(mappedById);
+          // Ensure saved carrier (in edit mode) appears in the list even if not mapped
+          const selectedCarrierId = form.getValues('carrier_id');
+          if (selectedCarrierId && !mapped.some((c: any) => String(c.id) === String(selectedCarrierId))) {
+            const { data: selCarrier } = await supabase
+              .from('carriers')
+              .select('id, carrier_name, is_active')
+              .eq('id', selectedCarrierId)
+              .maybeSingle();
+            if (selCarrier) {
+              mappedById[String(selCarrier.id)] = selCarrier;
+              mapped = Object.values(mappedById);
+            }
+          }
           setCarriers(mapped);
         } else {
           // No service type selected yet; do not show carriers
@@ -1017,9 +1036,28 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         setCarriers([]);
         return;
       }
-      const mapped = (carriersRes.data || [])
+      // Map carriers from join and de-duplicate by id to avoid double labels
+      const mappedRaw = (carriersRes.data || [])
         .map((row: any) => row.carriers)
         .filter((c: any) => !!c && c.is_active);
+      const mappedById: Record<string, any> = {};
+      for (const c of mappedRaw) {
+        mappedById[String(c.id)] = c;
+      }
+      let mapped = Object.values(mappedById);
+      // Ensure saved carrier (in edit mode) appears in the list even if not mapped
+      const selectedCarrierId = form.getValues('carrier_id');
+      if (selectedCarrierId && !mapped.some((c: any) => String(c.id) === String(selectedCarrierId))) {
+        const { data: selCarrier } = await supabase
+          .from('carriers')
+          .select('id, carrier_name, is_active')
+          .eq('id', selectedCarrierId)
+          .maybeSingle();
+        if (selCarrier) {
+          mappedById[String(selCarrier.id)] = selCarrier;
+          mapped = Object.values(mappedById);
+        }
+      }
       setCarriers(mapped);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -26,14 +26,41 @@ export default function Carriers() {
   const [carriers, setCarriers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editCarrierId, setEditCarrierId] = useState<string | null>(null);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [tenantNameById, setTenantNameById] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    if (context.isPlatformAdmin) {
+      fetchTenants();
+    }
     if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
       fetchCarriers();
     } else {
       setLoading(false);
     }
   }, [context.isPlatformAdmin, context.tenantId, roles]);
+
+  const fetchTenants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      const rows = data || [];
+      setTenants(rows);
+      const map: Record<string, string> = {};
+      rows.forEach((t: any) => {
+        map[t.id] = t.name;
+      });
+      setTenantNameById(map);
+    } catch (err: any) {
+      console.warn('Failed to fetch tenants:', err?.message || err);
+    }
+  };
 
   const fetchCarriers = async () => {
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
@@ -43,13 +70,19 @@ export default function Carriers() {
       return;
     }
 
+    // Platform admins see all carriers if no tenant is selected
+
     try {
       let query = supabase
         .from('carriers')
         .select('*');
       if (!isPlatform) {
+        // Tenant users: always scope by tenant
         query = query.eq('tenant_id', tenantId as string);
-      }
+      } else if (tenantId) {
+        // Platform admin with tenant selected: scope by selected tenant
+        query = query.eq('tenant_id', tenantId as string);
+      } // else platform admin without tenant filter: show all
       const { data, error } = await query.order('carrier_name');
 
       if (error) throw error;
@@ -128,7 +161,26 @@ export default function Carriers() {
 
   const handleSuccess = () => {
     setDialogOpen(false);
+    setEditDialogOpen(false);
+    setEditCarrierId(null);
     fetchCarriers();
+  };
+
+  const handleEdit = (id: string) => {
+    setEditCarrierId(id);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteCarrier = async (id: string) => {
+    if (!confirm('Delete this carrier? This action cannot be undone.')) return;
+    try {
+      const { error } = await supabase.from('carriers').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Carrier deleted');
+      fetchCarriers();
+    } catch (e: any) {
+      toast.error('Failed to delete carrier', { description: e.message });
+    }
   };
 
   return (
@@ -171,17 +223,22 @@ export default function Carriers() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Carrier Name</TableHead>
+                    {context.isPlatformAdmin && <TableHead>Tenant</TableHead>}
                     <TableHead>Code</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Rating</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {carriers.map((carrier) => (
                     <TableRow key={carrier.id}>
                       <TableCell className="font-medium">{carrier.carrier_name}</TableCell>
+                      {context.isPlatformAdmin && (
+                        <TableCell>{tenantNameById[carrier.tenant_id] || carrier.tenant_id || '—'}</TableCell>
+                      )}
                       <TableCell>{carrier.carrier_code || 'N/A'}</TableCell>
                       <TableCell>
                         {carrier.carrier_type && (
@@ -212,6 +269,12 @@ export default function Carriers() {
                           {carrier.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(carrier.id)}>Edit</Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteCarrier(carrier.id)}>Delete</Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -219,6 +282,16 @@ export default function Carriers() {
             )}
           </CardContent>
         </Card>
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Carrier</DialogTitle>
+            </DialogHeader>
+            {editCarrierId && (
+              <CarrierForm carrierId={editCarrierId} onSuccess={handleSuccess} />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

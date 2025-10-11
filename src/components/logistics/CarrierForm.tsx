@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -21,17 +22,20 @@ const carrierSchema = z.object({
   website: z.string().url().optional().or(z.literal('')),
   rating: z.string().optional(),
   notes: z.string().optional(),
+  is_active: z.boolean().optional(),
   street: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   country: z.string().optional(),
   postal_code: z.string().optional(),
+  tenant_id: z.string().optional(),
 });
 
 export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSuccess?: () => void }) {
   const { context, supabase } = useCRM();
   const { roles } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tenants, setTenants] = useState<any[]>([]);
 
   const form = useForm<z.infer<typeof carrierSchema>>({
     resolver: zodResolver(carrierSchema),
@@ -43,13 +47,72 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
       contact_phone: '',
       website: '',
       notes: '',
+      is_active: true,
+      tenant_id: context.tenantId || roles?.[0]?.tenant_id || '',
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof carrierSchema>) => {
-    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+  // Load existing carrier in edit mode
+  useEffect(() => {
+    const fetchTenants = async () => {
+      if (!context.isPlatformAdmin) return;
+      try {
+        const { data, error } = await supabase
+          .from('tenants')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        if (error) throw error;
+        setTenants(data || []);
+      } catch (err: any) {
+        console.warn('Failed to fetch tenants:', err?.message || err);
+      }
+    };
+    fetchTenants();
 
-    if (!tenantId) {
+    const loadCarrier = async () => {
+      if (!carrierId) return;
+      try {
+        const { data, error } = await supabase
+          .from('carriers')
+          .select('*')
+          .eq('id', carrierId)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          form.reset({
+            carrier_name: data.carrier_name || '',
+            carrier_code: data.carrier_code || '',
+            carrier_type: (data.carrier_type as any) || undefined,
+            contact_person: data.contact_person || '',
+            contact_email: data.contact_email || '',
+            contact_phone: data.contact_phone || '',
+            website: data.website || '',
+            rating: data.rating != null ? String(data.rating) : '',
+            notes: data.notes || '',
+            is_active: !!data.is_active,
+            street: (data.address as any)?.street || '',
+            city: (data.address as any)?.city || '',
+            state: (data.address as any)?.state || '',
+            country: (data.address as any)?.country || '',
+            postal_code: (data.address as any)?.postal_code || '',
+            tenant_id: data.tenant_id || '',
+          });
+        }
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to load carrier');
+      }
+    };
+    loadCarrier();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carrierId]);
+
+  const onSubmit = async (values: z.infer<typeof carrierSchema>) => {
+    const contextTenantId = context.tenantId || roles?.[0]?.tenant_id;
+    const selectedTenantId = values.tenant_id?.trim() || '';
+
+    // Only require tenant when creating a new carrier
+    if (!carrierId && !context.isPlatformAdmin && !contextTenantId) {
       toast.error('No tenant selected');
       return;
     }
@@ -66,6 +129,7 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
         website: values.website || null,
         rating: values.rating ? parseFloat(values.rating) : null,
         notes: values.notes || null,
+        is_active: values.is_active ?? true,
         address: {
           street: values.street || '',
           city: values.city || '',
@@ -73,18 +137,55 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
           country: values.country || '',
           postal_code: values.postal_code || '',
         },
-        tenant_id: tenantId,
       };
-
-      const { error } = await supabase.from('carriers').insert([carrierData]);
-
-      if (error) throw error;
-
-      toast.success('Carrier created successfully');
-      onSuccess?.();
-      form.reset();
+      if (carrierId) {
+        // Allow platform admins to change tenant association
+        if (context.isPlatformAdmin && selectedTenantId) {
+          carrierData.tenant_id = selectedTenantId;
+        }
+        const { error } = await supabase
+          .from('carriers')
+          .update(carrierData)
+          .eq('id', carrierId);
+        if (error) throw error;
+        toast.success('Carrier updated successfully');
+        onSuccess?.();
+      } else {
+        const effectiveTenantId = context.isPlatformAdmin
+          ? (selectedTenantId || contextTenantId)
+          : contextTenantId;
+        if (!effectiveTenantId) {
+          toast.error('Please select a tenant');
+          setIsSubmitting(false);
+          return;
+        }
+        const { error } = await supabase.from('carriers').insert([{ ...carrierData, tenant_id: effectiveTenantId }]);
+        if (error) throw error;
+        toast.success('Carrier created successfully');
+        onSuccess?.();
+        form.reset();
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create carrier');
+      toast.error(error.message || (carrierId ? 'Failed to update carrier' : 'Failed to create carrier'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!carrierId) return;
+    if (!confirm('Delete this carrier? This action cannot be undone.')) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('carriers')
+        .delete()
+        .eq('id', carrierId);
+      if (error) throw error;
+      toast.success('Carrier deleted');
+      onSuccess?.();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete carrier');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,6 +194,33 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {context.isPlatformAdmin && (
+          <FormField
+            control={form.control}
+            name="tenant_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tenant</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select tenant" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {tenants.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -313,9 +441,32 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Carrier'}
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2">
+                  <FormLabel>Active</FormLabel>
+                  <FormControl>
+                    <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {carrierId && (
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
+                Delete
+              </Button>
+            )}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (carrierId ? 'Saving...' : 'Creating...') : (carrierId ? 'Save Changes' : 'Create Carrier')}
+            </Button>
+          </div>
+        </div>
       </form>
     </Form>
   );
