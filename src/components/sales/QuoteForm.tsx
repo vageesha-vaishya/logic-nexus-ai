@@ -728,9 +728,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
 
       if (tenantId) {
-        const [servicesRes, carriersRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
+        const [servicesRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
           servicesQuery,
-          supabase.from('carriers').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
@@ -739,7 +738,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         ]);
 
         if (servicesRes.error) throw servicesRes.error;
-        if (carriersRes.error) throw carriersRes.error;
         if (consigneesRes.error) throw consigneesRes.error;
         if (portsRes.error) throw portsRes.error;
         if (accountsRes.error) throw accountsRes.error;
@@ -747,12 +745,30 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (opportunitiesRes.error) throw opportunitiesRes.error;
 
         setServices(servicesRes.data || []);
-        setCarriers(carriersRes.data || []);
         setConsignees(consigneesRes.data || []);
         setPorts(portsRes.data || []);
         setAccounts(accountsRes.data || []);
         setContacts(contactsRes.data || []);
         setOpportunities(opportunitiesRes.data || []);
+
+        // Fetch carriers filtered by selected service type via mapping table
+        const currentServiceType = selectedServiceType || form.getValues('service_type');
+        if (currentServiceType) {
+          const carriersRes = await supabase
+            .from('carrier_service_types')
+            .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
+            .eq('tenant_id', tenantId)
+            .eq('service_type', currentServiceType)
+            .eq('is_active', true);
+          if (carriersRes.error) throw carriersRes.error;
+          const mapped = (carriersRes.data || [])
+            .map((row: any) => row.carriers)
+            .filter((c: any) => !!c && c.is_active);
+          setCarriers(mapped);
+        } else {
+          // No service type selected yet; do not show carriers
+          setCarriers([]);
+        }
 
         // Seed resolved tenant from current context
         setResolvedTenantId(tenantId);
@@ -979,6 +995,35 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       console.error('Failed to fetch data:', error);
     }
   };
+
+  // Refetch carriers when service type changes to enforce filtering
+  useEffect(() => {
+    const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
+    if (!tenantId) return;
+    const currentServiceType = selectedServiceType || form.getValues('service_type');
+    if (!currentServiceType) {
+      setCarriers([]);
+      return;
+    }
+    (async () => {
+      const carriersRes = await supabase
+        .from('carrier_service_types')
+        .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
+        .eq('tenant_id', tenantId)
+        .eq('service_type', currentServiceType)
+        .eq('is_active', true);
+      if (carriersRes.error) {
+        console.warn('Failed to fetch carriers by service type:', carriersRes.error);
+        setCarriers([]);
+        return;
+      }
+      const mapped = (carriersRes.data || [])
+        .map((row: any) => row.carriers)
+        .filter((c: any) => !!c && c.is_active);
+      setCarriers(mapped);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedServiceType, resolvedTenantId]);
 
   // Preview next quote number via RPC when context becomes available
   useEffect(() => {
@@ -1850,58 +1895,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             <div className="ef-grid">
               <FormField
                 control={form.control}
-                name="carrier_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Carrier</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select carrier" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {carriers.map((carrier) => (
-                          <SelectItem key={carrier.id} value={String(carrier.id)}>
-                            {carrier.carrier_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="consignee_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Consignee</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select consignee" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {consignees.map((consignee) => (
-                          <SelectItem key={consignee.id} value={String(consignee.id)}>
-                            {consignee.company_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="ef-grid">
-              <FormField
-                control={form.control}
                 name="origin_port_id"
                 render={({ field }) => (
                   <FormItem>
@@ -1941,6 +1934,58 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         {ports.map((port) => (
                           <SelectItem key={port.id} value={String(port.id)}>
                             {port.location_name} ({port.location_code || 'N/A'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="ef-grid">
+              <FormField
+                control={form.control}
+                name="carrier_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Carrier</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select carrier" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {carriers.map((carrier) => (
+                          <SelectItem key={carrier.id} value={String(carrier.id)}>
+                            {carrier.carrier_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="consignee_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Consignee</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select consignee" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {consignees.map((consignee) => (
+                          <SelectItem key={consignee.id} value={String(consignee.id)}>
+                            {consignee.company_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
