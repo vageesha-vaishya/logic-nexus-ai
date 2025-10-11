@@ -393,6 +393,53 @@ export type Database = {
           },
         ]
       }
+      carrier_service_types: {
+        Row: {
+          carrier_id: string
+          code_type: string | null
+          code_value: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_primary: boolean | null
+          service_type: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_id: string
+          code_type?: string | null
+          code_value?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          service_type: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_id?: string
+          code_type?: string | null
+          code_value?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          service_type?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_service_types_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       carriers: {
         Row: {
           address: Json | null
@@ -403,10 +450,14 @@ export type Database = {
           contact_person: string | null
           contact_phone: string | null
           created_at: string | null
+          iata: string | null
           id: string
           is_active: boolean | null
+          mc_dot: string | null
+          mode: string | null
           notes: string | null
           rating: number | null
+          scac: string | null
           service_routes: Json | null
           tenant_id: string
           updated_at: string | null
@@ -421,10 +472,14 @@ export type Database = {
           contact_person?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          iata?: string | null
           id?: string
           is_active?: boolean | null
+          mc_dot?: string | null
+          mode?: string | null
           notes?: string | null
           rating?: number | null
+          scac?: string | null
           service_routes?: Json | null
           tenant_id: string
           updated_at?: string | null
@@ -439,10 +494,14 @@ export type Database = {
           contact_person?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          iata?: string | null
           id?: string
           is_active?: boolean | null
+          mc_dot?: string | null
+          mode?: string | null
           notes?: string | null
           rating?: number | null
+          scac?: string | null
           service_routes?: Json | null
           tenant_id?: string
           updated_at?: string | null
