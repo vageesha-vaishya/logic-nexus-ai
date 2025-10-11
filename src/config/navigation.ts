@@ -70,6 +70,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Package Categories', path: '/dashboard/package-categories', icon: Box, description: 'Container types' },
       { name: 'Package Sizes', path: '/dashboard/package-sizes', icon: Ruler, description: 'Container dimensions' },
       { name: 'Cargo Types', path: '/dashboard/cargo-types', icon: PackageCheck, description: 'Cargo classifications' },
+      { name: 'Cargo Details', path: '/dashboard/cargo-details', icon: Package, description: 'Configure cargo details per service' },
       { name: 'Incoterms', path: '/dashboard/incoterms', icon: Globe, description: 'Trade terms' },
       { name: 'Service Types', path: '/dashboard/service-types', icon: Cog, description: 'Define allowed service type values', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Service Type Mappings', path: '/dashboard/service-type-mappings', icon: GitBranch, description: 'Manage service type mappings', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },

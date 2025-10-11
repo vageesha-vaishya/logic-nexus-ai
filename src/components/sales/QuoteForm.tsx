@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CarrierQuotesSection } from './CarrierQuotesSection';
 import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
@@ -48,6 +49,8 @@ type QuoteItem = {
   quantity: number;
   unit_price: number;
   discount_percent: number;
+  package_category_id?: string;
+  package_size_id?: string;
 };
 
 type Charge = {
@@ -82,6 +85,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [packageCategories, setPackageCategories] = useState<any[]>([]);
+  const [packageSizes, setPackageSizes] = useState<any[]>([]);
   const [resolvedTenantId, setResolvedTenantId] = useState<string | null>(null);
   const [resolvedTenantName, setResolvedTenantName] = useState<string | null>(null);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
@@ -392,7 +397,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Load items; tolerate RLS issues by falling back to empty
         const { data: itemsRes, error: itemsErr } = await supabase
           .from('quote_items')
-          .select('line_number, product_name, description, quantity, unit_price, discount_percent')
+          .select('line_number, product_name, description, quantity, unit_price, discount_percent, package_category_id, package_size_id')
           .eq('quote_id', quoteId)
           .order('line_number', { ascending: true });
         if (!itemsErr && Array.isArray(itemsRes)) {
@@ -404,6 +409,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               quantity: Number(it.quantity) || 0,
               unit_price: Number(it.unit_price) || 0,
               discount_percent: Number(it.discount_percent) || 0,
+              package_category_id: it.package_category_id ? String(it.package_category_id) : undefined,
+              package_size_id: it.package_size_id ? String(it.package_size_id) : undefined,
             }))
           );
         }
@@ -767,13 +774,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
 
       if (tenantId) {
-        const [servicesRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
+        const [servicesRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes, pkgCatsRes, pkgSizesRes] = await Promise.all([
           servicesQuery,
           supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
           supabase.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
           supabase.from('opportunities').select('id, name, account_id, contact_id, tenant_id').eq('tenant_id', tenantId),
+          supabase.from('package_categories').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          supabase.from('package_sizes').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         ]);
 
         if (servicesRes.error) throw servicesRes.error;
@@ -782,6 +791,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (accountsRes.error) throw accountsRes.error;
         if (contactsRes.error) throw contactsRes.error;
         if (opportunitiesRes.error) throw opportunitiesRes.error;
+        if (pkgCatsRes.error) throw pkgCatsRes.error;
+        if (pkgSizesRes.error) throw pkgSizesRes.error;
 
         setServices(servicesRes.data || []);
         setConsignees(consigneesRes.data || []);
@@ -789,6 +800,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         setAccounts(accountsRes.data || []);
         setContacts(contactsRes.data || []);
         setOpportunities(opportunitiesRes.data || []);
+        setPackageCategories(pkgCatsRes.data || []);
+        setPackageSizes(pkgSizesRes.data || []);
 
         // Fetch carriers filtered by selected service type via mapping table
         const currentServiceType = selectedServiceType || form.getValues('service_type');
@@ -875,6 +888,20 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         const { data: globalServices, error: svcErr } = await servicesQuery;
         if (svcErr) throw svcErr;
         setServices(globalServices || []);
+
+        // Attempt to fetch categories and sizes globally if permitted
+        try {
+          const [{ data: cats = [] }, { data: sizes = [] }] = await Promise.all([
+            supabase.from('package_categories').select('*').eq('is_active', true),
+            supabase.from('package_sizes').select('*').eq('is_active', true),
+          ]);
+          setPackageCategories(cats || []);
+          setPackageSizes(sizes || []);
+        } catch (e) {
+          // Non-fatal if RLS blocks global lists
+          setPackageCategories([]);
+          setPackageSizes([]);
+        }
 
         // Initialize defaults for new quotes from global services
         try {
@@ -1663,7 +1690,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           .eq('quote_id', quoteId);
         if (delErr) throw delErr;
       }
-      const { error: itemsError } = await supabase.from('quote_items').insert(itemsData);
+          const { error: itemsError } = await supabase.from('quote_items').insert(itemsData);
 
       if (itemsError) throw itemsError;
 
@@ -1999,7 +2026,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="ef-grid">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <FormField
                 control={form.control}
                 name="origin_port_id"
@@ -2049,9 +2076,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="carrier_id"
@@ -2083,6 +2107,32 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 )}
               />
 
+              {/* Fourth column: Capture Carrier Rates label and button/dialog */}
+              <div className="space-y-2">
+                <FormLabel>Capture Carrier Rates</FormLabel>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full md:w-auto">
+                      Carrier Rates
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Carrier Rates</DialogTitle>
+                    </DialogHeader>
+                    <CarrierQuotesSection
+                      carriers={carriers}
+                      selectedServiceType={selectedServiceType}
+                      carrierQuotes={carrierQuotes}
+                      setCarrierQuotes={setCarrierQuotes}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+            </div>
+
+            <div className="ef-grid">
               <FormField
                 control={form.control}
                 name="consignee_id"
@@ -2168,13 +2218,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           </CardContent>
         </Card>
 
-        {/* Carrier quotations section */}
-        <CarrierQuotesSection
-          carriers={carriers}
-          selectedServiceType={selectedServiceType}
-          carrierQuotes={carrierQuotes}
-          setCarrierQuotes={setCarrierQuotes}
-        />
+        {/* Carrier quotations moved into dialog opened by the Carrier Rates button above */}
 
         <div className="ef-divider" />
         <Card className="ef-card">
@@ -2220,6 +2264,50 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     value={item.quantity}
                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                   />
+                  {selectedServiceType === 'ocean' && (
+                    <>
+                      <div>
+                        <FormLabel>Container Category</FormLabel>
+                        <Select
+                          value={item.package_category_id || ''}
+                          onValueChange={(v) => updateItem(index, 'package_category_id', v)}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {packageCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={String(cat.id)}>
+                                {cat.category_name || cat.name || 'Category'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <FormLabel>Container Size</FormLabel>
+                        <Select
+                          value={item.package_size_id || ''}
+                          onValueChange={(v) => updateItem(index, 'package_size_id', v)}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select size" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {packageSizes.map((sz) => (
+                              <SelectItem key={sz.id} value={String(sz.id)}>
+                                {(sz.size_name || sz.name) + (sz.size_code ? ` (${sz.size_code})` : '')}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                   <Input
                     type="number"
                     step="0.01"

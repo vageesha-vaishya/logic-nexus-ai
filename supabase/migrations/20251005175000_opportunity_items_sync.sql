@@ -23,9 +23,19 @@ ALTER TABLE public.opportunity_items ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_opportunity_items_opportunity_id ON public.opportunity_items(opportunity_id);
 
 -- Minimal RLS policies aligned with quotes access
-CREATE POLICY IF NOT EXISTS "Platform admins manage all opportunity items"
-  ON public.opportunity_items FOR ALL
-  USING (is_platform_admin(auth.uid()));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'opportunity_items'
+      AND policyname = 'Platform admins manage all opportunity items'
+  ) THEN
+    CREATE POLICY "Platform admins manage all opportunity items"
+      ON public.opportunity_items FOR ALL
+      USING (is_platform_admin(auth.uid()));
+  END IF;
+END$$;
 
 -- Function: sync opportunity_items from a primary quote's items
 CREATE OR REPLACE FUNCTION public.sync_opportunity_items_from_quote(p_quote_id UUID)
@@ -59,11 +69,49 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Extend quote_items triggers to also run syncing after recalculation
-CREATE OR REPLACE FUNCTION public.recalculate_and_sync_quote(p_quote_id UUID)
-RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.recalculate_and_sync_quote_trigger()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_quote_id UUID;
+  v_total NUMERIC;
 BEGIN
-  PERFORM public.recalculate_quote_total(p_quote_id);
-  PERFORM public.sync_opportunity_items_from_quote(p_quote_id);
+  IF TG_OP = 'DELETE' THEN
+    v_quote_id := OLD.quote_id;
+  ELSE
+    v_quote_id := NEW.quote_id;
+  END IF;
+
+  -- Recalculate quote total (supports both schemas of quote_items)
+  SELECT COALESCE(SUM(COALESCE(qi.line_total, qi.total, 0)), 0)
+    INTO v_total
+  FROM public.quote_items qi
+  WHERE qi.quote_id = v_quote_id;
+
+  -- Always update total_amount
+  UPDATE public.quotes q
+    SET total_amount = v_total,
+        updated_at = now()
+  WHERE q.id = v_quote_id;
+
+  -- Conditionally update total if the column exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'quotes' AND column_name = 'total'
+  ) THEN
+    UPDATE public.quotes q
+      SET total = v_total,
+          updated_at = now()
+    WHERE q.id = v_quote_id;
+  END IF;
+
+  -- Sync opportunity items from the quote
+  PERFORM public.sync_opportunity_items_from_quote(v_quote_id);
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -71,18 +119,18 @@ DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_ins ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_ins
   AFTER INSERT ON public.quote_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.recalculate_and_sync_quote(NEW.quote_id);
+  EXECUTE FUNCTION public.recalculate_and_sync_quote_trigger();
 
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_upd ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_upd
   AFTER UPDATE ON public.quote_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.recalculate_and_sync_quote(NEW.quote_id);
+  EXECUTE FUNCTION public.recalculate_and_sync_quote_trigger();
 
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_del ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_del
   AFTER DELETE ON public.quote_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.recalculate_and_sync_quote(OLD.quote_id);
+  EXECUTE FUNCTION public.recalculate_and_sync_quote_trigger();
 
 COMMIT;

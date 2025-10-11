@@ -22,7 +22,7 @@ CREATE TABLE public.carriers (
 ALTER TABLE public.carriers ENABLE ROW LEVEL SECURITY;
 
 -- Services
-CREATE TABLE public.services (
+CREATE TABLE IF NOT EXISTS public.services (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   franchise_id uuid,
@@ -85,7 +85,7 @@ CREATE TABLE public.rate_components (
 ALTER TABLE public.rate_components ENABLE ROW LEVEL SECURITY;
 
 -- Quotes
-CREATE TABLE public.quotes (
+CREATE TABLE IF NOT EXISTS public.quotes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   franchise_id uuid,
@@ -100,11 +100,18 @@ CREATE TABLE public.quotes (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-CREATE INDEX quotes_customer_idx ON public.quotes (customer_id);
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'quotes' AND column_name = 'customer_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS quotes_customer_idx ON public.quotes (customer_id);
+  END IF;
+END $$;
 ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
 
 -- Quote Items
-CREATE TABLE public.quote_items (
+CREATE TABLE IF NOT EXISTS public.quote_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   quote_id uuid NOT NULL REFERENCES public.quotes(id) ON DELETE CASCADE,
@@ -152,7 +159,7 @@ CREATE INDEX quote_events_quote_idx ON public.quote_events (quote_id);
 ALTER TABLE public.quote_events ENABLE ROW LEVEL SECURITY;
 
 -- Compliance Checks
-CREATE TABLE public.compliance_checks (
+CREATE TABLE IF NOT EXISTS public.compliance_checks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   quote_id uuid NOT NULL REFERENCES public.quotes(id) ON DELETE CASCADE,

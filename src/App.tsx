@@ -72,6 +72,7 @@ import PortsLocations from "./pages/dashboard/PortsLocations";
 import PackageCategories from "./pages/dashboard/PackageCategories";
 import PackageSizes from "./pages/dashboard/PackageSizes";
 import CargoTypes from "./pages/dashboard/CargoTypes";
+import CargoDetails from "./pages/dashboard/CargoDetails";
 import Incoterms from "./pages/dashboard/Incoterms";
 import UIDemoForms from "./pages/dashboard/UIDemoForms";
 import UIDemoAdvanced from "./pages/dashboard/UIDemoAdvanced";
@@ -452,9 +453,10 @@ const App = () => (
             <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
             <Route path="/dashboard/ports-locations" element={<ProtectedRoute><PortsLocations /></ProtectedRoute>} />
             <Route path="/dashboard/package-categories" element={<ProtectedRoute><PackageCategories /></ProtectedRoute>} />
-            <Route path="/dashboard/package-sizes" element={<ProtectedRoute><PackageSizes /></ProtectedRoute>} />
-            <Route path="/dashboard/cargo-types" element={<ProtectedRoute><CargoTypes /></ProtectedRoute>} />
-             <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
+             <Route path="/dashboard/package-sizes" element={<ProtectedRoute><PackageSizes /></ProtectedRoute>} />
+             <Route path="/dashboard/cargo-types" element={<ProtectedRoute><CargoTypes /></ProtectedRoute>} />
+             <Route path="/dashboard/cargo-details" element={<ProtectedRoute><CargoDetails /></ProtectedRoute>} />
+              <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
              <Route path="/dashboard/service-types" element={<ProtectedRoute><ServiceTypes /></ProtectedRoute>} />
              <Route path="/dashboard/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
              <Route path="/dashboard/service-type-mappings" element={<ProtectedRoute><ServiceTypeMappings /></ProtectedRoute>} />

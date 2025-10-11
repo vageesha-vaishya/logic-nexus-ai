@@ -11,10 +11,6 @@ RETURNS TABLE (
   references_table text,
   references_column text
 )
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   WITH cols AS (
     SELECT 
@@ -76,4 +72,4 @@ AS $$
     ON fk.table_name = cols.table_name 
     AND fk.column_name = cols.column_name
   ORDER BY cols.table_name, cols.column_name;
-$$;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;

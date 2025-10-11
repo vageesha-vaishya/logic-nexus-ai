@@ -5,13 +5,23 @@
 BEGIN;
 
 -- INSERT policy: Tenant admins can create subscriptions for their own tenant
-CREATE POLICY IF NOT EXISTS "Tenant admins can create own subscriptions"
-  ON public.tenant_subscriptions
-  FOR INSERT
-  WITH CHECK (
-    public.has_role(auth.uid(), 'tenant_admin'::app_role)
-    AND tenant_id = public.get_user_tenant_id(auth.uid())
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'tenant_subscriptions'
+      AND policyname = 'Tenant admins can create own subscriptions'
+  ) THEN
+    CREATE POLICY "Tenant admins can create own subscriptions"
+      ON public.tenant_subscriptions
+      FOR INSERT
+      WITH CHECK (
+        public.has_role(auth.uid(), 'tenant_admin'::app_role)
+        AND tenant_id = public.get_user_tenant_id(auth.uid())
+      );
+  END IF;
+END$$;
 
 -- Seed Starter plan if it does not already exist
 INSERT INTO public.subscription_plans (

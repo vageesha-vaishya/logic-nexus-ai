@@ -11,10 +11,6 @@ RETURNS TABLE (
   security_definer boolean,
   description text
 )
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   SELECT
     p.proname::text AS name,
@@ -42,4 +38,4 @@ AS $$
   JOIN pg_language l ON l.oid = p.prolang
   WHERE n.nspname = 'public'
   ORDER BY n.nspname, p.proname;
-$$;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;

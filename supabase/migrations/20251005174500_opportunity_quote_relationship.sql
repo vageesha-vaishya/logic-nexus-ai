@@ -71,8 +71,6 @@ DECLARE
   v_total NUMERIC;
   v_other_primary UUID;
 BEGIN
-  -- Determine total field (supports both total_amount and total columns)
-  v_total := COALESCE(NEW.total_amount, NEW.total, 0);
 
   IF NEW.opportunity_id IS NULL THEN
     RETURN NEW;
@@ -90,12 +88,18 @@ BEGIN
 
       UPDATE public.opportunities o
         SET primary_quote_id = v_other_primary,
-            amount = COALESCE((SELECT COALESCE(q.total_amount, q.total, 0) FROM public.quotes q WHERE q.id = v_other_primary), 0),
+            amount = COALESCE((SELECT q.total_amount FROM public.quotes q WHERE q.id = v_other_primary), 0),
             updated_at = now()
       WHERE o.id = OLD.opportunity_id;
     END IF;
     RETURN OLD;
   END IF;
+
+  -- Determine total from quotes table to avoid referencing absent columns
+  SELECT COALESCE(q.total_amount, 0)
+    INTO v_total
+  FROM public.quotes q
+  WHERE q.id = NEW.id;
 
   -- INSERT/UPDATE path
   IF NEW.is_primary IS TRUE THEN
@@ -116,7 +120,7 @@ BEGIN
 
       UPDATE public.opportunities o
         SET primary_quote_id = v_other_primary,
-            amount = COALESCE((SELECT COALESCE(q.total_amount, q.total, 0) FROM public.quotes q WHERE q.id = v_other_primary), 0),
+            amount = COALESCE((SELECT q.total_amount FROM public.quotes q WHERE q.id = v_other_primary), 0),
             updated_at = now()
       WHERE o.id = NEW.opportunity_id;
     END IF;
@@ -136,27 +140,51 @@ CREATE TRIGGER trg_quotes_ensure_single_primary
 -- Trigger: sync opportunity amount and primary quote on insert/update/delete
 DROP TRIGGER IF EXISTS trg_quotes_sync_opportunity ON public.quotes;
 CREATE TRIGGER trg_quotes_sync_opportunity
-  AFTER INSERT OR UPDATE OF is_primary, total_amount, total, opportunity_id ON public.quotes
+  AFTER INSERT OR UPDATE ON public.quotes
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_opportunity_from_primary_quote();
 
 -- Recalculate quote totals when items change and cascade to opportunity via above trigger
-CREATE OR REPLACE FUNCTION public.recalculate_quote_total(p_quote_id UUID)
-RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION public.recalculate_quote_total_trigger()
+RETURNS TRIGGER AS $$
 DECLARE
   v_total NUMERIC;
+  v_quote_id UUID;
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    v_quote_id := OLD.quote_id;
+  ELSE
+    v_quote_id := NEW.quote_id;
+  END IF;
+
   -- Supports both schemas of quote_items
   SELECT COALESCE(SUM(COALESCE(qi.line_total, qi.total, 0)), 0)
     INTO v_total
   FROM public.quote_items qi
-  WHERE qi.quote_id = p_quote_id;
+  WHERE qi.quote_id = v_quote_id;
 
+  -- Always update total_amount
   UPDATE public.quotes q
     SET total_amount = v_total,
-        total = v_total,
         updated_at = now()
-  WHERE q.id = p_quote_id;
+  WHERE q.id = v_quote_id;
+
+  -- Conditionally update total if the column exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'quotes' AND column_name = 'total'
+  ) THEN
+    UPDATE public.quotes q
+      SET total = v_total,
+          updated_at = now()
+    WHERE q.id = v_quote_id;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -165,18 +193,18 @@ DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_ins ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_ins
   AFTER INSERT ON public.quote_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.recalculate_quote_total(NEW.quote_id);
+  EXECUTE FUNCTION public.recalculate_quote_total_trigger();
 
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_upd ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_upd
   AFTER UPDATE ON public.quote_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.recalculate_quote_total(NEW.quote_id);
+  EXECUTE FUNCTION public.recalculate_quote_total_trigger();
 
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_del ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_del
   AFTER DELETE ON public.quote_items
   FOR EACH ROW
-  EXECUTE FUNCTION public.recalculate_quote_total(OLD.quote_id);
+  EXECUTE FUNCTION public.recalculate_quote_total_trigger();
 
 COMMIT;

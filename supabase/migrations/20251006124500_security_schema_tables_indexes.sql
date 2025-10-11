@@ -9,10 +9,6 @@ RETURNS TABLE (
   index_count integer,
   row_estimate bigint
 )
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   WITH cols AS (
     SELECT table_name, COUNT(*) AS column_count
@@ -47,7 +43,7 @@ AS $$
   LEFT JOIN pol ON pol.table_name = c.relname
   WHERE n.nspname = 'public' AND c.relkind IN ('r','v')
   ORDER BY c.relname;
-$$;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- Function: List constraints across public tables (PK, FK, UNIQUE, CHECK)
 CREATE OR REPLACE FUNCTION public.get_table_constraints()
@@ -57,10 +53,6 @@ RETURNS TABLE (
   constraint_type text,
   constraint_details text
 )
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   WITH tc AS (
     SELECT * FROM information_schema.table_constraints
@@ -133,7 +125,7 @@ AS $$
   UNION ALL
   SELECT * FROM ck
   ORDER BY table_name, constraint_name;
-$$;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- Function: List indexes across public tables
 CREATE OR REPLACE FUNCTION public.get_table_indexes()
@@ -144,10 +136,6 @@ RETURNS TABLE (
   index_columns text,
   index_definition text
 )
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   SELECT 
     t.relname::text AS table_name,
@@ -163,4 +151,4 @@ AS $$
   WHERE n.nspname = 'public'
   GROUP BY t.relname, i.relname, ix.indisunique, ix.indexrelid
   ORDER BY t.relname, i.relname;
-$$;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;

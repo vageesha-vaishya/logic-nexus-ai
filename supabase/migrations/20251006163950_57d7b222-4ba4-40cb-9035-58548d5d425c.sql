@@ -11,10 +11,6 @@ RETURNS TABLE (
   references_table text,
   references_column text
 )
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   SELECT 
     c.table_name::text,
@@ -43,7 +39,7 @@ AS $$
   WHERE c.table_schema = 'public'
     AND c.table_name NOT IN ('spatial_ref_sys')
   ORDER BY c.table_name, c.ordinal_position;
-$$;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- Create function to get database tables overview
 CREATE OR REPLACE FUNCTION public.get_database_tables()
