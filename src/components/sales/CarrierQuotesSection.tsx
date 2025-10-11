@@ -164,11 +164,21 @@ export function CarrierQuotesSection({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {carriers.map((carrier) => (
-                        <SelectItem key={carrier.id} value={carrier.id}>
-                          {carrier.carrier_name}
-                        </SelectItem>
-                      ))}
+                      {carriers
+                        .reduce((acc: Record<string, any>, c: any) => {
+                          acc[String(c.id)] = c;
+                          return acc;
+                        }, {})
+                        && Object.values(
+                          carriers.reduce((acc: Record<string, any>, c: any) => {
+                            acc[String(c.id)] = c;
+                            return acc;
+                          }, {}),
+                        ).map((carrier: any) => (
+                          <SelectItem key={carrier.id} value={String(carrier.id)}>
+                            {String(carrier.carrier_name || '').trim()}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

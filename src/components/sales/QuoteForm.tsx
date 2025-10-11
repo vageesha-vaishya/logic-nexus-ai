@@ -92,7 +92,22 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [resolvedContactLabels, setResolvedContactLabels] = useState<Record<string, string>>({});
   // Resolved labels for services that are not directly visible due to tenant scope/RLS
   const [resolvedServiceLabels, setResolvedServiceLabels] = useState<Record<string, string>>({});
+  // Resolved labels for carriers not yet in the dropdown list
+  const [resolvedCarrierLabels, setResolvedCarrierLabels] = useState<Record<string, string>>({});
   
+  // Format carrier name defensively to avoid accidental repeated text in UI (e.g., "ABCABC")
+  const formatCarrierName = (name: string) => {
+    if (!name) return name;
+    const trimmed = String(name).trim();
+    const len = trimmed.length;
+    if (len % 2 === 0) {
+      const half = len / 2;
+      const first = trimmed.slice(0, half);
+      const second = trimmed.slice(half);
+      if (first === second) return first;
+    }
+    return trimmed;
+  };
 
   const form = useForm<z.infer<typeof quoteSchema>>({
     resolver: zodResolver(quoteSchema),
@@ -122,6 +137,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   // Watch selected account to enable contact filtering
   const accountId = form.watch('account_id');
+  // Watch selected carrier to ensure its label is available immediately
+  const carrierId = form.watch('carrier_id');
 
   useEffect(() => {
     if (context.tenantId || roles?.[0]?.tenant_id) {
@@ -474,7 +491,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               .select('id, carrier_name')
               .eq('id', selCarrierId)
               .maybeSingle();
-            if (data) setCarriers((prev) => [data, ...prev]);
+            if (data) {
+              setResolvedCarrierLabels((prev) => ({
+                ...prev,
+                [String(data.id)]: data.carrier_name || 'Selected Carrier',
+              }));
+              setCarriers((prev) => [data, ...prev]);
+            }
           }
 
           const selConsigneeId = (quote as any).consignee_id;
@@ -1062,6 +1085,35 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedServiceType, resolvedTenantId]);
+
+  // Ensure selected carrier appears promptly even before service-type filtered list loads
+  useEffect(() => {
+    const id = carrierId;
+    if (!id) return;
+    if (carriers.some((c: any) => String(c.id) === String(id))) return;
+    (async () => {
+      try {
+        const { data: selCarrier } = await supabase
+          .from('carriers')
+          .select('id, carrier_name, is_active')
+          .eq('id', id)
+          .maybeSingle();
+        if (selCarrier) {
+          setResolvedCarrierLabels((prev) => ({
+            ...prev,
+            [String(selCarrier.id)]: selCarrier.carrier_name || 'Selected Carrier',
+          }));
+          const byId: Record<string, any> = {};
+          for (const c of carriers) byId[String(c.id)] = c;
+          byId[String(selCarrier.id)] = selCarrier;
+          setCarriers(Object.values(byId));
+        }
+      } catch (e) {
+        // Silent; fallback label will still render
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carrierId]);
 
   // Preview next quote number via RPC when context becomes available
   useEffect(() => {
@@ -1996,9 +2048,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {/* Ensure currently selected carrier appears even if list is filtered out or still loading */}
+                        {field.value && !carriers.some((c: any) => String(c.id) === String(field.value)) && (
+                          <SelectItem key={`selected-carrier-${field.value}`} value={String(field.value)}>
+                            {formatCarrierName(resolvedCarrierLabels[String(field.value)] || 'Selected Carrier')}
+                          </SelectItem>
+                        )}
                         {carriers.map((carrier) => (
                           <SelectItem key={carrier.id} value={String(carrier.id)}>
-                            {carrier.carrier_name}
+                            {formatCarrierName(carrier.carrier_name)}
                           </SelectItem>
                         ))}
                       </SelectContent>
