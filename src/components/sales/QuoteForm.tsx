@@ -200,6 +200,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (quoteErr) throw quoteErr;
         if (!quote) return;
 
+        // Ensure tenant is resolved early from the quote itself (important when no account is selected)
+        try {
+          const qTenantId = (quote as any)?.tenant_id;
+          if (qTenantId) {
+            setResolvedTenantId(String(qTenantId));
+          }
+        } catch {}
+
         // CRITICAL: Hydrate dropdown lists BEFORE setting form values
         // This ensures Select components recognize the values as valid options
         const selOppId = (quote as any).opportunity_id ? String((quote as any).opportunity_id) : undefined;
@@ -704,78 +712,132 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   const fetchData = async () => {
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
-    if (!tenantId) return;
+    // If no tenant is resolved, still allow platform admins to load global services
+    if (!tenantId && !context.isPlatformAdmin) return;
 
     try {
-      const [servicesRes, carriersRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
-        supabase.from('services').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-        supabase.from('carriers').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-        supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-        supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-        supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
-        supabase.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
-        supabase.from('opportunities').select('id, name, account_id, contact_id, tenant_id').eq('tenant_id', tenantId),
-      ]);
+      // Local lists used later in this function regardless of branch
+      let accountsList: any[] = [];
+      let contactsList: any[] = [];
+      let opportunitiesList: any[] = [];
 
-      if (servicesRes.error) throw servicesRes.error;
-      if (carriersRes.error) throw carriersRes.error;
-      if (consigneesRes.error) throw consigneesRes.error;
-      if (portsRes.error) throw portsRes.error;
-      if (accountsRes.error) throw accountsRes.error;
-      if (contactsRes.error) throw contactsRes.error;
-      if (opportunitiesRes.error) throw opportunitiesRes.error;
+      // Build services query with fallback for platform admins when tenant is not resolved
+      let servicesQuery: any = supabase.from('services').select('*').eq('is_active', true);
+      if (tenantId) {
+        servicesQuery = servicesQuery.eq('tenant_id', tenantId);
+      }
 
-      setServices(servicesRes.data || []);
-      setCarriers(carriersRes.data || []);
-      setConsignees(consigneesRes.data || []);
-      setPorts(portsRes.data || []);
-      setAccounts(accountsRes.data || []);
-      setContacts(contactsRes.data || []);
-      setOpportunities(opportunitiesRes.data || []);
+      if (tenantId) {
+        const [servicesRes, carriersRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
+          servicesQuery,
+          supabase.from('carriers').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
+          supabase.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
+          supabase.from('opportunities').select('id, name, account_id, contact_id, tenant_id').eq('tenant_id', tenantId),
+        ]);
 
-      // Seed resolved tenant from current context
-      setResolvedTenantId(tenantId);
+        if (servicesRes.error) throw servicesRes.error;
+        if (carriersRes.error) throw carriersRes.error;
+        if (consigneesRes.error) throw consigneesRes.error;
+        if (portsRes.error) throw portsRes.error;
+        if (accountsRes.error) throw accountsRes.error;
+        if (contactsRes.error) throw contactsRes.error;
+        if (opportunitiesRes.error) throw opportunitiesRes.error;
 
-      // Initialize default Service Type and Service for new quotes
-      try {
-        if (!isEditMode) {
-          const currentServiceType = form.getValues('service_type') as (
-            'ocean' | 'air' | 'trucking' | 'courier' | 'moving' | 'railway_transport'
-          ) | undefined;
-          const hasServices = Array.isArray(servicesRes.data) && servicesRes.data.length > 0;
-          if (!currentServiceType && hasServices) {
-            // Prefer 'ocean' if available, otherwise first available type
-            const oceanService = servicesRes.data.find((s: any) => s.service_type === 'ocean');
-            const rawType: string = oceanService?.service_type ?? servicesRes.data[0].service_type;
-            const allowedTypes = ['ocean','air','trucking','courier','moving','railway_transport'] as const;
-            type ServiceType = typeof allowedTypes[number];
-            const defaultType: ServiceType = allowedTypes.find((t) => t === rawType) ?? 'ocean';
-            form.setValue('service_type', defaultType, { shouldDirty: true });
-            setSelectedServiceType(defaultType);
+        setServices(servicesRes.data || []);
+        setCarriers(carriersRes.data || []);
+        setConsignees(consigneesRes.data || []);
+        setPorts(portsRes.data || []);
+        setAccounts(accountsRes.data || []);
+        setContacts(contactsRes.data || []);
+        setOpportunities(opportunitiesRes.data || []);
 
-            const defaultService = servicesRes.data.find((s: any) => s.service_type === defaultType);
-            if (defaultService) {
-              form.setValue('service_id', String(defaultService.id), { shouldDirty: true });
-            }
-          } else if (currentServiceType && hasServices) {
-            // Keep state in sync if form already has a value (e.g. restored state)
-            setSelectedServiceType(currentServiceType);
-            const currentServiceId = form.getValues('service_id');
-            if (!currentServiceId) {
-              const def = servicesRes.data.find((s: any) => s.service_type === currentServiceType);
-              if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+        // Seed resolved tenant from current context
+        setResolvedTenantId(tenantId);
+
+        // Capture local lists for use below
+        accountsList = Array.isArray(accountsRes.data) ? accountsRes.data : [];
+        contactsList = Array.isArray(contactsRes.data) ? contactsRes.data : [];
+        opportunitiesList = Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : [];
+
+        // Initialize default Service Type and Service for new quotes
+        try {
+          if (!isEditMode) {
+            const currentServiceType = form.getValues('service_type') as (
+              'ocean' | 'air' | 'trucking' | 'courier' | 'moving' | 'railway_transport'
+            ) | undefined;
+            const hasServices = Array.isArray(servicesRes.data) && servicesRes.data.length > 0;
+            if (!currentServiceType && hasServices) {
+              // Prefer 'ocean' if available, otherwise first available type
+              const oceanService = servicesRes.data.find((s: any) => s.service_type === 'ocean');
+              const rawType: string = oceanService?.service_type ?? servicesRes.data[0].service_type;
+              const allowedTypes = ['ocean','air','trucking','courier','moving','railway_transport'] as const;
+              type ServiceType = typeof allowedTypes[number];
+              const defaultType: ServiceType = allowedTypes.find((t) => t === rawType) ?? 'ocean';
+              form.setValue('service_type', defaultType, { shouldDirty: true });
+              setSelectedServiceType(defaultType);
+
+              const defaultService = servicesRes.data.find((s: any) => s.service_type === defaultType);
+              if (defaultService) {
+                form.setValue('service_id', String(defaultService.id), { shouldDirty: true });
+              }
+            } else if (currentServiceType && hasServices) {
+              // Keep state in sync if form already has a value (e.g. restored state)
+              setSelectedServiceType(currentServiceType);
+              const currentServiceId = form.getValues('service_id');
+              if (!currentServiceId) {
+                const def = servicesRes.data.find((s: any) => s.service_type === currentServiceType);
+                if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+              }
             }
           }
-        }
-      } catch (e) {
+        } catch (e) {
         console.warn('Failed to initialize default service selections:', e);
+        }
+      } else {
+        // Platform admin path without tenant: fetch services globally (respecting RLS)
+        const { data: globalServices, error: svcErr } = await servicesQuery;
+        if (svcErr) throw svcErr;
+        setServices(globalServices || []);
+
+        // Initialize defaults for new quotes from global services
+        try {
+          if (!isEditMode) {
+            const currentServiceType = form.getValues('service_type') as (
+              'ocean' | 'air' | 'trucking' | 'courier' | 'moving' | 'railway_transport'
+            ) | undefined;
+            const hasServices = Array.isArray(globalServices) && globalServices.length > 0;
+            if (!currentServiceType && hasServices) {
+              const oceanService = globalServices.find((s: any) => canonicalType(s.service_type) === 'ocean');
+              const rawType: string = oceanService?.service_type ?? globalServices[0].service_type;
+              const allowedTypes = ['ocean','air','trucking','courier','moving','railway_transport'] as const;
+              type ServiceType = typeof allowedTypes[number];
+              const defaultType: ServiceType = allowedTypes.find((t) => t === canonicalType(rawType)) ?? 'ocean';
+              form.setValue('service_type', defaultType, { shouldDirty: true });
+              setSelectedServiceType(defaultType);
+              const def = globalServices.find((s: any) => canonicalType(s.service_type) === defaultType);
+              if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+            } else if (currentServiceType && hasServices) {
+              setSelectedServiceType(currentServiceType);
+              const currentServiceId = form.getValues('service_id');
+              if (!currentServiceId) {
+                const def = globalServices.find((s: any) => canonicalType(s.service_type) === canonicalType(currentServiceType));
+                if (def) form.setValue('service_id', String(def.id), { shouldDirty: true });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to initialize default service selections (platform admin):', e);
+        }
       }
 
       // If an opportunity is preselected (e.g. via URL), auto-fill account/contact
       try {
         const preselectedOppId = form.getValues('opportunity_id');
         if (preselectedOppId) {
-          const opp = (opportunitiesRes.data || []).find((o: any) => String(o.id) === String(preselectedOppId));
+          const opp = opportunitiesList.find((o: any) => String(o.id) === String(preselectedOppId));
           if (opp) {
             if (opp.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
             if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
@@ -786,7 +848,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Ensure currently selected CRM IDs appear in dropdowns even if tenant lists exclude them
       try {
         const curAccountId = form.getValues('account_id');
-        const accountsList = Array.isArray(accountsRes.data) ? accountsRes.data : [];
         if (curAccountId && !accountsList.some((a: any) => String(a.id) === String(curAccountId))) {
           const { data } = await supabase
             .from('accounts')
@@ -821,7 +882,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }
 
         const curContactId = form.getValues('contact_id');
-        const contactsList = Array.isArray(contactsRes.data) ? contactsRes.data : [];
         if (curContactId && !contactsList.some((c: any) => String(c.id) === String(curContactId))) {
           const { data } = await supabase
             .from('contacts')
@@ -876,7 +936,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }
 
         const curOppId = form.getValues('opportunity_id');
-        const opportunitiesList = Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : [];
         if (curOppId && !opportunitiesList.some((o: any) => String(o.id) === String(curOppId))) {
           const { data } = await supabase
             .from('opportunities')
@@ -1529,7 +1588,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             </div>
             <div className="ef-divider" />
             {/* Quotation, Opportunity, Account, Contact section */}
-            <section aria-labelledby="quote-identifiers">
+            <section aria-labelledby="quote-identifiers" className="border border-border rounded-md p-3">
               <h3 id="quote-identifiers" className="sr-only">Quotation, Opportunity, Account, Contact</h3>
               <div className="ef-grid">
                 {/* Quotation Number */}
@@ -1729,7 +1788,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <FormLabel>Service</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
-                        <SelectTrigger className="w-full" disabled={!selectedServiceType}>
+                        <SelectTrigger className="w-full" disabled={!selectedServiceType && !isEditMode}>
                           <SelectValue placeholder="Select service" />
                         </SelectTrigger>
                       </FormControl>
