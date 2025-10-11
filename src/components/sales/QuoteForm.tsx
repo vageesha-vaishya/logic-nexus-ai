@@ -1041,7 +1041,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   // Refetch carriers when service type changes to enforce filtering
   useEffect(() => {
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
-    if (!tenantId) return;
+    // Skip during initial hydration to preserve manually-added carriers from edit mode
+    if (!tenantId || isHydrating) return;
     const currentServiceType = selectedServiceType || form.getValues('service_type');
     if (!currentServiceType) {
       setCarriers([]);
@@ -1084,7 +1085,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       setCarriers(mapped);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedServiceType, resolvedTenantId]);
+  }, [selectedServiceType, resolvedTenantId, isHydrating]);
 
   // Ensure selected carrier appears promptly even before service-type filtered list loads
   useEffect(() => {
