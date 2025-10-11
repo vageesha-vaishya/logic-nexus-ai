@@ -2045,7 +2045,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select carrier" />
+                          {/* Always show a deterministic label even if the option isn't mounted yet */}
+                          <span className="truncate">
+                            {field.value
+                              ? formatCarrierName(
+                                  (carriers.find((c: any) => String(c.id) === String(field.value))?.carrier_name) ||
+                                    resolvedCarrierLabels[String(field.value)] ||
+                                    ''
+                                ) || 'Select carrier'
+                              : 'Select carrier'}
+                          </span>
+                          {/* Keep SelectValue for accessibility and Radix internal state */}
+                          <SelectValue className="sr-only" placeholder="Select carrier" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
