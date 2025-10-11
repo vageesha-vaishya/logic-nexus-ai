@@ -14,6 +14,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { useCRM } from '@/hooks/useCRM';
 import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -245,6 +246,45 @@ export default function Activities() {
     canNext,
   } = usePagination(sortedActivities, { initialPageSize: 20 });
 
+  const downloadCSV = () => {
+    const header = ['Subject','Type','Status','Priority','Due Date'];
+    const rows = pagedActivities.map(a => [
+      JSON.stringify(a.subject ?? ''),
+      a.activity_type ?? '',
+      a.status ?? '',
+      a.priority ?? '',
+      a.due_date ? new Date(a.due_date).toLocaleString() : ''
+    ]);
+    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'activities.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPDF = () => {
+    // Basic print of current page content
+    window.print();
+  };
+
+  // Register sticky actions from within the layout subtree to ensure provider ancestry
+  const StickyActionsRegister = ({ items }: { items: Activity[] }) => {
+    const { setActions, clearActions } = useStickyActions();
+    useEffect(() => {
+      setActions({
+        right: [
+          (<Button key="export" variant="outline" onClick={downloadCSV}>Export</Button>),
+          (<Button key="export-pdf" variant="outline" onClick={downloadPDF}>Export.PDF</Button>),
+        ],
+      });
+      return () => clearActions();
+    }, [items]);
+    return null;
+  };
+
   const getTabCounts = () => {
     const now = startOfDay(new Date());
     return {
@@ -300,6 +340,7 @@ export default function Activities() {
 
   return (
     <DashboardLayout>
+      <StickyActionsRegister items={pagedActivities} />
       <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import OpportunitySelectDialogList from '@/components/crm/OpportunitySelectDialogList';
 import AccountSelectDialogList from '@/components/crm/AccountSelectDialogList';
 import ContactSelectDialogList from '@/components/crm/ContactSelectDialogList';
+import { useStickyActions } from '@/components/layout/StickyActionsContext';
 
 const quoteSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -67,6 +68,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const { context, supabase, user } = useCRM();
   const { roles } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const isEditMode = !!quoteId;
   const [items, setItems] = useState<QuoteItem[]>([
     { line_number: 1, product_name: '', quantity: 1, unit_price: 0, discount_percent: 0 },
@@ -992,6 +994,164 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     setItems(newItems);
   };
 
+  // ===== Import/Export helpers =====
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const parseCSV = (text: string): QuoteItem[] => {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length === 0) return [];
+    const parseLine = (line: string) => {
+      const result: string[] = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          // Toggle quotes or escape
+          if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(cur.trim()); cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    };
+    const headers = parseLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'));
+    const idx = (name: string, aliases: string[]) => {
+      const names = [name, ...aliases];
+      for (const n of names) {
+        const pos = headers.indexOf(n);
+        if (pos !== -1) return pos;
+      }
+      return -1;
+    };
+    const iLine = idx('line_number', ['line', 'no']);
+    const iProd = idx('product_name', ['product', 'item', 'name']);
+    const iDesc = idx('description', ['desc']);
+    const iQty = idx('quantity', ['qty']);
+    const iPrice = idx('unit_price', ['price', 'unitprice']);
+    const iDisc = idx('discount_percent', ['discount', 'disc_percent']);
+    const parsed: QuoteItem[] = [];
+    for (let r = 1; r < lines.length; r++) {
+      const cols = parseLine(lines[r]);
+      const q = Number(cols[iQty >= 0 ? iQty : -1] || 1);
+      const p = Number(cols[iPrice >= 0 ? iPrice : -1] || 0);
+      const d = Number(cols[iDisc >= 0 ? iDisc : -1] || 0);
+      const product = cols[iProd >= 0 ? iProd : -1] || '';
+      const description = cols[iDesc >= 0 ? iDesc : -1] || '';
+      if (!product && description === '' && isNaN(q) && isNaN(p)) continue;
+      parsed.push({
+        line_number: Number(cols[iLine >= 0 ? iLine : -1] || parsed.length + 1),
+        product_name: product,
+        description,
+        quantity: isNaN(q) ? 1 : q,
+        unit_price: isNaN(p) ? 0 : p,
+        discount_percent: isNaN(d) ? 0 : d,
+      });
+    }
+    return parsed;
+  };
+
+  const handleUploadClick = () => fileInputRef.current?.click();
+  const handleFileSelected = (e: any) => {
+    try {
+      const file = e?.target?.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const text = String(reader.result || '');
+          const next = parseCSV(text);
+          if (next.length) setItems(next);
+          toast.success('Items imported from Excel/CSV');
+        } catch {
+          toast.error('Failed to parse CSV. Please check columns.');
+        }
+      };
+      reader.readAsText(file);
+    } catch {
+      toast.error('Import failed');
+    } finally {
+      if (e?.target) e.target.value = '';
+    }
+  };
+
+  const downloadItemsCSV = () => {
+    const headers = ['line_number','product_name','description','quantity','unit_price','discount_percent'];
+    const rows = items.map(i => [i.line_number, i.product_name, i.description || '', i.quantity, i.unit_price, i.discount_percent]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(v => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quote_items_${quoteId || 'new'}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const downloadPDF = () => {
+    try {
+      const totals = calculateTotals();
+      const rows = items.map(i => `<tr><td>${i.line_number}</td><td>${i.product_name}</td><td>${i.description || ''}</td><td>${i.quantity}</td><td>${i.unit_price.toFixed(2)}</td><td>${i.discount_percent}%</td></tr>`).join('');
+      const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Quote</title>
+        <style>
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",sans-serif;padding:24px;color:#111}
+          h1{font-size:20px;margin:0 0 12px}
+          table{width:100%;border-collapse:collapse}
+          th,td{border:1px solid #ddd;padding:6px;text-align:left;font-size:12px}
+          tfoot td{font-weight:bold}
+        </style>
+      </head><body>
+        <h1>Quotation ${quoteNumberPreview || ''}</h1>
+        <table>
+          <thead><tr><th>Line</th><th>Product</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Discount</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr><td colspan="5">Subtotal</td><td>${totals.subtotal.toFixed(2)}</td></tr>
+            <tr><td colspan="5">Tax</td><td>${totals.taxAmount.toFixed(2)}</td></tr>
+            <tr><td colspan="5">Total</td><td>${totals.total.toFixed(2)}</td></tr>
+          </tfoot>
+        </table>
+      </body></html>`;
+      const w = window.open('', '_blank');
+      if (!w) { toast.error('Popup blocked. Allow popups to download PDF.'); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+    } catch {
+      toast.error('Failed to prepare PDF');
+    }
+  };
+
+  // Register sticky actions in Dashboard layout (inside component)
+  const { setActions, clearActions } = useStickyActions();
+
+  useEffect(() => {
+    const left = [
+      (<Button key="close" type="button" variant="secondary" onClick={() => navigate(-1)}>Close</Button>),
+    ];
+
+    const right = [
+      (<Button key="import" type="button" variant="outline" onClick={handleUploadClick}>Import</Button>),
+      (<Button key="export" type="button" variant="outline" onClick={downloadItemsCSV}>Export</Button>),
+      (<Button key="export-pdf" type="button" variant="outline" onClick={downloadPDF}>Export.PDF</Button>),
+      (<Button key="submit" type="button" disabled={isSubmitting} onClick={() => form.handleSubmit(onSubmit)()}>
+        {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Add')}
+      </Button>),
+    ];
+
+    setActions({ left, right });
+    return () => clearActions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSubmitting, isEditMode, items]);
+
   // Carrier quotations helpers
   const addCarrierQuote = () => {
     setCarrierQuotes([
@@ -1306,9 +1466,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   };
 
   return (
-    <div className="enterprise-form">
+    <div className="enterprise-form pb-24">
       <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+        {/* Hidden file input for Import (CSV) */}
+        <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileSelected} />
         <fieldset disabled={isHydrating} aria-busy={isHydrating}>
         <Card className="ef-card">
           <CardHeader className="ef-header">
@@ -1324,13 +1486,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               </div>
             )}
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-1">
+            <div className="ef-grid">
+              {/* Compact top grid spacing */}
               <FormField
                 control={form.control}
                 name="title"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="col-span-1 sm:col-span-2 lg:col-span-2">
                     <FormLabel>Title</FormLabel>
                     <FormControl>
                       <Input value={field.value ?? ''} onChange={field.onChange} />
@@ -1344,7 +1507,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 control={form.control}
                 name="description"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="col-span-1 sm:col-span-2 lg:col-span-2">
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea
@@ -1365,17 +1528,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
             <div className="ef-divider" />
-
-            {/* Quotation and Opportunity row */}
-            <div className="ef-grid">
-              {/* Quotation Number */}
-              <FormItem>
-                <FormLabel>Quotation Number</FormLabel>
-                <FormDescription className="form-description">{isEditMode ? 'Existing number' : 'Auto-generated on save'}</FormDescription>
-                <FormControl>
-                  <Input readOnly value={quoteNumberPreview} />
-                </FormControl>
-              </FormItem>
+            {/* Quotation, Opportunity, Account, Contact section */}
+            <section aria-labelledby="quote-identifiers">
+              <h3 id="quote-identifiers" className="sr-only">Quotation, Opportunity, Account, Contact</h3>
+              <div className="ef-grid">
+                {/* Quotation Number */}
+                <FormItem>
+                  <FormLabel>Quotation Number</FormLabel>
+                  <FormControl>
+                    <Input readOnly value={quoteNumberPreview} />
+                  </FormControl>
+                </FormItem>
 
               {/* Opportunity Number */}
               <FormField
@@ -1384,7 +1547,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Opportunity Number</FormLabel>
-                    <FormDescription>Select opportunity</FormDescription>
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
@@ -1426,123 +1588,107 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
-            </div>
-            <div className="ef-divider" />
 
-            <div className="ef-grid">
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="account_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Account</FormLabel>
-                      <FormDescription>Select account</FormDescription>
-                      <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select account" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {accounts.map((account) => (
-                            <SelectItem key={account.id} value={String(account.id)}>
-                              {account.name || (account as any).account_name || 'Account'}
-                            </SelectItem>
-                          ))}
-                          {accounts.length === 0 && (
-                            <SelectItem disabled value="__no_accounts__">No accounts found</SelectItem>
-                          )}
-                          {field.value && !accounts.some((a: any) => String(a.id) === String(field.value)) && (
-                            <SelectItem key={`selected-account-${field.value}`} value={String(field.value)}>
-                              Selected Account
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <div className="mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setAccDialogOpen(true)}>
-                          <Search className="h-4 w-4 mr-2" /> Browse accounts
-                        </Button>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {resolvedTenantId ? (
-                          <>Tenant: {resolvedTenantName ?? 'Resolving…'}</>
-                        ) : (
-                          <>Tenant: Not resolved</>
-                        )}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Quotation Number moved above next to Opportunity */}
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="contact_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Contact</FormLabel>
-                      <FormDescription>Select contact</FormDescription>
-                      <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select contact" />
-                          </SelectTrigger>
-                        </FormControl>
-                      <SelectContent>
-                          {(accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts).map((contact) => (
-                            <SelectItem key={contact.id} value={String(contact.id)}>
-                              {contact.first_name} {contact.last_name}
-                            </SelectItem>
-                          ))}
-                          {contacts.length === 0 && (
-                            <SelectItem disabled value="__no_contacts__">No contacts found</SelectItem>
-                          )}
-                          {field.value && !(
-                            (accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts)
-                              .some((c: any) => String(c.id) === String(field.value))
-                          ) && (
-                            <SelectItem key={`selected-contact-${field.value}`} value={String(field.value)}>
-                              {resolvedContactLabels[String(field.value)] || 'Selected Contact'}
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <div className="mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setContactDialogOpen(true)}>
-                          <Search className="h-4 w-4 mr-2" /> Browse contacts
-                        </Button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Opportunity field moved above next to Quotation */}
-
-                <FormField
-                  control={form.control}
-                  name="valid_until"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valid Until</FormLabel>
+              {/* Account */}
+              <FormField
+                control={form.control}
+                name="account_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account</FormLabel>
+                    <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
                       <FormControl>
-                        <Input type="date" value={field.value ?? ''} onChange={field.onChange} />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={String(account.id)}>
+                            {account.name || (account as any).account_name || 'Account'}
+                          </SelectItem>
+                        ))}
+                        {accounts.length === 0 && (
+                          <SelectItem disabled value="__no_accounts__">No accounts found</SelectItem>
+                        )}
+                        {field.value && !accounts.some((a: any) => String(a.id) === String(field.value)) && (
+                          <SelectItem key={`selected-account-${field.value}`} value={String(field.value)}>
+                            Selected Account
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <div className="mt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setAccDialogOpen(true)}>
+                        <Search className="h-4 w-4 mr-2" /> Browse accounts
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Contact */}
+              <FormField
+                control={form.control}
+                name="contact_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact</FormLabel>
+                    <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select contact" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts).map((contact) => (
+                          <SelectItem key={contact.id} value={String(contact.id)}>
+                            {contact.first_name} {contact.last_name}
+                          </SelectItem>
+                        ))}
+                        {contacts.length === 0 && (
+                          <SelectItem disabled value="__no_contacts__">No contacts found</SelectItem>
+                        )}
+                        {field.value && !(
+                          (accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts)
+                            .some((c: any) => String(c.id) === String(field.value))
+                        ) && (
+                          <SelectItem key={`selected-contact-${field.value}`} value={String(field.value)}>
+                            {resolvedContactLabels[String(field.value)] || 'Selected Contact'}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <div className="mt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setContactDialogOpen(true)}>
+                        <Search className="h-4 w-4 mr-2" /> Browse contacts
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               </div>
-            </div>
+            </section>
             <div className="ef-divider" />
 
             <div className="ef-grid">
+              {/* Arrange Valid Until, Service Type, Service, Import/Export in one row */}
+              <FormField
+                control={form.control}
+                name="valid_until"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valid Until</FormLabel>
+                    <FormControl>
+                      <Input type="date" value={field.value ?? ''} onChange={field.onChange} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="service_type"
@@ -1618,16 +1764,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
-            </div>
 
-            <div className="grid grid-cols-1 gap-4">
               <FormField
                 control={form.control}
                 name="trade_direction"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Import/Export</FormLabel>
-                    <FormDescription>Select trade direction</FormDescription>
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -1780,7 +1923,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-2">
               <FormField
                 control={form.control}
                 name="status"
@@ -1827,9 +1970,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-1">
             {items.map((item, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-4">
+              <div key={index} className="border rounded-lg p-2 space-y-1">
                 <div className="flex justify-between items-start">
                   <span className="font-medium">Item {index + 1}</span>
                   {items.length > 1 && (
@@ -1889,7 +2032,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           <CardHeader className="ef-header">
             <CardTitle className="ef-title">Totals & Additional Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-1">
             <div className="ef-grid">
               <FormField
                 control={form.control}
@@ -1920,7 +2063,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               />
             </div>
 
-            <div className="border-t pt-4 space-y-2">
+            <div className="border-t pt-1 space-y-1">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
                 <span className="font-medium">${calculateTotals().subtotal.toFixed(2)}</span>
@@ -1969,11 +2112,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-4">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Save')}
-          </Button>
-        </div>
+        {/* Submit button removed from main form per request; actions moved to sticky panel */}
 
         {/* Opportunity selection dialog */}
         <OpportunitySelectDialogList
@@ -1996,64 +2135,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           onSelect={handleSelectContact}
         />
 
-        {/* Sticky totals footer for mobile */}
-        {typeof window !== 'undefined' && (localStorage.getItem('quoteStickyTotalsVisible') ?? 'true') === 'true' && (
-          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4" data-sticky-totals>
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal</span>
-                  <span className="font-medium">${calculateTotals().subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Tax</span>
-                  <span className="font-medium">${calculateTotals().taxAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-base font-bold">
-                  <span>Total</span>
-                  <span>${calculateTotals().total.toFixed(2)}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={(e) => { localStorage.setItem('quoteStickyTotalsVisible', 'false'); const wrapper = (e.currentTarget.closest('[data-sticky-totals]') as HTMLElement | null); if (wrapper) wrapper.remove(); }}>Dismiss</Button>
-                <Button type="submit" disabled={isSubmitting} size="sm">
-                  {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Save')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Sticky totals footer for tablet (md to xl) */}
-        {typeof window !== 'undefined' && (localStorage.getItem('quoteStickyTotalsVisible') ?? 'true') === 'true' && (
-        <div className="hidden md:block 2xl:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4" data-sticky-totals>
-          <div className="flex items-center justify-between gap-6">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span className="font-medium">${calculateTotals().subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Shipping</span>
-                <span className="font-medium">${parseFloat(form.watch('shipping_amount') || '0').toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax</span>
-                <span className="font-medium">${calculateTotals().taxAmount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-base font-bold">
-                <span>Total</span>
-                <span>${calculateTotals().total.toFixed(2)}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" onClick={(e) => { localStorage.setItem('quoteStickyTotalsVisible', 'false'); const wrapper = (e.currentTarget.closest('[data-sticky-totals]') as HTMLElement | null); if (wrapper) wrapper.remove(); }}>Dismiss</Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (isEditMode ? 'Modifying...' : 'Saving...') : (isEditMode ? 'Modify' : 'Save')}
-            </Button>
-            </div>
-          </div>
-        </div>
-        )}
+        {/* Sticky actions handled globally via DashboardLayout sticky bar */}
+        
         </fieldset>
       </form>
     </Form>

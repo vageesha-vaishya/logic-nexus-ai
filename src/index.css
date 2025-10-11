@@ -144,7 +144,7 @@ All colors MUST be HSL.
     @apply shadow-md;
   }
   .enterprise-form .ef-header {
-    @apply pb-2;
+    @apply pb-1;
   }
   .enterprise-form .ef-title {
     @apply text-xl md:text-2xl font-semibold tracking-tight;
@@ -159,10 +159,10 @@ All colors MUST be HSL.
     @apply text-[11px] md:text-xs text-muted-foreground;
   }
   .enterprise-form .ef-grid {
-    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1;
   }
   .enterprise-form .ef-divider {
-    @apply border-t pt-3 mt-2;
+    @apply border-t pt-1 mt-1;
   }
   .enterprise-form .ef-hover {
     @apply transition-shadow;
