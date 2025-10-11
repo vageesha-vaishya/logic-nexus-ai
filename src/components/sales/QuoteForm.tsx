@@ -235,6 +235,28 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         let opportunityToAdd = null;
         let accountToAdd = null;
         let contactToAdd = null;
+        let carrierToAdd = null;
+
+        // Fetch carrier FIRST if it exists (critical for display)
+        const selCarrierId = (quote as any).carrier_id;
+        if (selCarrierId) {
+          try {
+            const { data: carrierData } = await supabase
+              .from('carriers')
+              .select('id, carrier_name')
+              .eq('id', selCarrierId)
+              .maybeSingle();
+            if (carrierData) {
+              carrierToAdd = carrierData;
+              setResolvedCarrierLabels((prev) => ({
+                ...prev,
+                [String(carrierData.id)]: carrierData.carrier_name || 'Selected Carrier',
+              }));
+            }
+          } catch (err) {
+            console.warn('Failed to fetch carrier:', err);
+          }
+        }
 
         // Fetch opportunity data with full details
         if (selOppId) {
@@ -328,6 +350,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           setContacts((prev) => {
             const exists = prev.some((c: any) => String(c.id) === String(contactToAdd.id));
             return exists ? prev : [contactToAdd, ...prev];
+          });
+        }
+
+        // Add carrier to list BEFORE form reset
+        if (carrierToAdd) {
+          setCarriers((prev) => {
+            const exists = prev.some((c: any) => String(c.id) === String(carrierToAdd.id));
+            return exists ? prev : [carrierToAdd, ...prev];
           });
         }
 
@@ -484,21 +514,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (data) setServices((prev) => [data, ...prev]);
           }
 
-          const selCarrierId = (quote as any).carrier_id;
-          if (selCarrierId && !carriers.some((c: any) => String(c.id) === String(selCarrierId))) {
-            const { data } = await supabase
-              .from('carriers')
-              .select('id, carrier_name')
-              .eq('id', selCarrierId)
-              .maybeSingle();
-            if (data) {
-              setResolvedCarrierLabels((prev) => ({
-                ...prev,
-                [String(data.id)]: data.carrier_name || 'Selected Carrier',
-              }));
-              setCarriers((prev) => [data, ...prev]);
-            }
-          }
+          // Carrier already fetched and added before form.reset above, skip redundant check
 
           const selConsigneeId = (quote as any).consignee_id;
           if (selConsigneeId && !consignees.some((c: any) => String(c.id) === String(selConsigneeId))) {
@@ -2045,18 +2061,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger className="w-full">
-                          {/* Always show a deterministic label even if the option isn't mounted yet */}
-                          <span className="truncate">
-                            {field.value
-                              ? formatCarrierName(
-                                  (carriers.find((c: any) => String(c.id) === String(field.value))?.carrier_name) ||
-                                    resolvedCarrierLabels[String(field.value)] ||
-                                    ''
-                                ) || 'Select carrier'
-                              : 'Select carrier'}
-                          </span>
-                          {/* Keep SelectValue for accessibility and Radix internal state */}
-                          <SelectValue className="sr-only" placeholder="Select carrier" />
+                          <SelectValue placeholder="Select carrier" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
