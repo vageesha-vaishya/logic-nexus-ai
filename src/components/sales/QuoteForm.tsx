@@ -2073,11 +2073,21 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 <FormLabel>Capture Carrier Rates</FormLabel>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button type="button" variant="outline" className="w-full md:w-auto">
-                      Carrier Rates
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="lg"
+                      className="w-full md:w-auto font-semibold shadow-lg ring-4 ring-primary/70 animate-pulse"
+                    >
+                      {/* Using an icon to emphasize action */}
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2">
+                        <rect width="18" height="14" x="3" y="5" rx="2" ry="2"></rect>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      Capture Carrier Rates
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-4xl">
+                  <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Carrier Rates</DialogTitle>
                     </DialogHeader>

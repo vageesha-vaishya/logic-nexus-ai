@@ -144,13 +144,16 @@ export async function createQuotationVersionWithOptions(
     valid_until: opts.valid_until || null,
     created_by: opts.created_by || null,
   };
-  const { data: version, error: vErr } = (client as any)
+  // Insert version and safely extract the returned id regardless of shape
+  const { data: versionData, error: vErr } = await (client as any)
     .from('quotation_versions')
-    .insert([versionPayload])
-    .select('id')
-    .single();
+    .insert(versionPayload)
+    .select('id');
   if (vErr) throw vErr;
-  const version_id = version.id as string;
+  const version_id = Array.isArray(versionData)
+    ? (versionData[0]?.id as string | undefined)
+    : (versionData?.id as string | undefined);
+  if (!version_id) throw new Error('Version insert did not return id');
 
   // Only create options if there are carrier rates to link
   let option_ids: string[] = [];
@@ -162,12 +165,16 @@ export async function createQuotationVersionWithOptions(
       recommended: false,
       status: 'active',
     }));
-    const { data: options, error: oErr } = (client as any)
+    const { data: optionsData, error: oErr } = await (client as any)
       .from('quotation_version_options')
       .insert(optionRows)
       .select('id');
     if (oErr) throw oErr;
-    option_ids = (options || []).map((x: any) => x.id as string);
+    option_ids = Array.isArray(optionsData)
+      ? (optionsData || []).map((x: any) => x.id as string)
+      : optionsData?.id
+        ? [optionsData.id as string]
+        : [];
   }
   return { version_id, option_ids };
 }
