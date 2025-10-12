@@ -35,7 +35,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
     try {
       const { data: vs, error: vErr } = await supabase
         .from('quotation_versions')
-        .select('*')
+        .select('id, quote_id, version_number, kind, status, created_at')
         .eq('quote_id', quoteId)
         .order('version_number', { ascending: false });
       if (vErr) throw vErr;

@@ -132,10 +132,7 @@ export async function createQuotationVersionWithOptions(
   opts: { major?: number; minor?: number; change_reason?: string; valid_until?: string; created_by?: string | null; version_number?: number; kind?: 'minor' | 'major' } = {},
   client = defaultClient,
 ): Promise<{ version_id: string; option_ids: string[] }> {
-  if (carrier_rate_ids.length === 0) {
-    return { version_id: '', option_ids: [] };
-  }
-
+  // Allow creating versions without carrier rates (can be added later)
   const versionPayload: any = {
     tenant_id,
     quote_id,
@@ -155,19 +152,23 @@ export async function createQuotationVersionWithOptions(
   if (vErr) throw vErr;
   const version_id = version.id as string;
 
-  const optionRows = carrier_rate_ids.map((rid) => ({
-    tenant_id,
-    quotation_version_id: version_id,
-    carrier_rate_id: rid,
-    recommended: false,
-    status: 'active',
-  }));
-  const { data: options, error: oErr } = (client as any)
-    .from('quotation_version_options')
-    .insert(optionRows)
-    .select('id');
-  if (oErr) throw oErr;
-  const option_ids = (options || []).map((x: any) => x.id as string);
+  // Only create options if there are carrier rates to link
+  let option_ids: string[] = [];
+  if (carrier_rate_ids.length > 0) {
+    const optionRows = carrier_rate_ids.map((rid) => ({
+      tenant_id,
+      quotation_version_id: version_id,
+      carrier_rate_id: rid,
+      recommended: false,
+      status: 'active',
+    }));
+    const { data: options, error: oErr } = (client as any)
+      .from('quotation_version_options')
+      .insert(optionRows)
+      .select('id');
+    if (oErr) throw oErr;
+    option_ids = (options || []).map((x: any) => x.id as string);
+  }
   return { version_id, option_ids };
 }
 

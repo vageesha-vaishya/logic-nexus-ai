@@ -2283,6 +2283,7 @@ export type Database = {
           major: number
           minor: number
           quote_id: string
+          status: string | null
           tenant_id: string
           updated_at: string | null
           valid_until: string | null
@@ -2297,6 +2298,7 @@ export type Database = {
           major?: number
           minor?: number
           quote_id: string
+          status?: string | null
           tenant_id: string
           updated_at?: string | null
           valid_until?: string | null
@@ -2311,6 +2313,7 @@ export type Database = {
           major?: number
           minor?: number
           quote_id?: string
+          status?: string | null
           tenant_id?: string
           updated_at?: string | null
           valid_until?: string | null
