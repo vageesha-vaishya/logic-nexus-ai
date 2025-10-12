@@ -819,6 +819,61 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_selections: {
+        Row: {
+          id: string
+          quotation_version_id: string
+          quotation_version_option_id: string
+          quote_id: string
+          reason: string | null
+          selected_at: string | null
+          selected_by: string | null
+          tenant_id: string
+        }
+        Insert: {
+          id?: string
+          quotation_version_id: string
+          quotation_version_option_id: string
+          quote_id: string
+          reason?: string | null
+          selected_at?: string | null
+          selected_by?: string | null
+          tenant_id: string
+        }
+        Update: {
+          id?: string
+          quotation_version_id?: string
+          quotation_version_option_id?: string
+          quote_id?: string
+          reason?: string | null
+          selected_at?: string | null
+          selected_by?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_selections_quotation_version_id_fkey"
+            columns: ["quotation_version_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_selections_quotation_version_option_id_fkey"
+            columns: ["quotation_version_option_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_version_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_selections_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customs_documents: {
         Row: {
           created_at: string | null
@@ -2101,6 +2156,94 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      quotation_version_options: {
+        Row: {
+          carrier_rate_id: string
+          created_at: string | null
+          id: string
+          quotation_version_id: string
+          recommended: boolean | null
+          status: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_rate_id: string
+          created_at?: string | null
+          id?: string
+          quotation_version_id: string
+          recommended?: boolean | null
+          status?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_rate_id?: string
+          created_at?: string | null
+          id?: string
+          quotation_version_id?: string
+          recommended?: boolean | null
+          status?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_version_options_quotation_version_id_fkey"
+            columns: ["quotation_version_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotation_versions: {
+        Row: {
+          change_reason: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          major: number
+          minor: number
+          quote_id: string
+          tenant_id: string
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          change_reason?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          major?: number
+          minor?: number
+          quote_id: string
+          tenant_id: string
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          change_reason?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          major?: number
+          minor?: number
+          quote_id?: string
+          tenant_id?: string
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_versions_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quote_documents: {
         Row: {
@@ -4129,6 +4272,17 @@ export type Database = {
       preview_next_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
+      }
+      record_customer_selection: {
+        Args: {
+          p_option_id: string
+          p_quote_id: string
+          p_reason: string
+          p_tenant_id: string
+          p_user_id: string
+          p_version_id: string
+        }
+        Returns: undefined
       }
       tenant_has_feature: {
         Args: { _feature_key: string; _tenant_id: string }
