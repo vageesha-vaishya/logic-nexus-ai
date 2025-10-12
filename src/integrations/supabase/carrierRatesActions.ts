@@ -129,7 +129,7 @@ export async function createQuotationVersionWithOptions(
   tenant_id: string,
   quote_id: string,
   carrier_rate_ids: string[],
-  opts: { major?: number; minor?: number; change_reason?: string; valid_until?: string; created_by?: string | null } = {},
+  opts: { major?: number; minor?: number; change_reason?: string; valid_until?: string; created_by?: string | null; version_number?: number; kind?: 'minor' | 'major' } = {},
   client = defaultClient,
 ): Promise<{ version_id: string; option_ids: string[] }> {
   if (carrier_rate_ids.length === 0) {
@@ -141,6 +141,8 @@ export async function createQuotationVersionWithOptions(
     quote_id,
     major: opts.major ?? 1,
     minor: opts.minor ?? 0,
+    version_number: opts.version_number ?? 1,
+    kind: opts.kind ?? 'minor',
     change_reason: opts.change_reason || null,
     valid_until: opts.valid_until || null,
     created_by: opts.created_by || null,

@@ -75,9 +75,33 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
   const createVersion = async (kind: 'minor' | 'major') => {
     try {
+      // Get current user and tenant context
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get quote to find tenant_id
+      const { data: quote, error: quoteErr } = await supabase
+        .from('quotes')
+        .select('tenant_id')
+        .eq('id', quoteId)
+        .single();
+      if (quoteErr) throw quoteErr;
+      if (!quote) throw new Error('Quote not found');
+
       const nextNumber = kind === 'minor' ? latestVersionNumber + 1 : 1;
-      const res: any = await createQuotationVersionWithOptions(quoteId, kind, nextNumber);
-      if (res?.error) throw new Error(res.error.message);
+      
+      // Create version with empty carrier_rate_ids for now (can be populated later)
+      const res = await createQuotationVersionWithOptions(
+        quote.tenant_id,
+        quoteId,
+        [], // Empty carrier rates for now
+        { 
+          version_number: nextNumber, 
+          kind,
+          created_by: user.id 
+        }
+      );
+      
       toast({ title: `${kind === 'minor' ? 'Minor' : 'Major'} version created` });
       await load();
     } catch (e: any) {
@@ -87,12 +111,28 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
   const selectOption = async (versionId: string, optionId: string) => {
     try {
-      const result: any = await recordCustomerSelection({
-        quotation_version_id: versionId,
-        selected_option_id: optionId,
-        meta: { source: 'internal_ui' },
-      });
-      if (result?.error) throw new Error(result.error.message);
+      // Get current user and quote context
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get quote to find tenant_id
+      const { data: quote, error: quoteErr } = await supabase
+        .from('quotes')
+        .select('tenant_id')
+        .eq('id', quoteId)
+        .single();
+      if (quoteErr) throw quoteErr;
+      if (!quote) throw new Error('Quote not found');
+
+      await recordCustomerSelection(
+        quote.tenant_id,
+        quoteId,
+        versionId,
+        optionId,
+        null,
+        user.id
+      );
+      
       toast({ title: 'Customer selection recorded' });
       await load();
     } catch (e: any) {
