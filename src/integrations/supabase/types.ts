@@ -312,20 +312,76 @@ export type Database = {
         }
         Relationships: []
       }
+      carrier_rate_charges: {
+        Row: {
+          amount: number
+          basis: string | null
+          carrier_rate_id: string
+          charge_type: string
+          created_at: string | null
+          currency: string | null
+          id: string
+          notes: string | null
+          quantity: number | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          basis?: string | null
+          carrier_rate_id: string
+          charge_type: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          basis?: string | null
+          carrier_rate_id?: string
+          charge_type?: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_rate_charges_carrier_rate_id_fkey"
+            columns: ["carrier_rate_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       carrier_rates: {
         Row: {
           accessorial_fees: Json | null
           base_rate: number
+          carrier_id: string | null
           carrier_name: string
           created_at: string | null
           currency: string | null
           destination_location: string | null
+          destination_port_id: string | null
           id: string
           is_active: boolean | null
+          mode: string | null
           notes: string | null
           origin_location: string | null
+          origin_port_id: string | null
+          rate_reference_id: string | null
           rate_type: string
           service_id: string | null
+          status: string | null
           surcharges: Json | null
           tenant_id: string
           updated_at: string | null
@@ -337,16 +393,22 @@ export type Database = {
         Insert: {
           accessorial_fees?: Json | null
           base_rate: number
+          carrier_id?: string | null
           carrier_name: string
           created_at?: string | null
           currency?: string | null
           destination_location?: string | null
+          destination_port_id?: string | null
           id?: string
           is_active?: boolean | null
+          mode?: string | null
           notes?: string | null
           origin_location?: string | null
+          origin_port_id?: string | null
+          rate_reference_id?: string | null
           rate_type: string
           service_id?: string | null
+          status?: string | null
           surcharges?: Json | null
           tenant_id: string
           updated_at?: string | null
@@ -358,16 +420,22 @@ export type Database = {
         Update: {
           accessorial_fees?: Json | null
           base_rate?: number
+          carrier_id?: string | null
           carrier_name?: string
           created_at?: string | null
           currency?: string | null
           destination_location?: string | null
+          destination_port_id?: string | null
           id?: string
           is_active?: boolean | null
+          mode?: string | null
           notes?: string | null
           origin_location?: string | null
+          origin_port_id?: string | null
+          rate_reference_id?: string | null
           rate_type?: string
           service_id?: string | null
+          status?: string | null
           surcharges?: Json | null
           tenant_id?: string
           updated_at?: string | null
@@ -377,6 +445,13 @@ export type Database = {
           weight_break_min?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "carrier_rates_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "carrier_rates_service_id_fkey"
             columns: ["service_id"]
