@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteForm } from '@/components/sales/QuoteForm';
+import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
@@ -69,6 +70,9 @@ export default function QuoteDetail() {
           </div>
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
+        {resolvedId && (
+          <QuotationVersionHistory quoteId={resolvedId} />
+        )}
       </div>
     </DashboardLayout>
   );

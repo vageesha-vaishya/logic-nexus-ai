@@ -19,6 +19,10 @@ import OpportunitySelectDialogList from '@/components/crm/OpportunitySelectDialo
 import AccountSelectDialogList from '@/components/crm/AccountSelectDialogList';
 import ContactSelectDialogList from '@/components/crm/ContactSelectDialogList';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
+import {
+  createRatesAndChargesForQuote,
+  createQuotationVersionWithOptions,
+} from '@/integrations/supabase/carrierRatesActions';
 
 const quoteSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -1690,9 +1694,45 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           .eq('quote_id', quoteId);
         if (delErr) throw delErr;
       }
-          const { error: itemsError } = await supabase.from('quote_items').insert(itemsData);
+      const { error: itemsError } = await supabase.from('quote_items').insert(itemsData);
 
       if (itemsError) throw itemsError;
+
+      // Persist carrier rates and charges, then generate quotation version/options
+      try {
+        if (carrierQuotes.length > 0) {
+          const rateIds = await createRatesAndChargesForQuote(
+            quote.id,
+            tenantId!,
+            values.service_id || null,
+            values.origin_port_id || null,
+            values.destination_port_id || null,
+            carrierQuotes.map((cq) => ({
+              carrier_id: cq.carrier_id,
+              mode: cq.mode || selectedServiceType || undefined,
+              buying_charges: cq.buying_charges || [],
+              selling_charges: cq.selling_charges || [],
+            })),
+            supabase as any,
+          );
+          if (rateIds.length > 0) {
+            await createQuotationVersionWithOptions(
+              tenantId!,
+              quote.id,
+              rateIds,
+              {
+                valid_until: values.valid_until || undefined,
+                created_by: user?.id || null,
+                change_reason: 'Initial options from captured carrier rates',
+              },
+              supabase as any,
+            );
+          }
+        }
+      } catch (err: any) {
+        console.warn('Carrier rates/options handling failed', err);
+        toast.error('Saved quote, but failed to generate options from carrier rates');
+      }
 
       toast.success(quoteId ? 'Quote updated successfully' : 'Quote created successfully');
       onSuccess?.(quote.id);
