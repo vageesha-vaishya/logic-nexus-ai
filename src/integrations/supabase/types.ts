@@ -2307,6 +2307,54 @@ export type Database = {
         }
         Relationships: []
       }
+      quotation_packages: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          height_cm: number | null
+          id: string
+          length_cm: number | null
+          package_type: string
+          quantity: number
+          quote_id: string
+          tenant_id: string
+          updated_at: string | null
+          volume_cbm: number | null
+          weight_kg: number | null
+          width_cm: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          height_cm?: number | null
+          id?: string
+          length_cm?: number | null
+          package_type: string
+          quantity?: number
+          quote_id: string
+          tenant_id: string
+          updated_at?: string | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
+          width_cm?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          height_cm?: number | null
+          id?: string
+          length_cm?: number | null
+          package_type?: string
+          quantity?: number
+          quote_id?: string
+          tenant_id?: string
+          updated_at?: string | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
+          width_cm?: number | null
+        }
+        Relationships: []
+      }
       quotation_version_options: {
         Row: {
           carrier_rate_id: string
