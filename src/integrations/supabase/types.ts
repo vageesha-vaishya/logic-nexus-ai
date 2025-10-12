@@ -2279,36 +2279,42 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          kind: string | null
           major: number
           minor: number
           quote_id: string
           tenant_id: string
           updated_at: string | null
           valid_until: string | null
+          version_number: number
         }
         Insert: {
           change_reason?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          kind?: string | null
           major?: number
           minor?: number
           quote_id: string
           tenant_id: string
           updated_at?: string | null
           valid_until?: string | null
+          version_number: number
         }
         Update: {
           change_reason?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          kind?: string | null
           major?: number
           minor?: number
           quote_id?: string
           tenant_id?: string
           updated_at?: string | null
           valid_until?: string | null
+          version_number?: number
         }
         Relationships: [
           {
