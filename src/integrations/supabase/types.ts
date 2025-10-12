@@ -270,6 +270,81 @@ export type Database = {
           },
         ]
       }
+      cargo_details: {
+        Row: {
+          cargo_type_id: string | null
+          commodity_description: string | null
+          created_at: string | null
+          created_by: string | null
+          dimensions_cm: Json | null
+          hazmat_class: string | null
+          hazmat_un_number: string | null
+          hs_code: string | null
+          id: string
+          is_hazardous: boolean | null
+          notes: string | null
+          service_id: string | null
+          service_type: string | null
+          special_requirements: string | null
+          temperature_controlled: boolean | null
+          temperature_range: Json | null
+          tenant_id: string
+          updated_at: string | null
+          value_amount: number | null
+          value_currency: string | null
+          volume_cbm: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          cargo_type_id?: string | null
+          commodity_description?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dimensions_cm?: Json | null
+          hazmat_class?: string | null
+          hazmat_un_number?: string | null
+          hs_code?: string | null
+          id?: string
+          is_hazardous?: boolean | null
+          notes?: string | null
+          service_id?: string | null
+          service_type?: string | null
+          special_requirements?: string | null
+          temperature_controlled?: boolean | null
+          temperature_range?: Json | null
+          tenant_id: string
+          updated_at?: string | null
+          value_amount?: number | null
+          value_currency?: string | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          cargo_type_id?: string | null
+          commodity_description?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dimensions_cm?: Json | null
+          hazmat_class?: string | null
+          hazmat_un_number?: string | null
+          hs_code?: string | null
+          id?: string
+          is_hazardous?: boolean | null
+          notes?: string | null
+          service_id?: string | null
+          service_type?: string | null
+          special_requirements?: string | null
+          temperature_controlled?: boolean | null
+          temperature_range?: Json | null
+          tenant_id?: string
+          updated_at?: string | null
+          value_amount?: number | null
+          value_currency?: string | null
+          volume_cbm?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
       cargo_types: {
         Row: {
           cargo_code: string | null
