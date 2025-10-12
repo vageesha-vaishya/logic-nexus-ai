@@ -32,20 +32,6 @@ export function CarrierQuotesSection({
   carrierQuotes: CarrierQuote[];
   setCarrierQuotes: Dispatch<SetStateAction<CarrierQuote[]>>;
 }) {
-  // Normalize any accidentally duplicated labels like "ABCABC" to "ABC"
-  const formatCarrierName = (name: string) => {
-    if (!name) return '';
-    const trimmed = String(name).trim();
-    const len = trimmed.length;
-    if (len % 2 === 0) {
-      const half = len / 2;
-      const first = trimmed.slice(0, half);
-      const second = trimmed.slice(half);
-      if (first === second) return first;
-    }
-    return trimmed;
-  };
-
   // Collapsible on mobile, open by default on md+; persist to localStorage
   const [accordionOpen, setAccordionOpen] = useState<boolean>(true);
   useEffect(() => {
@@ -190,7 +176,7 @@ export function CarrierQuotesSection({
                           }, {}),
                         ).map((carrier: any) => (
                           <SelectItem key={carrier.id} value={String(carrier.id)}>
-                            {formatCarrierName(carrier.carrier_name || '')}
+                            {String(carrier.carrier_name || '').trim()}
                           </SelectItem>
                         ))}
                     </SelectContent>
