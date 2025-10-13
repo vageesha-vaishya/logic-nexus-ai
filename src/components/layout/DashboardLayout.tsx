@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { StickyActionsProvider, useStickyActions } from '@/components/layout/StickyActionsContext';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 import { GlobalSearch } from '@/components/ui/global-search';
+import { AppLauncher } from '@/components/ui/app-launcher';
+import { KeyboardShortcuts } from '@/components/ui/keyboard-shortcuts';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -36,13 +38,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <ObjectMenu />
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
                 <GlobalSearch />
+                <AppLauncher />
               </div>
             </header>
             <main className="flex-1 p-4 bg-muted/30 pb-24" style={{ backgroundImage: 'var(--app-background, none)' }}>
               {children}
               <StickyActionsMount />
+              <KeyboardShortcuts />
             </main>
           </div>
         </div>
