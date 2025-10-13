@@ -12,26 +12,20 @@ import { CargoDetailsForm } from "@/components/logistics/CargoDetailsForm";
 type CargoDetail = {
   id: string;
   tenant_id: string;
-  service_type: string | null;
-  service_id: string | null;
+  service_type: string;
+  service_id: string;
   cargo_type_id: string | null;
   commodity_description: string | null;
   hs_code: string | null;
-  weight_kg: number | null;
-  volume_cbm: number | null;
-  dimensions_cm: any;
-  value_amount: number | null;
-  value_currency: string | null;
-  special_requirements: string | null;
-  is_hazardous: boolean | null;
-  hazmat_un_number: string | null;
+  package_count: number | null;
+  total_weight_kg: number | null;
+  total_volume_cbm: number | null;
+  hazmat: boolean | null;
   hazmat_class: string | null;
   temperature_controlled: boolean | null;
-  temperature_range: any;
+  requires_special_handling: boolean | null;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
+  is_active: boolean | null;
 };
 
 export default function CargoDetails() {
@@ -149,11 +143,11 @@ export default function CargoDetails() {
                       <TableCell className="capitalize">{d.service_type?.replace(/_/g, " ")}</TableCell>
                       <TableCell>{serviceMap[String(d.service_id)] || d.service_id}</TableCell>
                       <TableCell>{d.cargo_type_id ? cargoTypeMap[String(d.cargo_type_id)] : '-'}</TableCell>
-                      <TableCell>-</TableCell>
-                      <TableCell>{d.weight_kg ?? '-'}</TableCell>
-                      <TableCell>{d.volume_cbm ?? '-'}</TableCell>
-                      <TableCell>{d.is_hazardous ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>Active</TableCell>
+                      <TableCell>{d.package_count ?? '-'}</TableCell>
+                      <TableCell>{d.total_weight_kg ?? '-'}</TableCell>
+                      <TableCell>{d.total_volume_cbm ?? '-'}</TableCell>
+                      <TableCell>{d.hazmat ? 'Yes' : 'No'}</TableCell>
+                      <TableCell>{d.is_active ? 'Active' : 'Inactive'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" onClick={() => { setEditItem(d); setEditOpen(true); }}>

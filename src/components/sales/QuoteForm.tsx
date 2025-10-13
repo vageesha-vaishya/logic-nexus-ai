@@ -103,6 +103,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [resolvedServiceLabels, setResolvedServiceLabels] = useState<Record<string, string>>({});
   // Resolved labels for carriers not yet in the dropdown list
   const [resolvedCarrierLabels, setResolvedCarrierLabels] = useState<Record<string, string>>({});
+  // Resolved labels for package categories and sizes that may be hidden by RLS/tenant scope
+  const [resolvedPackageCategoryLabels, setResolvedPackageCategoryLabels] = useState<Record<string, string>>({});
+  const [resolvedPackageSizeLabels, setResolvedPackageSizeLabels] = useState<Record<string, string>>({});
   
   // Format carrier name defensively to avoid accidental repeated text in UI (e.g., "ABCABC")
   const formatCarrierName = (name: string) => {
@@ -716,8 +719,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (accountsRes.error) throw accountsRes.error;
         if (contactsRes.error) throw contactsRes.error;
         if (opportunitiesRes.error) throw opportunitiesRes.error;
-        if (pkgCatsRes.error) throw pkgCatsRes.error;
-        if (pkgSizesRes.error) throw pkgSizesRes.error;
+      if (pkgCatsRes.error) throw pkgCatsRes.error;
+      if (pkgSizesRes.error) throw pkgSizesRes.error;
 
         setServices(servicesRes.data || []);
         setConsignees(consigneesRes.data || []);
@@ -725,8 +728,28 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         setAccounts(accountsRes.data || []);
         setContacts(contactsRes.data || []);
         setOpportunities(opportunitiesRes.data || []);
-        setPackageCategories(pkgCatsRes.data || []);
-        setPackageSizes(pkgSizesRes.data || []);
+      setPackageCategories(pkgCatsRes.data || []);
+      setPackageSizes(pkgSizesRes.data || []);
+
+        // Fallback: if tenant-scoped lists are empty, attempt global fetch (subject to RLS)
+        try {
+          if (!pkgCatsRes.data || pkgCatsRes.data.length === 0) {
+            const { data: globalCats } = await supabase
+              .from('package_categories')
+              .select('*')
+              .eq('is_active', true);
+            setPackageCategories(globalCats || []);
+          }
+        } catch {}
+        try {
+          if (!pkgSizesRes.data || pkgSizesRes.data.length === 0) {
+            const { data: globalSizes } = await supabase
+              .from('package_sizes')
+              .select('*')
+              .eq('is_active', true);
+            setPackageSizes(globalSizes || []);
+          }
+        } catch {}
 
         // Fetch carriers filtered by selected service type via mapping table
         const currentServiceType = selectedServiceType || form.getValues('service_type');
@@ -1148,7 +1171,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   };
 
   const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    const next = items
+      .filter((_, i) => i !== index)
+      .map((it, idx) => ({ ...it, line_number: idx + 1 }));
+    setItems(next);
   };
 
   const updateItem = (index: number, field: keyof QuoteItem, value: any) => {
@@ -1156,6 +1182,64 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
   };
+
+  // Resolve labels for package category/size IDs that are selected but not present in the current lists
+  useEffect(() => {
+    const resolveMissingLabels = async () => {
+      try {
+        const catIds = Array.from(new Set(items.map((i) => i.package_category_id).filter((v): v is string => !!v).map(String)));
+        const sizeIds = Array.from(new Set(items.map((i) => i.package_size_id).filter((v): v is string => !!v).map(String)));
+
+        const presentCatIds = new Set((packageCategories || []).map((c: any) => String(c.id)));
+        const presentSizeIds = new Set((packageSizes || []).map((s: any) => String(s.id)));
+
+        const missingCatIds = catIds.filter((id) => !presentCatIds.has(id));
+        const missingSizeIds = sizeIds.filter((id) => !presentSizeIds.has(id));
+
+        if (missingCatIds.length > 0) {
+          try {
+            const { data: cats } = await supabase
+              .from('package_categories')
+              .select('id, category_name, is_active')
+              .in('id', missingCatIds);
+            if (Array.isArray(cats)) {
+              setResolvedPackageCategoryLabels((prev) => {
+                const next = { ...prev };
+                for (const c of cats) {
+                  next[String(c.id)] = c.category_name || 'Selected Category';
+                }
+                return next;
+              });
+            }
+          } catch (e) {
+            // Non-fatal if RLS blocks direct resolution
+          }
+        }
+
+        if (missingSizeIds.length > 0) {
+          try {
+            const { data: sizes } = await supabase
+              .from('package_sizes')
+              .select('id, size_name, size_code, is_active')
+              .in('id', missingSizeIds);
+            if (Array.isArray(sizes)) {
+              setResolvedPackageSizeLabels((prev) => {
+                const next = { ...prev };
+                for (const s of sizes) {
+                  const base = s.size_name || 'Selected Size';
+                  next[String(s.id)] = s.size_code ? `${base} (${s.size_code})` : base;
+                }
+                return next;
+              });
+            }
+          } catch (e) {
+            // Non-fatal if RLS blocks direct resolution
+          }
+        }
+      } catch {}
+    };
+    resolveMissingLabels();
+  }, [items, packageCategories, packageSizes, supabase]);
 
   // ===== Import/Export helpers =====
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1603,8 +1687,16 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       const itemsData = items.map((item) => ({
         quote_id: quote.id,
-        ...item,
-        line_total: item.quantity * item.unit_price * (1 - item.discount_percent / 100),
+        line_number: Number(item.line_number) || 1,
+        product_name: item.product_name,
+        description: item.description ?? null,
+        quantity: Number(item.quantity) || 0,
+        unit_price: Number(item.unit_price) || 0,
+        discount_percent: Number(item.discount_percent) || 0,
+        package_category_id: item.package_category_id ? String(item.package_category_id) : null,
+        package_size_id: item.package_size_id ? String(item.package_size_id) : null,
+        line_total:
+          (Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * (1 - (Number(item.discount_percent) || 0) / 100),
       }));
 
       // Replace existing items on edit; insert on create
@@ -2218,7 +2310,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     </Button>
                   )}
                 </div>
-                <div className="ef-grid">
+                <div className="grid grid-cols-1 lg:grid-cols-8 gap-2 items-end">
                   <Input
                     placeholder="Product Name"
                     value={item.product_name}
@@ -2230,6 +2322,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     onChange={(e) => updateItem(index, 'description', e.target.value)}
                   />
                   <Input
+                    className="min-w-[2ch]"
                     type="number"
                     placeholder="Quantity"
                     value={item.quantity}
@@ -2249,9 +2342,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {packageCategories.map((cat) => (
+                            {item.package_category_id && !packageCategories.some((cat) => String(cat.id) === String(item.package_category_id)) && (
+                              <SelectItem key={`fallback-cat-${index}`} value={String(item.package_category_id)}>
+                                {resolvedPackageCategoryLabels[String(item.package_category_id)] || 'Selected Category'}
+                              </SelectItem>
+                            )}
+                            {packageCategories.length === 0 && (
+                              <SelectItem disabled value="__no_categories__">No categories found</SelectItem>
+                            )}
+                            {packageCategories.map((cat: any) => (
                               <SelectItem key={cat.id} value={String(cat.id)}>
-                                {cat.category_name || cat.name || 'Category'}
+                                {cat.category_name || 'Category'}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -2269,9 +2370,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {packageSizes.map((sz) => (
+                            {item.package_size_id && !packageSizes.some((sz) => String(sz.id) === String(item.package_size_id)) && (
+                              <SelectItem key={`fallback-size-${index}`} value={String(item.package_size_id)}>
+                                {resolvedPackageSizeLabels[String(item.package_size_id)] || 'Selected Size'}
+                              </SelectItem>
+                            )}
+                            {packageSizes.length === 0 && (
+                              <SelectItem disabled value="__no_sizes__">No sizes found</SelectItem>
+                            )}
+                            {packageSizes.map((sz: any) => (
                               <SelectItem key={sz.id} value={String(sz.id)}>
-                                {(sz.size_name || sz.name) + (sz.size_code ? ` (${sz.size_code})` : '')}
+                                {(sz.size_name || 'Size') + (sz.size_code ? ` (${sz.size_code})` : '')}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -2280,6 +2389,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     </>
                   )}
                   <Input
+                    className="min-w-[5ch]"
                     type="number"
                     step="0.01"
                     placeholder="Unit Price"
@@ -2287,13 +2397,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                   />
                   <Input
+                    className="min-w-[3ch]"
                     type="number"
                     step="0.01"
                     placeholder="Discount %"
                     value={item.discount_percent}
                     onChange={(e) => updateItem(index, 'discount_percent', parseFloat(e.target.value) || 0)}
                   />
-                  <div className="flex items-center">
+                  <div className="min-w-[5ch] flex items-center">
                     <span className="text-sm font-medium">
                       Total: ${(item.quantity * item.unit_price * (1 - item.discount_percent / 100)).toFixed(2)}
                     </span>

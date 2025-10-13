@@ -75,11 +75,10 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   useEffect(() => {
     // Load cargo types for tenant
     (async () => {
-      if (!context.tenantId) return;
       const { data, error } = await supabase
         .from("cargo_types")
         .select("id, cargo_type_name, is_active")
-        .eq("tenant_id", context.tenantId);
+        .eq("tenant_id", context.tenantId || context.platformTenantId || context.tenantId);
       if (!error) setCargoTypes((data || []).filter((c: any) => c.is_active));
     })();
   }, [supabase, context.tenantId]);

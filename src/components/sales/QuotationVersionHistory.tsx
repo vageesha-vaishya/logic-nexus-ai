@@ -29,13 +29,15 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const [versions, setVersions] = useState<Version[]>([]);
   const [optionsByVersion, setOptionsByVersion] = useState<Record<string, Option[]>>({});
   const [loading, setLoading] = useState(false);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
       const { data: vs, error: vErr } = await supabase
         .from('quotation_versions')
-        .select('id, quote_id, version_number, kind, status, created_at')
+        .select('*')
         .eq('quote_id', quoteId)
         .order('version_number', { ascending: false });
       if (vErr) throw vErr;
@@ -43,14 +45,33 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       if (versionIds.length > 0) {
         const { data: opts, error: oErr } = await supabase
           .from('quotation_version_options')
-          .select('*')
+          .select('id, quotation_version_id, carrier_rate_id')
           .in('quotation_version_id', versionIds);
         if (oErr) throw oErr;
+        const carrierRateIds = (opts ?? []).map((o: any) => o.carrier_rate_id).filter(Boolean);
+        let rateMap: Record<string, any> = {};
+        if (carrierRateIds.length > 0) {
+          const { data: rates, error: rErr } = await supabase
+            .from('carrier_rates')
+            .select('id, carrier_name, currency, base_rate, mode, valid_until')
+            .in('id', carrierRateIds);
+          if (rErr) throw rErr;
+          (rates ?? []).forEach((r: any) => { rateMap[String(r.id)] = r; });
+        }
         const grouped: Record<string, Option[]> = {};
         (opts ?? []).forEach((o: any) => {
-          const key = o.quotation_version_id;
+          const key = o.quotation_version_id as string;
+          const r = rateMap[String(o.carrier_rate_id)] || {};
+          const opt: Option = {
+            id: o.id,
+            quotation_version_id: key,
+            carrier_name: r.carrier_name || 'Carrier',
+            total_amount: Number(r.base_rate ?? 0),
+            currency: r.currency || 'USD',
+            transit_time_days: null,
+          };
           grouped[key] = grouped[key] || [];
-          grouped[key].push(o as Option);
+          grouped[key].push(opt);
         });
         setOptionsByVersion(grouped);
       } else {
@@ -65,6 +86,19 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   };
 
   useEffect(() => {
+    const init = async () => {
+      try {
+        const { data: q } = await supabase
+          .from('quotes')
+          .select('tenant_id')
+          .eq('id', quoteId)
+          .maybeSingle();
+        if (q?.tenant_id) setTenantId(String(q.tenant_id));
+        const { data: auth } = await supabase.auth.getUser();
+        setUserId(auth?.user?.id ?? null);
+      } catch {}
+    };
+    init();
     load();
   }, [quoteId]);
 
@@ -75,33 +109,16 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
   const createVersion = async (kind: 'minor' | 'major') => {
     try {
-      // Get current user and tenant context
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Get quote to find tenant_id
-      const { data: quote, error: quoteErr } = await supabase
-        .from('quotes')
-        .select('tenant_id')
-        .eq('id', quoteId)
-        .single();
-      if (quoteErr) throw quoteErr;
-      if (!quote) throw new Error('Quote not found');
-
       const nextNumber = kind === 'minor' ? latestVersionNumber + 1 : 1;
-      
-      // Create version with empty carrier_rate_ids for now (can be populated later)
+      if (!tenantId) throw new Error('Missing tenant context');
       const res = await createQuotationVersionWithOptions(
-        quote.tenant_id,
+        tenantId,
         quoteId,
-        [], // Empty carrier rates for now
-        { 
-          version_number: nextNumber, 
-          kind,
-          created_by: user.id 
-        }
+        [],
+        { kind, version_number: nextNumber, created_by: userId || null },
+        supabase as any,
       );
-      
+      if (!res?.version_id) throw new Error('Version creation did not return id');
       toast({ title: `${kind === 'minor' ? 'Minor' : 'Major'} version created` });
       await load();
     } catch (e: any) {
@@ -111,28 +128,16 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
   const selectOption = async (versionId: string, optionId: string) => {
     try {
-      // Get current user and quote context
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Get quote to find tenant_id
-      const { data: quote, error: quoteErr } = await supabase
-        .from('quotes')
-        .select('tenant_id')
-        .eq('id', quoteId)
-        .single();
-      if (quoteErr) throw quoteErr;
-      if (!quote) throw new Error('Quote not found');
-
+      if (!tenantId || !userId) throw new Error('Missing tenant or user context');
       await recordCustomerSelection(
-        quote.tenant_id,
+        tenantId,
         quoteId,
         versionId,
         optionId,
         null,
-        user.id
+        userId,
+        supabase as any,
       );
-      
       toast({ title: 'Customer selection recorded' });
       await load();
     } catch (e: any) {
