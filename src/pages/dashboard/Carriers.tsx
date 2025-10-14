@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, ArrowUp, ArrowDown } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CarrierForm } from '@/components/logistics/CarrierForm';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -30,6 +32,137 @@ export default function Carriers() {
   const [editCarrierId, setEditCarrierId] = useState<string | null>(null);
   const [tenants, setTenants] = useState<any[]>([]);
   const [tenantNameById, setTenantNameById] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'carrier_name', direction: 'ascending' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const requestSort = (key: string) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredCarriers = carriers.filter(carrier => {
+    const searchTerms = searchTerm.toLowerCase().split(' ').filter(term => term.trim() !== '');
+    if (searchTerms.length === 0) {
+      return true;
+    }
+
+    return searchTerms.every(term => {
+      const parts = term.split(':');
+      const field = parts.length > 1 ? parts[0] : 'global';
+      const value = parts.length > 1 ? parts[1] : parts[0];
+
+      if (field === 'global') {
+        const values = [
+          carrier.carrier_name,
+          context.isPlatformAdmin && (tenantNameById[carrier.tenant_id] || carrier.tenant_id),
+          carrier.carrier_code,
+          carrier.carrier_type,
+          carrier.contact_person,
+          carrier.contact_email,
+          carrier.rating?.toString(),
+          carrier.is_active ? 'active' : 'inactive',
+        ];
+        return values.some((val) =>
+          val?.toString().toLowerCase().includes(value)
+        );
+      }
+
+      // Field-specific search
+      switch (field) {
+        case 'name':
+          return carrier.carrier_name?.toLowerCase().includes(value);
+        case 'tenant':
+          return context.isPlatformAdmin && (tenantNameById[carrier.tenant_id] || carrier.tenant_id)?.toLowerCase().includes(value);
+        case 'code':
+          return carrier.carrier_code?.toLowerCase().includes(value);
+        case 'type':
+          return carrier.carrier_type?.toLowerCase().includes(value);
+        case 'contact':
+          return `${carrier.contact_person} ${carrier.contact_email}`.toLowerCase().includes(value);
+        case 'rating':
+          const ratingValue = parseFloat(carrier.rating);
+          if (isNaN(ratingValue)) return false;
+
+          const ratingFilter = value.trim();
+          const operatorMatch = ratingFilter.match(/^(>=|<=|>|<)/);
+          const operator = operatorMatch ? operatorMatch[0] : null;
+          const filterValueString = operator ? ratingFilter.substring(operator.length) : ratingFilter;
+          const filterValue = parseFloat(filterValueString);
+
+          if (isNaN(filterValue)) return false;
+
+          switch (operator) {
+            case '>=':
+              return ratingValue >= filterValue;
+            case '<=':
+              return ratingValue <= filterValue;
+            case '>':
+              return ratingValue > filterValue;
+            case '<':
+              return ratingValue < filterValue;
+            default:
+              return ratingValue === filterValue;
+          }
+        case 'status':
+          return (carrier.is_active ? 'active' : 'inactive').includes(value);
+        default:
+          return false; // Unknown field
+      }
+    });
+  });
+
+  const sortedAndFilteredCarriers = [...filteredCarriers].sort((a, b) => {
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+
+    if (sortConfig.key === 'tenant_id') {
+      const aTenantName = tenantNameById[a.tenant_id] || '';
+      const bTenantName = tenantNameById[b.tenant_id] || '';
+      if (aTenantName < bTenantName) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (aTenantName > bTenantName) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    }
+
+    if (aValue === null || aValue === undefined) return 1;
+    if (bValue === null || bValue === undefined) return -1;
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      const comparison = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: 'base' });
+      return sortConfig.direction === 'ascending' ? comparison : -comparison;
+    }
+
+    if (aValue < bValue) {
+      return sortConfig.direction === 'ascending' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortConfig.direction === 'ascending' ? 1 : -1;
+    }
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sortedAndFilteredCarriers.length / itemsPerPage);
+  const paginatedCarriers = sortedAndFilteredCarriers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value, 10));
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     if (context.isPlatformAdmin) {
@@ -210,30 +343,58 @@ export default function Carriers() {
         <Card>
           <CardHeader>
             <CardTitle>All Carriers</CardTitle>
+            <div className="mt-4">
+              <Input
+                placeholder="Search carriers (e.g., name:Maersk type:ocean status:active)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">Loading carriers...</div>
-            ) : carriers.length === 0 ? (
+            ) : sortedAndFilteredCarriers.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No carriers found. Create your first carrier to get started.
+                No carriers found.
               </div>
             ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Carrier Name</TableHead>
-                    {context.isPlatformAdmin && <TableHead>Tenant</TableHead>}
-                    <TableHead>Code</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Rating</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => requestSort('carrier_name')}>
+                      Carrier Name
+                      {sortConfig.key === 'carrier_name' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
+                    </TableHead>
+                    {context.isPlatformAdmin && <TableHead className="cursor-pointer" onClick={() => requestSort('tenant_id')}>
+                      Tenant
+                      {sortConfig.key === 'tenant_id' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
+                      </TableHead>}
+                    <TableHead className="cursor-pointer" onClick={() => requestSort('carrier_code')}>
+                      Code
+                      {sortConfig.key === 'carrier_code' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
+                      </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => requestSort('carrier_type')}>
+                      Type
+                      {sortConfig.key === 'carrier_type' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
+                      </TableHead>
+                    <TableHead>
+                      Contact
+                      </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => requestSort('rating')}>
+                      Rating
+                      {sortConfig.key === 'rating' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
+                      </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => requestSort('is_active')}>
+                      Status
+                      {sortConfig.key === 'is_active' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
+                      </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {carriers.map((carrier) => (
+                  {paginatedCarriers.map((carrier) => (
                     <TableRow key={carrier.id}>
                       <TableCell className="font-medium">{carrier.carrier_name}</TableCell>
                       {context.isPlatformAdmin && (
@@ -279,6 +440,59 @@ export default function Carriers() {
                   ))}
                 </TableBody>
               </Table>
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {paginatedCarriers.length} of {sortedAndFilteredCarriers.length} carriers.
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 per page</SelectItem>
+                      <SelectItem value="20">20 per page</SelectItem>
+                      <SelectItem value="50">50 per page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+              </>
             )}
           </CardContent>
         </Card>

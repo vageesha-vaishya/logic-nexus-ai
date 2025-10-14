@@ -1711,6 +1711,29 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       if (itemsError) throw itemsError;
 
+      // Immediately reload items to ensure all fields (including container size) are persisted
+      try {
+        const { data: savedItems } = await supabase
+          .from('quote_items')
+          .select('line_number, product_name, description, quantity, unit_price, discount_percent, package_category_id, package_size_id')
+          .eq('quote_id', quote.id)
+          .order('line_number', { ascending: true });
+        if (Array.isArray(savedItems)) {
+          setItems(
+            savedItems.map((it: any) => ({
+              line_number: it.line_number,
+              product_name: it.product_name || '',
+              description: it.description || '',
+              quantity: Number(it.quantity) || 0,
+              unit_price: Number(it.unit_price) || 0,
+              discount_percent: Number(it.discount_percent) || 0,
+              package_category_id: it.package_category_id ? String(it.package_category_id) : undefined,
+              package_size_id: it.package_size_id ? String(it.package_size_id) : undefined,
+            }))
+          );
+        }
+      } catch {}
+
       // Persist carrier rates and charges, then generate quotation version/options
       try {
         if (carrierQuotes.length > 0) {
@@ -2196,87 +2219,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             </div>
 
             <div className="ef-grid">
-              <FormField
-                control={form.control}
-                name="consignee_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Consignee</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select consignee" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {consignees.map((consignee) => (
-                          <SelectItem key={consignee.id} value={String(consignee.id)}>
-                            {consignee.company_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
             </div>
 
             <div className="ef-grid">
-              <FormField
-                control={form.control}
-                name="incoterms"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Incoterms</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select incoterms" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="FOB">FOB - Free On Board</SelectItem>
-                        <SelectItem value="CIF">CIF - Cost, Insurance & Freight</SelectItem>
-                        <SelectItem value="EXW">EXW - Ex Works</SelectItem>
-                        <SelectItem value="FCA">FCA - Free Carrier</SelectItem>
-                        <SelectItem value="CPT">CPT - Carriage Paid To</SelectItem>
-                        <SelectItem value="CIP">CIP - Carriage & Insurance Paid</SelectItem>
-                        <SelectItem value="DAP">DAP - Delivered At Place</SelectItem>
-                        <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
             </div>
 
             <div className="grid grid-cols-1 gap-2">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="sent">Sent</SelectItem>
-                        <SelectItem value="accepted">Accepted</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
             </div>
           </CardContent>
         </Card>
@@ -2415,6 +2366,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           </CardContent>
         </Card>
 
+
+
         <Card className="ef-card">
           <CardHeader className="ef-header">
             <CardTitle className="ef-title">Totals & Additional Details</CardTitle>
@@ -2496,6 +2449,90 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 </FormItem>
               )}
             />
+          </CardContent>
+        </Card>
+
+        <Card className="ef-card">
+          <CardHeader className="ef-header">
+            <CardTitle className="ef-title">Additional Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="ef-grid">
+              <FormField
+                control={form.control}
+                name="consignee_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Consignee</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select consignee" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {consignees.map((consignee) => (
+                          <SelectItem key={consignee.id} value={String(consignee.id)}>
+                            {consignee.company_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="incoterms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Incoterms</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select incoterms" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="FOB">FOB - Free On Board</SelectItem>
+                        <SelectItem value="CIF">CIF - Cost, Insurance & Freight</SelectItem>
+                        <SelectItem value="EXW">EXW - Ex Works</SelectItem>
+                        <SelectItem value="FCA">FCA - Free Carrier</SelectItem>
+                        <SelectItem value="CPT">CPT - Carriage Paid To</SelectItem>
+                        <SelectItem value="CIP">CIP - Carriage & Insurance Paid</SelectItem>
+                        <SelectItem value="DAP">DAP - Delivered At Place</SelectItem>
+                        <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem>
+                        <SelectItem value="accepted">Accepted</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </CardContent>
         </Card>
 
