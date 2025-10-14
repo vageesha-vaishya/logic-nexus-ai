@@ -527,46 +527,41 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceTypes, isEditMode]);
 
-  // When service_type_id changes: filter services based on type
+  // When service_type_id changes: filter services based on type and auto-select
   useEffect(() => {
     if (isEditMode) return; // don't disturb existing selections in edit mode
-    (async () => {
-      try {
-        const currentTypeId = form.getValues('service_type_id');
-        const currentServiceId = form.getValues('service_id');
-        if (!currentTypeId) {
-          // No type selected: clear service
-          if (currentServiceId) form.setValue('service_id', '', { shouldDirty: true });
-          return;
-        }
+    if (!selectedServiceType) {
+      // No type selected: clear service
+      const currentServiceId = form.getValues('service_id');
+      if (currentServiceId) form.setValue('service_id', '', { shouldDirty: true });
+      return;
+    }
 
-        const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-        // Filter services by service_type_id
-        const matchingServices = services.filter((s: any) => 
-          String(s.service_type_id) === String(currentTypeId)
-        );
-        
-        // If current service doesn't match the type, select first matching service
-        if (currentServiceId) {
-          const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
-          if (!svc || String(svc.service_type_id) !== String(currentTypeId)) {
-            if (matchingServices.length > 0) {
-              form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
-            } else {
-              form.setValue('service_id', '', { shouldDirty: true });
-            }
-          }
-          return;
-        }
-
-        // If no service selected yet, select first matching service
+    // Filter services by service_type_id
+    const matchingServices = services.filter((s: any) => 
+      String(s.service_type_id) === String(selectedServiceType)
+    );
+    
+    const currentServiceId = form.getValues('service_id');
+    
+    // If current service doesn't match the type, select first matching service
+    if (currentServiceId) {
+      const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
+      if (!svc || String(svc.service_type_id) !== String(selectedServiceType)) {
         if (matchingServices.length > 0) {
           form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
+        } else {
+          form.setValue('service_id', '', { shouldDirty: true });
         }
-      } catch {}
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedServiceType, services, isEditMode]);
+      }
+      return;
+    }
+
+    // If no service selected yet, auto-select first matching service
+    if (matchingServices.length > 0) {
+      form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
+    }
+  }, [selectedServiceType, services, isEditMode, form]);
 
   const fetchData = async () => {
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
