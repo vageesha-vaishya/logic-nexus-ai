@@ -27,7 +27,7 @@ import {
 const quoteSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  service_type: z.enum(['ocean', 'air', 'trucking', 'courier', 'moving', 'railway_transport']).optional(),
+  service_type_id: z.string().optional(),
   service_id: z.string().optional(),
   incoterms: z.string().optional(),
   trade_direction: z.enum(['import', 'export']).optional(),
@@ -82,6 +82,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHydrating, setIsHydrating] = useState(false);
+  const [serviceTypes, setServiceTypes] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
   const [consignees, setConsignees] = useState<any[]>([]);
@@ -129,7 +130,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Keep inputs controlled from mount
       title: '',
       description: '',
-      service_type: undefined,
+      service_type_id: undefined,
       service_id: '',
       incoterms: '',
       trade_direction: undefined,
