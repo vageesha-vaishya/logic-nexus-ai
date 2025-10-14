@@ -165,7 +165,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (!tenantId) return;
     
     // Use RPC or direct query to avoid type inference issues
-    fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/service_types?tenant_id=eq.${tenantId}&is_active=eq.true&select=id,service_type_name,service_type_code,is_active`, {
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/service_types?tenant_id=eq.${tenantId}&is_active=eq.true&select=id,name,description,is_active`, {
       headers: {
         'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
@@ -643,7 +643,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (currentServiceTypeId) {
           // Get service type code to use for carrier filtering
           const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-          const serviceTypeCode = serviceType?.service_type_code || serviceType?.service_type_name;
+          const serviceTypeCode = serviceType?.name;
           
           if (serviceTypeCode) {
             const carriersRes = await supabase
@@ -877,7 +877,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     (async () => {
       // Get service type code to use for carrier filtering
       const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-      const serviceTypeCode = serviceType?.service_type_code || serviceType?.service_type_name;
+      const serviceTypeCode = serviceType?.name;
       
       if (!serviceTypeCode) {
         setCarriers([]);
@@ -1868,7 +1868,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       <SelectContent>
                         {serviceTypes.map((st: any) => (
                           <SelectItem key={st.id} value={String(st.id)}>
-                            {st.service_type_name}
+                            {st.name}
                           </SelectItem>
                         ))}
                         {serviceTypes.length === 0 && (
