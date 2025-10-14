@@ -17,15 +17,15 @@ type CargoDetail = {
   cargo_type_id: string | null;
   commodity_description: string | null;
   hs_code: string | null;
-  package_count: number;
-  total_weight_kg: number;
-  total_volume_cbm: number;
-  hazmat: boolean;
+  package_count: number | null;
+  total_weight_kg: number | null;
+  total_volume_cbm: number | null;
+  hazmat: boolean | null;
   hazmat_class: string | null;
-  temperature_controlled: boolean;
-  requires_special_handling: boolean;
+  temperature_controlled: boolean | null;
+  requires_special_handling: boolean | null;
   notes: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
 };
 
 export default function CargoDetails() {
@@ -47,7 +47,7 @@ export default function CargoDetails() {
         supabase.from("services").select("id, service_name, service_type, service_code").eq("tenant_id", context.tenantId),
         supabase.from("cargo_types").select("id, cargo_type_name").eq("tenant_id", context.tenantId),
       ]);
-      setDetails((cd || []) as any);
+      setDetails(cd || []);
       setServices(svc || []);
       setCargoTypes(ct || []);
     } catch (err: any) {
