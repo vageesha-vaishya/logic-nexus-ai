@@ -579,8 +579,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       let contactsList: any[] = [];
       let opportunitiesList: any[] = [];
 
-      // Build services query with fallback for platform admins when tenant is not resolved
-      let servicesQuery: any = supabase.from('services').select('*').eq('is_active', true);
+      // Build services query with service_types relationship
+      let servicesQuery: any = supabase
+        .from('services')
+        .select('*, service_types(id, name)')
+        .eq('is_active', true);
       if (tenantId) {
         servicesQuery = servicesQuery.eq('tenant_id', tenantId);
       }
@@ -1902,14 +1905,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           <SelectItem disabled value="__tenant_not_resolved__">Select an account to load services</SelectItem>
                         )}
                         {services
-                          .filter((s) => !selectedServiceType || canonicalType(s.service_type) === canonicalType(selectedServiceType))
+                          .filter((s) => !selectedServiceType || String(s.service_type_id) === String(selectedServiceType))
                           .map((service) => (
                             <SelectItem key={service.id} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
                           ))}
                         {/* Fallback when there are services but none match the selected type */}
-                        {selectedServiceType && services.filter((s) => canonicalType(s.service_type) === canonicalType(selectedServiceType)).length === 0 && (
+                        {selectedServiceType && services.filter((s) => String(s.service_type_id) === String(selectedServiceType)).length === 0 && (
                           <SelectItem disabled value="__no_services_for_type__">No services for selected type</SelectItem>
                         )}
                         {services.length === 0 && (

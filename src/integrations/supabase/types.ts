@@ -3157,6 +3157,7 @@ export type Database = {
           service_code: string
           service_name: string
           service_type: string
+          service_type_id: string | null
           tenant_id: string
           transit_time_days: number | null
           updated_at: string | null
@@ -3172,6 +3173,7 @@ export type Database = {
           service_code: string
           service_name: string
           service_type: string
+          service_type_id?: string | null
           tenant_id: string
           transit_time_days?: number | null
           updated_at?: string | null
@@ -3187,11 +3189,19 @@ export type Database = {
           service_code?: string
           service_name?: string
           service_type?: string
+          service_type_id?: string | null
           tenant_id?: string
           transit_time_days?: number | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "services_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "services_tenant_id_fkey"
             columns: ["tenant_id"]
