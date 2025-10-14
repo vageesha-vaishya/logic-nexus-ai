@@ -537,9 +537,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       return;
     }
 
-    // Filter services by service_type_id
+    // Filter services by service_type_id (FK) or nested relation fallback
     const matchingServices = services.filter((s: any) => 
-      String(s.service_type_id) === String(selectedServiceType)
+      String(s.service_type_id) === String(selectedServiceType) ||
+      String(s?.service_types?.id || '') === String(selectedServiceType)
     );
     
     const currentServiceId = form.getValues('service_id');
@@ -547,7 +548,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     // If current service doesn't match the type, select first matching service
     if (currentServiceId) {
       const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
-      if (!svc || String(svc.service_type_id) !== String(selectedServiceType)) {
+      const svcTypeId = String(svc?.service_type_id || '');
+      const svcRelTypeId = String(svc?.service_types?.id || '');
+      if (!svc || (svcTypeId !== String(selectedServiceType) && svcRelTypeId !== String(selectedServiceType))) {
         if (matchingServices.length > 0) {
           form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
         } else {
@@ -1900,14 +1903,20 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           <SelectItem disabled value="__tenant_not_resolved__">Select an account to load services</SelectItem>
                         )}
                         {services
-                          .filter((s) => !selectedServiceType || String(s.service_type_id) === String(selectedServiceType))
+                          .filter((s) => !selectedServiceType 
+                            || String(s.service_type_id) === String(selectedServiceType)
+                            || String((s as any)?.service_types?.id || '') === String(selectedServiceType)
+                          )
                           .map((service) => (
                             <SelectItem key={service.id} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
                           ))}
                         {/* Fallback when there are services but none match the selected type */}
-                        {selectedServiceType && services.filter((s) => String(s.service_type_id) === String(selectedServiceType)).length === 0 && (
+                        {selectedServiceType && services.filter((s) => 
+                          String(s.service_type_id) === String(selectedServiceType)
+                          || String((s as any)?.service_types?.id || '') === String(selectedServiceType)
+                        ).length === 0 && (
                           <SelectItem disabled value="__no_services_for_type__">No services for selected type</SelectItem>
                         )}
                         {services.length === 0 && (
