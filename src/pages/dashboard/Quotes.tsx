@@ -57,31 +57,31 @@ export default function Quotes() {
       try {
         const { data, error } = await supabase
           .from('quotes')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50);
-        
-        if (error) throw error;
+      .select('*, service_types:service_type_id(service_type_name, service_type_code)')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) throw error;
 
-        // Fetch related data separately
-        const quotesWithRelations = await Promise.all(
-          (data || []).map(async (quote) => {
-            const [account, contact, opportunity, carrier] = await Promise.all([
-              quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,
-              quote.contact_id ? supabase.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
-              quote.opportunity_id ? supabase.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
-              quote.carrier_id ? supabase.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
-            ]);
+    // Fetch related data separately
+    const quotesWithRelations = await Promise.all(
+      (data || []).map(async (quote) => {
+        const [account, contact, opportunity, carrier] = await Promise.all([
+          quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,
+          quote.contact_id ? supabase.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
+          quote.opportunity_id ? supabase.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
+          quote.carrier_id ? supabase.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
+        ]);
 
-            return {
-              ...quote,
-              accounts: account?.data || null,
-              contacts: contact?.data || null,
-              opportunities: opportunity?.data || null,
-              carriers: carrier?.data || null,
-            };
-          })
-        );
+        return {
+          ...quote,
+          accounts: account?.data || null,
+          contacts: contact?.data || null,
+          opportunities: opportunity?.data || null,
+          carriers: carrier?.data || null,
+        };
+      })
+    );
 
         setQuotes(quotesWithRelations);
       } catch (err: any) {
