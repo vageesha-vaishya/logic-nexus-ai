@@ -12,20 +12,20 @@ INSERT INTO carriers (carrier_name, carrier_type, is_active) VALUES
   ('Yang Ming Marine Transport Corporation', 'ocean', true),
 
   -- Air Cargo Carriers
-  ('FedEx Express', 'air', true),
-  ('UPS Airlines', 'air', true),
-  ('DHL Aviation', 'air', true),
-  ('Qatar Airways Cargo', 'air', true),
-  ('Emirates SkyCargo', 'air', true),
-  ('Cathay Pacific Cargo', 'air', true),
-  ('Lufthansa Cargo', 'air', true),
-  ('Korean Air Cargo', 'air', true),
-  ('Singapore Airlines Cargo', 'air', true),
-  ('Cargolux', 'air', true),
+  ('FedEx Express', 'air_cargo', true),
+  ('UPS Airlines', 'air_cargo', true),
+  ('DHL Aviation', 'air_cargo', true),
+  ('Qatar Airways Cargo', 'air_cargo', true),
+  ('Emirates SkyCargo', 'air_cargo', true),
+  ('Cathay Pacific Cargo', 'air_cargo', true),
+  ('Lufthansa Cargo', 'air_cargo', true),
+  ('Korean Air Cargo', 'air_cargo', true),
+  ('Singapore Airlines Cargo', 'air_cargo', true),
+  ('Cargolux', 'air_cargo', true),
 
-  -- Trucking Companies
-  ('UPS', 'trucking', true),
-  ('FedEx', 'trucking', true),
+  -- Trucking & Courier Companies
+  ('UPS', 'courier', true),
+  ('FedEx', 'courier', true),
   ('XPO Logistics', 'trucking', true),
   ('J.B. Hunt Transport Services', 'trucking', true),
   ('Knight-Swift Transportation', 'trucking', true),
@@ -33,4 +33,11 @@ INSERT INTO carriers (carrier_name, carrier_type, is_active) VALUES
   ('Werner Enterprises', 'trucking', true),
   ('U.S. Xpress Enterprises', 'trucking', true),
   ('Old Dominion Freight Line', 'trucking', true),
-  ('YRC Worldwide', 'trucking', true);
+  ('YRC Worldwide', 'trucking', true),
+
+  -- Movers and Packers
+  ('Allied Van Lines', 'movers_and_packers', true),
+  ('North American Van Lines', 'movers_and_packers', true),
+  ('Atlas Van Lines', 'movers_and_packers', true),
+  ('United Van Lines', 'movers_and_packers', true),
+  ('Mayflower Transit', 'movers_and_packers', true);
