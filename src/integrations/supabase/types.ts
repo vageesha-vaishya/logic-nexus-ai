@@ -2505,6 +2505,7 @@ export type Database = {
           product_name: string
           quantity: number
           quote_id: string
+          service_type_id: string | null
           special_instructions: string | null
           tax_amount: number | null
           tax_percent: number | null
@@ -2527,6 +2528,7 @@ export type Database = {
           product_name: string
           quantity?: number
           quote_id: string
+          service_type_id?: string | null
           special_instructions?: string | null
           tax_amount?: number | null
           tax_percent?: number | null
@@ -2549,6 +2551,7 @@ export type Database = {
           product_name?: string
           quantity?: number
           quote_id?: string
+          service_type_id?: string | null
           special_instructions?: string | null
           tax_amount?: number | null
           tax_percent?: number | null
@@ -2563,6 +2566,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
@@ -2747,7 +2757,7 @@ export type Database = {
           rejected_at: string | null
           sell_price: number | null
           service_id: string | null
-          service_type: string | null
+          service_type_id: string | null
           shipping_address: Json | null
           shipping_amount: number | null
           special_handling: Json | null
@@ -2798,7 +2808,7 @@ export type Database = {
           rejected_at?: string | null
           sell_price?: number | null
           service_id?: string | null
-          service_type?: string | null
+          service_type_id?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
           special_handling?: Json | null
@@ -2849,7 +2859,7 @@ export type Database = {
           rejected_at?: string | null
           sell_price?: number | null
           service_id?: string | null
-          service_type?: string | null
+          service_type_id?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
           special_handling?: Json | null
@@ -2912,6 +2922,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
@@ -3140,6 +3157,7 @@ export type Database = {
           service_code: string
           service_name: string
           service_type: string
+          service_type_id: string | null
           tenant_id: string
           transit_time_days: number | null
           updated_at: string | null
@@ -3155,6 +3173,7 @@ export type Database = {
           service_code: string
           service_name: string
           service_type: string
+          service_type_id?: string | null
           tenant_id: string
           transit_time_days?: number | null
           updated_at?: string | null
@@ -3170,11 +3189,19 @@ export type Database = {
           service_code?: string
           service_name?: string
           service_type?: string
+          service_type_id?: string | null
           tenant_id?: string
           transit_time_days?: number | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "services_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "services_tenant_id_fkey"
             columns: ["tenant_id"]
