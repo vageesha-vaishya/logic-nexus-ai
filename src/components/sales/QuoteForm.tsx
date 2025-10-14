@@ -161,11 +161,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   // Fetch service types
   useEffect(() => {
-    const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
-    if (!tenantId) return;
-    
-    // Use RPC or direct query to avoid type inference issues
-    fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/service_types?tenant_id=eq.${tenantId}&is_active=eq.true&select=id,name,description,is_active`, {
+    // Fetch all active service types (no tenant filtering since service_types doesn't have tenant_id)
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/service_types?is_active=eq.true&select=id,name,description,is_active`, {
       headers: {
         'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
