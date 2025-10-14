@@ -52,67 +52,19 @@ export default function Carriers() {
     }
 
     return searchTerms.every(term => {
-      const parts = term.split(':');
-      const field = parts.length > 1 ? parts[0] : 'global';
-      const value = parts.length > 1 ? parts[1] : parts[0];
-
-      if (field === 'global') {
-        const values = [
-          carrier.carrier_name,
-          context.isPlatformAdmin && (tenantNameById[carrier.tenant_id] || carrier.tenant_id),
-          carrier.carrier_code,
-          carrier.carrier_type,
-          carrier.contact_person,
-          carrier.contact_email,
-          carrier.rating?.toString(),
-          carrier.is_active ? 'active' : 'inactive',
-        ];
-        return values.some((val) =>
-          val?.toString().toLowerCase().includes(value)
-        );
-      }
-
-      // Field-specific search
-      switch (field) {
-        case 'name':
-          return carrier.carrier_name?.toLowerCase().includes(value);
-        case 'tenant':
-          return context.isPlatformAdmin && (tenantNameById[carrier.tenant_id] || carrier.tenant_id)?.toLowerCase().includes(value);
-        case 'code':
-          return carrier.carrier_code?.toLowerCase().includes(value);
-        case 'type':
-          return carrier.carrier_type?.toLowerCase().includes(value);
-        case 'contact':
-          return `${carrier.contact_person} ${carrier.contact_email}`.toLowerCase().includes(value);
-        case 'rating':
-          const ratingValue = parseFloat(carrier.rating);
-          if (isNaN(ratingValue)) return false;
-
-          const ratingFilter = value.trim();
-          const operatorMatch = ratingFilter.match(/^(>=|<=|>|<)/);
-          const operator = operatorMatch ? operatorMatch[0] : null;
-          const filterValueString = operator ? ratingFilter.substring(operator.length) : ratingFilter;
-          const filterValue = parseFloat(filterValueString);
-
-          if (isNaN(filterValue)) return false;
-
-          switch (operator) {
-            case '>=':
-              return ratingValue >= filterValue;
-            case '<=':
-              return ratingValue <= filterValue;
-            case '>':
-              return ratingValue > filterValue;
-            case '<':
-              return ratingValue < filterValue;
-            default:
-              return ratingValue === filterValue;
-          }
-        case 'status':
-          return (carrier.is_active ? 'active' : 'inactive').includes(value);
-        default:
-          return false; // Unknown field
-      }
+      const values = [
+        carrier.carrier_name,
+        context.isPlatformAdmin && (tenantNameById[carrier.tenant_id] || carrier.tenant_id),
+        carrier.carrier_code,
+        carrier.carrier_type,
+        carrier.contact_person,
+        carrier.contact_email,
+        carrier.rating?.toString(),
+        carrier.is_active ? 'active' : 'inactive',
+      ];
+      return values.some((val) =>
+        val?.toString().toLowerCase().includes(term)
+      );
     });
   });
 
@@ -163,6 +115,61 @@ export default function Carriers() {
     setItemsPerPage(parseInt(value, 10));
     setCurrentPage(1);
   };
+
+  const PaginationControls = () => (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground">
+        {sortedAndFilteredCarriers.length} carriers
+      </span>
+      <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+        <SelectTrigger className="w-24">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="10">10 per page</SelectItem>
+          <SelectItem value="20">20 per page</SelectItem>
+          <SelectItem value="50">50 per page</SelectItem>
+          <SelectItem value="100">100 per page</SelectItem>
+          <SelectItem value={sortedAndFilteredCarriers.length.toString()}>All</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(1)}
+        disabled={currentPage === 1}
+      >
+        First
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        Previous
+      </Button>
+      <span className="text-sm">
+        Page {currentPage} of {totalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        Next
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(totalPages)}
+        disabled={currentPage === totalPages}
+      >
+        Last
+      </Button>
+    </div>
+  );
 
   useEffect(() => {
     if (context.isPlatformAdmin) {
@@ -220,69 +227,7 @@ export default function Carriers() {
 
       if (error) throw error;
       const rows = data || [];
-      // Dev-only: auto-seed a few demo carriers if none exist (only when tenant scoped)
-      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
-        try {
-          await supabase.from('carriers').insert([
-            {
-              tenant_id: tenantId,
-              carrier_name: 'Maersk',
-              carrier_code: 'MAEU',
-              carrier_type: 'ocean',
-              contact_person: 'Alex Jensen',
-              contact_email: 'alex@maersk.example',
-              contact_phone: '+1-555-3001',
-              rating: 4.6,
-              is_active: true,
-            },
-            {
-              tenant_id: tenantId,
-              carrier_name: 'DHL Express',
-              carrier_code: 'DHL',
-              carrier_type: 'courier',
-              contact_person: 'Taylor Reed',
-              contact_email: 'taylor@dhl.example',
-              contact_phone: '+1-555-3002',
-              rating: 4.4,
-              is_active: true,
-            },
-            {
-              tenant_id: tenantId,
-              carrier_name: 'United Cargo',
-              carrier_code: 'UA',
-              carrier_type: 'air',
-              contact_person: 'Jordan Kim',
-              contact_email: 'jordan@united.example',
-              contact_phone: '+1-555-3003',
-              rating: 4.2,
-              is_active: true,
-            },
-            {
-              tenant_id: tenantId,
-              carrier_name: 'Swift Trucking',
-              carrier_code: 'SWFT',
-              carrier_type: 'trucking',
-              contact_person: 'Morgan Lee',
-              contact_email: 'morgan@swift.example',
-              contact_phone: '+1-555-3004',
-              rating: 4.0,
-              is_active: true,
-            },
-          ]);
-          toast.success('Seeded demo carriers');
-          const { data: seeded } = await supabase
-            .from('carriers')
-            .select('*')
-            .eq('tenant_id', tenantId as string)
-            .order('carrier_name');
-          setCarriers(seeded || []);
-        } catch (seedErr: any) {
-          console.warn('Carrier seed failed:', seedErr?.message || seedErr);
-          setCarriers([]);
-        }
-      } else {
-        setCarriers(rows);
-      }
+      setCarriers(rows);
     } catch (error: any) {
       toast.error('Failed to load carriers', {
         description: error.message,
@@ -341,17 +286,18 @@ export default function Carriers() {
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>All Carriers</CardTitle>
-            <div className="mt-4">
+            <PaginationControls />
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
               <Input
                 placeholder="Search carriers (e.g., name:Maersk type:ocean status:active)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </CardHeader>
-          <CardContent>
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">Loading carriers...</div>
             ) : sortedAndFilteredCarriers.length === 0 ? (
@@ -371,10 +317,6 @@ export default function Carriers() {
                       Tenant
                       {sortConfig.key === 'tenant_id' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
                       </TableHead>}
-                    <TableHead className="cursor-pointer" onClick={() => requestSort('carrier_code')}>
-                      Code
-                      {sortConfig.key === 'carrier_code' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
-                      </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => requestSort('carrier_type')}>
                       Type
                       {sortConfig.key === 'carrier_type' && (sortConfig.direction === 'ascending' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />)}
@@ -400,7 +342,6 @@ export default function Carriers() {
                       {context.isPlatformAdmin && (
                         <TableCell>{tenantNameById[carrier.tenant_id] || carrier.tenant_id || '—'}</TableCell>
                       )}
-                      <TableCell>{carrier.carrier_code || 'N/A'}</TableCell>
                       <TableCell>
                         {carrier.carrier_type && (
                           <Badge variant="outline">
@@ -440,57 +381,8 @@ export default function Carriers() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing {paginatedCarriers.length} of {sortedAndFilteredCarriers.length} carriers.
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10 per page</SelectItem>
-                      <SelectItem value="20">20 per page</SelectItem>
-                      <SelectItem value="50">50 per page</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(1)}
-                    disabled={currentPage === 1}
-                  >
-                    First
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    Last
-                  </Button>
-                </div>
+              <div className="flex items-center justify-end mt-4">
+                <PaginationControls />
               </div>
               </>
             )}
