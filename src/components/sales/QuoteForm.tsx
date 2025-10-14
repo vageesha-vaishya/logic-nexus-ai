@@ -164,10 +164,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
     if (!tenantId) return;
     
-    (async () => {
-      const res: any = await supabase.from('service_types').select('*').eq('tenant_id', tenantId).eq('is_active', true);
-      if (res.data) setServiceTypes(res.data);
-    })();
+    // Use RPC or direct query to avoid type inference issues
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/service_types?tenant_id=eq.${tenantId}&is_active=eq.true&select=id,service_type_name,service_type_code,is_active`, {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+      }
+    })
+    .then(res => res.json())
+    .then((data: any[]) => setServiceTypes(data))
+    .catch(err => console.warn('Error loading service types:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context.tenantId, resolvedTenantId]);
 
   // Trigger data fetch when tenant is resolved from selected account or other context
