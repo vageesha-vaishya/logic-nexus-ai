@@ -17,15 +17,15 @@ type CargoDetail = {
   cargo_type_id: string | null;
   commodity_description: string | null;
   hs_code: string | null;
-  package_count: number | null;
-  total_weight_kg: number | null;
-  total_volume_cbm: number | null;
-  hazmat: boolean | null;
+  package_count: number;
+  total_weight_kg: number;
+  total_volume_cbm: number;
+  hazmat: boolean;
   hazmat_class: string | null;
-  temperature_controlled: boolean | null;
-  requires_special_handling: boolean | null;
+  temperature_controlled: boolean;
+  requires_special_handling: boolean;
   notes: string | null;
-  is_active: boolean | null;
+  is_active: boolean;
 };
 
 export default function CargoDetails() {
