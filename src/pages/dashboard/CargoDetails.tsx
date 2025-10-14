@@ -47,7 +47,7 @@ export default function CargoDetails() {
         supabase.from("services").select("id, service_name, service_type, service_code").eq("tenant_id", context.tenantId),
         supabase.from("cargo_types").select("id, cargo_type_name").eq("tenant_id", context.tenantId),
       ]);
-      setDetails((cd || []) as CargoDetail[]);
+      setDetails((cd || []) as any);
       setServices(svc || []);
       setCargoTypes(ct || []);
     } catch (err: any) {
