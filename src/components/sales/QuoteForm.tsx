@@ -537,10 +537,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       return;
     }
 
-    // Filter services by service_type_id (FK) or nested relation fallback
-    const matchingServices = services.filter((s: any) => 
-      String(s.service_type_id) === String(selectedServiceType) ||
-      String(s?.service_types?.id || '') === String(selectedServiceType)
+    // Determine selected service type name for legacy text-based matching
+    const selectedTypeName = (() => {
+      const st = serviceTypes.find((t: any) => String(t.id) === String(selectedServiceType));
+      return st?.name || '';
+    })();
+
+    // Filter services by service_type_id (FK), nested relation (if present), or legacy text column
+    const matchingServices = services.filter((s: any) =>
+      String(s.service_type_id || '') === String(selectedServiceType) ||
+      String((s as any)?.service_types?.id || '') === String(selectedServiceType) ||
+      (selectedTypeName && String((s as any)?.service_type || '') === String(selectedTypeName))
     );
     
     const currentServiceId = form.getValues('service_id');
@@ -549,8 +556,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (currentServiceId) {
       const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
       const svcTypeId = String(svc?.service_type_id || '');
-      const svcRelTypeId = String(svc?.service_types?.id || '');
-      if (!svc || (svcTypeId !== String(selectedServiceType) && svcRelTypeId !== String(selectedServiceType))) {
+      const svcRelTypeId = String((svc as any)?.service_types?.id || '');
+      const svcTextType = String((svc as any)?.service_type || '');
+      const matches = svc && (
+        svcTypeId === String(selectedServiceType) ||
+        svcRelTypeId === String(selectedServiceType) ||
+        (selectedTypeName && svcTextType === selectedTypeName)
+      );
+      if (!matches) {
         if (matchingServices.length > 0) {
           form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
         } else {
@@ -564,7 +577,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (matchingServices.length > 0) {
       form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
     }
-  }, [selectedServiceType, services, isEditMode, form]);
+  }, [selectedServiceType, services, serviceTypes, isEditMode, form]);
 
   const fetchData = async () => {
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
@@ -577,10 +590,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       let contactsList: any[] = [];
       let opportunitiesList: any[] = [];
 
-      // Build services query with service_types relationship
+      // Build services query without relying on nested relation (safer across schemas)
       let servicesQuery: any = supabase
         .from('services')
-        .select('*, service_types(id, name)')
+        .select('id, service_name, service_type_id, service_type, tenant_id, is_active')
         .eq('is_active', true);
       if (tenantId) {
         servicesQuery = servicesQuery.eq('tenant_id', tenantId);
@@ -598,23 +611,34 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           supabase.from('package_sizes').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         ]);
 
-        if (servicesRes.error) throw servicesRes.error;
+        // Fallback: if tenant-scoped services are empty or error, try global active services
+        let finalServices = servicesRes?.data || [];
+        if (servicesRes?.error || finalServices.length === 0) {
+          try {
+            const { data: globalServices } = await supabase
+              .from('services')
+              .select('id, service_name, service_type_id, service_type, tenant_id, is_active')
+              .eq('is_active', true);
+            finalServices = globalServices || [];
+          } catch {}
+        }
+
         if (consigneesRes.error) throw consigneesRes.error;
         if (portsRes.error) throw portsRes.error;
         if (accountsRes.error) throw accountsRes.error;
         if (contactsRes.error) throw contactsRes.error;
         if (opportunitiesRes.error) throw opportunitiesRes.error;
-      if (pkgCatsRes.error) throw pkgCatsRes.error;
-      if (pkgSizesRes.error) throw pkgSizesRes.error;
+        if (pkgCatsRes.error) throw pkgCatsRes.error;
+        if (pkgSizesRes.error) throw pkgSizesRes.error;
 
-        setServices(servicesRes.data || []);
+        setServices(finalServices);
         setConsignees(consigneesRes.data || []);
         setPorts(portsRes.data || []);
         setAccounts(accountsRes.data || []);
         setContacts(contactsRes.data || []);
         setOpportunities(opportunitiesRes.data || []);
-      setPackageCategories(pkgCatsRes.data || []);
-      setPackageSizes(pkgSizesRes.data || []);
+        setPackageCategories(pkgCatsRes.data || []);
+        setPackageSizes(pkgSizesRes.data || []);
 
         // Fallback: if tenant-scoped lists are empty, attempt global fetch (subject to RLS)
         try {
@@ -1903,10 +1927,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           <SelectItem disabled value="__tenant_not_resolved__">Select an account to load services</SelectItem>
                         )}
                         {services
-                          .filter((s) => !selectedServiceType 
-                            || String(s.service_type_id) === String(selectedServiceType)
-                            || String((s as any)?.service_types?.id || '') === String(selectedServiceType)
-                          )
+                          .filter((s) => {
+                            if (!selectedServiceType) return true;
+                            const matchId = String((s as any)?.service_type_id || '') === String(selectedServiceType);
+                            const matchRel = String((s as any)?.service_types?.id || '') === String(selectedServiceType);
+                            const st = serviceTypes.find((t: any) => String(t.id) === String(selectedServiceType));
+                            const typeName = st?.name;
+                            const matchText = typeName ? String((s as any)?.service_type || '') === String(typeName) : false;
+                            return matchId || matchRel || matchText;
+                          })
                           .map((service) => (
                             <SelectItem key={service.id} value={String(service.id)}>
                               {service.service_name}
