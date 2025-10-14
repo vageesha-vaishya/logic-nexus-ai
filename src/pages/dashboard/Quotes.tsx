@@ -57,7 +57,10 @@ export default function Quotes() {
       try {
         const { data, error } = await supabase
           .from('quotes')
-          .select('*')
+          .select(`
+            *,
+            service_types:service_type_id(name)
+          `)
           .order('created_at', { ascending: false })
           .limit(50);
         
