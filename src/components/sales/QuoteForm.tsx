@@ -200,27 +200,43 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Extract unique service types for dropdown (codes like 'ocean', 'air')
       const uniqueServiceTypes = [...new Set(mappingRows.map((m: any) => String(m.service_type)))];
 
-      // Resolve codes to canonical service_types (UUID id + code + name)
+      // Resolve codes to canonical service_types (UUID id + name, map name to code for compatibility)
       let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
       if (uniqueServiceTypes.length > 0) {
         const { data: typesData, error: typesErr } = await (supabase as any)
           .from('service_types')
-          .select('id, code, name')
-          .in('code', uniqueServiceTypes as any);
+          .select('id, name')
+          .in('name', uniqueServiceTypes as any);
         if (typesErr) {
-          console.warn('Failed to resolve service_types by code, falling back to codes:', typesErr);
+          console.warn('Failed to resolve service_types by name, falling back to codes:', typesErr);
         }
         if (Array.isArray(typesData) && typesData.length > 0) {
-          serviceTypesForDropdown = typesData.map((t: any) => ({ id: String(t.id), code: String(t.code), name: t.name || String(t.code) }));
+          serviceTypesForDropdown = typesData.map((t: any) => ({ 
+            id: String(t.id), 
+            code: String(t.name), // Map name to code for backward compatibility
+            name: t.name || String(t.name) 
+          }));
         }
       }
       // Fallback if service_types table didn't resolve some/any codes
-      if (serviceTypesForDropdown.length === 0) {
-        serviceTypesForDropdown = uniqueServiceTypes.map((code: string) => ({
-          id: code, // fallback: id as code (not ideal, but prevents UI break)
+      // Create a mapping for unresolved service types, but don't use them as IDs to avoid UUID errors
+      const resolvedNames = new Set(serviceTypesForDropdown.map(st => st.code));
+      const unresolvedTypes = uniqueServiceTypes.filter(code => !resolvedNames.has(code));
+      
+      if (unresolvedTypes.length > 0) {
+        console.warn('Some service types could not be resolved to UUIDs:', unresolvedTypes);
+        // Add unresolved types with empty ID to prevent UUID errors
+        const unresolvedMappings = unresolvedTypes.map((code: string) => ({
+          id: '', // Empty ID to prevent UUID errors - these won't be selectable
           code,
           name: code.charAt(0).toUpperCase() + code.slice(1).replace('_', ' '),
         }));
+        serviceTypesForDropdown = [...serviceTypesForDropdown, ...unresolvedMappings];
+      }
+      
+      // If no service types were resolved at all, show a warning
+      if (serviceTypesForDropdown.filter(st => st.id !== '').length === 0) {
+        console.warn('No service types could be resolved from the database. Please check service_types table.');
       }
       setServiceTypes(serviceTypesForDropdown);
 
@@ -1959,7 +1975,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       <Select
                         onValueChange={(value) => {
                           const selectedType = serviceTypes.find(st => st.id === value);
-                          if (selectedType) {
+                          if (selectedType && selectedType.id !== '') {
                             form.setValue('service_type_id', selectedType.id);
                             setSelectedServiceType(selectedType.code);
                             form.setValue('service_id', ''); // Reset service selection
@@ -1973,11 +1989,16 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {serviceTypes.map((st) => (
+                        {serviceTypes.filter(st => st.id !== '').map((st) => (
                           <SelectItem key={st.id} value={st.id}>
                             {st.name}
                           </SelectItem>
                         ))}
+                        {serviceTypes.filter(st => st.id !== '').length === 0 && (
+                          <SelectItem disabled value="__no_service_types__">
+                            No service types available
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
