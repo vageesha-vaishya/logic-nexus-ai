@@ -167,23 +167,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         return;
       }
 
-      // Fetch service types and services from service_type_mappings table
+      // Fetch service types and services for the current tenant using mapping table, then hydrate service records
       const { data: mappingsData, error: mappingsError } = await supabase
         .from('service_type_mappings')
-        .select(`
-          service_type,
-          service_id,
-          is_default,
-          priority,
-          services!inner (
-            id,
-            service_name,
-            is_active
-          )
-        `)
+        .select('service_type, service_id, is_default, priority')
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
-        .eq('services.is_active', true)
         .order('service_type')
         .order('priority', { ascending: false });
 
@@ -192,25 +181,44 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         throw mappingsError;
       }
 
-      // Extract unique service types
-      const uniqueServiceTypes = [...new Set(mappingsData?.map(m => m.service_type) || [])];
-      const serviceTypesForDropdown = uniqueServiceTypes.map(type => ({
-        id: type,
-        name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')
-      }));
+      const mappingRows = Array.isArray(mappingsData) ? mappingsData : [];
+      const serviceIds = [...new Set(mappingRows.map((m: any) => m.service_id).filter(Boolean))];
 
+      let servicesById: Record<string, any> = {};
+      if (serviceIds.length > 0) {
+        const { data: svcData, error: svcErr } = await supabase
+          .from('services')
+          .select('id, service_name, is_active')
+          .in('id', serviceIds)
+          .eq('is_active', true);
+        if (svcErr) throw svcErr;
+        for (const s of svcData || []) servicesById[String(s.id)] = s;
+      }
+
+      // Extract unique service types for dropdown
+      const uniqueServiceTypes = [...new Set(mappingRows.map((m: any) => String(m.service_type)))];
+      const serviceTypesForDropdown = uniqueServiceTypes.map((type: string) => ({
+        id: type,
+        name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
+      }));
       setServiceTypes(serviceTypesForDropdown);
 
-      // Extract services with their mapped service types
-      const servicesForDropdown = mappingsData?.map(mapping => ({
-        id: mapping.services.id,
-        service_name: mapping.services.service_name,
-        service_type: mapping.service_type,
-        is_default: mapping.is_default,
-        priority: mapping.priority
-      })) || [];
+      // Build services list matched to mappings and available service records
+      const servicesForDropdown = mappingRows
+        .map((m: any) => {
+          const svc = servicesById[String(m.service_id)];
+          if (!svc) return null;
+          return {
+            id: svc.id,
+            service_name: svc.service_name,
+            service_type: m.service_type,
+            is_default: m.is_default,
+            priority: m.priority,
+          };
+        })
+        .filter(Boolean);
 
-      setServices(servicesForDropdown);
+      setServices(servicesForDropdown as any[]);
 
     } catch (error) {
       console.error('Error loading service data:', error);
@@ -221,7 +229,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   useEffect(() => {
     fetchData();
     fetchServiceData();
-  }, []);
+    // Re-run when tenant context resolves so mappings/services populate
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context.tenantId, resolvedTenantId]);
 
   // Pre-populate with user's last used values for new quotes
   // Only runs after opportunities/accounts/contacts data is loaded
@@ -1960,7 +1970,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       <SelectContent>
                         {filteredServices.length > 0 ? (
                           filteredServices.map((service) => (
-                            <SelectItem key={service.id} value={service.id}>
+                            <SelectItem key={String(service.id)} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
                           ))
