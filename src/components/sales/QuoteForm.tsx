@@ -201,6 +201,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       const uniqueServiceTypes = [...new Set(mappingRows.map((m: any) => String(m.service_type)))];
       const serviceTypesForDropdown = uniqueServiceTypes.map((type: string) => ({
         id: type,
+        code: type,
         name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
       }));
       setServiceTypes(serviceTypesForDropdown);
