@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 type ServiceTypeRow = {
   id: string;
   name: string;
+  code: string;
   description: string | null;
   is_active: boolean;
 };
@@ -24,6 +25,7 @@ export default function ServiceTypes() {
   const [types, setTypes] = useState<ServiceTypeRow[]>([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
   // Search / filter / sort
@@ -35,6 +37,7 @@ export default function ServiceTypes() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<ServiceTypeRow | null>(null);
   const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
 
@@ -60,6 +63,7 @@ export default function ServiceTypes() {
 
   const resetForm = () => {
     setName('');
+    setCode('');
     setDescription('');
     setIsActive(true);
   };
@@ -67,6 +71,7 @@ export default function ServiceTypes() {
   const resetEditForm = () => {
     setEditingRow(null);
     setEditName('');
+    setEditCode('');
     setEditDescription('');
     setEditIsActive(true);
   };
@@ -81,7 +86,16 @@ export default function ServiceTypes() {
         toast.error('Type name is required');
         return;
       }
-      const payload = { name: name.trim(), description: description || null, is_active: isActive } as any;
+      if (!code.trim()) {
+        toast.error('Type code is required');
+        return;
+      }
+      const payload = { 
+        name: name.trim(), 
+        code: code.trim().toLowerCase(),
+        description: description || null, 
+        is_active: isActive 
+      } as any;
       const { error } = await (supabase as any).from('service_types').insert([payload]);
       if (error) throw error;
       toast.success('Service type created');
@@ -131,6 +145,7 @@ export default function ServiceTypes() {
   const openEdit = (row: ServiceTypeRow) => {
     setEditingRow(row);
     setEditName(row.name);
+    setEditCode(row.code);
     setEditDescription(row.description || '');
     setEditIsActive(row.is_active);
     setEditOpen(true);
@@ -147,8 +162,13 @@ export default function ServiceTypes() {
         toast.error('Type name is required');
         return;
       }
+      if (!editCode.trim()) {
+        toast.error('Type code is required');
+        return;
+      }
       const payload = {
         name: editName.trim(),
+        code: editCode.trim().toLowerCase(),
         description: editDescription || null,
         is_active: editIsActive,
       } as any;
@@ -217,7 +237,11 @@ export default function ServiceTypes() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Name</label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. inland_waterway" />
+                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ocean Freight" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Code</label>
+                    <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. ocean" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Description</label>
@@ -279,6 +303,7 @@ export default function ServiceTypes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Code</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
@@ -288,6 +313,7 @@ export default function ServiceTypes() {
               {visibleTypes.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-medium">{row.name}</TableCell>
+                  <TableCell className="font-mono text-sm">{row.code}</TableCell>
                   <TableCell>{row.description || '—'}</TableCell>
                   <TableCell>
                     <Badge variant={row.is_active ? 'default' : 'secondary'}>
@@ -321,6 +347,10 @@ export default function ServiceTypes() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Code</label>
+              <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Description</label>

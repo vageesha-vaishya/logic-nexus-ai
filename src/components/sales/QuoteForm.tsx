@@ -124,6 +124,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   const filteredServices = useMemo(() => {
     if (!selectedServiceType) return [];
+    // Filter services by the service_type code from the mapping table
     return services.filter(service => service.service_type === selectedServiceType);
   }, [selectedServiceType, services]);
 
@@ -200,28 +201,39 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Extract unique service types for dropdown (codes like 'ocean', 'air')
       const uniqueServiceTypes = [...new Set(mappingRows.map((m: any) => String(m.service_type)))];
 
-      // Resolve codes to canonical service_types (UUID id + name, map name to code for compatibility)
+      // Resolve codes to canonical service_types (UUID id + name + code)
       let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
       if (uniqueServiceTypes.length > 0) {
         const { data: typesData, error: typesErr } = await (supabase as any)
           .from('service_types')
-          .select('id, name')
-          .in('name', uniqueServiceTypes as any);
+          .select('id, name, code')
+          .in('code', uniqueServiceTypes as any);
         if (typesErr) {
-          console.warn('Failed to resolve service_types by name, falling back to codes:', typesErr);
-        }
-        if (Array.isArray(typesData) && typesData.length > 0) {
+          console.warn('Failed to resolve service_types by code, falling back to name lookup:', typesErr);
+          // Fallback to name lookup if code lookup fails
+          const { data: fallbackData, error: fallbackErr } = await (supabase as any)
+            .from('service_types')
+            .select('id, name, code')
+            .in('name', uniqueServiceTypes as any);
+          if (!fallbackErr && Array.isArray(fallbackData)) {
+            serviceTypesForDropdown = fallbackData.map((t: any) => ({ 
+              id: String(t.id), 
+              code: String(t.code || t.name), 
+              name: t.name || String(t.name) 
+            }));
+          }
+        } else if (Array.isArray(typesData) && typesData.length > 0) {
           serviceTypesForDropdown = typesData.map((t: any) => ({ 
             id: String(t.id), 
-            code: String(t.name), // Map name to code for backward compatibility
-            name: t.name || String(t.name) 
+            code: String(t.code), 
+            name: t.name || String(t.code) 
           }));
         }
       }
       // Fallback if service_types table didn't resolve some/any codes
       // Create a mapping for unresolved service types, but don't use them as IDs to avoid UUID errors
-      const resolvedNames = new Set(serviceTypesForDropdown.map(st => st.code));
-      const unresolvedTypes = uniqueServiceTypes.filter(code => !resolvedNames.has(code));
+      const resolvedCodes = new Set(serviceTypesForDropdown.map(st => st.code));
+      const unresolvedTypes = uniqueServiceTypes.filter(code => !resolvedCodes.has(code));
       
       if (unresolvedTypes.length > 0) {
         console.warn('Some service types could not be resolved to UUIDs:', unresolvedTypes);
@@ -618,13 +630,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   // Sync selectedServiceType (code like 'ocean') whenever the UUID in the form changes
   useEffect(() => {
-    try {
-      if (!serviceTypeId) return;
-      const st = serviceTypes.find((t: any) => String(t.id) === String(serviceTypeId));
-      if (st && selectedServiceType !== st.code) {
-        setSelectedServiceType(st.code);
-      }
-    } catch {}
+    if (!serviceTypeId) {
+      setSelectedServiceType('');
+      return;
+    }
+    const st = serviceTypes.find((t: any) => String(t.id) === String(serviceTypeId));
+    if (st && selectedServiceType !== st.code) {
+      setSelectedServiceType(st.code);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceTypeId, serviceTypes]);
 
@@ -638,14 +651,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       return;
     }
 
-    // Determine current UUID from form
-    const currentTypeId = form.getValues('service_type_id');
-
-    // Filter services by UUID (FK) or legacy text code
+    // Filter services by the service_type code from the mapping table
     const matchingServices = services.filter((s: any) =>
-      String(s.service_type_id || '') === String(currentTypeId) ||
-      String((s as any)?.service_types?.id || '') === String(currentTypeId) ||
-      (selectedServiceType && String((s as any)?.service_type || '') === String(selectedServiceType))
+      String(s.service_type || '') === String(selectedServiceType)
     );
     
     const currentServiceId = form.getValues('service_id');
@@ -653,14 +661,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     // If current service doesn't match the type, select first matching service
     if (currentServiceId) {
       const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
-      const svcTypeId = String(svc?.service_type_id || '');
-      const svcRelTypeId = String((svc as any)?.service_types?.id || '');
       const svcTextType = String((svc as any)?.service_type || '');
-      const matches = svc && (
-        svcTypeId === String(currentTypeId) ||
-        svcRelTypeId === String(currentTypeId) ||
-        (selectedServiceType && svcTextType === selectedServiceType)
-      );
+      const matches = svc && (svcTextType === String(selectedServiceType));
       if (!matches) {
         if (matchingServices.length > 0) {
           form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
@@ -763,7 +765,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (currentServiceTypeId) {
           // Get service type code to use for carrier filtering
           const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-          const serviceTypeCode = serviceType?.id;
+          const serviceTypeCode = serviceType?.code;
           
           if (serviceTypeCode) {
             const carriersRes = await supabase
@@ -996,7 +998,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     (async () => {
       // Get service type code to use for carrier filtering
        const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-       const serviceTypeCode = serviceType?.id;
+       const serviceTypeCode = serviceType?.code;
       
       if (!serviceTypeCode) {
         setCarriers([]);
