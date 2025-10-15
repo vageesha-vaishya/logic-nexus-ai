@@ -197,13 +197,31 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         for (const s of svcData || []) servicesById[String(s.id)] = s;
       }
 
-      // Extract unique service types for dropdown
+      // Extract unique service types for dropdown (codes like 'ocean', 'air')
       const uniqueServiceTypes = [...new Set(mappingRows.map((m: any) => String(m.service_type)))];
-      const serviceTypesForDropdown = uniqueServiceTypes.map((type: string) => ({
-        id: type,
-        code: type,
-        name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
-      }));
+
+      // Resolve codes to canonical service_types (UUID id + code + name)
+      let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
+      if (uniqueServiceTypes.length > 0) {
+        const { data: typesData, error: typesErr } = await (supabase as any)
+          .from('service_types')
+          .select('id, code, name')
+          .in('code', uniqueServiceTypes as any);
+        if (typesErr) {
+          console.warn('Failed to resolve service_types by code, falling back to codes:', typesErr);
+        }
+        if (Array.isArray(typesData) && typesData.length > 0) {
+          serviceTypesForDropdown = typesData.map((t: any) => ({ id: String(t.id), code: String(t.code), name: t.name || String(t.code) }));
+        }
+      }
+      // Fallback if service_types table didn't resolve some/any codes
+      if (serviceTypesForDropdown.length === 0) {
+        serviceTypesForDropdown = uniqueServiceTypes.map((code: string) => ({
+          id: code, // fallback: id as code (not ideal, but prevents UI break)
+          code,
+          name: code.charAt(0).toUpperCase() + code.slice(1).replace('_', ' '),
+        }));
+      }
       setServiceTypes(serviceTypesForDropdown);
 
       // Build services list matched to mappings and available service records
@@ -576,7 +594,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       if (!currentTypeId && hasServiceTypes) {
         const defaultServiceType = serviceTypes[0];
         form.setValue('service_type_id', String(defaultServiceType.id), { shouldDirty: true });
-        setSelectedServiceType(String(defaultServiceType.id));
+        setSelectedServiceType(String(defaultServiceType.code));
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -604,17 +622,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       return;
     }
 
-    // Determine selected service type name for legacy text-based matching
-    const selectedTypeName = (() => {
-      const st = serviceTypes.find((t: any) => String(t.id) === String(selectedServiceType));
-      return st?.name || '';
-    })();
+    // Determine current UUID from form
+    const currentTypeId = form.getValues('service_type_id');
 
-    // Filter services by service_type_id (FK), nested relation (if present), or legacy text column
+    // Filter services by UUID (FK) or legacy text code
     const matchingServices = services.filter((s: any) =>
-      String(s.service_type_id || '') === String(selectedServiceType) ||
-      String((s as any)?.service_types?.id || '') === String(selectedServiceType) ||
-      (selectedTypeName && String((s as any)?.service_type || '') === String(selectedTypeName))
+      String(s.service_type_id || '') === String(currentTypeId) ||
+      String((s as any)?.service_types?.id || '') === String(currentTypeId) ||
+      (selectedServiceType && String((s as any)?.service_type || '') === String(selectedServiceType))
     );
     
     const currentServiceId = form.getValues('service_id');
@@ -626,9 +641,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       const svcRelTypeId = String((svc as any)?.service_types?.id || '');
       const svcTextType = String((svc as any)?.service_type || '');
       const matches = svc && (
-        svcTypeId === String(selectedServiceType) ||
-        svcRelTypeId === String(selectedServiceType) ||
-        (selectedTypeName && svcTextType === selectedTypeName)
+        svcTypeId === String(currentTypeId) ||
+        svcRelTypeId === String(currentTypeId) ||
+        (selectedServiceType && svcTextType === selectedServiceType)
       );
       if (!matches) {
         if (matchingServices.length > 0) {
@@ -1941,17 +1956,17 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service Type</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const selectedType = serviceTypes.find(st => st.id === value);
-                        if (selectedType) {
-                          form.setValue('service_type_id', selectedType.id);
-                          setSelectedServiceType(selectedType.id);
-                          form.setValue('service_id', ''); // Reset service selection
-                        }
-                      }}
-                      defaultValue={form.getValues('service_type_id')}
-                    >
+                      <Select
+                        onValueChange={(value) => {
+                          const selectedType = serviceTypes.find(st => st.id === value);
+                          if (selectedType) {
+                            form.setValue('service_type_id', selectedType.id);
+                            setSelectedServiceType(selectedType.code);
+                            form.setValue('service_id', ''); // Reset service selection
+                          }
+                        }}
+                        defaultValue={form.getValues('service_type_id')}
+                      >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a service type" />
