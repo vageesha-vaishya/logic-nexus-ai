@@ -107,6 +107,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   // Resolved labels for package categories and sizes that may be hidden by RLS/tenant scope
   const [resolvedPackageCategoryLabels, setResolvedPackageCategoryLabels] = useState<Record<string, string>>({});
   const [resolvedPackageSizeLabels, setResolvedPackageSizeLabels] = useState<Record<string, string>>({});
+  const debugHydration = import.meta.env.DEV;
   
   // Format carrier name defensively to avoid accidental repeated text in UI (e.g., "ABCABC")
   const formatCarrierName = (name: string) => {
@@ -124,8 +125,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   const filteredServices = useMemo(() => {
     if (!selectedServiceType) return [];
-    // Filter services by the service_type code from the mapping table
-    return services.filter(service => service.service_type === selectedServiceType);
+    // Filter services by canonical type to tolerate code/name variations
+    return services.filter(service => canonicalType(service.service_type) === canonicalType(selectedServiceType));
   }, [selectedServiceType, services]);
 
   const form = useForm<z.infer<typeof quoteSchema>>({
@@ -164,25 +165,21 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const fetchServiceData = async () => {
     try {
       const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
-      
-      if (!tenantId) {
-        console.warn('No tenant ID available for fetching service data');
-        return;
-      }
 
-      // Fetch service types and services for the current tenant using mapping table, then hydrate service records
-      const { data: mappingsData, error: mappingsError } = await supabase
+      let query = supabase
         .from('service_type_mappings')
         .select('service_type, service_id, is_default, priority')
-        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .order('service_type')
         .order('priority', { ascending: false });
 
-      if (mappingsError) {
-        console.error('Service mappings error:', mappingsError);
-        throw mappingsError;
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      } else {
+        query = query.is('tenant_id', null);
       }
+
+      const { data: mappingsData, error: mappingsError } = await query;
 
       const mappingRows = Array.isArray(mappingsData) ? mappingsData : [];
       const serviceIds = [...new Set(mappingRows.map((m: any) => m.service_id).filter(Boolean))];
@@ -204,36 +201,81 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Resolve codes to canonical service_types (UUID id + name + code)
       let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
       if (uniqueServiceTypes.length > 0) {
-        const { data: typesData, error: typesErr } = await (supabase as any)
+        // Normalize helper for matching codes/names
+        const normalize = (s: any) => String(s || '').trim().toLowerCase().replace(/[\s\-]+/g, '_');
+        const synonyms = (norm: string): string[] => {
+          switch (norm) {
+            case 'ocean':
+            case 'sea':
+            case 'ocean_freight':
+            case 'sea_freight':
+            case 'maritime':
+              return ['ocean', 'sea', 'ocean_freight', 'sea_freight', 'maritime'];
+            case 'air':
+            case 'air_freight':
+            case 'air_cargo':
+              return ['air', 'air_freight', 'air_cargo'];
+            case 'road':
+            case 'truck':
+            case 'trucking':
+            case 'land':
+            case 'road_freight':
+              return ['road', 'truck', 'trucking', 'land', 'road_freight'];
+            case 'rail':
+            case 'train':
+            case 'rail_freight':
+              return ['rail', 'train', 'rail_freight'];
+            default:
+              return [norm];
+          }
+        };
+
+        // Fetch all active service types once and build a flexible index
+        const { data: allTypes, error: typesErr } = await (supabase as any)
           .from('service_types')
           .select('id, name, code')
-          .in('code', uniqueServiceTypes as any);
-        if (typesErr) {
-          console.warn('Failed to resolve service_types by code, falling back to name lookup:', typesErr);
-          // Fallback to name lookup if code lookup fails
-          const { data: fallbackData, error: fallbackErr } = await (supabase as any)
-            .from('service_types')
-            .select('id, name, code')
-            .in('name', uniqueServiceTypes as any);
-          if (!fallbackErr && Array.isArray(fallbackData)) {
-            serviceTypesForDropdown = fallbackData.map((t: any) => ({ 
-              id: String(t.id), 
-              code: String(t.code || t.name), 
-              name: t.name || String(t.name) 
-            }));
+          .eq('is_active', true);
+        const index = new Map<string, any>();
+        if (!typesErr && Array.isArray(allTypes)) {
+          for (const t of allTypes) {
+            const codeNorm = normalize(t.code);
+            const nameNorm = normalize(t.name);
+            const keys = new Set([codeNorm, nameNorm, ...synonyms(codeNorm), ...synonyms(nameNorm)]);
+            for (const k of keys) {
+              if (k) index.set(k, t);
+            }
           }
-        } else if (Array.isArray(typesData) && typesData.length > 0) {
-          serviceTypesForDropdown = typesData.map((t: any) => ({ 
-            id: String(t.id), 
-            code: String(t.code), 
-            name: t.name || String(t.code) 
-          }));
+
+          const seen = new Set<string>();
+          for (const raw of uniqueServiceTypes) {
+            const norm = normalize(raw);
+            const keys = synonyms(norm);
+            let match: any = null;
+            for (const k of keys) {
+              if (index.has(k)) { match = index.get(k); break; }
+            }
+            if (match) {
+              const key = String(match.id);
+              if (!seen.has(key)) {
+                // IMPORTANT: Use the raw mapping code for `code` so downstream
+                // filtering against mappingRows/services (which store mapping codes)
+                // remains consistent. The `id`/`name` come from canonical service_types.
+                serviceTypesForDropdown.push({
+                  id: String(match.id),
+                  code: String(raw),
+                  name: match.name ?? String(match.code),
+                });
+                seen.add(key);
+              }
+            }
+          }
         }
       }
       // Fallback if service_types table didn't resolve some/any codes
       // Create a mapping for unresolved service types, but don't use them as IDs to avoid UUID errors
-      const resolvedCodes = new Set(serviceTypesForDropdown.map(st => st.code));
-      const unresolvedTypes = uniqueServiceTypes.filter(code => !resolvedCodes.has(code));
+      const normalizeMissing = (s: any) => String(s || '').trim().toLowerCase().replace(/[\s\-]+/g, '_');
+      const resolvedCodes = new Set(serviceTypesForDropdown.map(st => normalizeMissing(st.code)));
+      const unresolvedTypes = uniqueServiceTypes.filter(code => !resolvedCodes.has(normalizeMissing(code)));
       
       if (unresolvedTypes.length > 0) {
         console.warn('Some service types could not be resolved to UUIDs:', unresolvedTypes);
@@ -246,14 +288,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         serviceTypesForDropdown = [...serviceTypesForDropdown, ...unresolvedMappings];
       }
       
-      // If no service types were resolved at all, show a warning
-      if (serviceTypesForDropdown.filter(st => st.id !== '').length === 0) {
-        console.warn('No service types could be resolved from the database. Please check service_types table.');
-      }
-      setServiceTypes(serviceTypesForDropdown);
-
       // Build services list matched to mappings and available service records
-      const servicesForDropdown = mappingRows
+      let servicesForDropdown = mappingRows
         .map((m: any) => {
           const svc = servicesById[String(m.service_id)];
           if (!svc) return null;
@@ -265,8 +301,51 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             priority: m.priority,
           };
         })
-        .filter(Boolean);
+        .filter(Boolean) as any[];
 
+      // Robust fallback ONLY when no tenant is resolved (e.g., platform admin browsing globally).
+      // For tenant-specific flows, strictly rely on service_type_mappings.
+      const noResolvedTypes = serviceTypesForDropdown.filter(st => st.id !== '').length === 0;
+      const noServices = servicesForDropdown.length === 0;
+      if (!tenantId && (mappingsError || mappingRows.length === 0 || noResolvedTypes || noServices)) {
+        try {
+          // Fetch active service types globally
+          const { data: fallbackTypes } = await (supabase as any)
+            .from('service_types')
+            .select('id, name, code')
+            .eq('is_active', true)
+            .order('name');
+          if (Array.isArray(fallbackTypes) && fallbackTypes.length > 0) {
+            serviceTypesForDropdown = fallbackTypes.map((t: any) => ({
+              id: String(t.id),
+              code: String(t.code),
+              name: t.name || String(t.code),
+            }));
+          }
+
+          // Fetch services scoped to tenant when available; otherwise global active
+          let svcQuery = supabase
+            .from('services')
+            .select('id, service_name, service_type, tenant_id, is_active')
+            .eq('is_active', true)
+            .order('service_name');
+          const { data: fallbackServices } = await svcQuery;
+          if (Array.isArray(fallbackServices)) {
+            servicesForDropdown = fallbackServices.map((s: any) => ({
+              id: s.id,
+              service_name: s.service_name,
+              service_type: s.service_type,
+              is_default: false,
+              priority: 0,
+            })) as any[];
+          }
+        } catch (fallbackErr) {
+          console.warn('Fallback service data load failed:', fallbackErr);
+        }
+      }
+
+      // Finalize
+      setServiceTypes(serviceTypesForDropdown);
       setServices(servicesForDropdown as any[]);
 
     } catch (error) {
@@ -515,8 +594,24 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           terms_conditions: (quote as any).terms_conditions || '',
           notes: (quote as any).notes || '',
         });
+        // If the quote has a textual service_type (legacy), seed selectedServiceType
+        try {
+          const qServiceTypeText = (quote as any).service_type ? String((quote as any).service_type) : '';
+          if (qServiceTypeText && !selectedServiceType) {
+            setSelectedServiceType(canonicalType(qServiceTypeText));
+          }
+        } catch {}
         // Defer syncing of selectedServiceType (code) to effect that watches service_type_id
         setQuoteNumberPreview((quote as any).quote_number || '');
+        if (debugHydration) {
+          try {
+            console.debug('[hydrate] form.reset applied', {
+              service_type_id: form.getValues('service_type_id'),
+              service_id: form.getValues('service_id'),
+              selectedServiceType,
+            });
+          } catch {}
+        }
 
         // Load items; tolerate RLS issues by falling back to empty
         const { data: itemsRes, error: itemsErr } = await supabase
@@ -563,7 +658,90 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               .select('id, service_name, service_type')
               .eq('id', selServiceId)
               .maybeSingle();
-            if (data) setServices((prev) => [data, ...prev]);
+            if (data) {
+              setServices((prev) => [data, ...prev]);
+              // Keep a resolved label for fallback rendering paths
+              setResolvedServiceLabels((prev) => ({
+                ...prev,
+                [String(data.id)]: data.service_name || 'Selected Service',
+              }));
+              if (debugHydration) {
+                try {
+                  console.debug('[hydrate] injected service from fetch', {
+                    id: String(data.id),
+                    label: data.service_name,
+                    svcType: String(data.service_type || ''),
+                    formServiceId: form.getValues('service_id'),
+                  });
+                } catch {}
+              }
+              // If edit mode has no selectedServiceType yet, derive from saved service
+              try {
+                const svcTypeCode = String(data.service_type || '').trim();
+                if (svcTypeCode && !selectedServiceType) {
+                  setSelectedServiceType(svcTypeCode);
+                }
+              } catch {}
+              // Ensure the form's service_id reflects the injected value
+              try {
+                const curFormServiceId = form.getValues('service_id');
+                if (String(curFormServiceId) !== String(selServiceId)) {
+                  form.setValue('service_id', String(selServiceId), { shouldDirty: false });
+                }
+              } catch {}
+            } else {
+              // Fallback: if direct fetch is blocked (e.g., RLS), resolve label via Edge Function and inject minimal entry
+              try {
+                const { data: fnData } = await (supabase as any).functions.invoke('get-service-label', { body: { id: selServiceId } });
+                const fallbackLabel = fnData?.label || 'Selected Service';
+                setServices((prev) => [{ id: String(selServiceId), service_name: fallbackLabel, service_type: String((quote as any).service_type || selectedServiceType || '') }, ...prev]);
+                setResolvedServiceLabels((prev) => ({ ...prev, [String(selServiceId)]: fallbackLabel }));
+                if (!selectedServiceType && (quote as any).service_type) {
+                  setSelectedServiceType(String((quote as any).service_type));
+                }
+                if (debugHydration) {
+                  try {
+                    console.debug('[hydrate] injected service via fallback', {
+                      id: String(selServiceId),
+                      label: fallbackLabel,
+                      svcType: String((quote as any).service_type || selectedServiceType || ''),
+                      formServiceId: form.getValues('service_id'),
+                    });
+                  } catch {}
+                }
+                // Ensure the form reflects the saved selection even without full dataset
+                try {
+                  const curFormServiceId = form.getValues('service_id');
+                  if (String(curFormServiceId) !== String(selServiceId)) {
+                    form.setValue('service_id', String(selServiceId), { shouldDirty: false });
+                  }
+                } catch {}
+              } catch (_) {
+                const fallbackLabel = 'Selected Service';
+                setServices((prev) => [{ id: String(selServiceId), service_name: fallbackLabel, service_type: String((quote as any).service_type || selectedServiceType || '') }, ...prev]);
+                setResolvedServiceLabels((prev) => ({ ...prev, [String(selServiceId)]: fallbackLabel }));
+                if (!selectedServiceType && (quote as any).service_type) {
+                  setSelectedServiceType(String((quote as any).service_type));
+                }
+                if (debugHydration) {
+                  try {
+                    console.debug('[hydrate] injected service via final fallback', {
+                      id: String(selServiceId),
+                      label: fallbackLabel,
+                      svcType: String((quote as any).service_type || selectedServiceType || ''),
+                      formServiceId: form.getValues('service_id'),
+                    });
+                  } catch {}
+                }
+                // Ensure the form reflects the saved selection even without full dataset
+                try {
+                  const curFormServiceId = form.getValues('service_id');
+                  if (String(curFormServiceId) !== String(selServiceId)) {
+                    form.setValue('service_id', String(selServiceId), { shouldDirty: false });
+                  }
+                } catch {}
+              }
+            }
           }
 
           // Carrier already fetched and added before form.reset above, skip redundant check
@@ -598,6 +776,80 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (data) setPorts((prev) => [data, ...prev]);
           }
 
+          // Ensure saved service type appears in dropdowns even if mappings exclude it
+          const selServiceTypeId = (quote as any).service_type_id;
+          if (selServiceTypeId && !serviceTypes.some((st: any) => String(st.id) === String(selServiceTypeId))) {
+            try {
+              const { data: stData } = await (supabase as any)
+                .from('service_types')
+                .select('id, name, code')
+                .eq('id', selServiceTypeId)
+                .maybeSingle();
+              if (stData) {
+                const injected = {
+                  id: String(stData.id),
+                  code: String(stData.code || ''),
+                  name: stData.name || String(stData.code || 'Service Type'),
+                };
+                setServiceTypes((prev) => {
+                  const exists = prev.some((st: any) => String(st.id) === String(injected.id));
+                  return exists ? prev : [injected, ...prev];
+                });
+                // Keep form value aligned with injected entry
+                try {
+                  const curFormTypeId = form.getValues('service_type_id');
+                  if (String(curFormTypeId) !== String(selServiceTypeId)) {
+                    form.setValue('service_type_id', String(selServiceTypeId), { shouldDirty: false });
+                  }
+                } catch {}
+                // Also seed selectedServiceType code if not yet set
+                if (!selectedServiceType && injected.code) {
+                  setSelectedServiceType(injected.code);
+                }
+                if (debugHydration) {
+                  try {
+                    console.debug('[hydrate] injected service type from fetch', {
+                      id: String(selServiceTypeId),
+                      code: String(injected.code || ''),
+                      formTypeId: form.getValues('service_type_id'),
+                    });
+                  } catch {}
+                }
+              } else {
+                // Fallback: inject minimal service type from textual service_type on quote if available
+                const derivedCode = String((quote as any).service_type || '');
+                const injected = {
+                  id: String(selServiceTypeId),
+                  code: derivedCode,
+                  name: 'Selected Service Type',
+                } as any;
+                setServiceTypes((prev) => {
+                  const exists = prev.some((st: any) => String(st.id) === String(injected.id));
+                  return exists ? prev : [injected, ...prev];
+                });
+                // Keep form value aligned with injected entry
+                try {
+                  const curFormTypeId = form.getValues('service_type_id');
+                  if (String(curFormTypeId) !== String(selServiceTypeId)) {
+                    form.setValue('service_type_id', String(selServiceTypeId), { shouldDirty: false });
+                  }
+                } catch {}
+                if (!selectedServiceType && derivedCode) {
+                  setSelectedServiceType(derivedCode);
+                }
+                if (debugHydration) {
+                  try {
+                    console.debug('[hydrate] injected service type via fallback', {
+                      id: String(selServiceTypeId),
+                      code: String(derivedCode || ''),
+                      formTypeId: form.getValues('service_type_id'),
+                    });
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+
           // Note: opportunity, account, contact already fetched above
         } catch (e) {
           console.warn('Failed to hydrate selected options for edit mode:', e);
@@ -620,9 +872,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       const hasServiceTypes = Array.isArray(serviceTypes) && serviceTypes.length > 0;
       const currentTypeId = form.getValues('service_type_id');
       if (!currentTypeId && hasServiceTypes) {
-        const defaultServiceType = serviceTypes[0];
-        form.setValue('service_type_id', String(defaultServiceType.id), { shouldDirty: true });
-        setSelectedServiceType(String(defaultServiceType.code));
+        const defaultServiceType = serviceTypes.find((st: any) => st.id !== '');
+        if (defaultServiceType) {
+          form.setValue('service_type_id', String(defaultServiceType.id), { shouldDirty: true });
+          setSelectedServiceType(String(defaultServiceType.code));
+        }
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -640,6 +894,58 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceTypeId, serviceTypes]);
+  useEffect(() => {
+    if (!debugHydration) return;
+    try {
+      console.debug('[render] selectedServiceType code', selectedServiceType);
+    } catch {}
+  }, [selectedServiceType]);
+  useEffect(() => {
+    if (!debugHydration) return;
+    try {
+      console.debug('[render] filteredServices length', filteredServices.length);
+    } catch {}
+  }, [filteredServices]);
+
+  // In edit mode, if selectedServiceType is still empty, derive it from saved service or fetch by type id
+  useEffect(() => {
+    if (!isEditMode) return;
+    try {
+      if (!selectedServiceType) {
+        const curServiceId = form.getValues('service_id');
+        if (curServiceId) {
+          const svc = services.find((s: any) => String(s.id) === String(curServiceId));
+          const svcTypeCode = String((svc as any)?.service_type || '').trim();
+          if (svcTypeCode) {
+            setSelectedServiceType(svcTypeCode);
+            return;
+          }
+        }
+        const curTypeId = form.getValues('service_type_id');
+        if (curTypeId && !serviceTypes.some((st: any) => String(st.id) === String(curTypeId))) {
+          (async () => {
+            try {
+              const { data: stData } = await (supabase as any)
+                .from('service_types')
+                .select('id, code')
+                .eq('id', curTypeId)
+                .maybeSingle();
+              if (stData && stData.code) {
+                // Inject missing type to list to keep Select happy
+                setServiceTypes((prev) => {
+                  const exists = prev.some((st: any) => String(st.id) === String(curTypeId));
+                  const injected = { id: String(stData.id), code: String(stData.code), name: String(stData.code) } as any;
+                  return exists ? prev : [injected, ...prev];
+                });
+                setSelectedServiceType(String(stData.code));
+              }
+            } catch {}
+          })();
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, selectedServiceType, services, serviceTypes]);
 
   // When service_type_id changes: filter services based on type and auto-select
   useEffect(() => {
@@ -690,18 +996,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       let contactsList: any[] = [];
       let opportunitiesList: any[] = [];
 
-      // Build services query without relying on nested relation (safer across schemas)
-      let servicesQuery: any = supabase
-        .from('services')
-        .select('id, service_name, service_type_id, service_type, tenant_id, is_active')
-        .eq('is_active', true);
       if (tenantId) {
-        servicesQuery = servicesQuery.eq('tenant_id', tenantId);
-      }
-
-      if (tenantId) {
-        const [servicesRes, consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes, pkgCatsRes, pkgSizesRes] = await Promise.all([
-          servicesQuery,
+        const [consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes, pkgCatsRes, pkgSizesRes] = await Promise.all([
           supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
@@ -710,18 +1006,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           supabase.from('package_categories').select('*').eq('tenant_id', tenantId).eq('is_active', true),
           supabase.from('package_sizes').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         ]);
-
-        // Fallback: if tenant-scoped services are empty or error, try global active services
-        let finalServices = servicesRes?.data || [];
-        if (servicesRes?.error || finalServices.length === 0) {
-          try {
-            const { data: globalServices } = await supabase
-              .from('services')
-              .select('id, service_name, service_type_id, service_type, tenant_id, is_active')
-              .eq('is_active', true);
-            finalServices = globalServices || [];
-          } catch {}
-        }
 
         if (consigneesRes.error) throw consigneesRes.error;
         if (portsRes.error) throw portsRes.error;
@@ -732,7 +1016,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (pkgSizesRes.error) throw pkgSizesRes.error;
 
         setConsignees(consigneesRes.data || []);
-        setPorts(portsRes.data || []);
         setPorts(portsRes.data || []);
         setAccounts(accountsRes.data || []);
         setContacts(contactsRes.data || []);
@@ -815,12 +1098,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         contactsList = Array.isArray(contactsRes.data) ? contactsRes.data : [];
         opportunitiesList = Array.isArray(opportunitiesRes.data) ? opportunitiesRes.data : [];
 
-        // Service types are now loaded separately, services will filter based on type selection
       } else {
         // Platform admin path without tenant: fetch services globally (respecting RLS)
-        const { data: globalServices, error: svcErr } = await servicesQuery;
-        if (svcErr) throw svcErr;
-
         // Attempt to fetch categories and sizes globally if permitted
         try {
           const [{ data: cats = [] }, { data: sizes = [] }] = await Promise.all([
@@ -834,8 +1113,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           setPackageCategories([]);
           setPackageSizes([]);
         }
-
-        // Service types are now loaded separately
       }
 
       // If an opportunity is preselected (e.g. via URL), auto-fill account/contact
@@ -990,7 +1267,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
     // Skip during initial hydration to preserve manually-added carriers from edit mode
     if (!tenantId || isHydrating) return;
-    const currentServiceTypeId = selectedServiceType || form.getValues('service_type_id');
+    const currentServiceTypeId = form.getValues('service_type_id');
     if (!currentServiceTypeId) {
       setCarriers([]);
       return;
@@ -1975,32 +2252,47 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   <FormItem>
                     <FormLabel>Service Type</FormLabel>
                       <Select
+                        value={field.value}
                         onValueChange={(value) => {
                           const selectedType = serviceTypes.find(st => st.id === value);
                           if (selectedType && selectedType.id !== '') {
-                            form.setValue('service_type_id', selectedType.id);
+                            form.setValue('service_type_id', selectedType.id, { shouldDirty: true });
                             setSelectedServiceType(selectedType.code);
-                            form.setValue('service_id', ''); // Reset service selection
+                            form.setValue('service_id', '', { shouldDirty: true }); // Reset service selection
                           }
                         }}
-                        defaultValue={form.getValues('service_type_id')}
                       >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a service type" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        {serviceTypes.filter(st => st.id !== '').map((st) => (
-                          <SelectItem key={st.id} value={st.id}>
-                            {st.name}
-                          </SelectItem>
-                        ))}
-                        {serviceTypes.filter(st => st.id !== '').length === 0 && (
-                          <SelectItem disabled value="__no_service_types__">
-                            No service types available
-                          </SelectItem>
-                        )}
+                      <SelectContent forceMount>
+                        {(() => {
+                          const list = serviceTypes.filter(st => st.id !== '');
+                          const currentTypeId = form.getValues('service_type_id');
+                          const inList = list.some(st => String(st.id) === String(currentTypeId));
+                          const items = list.map((st) => (
+                            <SelectItem key={st.id} value={st.id}>
+                              {st.name}
+                            </SelectItem>
+                          ));
+                          if (currentTypeId && !inList) {
+                            const labelFromList = serviceTypes.find(st => String(st.id) === String(currentTypeId))?.name;
+                            const fallbackLabel = labelFromList || (selectedServiceType ? selectedServiceType : 'Selected Service Type');
+                            items.unshift(
+                              <SelectItem key={String(currentTypeId)} value={String(currentTypeId)}>
+                                {fallbackLabel}
+                              </SelectItem>
+                            );
+                          }
+                          if (items.length > 0) return items;
+                          return (
+                            <SelectItem disabled value="__no_service_types__">
+                              No service types available
+                            </SelectItem>
+                          );
+                        })()}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -2014,26 +2306,40 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedServiceType}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedServiceType && !field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a service" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        {filteredServices.length > 0 ? (
-                          filteredServices.map((service) => (
+                      <SelectContent forceMount>
+                        {(() => {
+                          const currentServiceId = form.getValues('service_id');
+                          const inList = filteredServices.some((s) => String(s.id) === String(currentServiceId));
+                          const items = filteredServices.map((service) => (
                             <SelectItem key={String(service.id)} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-4 text-sm text-gray-500">
-                            {selectedServiceType
-                              ? 'No services found for this service type.'
-                              : 'Please select a service type first.'}
-                          </div>
-                        )}
+                          ));
+                          // Add a fallback item for the saved selection when not present in the filtered list
+                          if (currentServiceId && !inList) {
+                            const existing = services.find((s: any) => String(s.id) === String(currentServiceId));
+                            const label = resolvedServiceLabels[String(currentServiceId)] || existing?.service_name || 'Selected Service';
+                            items.unshift(
+                              <SelectItem key={String(currentServiceId)} value={String(currentServiceId)}>
+                                {label}
+                              </SelectItem>
+                            );
+                          }
+                          if (items.length > 0) return items;
+                          return (
+                            <div className="p-4 text-sm text-gray-500">
+                              {selectedServiceType
+                                ? 'No services found for this service type.'
+                                : 'Please select a service type first.'}
+                            </div>
+                          );
+                        })()}
                       </SelectContent>
                     </Select>
                     <FormMessage />

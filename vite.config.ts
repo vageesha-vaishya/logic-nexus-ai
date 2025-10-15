@@ -8,6 +8,17 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    headers: {
+      // Explicitly disable Privacy Sandbox/FLEDGE trial features to silence devtools warnings
+      // These features are origin-trial controlled; disabling prevents noisy console errors
+      "Permissions-Policy": [
+        "browsing-topics=()",
+        "run-ad-auction=()",
+        "join-ad-interest-group=()",
+        "private-state-token-redemption=()",
+        "private-state-token-issuance=()"
+      ].join(", "),
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

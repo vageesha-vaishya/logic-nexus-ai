@@ -47,6 +47,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [themes, setThemes] = useState<SavedTheme[]>([]);
   const [activeThemeName, setActiveThemeName] = useState<string | null>(null);
   const [scope, setScope] = useState<'platform' | 'tenant' | 'franchise' | 'user'>('user');
+  const [themesFetchDisabled, setThemesFetchDisabled] = useState(false);
   const LS_DARK_KEY = 'soslogicpro.darkMode';
   const { supabase, context } = useCRM();
 
@@ -187,7 +188,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     (async () => {
       try {
-        if (!supabase) return;
+        if (!supabase || themesFetchDisabled) return;
         // Cast to any to avoid typed relation errors for ui_themes
         let query: any = (supabase as any).from('ui_themes').select('name, tokens, is_default, scope');
         if (scope === 'user' && context?.userId) {
@@ -202,7 +203,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return; // insufficient context for scoped fetch
         }
         const { data, error } = await query;
-        if (error) return;
+        if (error) {
+          // Silence noisy devtools network 404s by disabling future fetches until reload
+          const status = (error as any)?.status ?? (error as any)?.code;
+          if (status === 404 || String(error?.message || '').toLowerCase().includes('not found')) {
+            setThemesFetchDisabled(true);
+          }
+          return;
+        }
         if (Array.isArray(data)) {
           const mapped: SavedTheme[] = data.map((row: any) => ({
             name: row.name,
@@ -238,7 +246,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // noop; keep local storage themes
       }
     })();
-  }, [scope, context?.userId, context?.tenantId, context?.franchiseId, applyTheme]);
+  }, [scope, context?.userId, context?.tenantId, context?.franchiseId, applyTheme, themesFetchDisabled]);
 
   const saveTheme = async (t: { name: string; start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; tableForeground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => {
     const saved: SavedTheme = { ...t, createdAt: new Date().toISOString() };
