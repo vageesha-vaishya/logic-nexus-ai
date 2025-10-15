@@ -673,7 +673,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (pkgCatsRes.error) throw pkgCatsRes.error;
         if (pkgSizesRes.error) throw pkgSizesRes.error;
 
-        setServices(finalServices);
         setConsignees(consigneesRes.data || []);
         setPorts(portsRes.data || []);
         setPorts(portsRes.data || []);
@@ -708,7 +707,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (currentServiceTypeId) {
           // Get service type code to use for carrier filtering
           const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-          const serviceTypeCode = serviceType?.name;
+          const serviceTypeCode = serviceType?.id;
           
           if (serviceTypeCode) {
             const carriersRes = await supabase
@@ -763,7 +762,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Platform admin path without tenant: fetch services globally (respecting RLS)
         const { data: globalServices, error: svcErr } = await servicesQuery;
         if (svcErr) throw svcErr;
-        setServices(globalServices || []);
 
         // Attempt to fetch categories and sizes globally if permitted
         try {
@@ -941,8 +939,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     }
     (async () => {
       // Get service type code to use for carrier filtering
-      const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-      const serviceTypeCode = serviceType?.name;
+       const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
+       const serviceTypeCode = serviceType?.id;
       
       if (!serviceTypeCode) {
         setCarriers([]);
@@ -1923,7 +1921,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         const selectedType = serviceTypes.find(st => st.id === value);
                         if (selectedType) {
                           form.setValue('service_type_id', selectedType.id);
-                          setSelectedServiceType(selectedType.name);
+                          setSelectedServiceType(selectedType.id);
                           form.setValue('service_id', ''); // Reset service selection
                         }
                       }}
