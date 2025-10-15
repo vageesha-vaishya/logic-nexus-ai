@@ -3120,6 +3120,7 @@ export type Database = {
       }
       service_types: {
         Row: {
+          code: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -3128,6 +3129,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          code?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -3136,6 +3138,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          code?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
