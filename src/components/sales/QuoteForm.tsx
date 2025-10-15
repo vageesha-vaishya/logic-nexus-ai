@@ -82,7 +82,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHydrating, setIsHydrating] = useState(false);
-  const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string }[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<{ id: string; code: string; name: string }[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
   const [consignees, setConsignees] = useState<any[]>([]);
@@ -157,6 +157,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const accountId = form.watch('account_id');
   // Watch selected carrier to ensure its label is available immediately
   const carrierId = form.watch('carrier_id');
+  // Watch service type id (UUID) to sync code for filtering/mappings
+  const serviceTypeId = form.watch('service_type_id');
 
   const fetchServiceData = async () => {
     try {
@@ -466,7 +468,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           terms_conditions: (quote as any).terms_conditions || '',
           notes: (quote as any).notes || '',
         });
-        setSelectedServiceType((quote as any).service_type_id || '');
+        // Defer syncing of selectedServiceType (code) to effect that watches service_type_id
         setQuoteNumberPreview((quote as any).quote_number || '');
 
         // Load items; tolerate RLS issues by falling back to empty
@@ -578,6 +580,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceTypes, isEditMode]);
+
+  // Sync selectedServiceType (code like 'ocean') whenever the UUID in the form changes
+  useEffect(() => {
+    try {
+      if (!serviceTypeId) return;
+      const st = serviceTypes.find((t: any) => String(t.id) === String(serviceTypeId));
+      if (st && selectedServiceType !== st.code) {
+        setSelectedServiceType(st.code);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceTypeId, serviceTypes]);
 
   // When service_type_id changes: filter services based on type and auto-select
   useEffect(() => {
