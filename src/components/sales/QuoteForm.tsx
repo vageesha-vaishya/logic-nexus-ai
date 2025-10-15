@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -82,7 +82,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isHydrating, setIsHydrating] = useState(false);
-  const [serviceTypes, setServiceTypes] = useState<any[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string }[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
   const [consignees, setConsignees] = useState<any[]>([]);
@@ -122,6 +122,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     return trimmed;
   };
 
+  const filteredServices = useMemo(() => {
+    if (!selectedServiceType) return [];
+    return services.filter(service => service.service_type === selectedServiceType);
+  }, [selectedServiceType, services]);
+
   const form = useForm<z.infer<typeof quoteSchema>>({
     resolver: zodResolver(quoteSchema),
     defaultValues: {
@@ -153,33 +158,70 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   // Watch selected carrier to ensure its label is available immediately
   const carrierId = form.watch('carrier_id');
 
-  useEffect(() => {
-    if (context.tenantId || roles?.[0]?.tenant_id) {
-      fetchData();
-    }
-  }, [context.tenantId, roles]);
-
-  // Fetch service types
-  useEffect(() => {
-    // Fetch all active service types (no tenant filtering since service_types doesn't have tenant_id)
-    fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/service_types?is_active=eq.true&select=id,name,description,is_active`, {
-      headers: {
-        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+  const fetchServiceData = async () => {
+    try {
+      const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
+      
+      if (!tenantId) {
+        console.warn('No tenant ID available for fetching service data');
+        return;
       }
-    })
-    .then(res => res.json())
-    .then((data: any[]) => setServiceTypes(data))
-    .catch(err => console.warn('Error loading service types:', err));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [context.tenantId, resolvedTenantId]);
 
-  // Trigger data fetch when tenant is resolved from selected account or other context
-  useEffect(() => {
-    if (resolvedTenantId) {
-      fetchData();
+      // Fetch service types and services from service_type_mappings table
+      const { data: mappingsData, error: mappingsError } = await supabase
+        .from('service_type_mappings')
+        .select(`
+          service_type,
+          service_id,
+          is_default,
+          priority,
+          services!inner (
+            id,
+            service_name,
+            is_active
+          )
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .eq('services.is_active', true)
+        .order('service_type')
+        .order('priority', { ascending: false });
+
+      if (mappingsError) {
+        console.error('Service mappings error:', mappingsError);
+        throw mappingsError;
+      }
+
+      // Extract unique service types
+      const uniqueServiceTypes = [...new Set(mappingsData?.map(m => m.service_type) || [])];
+      const serviceTypesForDropdown = uniqueServiceTypes.map(type => ({
+        id: type,
+        name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')
+      }));
+
+      setServiceTypes(serviceTypesForDropdown);
+
+      // Extract services with their mapped service types
+      const servicesForDropdown = mappingsData?.map(mapping => ({
+        id: mapping.services.id,
+        service_name: mapping.services.service_name,
+        service_type: mapping.service_type,
+        is_default: mapping.is_default,
+        priority: mapping.priority
+      })) || [];
+
+      setServices(servicesForDropdown);
+
+    } catch (error) {
+      console.error('Error loading service data:', error);
+      toast.error('Failed to load service options.');
     }
-  }, [resolvedTenantId]);
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchServiceData();
+  }, []);
 
   // Pre-populate with user's last used values for new quotes
   // Only runs after opportunities/accounts/contacts data is loaded
@@ -633,6 +675,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         setServices(finalServices);
         setConsignees(consigneesRes.data || []);
+        setPorts(portsRes.data || []);
         setPorts(portsRes.data || []);
         setAccounts(accountsRes.data || []);
         setContacts(contactsRes.data || []);
@@ -1875,27 +1918,28 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service Type</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => {
-                        field.onChange(value);
-                        setSelectedServiceType(value);
-                      }} 
-                      value={field.value ?? ''}
+                        const selectedType = serviceTypes.find(st => st.id === value);
+                        if (selectedType) {
+                          form.setValue('service_type_id', selectedType.id);
+                          setSelectedServiceType(selectedType.name);
+                          form.setValue('service_id', ''); // Reset service selection
+                        }
+                      }}
+                      defaultValue={form.getValues('service_type_id')}
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select service type" />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a service type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {serviceTypes.map((st: any) => (
-                          <SelectItem key={st.id} value={String(st.id)}>
+                        {serviceTypes.map((st) => (
+                          <SelectItem key={st.id} value={st.id}>
                             {st.name}
                           </SelectItem>
                         ))}
-                        {serviceTypes.length === 0 && (
-                          <SelectItem disabled value="__no_types__">No service types available</SelectItem>
-                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -1909,47 +1953,25 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Service</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedServiceType}>
                       <FormControl>
-                        <SelectTrigger className="w-full" disabled={!selectedServiceType && !isEditMode}>
-                          <SelectValue placeholder="Select service" />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a service" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {/* Ensure currently selected service appears even if list is filtered out or RLS-hidden */}
-                        {field.value && !services.some((s) => String(s.id) === String(field.value)) && (
-                          <SelectItem key={`selected-service-${field.value}`} value={String(field.value)}>
-                            {resolvedServiceLabels[String(field.value)] || 'Selected Service'}
-                          </SelectItem>
-                        )}
-                        {/* Helpful hint when tenant not resolved yet */}
-                        {!resolvedTenantId && services.length === 0 && (
-                          <SelectItem disabled value="__tenant_not_resolved__">Select an account to load services</SelectItem>
-                        )}
-                        {services
-                          .filter((s) => {
-                            if (!selectedServiceType) return true;
-                            const matchId = String((s as any)?.service_type_id || '') === String(selectedServiceType);
-                            const matchRel = String((s as any)?.service_types?.id || '') === String(selectedServiceType);
-                            const st = serviceTypes.find((t: any) => String(t.id) === String(selectedServiceType));
-                            const typeName = st?.name;
-                            const matchText = typeName ? String((s as any)?.service_type || '') === String(typeName) : false;
-                            return matchId || matchRel || matchText;
-                          })
-                          .map((service) => (
-                            <SelectItem key={service.id} value={String(service.id)}>
+                        {filteredServices.length > 0 ? (
+                          filteredServices.map((service) => (
+                            <SelectItem key={service.id} value={service.id}>
                               {service.service_name}
                             </SelectItem>
-                          ))}
-                        {/* Fallback when there are services but none match the selected type */}
-                        {selectedServiceType && services.filter((s) => 
-                          String(s.service_type_id) === String(selectedServiceType)
-                          || String((s as any)?.service_types?.id || '') === String(selectedServiceType)
-                        ).length === 0 && (
-                          <SelectItem disabled value="__no_services_for_type__">No services for selected type</SelectItem>
-                        )}
-                        {services.length === 0 && (
-                          <SelectItem disabled value="__no_services__">No services found</SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-4 text-sm text-gray-500">
+                            {selectedServiceType
+                              ? 'No services found for this service type.'
+                              : 'Please select a service type first.'}
+                          </div>
                         )}
                       </SelectContent>
                     </Select>
