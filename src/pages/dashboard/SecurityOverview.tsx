@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,8 +10,10 @@ import { RoleGuard } from '@/components/auth/RoleGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
@@ -276,6 +278,191 @@ export default function SecurityOverview() {
     staleTime: 60_000,
     retry: 1
   });
+
+  // Full table search and data search state
+  const [schemaSearch, setSchemaSearch] = useState('');
+  const [selectedTableForSearch, setSelectedTableForSearch] = useState<string>('');
+  const [dataSearch, setDataSearch] = useState('');
+  const [dataResults, setDataResults] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataPage, setDataPage] = useState(1);
+  const [dataPageSize, setDataPageSize] = useState(20);
+  const [dataTotalCount, setDataTotalCount] = useState<number | null>(null);
+
+  const columnsByTable = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+    (schema || []).forEach((col: any) => {
+      const t = col.table_name;
+      if (!grouped[t]) grouped[t] = [];
+      grouped[t].push(col);
+    });
+    return grouped;
+  }, [schema]);
+
+  // Tailored filters per table
+  const [showFilters, setShowFilters] = useState(false);
+  const [tableFilters, setTableFilters] = useState<Record<string, Record<string, any>>>({});
+  const enumLabelsByType = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    (enums || []).forEach((e: any) => {
+      const labels = String(e.labels || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      map[e.enum_type] = labels;
+    });
+    return map;
+  }, [enums]);
+
+  const setFilterValue = (colName: string, patch: any) => {
+    setTableFilters((prev) => {
+      const table = selectedTableForSearch;
+      const existing = prev[table] || {};
+      const col = existing[colName] || {};
+      return { ...prev, [table]: { ...existing, [colName]: { ...col, ...patch } } };
+    });
+  };
+
+  const clearFiltersForCurrentTable = () => {
+    setTableFilters((prev) => ({ ...prev, [selectedTableForSearch]: {} }));
+  };
+
+  // Persist filters, selected table, and visibility
+  useEffect(() => {
+    try {
+      const json = localStorage.getItem('schema_table_filters');
+      if (json) {
+        const parsed = JSON.parse(json);
+        if (parsed && typeof parsed === 'object') setTableFilters(parsed);
+      }
+      const savedTable = localStorage.getItem('schema_selected_table');
+      if (savedTable) setSelectedTableForSearch(savedTable);
+      const savedShow = localStorage.getItem('schema_show_filters');
+      if (savedShow) setShowFilters(savedShow === 'true');
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('schema_table_filters', JSON.stringify(tableFilters));
+    } catch {}
+  }, [tableFilters]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('schema_selected_table', selectedTableForSearch || '');
+    } catch {}
+  }, [selectedTableForSearch]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('schema_show_filters', showFilters ? 'true' : 'false');
+    } catch {}
+  }, [showFilters]);
+ 
+   const runDataSearch = async (pageOverride?: number) => {
+    if (!selectedTableForSearch) return;
+    const page = pageOverride ?? dataPage;
+    setDataLoading(true);
+    try {
+      const cols = columnsByTable[selectedTableForSearch] || [];
+      const q = dataSearch.trim();
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(q);
+      const isNumber = q !== '' && !isNaN(Number(q));
+      const textCols = cols.filter((c: any) => {
+        const dt = String(c.data_type || '').toLowerCase();
+        return dt.includes('text') || dt.includes('character varying') || dt.includes('varchar') || dt.includes('uuid');
+      });
+      const numCols = cols.filter((c: any) => {
+        const dt = String(c.data_type || '').toLowerCase();
+        return dt === 'integer' || dt === 'bigint' || dt === 'numeric' || dt === 'double precision' || dt === 'real';
+      });
+
+      let segments: string[] = [];
+      if (q) {
+        segments = [
+          ...textCols.map((c: any) => `${c.column_name}.ilike.*${q}*`),
+        ];
+        if (isUUID) {
+          segments.push(
+            ...textCols
+              .filter((c: any) => String(c.data_type || '').toLowerCase().includes('uuid'))
+              .map((c: any) => `${c.column_name}.eq.${q}`)
+          );
+        }
+        if (isNumber) {
+          const numVal = Number(q);
+          segments.push(...numCols.map((c: any) => `${c.column_name}.eq.${numVal}`));
+        }
+      }
+
+      let query = supabase.from(selectedTableForSearch).select('*', { count: 'exact' });
+
+      // Apply typed filters (AND semantics)
+      const tableFilter = tableFilters[selectedTableForSearch] || {};
+      cols.forEach((c: any) => {
+        const fv = tableFilter[c.column_name];
+        if (!fv) return;
+        const dt = String(c.data_type || '').toLowerCase();
+
+        // Enumerations
+        if (fv.enumValue !== undefined && fv.enumValue !== '') {
+          query = query.eq(c.column_name, fv.enumValue);
+          return;
+        }
+
+        // Date/time range
+        if ((dt.includes('timestamp') || dt === 'date') && (fv.from || fv.to)) {
+          if (fv.from) query = query.gte(c.column_name, fv.from);
+          if (fv.to) query = query.lte(c.column_name, fv.to);
+          return;
+        }
+
+        // Numeric range
+        if (
+          dt === 'integer' || dt === 'bigint' || dt === 'smallint' || dt === 'numeric' || dt === 'double precision' || dt === 'real' || dt === 'decimal'
+        ) {
+          if (fv.min !== undefined && fv.min !== '') query = query.gte(c.column_name, Number(fv.min));
+          if (fv.max !== undefined && fv.max !== '') query = query.lte(c.column_name, Number(fv.max));
+          return;
+        }
+
+        // UUID equals
+        if (dt.includes('uuid')) {
+          if (fv.eq && fv.eq.trim()) query = query.eq(c.column_name, fv.eq.trim());
+          return;
+        }
+
+        // Text contains
+        if (fv.contains && fv.contains.trim()) {
+          query = query.ilike(c.column_name, `%${fv.contains.trim()}%`);
+        }
+      });
+
+      // Apply general search (OR across common columns)
+      if (segments.length) {
+        query = query.or(segments.join(','));
+      }
+      const from = (page - 1) * dataPageSize;
+      const to = from + dataPageSize - 1;
+      const { data, count, error } = await query.range(from, to);
+      if (error) throw error;
+      setDataResults(data || []);
+      setDataTotalCount(count ?? null);
+    } catch (error: any) {
+      toast({ title: 'Data search failed', description: error.message, variant: 'destructive' });
+      setDataResults([]);
+      setDataTotalCount(null);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTableForSearch) return;
+    runDataSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTableForSearch, dataPage, dataPageSize]);
 
   return (
     <RoleGuard roles={['platform_admin', 'tenant_admin']} fallback={<div>Access denied</div>}>
@@ -689,6 +876,43 @@ export default function SecurityOverview() {
                     <div>Loading...</div>
                   ) : (
                     <div className="space-y-6">
+                      <Input
+                        value={schemaSearch}
+                        onChange={(e) => setSchemaSearch(e.target.value)}
+                        placeholder="Search tables or columns..."
+                        className="w-[280px]"
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          value={schemaSearch}
+                          onChange={(e) => setSchemaSearch(e.target.value)}
+                          placeholder="Search tables or columns..."
+                          className="w-[280px]"
+                        />
+                        <Select value={selectedTableForSearch} onValueChange={setSelectedTableForSearch}>
+                          <SelectTrigger className="w-[240px]">
+                            <SelectValue placeholder="Choose table" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(schemaTables ? schemaTables.map((t) => t.table_name) : Object.keys(columnsByTable)).map((name) => (
+                              <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={dataSearch}
+                          onChange={(e) => setDataSearch(e.target.value)}
+                          placeholder="Search table data..."
+                          className="w-[280px]"
+                          disabled={!selectedTableForSearch}
+                        />
+                        <Button
+                          onClick={() => { setDataPage(1); runDataSearch(1); }}
+                          disabled={!selectedTableForSearch || dataLoading}
+                        >
+                          {dataLoading ? 'Searching…' : 'Search'}
+                        </Button>
+                      </div>
                       <div className="border rounded-lg">
                         <div className="px-4 py-3 border-b bg-muted/30">
                           <span className="font-semibold">Tables</span>
@@ -1014,13 +1238,47 @@ export default function SecurityOverview() {
                     <div>Loading...</div>
                   ) : (
                     <div className="space-y-6">
-                      {Object.entries(
-                        (schema || []).reduce((acc, col) => {
-                          if (!acc[col.table_name]) acc[col.table_name] = [];
-                          acc[col.table_name].push(col);
-                          return acc;
-                        }, {} as Record<string, typeof schema>)
-                      ).map(([tableName, columns]) => (
+                      <Input
+                        value={schemaSearch}
+                        onChange={(e) => setSchemaSearch(e.target.value)}
+                        placeholder="Search tables or columns..."
+                        className="w-[280px]"
+                      />
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Select value={selectedTableForSearch} onValueChange={setSelectedTableForSearch}>
+                          <SelectTrigger className="w-[240px]">
+                            <SelectValue placeholder="Choose table" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(schemaTables ? schemaTables.map((t) => t.table_name) : Object.keys(columnsByTable)).map((name) => (
+                              <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={dataSearch}
+                          onChange={(e) => setDataSearch(e.target.value)}
+                          placeholder="Search table data..."
+                          className="w-[280px]"
+                          disabled={!selectedTableForSearch}
+                        />
+                        <Button
+                          onClick={() => { setDataPage(1); runDataSearch(1); }}
+                          disabled={!selectedTableForSearch || dataLoading}
+                        >
+                          {dataLoading ? 'Searching…' : 'Search'}
+                        </Button>
+                      </div>
+                      {Object.entries(columnsByTable)
+                        .filter(([tableName, columns]) => {
+                          const q = schemaSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            tableName.toLowerCase().includes(q) ||
+                            columns.some((col) => col.column_name.toLowerCase().includes(q))
+                          );
+                        })
+                        .map(([tableName, columns]) => (
                         <div key={tableName} className="border rounded-lg">
                           <div className="px-4 py-3 border-b bg-muted/30">
                             <span className="font-semibold">{tableName}</span>

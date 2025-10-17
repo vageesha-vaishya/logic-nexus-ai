@@ -2530,6 +2530,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         if (debugHydration) {
                           try {
                             console.debug('[modal:rates] auto-hydrate on open', { quoteId, rows: (rows || []).length, mapped: mapped.length });
+                            console.debug('[modal:rates]', { quoteId, rows: (rows || []).length, mapped: mapped.length });
                           } catch {}
                         }
                         setCarrierQuotes(mapped);

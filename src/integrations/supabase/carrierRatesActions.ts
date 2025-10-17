@@ -279,12 +279,18 @@ export async function listCarrierRatesForQuote(
     } catch {}
   }
 
-  return (rows || []).map((r: any) => ({
+  const out = (rows || []).map((r: any) => ({
     id: String(r.id),
     carrier_id: String(r.carrier_id),
     mode: r.mode || null,
     charges: r.charges || [],
   }));
+  if (import.meta.env.DEV) {
+    try {
+      console.debug('[hydrate:rates]', { quoteId, rows: (rows || []).length, mapped: out.length });
+    } catch {}
+  }
+  return out;
 }
 
 export async function createQuotationVersionWithOptions(
