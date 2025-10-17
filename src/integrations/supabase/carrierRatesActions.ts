@@ -10,6 +10,8 @@ type ChargeInput = {
 };
 
 type CarrierQuoteInput = {
+  // Optional when updating existing rates; present for upsert flows
+  carrier_rate_id?: string;
   carrier_id: string;
   mode?: string; // 'ocean' | 'air' | 'trucking' | 'courier' | 'moving' | 'railway_transport'
   buying_charges: ChargeInput[];
@@ -50,12 +52,16 @@ const chargeTypeMap = (mode: string | undefined, type: string): string => {
 };
 
 export async function createCarrierRate(params: CreateRateParams, client = defaultClient): Promise<string> {
+  // Pre-generate an ID so we can rely on it even if RLS prevents returning the inserted row
+  const preGeneratedId = crypto.randomUUID();
   const payload: any = {
+    id: preGeneratedId,
     tenant_id: params.tenant_id,
     carrier_id: params.carrier_id,
     service_id: params.service_id || null,
     origin_port_id: params.origin_port_id || null,
     destination_port_id: params.destination_port_id || null,
+    mode: params.mode || null,
     currency: params.currency || 'USD',
     base_rate: params.base_rate ?? 0,
     rate_reference_id: params.rate_reference_id || null,
@@ -65,10 +71,12 @@ export async function createCarrierRate(params: CreateRateParams, client = defau
   const { data, error } = (client as any)
     .from('carrier_rates')
     .insert([payload])
-    .select('id')
-    .single();
+    .select('id');
   if (error) throw error;
-  return data.id as string;
+
+  // Supabase may return an array or object depending on policies; if not, rely on preGeneratedId
+  const insertedId: string | undefined = Array.isArray(data) ? (data[0]?.id as string | undefined) : (data?.id as string | undefined);
+  return insertedId || preGeneratedId;
 }
 
 export async function upsertChargesForRate(
@@ -123,6 +131,160 @@ export async function createRatesAndChargesForQuote(
     rateIds.push(rateId);
   }
   return rateIds;
+}
+
+// Upsert carrier rates and charges for a quote. If a carrier_rate_id is provided,
+// charges are replaced for that rate and minimal metadata is updated; otherwise a new rate is created.
+// Any existingRateIds not present in the provided carrierQuotes are deleted.
+export async function upsertRatesAndChargesForQuote(
+  quoteId: string,
+  tenant_id: string,
+  service_id: string | null,
+  origin_port_id: string | null,
+  destination_port_id: string | null,
+  carrierQuotes: CarrierQuoteInput[],
+  existingRateIds: string[] = [],
+  client = defaultClient,
+): Promise<string[]> {
+  const finalRateIds: string[] = [];
+  const keptRateIds = new Set<string>();
+
+  for (const cq of (carrierQuotes || [])) {
+    if (!cq.carrier_id && !cq.carrier_rate_id) continue;
+    let rateId = cq.carrier_rate_id ? String(cq.carrier_rate_id) : undefined;
+
+    // Create new rate if none provided
+    if (!rateId) {
+      rateId = await createCarrierRate(
+        {
+          tenant_id,
+          carrier_id: cq.carrier_id,
+          service_id,
+          origin_port_id,
+          destination_port_id,
+          mode: cq.mode || null,
+          currency: 'USD',
+          base_rate: 0,
+          rate_reference_id: quoteId,
+        },
+        client,
+      );
+    } else {
+      // Best-effort metadata update for existing rate
+      try {
+        await (client as any)
+          .from('carrier_rates')
+          .update({
+            carrier_id: cq.carrier_id,
+            service_id: service_id || null,
+            origin_port_id: origin_port_id || null,
+            destination_port_id: destination_port_id || null,
+            mode: cq.mode || null,
+            rate_reference_id: quoteId,
+          })
+          .eq('id', rateId);
+      } catch {}
+    }
+
+    // Replace charges for this rate to avoid duplication
+    await (client as any)
+      .from('carrier_rate_charges')
+      .delete()
+      .eq('carrier_rate_id', rateId);
+
+    const mergedCharges: ChargeInput[] = [
+      ...((cq.buying_charges || []) as ChargeInput[]),
+      ...((cq.selling_charges || []) as ChargeInput[]),
+    ];
+    await upsertChargesForRate(tenant_id, rateId!, cq.mode, mergedCharges, client);
+
+    finalRateIds.push(rateId!);
+    keptRateIds.add(rateId!);
+  }
+
+  // Remove any rates that were previously saved but not included now
+  const toRemove = (existingRateIds || [])
+    .map((id) => String(id))
+    .filter((id) => !keptRateIds.has(id));
+
+  if (toRemove.length > 0) {
+    await (client as any)
+      .from('carrier_rate_charges')
+      .delete()
+      .in('carrier_rate_id', toRemove);
+    await (client as any)
+      .from('carrier_rates')
+      .delete()
+      .in('id', toRemove);
+  }
+
+  return finalRateIds;
+}
+
+export async function listCarrierRatesForQuote(
+  quoteId: string,
+  client = defaultClient,
+): Promise<Array<{ id: string; carrier_id: string; mode: string | null; charges: any[] }>> {
+  // Primary: fetch by rate_reference_id = quoteId
+  const { data: byRef, error: refErr } = (client as any)
+    .from('carrier_rates')
+    .select('id, carrier_id, mode, charges:carrier_rate_charges(*)')
+    .eq('rate_reference_id', quoteId);
+  if (refErr) throw refErr;
+  let rows: any[] = byRef || [];
+
+  // Fallback 1: some older or mismatched saves might reference quote_number
+  if (!rows || rows.length === 0) {
+    try {
+      const { data: quote } = (client as any)
+        .from('quotes')
+        .select('quote_number')
+        .eq('id', quoteId)
+        .maybeSingle();
+      const qn = (quote as any)?.quote_number;
+      if (qn) {
+        const { data: byNumber } = (client as any)
+          .from('carrier_rates')
+          .select('id, carrier_id, mode, charges:carrier_rate_charges(*)')
+          .eq('rate_reference_id', qn);
+        rows = byNumber || rows;
+      }
+    } catch {}
+  }
+
+  // Fallback 2: if still empty, resolve via quotation versions/options
+  if (!rows || rows.length === 0) {
+    try {
+      const { data: versions } = (client as any)
+        .from('quotation_versions')
+        .select('id')
+        .eq('quote_id', quoteId)
+        .order('version_number', { ascending: false })
+        .limit(1);
+      const versionId = Array.isArray(versions) ? versions[0]?.id : versions?.id;
+      if (versionId) {
+        const { data: opts } = (client as any)
+          .from('quotation_version_options')
+          .select('carrier_rate_id')
+          .eq('quotation_version_id', versionId);
+        const rateIds = (opts || []).map((o: any) => String(o.carrier_rate_id)).filter(Boolean);
+        if (rateIds.length > 0) {
+          const { data: byIds } = (client as any)
+            .from('carrier_rates')
+            .select('id, carrier_id, mode, charges:carrier_rate_charges(*)')
+            .in('id', rateIds);
+          rows = byIds || rows;
+        }
+      }
+    } catch {}
+  }
+
+  return (rows || []).map((r: any) => ({
+    id: String(r.id),
+    carrier_id: String(r.carrier_id),
+    mode: r.mode || null,
+    charges: r.charges || [],
+  }));
 }
 
 export async function createQuotationVersionWithOptions(

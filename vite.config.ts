@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    strictPort: true,
     headers: {
       // Explicitly disable Privacy Sandbox/FLEDGE trial features to silence devtools warnings
       // These features are origin-trial controlled; disabling prevents noisy console errors

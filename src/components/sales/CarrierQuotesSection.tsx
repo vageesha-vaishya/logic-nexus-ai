@@ -26,11 +26,15 @@ export function CarrierQuotesSection({
   selectedServiceType,
   carrierQuotes,
   setCarrierQuotes,
+  onSave,
+  onReload,
 }: {
   carriers: any[];
   selectedServiceType: string;
   carrierQuotes: CarrierQuote[];
   setCarrierQuotes: Dispatch<SetStateAction<CarrierQuote[]>>;
+  onSave?: () => void | Promise<void>;
+  onReload?: () => void | Promise<void>;
 }) {
   // Collapsible on mobile, open by default on md+; persist to localStorage
   const [accordionOpen, setAccordionOpen] = useState<boolean>(true);
@@ -112,10 +116,22 @@ export function CarrierQuotesSection({
       <CardHeader className="ef-header">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <CardTitle className="ef-title">Carrier Quotations</CardTitle>
-          <Button type="button" onClick={addCarrierQuote} size="sm" className="ef-hover">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Carrier Quote
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" onClick={addCarrierQuote} size="sm" className="ef-hover">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Quote
+            </Button>
+            {onSave && (
+              <Button type="button" variant="default" size="sm" onClick={() => onSave?.()} className="ef-hover">
+                Save Rates
+              </Button>
+            )}
+            {onReload && (
+              <Button type="button" variant="outline" size="sm" onClick={() => onReload?.()} className="ef-hover">
+                Reload Saved
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

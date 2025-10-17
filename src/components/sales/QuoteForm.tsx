@@ -20,8 +20,9 @@ import AccountSelectDialogList from '@/components/crm/AccountSelectDialogList';
 import ContactSelectDialogList from '@/components/crm/ContactSelectDialogList';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import {
-  createRatesAndChargesForQuote,
+  upsertRatesAndChargesForQuote,
   createQuotationVersionWithOptions,
+  listCarrierRatesForQuote,
 } from '@/integrations/supabase/carrierRatesActions';
 
 const quoteSchema = z.object({
@@ -65,6 +66,7 @@ type Charge = {
 };
 
 type CarrierQuote = {
+  carrier_rate_id?: string;
   carrier_id: string;
   mode?: string;
   buying_charges: Charge[];
@@ -96,6 +98,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [resolvedTenantName, setResolvedTenantName] = useState<string | null>(null);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   const [carrierQuotes, setCarrierQuotes] = useState<CarrierQuote[]>([]);
+  const [existingRateIds, setExistingRateIds] = useState<string[]>([]);
   // Display-only hint; actual quote_number is generated in DB
   const [quoteNumberPreview, setQuoteNumberPreview] = useState<string>('Auto-generated on save');
   // Resolved labels for hidden contacts
@@ -108,6 +111,20 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [resolvedPackageCategoryLabels, setResolvedPackageCategoryLabels] = useState<Record<string, string>>({});
   const [resolvedPackageSizeLabels, setResolvedPackageSizeLabels] = useState<Record<string, string>>({});
   const debugHydration = import.meta.env.DEV;
+
+  // Ensure unique option lists by id to avoid duplicate React keys
+  const uniqueById = (arr: any[]) => {
+    try {
+      const map: Record<string, any> = {};
+      for (const item of arr || []) {
+        const id = (item as any)?.id;
+        if (id != null) map[String(id)] = item;
+      }
+      return Object.values(map);
+    } catch {
+      return arr || [];
+    }
+  };
   
   // Format carrier name defensively to avoid accidental repeated text in UI (e.g., "ABCABC")
   const formatCarrierName = (name: string) => {
@@ -634,18 +651,39 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           );
         }
 
-        // Restore carrier quotes if present
+        // Load carrier rates and charges using robust helper with fallbacks
         try {
-          const rq = (quote as any).regulatory_data?.carrier_quotes;
-          if (Array.isArray(rq)) {
-            setCarrierQuotes(
-              rq.map((cq: any) => ({
-                carrier_id: cq.carrier_id || '',
-                mode: cq.mode || (quote as any).service_type || undefined,
-                buying_charges: Array.isArray(cq.buying_charges) ? cq.buying_charges : [],
-                selling_charges: Array.isArray(cq.selling_charges) ? cq.selling_charges : [],
-              }))
-            );
+          const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
+          if (Array.isArray(rows)) {
+            const mapped = rows.map((r: any) => ({
+              carrier_rate_id: String(r.id),
+              carrier_id: String(r.carrier_id),
+              mode: r.mode || selectedServiceType || undefined,
+              buying_charges: (r.charges || []).map((c: any) => ({
+                type: (() => {
+                  const ct = String(c.charge_type || '').toUpperCase();
+                  if (ct === 'AFT' || ct === 'OFT') return 'freight';
+                  if (ct === 'BAF') return 'fuel';
+                  if (ct === 'THC') return 'handling';
+                  if (ct === 'DOC') return 'documentation';
+                  if (ct === 'ISF' || ct === 'AMS' || ct === 'ISPS') return 'customs';
+                  return 'other';
+                })(),
+                amount: Number(c.amount || 0),
+                currency: c.currency || 'USD',
+                note: c.notes || undefined,
+                basis: c.basis || undefined,
+                quantity: c.quantity ?? 1,
+              })),
+              selling_charges: [],
+            }));
+            if (debugHydration) {
+              try {
+                console.debug('[hydrate:rates] quoteId', String(quoteId), 'rows', rows.length, 'mapped', mapped.length);
+              } catch {}
+            }
+            setCarrierQuotes(mapped);
+            setExistingRateIds(rows.map((r: any) => String(r.id)));
           }
         } catch {}
 
@@ -1979,18 +2017,20 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Persist carrier rates and charges, then generate quotation version/options
       try {
         if (carrierQuotes.length > 0) {
-          const rateIds = await createRatesAndChargesForQuote(
+          const rateIds = await upsertRatesAndChargesForQuote(
             quote.id,
             tenantId!,
             values.service_id || null,
             values.origin_port_id || null,
             values.destination_port_id || null,
             carrierQuotes.map((cq) => ({
+              carrier_rate_id: cq.carrier_rate_id,
               carrier_id: cq.carrier_id,
               mode: cq.mode || selectedServiceType || undefined,
               buying_charges: cq.buying_charges || [],
               selling_charges: cq.selling_charges || [],
             })),
+            existingRateIds,
             supabase as any,
           );
           if (rateIds.length > 0) {
@@ -2120,8 +2160,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {opportunities.map((opp) => (
-                          <SelectItem key={opp.id} value={String(opp.id)}>
+                        {uniqueById(opportunities).map((opp) => (
+                          <SelectItem key={String(opp.id)} value={String(opp.id)}>
                             {opp.name}
                           </SelectItem>
                         ))}
@@ -2159,8 +2199,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.id} value={String(account.id)}>
+                        {uniqueById(accounts).map((account) => (
+                          <SelectItem key={String(account.id)} value={String(account.id)}>
                             {account.name || (account as any).account_name || 'Account'}
                           </SelectItem>
                         ))}
@@ -2198,8 +2238,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {(accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts).map((contact) => (
-                          <SelectItem key={contact.id} value={String(contact.id)}>
+                        {uniqueById(accountId ? contacts.filter((c: any) => String(c.account_id) === String(accountId)) : contacts).map((contact) => (
+                          <SelectItem key={String(contact.id)} value={String(contact.id)}>
                             {contact.first_name} {contact.last_name}
                           </SelectItem>
                         ))}
@@ -2272,8 +2312,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           const list = serviceTypes.filter(st => st.id !== '');
                           const currentTypeId = form.getValues('service_type_id');
                           const inList = list.some(st => String(st.id) === String(currentTypeId));
-                          const items = list.map((st) => (
-                            <SelectItem key={st.id} value={st.id}>
+                          const unique = uniqueById(list);
+                          const items = unique.map((st: any) => (
+                            <SelectItem key={String(st.id)} value={String(st.id)}>
                               {st.name}
                             </SelectItem>
                           ));
@@ -2281,7 +2322,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             const labelFromList = serviceTypes.find(st => String(st.id) === String(currentTypeId))?.name;
                             const fallbackLabel = labelFromList || (selectedServiceType ? selectedServiceType : 'Selected Service Type');
                             items.unshift(
-                              <SelectItem key={String(currentTypeId)} value={String(currentTypeId)}>
+                              <SelectItem key={`fallback-service-type-${String(currentTypeId)}`} value={String(currentTypeId)}>
                                 {fallbackLabel}
                               </SelectItem>
                             );
@@ -2316,7 +2357,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         {(() => {
                           const currentServiceId = form.getValues('service_id');
                           const inList = filteredServices.some((s) => String(s.id) === String(currentServiceId));
-                          const items = filteredServices.map((service) => (
+                          const unique = uniqueById(filteredServices);
+                          const items = unique.map((service: any) => (
                             <SelectItem key={String(service.id)} value={String(service.id)}>
                               {service.service_name}
                             </SelectItem>
@@ -2326,7 +2368,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             const existing = services.find((s: any) => String(s.id) === String(currentServiceId));
                             const label = resolvedServiceLabels[String(currentServiceId)] || existing?.service_name || 'Selected Service';
                             items.unshift(
-                              <SelectItem key={String(currentServiceId)} value={String(currentServiceId)}>
+                              <SelectItem key={`fallback-service-${String(currentServiceId)}`} value={String(currentServiceId)}>
                                 {label}
                               </SelectItem>
                             );
@@ -2384,8 +2426,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {ports.map((port) => (
-                          <SelectItem key={port.id} value={String(port.id)}>
+                        {uniqueById(ports).map((port) => (
+                          <SelectItem key={String(port.id)} value={String(port.id)}>
                             {port.location_name} ({port.location_code || 'N/A'})
                           </SelectItem>
                         ))}
@@ -2409,8 +2451,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {ports.map((port) => (
-                          <SelectItem key={port.id} value={String(port.id)}>
+                        {uniqueById(ports).map((port) => (
+                          <SelectItem key={String(port.id)} value={String(port.id)}>
                             {port.location_name} ({port.location_code || 'N/A'})
                           </SelectItem>
                         ))}
@@ -2454,7 +2496,51 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               {/* Fourth column: Capture Carrier Rates label and button/dialog */}
               <div className="space-y-2">
                 <FormLabel>Capture Carrier Rates</FormLabel>
-                <Dialog>
+                <Dialog
+                  onOpenChange={async (open) => {
+                    try {
+                      if (!open) return;
+                      if (!quoteId) return;
+                      // Only auto-hydrate on open if nothing is loaded yet
+                      if (carrierQuotes.length > 0) return;
+                      const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
+                      const mapped = (rows || []).map((r: any) => ({
+                        carrier_rate_id: String(r.id),
+                        carrier_id: String(r.carrier_id),
+                        mode: r.mode || selectedServiceType || undefined,
+                        buying_charges: (r.charges || []).map((c: any) => ({
+                          type: (() => {
+                            const ct = String(c.charge_type || '').toUpperCase();
+                            if (ct === 'AFT' || ct === 'OFT') return 'freight';
+                            if (ct === 'BAF') return 'fuel';
+                            if (ct === 'THC') return 'handling';
+                            if (ct === 'DOC') return 'documentation';
+                            if (ct === 'ISF' || ct === 'AMS' || ct === 'ISPS') return 'customs';
+                            return 'other';
+                          })(),
+                          amount: Number(c.amount || 0),
+                          currency: c.currency || 'USD',
+                          note: c.notes || undefined,
+                          basis: c.basis || undefined,
+                          quantity: c.quantity ?? 1,
+                        })),
+                        selling_charges: [],
+                      }));
+                      if (mapped.length > 0) {
+                        if (debugHydration) {
+                          try {
+                            console.debug('[modal:rates] auto-hydrate on open', { quoteId, rows: (rows || []).length, mapped: mapped.length });
+                          } catch {}
+                        }
+                        setCarrierQuotes(mapped);
+                        setExistingRateIds((rows || []).map((r: any) => String(r.id)));
+                      }
+                    } catch (e: any) {
+                      // Non-blocking hydration failure; keep modal usable for manual reload
+                      console.warn('Auto-hydrate carrier rates on open failed', e);
+                    }
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button
                       type="button"
@@ -2479,6 +2565,94 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       selectedServiceType={selectedServiceType}
                       carrierQuotes={carrierQuotes}
                       setCarrierQuotes={setCarrierQuotes}
+                      onSave={async () => {
+                        try {
+                          // Prefer the quote/context tenant to ensure RLS visibility on reload
+                          const tenantId = context.tenantId || roles?.[0]?.tenant_id || resolvedTenantId;
+                          if (!tenantId) {
+                            toast.error('Missing tenant context');
+                            return;
+                          }
+                          if (!quoteId) {
+                            toast.error('Save the quote before saving carrier rates');
+                            return;
+                          }
+                          const values = form.getValues();
+                          const rateIds = await upsertRatesAndChargesForQuote(
+                            quoteId,
+                            String(tenantId),
+                            values.service_id || null,
+                            values.origin_port_id || null,
+                            values.destination_port_id || null,
+                            carrierQuotes.map((cq) => ({
+                              carrier_rate_id: cq.carrier_rate_id,
+                              carrier_id: cq.carrier_id,
+                              mode: cq.mode || selectedServiceType || undefined,
+                              buying_charges: cq.buying_charges || [],
+                              selling_charges: cq.selling_charges || [],
+                            })),
+                            existingRateIds,
+                            supabase as any,
+                          );
+                          // Persist returned IDs for subsequent updates; also attach to local items to avoid duplicates/deletes later
+                          const normalizedIds = rateIds.map((id) => String(id));
+                          setExistingRateIds(normalizedIds);
+                          setCarrierQuotes((prev) => {
+                            const next = [...prev];
+                            for (let i = 0; i < next.length && i < normalizedIds.length; i++) {
+                              // Only set if not already present
+                              if (!next[i].carrier_rate_id) {
+                                (next[i] as any).carrier_rate_id = normalizedIds[i];
+                              }
+                            }
+                            return next;
+                          });
+                          toast.success('Carrier rates saved');
+                        } catch (e: any) {
+                          toast.error(e.message || 'Failed to save carrier rates');
+                        }
+                      }}
+                      onReload={async () => {
+                        try {
+                          if (!quoteId) {
+                            toast.error('Quote not saved yet');
+                            return;
+                          }
+                          const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
+                          const mapped = (rows || []).map((r: any) => ({
+                            carrier_rate_id: String(r.id),
+                            carrier_id: String(r.carrier_id),
+                            mode: r.mode || selectedServiceType || undefined,
+                            buying_charges: (r.charges || []).map((c: any) => ({
+                              type: (() => {
+                                const ct = String(c.charge_type || '').toUpperCase();
+                                if (ct === 'AFT' || ct === 'OFT') return 'freight';
+                                if (ct === 'BAF') return 'fuel';
+                                if (ct === 'THC') return 'handling';
+                                if (ct === 'DOC') return 'documentation';
+                                if (ct === 'ISF' || ct === 'AMS' || ct === 'ISPS') return 'customs';
+                                return 'other';
+                              })(),
+                              amount: Number(c.amount || 0),
+                              currency: c.currency || 'USD',
+                              note: c.notes || undefined,
+                              basis: c.basis || undefined,
+                              quantity: c.quantity ?? 1,
+                            })),
+                            selling_charges: [],
+                          }));
+                          if (debugHydration) {
+                            try {
+                              console.debug('[reload:rates] rows', (rows || []).length, 'mapped', mapped.length);
+                            } catch {}
+                          }
+                          setCarrierQuotes(mapped);
+                          setExistingRateIds((rows || []).map((r: any) => String(r.id)));
+                          toast.success('Reloaded saved carrier rates');
+                        } catch (e: any) {
+                          toast.error(e.message || 'Failed to reload carrier rates');
+                        }
+                      }}
                     />
                   </DialogContent>
                 </Dialog>
@@ -2569,8 +2743,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             {packageCategories.length === 0 && (
                               <SelectItem disabled value="__no_categories__">No categories found</SelectItem>
                             )}
-                            {packageCategories.map((cat: any) => (
-                              <SelectItem key={cat.id} value={String(cat.id)}>
+                            {uniqueById(packageCategories).map((cat: any) => (
+                              <SelectItem key={String(cat.id)} value={String(cat.id)}>
                                 {cat.category_name || 'Category'}
                               </SelectItem>
                             ))}
@@ -2597,8 +2771,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             {packageSizes.length === 0 && (
                               <SelectItem disabled value="__no_sizes__">No sizes found</SelectItem>
                             )}
-                            {packageSizes.map((sz: any) => (
-                              <SelectItem key={sz.id} value={String(sz.id)}>
+                            {uniqueById(packageSizes).map((sz: any) => (
+                              <SelectItem key={String(sz.id)} value={String(sz.id)}>
                                 {(sz.size_name || 'Size') + (sz.size_code ? ` (${sz.size_code})` : '')}
                               </SelectItem>
                             ))}
@@ -2739,8 +2913,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {consignees.map((consignee) => (
-                          <SelectItem key={consignee.id} value={String(consignee.id)}>
+                        {uniqueById(consignees).map((consignee) => (
+                          <SelectItem key={String(consignee.id)} value={String(consignee.id)}>
                             {consignee.company_name}
                           </SelectItem>
                         ))}
