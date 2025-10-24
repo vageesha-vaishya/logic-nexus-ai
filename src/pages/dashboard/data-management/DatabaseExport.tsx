@@ -129,6 +129,7 @@ export default function DatabaseExport() {
     a.target = "_blank";
     a.click();
     // Do not revoke here; user can use Manual Downloads to save and then clear
+  };
 
   // Cloud storage helpers and unified save functions
   const splitPath = (path: string) => {
