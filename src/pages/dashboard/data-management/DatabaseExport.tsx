@@ -36,6 +36,7 @@ export default function DatabaseExport() {
     enums: true,
     edgeFunctions: true,
     secrets: true,
+    tableData: true,
   });
 
   useEffect(() => {
@@ -114,6 +115,7 @@ export default function DatabaseExport() {
       enums: checked,
       edgeFunctions: checked,
       secrets: checked,
+      tableData: checked,
     });
   };
 
@@ -185,6 +187,22 @@ export default function DatabaseExport() {
           payload[key] = result.data;
         }
       });
+
+      // Export table data if selected
+      if (exportOptions.tableData) {
+        const chosen = tables.filter(t => selected[t.table_name]);
+        if (chosen.length > 0) {
+          const tableDataPromises = chosen.map(async (t) => {
+            const { data, error } = await supabase.from(t.table_name).select("*");
+            if (error) {
+              console.error(`Failed exporting ${t.table_name}:`, error.message);
+              return { table_name: t.table_name, data: [], error: error.message };
+            }
+            return { table_name: t.table_name, data: data || [] };
+          });
+          payload.table_data = await Promise.all(tableDataPromises);
+        }
+      }
 
       downloadFile("schema-metadata.json", JSON.stringify(payload, null, 2), "application/json");
       
@@ -306,7 +324,49 @@ export default function DatabaseExport() {
               />
               <label htmlFor="export-secrets" className="text-sm">Secrets (names only)</label>
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-tabledata" 
+                checked={exportOptions.tableData} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, tableData: Boolean(v) }))} 
+              />
+              <label htmlFor="export-tabledata" className="text-sm">Table Data</label>
+            </div>
           </div>
+
+          {exportOptions.tableData && (
+            <div className="mt-4 p-4 border rounded-lg bg-muted/20">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-medium">Select tables to export:</div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
+                  <label htmlFor="select-all-tables" className="text-sm">Select all tables</label>
+                </div>
+              </div>
+              <div className="border rounded-md max-h-[300px] overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead>Table</TableHead>
+                      <TableHead>Rows (est.)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tables.map((t) => (
+                      <TableRow key={t.table_name}>
+                        <TableCell>
+                          <Checkbox checked={!!selected[t.table_name]} onCheckedChange={(v: any) => toggle(t.table_name, Boolean(v))} />
+                        </TableCell>
+                        <TableCell>{t.table_name}</TableCell>
+                        <TableCell>{t.row_estimate}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end">
             <Button onClick={exportSchemaMetadata} disabled={loading}>
