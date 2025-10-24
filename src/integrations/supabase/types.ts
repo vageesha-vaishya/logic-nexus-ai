@@ -2579,38 +2579,26 @@ export type Database = {
       }
       quote_number_config_franchise: {
         Row: {
-          allow_manual_override: boolean | null
           created_at: string | null
           franchise_id: string
-          last_reset_bucket: string | null
           prefix: string
           reset_policy: Database["public"]["Enums"]["quote_reset_policy"]
-          start_number: number | null
-          suffix: string | null
           tenant_id: string
           updated_at: string | null
         }
         Insert: {
-          allow_manual_override?: boolean | null
           created_at?: string | null
           franchise_id: string
-          last_reset_bucket?: string | null
           prefix?: string
           reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          start_number?: number | null
-          suffix?: string | null
           tenant_id: string
           updated_at?: string | null
         }
         Update: {
-          allow_manual_override?: boolean | null
           created_at?: string | null
           franchise_id?: string
-          last_reset_bucket?: string | null
           prefix?: string
           reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          start_number?: number | null
-          suffix?: string | null
           tenant_id?: string
           updated_at?: string | null
         }
@@ -2633,35 +2621,23 @@ export type Database = {
       }
       quote_number_config_tenant: {
         Row: {
-          allow_manual_override: boolean | null
           created_at: string | null
-          last_reset_bucket: string | null
           prefix: string
           reset_policy: Database["public"]["Enums"]["quote_reset_policy"]
-          start_number: number | null
-          suffix: string | null
           tenant_id: string
           updated_at: string | null
         }
         Insert: {
-          allow_manual_override?: boolean | null
           created_at?: string | null
-          last_reset_bucket?: string | null
           prefix?: string
           reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          start_number?: number | null
-          suffix?: string | null
           tenant_id: string
           updated_at?: string | null
         }
         Update: {
-          allow_manual_override?: boolean | null
           created_at?: string | null
-          last_reset_bucket?: string | null
           prefix?: string
           reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          start_number?: number | null
-          suffix?: string | null
           tenant_id?: string
           updated_at?: string | null
         }
@@ -2679,7 +2655,6 @@ export type Database = {
         Row: {
           created_at: string | null
           franchise_id: string | null
-          id: string
           last_sequence: number
           period_key: string
           tenant_id: string
@@ -2688,7 +2663,6 @@ export type Database = {
         Insert: {
           created_at?: string | null
           franchise_id?: string | null
-          id?: string
           last_sequence?: number
           period_key: string
           tenant_id: string
@@ -2697,7 +2671,6 @@ export type Database = {
         Update: {
           created_at?: string | null
           franchise_id?: string | null
-          id?: string
           last_sequence?: number
           period_key?: string
           tenant_id?: string
@@ -4557,13 +4530,7 @@ export type Database = {
         | "closed_lost"
       plan_type: "crm_base" | "service_addon" | "bundle"
       priority_level: "low" | "medium" | "high" | "urgent"
-      quote_reset_policy:
-        | "none"
-        | "daily"
-        | "monthly"
-        | "yearly"
-        | "weekly"
-        | "per_customer"
+      quote_reset_policy: "none" | "daily" | "monthly" | "yearly"
       shipment_status:
         | "draft"
         | "confirmed"
@@ -4775,14 +4742,7 @@ export const Constants = {
       ],
       plan_type: ["crm_base", "service_addon", "bundle"],
       priority_level: ["low", "medium", "high", "urgent"],
-      quote_reset_policy: [
-        "none",
-        "daily",
-        "monthly",
-        "yearly",
-        "weekly",
-        "per_customer",
-      ],
+      quote_reset_policy: ["none", "daily", "monthly", "yearly"],
       shipment_status: [
         "draft",
         "confirmed",
