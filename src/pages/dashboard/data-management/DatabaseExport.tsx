@@ -382,6 +382,316 @@ export default function DatabaseExport() {
     }
   };
 
+  const exportSchemaSQL = async () => {
+    const hasAnySelected = Object.values(exportOptions).some(v => v);
+    if (!hasAnySelected) {
+      toast.message("No components selected", { description: "Select at least one export option." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let sqlContent = `-- Database Schema Export\n-- Generated on: ${new Date().toISOString()}\n\n`;
+
+      // Export schema (tables and columns)
+      if (exportOptions.schema) {
+        const { data: schemaData, error } = await supabase.rpc("get_database_schema");
+        if (error) throw error;
+        
+        sqlContent += "-- Tables and Columns\n";
+        if (schemaData && Array.isArray(schemaData)) {
+          const tableGroups = schemaData.reduce((acc: any, row: any) => {
+            if (!acc[row.table_name]) {
+              acc[row.table_name] = [];
+            }
+            acc[row.table_name].push(row);
+            return acc;
+          }, {});
+
+          Object.entries(tableGroups).forEach(([tableName, columns]: [string, any]) => {
+            sqlContent += `\nCREATE TABLE IF NOT EXISTS "${tableName}" (\n`;
+            const columnDefs = columns.map((col: any) => {
+              let def = `  "${col.column_name}" ${col.data_type}`;
+              if (col.character_maximum_length) {
+                def += `(${col.character_maximum_length})`;
+              }
+              if (col.is_nullable === false) {
+                def += ' NOT NULL';
+              }
+              if (col.column_default) {
+                def += ` DEFAULT ${col.column_default}`;
+              }
+              return def;
+            });
+            sqlContent += columnDefs.join(',\n') + '\n);\n';
+          });
+        }
+      }
+
+      // Export constraints
+      if (exportOptions.constraints) {
+        const { data: constraintsData, error } = await supabase.rpc("get_table_constraints");
+        if (error) throw error;
+        
+        sqlContent += "\n-- Constraints\n";
+        if (constraintsData && Array.isArray(constraintsData)) {
+          constraintsData.forEach((constraint: any) => {
+            // Use constraint_details provided by RPC for accuracy across PK, FK, UNIQUE, CHECK
+            const details = (constraint.constraint_details || '').toString();
+            if (details.trim().length > 0) {
+              sqlContent += `ALTER TABLE "${constraint.table_name}" ADD CONSTRAINT "${constraint.constraint_name}" ${details};\n`;
+            }
+          });
+        }
+      }
+
+      // Export indexes
+      if (exportOptions.indexes) {
+        const { data: indexesData, error } = await supabase.rpc("get_table_indexes");
+        if (error) throw error;
+        
+        sqlContent += "\n-- Indexes\n";
+        if (indexesData && Array.isArray(indexesData)) {
+          indexesData.forEach((index: any) => {
+            // Use full index definition from pg_get_indexdef for correctness
+            const def = (index.index_definition || '').toString();
+            if (def.trim().length > 0) {
+              sqlContent += `${def};\n`;
+            }
+          });
+        }
+      }
+
+      // Export database functions
+      if (exportOptions.dbFunctions) {
+        // Prefer RPC with full bodies; gracefully fall back to metadata-only
+        let functionsData: any[] | null = null;
+        try {
+          const { data: functionsWithBody } = await supabase.rpc("get_database_functions_with_body");
+          functionsData = functionsWithBody || null;
+        } catch (e) {
+          functionsData = null;
+        }
+        if (!functionsData) {
+          const { data: metaData, error } = await supabase.rpc("get_database_functions");
+          if (error) throw error;
+          functionsData = metaData || [];
+        }
+        
+        sqlContent += "\n-- Database Functions\n";
+        if (functionsData && Array.isArray(functionsData)) {
+          let anyPrinted = false;
+          functionsData.forEach((func: any) => {
+            const name = func?.name || func?.function_name;
+            const schema = func?.schema || 'public';
+            const def = func?.function_definition;
+            if (def && name) {
+              const trimmed = String(def).trim();
+              sqlContent += `-- Function: ${schema}.${name}\n`;
+              // pg_get_functiondef returns a full CREATE FUNCTION ... AS $$ ... $$; do not append another semicolon
+              sqlContent += `${trimmed}\n\n`;
+              anyPrinted = true;
+            } else if (name) {
+              sqlContent += `-- Function metadata only: ${schema}.${name} (${func?.argument_types ?? ''}) RETURNS ${func?.return_type ?? ''} [definition unavailable]\n`;
+              anyPrinted = true;
+            }
+          });
+          if (!anyPrinted) {
+            sqlContent += "-- No function definitions available from introspection.\n";
+          }
+        }
+      }
+
+      // Export RLS policies
+      if (exportOptions.rlsPolicies) {
+        const { data: policiesData, error } = await supabase.rpc("get_rls_policies");
+        if (error) throw error;
+        
+        sqlContent += "\n-- RLS Policies\n";
+        if (policiesData && Array.isArray(policiesData)) {
+          const tableGroups = policiesData.reduce((acc: any, policy: any) => {
+            if (!acc[policy.table_name]) {
+              acc[policy.table_name] = [];
+            }
+            acc[policy.table_name].push(policy);
+            return acc;
+          }, {});
+
+          Object.entries(tableGroups).forEach(([tableName, policies]: [string, any]) => {
+            sqlContent += `\n-- Enable RLS on ${tableName}\n`;
+            sqlContent += `ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY;\n`;
+            
+            policies.forEach((policy: any) => {
+              sqlContent += `CREATE POLICY "${policy.policy_name}" ON "${tableName}"\n`;
+              // 'command' comes from get_rls_policies; default to ALL if missing
+              sqlContent += `  FOR ${policy.command || 'ALL'}\n`;
+              // 'roles' is returned as text (e.g., "{authenticated,anon}"). Parse safely.
+              const rolesText = (policy.roles ?? '').toString();
+              if (rolesText.trim() !== '') {
+                const parsedRoles = rolesText
+                  .replace(/^{|}$/g, '')
+                  .split(',')
+                  .map((r: string) => r.trim())
+                  .filter((r: string) => r.length > 0);
+                if (parsedRoles.length > 0) {
+                  const rolesSql = parsedRoles
+                    .map((r: string) => {
+                      const lower = r.toLowerCase();
+                      if (lower === 'public') return 'PUBLIC';
+                      if (lower === 'current_user') return 'CURRENT_USER';
+                      if (lower === 'session_user') return 'SESSION_USER';
+                      return `"${r}"`;
+                    })
+                    .join(', ');
+                  sqlContent += `  TO ${rolesSql}\n`;
+                }
+              }
+              if (policy.using_expression) {
+                sqlContent += `  USING (${policy.using_expression})\n`;
+              }
+              if (policy.with_check_expression) {
+                sqlContent += `  WITH CHECK (${policy.with_check_expression})\n`;
+              }
+              sqlContent += ';\n';
+            });
+          });
+        }
+      }
+
+      // Export enums
+      if (exportOptions.enums) {
+        const { data: enumsData, error } = await supabase.rpc("get_database_enums");
+        if (error) throw error;
+        
+        sqlContent += "\n-- Enums\n";
+        if (enumsData && Array.isArray(enumsData)) {
+          enumsData.forEach((enumItem: any) => {
+            const enumType = enumItem?.enum_type;
+            const labelsText = (enumItem?.labels ?? '').toString();
+            if (!enumType || labelsText.trim() === '') return;
+            const labels = labelsText
+              .replace(/^{|}$/g, '')
+              .split(',')
+              .map((l: string) => l.trim())
+              .filter((l: string) => l.length > 0)
+              .map((l: string) => `'${l.replace(/'/g, "''")}'`)
+              .join(', ');
+            sqlContent += `CREATE TYPE "${enumType}" AS ENUM (${labels});\n`;
+          });
+        }
+      }
+
+      // Export table data as INSERT statements
+      if (exportOptions.tableData) {
+        const chosen = tables.filter(t => selected[t.table_name]);
+
+        // Build a table->column->data_type map for formatting
+        const { data: schemaData, error: schemaError } = await supabase.rpc("get_database_schema");
+        if (schemaError) throw schemaError;
+        const typeMapByTable: Record<string, Record<string, string>> = (schemaData || []).reduce(
+          (acc: Record<string, Record<string, string>>, col: any) => {
+            if (!acc[col.table_name]) acc[col.table_name] = {};
+            acc[col.table_name][col.column_name] = col.data_type;
+            return acc;
+          },
+          {}
+        );
+
+        if (chosen.length > 0) {
+          sqlContent += "\n-- Table Data\n";
+
+          const escapeStr = (s: string) => s.replace(/'/g, "''");
+
+          const formatArray = (arr: any[], baseType?: string) => {
+            const numericTypes = [
+              "integer",
+              "bigint",
+              "smallint",
+              "numeric",
+              "real",
+              "double precision",
+            ];
+            const items = arr
+              .map((v) => {
+                if (v === null) return "NULL";
+                if (baseType && numericTypes.includes(baseType)) return String(v);
+                if (baseType === "boolean") return v ? "true" : "false";
+                const s = String(v)
+                  .replace(/"/g, '\\"')
+                  .replace(/\\/g, "\\\\")
+                  .replace(/'/g, "''");
+                return `"${s}"`;
+              })
+              .join(",");
+            const literal = `{${items}}`;
+            return baseType ? `'${literal}'::${baseType}[]` : `'${literal}'`;
+          };
+
+          const formatValue = (value: any, dataType?: string) => {
+            if (value === null) return "NULL";
+
+            if (dataType === "json" || dataType === "jsonb") {
+              const json = JSON.stringify(value);
+              return `'${escapeStr(json)}'::${dataType}`;
+            }
+
+            if (dataType && dataType.endsWith("[]") && Array.isArray(value)) {
+              const baseType = dataType.slice(0, -2);
+              return formatArray(value, baseType);
+            }
+
+            if (typeof value === "string") return `'${escapeStr(value)}'`;
+            if (typeof value === "number") return String(value);
+            if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+            if (value instanceof Date) return `'${value.toISOString()}'`;
+
+            if (typeof value === "object") {
+              const json = JSON.stringify(value);
+              return `'${escapeStr(json)}'`;
+            }
+
+            return `'${escapeStr(String(value))}'`;
+          };
+
+          for (const table of chosen) {
+            const { data, error } = await supabase.from(table.table_name).select("*");
+            if (error) {
+              console.error(`Failed exporting ${table.table_name}:`, error.message);
+              continue;
+            }
+
+            if (data && data.length > 0) {
+              sqlContent += `\n-- Data for table: ${table.table_name}\n`;
+
+              const columns = Object.keys(data[0]);
+              const columnNames = columns.map((col) => `"${col}"`).join(", ");
+              const colTypes = typeMapByTable[table.table_name] || {};
+
+              data.forEach((row: any) => {
+                const values = columns
+                  .map((col) => formatValue(row[col], colTypes[col]))
+                  .join(", ");
+                sqlContent += `INSERT INTO "${table.table_name}" (${columnNames}) VALUES (${values});\n`;
+              });
+            }
+          }
+        }
+      }
+
+      await saveFile(`schema-export.sql`, sqlContent, "text/plain");
+      
+      const exportedItems = Object.entries(exportOptions)
+        .filter(([_, v]) => v)
+        .map(([k]) => k)
+        .join(", ");
+      toast.success("SQL Export complete", { description: `Exported: ${exportedItems}` });
+    } catch (e: any) {
+      toast.error("SQL Export failed", { description: e.message || String(e) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const runQuery = async () => {
     setLoading(true);
     try {
@@ -879,6 +1189,9 @@ export default function DatabaseExport() {
           )}
 
           <div className="flex justify-end gap-3">
+            <Button onClick={exportSchemaSQL} disabled={loading}>
+              Export as SQL File
+            </Button>
             <Button onClick={exportSchemaMetadata} disabled={loading}>
               Export Selected Components
             </Button>
