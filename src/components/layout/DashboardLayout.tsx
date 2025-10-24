@@ -6,6 +6,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StickyActionsProvider, useStickyActions } from '@/components/layout/StickyActionsContext';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
+import { EnvironmentIndicator } from '@/components/ui/environment-indicator';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -35,6 +36,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <ObjectMenu />
+              <div className="ml-auto">
+                <EnvironmentIndicator />
+              </div>
             </header>
             <main className="flex-1 p-4 bg-muted/30 pb-24" style={{ backgroundImage: 'var(--app-background, none)' }}>
               {children}
