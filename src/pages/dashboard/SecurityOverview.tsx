@@ -396,8 +396,7 @@ export default function SecurityOverview() {
         }
       }
 
-      const baseQuery = (supabase.from as any)(selectedTableForSearch).select('*', { count: 'exact' });
-      let query = baseQuery;
+      let query = (supabase as any).from(selectedTableForSearch).select('*', { count: 'exact' });
 
       // Apply typed filters (AND semantics)
       const tableFilter = tableFilters[selectedTableForSearch] || {};
@@ -408,7 +407,7 @@ export default function SecurityOverview() {
 
         // Enumerations
         if (fv.enumValue !== undefined && fv.enumValue !== '') {
-          query = query.eq(c.column_name, fv.enumValue);
+          query.eq(c.column_name, fv.enumValue);
           return;
         }
 
