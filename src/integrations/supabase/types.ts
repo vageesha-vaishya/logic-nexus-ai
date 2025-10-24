@@ -4364,10 +4364,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      calculate_lead_score: {
-        Args: { lead_id: string }
-        Returns: number
-      }
+      calculate_lead_score: { Args: { lead_id: string }; Returns: number }
       check_usage_limit: {
         Args: { _feature_key: string; _tenant_id: string }
         Returns: boolean
@@ -4376,23 +4373,20 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
-      execute_sql_query: {
-        Args: { query_text: string }
-        Returns: Json
-      }
+      execute_sql_query: { Args: { query_text: string }; Returns: Json }
       generate_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
       }
       get_database_enums: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           enum_type: string
           labels: string
         }[]
       }
       get_database_functions: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           argument_types: string
           description: string
@@ -4406,7 +4400,7 @@ export type Database = {
         }[]
       }
       get_database_schema: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           column_default: string
           column_name: string
@@ -4420,7 +4414,7 @@ export type Database = {
         }[]
       }
       get_database_tables: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           column_count: number
           index_count: number
@@ -4432,7 +4426,7 @@ export type Database = {
         }[]
       }
       get_rls_policies: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           command: string
           policy_name: string
@@ -4442,7 +4436,7 @@ export type Database = {
         }[]
       }
       get_rls_status: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           policy_count: number
           rls_enabled: boolean
@@ -4450,7 +4444,7 @@ export type Database = {
         }[]
       }
       get_table_constraints: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           constraint_details: string
           constraint_name: string
@@ -4459,7 +4453,7 @@ export type Database = {
         }[]
       }
       get_table_indexes: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           index_columns: string
           index_definition: string
@@ -4483,10 +4477,7 @@ export type Database = {
         Args: { check_user_id: string }
         Returns: string
       }
-      get_user_tenant_id: {
-        Args: { check_user_id: string }
-        Returns: string
-      }
+      get_user_tenant_id: { Args: { check_user_id: string }; Returns: string }
       has_role: {
         Args: {
           check_role: Database["public"]["Enums"]["app_role"]
@@ -4502,10 +4493,7 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
-      is_platform_admin: {
-        Args: { check_user_id: string }
-        Returns: boolean
-      }
+      is_platform_admin: { Args: { check_user_id: string }; Returns: boolean }
       preview_next_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
