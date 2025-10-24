@@ -51,6 +51,14 @@ export default function DatabaseExport() {
   const [conflictPolicy, setConflictPolicy] = useState<'ask' | 'overwrite' | 'rename'>('rename');
   const [cloudBasePath, setCloudBasePath] = useState<string>('db-exports');
 
+  // Manual download queue for restricted iframes/browsers
+  const [pendingDownloads, setPendingDownloads] = useState<Array<{ name: string; url: string }>>([]);
+  const clearPendingDownloads = () => {
+    try {
+      pendingDownloads.forEach((d) => URL.revokeObjectURL(d.url));
+    } catch {}
+    setPendingDownloads([]);
+  };
   useEffect(() => {
     const loadTables = async () => {
       const { data, error } = await supabase.rpc("get_database_tables");
@@ -109,15 +117,18 @@ export default function DatabaseExport() {
       }
     }
     
-    // Fallback for browsers without File System Access API
+    // Fallback for browsers without File System Access API or when blocked in iframes
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
+    // Keep a manual download link for the user to click if auto-download is blocked
+    setPendingDownloads((prev) => [...prev, { name: filename, url }]);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
+    a.rel = "noopener";
+    a.target = "_blank";
     a.click();
-    URL.revokeObjectURL(url);
-  };
+    // Do not revoke here; user can use Manual Downloads to save and then clear
 
   // Cloud storage helpers and unified save functions
   const splitPath = (path: string) => {
@@ -617,6 +628,27 @@ export default function DatabaseExport() {
           )}
         </CardContent>
       </Card>
+
+      {pendingDownloads.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Manual Downloads</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">Your browser blocked automatic downloads. Click the links below to save files, or clear when done.</p>
+            <div className="space-y-2">
+              {pendingDownloads.map((d, i) => (
+                <div key={`${d.name}-${i}`} className="flex items-center justify-between gap-2">
+                  <a href={d.url} download={d.name} className="text-primary underline break-all">{d.name}</a>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={clearPendingDownloads}>Clear</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
