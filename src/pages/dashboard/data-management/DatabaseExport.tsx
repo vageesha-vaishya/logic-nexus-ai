@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
 import { toast } from "sonner";
 
@@ -25,6 +27,10 @@ export default function DatabaseExport() {
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 50;");
   const [queryResult, setQueryResult] = useState<any[]>([]);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreMode, setRestoreMode] = useState<'insert' | 'upsert'>('upsert');
+  const [lastBackupTime, setLastBackupTime] = useState<string | null>(null);
+  const [backupType, setBackupType] = useState<'full' | 'incremental'>('full');
   
   // Export component selection
   const [exportOptions, setExportOptions] = useState({
@@ -52,6 +58,12 @@ export default function DatabaseExport() {
       setSelected(sel);
     };
     loadTables();
+    
+    // Load last backup timestamp from localStorage
+    const lastBackup = localStorage.getItem('last_database_backup');
+    if (lastBackup) {
+      setLastBackupTime(lastBackup);
+    }
   }, []);
 
   const allSelected = useMemo(() => tables.length > 0 && tables.every(t => selected[t.table_name]), [tables, selected]);
@@ -242,107 +254,165 @@ export default function DatabaseExport() {
     downloadFile("query-result.csv", csv, "text/csv");
   };
 
-  const exportDatabaseDump = async () => {
+  const exportFullBackup = async () => {
     setLoading(true);
     try {
-      const promises: Promise<any>[] = [];
-      
-      // Fetch schema, functions, enums, RLS policies
-      promises.push(
-        supabase.rpc("get_database_schema"),
-        supabase.rpc("get_database_functions"),
-        supabase.rpc("get_database_enums"),
-        supabase.rpc("get_rls_policies"),
-        supabase.rpc("get_table_constraints"),
-        supabase.rpc("get_table_indexes")
-      );
-      
-      const [schemaRes, functionsRes, enumsRes, rlsRes, constraintsRes, indexesRes] = await Promise.all(promises);
-      
-      if (schemaRes.error) throw schemaRes.error;
-      if (functionsRes.error) throw functionsRes.error;
-      if (enumsRes.error) throw enumsRes.error;
-      if (rlsRes.error) throw rlsRes.error;
-      
-      let sqlDump = `-- Complete Database Dump\n-- Generated: ${new Date().toISOString()}\n\n`;
-      
-      // Export enums
-      sqlDump += `-- ENUMS\n`;
-      (enumsRes.data || []).forEach((e: any) => {
-        sqlDump += `CREATE TYPE ${e.enum_type} AS ENUM (${e.labels.split(', ').map((l: string) => `'${l}'`).join(', ')});\n`;
-      });
-      sqlDump += `\n`;
-      
-      // Export tables
-      sqlDump += `-- TABLES\n`;
-      const tablesByName: Record<string, any[]> = {};
-      (schemaRes.data || []).forEach((col: any) => {
-        if (!tablesByName[col.table_name]) tablesByName[col.table_name] = [];
-        tablesByName[col.table_name].push(col);
-      });
-      
-      for (const [tableName, columns] of Object.entries(tablesByName)) {
-        sqlDump += `CREATE TABLE ${tableName} (\n`;
-        sqlDump += columns.map((col: any) => {
-          let line = `  ${col.column_name} ${col.data_type}`;
-          if (!col.is_nullable) line += ' NOT NULL';
-          if (col.column_default) line += ` DEFAULT ${col.column_default}`;
-          return line;
-        }).join(',\n');
-        sqlDump += `\n);\n\n`;
+      const timestamp = new Date().toISOString();
+      const backup: any = {
+        backup_type: 'full',
+        timestamp,
+        tables: {},
+      };
+
+      // Export all table data
+      for (const table of tables) {
+        const { data, error } = await supabase.from(table.table_name).select("*");
+        if (error) {
+          console.error(`Failed to backup ${table.table_name}:`, error.message);
+          continue;
+        }
+        backup.tables[table.table_name] = data || [];
       }
+
+      downloadFile(`full-backup-${timestamp}.json`, JSON.stringify(backup, null, 2), "application/json");
       
-      // Export constraints
-      sqlDump += `-- CONSTRAINTS\n`;
-      (constraintsRes.data || []).forEach((c: any) => {
-        sqlDump += `ALTER TABLE ${c.table_name} ADD CONSTRAINT ${c.constraint_name} ${c.constraint_type} (${c.constraint_details});\n`;
+      // Save backup timestamp
+      localStorage.setItem('last_database_backup', timestamp);
+      setLastBackupTime(timestamp);
+      
+      toast.success("Full backup completed", { 
+        description: `Backed up ${Object.keys(backup.tables).length} tables` 
       });
-      sqlDump += `\n`;
-      
-      // Export indexes
-      sqlDump += `-- INDEXES\n`;
-      (indexesRes.data || []).forEach((idx: any) => {
-        sqlDump += `${idx.index_definition};\n`;
+    } catch (e: any) {
+      toast.error("Full backup failed", { description: e.message || String(e) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportIncrementalBackup = async () => {
+    if (!lastBackupTime) {
+      toast.error("No previous backup found", { 
+        description: "Please create a full backup first." 
       });
-      sqlDump += `\n`;
-      
-      // Export table data
-      sqlDump += `-- TABLE DATA\n`;
-      for (const tableName of Object.keys(tablesByName)) {
-        const { data, error } = await supabase.from(tableName).select("*");
-        if (!error && data && data.length > 0) {
-          sqlDump += `-- Data for ${tableName}\n`;
-          data.forEach((row: any) => {
-            const cols = Object.keys(row).join(', ');
-            const vals = Object.values(row).map(v => {
-              if (v === null) return 'NULL';
-              if (typeof v === 'string') return `'${v.replace(/'/g, "''")}'`;
-              if (typeof v === 'object') return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
-              return v;
-            }).join(', ');
-            sqlDump += `INSERT INTO ${tableName} (${cols}) VALUES (${vals});\n`;
-          });
-          sqlDump += `\n`;
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const timestamp = new Date().toISOString();
+      const backup: any = {
+        backup_type: 'incremental',
+        timestamp,
+        since: lastBackupTime,
+        tables: {},
+      };
+
+      let totalChanges = 0;
+
+      // Export only changed records since last backup
+      for (const table of tables) {
+        const { data, error } = await supabase
+          .from(table.table_name)
+          .select("*")
+          .or(`created_at.gte.${lastBackupTime},updated_at.gte.${lastBackupTime}`);
+        
+        if (error) {
+          console.error(`Failed to backup ${table.table_name}:`, error.message);
+          continue;
+        }
+        
+        if (data && data.length > 0) {
+          backup.tables[table.table_name] = data;
+          totalChanges += data.length;
         }
       }
+
+      if (totalChanges === 0) {
+        toast.message("No changes to backup", { 
+          description: "Database has no changes since last backup." 
+        });
+        setLoading(false);
+        return;
+      }
+
+      downloadFile(`incremental-backup-${timestamp}.json`, JSON.stringify(backup, null, 2), "application/json");
       
-      // Export functions
-      sqlDump += `-- FUNCTIONS\n`;
-      (functionsRes.data || []).forEach((f: any) => {
-        sqlDump += `-- Function: ${f.name}\n`;
-        sqlDump += `-- Note: Function body not included in dump. Please export manually from database.\n\n`;
+      // Update backup timestamp
+      localStorage.setItem('last_database_backup', timestamp);
+      setLastBackupTime(timestamp);
+      
+      toast.success("Incremental backup completed", { 
+        description: `Backed up ${totalChanges} changed records across ${Object.keys(backup.tables).length} tables` 
       });
-      
-      // Export RLS policies
-      sqlDump += `-- RLS POLICIES\n`;
-      (rlsRes.data || []).forEach((p: any) => {
-        sqlDump += `CREATE POLICY "${p.policy_name}" ON ${p.table_name} FOR ${p.command} USING (${p.using_expression});\n`;
-      });
-      
-      downloadFile("database-dump.sql", sqlDump, "text/plain");
-      toast.success("Database dump exported", { description: "Complete SQL dump has been downloaded." });
     } catch (e: any) {
-      toast.error("Database dump failed", { description: e.message || String(e) });
+      toast.error("Incremental backup failed", { description: e.message || String(e) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const restoreDatabase = async () => {
+    if (!restoreFile) {
+      toast.error("No file selected", { description: "Please select a backup file to restore." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const fileContent = await restoreFile.text();
+      const backup = JSON.parse(fileContent);
+
+      if (!backup.backup_type || !backup.tables) {
+        throw new Error("Invalid backup file format");
+      }
+
+      let totalRestored = 0;
+      let errors = 0;
+
+      for (const [tableName, records] of Object.entries(backup.tables)) {
+        const recordsArray = records as any[];
+        
+        for (const record of recordsArray) {
+          if (restoreMode === 'upsert') {
+            const { error } = await supabase
+              .from(tableName)
+              .upsert(record, { onConflict: 'id' });
+            
+            if (error) {
+              console.error(`Error upserting to ${tableName}:`, error.message);
+              errors++;
+            } else {
+              totalRestored++;
+            }
+          } else {
+            const { error } = await supabase
+              .from(tableName)
+              .insert(record);
+            
+            if (error) {
+              console.error(`Error inserting to ${tableName}:`, error.message);
+              errors++;
+            } else {
+              totalRestored++;
+            }
+          }
+        }
+      }
+
+      if (errors > 0) {
+        toast.warning("Restore completed with errors", { 
+          description: `Restored ${totalRestored} records, ${errors} failed` 
+        });
+      } else {
+        toast.success("Database restored successfully", { 
+          description: `Restored ${totalRestored} records from backup` 
+        });
+      }
+      
+      setRestoreFile(null);
+    } catch (e: any) {
+      toast.error("Restore failed", { description: e.message || String(e) });
     } finally {
       setLoading(false);
     }
@@ -352,7 +422,103 @@ export default function DatabaseExport() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Database Export</CardTitle>
+          <CardTitle>Database Backup</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium">Full Backup</h3>
+                <p className="text-sm text-muted-foreground">Export complete database with all records</p>
+              </div>
+              <Button onClick={exportFullBackup} disabled={loading}>
+                Create Full Backup
+              </Button>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium">Incremental Backup</h3>
+                <p className="text-sm text-muted-foreground">
+                  Export only changes since last backup
+                  {lastBackupTime && (
+                    <span className="block text-xs mt-1">
+                      Last backup: {new Date(lastBackupTime).toLocaleString()}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={exportIncrementalBackup} 
+                disabled={loading || !lastBackupTime}
+              >
+                Create Incremental Backup
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Database Restore</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Select Backup File</label>
+              <input
+                type="file"
+                accept=".json"
+                onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+                className="mt-2 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              />
+              {restoreFile && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Selected: {restoreFile.name}
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">Restore Mode</label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    value="upsert"
+                    checked={restoreMode === 'upsert'}
+                    onChange={(e) => setRestoreMode(e.target.value as 'upsert')}
+                  />
+                  <span className="text-sm">Upsert (Update or Insert)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    value="insert"
+                    checked={restoreMode === 'insert'}
+                    onChange={(e) => setRestoreMode(e.target.value as 'insert')}
+                  />
+                  <span className="text-sm">Insert Only</span>
+                </label>
+              </div>
+            </div>
+
+            <Button 
+              onClick={restoreDatabase} 
+              disabled={loading || !restoreFile}
+              className="w-full"
+            >
+              Restore Database
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Advanced Export</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground mb-3">Select components to export</div>
@@ -482,9 +648,6 @@ export default function DatabaseExport() {
           )}
 
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={exportDatabaseDump} disabled={loading}>
-              Export Complete DB Dump (SQL)
-            </Button>
             <Button onClick={exportSchemaMetadata} disabled={loading}>
               Export Selected Components
             </Button>
