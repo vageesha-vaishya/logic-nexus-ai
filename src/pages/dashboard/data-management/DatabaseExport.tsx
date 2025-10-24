@@ -78,7 +78,32 @@ export default function DatabaseExport() {
     setSelected(prev => ({ ...prev, [name]: checked }));
   };
 
-  const downloadFile = (filename: string, content: string, type = "text/plain") => {
+  const downloadFile = async (filename: string, content: string, type = "text/plain") => {
+    try {
+      // Use File System Access API for better UX (save location dialog)
+      if ('showSaveFilePicker' in window) {
+        const extension = filename.split('.').pop() || 'txt';
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'File',
+            accept: { [type]: ['.' + extension] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        return;
+      }
+    } catch (e: any) {
+      // User cancelled or API not available, fall back to standard download
+      if (e.name === 'AbortError') {
+        toast.message("Save cancelled");
+        return;
+      }
+    }
+    
+    // Fallback for browsers without File System Access API
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
