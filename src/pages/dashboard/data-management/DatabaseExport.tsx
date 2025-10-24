@@ -242,14 +242,120 @@ export default function DatabaseExport() {
     downloadFile("query-result.csv", csv, "text/csv");
   };
 
+  const exportDatabaseDump = async () => {
+    setLoading(true);
+    try {
+      const promises: Promise<any>[] = [];
+      
+      // Fetch schema, functions, enums, RLS policies
+      promises.push(
+        supabase.rpc("get_database_schema"),
+        supabase.rpc("get_database_functions"),
+        supabase.rpc("get_database_enums"),
+        supabase.rpc("get_rls_policies"),
+        supabase.rpc("get_table_constraints"),
+        supabase.rpc("get_table_indexes")
+      );
+      
+      const [schemaRes, functionsRes, enumsRes, rlsRes, constraintsRes, indexesRes] = await Promise.all(promises);
+      
+      if (schemaRes.error) throw schemaRes.error;
+      if (functionsRes.error) throw functionsRes.error;
+      if (enumsRes.error) throw enumsRes.error;
+      if (rlsRes.error) throw rlsRes.error;
+      
+      let sqlDump = `-- Complete Database Dump\n-- Generated: ${new Date().toISOString()}\n\n`;
+      
+      // Export enums
+      sqlDump += `-- ENUMS\n`;
+      (enumsRes.data || []).forEach((e: any) => {
+        sqlDump += `CREATE TYPE ${e.enum_type} AS ENUM (${e.labels.split(', ').map((l: string) => `'${l}'`).join(', ')});\n`;
+      });
+      sqlDump += `\n`;
+      
+      // Export tables
+      sqlDump += `-- TABLES\n`;
+      const tablesByName: Record<string, any[]> = {};
+      (schemaRes.data || []).forEach((col: any) => {
+        if (!tablesByName[col.table_name]) tablesByName[col.table_name] = [];
+        tablesByName[col.table_name].push(col);
+      });
+      
+      for (const [tableName, columns] of Object.entries(tablesByName)) {
+        sqlDump += `CREATE TABLE ${tableName} (\n`;
+        sqlDump += columns.map((col: any) => {
+          let line = `  ${col.column_name} ${col.data_type}`;
+          if (!col.is_nullable) line += ' NOT NULL';
+          if (col.column_default) line += ` DEFAULT ${col.column_default}`;
+          return line;
+        }).join(',\n');
+        sqlDump += `\n);\n\n`;
+      }
+      
+      // Export constraints
+      sqlDump += `-- CONSTRAINTS\n`;
+      (constraintsRes.data || []).forEach((c: any) => {
+        sqlDump += `ALTER TABLE ${c.table_name} ADD CONSTRAINT ${c.constraint_name} ${c.constraint_type} (${c.constraint_details});\n`;
+      });
+      sqlDump += `\n`;
+      
+      // Export indexes
+      sqlDump += `-- INDEXES\n`;
+      (indexesRes.data || []).forEach((idx: any) => {
+        sqlDump += `${idx.index_definition};\n`;
+      });
+      sqlDump += `\n`;
+      
+      // Export table data
+      sqlDump += `-- TABLE DATA\n`;
+      for (const tableName of Object.keys(tablesByName)) {
+        const { data, error } = await supabase.from(tableName).select("*");
+        if (!error && data && data.length > 0) {
+          sqlDump += `-- Data for ${tableName}\n`;
+          data.forEach((row: any) => {
+            const cols = Object.keys(row).join(', ');
+            const vals = Object.values(row).map(v => {
+              if (v === null) return 'NULL';
+              if (typeof v === 'string') return `'${v.replace(/'/g, "''")}'`;
+              if (typeof v === 'object') return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
+              return v;
+            }).join(', ');
+            sqlDump += `INSERT INTO ${tableName} (${cols}) VALUES (${vals});\n`;
+          });
+          sqlDump += `\n`;
+        }
+      }
+      
+      // Export functions
+      sqlDump += `-- FUNCTIONS\n`;
+      (functionsRes.data || []).forEach((f: any) => {
+        sqlDump += `-- Function: ${f.name}\n`;
+        sqlDump += `-- Note: Function body not included in dump. Please export manually from database.\n\n`;
+      });
+      
+      // Export RLS policies
+      sqlDump += `-- RLS POLICIES\n`;
+      (rlsRes.data || []).forEach((p: any) => {
+        sqlDump += `CREATE POLICY "${p.policy_name}" ON ${p.table_name} FOR ${p.command} USING (${p.using_expression});\n`;
+      });
+      
+      downloadFile("database-dump.sql", sqlDump, "text/plain");
+      toast.success("Database dump exported", { description: "Complete SQL dump has been downloaded." });
+    } catch (e: any) {
+      toast.error("Database dump failed", { description: e.message || String(e) });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Schema & Metadata Export</CardTitle>
+          <CardTitle>Database Export</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="text-sm text-muted-foreground mb-3">Select components to export as JSON metadata</div>
+          <div className="text-sm text-muted-foreground mb-3">Select components to export</div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border rounded-lg bg-muted/30">
             <div className="flex items-center gap-2">
@@ -338,9 +444,12 @@ export default function DatabaseExport() {
             <div className="mt-4 p-4 border rounded-lg bg-muted/20">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium">Select tables to export:</div>
-                <div className="flex items-center gap-2">
-                  <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
-                  <label htmlFor="select-all-tables" className="text-sm">Select all tables</label>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
+                    <label htmlFor="select-all-tables" className="text-sm">Select all tables</label>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={exportSelectedCSV} disabled={loading}>Export as CSV</Button>
                 </div>
               </div>
               <div className="border rounded-md max-h-[300px] overflow-auto">
@@ -350,6 +459,8 @@ export default function DatabaseExport() {
                       <TableHead className="w-[50px]"></TableHead>
                       <TableHead>Table</TableHead>
                       <TableHead>Rows (est.)</TableHead>
+                      <TableHead>RLS</TableHead>
+                      <TableHead>Policies</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -360,6 +471,8 @@ export default function DatabaseExport() {
                         </TableCell>
                         <TableCell>{t.table_name}</TableCell>
                         <TableCell>{t.row_estimate}</TableCell>
+                        <TableCell>{t.rls_enabled ? "On" : "Off"}</TableCell>
+                        <TableCell>{t.policy_count}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -368,58 +481,13 @@ export default function DatabaseExport() {
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button onClick={exportSchemaMetadata} disabled={loading}>
-              Export Selected Metadata
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={exportDatabaseDump} disabled={loading}>
+              Export Complete DB Dump (SQL)
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Table Data Export</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">Select tables to export as CSV</div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox id="select-all" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
-                <label htmlFor="select-all" className="text-sm">Select all tables</label>
-              </div>
-              <Button onClick={exportSelectedCSV} disabled={loading}>Export Selected as CSV</Button>
-            </div>
-          </div>
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]"></TableHead>
-                  <TableHead>Table</TableHead>
-                  <TableHead>Rows (est.)</TableHead>
-                  <TableHead>RLS</TableHead>
-                  <TableHead>Policies</TableHead>
-                  <TableHead>Columns</TableHead>
-                  <TableHead>Indexes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tables.map((t) => (
-                  <TableRow key={t.table_name}>
-                    <TableCell>
-                      <Checkbox checked={!!selected[t.table_name]} onCheckedChange={(v: any) => toggle(t.table_name, Boolean(v))} />
-                    </TableCell>
-                    <TableCell>{t.table_name}</TableCell>
-                    <TableCell>{t.row_estimate}</TableCell>
-                    <TableCell>{t.rls_enabled ? "On" : "Off"}</TableCell>
-                    <TableCell>{t.policy_count}</TableCell>
-                    <TableCell>{t.column_count}</TableCell>
-                    <TableCell>{t.index_count}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <Button onClick={exportSchemaMetadata} disabled={loading}>
+              Export Selected Components
+            </Button>
           </div>
         </CardContent>
       </Card>
