@@ -479,6 +479,7 @@ export default function SecurityOverview() {
 
           <Tabs defaultValue={initialTab} className="w-full">
             <TabsList>
+              <TabsTrigger value="database-management">Database Management</TabsTrigger>
               <TabsTrigger value="sql">SQL Editor</TabsTrigger>
               <TabsTrigger value="rls">RLS Status</TabsTrigger>
               <TabsTrigger value="policies">Policies</TabsTrigger>
@@ -487,6 +488,23 @@ export default function SecurityOverview() {
               <TabsTrigger value="schema">Schema</TabsTrigger>
               <TabsTrigger value="data-management">Data Management</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="database-management" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Database Management
+                  </CardTitle>
+                  <CardDescription>
+                    Export, backup, and restore database
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DatabaseExport />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="sql" className="space-y-4">
               <Card>
@@ -742,7 +760,6 @@ export default function SecurityOverview() {
                       <TabsTrigger value="tenant">Tenant Config</TabsTrigger>
                       <TabsTrigger value="franchise">Franchise Config</TabsTrigger>
                       <TabsTrigger value="preview">Sequences & Preview</TabsTrigger>
-                      <TabsTrigger value="export">Export</TabsTrigger>
                     </TabsList>
                     <TabsContent value="tenant" className="mt-4">
                       <TenantConfigForm tenantIdOverride={tenantId} />
@@ -752,9 +769,6 @@ export default function SecurityOverview() {
                     </TabsContent>
                     <TabsContent value="preview" className="mt-4">
                       <SequencesAndPreview tenantIdOverride={tenantId} franchiseIdOverride={franchiseId} />
-                    </TabsContent>
-                    <TabsContent value="export" className="mt-4">
-                      <DatabaseExport />
                     </TabsContent>
                   </Tabs>
                 </CardContent>
