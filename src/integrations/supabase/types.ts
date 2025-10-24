@@ -2577,122 +2577,6 @@ export type Database = {
           },
         ]
       }
-      quote_number_config_franchise: {
-        Row: {
-          created_at: string | null
-          franchise_id: string
-          prefix: string
-          reset_policy: Database["public"]["Enums"]["quote_reset_policy"]
-          tenant_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          franchise_id: string
-          prefix?: string
-          reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          tenant_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          franchise_id?: string
-          prefix?: string
-          reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          tenant_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quote_number_config_franchise_franchise_id_fkey"
-            columns: ["franchise_id"]
-            isOneToOne: false
-            referencedRelation: "franchises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "quote_number_config_franchise_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      quote_number_config_tenant: {
-        Row: {
-          created_at: string | null
-          prefix: string
-          reset_policy: Database["public"]["Enums"]["quote_reset_policy"]
-          tenant_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          prefix?: string
-          reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          tenant_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          prefix?: string
-          reset_policy?: Database["public"]["Enums"]["quote_reset_policy"]
-          tenant_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quote_number_config_tenant_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: true
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      quote_number_sequences: {
-        Row: {
-          created_at: string | null
-          franchise_id: string | null
-          last_sequence: number
-          period_key: string
-          tenant_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          franchise_id?: string | null
-          last_sequence?: number
-          period_key: string
-          tenant_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          franchise_id?: string | null
-          last_sequence?: number
-          period_key?: string
-          tenant_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quote_number_sequences_franchise_id_fkey"
-            columns: ["franchise_id"]
-            isOneToOne: false
-            referencedRelation: "franchises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "quote_number_sequences_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       quotes: {
         Row: {
           accepted_at: string | null
@@ -4530,7 +4414,6 @@ export type Database = {
         | "closed_lost"
       plan_type: "crm_base" | "service_addon" | "bundle"
       priority_level: "low" | "medium" | "high" | "urgent"
-      quote_reset_policy: "none" | "daily" | "monthly" | "yearly"
       shipment_status:
         | "draft"
         | "confirmed"
@@ -4742,7 +4625,6 @@ export const Constants = {
       ],
       plan_type: ["crm_base", "service_addon", "bundle"],
       priority_level: ["low", "medium", "high", "urgent"],
-      quote_reset_policy: ["none", "daily", "monthly", "yearly"],
       shipment_status: [
         "draft",
         "confirmed",
