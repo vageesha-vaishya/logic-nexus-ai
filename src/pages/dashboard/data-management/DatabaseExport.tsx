@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
@@ -44,6 +45,11 @@ export default function DatabaseExport() {
     secrets: true,
     tableData: true,
   });
+
+  // Storage settings
+  const [destination, setDestination] = useState<'device' | 'cloud'>('device');
+  const [conflictPolicy, setConflictPolicy] = useState<'ask' | 'overwrite' | 'rename'>('rename');
+  const [cloudBasePath, setCloudBasePath] = useState<string>('db-exports');
 
   useEffect(() => {
     const loadTables = async () => {
@@ -113,6 +119,119 @@ export default function DatabaseExport() {
     URL.revokeObjectURL(url);
   };
 
+  // Cloud storage helpers and unified save functions
+  const ensureBucket = async () => {
+    const { data } = await supabase.storage.getBucket('db-backups');
+    if (!data) {
+      await supabase.storage.createBucket('db-backups', { public: false });
+    }
+  };
+
+  const splitPath = (path: string) => {
+    const normalized = path.replace(/^\/+|\/+$/g, '');
+    const parts = normalized.split('/');
+    const name = parts.pop() || '';
+    const folder = parts.join('/');
+    return { folder, name };
+  };
+
+  const fileExists = async (fullPath: string) => {
+    const { folder, name } = splitPath(fullPath);
+    const { data } = await supabase.storage.from('db-backups').list(folder || '', { search: name });
+    return (data || []).some((o: any) => o.name === name);
+  };
+
+  const resolveConflictPath = async (fullPath: string): Promise<string | null> => {
+    if (conflictPolicy === 'overwrite') return fullPath;
+    if (!(await fileExists(fullPath))) return fullPath;
+    if (conflictPolicy === 'ask') {
+      const ok = window.confirm(`File "${fullPath}" exists. Overwrite? Click Cancel to auto-rename.`);
+      if (ok) return fullPath;
+    }
+    const dot = fullPath.lastIndexOf('.');
+    const base = dot > -1 ? fullPath.slice(0, dot) : fullPath;
+    const ext = dot > -1 ? fullPath.slice(dot) : '';
+    let i = 1;
+    let candidate = `${base} (${i})${ext}`;
+    while (await fileExists(candidate)) {
+      i++;
+      candidate = `${base} (${i})${ext}`;
+    }
+    return candidate;
+  };
+
+  const saveToCloud = async (filename: string, content: string, type: string) => {
+    await ensureBucket();
+    const dir = (cloudBasePath || '').replace(/^\/+|\/+$/g, '');
+    const fullPath = dir ? `${dir}/${filename}` : filename;
+    const finalPath = await resolveConflictPath(fullPath);
+    if (!finalPath) return;
+    const blob = new Blob([content], { type });
+    const { error } = await supabase.storage.from('db-backups').upload(finalPath, blob, { upsert: conflictPolicy === 'overwrite' });
+    if (error) throw error;
+    toast.success('Saved to Cloud storage', { description: finalPath });
+  };
+
+  const saveFile = async (filename: string, content: string, type = 'text/plain') => {
+    if (destination === 'cloud') {
+      return await saveToCloud(filename, content, type);
+    }
+    await downloadFile(filename, content, type);
+  };
+
+  const saveMultipleFiles = async (files: Array<{ name: string; content: string; type: string }>) => {
+    if (destination === 'cloud') {
+      for (const f of files) {
+        await saveToCloud(f.name, f.content, f.type);
+      }
+      return;
+    }
+    if ('showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({ id: 'db-exports' });
+        for (const f of files) {
+          let name = f.name;
+          try {
+            // If exists, handle conflict according to policy
+            await dirHandle.getFileHandle(name, { create: false });
+            if (conflictPolicy === 'overwrite') {
+              // keep name
+            } else if (conflictPolicy === 'ask') {
+              const ok = window.confirm(`File "${name}" exists. Overwrite? Click Cancel to auto-rename.`);
+              if (!ok) {
+                const dot = name.lastIndexOf('.');
+                const base = dot > -1 ? name.slice(0, dot) : name;
+                const ext = dot > -1 ? name.slice(dot) : '';
+                let i = 1;
+                name = `${base} (${i})${ext}`;
+              }
+            } else {
+              const dot = name.lastIndexOf('.');
+              const base = dot > -1 ? name.slice(0, dot) : name;
+              const ext = dot > -1 ? name.slice(dot) : '';
+              let i = 1;
+              name = `${base} (${i})${ext}`;
+            }
+          } catch {}
+          const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(f.content);
+          await writable.close();
+        }
+        toast.success('Saved files to chosen folder');
+        return;
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+          toast.message('Folder selection cancelled');
+          return;
+        }
+      }
+    }
+    for (const f of files) {
+      await downloadFile(f.name, f.content, f.type);
+    }
+  };
+
   const exportSelectedCSV = async () => {
     const chosen = tables.filter(t => selected[t.table_name]);
     if (chosen.length === 0) {
@@ -121,17 +240,17 @@ export default function DatabaseExport() {
     }
     setLoading(true);
     try {
-      await Promise.all(
-        chosen.map(async (t) => {
-          const { data, error } = await supabase.from(t.table_name).select("*");
-          if (error) {
-            toast.error(`Failed exporting ${t.table_name}`, { description: error.message });
-            return;
-          }
-          const csv = Papa.unparse(data || []);
-          downloadFile(`${t.table_name}.csv`, csv, "text/csv");
-        })
-      );
+      const files: Array<{ name: string; content: string; type: string }> = [];
+      for (const t of chosen) {
+        const { data, error } = await supabase.from(t.table_name).select("*");
+        if (error) {
+          toast.error(`Failed exporting ${t.table_name}`, { description: error.message });
+          continue;
+        }
+        const csv = Papa.unparse(data || []);
+        files.push({ name: `${t.table_name}.csv`, content: csv, type: "text/csv" });
+      }
+      await saveMultipleFiles(files);
       toast.success("Export complete", { description: "Downloaded CSVs for selected tables." });
     } catch (e: any) {
       toast.error("Export failed", { description: e.message || String(e) });
