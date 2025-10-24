@@ -162,8 +162,12 @@ export default function DatabaseExport() {
 
   const saveToCloud = async (filename: string, content: string, type: string) => {
     await ensureBucket();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    
+    const userFolder = user.id;
     const dir = (cloudBasePath || '').replace(/^\/+|\/+$/g, '');
-    const fullPath = dir ? `${dir}/${filename}` : filename;
+    const fullPath = dir ? `${userFolder}/${dir}/${filename}` : `${userFolder}/${filename}`;
     const finalPath = await resolveConflictPath(fullPath);
     if (!finalPath) return;
     const blob = new Blob([content], { type });
@@ -360,7 +364,7 @@ export default function DatabaseExport() {
         }
       }
 
-      downloadFile("schema-metadata.json", JSON.stringify(payload, null, 2), "application/json");
+      await saveFile(`schema-metadata.json`, JSON.stringify(payload, null, 2), "application/json");
       
       const exportedItems = Object.entries(exportOptions)
         .filter(([_, v]) => v)
@@ -395,7 +399,7 @@ export default function DatabaseExport() {
       return;
     }
     const csv = Papa.unparse(queryResult);
-    downloadFile("query-result.csv", csv, "text/csv");
+    await saveFile("query-result.csv", csv, "text/csv");
   };
 
   const exportFullBackup = async () => {
@@ -418,7 +422,7 @@ export default function DatabaseExport() {
         backup.tables[table.table_name] = data || [];
       }
 
-      downloadFile(`full-backup-${timestamp}.json`, JSON.stringify(backup, null, 2), "application/json");
+      await saveFile(`full-backup-${timestamp}.json`, JSON.stringify(backup, null, 2), "application/json");
       
       // Save backup timestamp
       localStorage.setItem('last_database_backup', timestamp);
@@ -480,7 +484,7 @@ export default function DatabaseExport() {
         return;
       }
 
-      downloadFile(`incremental-backup-${timestamp}.json`, JSON.stringify(backup, null, 2), "application/json");
+      await saveFile(`incremental-backup-${timestamp}.json`, JSON.stringify(backup, null, 2), "application/json");
       
       // Update backup timestamp
       localStorage.setItem('last_database_backup', timestamp);
@@ -564,6 +568,64 @@ export default function DatabaseExport() {
 
   return (
     <div className="space-y-6">
+      {/* Save Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Save Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="destination" className="text-sm font-medium mb-2 block">Save Destination</Label>
+              <RadioGroup value={destination} onValueChange={(v) => setDestination(v as 'device' | 'cloud')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="device" id="device" />
+                  <Label htmlFor="device" className="font-normal cursor-pointer">Device (Local Download)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="cloud" id="cloud" />
+                  <Label htmlFor="cloud" className="font-normal cursor-pointer">Cloud Storage (Supabase)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
+            <div>
+              <Label htmlFor="conflict" className="text-sm font-medium mb-2 block">If File Exists</Label>
+              <RadioGroup value={conflictPolicy} onValueChange={(v) => setConflictPolicy(v as 'ask' | 'overwrite' | 'rename')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="rename" id="rename" />
+                  <Label htmlFor="rename" className="font-normal cursor-pointer">Auto-rename (file-1, file-2...)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="ask" id="ask" />
+                  <Label htmlFor="ask" className="font-normal cursor-pointer">Ask me</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="overwrite" id="overwrite" />
+                  <Label htmlFor="overwrite" className="font-normal cursor-pointer">Overwrite</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+          
+          {destination === 'cloud' && (
+            <div>
+              <Label htmlFor="cloudPath" className="text-sm font-medium mb-2 block">Cloud Storage Path (optional)</Label>
+              <Input
+                id="cloudPath"
+                value={cloudBasePath}
+                onChange={(e) => setCloudBasePath(e.target.value)}
+                placeholder="e.g., backups/2024"
+                className="max-w-md"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Files will be saved to: db-backups/{cloudBasePath || '(root)'}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Database Backup</CardTitle>
