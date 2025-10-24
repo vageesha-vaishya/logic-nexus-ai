@@ -25,6 +25,18 @@ export default function DatabaseExport() {
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 50;");
   const [queryResult, setQueryResult] = useState<any[]>([]);
+  
+  // Export component selection
+  const [exportOptions, setExportOptions] = useState({
+    schema: true,
+    constraints: true,
+    indexes: true,
+    dbFunctions: true,
+    rlsPolicies: true,
+    enums: true,
+    edgeFunctions: true,
+    secrets: true,
+  });
 
   useEffect(() => {
     const loadTables = async () => {
@@ -90,42 +102,99 @@ export default function DatabaseExport() {
     }
   };
 
+  const allExportOptionsSelected = Object.values(exportOptions).every(v => v);
+  
+  const toggleAllExportOptions = (checked: boolean) => {
+    setExportOptions({
+      schema: checked,
+      constraints: checked,
+      indexes: checked,
+      dbFunctions: checked,
+      rlsPolicies: checked,
+      enums: checked,
+      edgeFunctions: checked,
+      secrets: checked,
+    });
+  };
+
   const exportSchemaMetadata = async () => {
+    const hasAnySelected = Object.values(exportOptions).some(v => v);
+    if (!hasAnySelected) {
+      toast.message("No components selected", { description: "Select at least one export option." });
+      return;
+    }
+
     setLoading(true);
     try {
-      const [schema, constraints, indexes, functionsList, policies, enums, edgeFunctionsResponse] = await Promise.all([
-        supabase.rpc("get_database_schema"),
-        supabase.rpc("get_table_constraints"),
-        supabase.rpc("get_table_indexes"),
-        supabase.rpc("get_database_functions"),
-        supabase.rpc("get_rls_policies"),
-        supabase.rpc("get_database_enums"),
-        supabase.functions.invoke("list-edge-functions"),
-      ]);
+      const promises: Promise<any>[] = [];
+      const keys: string[] = [];
 
-      const error = schema.error || constraints.error || indexes.error || functionsList.error || policies.error || enums.error;
-      if (error) {
-        throw new Error(error.message);
+      if (exportOptions.schema) {
+        promises.push(supabase.rpc("get_database_schema"));
+        keys.push("schema");
+      }
+      if (exportOptions.constraints) {
+        promises.push(supabase.rpc("get_table_constraints"));
+        keys.push("constraints");
+      }
+      if (exportOptions.indexes) {
+        promises.push(supabase.rpc("get_table_indexes"));
+        keys.push("indexes");
+      }
+      if (exportOptions.dbFunctions) {
+        promises.push(supabase.rpc("get_database_functions"));
+        keys.push("database_functions");
+      }
+      if (exportOptions.rlsPolicies) {
+        promises.push(supabase.rpc("get_rls_policies"));
+        keys.push("rls_policies");
+      }
+      if (exportOptions.enums) {
+        promises.push(supabase.rpc("get_database_enums"));
+        keys.push("enums");
+      }
+      if (exportOptions.edgeFunctions || exportOptions.secrets) {
+        promises.push(supabase.functions.invoke("list-edge-functions"));
+        keys.push("edge_functions_response");
       }
 
-      const edgeFunctionsData = edgeFunctionsResponse.data || { edge_functions: [], secrets: [] };
-
-      const payload = {
+      const results = await Promise.all(promises);
+      
+      const payload: any = {
         exported_at: new Date().toISOString(),
-        tables,
-        schema: schema.data,
-        constraints: constraints.data,
-        indexes: indexes.data,
-        database_functions: functionsList.data,
-        rls_policies: policies.data,
-        enums: enums.data,
-        edge_functions: edgeFunctionsData.edge_functions,
-        secrets: edgeFunctionsData.secrets,
       };
+
+      if (exportOptions.schema || exportOptions.constraints || exportOptions.indexes) {
+        payload.tables = tables;
+      }
+
+      results.forEach((result, idx) => {
+        const key = keys[idx];
+        if (key === "edge_functions_response") {
+          const data = result.data || { edge_functions: [], secrets: [] };
+          if (exportOptions.edgeFunctions) {
+            payload.edge_functions = data.edge_functions;
+          }
+          if (exportOptions.secrets) {
+            payload.secrets = data.secrets;
+          }
+        } else {
+          if (result.error) {
+            throw new Error(result.error.message);
+          }
+          payload[key] = result.data;
+        }
+      });
+
       downloadFile("schema-metadata.json", JSON.stringify(payload, null, 2), "application/json");
-      toast.success("Full schema exported", { description: "Includes DB functions, edge functions, and secrets list" });
+      
+      const exportedItems = Object.entries(exportOptions)
+        .filter(([_, v]) => v)
+        .map(([k]) => k)
+        .join(", ");
+      toast.success("Export complete", { description: `Exported: ${exportedItems}` });
     } catch (e: any) {
-      toast.error("Schema export failed", { description: e.message || String(e) });
+      toast.error("Export failed", { description: e.message || String(e) });
     } finally {
       setLoading(false);
     }
@@ -159,18 +228,107 @@ export default function DatabaseExport() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Database Export</CardTitle>
+          <CardTitle>Schema & Metadata Export</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm text-muted-foreground mb-3">Select components to export as JSON metadata</div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-all" 
+                checked={allExportOptionsSelected} 
+                onCheckedChange={(v: any) => toggleAllExportOptions(Boolean(v))} 
+              />
+              <label htmlFor="export-all" className="text-sm font-semibold">ALL</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-schema" 
+                checked={exportOptions.schema} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, schema: Boolean(v) }))} 
+              />
+              <label htmlFor="export-schema" className="text-sm">Schema (Tables/Columns)</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-constraints" 
+                checked={exportOptions.constraints} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, constraints: Boolean(v) }))} 
+              />
+              <label htmlFor="export-constraints" className="text-sm">Constraints</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-indexes" 
+                checked={exportOptions.indexes} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, indexes: Boolean(v) }))} 
+              />
+              <label htmlFor="export-indexes" className="text-sm">Indexes</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-dbfunctions" 
+                checked={exportOptions.dbFunctions} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, dbFunctions: Boolean(v) }))} 
+              />
+              <label htmlFor="export-dbfunctions" className="text-sm">DB Functions</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-rls" 
+                checked={exportOptions.rlsPolicies} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, rlsPolicies: Boolean(v) }))} 
+              />
+              <label htmlFor="export-rls" className="text-sm">RLS Policies</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-enums" 
+                checked={exportOptions.enums} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, enums: Boolean(v) }))} 
+              />
+              <label htmlFor="export-enums" className="text-sm">Enums</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-edge" 
+                checked={exportOptions.edgeFunctions} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, edgeFunctions: Boolean(v) }))} 
+              />
+              <label htmlFor="export-edge" className="text-sm">Edge Functions</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="export-secrets" 
+                checked={exportOptions.secrets} 
+                onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, secrets: Boolean(v) }))} 
+              />
+              <label htmlFor="export-secrets" className="text-sm">Secrets (names only)</label>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={exportSchemaMetadata} disabled={loading}>
+              Export Selected Metadata
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Table Data Export</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">Select tables to export</div>
+            <div className="text-sm text-muted-foreground">Select tables to export as CSV</div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <Checkbox id="select-all" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
-                <label htmlFor="select-all" className="text-sm">Select all</label>
+                <label htmlFor="select-all" className="text-sm">Select all tables</label>
               </div>
-              <Button variant="outline" onClick={exportSelectedCSV} disabled={loading}>Export Selected as CSV</Button>
-              <Button onClick={exportSchemaMetadata} disabled={loading}>Export Schema Metadata</Button>
+              <Button onClick={exportSelectedCSV} disabled={loading}>Export Selected as CSV</Button>
             </div>
           </div>
           <div className="border rounded-md">
