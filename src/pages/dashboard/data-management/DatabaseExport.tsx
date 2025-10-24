@@ -120,13 +120,6 @@ export default function DatabaseExport() {
   };
 
   // Cloud storage helpers and unified save functions
-  const ensureBucket = async () => {
-    const { data } = await supabase.storage.getBucket('db-backups');
-    if (!data) {
-      await supabase.storage.createBucket('db-backups', { public: false });
-    }
-  };
-
   const splitPath = (path: string) => {
     const normalized = path.replace(/^\/+|\/+$/g, '');
     const parts = normalized.split('/');
@@ -137,7 +130,7 @@ export default function DatabaseExport() {
 
   const fileExists = async (fullPath: string) => {
     const { folder, name } = splitPath(fullPath);
-    const { data } = await supabase.storage.from('db-backups').list(folder || '', { search: name });
+    const { data } = await supabase.storage.from('db-backups').list(folder || undefined, { search: name });
     return (data || []).some((o: any) => o.name === name);
   };
 
@@ -161,7 +154,6 @@ export default function DatabaseExport() {
   };
 
   const saveToCloud = async (filename: string, content: string, type: string) => {
-    await ensureBucket();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
@@ -393,7 +385,7 @@ export default function DatabaseExport() {
     }
   };
 
-  const exportQueryCSV = () => {
+  const exportQueryCSV = async () => {
     if (!queryResult || queryResult.length === 0) {
       toast.message("No data to export", { description: "Run a query first." });
       return;
