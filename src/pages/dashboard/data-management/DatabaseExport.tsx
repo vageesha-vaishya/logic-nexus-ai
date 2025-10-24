@@ -408,13 +408,37 @@ export default function DatabaseExport() {
             return acc;
           }, {});
 
+          const resolveColumnType = (col: any) => {
+            const dt = (col.data_type || '').toString();
+            const udt = (col.udt_name || '').toString();
+            // Resolve enums/domains
+            if (dt.toUpperCase() === 'USER-DEFINED' && udt) {
+              return `"${udt}"`;
+            }
+            // Resolve arrays from udt_name (e.g., _uuid -> uuid[])
+            if (dt.toUpperCase() === 'ARRAY' && udt) {
+              const base = udt.startsWith('_') ? udt.slice(1) : udt;
+              return `${base}[]`;
+            }
+            // Length only for character types
+            if ((dt === 'character varying' || dt === 'varchar') && col.character_maximum_length) {
+              return `${dt}(${col.character_maximum_length})`;
+            }
+            return dt || 'text';
+          };
+
           Object.entries(tableGroups).forEach(([tableName, columns]: [string, any]) => {
             sqlContent += `\nCREATE TABLE IF NOT EXISTS "${tableName}" (\n`;
-            const columnDefs = columns.map((col: any) => {
-              let def = `  "${col.column_name}" ${col.data_type}`;
-              if (col.character_maximum_length) {
-                def += `(${col.character_maximum_length})`;
-              }
+            // Deduplicate column definitions by column_name
+            const seen = new Set<string>();
+            const uniqueCols = (columns as any[]).filter((col) => {
+              const name = col.column_name;
+              if (seen.has(name)) return false;
+              seen.add(name);
+              return true;
+            });
+            const columnDefs = uniqueCols.map((col: any) => {
+              let def = `  "${col.column_name}" ${resolveColumnType(col)}`;
               if (col.is_nullable === false) {
                 def += ' NOT NULL';
               }
@@ -588,10 +612,22 @@ export default function DatabaseExport() {
         // Build a table->column->data_type map for formatting
         const { data: schemaData, error: schemaError } = await supabase.rpc("get_database_schema");
         if (schemaError) throw schemaError;
+        const resolveDataTypeForValue = (col: any) => {
+          const dt = (col.data_type || '').toString();
+          const udt = (col.udt_name || '').toString();
+          if (dt.toUpperCase() === 'ARRAY' && udt) {
+            const base = udt.startsWith('_') ? udt.slice(1) : udt;
+            return `${base}[]`;
+          }
+          if (dt.toUpperCase() === 'USER-DEFINED' && udt) {
+            return udt;
+          }
+          return dt;
+        };
         const typeMapByTable: Record<string, Record<string, string>> = (schemaData || []).reduce(
           (acc: Record<string, Record<string, string>>, col: any) => {
             if (!acc[col.table_name]) acc[col.table_name] = {};
-            acc[col.table_name][col.column_name] = col.data_type;
+            acc[col.table_name][col.column_name] = resolveDataTypeForValue(col);
             return acc;
           },
           {}
@@ -628,6 +664,7 @@ export default function DatabaseExport() {
           };
 
           const formatValue = (value: any, dataType?: string) => {
+            if (value === undefined) return "NULL";
             if (value === null) return "NULL";
 
             if (dataType === "json" || dataType === "jsonb") {
@@ -641,7 +678,10 @@ export default function DatabaseExport() {
             }
 
             if (typeof value === "string") return `'${escapeStr(value)}'`;
-            if (typeof value === "number") return String(value);
+            if (typeof value === "number") {
+              if (!Number.isFinite(value)) return "NULL";
+              return String(value);
+            }
             if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
             if (value instanceof Date) return `'${value.toISOString()}'`;
 
@@ -663,9 +703,9 @@ export default function DatabaseExport() {
             if (data && data.length > 0) {
               sqlContent += `\n-- Data for table: ${table.table_name}\n`;
 
-              const columns = Object.keys(data[0]);
-              const columnNames = columns.map((col) => `"${col}"`).join(", ");
               const colTypes = typeMapByTable[table.table_name] || {};
+              const columns = Object.keys(colTypes).length > 0 ? Object.keys(colTypes) : Object.keys(data[0]);
+              const columnNames = columns.map((col) => `"${col}"`).join(", ");
 
               data.forEach((row: any) => {
                 const values = columns
