@@ -93,13 +93,14 @@ export default function DatabaseExport() {
   const exportSchemaMetadata = async () => {
     setLoading(true);
     try {
-      const [schema, constraints, indexes, functionsList, policies, enums] = await Promise.all([
+      const [schema, constraints, indexes, functionsList, policies, enums, edgeFunctionsResponse] = await Promise.all([
         supabase.rpc("get_database_schema"),
         supabase.rpc("get_table_constraints"),
         supabase.rpc("get_table_indexes"),
         supabase.rpc("get_database_functions"),
         supabase.rpc("get_rls_policies"),
         supabase.rpc("get_database_enums"),
+        supabase.functions.invoke("list-edge-functions"),
       ]);
 
       const error = schema.error || constraints.error || indexes.error || functionsList.error || policies.error || enums.error;
@@ -107,18 +108,22 @@ export default function DatabaseExport() {
         throw new Error(error.message);
       }
 
+      const edgeFunctionsData = edgeFunctionsResponse.data || { edge_functions: [], secrets: [] };
+
       const payload = {
         exported_at: new Date().toISOString(),
         tables,
         schema: schema.data,
         constraints: constraints.data,
         indexes: indexes.data,
-        functions: functionsList.data,
+        database_functions: functionsList.data,
         rls_policies: policies.data,
         enums: enums.data,
+        edge_functions: edgeFunctionsData.edge_functions,
+        secrets: edgeFunctionsData.secrets,
       };
       downloadFile("schema-metadata.json", JSON.stringify(payload, null, 2), "application/json");
-      toast.success("Schema metadata exported");
+      toast.success("Full schema exported", { description: "Includes DB functions, edge functions, and secrets list" });
     } catch (e: any) {
       toast.error("Schema export failed", { description: e.message || String(e) });
     } finally {
