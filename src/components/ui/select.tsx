@@ -66,8 +66,8 @@ type SelectContentPropsCustom = React.ComponentPropsWithoutRef<typeof SelectPrim
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   SelectContentPropsCustom
->(({ className, children, position = "popper", forceMount, ...props }, ref) => (
-  <SelectPrimitive.Portal forceMount={forceMount}>
+>(({ className, children, position = "popper", ...props }, ref) => (
+  <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
       className={cn(

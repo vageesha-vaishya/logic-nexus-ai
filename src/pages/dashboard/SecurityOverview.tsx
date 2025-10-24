@@ -396,7 +396,8 @@ export default function SecurityOverview() {
         }
       }
 
-      let query = supabase.from(selectedTableForSearch).select('*', { count: 'exact' });
+      const baseQuery = (supabase.from as any)(selectedTableForSearch).select('*', { count: 'exact' });
+      let query = baseQuery;
 
       // Apply typed filters (AND semantics)
       const tableFilter = tableFilters[selectedTableForSearch] || {};
