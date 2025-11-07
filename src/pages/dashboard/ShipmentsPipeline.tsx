@@ -7,12 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Package, MapPin, Layers } from "lucide-react";
+import { ArrowLeft, Search, Filter, Package, MapPin, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
 import { Draggable } from "@/components/kanban/Draggable";
 import { SwimLane } from "@/components/kanban/SwimLane";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 type ShipmentStatus = 'draft' | 'confirmed' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'customs' | 'cancelled' | 'on_hold' | 'returned';
 
@@ -66,6 +70,39 @@ export default function ShipmentsPipeline() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'none' | 'priority' | 'carrier'>('none');
+  
+  // Advanced filters
+  const [minCharges, setMinCharges] = useState<string>("");
+  const [maxCharges, setMaxCharges] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  
+  // WIP limits
+  const [wipLimits, setWipLimits] = useState<Record<ShipmentStatus, number>>({
+    draft: 50,
+    confirmed: 30,
+    in_transit: 40,
+    out_for_delivery: 20,
+    delivered: 999,
+    customs: 10,
+    cancelled: 999,
+    on_hold: 15,
+    returned: 999,
+  });
+  
+  // Card customization
+  const [showFields, setShowFields] = useState({
+    origin: true,
+    destination: true,
+    packages: true,
+    weight: false,
+    charges: true,
+    deliveryDate: true,
+  });
+  
+  // Bulk operations
+  const [selectedShipments, setSelectedShipments] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -185,9 +222,89 @@ export default function ShipmentsPipeline() {
 
     const matchesPriority =
       priorityFilter === "all" || shipment.priority_level === priorityFilter;
+    
+    // Charges range filter
+    const charges = shipment.total_charges || 0;
+    const matchesMinCharges = !minCharges || charges >= parseFloat(minCharges);
+    const matchesMaxCharges = !maxCharges || charges <= parseFloat(maxCharges);
+    
+    // Date range filter
+    const shipmentDate = shipment.pickup_date ? new Date(shipment.pickup_date) : new Date(shipment.created_at);
+    const matchesDateFrom = !dateFrom || shipmentDate >= new Date(dateFrom);
+    const matchesDateTo = !dateTo || shipmentDate <= new Date(dateTo);
 
-    return matchesSearch && matchesOrigin && matchesDestination && matchesPriority;
+    return matchesSearch && matchesOrigin && matchesDestination && matchesPriority && matchesMinCharges && matchesMaxCharges && matchesDateFrom && matchesDateTo;
   });
+  
+  const toggleShipmentSelection = (shipmentId: string) => {
+    setSelectedShipments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(shipmentId)) {
+        newSet.delete(shipmentId);
+      } else {
+        newSet.add(shipmentId);
+      }
+      return newSet;
+    });
+  };
+  
+  const handleBulkDelete = async () => {
+    if (selectedShipments.size === 0) return;
+    
+    try {
+      const { error } = await supabase
+        .from("shipments")
+        .delete()
+        .in("id", Array.from(selectedShipments));
+        
+      if (error) throw error;
+      
+      setShipments(prev => prev.filter(s => !selectedShipments.has(s.id)));
+      setSelectedShipments(new Set());
+      
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedShipments.size} shipment(s)`,
+      });
+    } catch (error) {
+      console.error("Error deleting shipments:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete shipments",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleBulkStatusChange = async (newStatus: ShipmentStatus) => {
+    if (selectedShipments.size === 0) return;
+    
+    try {
+      const { error } = await supabase
+        .from("shipments")
+        .update({ status: newStatus })
+        .in("id", Array.from(selectedShipments));
+        
+      if (error) throw error;
+      
+      setShipments(prev => prev.map(s => 
+        selectedShipments.has(s.id) ? { ...s, status: newStatus } : s
+      ));
+      setSelectedShipments(new Set());
+      
+      toast({
+        title: "Success",
+        description: `Updated ${selectedShipments.size} shipment(s)`,
+      });
+    } catch (error) {
+      console.error("Error updating shipments:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update shipments",
+        variant: "destructive",
+      });
+    }
+  };
 
   const groupedShipments = stages.reduce((acc, stage) => {
     acc[stage] = filteredShipments.filter((shipment) => shipment.status === stage);
@@ -280,57 +397,190 @@ export default function ShipmentsPipeline() {
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search shipments..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+            <div className="space-y-4">
+              {/* Main Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search shipments..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Filter by origin..."
+                    value={originFilter}
+                    onChange={(e) => setOriginFilter(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Filter by destination..."
+                    value={destinationFilter}
+                    onChange={(e) => setDestinationFilter(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                  <SelectTrigger>
+                    <Layers className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Group By" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Grouping</SelectItem>
+                    <SelectItem value="priority">By Priority</SelectItem>
+                    <SelectItem value="carrier">By Carrier</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Filter by origin..."
-                  value={originFilter}
-                  onChange={(e) => setOriginFilter(e.target.value)}
-                  className="pl-9"
-                />
+              
+              {/* Advanced Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Min Charges ($)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={minCharges}
+                    onChange={(e) => setMinCharges(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Max Charges ($)</Label>
+                  <Input
+                    type="number"
+                    placeholder="No limit"
+                    value={maxCharges}
+                    onChange={(e) => setMaxCharges(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Pickup From</Label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Pickup To</Label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Filter by destination..."
-                  value={destinationFilter}
-                  onChange={(e) => setDestinationFilter(e.target.value)}
-                  className="pl-9"
-                />
+              
+              {/* Actions Bar */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={bulkMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setBulkMode(!bulkMode);
+                      setSelectedShipments(new Set());
+                    }}
+                  >
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    {bulkMode ? "Cancel Selection" : "Bulk Select"}
+                  </Button>
+                  
+                  {bulkMode && selectedShipments.size > 0 && (
+                    <>
+                      <Badge variant="secondary">{selectedShipments.size} selected</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                      <Select onValueChange={handleBulkStatusChange}>
+                        <SelectTrigger className="w-[180px] h-9">
+                          <SelectValue placeholder="Change Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stages.map(stage => (
+                            <SelectItem key={stage} value={stage}>
+                              {statusConfig[stage].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+                </div>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Customize Cards
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Card Fields</h4>
+                      <div className="space-y-3">
+                        {Object.entries(showFields).map(([field, show]) => (
+                          <div key={field} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={field}
+                              checked={show}
+                              onCheckedChange={(checked) =>
+                                setShowFields(prev => ({ ...prev, [field]: !!checked }))
+                              }
+                            />
+                            <Label htmlFor={field} className="capitalize">
+                              {field.replace(/([A-Z])/g, ' $1').trim()}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      <Separator />
+                      <h4 className="font-medium">WIP Limits</h4>
+                      <div className="space-y-2">
+                        {stages.slice(0, 6).map(stage => (
+                          <div key={stage} className="flex items-center justify-between">
+                            <Label className="text-xs">{statusConfig[stage].label}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={wipLimits[stage]}
+                              onChange={(e) => setWipLimits(prev => ({
+                                ...prev,
+                                [stage]: parseInt(e.target.value) || 0
+                              }))}
+                              className="w-20 h-8"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-                <SelectTrigger>
-                  <Layers className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Group By" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Grouping</SelectItem>
-                  <SelectItem value="priority">By Priority</SelectItem>
-                  <SelectItem value="carrier">By Carrier</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </CardContent>
         </Card>
@@ -367,22 +617,53 @@ export default function ShipmentsPipeline() {
                             <CardHeader className="pb-3">
                               <CardTitle className="text-sm font-medium flex items-center justify-between">
                                 <span>{statusConfig[stage].label}</span>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={`${statusConfig[stage].color} transition-all duration-200`}
-                                >
-                                  {laneGroupedShipments[stage].length}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={`${statusConfig[stage].color} transition-all duration-200`}
+                                  >
+                                    {laneGroupedShipments[stage].length}
+                                  </Badge>
+                                  {wipLimits[stage] < 999 && laneGroupedShipments[stage].length >= wipLimits[stage] && (
+                                    <AlertCircle className="h-4 w-4 text-destructive" />
+                                  )}
+                                </div>
                               </CardTitle>
+                              {wipLimits[stage] < 999 && (
+                                <div className="text-xs text-muted-foreground">
+                                  Limit: {wipLimits[stage]} 
+                                  {laneGroupedShipments[stage].length > wipLimits[stage] && (
+                                    <span className="text-destructive ml-1">
+                                      (+{laneGroupedShipments[stage].length - wipLimits[stage]} over)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </CardHeader>
                             <CardContent className="space-y-2 min-h-[200px]">
                               {laneGroupedShipments[stage].map((shipment) => (
                                 <Draggable key={shipment.id} id={shipment.id}>
                                   <Card
-                                    className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in"
-                                    onClick={() => navigate(`/dashboard/shipments/${shipment.id}`)}
+                                    className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in relative"
+                                    onClick={(e) => {
+                                      if (bulkMode) {
+                                        e.stopPropagation();
+                                        toggleShipmentSelection(shipment.id);
+                                      } else {
+                                        navigate(`/dashboard/shipments/${shipment.id}`);
+                                      }
+                                    }}
                                   >
                                     <CardContent className="p-3 space-y-2">
+                                      {bulkMode && (
+                                        <div className="absolute top-2 right-2 z-10">
+                                          {selectedShipments.has(shipment.id) ? (
+                                            <CheckSquare className="h-4 w-4 text-primary" />
+                                          ) : (
+                                            <Square className="h-4 w-4 text-muted-foreground" />
+                                          )}
+                                        </div>
+                                      )}
                                       <div className="flex items-start justify-between">
                                         <div className="font-medium text-sm">{shipment.shipment_number}</div>
                                         {shipment.priority_level && (
@@ -400,23 +681,35 @@ export default function ShipmentsPipeline() {
                                           </Badge>
                                         )}
                                       </div>
-                                      <div className="text-xs text-muted-foreground space-y-1">
-                                        <div className="flex items-center gap-1">
+                                      {showFields.origin && (
+                                        <div className="text-xs text-muted-foreground flex items-center gap-1">
                                           <MapPin className="h-3 w-3" />
                                           <span>{getLocationString(shipment.origin_address)}</span>
                                         </div>
-                                        <div className="flex items-center gap-1">
+                                      )}
+                                      {showFields.destination && (
+                                        <div className="text-xs text-muted-foreground flex items-center gap-1">
                                           <MapPin className="h-3 w-3" />
                                           <span>{getLocationString(shipment.destination_address)}</span>
                                         </div>
-                                      </div>
-                                      {shipment.total_packages && (
+                                      )}
+                                      {showFields.packages && shipment.total_packages && (
                                         <div className="flex items-center gap-1 text-xs">
                                           <Package className="h-3 w-3" />
                                           <span>{shipment.total_packages} packages</span>
                                         </div>
                                       )}
-                                      {shipment.estimated_delivery_date && (
+                                      {showFields.weight && shipment.total_weight_kg && (
+                                        <div className="text-xs text-muted-foreground">
+                                          Weight: {shipment.total_weight_kg} kg
+                                        </div>
+                                      )}
+                                      {showFields.charges && shipment.total_charges && (
+                                        <div className="text-xs font-semibold text-primary">
+                                          {formatCurrency(shipment.total_charges, shipment.currency)}
+                                        </div>
+                                      )}
+                                      {showFields.deliveryDate && shipment.estimated_delivery_date && (
                                         <div className="text-xs text-muted-foreground">
                                           ETA: {formatDate(shipment.estimated_delivery_date)}
                                         </div>
