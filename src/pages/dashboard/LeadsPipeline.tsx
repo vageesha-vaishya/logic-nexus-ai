@@ -373,20 +373,23 @@ export default function LeadsPipeline() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                       {stages.map((stage) => (
                         <Droppable key={stage} id={stage}>
-                          <Card className="h-full">
+                          <Card className="h-full transition-all duration-200 hover:shadow-md">
                             <CardHeader className="pb-3">
                               <CardTitle className="text-sm font-medium flex items-center justify-between">
                                 <span>{statusConfig[stage].label}</span>
-                                <Badge variant="secondary" className={statusConfig[stage].color}>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`${statusConfig[stage].color} transition-all duration-200`}
+                                >
                                   {laneGroupedLeads[stage].length}
                                 </Badge>
                               </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2">
+                            <CardContent className="space-y-2 min-h-[200px]">
                               {laneGroupedLeads[stage].map((lead) => (
                                 <Draggable key={lead.id} id={lead.id}>
                                   <Card
-                                    className="cursor-pointer hover:shadow-md transition-shadow"
+                                    className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in"
                                     onClick={() => navigate(`/dashboard/leads/${lead.id}`)}
                                   >
                                     <CardContent className="p-3 space-y-2">
@@ -404,13 +407,13 @@ export default function LeadsPipeline() {
                                       {lead.lead_score !== null && (
                                         <Badge
                                           variant="outline"
-                                          className={
+                                          className={`transition-all duration-200 ${
                                             lead.lead_score >= 70
-                                              ? "bg-green-500/10"
+                                              ? "bg-green-500/10 hover:bg-green-500/20"
                                               : lead.lead_score >= 40
-                                              ? "bg-yellow-500/10"
-                                              : "bg-red-500/10"
-                                          }
+                                              ? "bg-yellow-500/10 hover:bg-yellow-500/20"
+                                              : "bg-red-500/10 hover:bg-red-500/20"
+                                          }`}
                                         >
                                           Score: {lead.lead_score}
                                         </Badge>
@@ -435,13 +438,18 @@ export default function LeadsPipeline() {
             </div>
             <DragOverlay>
               {activeLead ? (
-                <Card className="w-64 shadow-lg rotate-3">
-                  <CardContent className="p-3 space-y-2">
+                <Card className="w-64 shadow-2xl rotate-3 scale-105 border-2 border-primary animate-scale-in">
+                  <CardContent className="p-3 space-y-2 bg-gradient-to-br from-background to-muted">
                     <div className="font-medium text-sm">
                       {activeLead.first_name} {activeLead.last_name}
                     </div>
                     {activeLead.company && (
                       <div className="text-xs text-muted-foreground">{activeLead.company}</div>
+                    )}
+                    {activeLead.estimated_value && (
+                      <div className="text-xs font-semibold text-primary">
+                        {formatCurrency(activeLead.estimated_value)}
+                      </div>
                     )}
                   </CardContent>
                 </Card>

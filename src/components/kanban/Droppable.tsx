@@ -14,7 +14,11 @@ export function Droppable({ id, children }: DroppableProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`transition-colors ${isOver ? "ring-2 ring-primary ring-offset-2" : ""}`}
+      className={`transition-all duration-300 ${
+        isOver 
+          ? "ring-2 ring-primary ring-offset-2 bg-primary/5 scale-[1.02]" 
+          : ""
+      }`}
     >
       {children}
     </div>

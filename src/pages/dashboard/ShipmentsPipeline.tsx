@@ -363,20 +363,23 @@ export default function ShipmentsPipeline() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
                       {stages.map((stage) => (
                         <Droppable key={stage} id={stage}>
-                          <Card className="h-full">
+                          <Card className="h-full transition-all duration-200 hover:shadow-md">
                             <CardHeader className="pb-3">
                               <CardTitle className="text-sm font-medium flex items-center justify-between">
                                 <span>{statusConfig[stage].label}</span>
-                                <Badge variant="secondary" className={statusConfig[stage].color}>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`${statusConfig[stage].color} transition-all duration-200`}
+                                >
                                   {laneGroupedShipments[stage].length}
                                 </Badge>
                               </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2">
+                            <CardContent className="space-y-2 min-h-[200px]">
                               {laneGroupedShipments[stage].map((shipment) => (
                                 <Draggable key={shipment.id} id={shipment.id}>
                                   <Card
-                                    className="cursor-pointer hover:shadow-md transition-shadow"
+                                    className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in"
                                     onClick={() => navigate(`/dashboard/shipments/${shipment.id}`)}
                                   >
                                     <CardContent className="p-3 space-y-2">
@@ -385,13 +388,13 @@ export default function ShipmentsPipeline() {
                                         {shipment.priority_level && (
                                           <Badge
                                             variant="outline"
-                                            className={
+                                            className={`transition-all duration-200 ${
                                               shipment.priority_level === "high"
-                                                ? "bg-red-500/10"
+                                                ? "bg-red-500/10 hover:bg-red-500/20"
                                                 : shipment.priority_level === "medium"
-                                                ? "bg-yellow-500/10"
-                                                : "bg-blue-500/10"
-                                            }
+                                                ? "bg-yellow-500/10 hover:bg-yellow-500/20"
+                                                : "bg-blue-500/10 hover:bg-blue-500/20"
+                                            }`}
                                           >
                                             {shipment.priority_level}
                                           </Badge>
@@ -443,13 +446,18 @@ export default function ShipmentsPipeline() {
             </div>
             <DragOverlay>
               {activeShipment ? (
-                <Card className="w-64 shadow-lg rotate-3">
-                  <CardContent className="p-3 space-y-2">
+                <Card className="w-64 shadow-2xl rotate-3 scale-105 border-2 border-primary animate-scale-in">
+                  <CardContent className="p-3 space-y-2 bg-gradient-to-br from-background to-muted">
                     <div className="font-medium text-sm">{activeShipment.shipment_number}</div>
                     <div className="text-xs text-muted-foreground">
                       {getLocationString(activeShipment.origin_address)} →{" "}
                       {getLocationString(activeShipment.destination_address)}
                     </div>
+                    {activeShipment.total_charges && (
+                      <div className="text-xs font-semibold text-primary">
+                        {formatCurrency(activeShipment.total_charges, activeShipment.currency)}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ) : null}
