@@ -21,6 +21,7 @@ import Leads from "./pages/dashboard/Leads";
 import LeadNew from "./pages/dashboard/LeadNew";
 import LeadDetail from "./pages/dashboard/LeadDetail";
 import LeadsImportExport from "./pages/dashboard/LeadsImportExport";
+import LeadsPipeline from "./pages/dashboard/LeadsPipeline";
 import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
 import ActivityDetail from "./pages/dashboard/ActivityDetail";
@@ -57,6 +58,7 @@ import CustomRoles from "./pages/dashboard/CustomRoles";
 import Shipments from "./pages/dashboard/Shipments";
 import ShipmentNew from "./pages/dashboard/ShipmentNew";
 import ShipmentDetail from "./pages/dashboard/ShipmentDetail";
+import ShipmentsPipeline from "./pages/dashboard/ShipmentsPipeline";
 import Warehouses from "./pages/dashboard/Warehouses";
 import WarehouseNew from "./pages/dashboard/WarehouseNew";
 import Vehicles from "./pages/dashboard/Vehicles";
@@ -174,6 +176,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["leads.import_export"]}>
                   <LeadsImportExport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/leads/pipeline" 
+              element={
+                <ProtectedRoute requiredPermissions={["leads.view"]}>
+                  <LeadsPipeline />
                 </ProtectedRoute>
               } 
             />
@@ -444,6 +454,7 @@ const App = () => (
             {/* Logistics Routes */}
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
+            <Route path="/dashboard/shipments/pipeline" element={<ProtectedRoute><ShipmentsPipeline /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/:id" element={<ProtectedRoute><ShipmentDetail /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />

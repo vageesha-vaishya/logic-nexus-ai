@@ -92,20 +92,34 @@ export default function LeadsPipeline() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, users(email)")
-        .limit(100);
+      // Get unique owner_ids from leads first
+      const { data: leadsData, error: leadsError } = await supabase
+        .from("leads")
+        .select("owner_id")
+        .not("owner_id", "is", null);
 
-      if (error) throw error;
+      if (leadsError) throw leadsError;
       
-      const uniqueUsers = Array.from(
-        new Map(
-          (data || [])
-            .filter((ur: any) => ur.users?.email)
-            .map((ur: any) => [ur.user_id, { id: ur.user_id, email: ur.users.email }])
-        ).values()
-      );
+      const ownerIds = Array.from(new Set(leadsData?.map(l => l.owner_id).filter(Boolean)));
+      
+      if (ownerIds.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Get user_roles to get email info
+      const { data: userRolesData, error: userRolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .in("user_id", ownerIds);
+
+      if (userRolesError) throw userRolesError;
+
+      // For now, use user_id as display name since we can't access auth.users
+      const uniqueUsers = ownerIds.map(id => ({
+        id,
+        email: id // Using ID as email until we have a profiles table
+      }));
       
       setUsers(uniqueUsers);
     } catch (error) {
