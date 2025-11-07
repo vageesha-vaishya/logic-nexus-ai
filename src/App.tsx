@@ -21,6 +21,7 @@ import Leads from "./pages/dashboard/Leads";
 import LeadNew from "./pages/dashboard/LeadNew";
 import LeadDetail from "./pages/dashboard/LeadDetail";
 import LeadsImportExport from "./pages/dashboard/LeadsImportExport";
+import LeadsPipeline from "./pages/dashboard/LeadsPipeline";
 import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
 import ActivityDetail from "./pages/dashboard/ActivityDetail";
@@ -162,7 +163,15 @@ const App = () => (
               } 
             />
             <Route 
-              path="/dashboard/leads/new" 
+              path="/dashboard/leads/pipeline" 
+              element={
+                <ProtectedRoute requiredPermissions={["leads.view"]}>
+                  <LeadsPipeline />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/leads/new"
               element={
                 <ProtectedRoute requiredPermissions={["leads.create"]}>
                   <LeadNew />

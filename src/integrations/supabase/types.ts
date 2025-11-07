@@ -4403,6 +4403,7 @@ export type Database = {
         | "negotiation"
         | "won"
         | "lost"
+        | "converted"
       opportunity_stage:
         | "prospecting"
         | "qualification"
@@ -4612,6 +4613,7 @@ export const Constants = {
         "negotiation",
         "won",
         "lost",
+        "converted",
       ],
       opportunity_stage: [
         "prospecting",
