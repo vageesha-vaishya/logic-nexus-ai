@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter } from "lucide-react";
+import { ArrowLeft, Search, Filter, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
 import { Draggable } from "@/components/kanban/Draggable";
+import { SwimLane } from "@/components/kanban/SwimLane";
 import { useSort } from "@/hooks/useSort";
 
 type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'converted' | 'lost';
@@ -51,6 +52,8 @@ export default function LeadsPipeline() {
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<'none' | 'score' | 'value' | 'owner'>('none');
+  const [users, setUsers] = useState<Array<{ id: string; email: string }>>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -62,6 +65,7 @@ export default function LeadsPipeline() {
 
   useEffect(() => {
     fetchLeads();
+    fetchUsers();
   }, []);
 
   const fetchLeads = async () => {
@@ -83,6 +87,29 @@ export default function LeadsPipeline() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id, users(email)")
+        .limit(100);
+
+      if (error) throw error;
+      
+      const uniqueUsers = Array.from(
+        new Map(
+          (data || [])
+            .filter((ur: any) => ur.users?.email)
+            .map((ur: any) => [ur.user_id, { id: ur.user_id, email: ur.users.email }])
+        ).values()
+      );
+      
+      setUsers(uniqueUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
     }
   };
 
@@ -159,6 +186,78 @@ export default function LeadsPipeline() {
     return acc;
   }, {} as Record<LeadStatus, Lead[]>);
 
+  // Group leads by swim lane
+  const getSwimLanes = () => {
+    if (groupBy === 'none') {
+      return [{ id: 'all', title: 'All Leads', leads: filteredLeads }];
+    }
+
+    if (groupBy === 'score') {
+      return [
+        { 
+          id: 'high', 
+          title: 'High Score (70+)', 
+          leads: filteredLeads.filter(l => (l.lead_score || 0) >= 70) 
+        },
+        { 
+          id: 'medium', 
+          title: 'Medium Score (40-69)', 
+          leads: filteredLeads.filter(l => (l.lead_score || 0) >= 40 && (l.lead_score || 0) < 70) 
+        },
+        { 
+          id: 'low', 
+          title: 'Low Score (<40)', 
+          leads: filteredLeads.filter(l => (l.lead_score || 0) < 40) 
+        },
+      ];
+    }
+
+    if (groupBy === 'value') {
+      return [
+        { 
+          id: 'high-value', 
+          title: 'High Value ($50K+)', 
+          leads: filteredLeads.filter(l => (l.estimated_value || 0) >= 50000) 
+        },
+        { 
+          id: 'mid-value', 
+          title: 'Mid Value ($10K-$50K)', 
+          leads: filteredLeads.filter(l => (l.estimated_value || 0) >= 10000 && (l.estimated_value || 0) < 50000) 
+        },
+        { 
+          id: 'low-value', 
+          title: 'Low Value (<$10K)', 
+          leads: filteredLeads.filter(l => (l.estimated_value || 0) > 0 && (l.estimated_value || 0) < 10000) 
+        },
+        { 
+          id: 'no-value', 
+          title: 'No Value Set', 
+          leads: filteredLeads.filter(l => !l.estimated_value) 
+        },
+      ];
+    }
+
+    if (groupBy === 'owner') {
+      const unassigned = { 
+        id: 'unassigned', 
+        title: 'Unassigned', 
+        leads: filteredLeads.filter(l => !l.owner_id) 
+      };
+      
+      const ownerGroups = users.map(user => ({
+        id: user.id,
+        title: user.email,
+        leads: filteredLeads.filter(l => l.owner_id === user.id)
+      })).filter(g => g.leads.length > 0);
+
+      return [unassigned, ...ownerGroups];
+    }
+
+    return [{ id: 'all', title: 'All Leads', leads: filteredLeads }];
+  };
+
+  const swimLanes = getSwimLanes();
+
   const { sorted: sortedLeads } = useSort(filteredLeads, {
     initialField: "created_at",
     initialDirection: "desc",
@@ -214,6 +313,18 @@ export default function LeadsPipeline() {
                   <SelectItem value="low">Low (&lt;40)</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <Layers className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Group By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Grouping</SelectItem>
+                  <SelectItem value="score">By Score</SelectItem>
+                  <SelectItem value="value">By Value</SelectItem>
+                  <SelectItem value="owner">By Owner</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -222,64 +333,91 @@ export default function LeadsPipeline() {
           <div className="text-center py-12">Loading leads...</div>
         ) : (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-              {stages.map((stage) => (
-                <Droppable key={stage} id={stage}>
-                  <Card className="h-full">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center justify-between">
-                        <span>{statusConfig[stage].label}</span>
-                        <Badge variant="secondary" className={statusConfig[stage].color}>
-                          {groupedLeads[stage].length}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {groupedLeads[stage].map((lead) => (
-                        <Draggable key={lead.id} id={lead.id}>
-                          <Card
-                            className="cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => navigate(`/dashboard/leads/${lead.id}`)}
-                          >
-                            <CardContent className="p-3 space-y-2">
-                              <div className="font-medium text-sm">
-                                {lead.first_name} {lead.last_name}
-                              </div>
-                              {lead.company && (
-                                <div className="text-xs text-muted-foreground">{lead.company}</div>
-                              )}
-                              {lead.estimated_value && (
-                                <div className="text-xs font-semibold text-primary">
-                                  {formatCurrency(lead.estimated_value)}
-                                </div>
-                              )}
-                              {lead.lead_score !== null && (
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    lead.lead_score >= 70
-                                      ? "bg-green-500/10"
-                                      : lead.lead_score >= 40
-                                      ? "bg-yellow-500/10"
-                                      : "bg-red-500/10"
-                                  }
-                                >
-                                  Score: {lead.lead_score}
+            <div className="space-y-4">
+              {swimLanes.map((lane) => {
+                const laneGroupedLeads = stages.reduce((acc, stage) => {
+                  acc[stage] = lane.leads.filter((lead) => lead.status === stage as DatabaseLeadStatus);
+                  return acc;
+                }, {} as Record<LeadStatus, Lead[]>);
+
+                const totalValue = lane.leads.reduce((sum, lead) => sum + (lead.estimated_value || 0), 0);
+                const avgScore = lane.leads.length > 0
+                  ? Math.round(lane.leads.reduce((sum, lead) => sum + (lead.lead_score || 0), 0) / lane.leads.length)
+                  : 0;
+
+                return (
+                  <SwimLane
+                    key={lane.id}
+                    id={lane.id}
+                    title={lane.title}
+                    count={lane.leads.length}
+                    metrics={[
+                      { label: 'Total Value', value: formatCurrency(totalValue) },
+                      { label: 'Avg Score', value: avgScore },
+                    ]}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                      {stages.map((stage) => (
+                        <Droppable key={stage} id={stage}>
+                          <Card className="h-full">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                                <span>{statusConfig[stage].label}</span>
+                                <Badge variant="secondary" className={statusConfig[stage].color}>
+                                  {laneGroupedLeads[stage].length}
                                 </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              {laneGroupedLeads[stage].map((lead) => (
+                                <Draggable key={lead.id} id={lead.id}>
+                                  <Card
+                                    className="cursor-pointer hover:shadow-md transition-shadow"
+                                    onClick={() => navigate(`/dashboard/leads/${lead.id}`)}
+                                  >
+                                    <CardContent className="p-3 space-y-2">
+                                      <div className="font-medium text-sm">
+                                        {lead.first_name} {lead.last_name}
+                                      </div>
+                                      {lead.company && (
+                                        <div className="text-xs text-muted-foreground">{lead.company}</div>
+                                      )}
+                                      {lead.estimated_value && (
+                                        <div className="text-xs font-semibold text-primary">
+                                          {formatCurrency(lead.estimated_value)}
+                                        </div>
+                                      )}
+                                      {lead.lead_score !== null && (
+                                        <Badge
+                                          variant="outline"
+                                          className={
+                                            lead.lead_score >= 70
+                                              ? "bg-green-500/10"
+                                              : lead.lead_score >= 40
+                                              ? "bg-yellow-500/10"
+                                              : "bg-red-500/10"
+                                          }
+                                        >
+                                          Score: {lead.lead_score}
+                                        </Badge>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                </Draggable>
+                              ))}
+                              {laneGroupedLeads[stage].length === 0 && (
+                                <div className="text-xs text-muted-foreground text-center py-4">
+                                  No leads in this stage
+                                </div>
                               )}
                             </CardContent>
                           </Card>
-                        </Draggable>
+                        </Droppable>
                       ))}
-                      {groupedLeads[stage].length === 0 && (
-                        <div className="text-xs text-muted-foreground text-center py-4">
-                          No leads in this stage
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Droppable>
-              ))}
+                    </div>
+                  </SwimLane>
+                );
+              })}
             </div>
             <DragOverlay>
               {activeLead ? (

@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Package, MapPin } from "lucide-react";
+import { ArrowLeft, Search, Filter, Package, MapPin, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
 import { Draggable } from "@/components/kanban/Draggable";
+import { SwimLane } from "@/components/kanban/SwimLane";
 
 type ShipmentStatus = 'draft' | 'confirmed' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'customs' | 'cancelled' | 'on_hold' | 'returned';
 
@@ -64,6 +65,7 @@ export default function ShipmentsPipeline() {
   const [carrierFilter, setCarrierFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<'none' | 'priority' | 'carrier'>('none');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -192,6 +194,55 @@ export default function ShipmentsPipeline() {
     return acc;
   }, {} as Record<ShipmentStatus, Shipment[]>);
 
+  // Group shipments by swim lane
+  const getSwimLanes = () => {
+    if (groupBy === 'none') {
+      return [{ id: 'all', title: 'All Shipments', shipments: filteredShipments }];
+    }
+
+    if (groupBy === 'priority') {
+      return [
+        { 
+          id: 'high', 
+          title: 'High Priority', 
+          shipments: filteredShipments.filter(s => s.priority_level === 'high') 
+        },
+        { 
+          id: 'medium', 
+          title: 'Medium Priority', 
+          shipments: filteredShipments.filter(s => s.priority_level === 'medium') 
+        },
+        { 
+          id: 'low', 
+          title: 'Low Priority', 
+          shipments: filteredShipments.filter(s => s.priority_level === 'low') 
+        },
+        { 
+          id: 'no-priority', 
+          title: 'No Priority Set', 
+          shipments: filteredShipments.filter(s => !s.priority_level) 
+        },
+      ].filter(lane => lane.shipments.length > 0);
+    }
+
+    if (groupBy === 'carrier') {
+      const carrierGroups = carriers.map(carrier => ({
+        id: carrier.id,
+        title: carrier.carrier_name,
+        shipments: filteredShipments.filter(s => {
+          // This would need a carrier_id field on shipments table
+          // For now, we'll just group by all
+          return true;
+        })
+      }));
+      return [{ id: 'all', title: 'All Shipments', shipments: filteredShipments }];
+    }
+
+    return [{ id: 'all', title: 'All Shipments', shipments: filteredShipments }];
+  };
+
+  const swimLanes = getSwimLanes();
+
   const formatCurrency = (amount: number | null, currency: string | null) => {
     if (!amount) return "—";
     return new Intl.NumberFormat("en-US", {
@@ -229,7 +280,7 @@ export default function ShipmentsPipeline() {
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -269,6 +320,17 @@ export default function ShipmentsPipeline() {
                   <SelectItem value="low">Low</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                <SelectTrigger>
+                  <Layers className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Group By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Grouping</SelectItem>
+                  <SelectItem value="priority">By Priority</SelectItem>
+                  <SelectItem value="carrier">By Carrier</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -277,82 +339,107 @@ export default function ShipmentsPipeline() {
           <div className="text-center py-12">Loading shipments...</div>
         ) : (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-              {stages.map((stage) => (
-                <Droppable key={stage} id={stage}>
-                  <Card className="h-full">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center justify-between">
-                        <span>{statusConfig[stage].label}</span>
-                        <Badge variant="secondary" className={statusConfig[stage].color}>
-                          {groupedShipments[stage].length}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {groupedShipments[stage].map((shipment) => (
-                        <Draggable key={shipment.id} id={shipment.id}>
-                          <Card
-                            className="cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => navigate(`/dashboard/shipments/${shipment.id}`)}
-                          >
-                            <CardContent className="p-3 space-y-2">
-                              <div className="flex items-start justify-between">
-                                <div className="font-medium text-sm">{shipment.shipment_number}</div>
-                                {shipment.priority_level && (
-                                  <Badge
-                                    variant="outline"
-                                    className={
-                                      shipment.priority_level === "high"
-                                        ? "bg-red-500/10"
-                                        : shipment.priority_level === "medium"
-                                        ? "bg-yellow-500/10"
-                                        : "bg-blue-500/10"
-                                    }
+            <div className="space-y-4">
+              {swimLanes.map((lane) => {
+                const laneGroupedShipments = stages.reduce((acc, stage) => {
+                  acc[stage] = lane.shipments.filter((shipment) => shipment.status === stage);
+                  return acc;
+                }, {} as Record<ShipmentStatus, Shipment[]>);
+
+                const totalCharges = lane.shipments.reduce((sum, s) => sum + (s.total_charges || 0), 0);
+                const totalPackages = lane.shipments.reduce((sum, s) => sum + (s.total_packages || 0), 0);
+
+                return (
+                  <SwimLane
+                    key={lane.id}
+                    id={lane.id}
+                    title={lane.title}
+                    count={lane.shipments.length}
+                    metrics={[
+                      { label: 'Total Charges', value: formatCurrency(totalCharges, 'USD') },
+                      { label: 'Packages', value: totalPackages },
+                    ]}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+                      {stages.map((stage) => (
+                        <Droppable key={stage} id={stage}>
+                          <Card className="h-full">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                                <span>{statusConfig[stage].label}</span>
+                                <Badge variant="secondary" className={statusConfig[stage].color}>
+                                  {laneGroupedShipments[stage].length}
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              {laneGroupedShipments[stage].map((shipment) => (
+                                <Draggable key={shipment.id} id={shipment.id}>
+                                  <Card
+                                    className="cursor-pointer hover:shadow-md transition-shadow"
+                                    onClick={() => navigate(`/dashboard/shipments/${shipment.id}`)}
                                   >
-                                    {shipment.priority_level}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground space-y-1">
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{getLocationString(shipment.origin_address)}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{getLocationString(shipment.destination_address)}</span>
-                                </div>
-                              </div>
-                              {shipment.total_packages && (
-                                <div className="flex items-center gap-1 text-xs">
-                                  <Package className="h-3 w-3" />
-                                  <span>{shipment.total_packages} packages</span>
-                                </div>
-                              )}
-                              {shipment.estimated_delivery_date && (
-                                <div className="text-xs text-muted-foreground">
-                                  ETA: {formatDate(shipment.estimated_delivery_date)}
-                                </div>
-                              )}
-                              {shipment.total_charges && (
-                                <div className="text-xs font-semibold text-primary">
-                                  {formatCurrency(shipment.total_charges, shipment.currency)}
+                                    <CardContent className="p-3 space-y-2">
+                                      <div className="flex items-start justify-between">
+                                        <div className="font-medium text-sm">{shipment.shipment_number}</div>
+                                        {shipment.priority_level && (
+                                          <Badge
+                                            variant="outline"
+                                            className={
+                                              shipment.priority_level === "high"
+                                                ? "bg-red-500/10"
+                                                : shipment.priority_level === "medium"
+                                                ? "bg-yellow-500/10"
+                                                : "bg-blue-500/10"
+                                            }
+                                          >
+                                            {shipment.priority_level}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground space-y-1">
+                                        <div className="flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" />
+                                          <span>{getLocationString(shipment.origin_address)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" />
+                                          <span>{getLocationString(shipment.destination_address)}</span>
+                                        </div>
+                                      </div>
+                                      {shipment.total_packages && (
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <Package className="h-3 w-3" />
+                                          <span>{shipment.total_packages} packages</span>
+                                        </div>
+                                      )}
+                                      {shipment.estimated_delivery_date && (
+                                        <div className="text-xs text-muted-foreground">
+                                          ETA: {formatDate(shipment.estimated_delivery_date)}
+                                        </div>
+                                      )}
+                                      {shipment.total_charges && (
+                                        <div className="text-xs font-semibold text-primary">
+                                          {formatCurrency(shipment.total_charges, shipment.currency)}
+                                        </div>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                </Draggable>
+                              ))}
+                              {laneGroupedShipments[stage].length === 0 && (
+                                <div className="text-xs text-muted-foreground text-center py-4">
+                                  No shipments
                                 </div>
                               )}
                             </CardContent>
                           </Card>
-                        </Draggable>
+                        </Droppable>
                       ))}
-                      {groupedShipments[stage].length === 0 && (
-                        <div className="text-xs text-muted-foreground text-center py-4">
-                          No shipments
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Droppable>
-              ))}
+                    </div>
+                  </SwimLane>
+                );
+              })}
             </div>
             <DragOverlay>
               {activeShipment ? (
