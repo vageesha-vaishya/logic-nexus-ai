@@ -187,7 +187,7 @@ export function KanbanDashboard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LayoutGrid className="h-5 w-5 text-primary" />
-            <CardTitle>Kanban Pipelines Overview</CardTitle>
+ <CardTitle>Pipelines Overview</CardTitle>
           </div>
           <Badge variant="secondary" className="text-xs">Real-time</Badge>
         </div>
