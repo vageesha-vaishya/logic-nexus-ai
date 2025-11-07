@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, TrendingUp } from "lucide-react";
+import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
@@ -18,88 +18,73 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
-type Stage = 'prospecting' | 'qualification' | 'needs_analysis' | 'value_proposition' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
+type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 
-interface Opportunity {
+interface Quote {
   id: string;
-  name: string;
-  stage: Stage;
-  amount: number | null;
-  probability: number | null;
-  close_date: string | null;
-  expected_revenue: number | null;
+  quote_number: string;
+  title: string;
+  status: QuoteStatus;
+  sell_price: number | null;
+  cost_price: number | null;
+  margin_amount: number | null;
+  margin_percentage: number | null;
+  valid_until: string | null;
   created_at: string;
   account_id: string | null;
-  owner_id: string | null;
+  opportunity_id: string | null;
   accounts?: { name: string } | null;
-  contacts?: { first_name: string; last_name: string } | null;
+  opportunities?: { name: string } | null;
 }
 
-const stageColors: Record<Stage, string> = {
-  prospecting: 'bg-slate-500/10 text-slate-700 dark:text-slate-300',
-  qualification: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  needs_analysis: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
-  value_proposition: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-  proposal: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
-  negotiation: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  closed_won: 'bg-green-500/10 text-green-700 dark:text-green-300',
-  closed_lost: 'bg-red-500/10 text-red-700 dark:text-red-300',
+const statusConfig: Record<QuoteStatus, { label: string; color: string }> = {
+  draft: { label: "Draft", color: "bg-gray-500/10 text-gray-700 dark:text-gray-300" },
+  sent: { label: "Sent", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300" },
+  accepted: { label: "Accepted", color: "bg-green-500/10 text-green-700 dark:text-green-300" },
+  rejected: { label: "Rejected", color: "bg-red-500/10 text-red-700 dark:text-red-300" },
+  expired: { label: "Expired", color: "bg-orange-500/10 text-orange-700 dark:text-orange-300" },
 };
 
-const stageLabels: Record<Stage, string> = {
-  prospecting: 'Prospecting',
-  qualification: 'Qualification',
-  needs_analysis: 'Needs Analysis',
-  value_proposition: 'Value Proposition',
-  proposal: 'Proposal',
-  negotiation: 'Negotiation',
-  closed_won: 'Closed Won',
-  closed_lost: 'Closed Lost',
-};
+const stages: QuoteStatus[] = ['draft', 'sent', 'accepted', 'rejected', 'expired'];
 
-const stages: Stage[] = ['prospecting', 'qualification', 'needs_analysis', 'value_proposition', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
-
-export default function OpportunitiesPipeline() {
+export default function QuotesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [probabilityFilter, setProbabilityFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<'none' | 'probability' | 'value' | 'account'>('none');
+  const [groupBy, setGroupBy] = useState<'none' | 'value' | 'margin' | 'account'>('none');
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
 
   // Advanced filters
-  const [minAmount, setMinAmount] = useState<string>("");
-  const [maxAmount, setMaxAmount] = useState<string>("");
+  const [minValue, setMinValue] = useState<string>("");
+  const [maxValue, setMaxValue] = useState<string>("");
+  const [minMargin, setMinMargin] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
 
   // WIP limits
-  const [wipLimits, setWipLimits] = useState<Record<Stage, number>>({
-    prospecting: 30,
-    qualification: 20,
-    needs_analysis: 15,
-    value_proposition: 12,
-    proposal: 10,
-    negotiation: 8,
-    closed_won: 999,
-    closed_lost: 999,
+  const [wipLimits, setWipLimits] = useState<Record<QuoteStatus, number>>({
+    draft: 50,
+    sent: 30,
+    accepted: 999,
+    rejected: 999,
+    expired: 20,
   });
 
   // Card customization
   const [showFields, setShowFields] = useState({
     account: true,
-    contact: true,
-    amount: true,
-    probability: true,
-    closeDate: true,
+    opportunity: true,
+    value: true,
+    margin: true,
+    validUntil: true,
   });
 
   // Bulk operations
-  const [selectedOpportunities, setSelectedOpportunities] = useState<Set<string>>(new Set());
+  const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState(false);
 
   const sensors = useSensors(
@@ -111,29 +96,29 @@ export default function OpportunitiesPipeline() {
   );
 
   useEffect(() => {
-    fetchOpportunities();
+    fetchQuotes();
     fetchAccounts();
   }, []);
 
-  const fetchOpportunities = async () => {
+  const fetchQuotes = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("opportunities")
+        .from("quotes")
         .select(`
           *,
           accounts:account_id(name),
-          contacts:contact_id(first_name, last_name)
+          opportunities:opportunity_id(name)
         `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setOpportunities((data || []) as Opportunity[]);
+      setQuotes((data || []) as Quote[]);
     } catch (error) {
-      console.error("Error fetching opportunities:", error);
+      console.error("Error fetching quotes:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch opportunities",
+        description: "Failed to fetch quotes",
         variant: "destructive",
       });
     } finally {
@@ -155,30 +140,30 @@ export default function OpportunitiesPipeline() {
     }
   };
 
-  const handleStageChange = async (opportunityId: string, newStage: Stage) => {
+  const handleStatusChange = async (quoteId: string, newStatus: QuoteStatus) => {
     try {
       const { error } = await supabase
-        .from("opportunities")
-        .update({ stage: newStage })
-        .eq("id", opportunityId);
+        .from("quotes")
+        .update({ status: newStatus })
+        .eq("id", quoteId);
 
       if (error) throw error;
 
-      setOpportunities((prev) =>
-        prev.map((opportunity) =>
-          opportunity.id === opportunityId ? { ...opportunity, stage: newStage } : opportunity
+      setQuotes((prev) =>
+        prev.map((quote) =>
+          quote.id === quoteId ? { ...quote, status: newStatus } : quote
         )
       );
 
       toast({
         title: "Success",
-        description: "Opportunity stage updated",
+        description: "Quote status updated",
       });
     } catch (error) {
-      console.error("Error updating opportunity stage:", error);
+      console.error("Error updating quote status:", error);
       toast({
         title: "Error",
-        description: "Failed to update opportunity stage",
+        description: "Failed to update quote status",
         variant: "destructive",
       });
     }
@@ -194,181 +179,180 @@ export default function OpportunitiesPipeline() {
 
     if (!over) return;
 
-    const opportunityId = active.id as string;
-    const newStage = over.id as Stage;
+    const quoteId = active.id as string;
+    const newStatus = over.id as QuoteStatus;
 
-    const opportunity = opportunities.find((o) => o.id === opportunityId);
-    if (!opportunity || opportunity.stage === newStage) return;
+    const quote = quotes.find((q) => q.id === quoteId);
+    if (!quote || quote.status === newStatus) return;
 
-    handleStageChange(opportunityId, newStage);
+    handleStatusChange(quoteId, newStatus);
   };
 
-  const filteredOpportunities = opportunities.filter((opportunity) => {
+  const filteredQuotes = quotes.filter((quote) => {
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
-      opportunity.name.toLowerCase().includes(searchLower) ||
-      opportunity.accounts?.name?.toLowerCase().includes(searchLower);
+      quote.quote_number.toLowerCase().includes(searchLower) ||
+      quote.title?.toLowerCase().includes(searchLower) ||
+      quote.accounts?.name?.toLowerCase().includes(searchLower);
 
-    const matchesProbability =
-      probabilityFilter === "all" ||
-      (probabilityFilter === "high" && (opportunity.probability || 0) >= 70) ||
-      (probabilityFilter === "medium" && (opportunity.probability || 0) >= 40 && (opportunity.probability || 0) < 70) ||
-      (probabilityFilter === "low" && (opportunity.probability || 0) < 40);
+    const matchesAccount = accountFilter === "all" || quote.account_id === accountFilter;
 
-    const matchesAccount = accountFilter === "all" || opportunity.account_id === accountFilter;
+    // Value range filter
+    const quoteValue = quote.sell_price || 0;
+    const matchesMinValue = !minValue || quoteValue >= parseFloat(minValue);
+    const matchesMaxValue = !maxValue || quoteValue <= parseFloat(maxValue);
 
-    // Amount range filter
-    const amount = opportunity.amount || 0;
-    const matchesMinAmount = !minAmount || amount >= parseFloat(minAmount);
-    const matchesMaxAmount = !maxAmount || amount <= parseFloat(maxAmount);
+    // Margin filter
+    const margin = quote.margin_amount || 0;
+    const matchesMinMargin = !minMargin || margin >= parseFloat(minMargin);
 
     // Date range filter
-    const closeDate = opportunity.close_date ? new Date(opportunity.close_date) : null;
-    const matchesDateFrom = !dateFrom || (closeDate && closeDate >= new Date(dateFrom));
-    const matchesDateTo = !dateTo || (closeDate && closeDate <= new Date(dateTo));
+    const quoteDate = new Date(quote.created_at);
+    const matchesDateFrom = !dateFrom || quoteDate >= new Date(dateFrom);
+    const matchesDateTo = !dateTo || quoteDate <= new Date(dateTo);
 
-    return matchesSearch && matchesProbability && matchesAccount && matchesMinAmount && matchesMaxAmount && matchesDateFrom && matchesDateTo;
+    return matchesSearch && matchesAccount && matchesMinValue && matchesMaxValue && matchesMinMargin && matchesDateFrom && matchesDateTo;
   });
 
-  const toggleOpportunitySelection = (opportunityId: string) => {
-    setSelectedOpportunities(prev => {
+  const toggleQuoteSelection = (quoteId: string) => {
+    setSelectedQuotes(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(opportunityId)) {
-        newSet.delete(opportunityId);
+      if (newSet.has(quoteId)) {
+        newSet.delete(quoteId);
       } else {
-        newSet.add(opportunityId);
+        newSet.add(quoteId);
       }
       return newSet;
     });
   };
 
   const handleBulkDelete = async () => {
-    if (selectedOpportunities.size === 0) return;
+    if (selectedQuotes.size === 0) return;
 
     try {
       const { error } = await supabase
-        .from("opportunities")
+        .from("quotes")
         .delete()
-        .in("id", Array.from(selectedOpportunities));
+        .in("id", Array.from(selectedQuotes));
 
       if (error) throw error;
 
-      setOpportunities(prev => prev.filter(o => !selectedOpportunities.has(o.id)));
-      setSelectedOpportunities(new Set());
+      setQuotes(prev => prev.filter(q => !selectedQuotes.has(q.id)));
+      setSelectedQuotes(new Set());
 
       toast({
         title: "Success",
-        description: `Deleted ${selectedOpportunities.size} opportunity(ies)`,
+        description: `Deleted ${selectedQuotes.size} quote(s)`,
       });
     } catch (error) {
-      console.error("Error deleting opportunities:", error);
+      console.error("Error deleting quotes:", error);
       toast({
         title: "Error",
-        description: "Failed to delete opportunities",
+        description: "Failed to delete quotes",
         variant: "destructive",
       });
     }
   };
 
-  const handleBulkStageChange = async (newStage: Stage) => {
-    if (selectedOpportunities.size === 0) return;
+  const handleBulkStatusChange = async (newStatus: QuoteStatus) => {
+    if (selectedQuotes.size === 0) return;
 
     try {
       const { error } = await supabase
-        .from("opportunities")
-        .update({ stage: newStage })
-        .in("id", Array.from(selectedOpportunities));
+        .from("quotes")
+        .update({ status: newStatus })
+        .in("id", Array.from(selectedQuotes));
 
       if (error) throw error;
 
-      setOpportunities(prev => prev.map(o =>
-        selectedOpportunities.has(o.id) ? { ...o, stage: newStage } : o
+      setQuotes(prev => prev.map(q =>
+        selectedQuotes.has(q.id) ? { ...q, status: newStatus } : q
       ));
-      setSelectedOpportunities(new Set());
+      setSelectedQuotes(new Set());
 
       toast({
         title: "Success",
-        description: `Updated ${selectedOpportunities.size} opportunity(ies)`,
+        description: `Updated ${selectedQuotes.size} quote(s)`,
       });
     } catch (error) {
-      console.error("Error updating opportunities:", error);
+      console.error("Error updating quotes:", error);
       toast({
         title: "Error",
-        description: "Failed to update opportunities",
+        description: "Failed to update quotes",
         variant: "destructive",
       });
     }
   };
 
-  const groupedOpportunities = stages.reduce((acc, stage) => {
-    acc[stage] = filteredOpportunities.filter((opportunity) => opportunity.stage === stage);
+  const groupedQuotes = stages.reduce((acc, stage) => {
+    acc[stage] = filteredQuotes.filter((quote) => quote.status === stage);
     return acc;
-  }, {} as Record<Stage, Opportunity[]>);
+  }, {} as Record<QuoteStatus, Quote[]>);
 
-  // Group opportunities by swim lane
+  // Group quotes by swim lane
   const getSwimLanes = () => {
     if (groupBy === 'none') {
-      return [{ id: 'all', title: 'All Opportunities', opportunities: filteredOpportunities }];
-    }
-
-    if (groupBy === 'probability') {
-      return [
-        {
-          id: 'high',
-          title: 'High Probability (70%+)',
-          opportunities: filteredOpportunities.filter(o => (o.probability || 0) >= 70)
-        },
-        {
-          id: 'medium',
-          title: 'Medium Probability (40-69%)',
-          opportunities: filteredOpportunities.filter(o => (o.probability || 0) >= 40 && (o.probability || 0) < 70)
-        },
-        {
-          id: 'low',
-          title: 'Low Probability (<40%)',
-          opportunities: filteredOpportunities.filter(o => (o.probability || 0) < 40)
-        },
-      ].filter(lane => lane.opportunities.length > 0);
+      return [{ id: 'all', title: 'All Quotes', quotes: filteredQuotes }];
     }
 
     if (groupBy === 'value') {
       return [
         {
           id: 'high-value',
-          title: 'High Value ($100K+)',
-          opportunities: filteredOpportunities.filter(o => (o.amount || 0) >= 100000)
+          title: 'High Value ($50K+)',
+          quotes: filteredQuotes.filter(q => (q.sell_price || 0) >= 50000)
         },
         {
           id: 'mid-value',
-          title: 'Mid Value ($25K-$100K)',
-          opportunities: filteredOpportunities.filter(o => (o.amount || 0) >= 25000 && (o.amount || 0) < 100000)
+          title: 'Mid Value ($10K-$50K)',
+          quotes: filteredQuotes.filter(q => (q.sell_price || 0) >= 10000 && (q.sell_price || 0) < 50000)
         },
         {
           id: 'low-value',
-          title: 'Low Value (<$25K)',
-          opportunities: filteredOpportunities.filter(o => (o.amount || 0) < 25000)
+          title: 'Low Value (<$10K)',
+          quotes: filteredQuotes.filter(q => (q.sell_price || 0) > 0 && (q.sell_price || 0) < 10000)
         },
-      ].filter(lane => lane.opportunities.length > 0);
+      ].filter(lane => lane.quotes.length > 0);
+    }
+
+    if (groupBy === 'margin') {
+      return [
+        {
+          id: 'high-margin',
+          title: 'High Margin (30%+)',
+          quotes: filteredQuotes.filter(q => (q.margin_percentage || 0) >= 30)
+        },
+        {
+          id: 'mid-margin',
+          title: 'Mid Margin (15-30%)',
+          quotes: filteredQuotes.filter(q => (q.margin_percentage || 0) >= 15 && (q.margin_percentage || 0) < 30)
+        },
+        {
+          id: 'low-margin',
+          title: 'Low Margin (<15%)',
+          quotes: filteredQuotes.filter(q => (q.margin_percentage || 0) < 15)
+        },
+      ].filter(lane => lane.quotes.length > 0);
     }
 
     if (groupBy === 'account') {
       const unassigned = {
         id: 'unassigned',
         title: 'Unassigned',
-        opportunities: filteredOpportunities.filter(o => !o.account_id)
+        quotes: filteredQuotes.filter(q => !q.account_id)
       };
 
       const accountGroups = accounts.map(account => ({
         id: account.id,
         title: account.name,
-        opportunities: filteredOpportunities.filter(o => o.account_id === account.id)
-      })).filter(g => g.opportunities.length > 0);
+        quotes: filteredQuotes.filter(q => q.account_id === account.id)
+      })).filter(g => g.quotes.length > 0);
 
-      return [unassigned, ...accountGroups].filter(lane => lane.opportunities.length > 0);
+      return [unassigned, ...accountGroups].filter(lane => lane.quotes.length > 0);
     }
 
-    return [{ id: 'all', title: 'All Opportunities', opportunities: filteredOpportunities }];
+    return [{ id: 'all', title: 'All Quotes', quotes: filteredQuotes }];
   };
 
   const swimLanes = getSwimLanes();
@@ -391,17 +375,17 @@ export default function OpportunitiesPipeline() {
     });
   };
 
-  const activeOpportunity = activeId ? opportunities.find((o) => o.id === activeId) : null;
+  const activeQuote = activeId ? quotes.find((q) => q.id === activeId) : null;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Opportunities Pipeline</h1>
-            <p className="text-muted-foreground">Manage opportunities through stages</p>
+            <h1 className="text-3xl font-bold">Quotes Pipeline</h1>
+            <p className="text-muted-foreground">Manage quotes through stages</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/opportunities")}>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/quotes")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to List
           </Button>
@@ -417,27 +401,15 @@ export default function OpportunitiesPipeline() {
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search opportunities..."
+                      placeholder="Search quotes..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
                     />
                   </div>
-                  <Select value={probabilityFilter} onValueChange={setProbabilityFilter}>
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Probability" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Probabilities</SelectItem>
-                      <SelectItem value="high">High (70%+)</SelectItem>
-                      <SelectItem value="medium">Medium (40-69%)</SelectItem>
-                      <SelectItem value="low">Low (&lt;40%)</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Select value={accountFilter} onValueChange={setAccountFilter}>
                     <SelectTrigger className="w-full md:w-[200px]">
-                      <TrendingUp className="h-4 w-4 mr-2" />
+                      <Filter className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Account" />
                     </SelectTrigger>
                     <SelectContent>
@@ -456,8 +428,8 @@ export default function OpportunitiesPipeline() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Grouping</SelectItem>
-                      <SelectItem value="probability">By Probability</SelectItem>
                       <SelectItem value="value">By Value</SelectItem>
+                      <SelectItem value="margin">By Margin</SelectItem>
                       <SelectItem value="account">By Account</SelectItem>
                     </SelectContent>
                   </Select>
@@ -466,37 +438,38 @@ export default function OpportunitiesPipeline() {
                 {/* Advanced Filters */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Min Amount ($)</Label>
+                    <Label className="text-xs text-muted-foreground">Min Value ($)</Label>
                     <Input
                       type="number"
                       placeholder="0"
-                      value={minAmount}
-                      onChange={(e) => setMinAmount(e.target.value)}
+                      value={minValue}
+                      onChange={(e) => setMinValue(e.target.value)}
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Max Amount ($)</Label>
+                    <Label className="text-xs text-muted-foreground">Max Value ($)</Label>
                     <Input
                       type="number"
                       placeholder="No limit"
-                      value={maxAmount}
-                      onChange={(e) => setMaxAmount(e.target.value)}
+                      value={maxValue}
+                      onChange={(e) => setMaxValue(e.target.value)}
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Close From</Label>
+                    <Label className="text-xs text-muted-foreground">Min Margin ($)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={minMargin}
+                      onChange={(e) => setMinMargin(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Date From</Label>
                     <Input
                       type="date"
                       value={dateFrom}
                       onChange={(e) => setDateFrom(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Close To</Label>
-                    <Input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
                     />
                   </div>
                 </div>
@@ -509,16 +482,16 @@ export default function OpportunitiesPipeline() {
                       size="sm"
                       onClick={() => {
                         setBulkMode(!bulkMode);
-                        setSelectedOpportunities(new Set());
+                        setSelectedQuotes(new Set());
                       }}
                     >
                       <CheckSquare className="h-4 w-4 mr-2" />
                       {bulkMode ? "Cancel Selection" : "Bulk Select"}
                     </Button>
 
-                    {bulkMode && selectedOpportunities.size > 0 && (
+                    {bulkMode && selectedQuotes.size > 0 && (
                       <>
-                        <Badge variant="secondary">{selectedOpportunities.size} selected</Badge>
+                        <Badge variant="secondary">{selectedQuotes.size} selected</Badge>
                         <Button
                           variant="outline"
                           size="sm"
@@ -527,14 +500,14 @@ export default function OpportunitiesPipeline() {
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
                         </Button>
-                        <Select onValueChange={handleBulkStageChange}>
-                          <SelectTrigger className="w-[200px] h-9">
-                            <SelectValue placeholder="Change Stage" />
+                        <Select onValueChange={handleBulkStatusChange}>
+                          <SelectTrigger className="w-[180px] h-9">
+                            <SelectValue placeholder="Change Status" />
                           </SelectTrigger>
                           <SelectContent>
                             {stages.map(stage => (
                               <SelectItem key={stage} value={stage}>
-                                {stageLabels[stage]}
+                                {statusConfig[stage].label}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -572,9 +545,9 @@ export default function OpportunitiesPipeline() {
                         <Separator />
                         <h4 className="font-medium">WIP Limits</h4>
                         <div className="space-y-2">
-                          {stages.slice(0, 6).map(stage => (
+                          {stages.slice(0, 3).map(stage => (
                             <div key={stage} className="flex items-center justify-between">
-                              <Label className="text-xs">{stageLabels[stage]}</Label>
+                              <Label className="text-xs">{statusConfig[stage].label}</Label>
                               <Input
                                 type="number"
                                 min="0"
@@ -597,47 +570,45 @@ export default function OpportunitiesPipeline() {
           </Card>
 
           {loading ? (
-            <div className="text-center py-12">Loading opportunities...</div>
+            <div className="text-center py-12">Loading quotes...</div>
           ) : (
             <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
               <div className="space-y-4">
                 {swimLanes.map((lane) => {
-                  const laneGroupedOpportunities = stages.reduce((acc, stage) => {
-                    acc[stage] = lane.opportunities.filter((opportunity) => opportunity.stage === stage);
+                  const laneGroupedQuotes = stages.reduce((acc, stage) => {
+                    acc[stage] = lane.quotes.filter((quote) => quote.status === stage);
                     return acc;
-                  }, {} as Record<Stage, Opportunity[]>);
+                  }, {} as Record<QuoteStatus, Quote[]>);
 
-                  const totalValue = lane.opportunities.reduce((sum, opp) => sum + (opp.amount || 0), 0);
-                  const avgProbability = lane.opportunities.length > 0
-                    ? Math.round(lane.opportunities.reduce((sum, opp) => sum + (opp.probability || 0), 0) / lane.opportunities.length)
-                    : 0;
+                  const totalValue = lane.quotes.reduce((sum, quote) => sum + (quote.sell_price || 0), 0);
+                  const totalMargin = lane.quotes.reduce((sum, quote) => sum + (quote.margin_amount || 0), 0);
 
                   return (
                     <SwimLane
                       key={lane.id}
                       id={lane.id}
                       title={lane.title}
-                      count={lane.opportunities.length}
+                      count={lane.quotes.length}
                       metrics={[
                         { label: 'Total Value', value: formatCurrency(totalValue) },
-                        { label: 'Avg Probability', value: `${avgProbability}%` },
+                        { label: 'Total Margin', value: formatCurrency(totalMargin) },
                       ]}
                     >
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                         {stages.map((stage) => (
                           <Droppable key={stage} id={stage}>
                             <Card className="h-full transition-all duration-200 hover:shadow-md">
                               <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center justify-between">
-                                  <span>{stageLabels[stage]}</span>
+                                  <span>{statusConfig[stage].label}</span>
                                   <div className="flex items-center gap-2">
                                     <Badge
                                       variant="secondary"
-                                      className={`${stageColors[stage]} transition-all duration-200`}
+                                      className={`${statusConfig[stage].color} transition-all duration-200`}
                                     >
-                                      {laneGroupedOpportunities[stage].length}
+                                      {laneGroupedQuotes[stage].length}
                                     </Badge>
-                                    {wipLimits[stage] < 999 && laneGroupedOpportunities[stage].length >= wipLimits[stage] && (
+                                    {wipLimits[stage] < 999 && laneGroupedQuotes[stage].length >= wipLimits[stage] && (
                                       <AlertCircle className="h-4 w-4 text-destructive" />
                                     )}
                                   </div>
@@ -645,78 +616,74 @@ export default function OpportunitiesPipeline() {
                                 {wipLimits[stage] < 999 && (
                                   <div className="text-xs text-muted-foreground">
                                     Limit: {wipLimits[stage]}
-                                    {laneGroupedOpportunities[stage].length > wipLimits[stage] && (
+                                    {laneGroupedQuotes[stage].length > wipLimits[stage] && (
                                       <span className="text-destructive ml-1">
-                                        (+{laneGroupedOpportunities[stage].length - wipLimits[stage]} over)
+                                        (+{laneGroupedQuotes[stage].length - wipLimits[stage]} over)
                                       </span>
                                     )}
                                   </div>
                                 )}
                               </CardHeader>
                               <CardContent className="space-y-2 min-h-[200px]">
-                                {laneGroupedOpportunities[stage].map((opportunity) => (
-                                  <Draggable key={opportunity.id} id={opportunity.id}>
+                                {laneGroupedQuotes[stage].map((quote) => (
+                                  <Draggable key={quote.id} id={quote.id}>
                                     <Card
                                       className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in relative"
                                       onClick={(e) => {
                                         if (bulkMode) {
                                           e.stopPropagation();
-                                          toggleOpportunitySelection(opportunity.id);
+                                          toggleQuoteSelection(quote.id);
                                         } else {
-                                          navigate(`/dashboard/opportunities/${opportunity.id}`);
+                                          navigate(`/dashboard/quotes/${quote.id}`);
                                         }
                                       }}
                                     >
                                       <CardContent className="p-3 space-y-2">
                                         {bulkMode && (
                                           <div className="absolute top-2 right-2 z-10">
-                                            {selectedOpportunities.has(opportunity.id) ? (
+                                            {selectedQuotes.has(quote.id) ? (
                                               <CheckSquare className="h-4 w-4 text-primary" />
                                             ) : (
                                               <Square className="h-4 w-4 text-muted-foreground" />
                                             )}
                                           </div>
                                         )}
-                                        <div className="font-medium text-sm">{opportunity.name}</div>
-                                        {showFields.account && opportunity.accounts?.name && (
-                                          <div className="text-xs text-muted-foreground">{opportunity.accounts.name}</div>
+                                        <div className="font-medium text-sm">{quote.quote_number}</div>
+                                        {quote.title && (
+                                          <div className="text-xs text-muted-foreground line-clamp-1">{quote.title}</div>
                                         )}
-                                        {showFields.contact && opportunity.contacts && (
-                                          <div className="text-xs text-muted-foreground">
-                                            {opportunity.contacts.first_name} {opportunity.contacts.last_name}
-                                          </div>
+                                        {showFields.account && quote.accounts?.name && (
+                                          <div className="text-xs text-muted-foreground">{quote.accounts.name}</div>
                                         )}
-                                        {showFields.amount && opportunity.amount && (
-                                          <div className="text-xs font-semibold text-primary">
-                                            {formatCurrency(opportunity.amount)}
-                                          </div>
-                                        )}
-                                        {showFields.probability && opportunity.probability !== null && (
-                                          <Badge
-                                            variant="outline"
-                                            className={`transition-all duration-200 ${
-                                              opportunity.probability >= 70
-                                                ? "bg-green-500/10 hover:bg-green-500/20"
-                                                : opportunity.probability >= 40
-                                                ? "bg-yellow-500/10 hover:bg-yellow-500/20"
-                                                : "bg-red-500/10 hover:bg-red-500/20"
-                                            }`}
-                                          >
-                                            {opportunity.probability}% chance
+                                        {showFields.opportunity && quote.opportunities?.name && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {quote.opportunities.name}
                                           </Badge>
                                         )}
-                                        {showFields.closeDate && opportunity.close_date && (
+                                        {showFields.value && quote.sell_price && (
+                                          <div className="text-xs font-semibold text-primary flex items-center gap-1">
+                                            <DollarSign className="h-3 w-3" />
+                                            {formatCurrency(quote.sell_price)}
+                                          </div>
+                                        )}
+                                        {showFields.margin && quote.margin_amount !== null && (
                                           <div className="text-xs text-muted-foreground">
-                                            Close: {formatDate(opportunity.close_date)}
+                                            Margin: {formatCurrency(quote.margin_amount)}
+                                            {quote.margin_percentage !== null && ` (${Math.round(quote.margin_percentage)}%)`}
+                                          </div>
+                                        )}
+                                        {showFields.validUntil && quote.valid_until && (
+                                          <div className="text-xs text-muted-foreground">
+                                            Valid: {formatDate(quote.valid_until)}
                                           </div>
                                         )}
                                       </CardContent>
                                     </Card>
                                   </Draggable>
                                 ))}
-                                {laneGroupedOpportunities[stage].length === 0 && (
+                                {laneGroupedQuotes[stage].length === 0 && (
                                   <div className="text-xs text-muted-foreground text-center py-4">
-                                    No opportunities in this stage
+                                    No quotes in this stage
                                   </div>
                                 )}
                               </CardContent>
@@ -729,16 +696,16 @@ export default function OpportunitiesPipeline() {
                 })}
               </div>
               <DragOverlay>
-                {activeOpportunity ? (
+                {activeQuote ? (
                   <Card className="w-64 shadow-2xl rotate-3 scale-105 border-2 border-primary animate-scale-in">
                     <CardContent className="p-3 space-y-2 bg-gradient-to-br from-background to-muted">
-                      <div className="font-medium text-sm">{activeOpportunity.name}</div>
-                      {activeOpportunity.accounts?.name && (
-                        <div className="text-xs text-muted-foreground">{activeOpportunity.accounts.name}</div>
+                      <div className="font-medium text-sm">{activeQuote.quote_number}</div>
+                      {activeQuote.title && (
+                        <div className="text-xs text-muted-foreground">{activeQuote.title}</div>
                       )}
-                      {activeOpportunity.amount && (
+                      {activeQuote.sell_price && (
                         <div className="text-xs font-semibold text-primary">
-                          {formatCurrency(activeOpportunity.amount)}
+                          {formatCurrency(activeQuote.sell_price)}
                         </div>
                       )}
                     </CardContent>

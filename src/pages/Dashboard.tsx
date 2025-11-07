@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { KanbanDashboard } from '@/components/dashboard/KanbanDashboard';
 
 interface DashboardStats {
   accounts: number;
@@ -98,6 +99,9 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Welcome to SOSLogicPro CRM</p>
         </div>
+
+        {/* Kanban Dashboard Overview */}
+        <KanbanDashboard />
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {statCards.map((stat) => {
