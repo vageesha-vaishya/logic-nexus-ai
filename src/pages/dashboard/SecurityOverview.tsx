@@ -20,7 +20,6 @@ import { useCRM } from '@/hooks/useCRM';
 import TenantConfigForm from './data-management/TenantConfigForm';
 import FranchiseConfigForm from './data-management/FranchiseConfigForm';
 import SequencesAndPreview from './data-management/SequencesAndPreview';
-import DatabaseExport from './data-management/DatabaseExport';
 
 export default function SecurityOverview() {
   const { toast } = useToast();
@@ -397,7 +396,7 @@ export default function SecurityOverview() {
         }
       }
 
-      let query = (supabase as any).from(selectedTableForSearch).select('*', { count: 'exact' });
+      let query = supabase.from(selectedTableForSearch).select('*', { count: 'exact' });
 
       // Apply typed filters (AND semantics)
       const tableFilter = tableFilters[selectedTableForSearch] || {};
@@ -408,7 +407,7 @@ export default function SecurityOverview() {
 
         // Enumerations
         if (fv.enumValue !== undefined && fv.enumValue !== '') {
-          query.eq(c.column_name, fv.enumValue);
+          query = query.eq(c.column_name, fv.enumValue);
           return;
         }
 
@@ -479,7 +478,6 @@ export default function SecurityOverview() {
 
           <Tabs defaultValue={initialTab} className="w-full">
             <TabsList>
-              <TabsTrigger value="database-management">Database Management</TabsTrigger>
               <TabsTrigger value="sql">SQL Editor</TabsTrigger>
               <TabsTrigger value="rls">RLS Status</TabsTrigger>
               <TabsTrigger value="policies">Policies</TabsTrigger>
@@ -488,23 +486,6 @@ export default function SecurityOverview() {
               <TabsTrigger value="schema">Schema</TabsTrigger>
               <TabsTrigger value="data-management">Data Management</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="database-management" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5" />
-                    Database Management
-                  </CardTitle>
-                  <CardDescription>
-                    Export, backup, and restore database
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <DatabaseExport />
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="sql" className="space-y-4">
               <Card>

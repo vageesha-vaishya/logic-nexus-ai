@@ -5,7 +5,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import TenantConfigForm from './data-management/TenantConfigForm';
 import FranchiseConfigForm from './data-management/FranchiseConfigForm';
 import SequencesAndPreview from './data-management/SequencesAndPreview';
-import DatabaseExport from './data-management/DatabaseExport';
 import { useCRM } from '@/hooks/useCRM';
 
 export default function DataManagement() {
@@ -88,7 +87,6 @@ export default function DataManagement() {
             <TabsTrigger value="tenant">Tenant Config</TabsTrigger>
             <TabsTrigger value="franchise">Franchise Config</TabsTrigger>
             <TabsTrigger value="preview">Sequences & Preview</TabsTrigger>
-            <TabsTrigger value="export">Export</TabsTrigger>
           </TabsList>
           <TabsContent value="tenant" className="mt-4">
             <TenantConfigForm tenantIdOverride={tenantId} />
@@ -98,9 +96,6 @@ export default function DataManagement() {
           </TabsContent>
           <TabsContent value="preview" className="mt-4">
             <SequencesAndPreview tenantIdOverride={tenantId} franchiseIdOverride={franchiseId} />
-          </TabsContent>
-          <TabsContent value="export" className="mt-4">
-            <DatabaseExport />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp, Upload, Users as UsersIcon, Columns } from 'lucide-react';
+import { Plus, Search, UserPlus, DollarSign, Calendar, Filter, TrendingUp, Upload, Users as UsersIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -176,10 +176,6 @@ export default function Leads() {
         </div>
         <div className="flex gap-2 items-center">
           <ViewToggle value={viewMode} onChange={setViewMode} />
-          <Button variant="outline" onClick={() => navigate('/dashboard/leads/pipeline')}>
-            <Columns className="mr-2 h-4 w-4" />
-            Pipeline View
-          </Button>
           <Button variant="outline" onClick={() => navigate('/dashboard/lead-assignment')}>
             <UsersIcon className="mr-2 h-4 w-4" />
             Lead Assignment
