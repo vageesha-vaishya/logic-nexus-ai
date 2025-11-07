@@ -2307,7 +2307,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           <SelectValue placeholder="Select a service type" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent forceMount>
+                      <SelectContent>
                         {(() => {
                           const list = serviceTypes.filter(st => st.id !== '');
                           const currentTypeId = form.getValues('service_type_id');
@@ -2353,7 +2353,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                           <SelectValue placeholder="Select a service" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent forceMount>
+                      <SelectContent>
                         {(() => {
                           const currentServiceId = form.getValues('service_id');
                           const inList = filteredServices.some((s) => String(s.id) === String(currentServiceId));
