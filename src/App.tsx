@@ -58,6 +58,7 @@ import CustomRoles from "./pages/dashboard/CustomRoles";
 import Shipments from "./pages/dashboard/Shipments";
 import ShipmentNew from "./pages/dashboard/ShipmentNew";
 import ShipmentDetail from "./pages/dashboard/ShipmentDetail";
+import ShipmentsPipeline from "./pages/dashboard/ShipmentsPipeline";
 import Warehouses from "./pages/dashboard/Warehouses";
 import WarehouseNew from "./pages/dashboard/WarehouseNew";
 import Vehicles from "./pages/dashboard/Vehicles";
@@ -452,6 +453,7 @@ const App = () => (
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
             {/* Logistics Routes */}
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
+            <Route path="/dashboard/shipments/pipeline" element={<ProtectedRoute><ShipmentsPipeline /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/:id" element={<ProtectedRoute><ShipmentDetail /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
