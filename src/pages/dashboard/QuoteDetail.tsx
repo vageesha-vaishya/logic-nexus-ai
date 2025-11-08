@@ -52,6 +52,14 @@ export default function QuoteDetail() {
         if (error) return;
         if (Array.isArray(data) && data.length && data[0]?.id) {
           setVersionId(String(data[0].id));
+        } else {
+          // Create initial version if none exists
+          const { data: v } = await (supabase as any)
+            .from('quote_versions')
+            .insert({ quote_id: resolvedId, version_number: 1, snapshot: {}, total: 0 })
+            .select('id')
+            .single();
+          if (v?.id) setVersionId(String(v.id));
         }
       } catch {}
     };
@@ -92,9 +100,6 @@ export default function QuoteDetail() {
           </div>
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
-        {resolvedId && (
-          <QuotationVersionHistory quoteId={resolvedId} />
-        )}
         {resolvedId && versionId && (
           <QuoteComposer quoteId={resolvedId} versionId={versionId} />
         )}
