@@ -43,7 +43,11 @@ export default function QuoteDetail() {
       if (!resolvedId) return;
       try {
         // Use untyped access for quote_versions to avoid typed Database relation issues
+<<<<<<< HEAD
         const { data, error } = await (supabase as any)
+=======
+        const { data, error } = await supabase
+>>>>>>> 14a07f6 (Qutotation Schema fix)
           .from('quotation_versions')
           .select('id, version_number')
           .eq('quote_id', resolvedId)
@@ -53,10 +57,20 @@ export default function QuoteDetail() {
         if (Array.isArray(data) && data.length && data[0]?.id) {
           setVersionId(String(data[0].id));
         } else {
+<<<<<<< HEAD
           // Create initial version if none exists
           const { data: v } = await (supabase as any)
             .from('quotation_versions')
             .insert({ quote_id: resolvedId, version_number: 1, snapshot: {}, total: 0 })
+=======
+          // Create initial version if none exists (align with typed schema)
+          const { data: userData } = await supabase.auth.getUser();
+          const tenantId = (userData?.user as any)?.user_metadata?.tenant_id;
+          if (!tenantId) return;
+          const { data: v } = await supabase
+            .from('quotation_versions')
+            .insert({ quote_id: resolvedId, tenant_id: tenantId, version_number: 1 })
+>>>>>>> 14a07f6 (Qutotation Schema fix)
             .select('id')
             .single();
           if (v?.id) setVersionId(String(v.id));

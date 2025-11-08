@@ -21,7 +21,7 @@ export default function QuoteNew() {
     const ensureVersion = async () => {
       if (!createdQuoteId) return;
       // create version 1 for the new quote if none exists
-      const { data: existing } = await (supabase as any)
+      const { data: existing } = await supabase
         .from('quotation_versions')
         .select('id, version_number')
         .eq('quote_id', createdQuoteId)
@@ -31,9 +31,13 @@ export default function QuoteNew() {
         setVersionId(String(existing[0].id));
         return;
       }
-      const { data: v } = await (supabase as any)
+      // Insert initial version using allowed columns
+      const { data: userData } = await supabase.auth.getUser();
+      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id;
+      if (!tenantId) return;
+      const { data: v } = await supabase
         .from('quotation_versions')
-        .insert({ quote_id: createdQuoteId, version_number: 1, snapshot: {}, total: 0 })
+        .insert({ quote_id: createdQuoteId, tenant_id: tenantId, version_number: 1 })
         .select('id')
         .single();
       if (v?.id) setVersionId(String(v.id));

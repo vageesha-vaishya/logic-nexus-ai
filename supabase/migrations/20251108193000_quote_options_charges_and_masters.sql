@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS public.container_sizes (
 CREATE TABLE IF NOT EXISTS public.quote_options (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
-  quote_version_id uuid NOT NULL REFERENCES public.quote_versions(id) ON DELETE CASCADE,
+  quote_version_id uuid NOT NULL REFERENCES public.quotation_versions(id) ON DELETE CASCADE,
   provider_id uuid REFERENCES public.carriers(id),
   service_type_id uuid REFERENCES public.service_types(id),
   service_id uuid REFERENCES public.services(id),
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.quote_selection (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   quote_id uuid NOT NULL REFERENCES public.quotes(id) ON DELETE CASCADE,
-  version_id uuid NOT NULL REFERENCES public.quote_versions(id) ON DELETE CASCADE,
+  version_id uuid NOT NULL REFERENCES public.quotation_versions(id) ON DELETE CASCADE,
   option_id uuid NOT NULL REFERENCES public.quote_options(id) ON DELETE CASCADE,
   selected_by uuid REFERENCES public.profiles(id),
   reason text,
