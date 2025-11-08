@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteForm } from '@/components/sales/QuoteForm';
 import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
+import QuoteComposer from '@/components/sales/QuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
@@ -13,6 +14,7 @@ export default function QuoteDetail() {
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(true);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
+  const [versionId, setVersionId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkQuote = async () => {
@@ -35,6 +37,24 @@ export default function QuoteDetail() {
     };
     checkQuote();
   }, [id]);
+
+  useEffect(() => {
+    const loadLatestVersion = async () => {
+      if (!resolvedId) return;
+      try {
+        const { data, error } = await (supabase as any)
+          .from('quote_versions')
+          .select('id, version_number')
+          .eq('quote_id', resolvedId)
+          .order('version_number', { ascending: false })
+          .limit(1);
+        if (error) return;
+        const v = Array.isArray(data) ? data[0]?.id : (data as any)?.id;
+        if (v) setVersionId(v as string);
+      } catch {}
+    };
+    loadLatestVersion();
+  }, [resolvedId]);
 
   const handleSuccess = () => {
     toast.success('Quote updated successfully');
@@ -72,6 +92,9 @@ export default function QuoteDetail() {
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
         {resolvedId && (
           <QuotationVersionHistory quoteId={resolvedId} />
+        )}
+        {resolvedId && versionId && (
+          <QuoteComposer quoteId={resolvedId} versionId={versionId} />
         )}
       </div>
     </DashboardLayout>

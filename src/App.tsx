@@ -83,6 +83,8 @@ import DataManagement from "./pages/dashboard/DataManagement";
 import ServiceTypeMappings from "./pages/dashboard/ServiceTypeMappings";
 import ServiceTypes from "./pages/dashboard/ServiceTypes";
 import Services from "./pages/dashboard/Services";
+import ChargeCategories from "./pages/dashboard/ChargeCategories";
+import ChargeBases from "./pages/dashboard/ChargeBases";
 
 const queryClient = new QueryClient();
 
@@ -451,6 +453,8 @@ const App = () => (
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
+            <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             {/* Logistics Routes */}
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
