@@ -6,12 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 
-export default function ChargeBases() {
+export default function ContainerSizes() {
   const [items, setItems] = useState<any[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('charge_bases').select('*').order('name');
+    const { data } = await supabase.from('container_sizes').select('*').order('name');
     setItems(data ?? []);
   };
 
@@ -19,25 +19,25 @@ export default function ChargeBases() {
 
   const add = async () => {
     if (!newItem.name) return;
-    await supabase.from('charge_bases').insert({ ...newItem });
+    await supabase.from('container_sizes').insert({ ...newItem });
     setNewItem({ name: '', code: '', description: '' });
     load();
   };
 
   const update = async (id: string, patch: any) => {
-    await supabase.from('charge_bases').update(patch).eq('id', id);
+    await supabase.from('container_sizes').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('charge_bases').delete().eq('id', id);
+    await supabase.from('container_sizes').delete().eq('id', id);
     load();
   };
 
   return (
     <DashboardLayout>
       <Card>
-        <CardHeader><CardTitle>Charge Bases</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Container Sizes</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input placeholder="Name" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />

@@ -24,17 +24,17 @@ export default function QuoteComposer({ quoteId, versionId }: { quoteId: string;
 
   useEffect(() => {
     (async () => {
-      const { data: c } = await (supabase as any).from('carriers').select('id, carrier_name').order('carrier_name');
+      const { data: c } = await supabase.from('carriers').select('id, carrier_name').order('carrier_name');
       setCarriers(c ?? []);
-      const { data: st } = await (supabase as any).from('service_types').select('id, name').order('name');
+      const { data: st } = await supabase.from('service_types').select('id, name').order('name');
       setServiceTypes(st ?? []);
-      const { data: sv } = await (supabase as any).from('services').select('id, name').order('name');
+      const { data: sv } = await supabase.from('services').select('id, name').order('name');
       setServices(sv ?? []);
-      const { data: ct } = await (supabase as any).from('container_types').select('id, name').order('name');
+      const { data: ct } = await supabase.from('container_types').select('id, name').order('name');
       setContainerTypes(ct ?? []);
-      const { data: cs } = await (supabase as any).from('container_sizes').select('id, name').order('name');
+      const { data: cs } = await supabase.from('container_sizes').select('id, name').order('name');
       setContainerSizes(cs ?? []);
-      const { data: cur } = await (supabase as any).from('currencies').select('id, code').order('code');
+      const { data: cur } = await supabase.from('currencies').select('id, code').order('code');
       setCurrencies(cur ?? []);
     })();
   }, []);
@@ -43,7 +43,7 @@ export default function QuoteComposer({ quoteId, versionId }: { quoteId: string;
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('quote_options')
         .insert({
           tenant_id: tenantId,
@@ -79,12 +79,12 @@ export default function QuoteComposer({ quoteId, versionId }: { quoteId: string;
       note: c.note ?? null,
       sort_order: c.sort_order ?? 1000,
     }));
-    const { error } = await (supabase as any).from('quote_charges').insert(payload);
+    const { error } = await supabase.from('quote_charges').insert(payload);
     if (error) return;
 
     const buy = charges.filter((x: any) => x.side === 'buy').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
     const sell = charges.filter((x: any) => x.side === 'sell').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
-    await (supabase as any).from('quote_options').update({
+    await supabase.from('quote_options').update({
       buy_subtotal: buy,
       sell_subtotal: sell,
       margin_amount: sell - buy,

@@ -27,13 +27,13 @@ export default function ChargesTable({ charges, onChange }: { charges: ChargeRow
 
   useEffect(() => {
     (async () => {
-      const { data: ss } = await (supabase as any).from('charge_sides').select('id, name, code').order('name');
+      const { data: ss } = await supabase.from('charge_sides').select('id, name, code').order('name');
       setSides(ss ?? []);
-      const { data: cc } = await (supabase as any).from('charge_categories').select('id, name, code').order('name');
+      const { data: cc } = await supabase.from('charge_categories').select('id, name, code').order('name');
       setCategories(cc ?? []);
-      const { data: bb } = await (supabase as any).from('charge_bases').select('id, name, code').order('name');
+      const { data: bb } = await supabase.from('charge_bases').select('id, name, code').order('name');
       setBases(bb ?? []);
-      const { data: cur } = await (supabase as any).from('currencies').select('id, code').order('code');
+      const { data: cur } = await supabase.from('currencies').select('id, code').order('code');
       setCurrencies(cur ?? []);
     })();
   }, []);

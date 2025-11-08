@@ -42,6 +42,7 @@ export default function QuoteDetail() {
     const loadLatestVersion = async () => {
       if (!resolvedId) return;
       try {
+        // Use untyped access for quote_versions to avoid typed Database relation issues
         const { data, error } = await (supabase as any)
           .from('quote_versions')
           .select('id, version_number')
@@ -49,8 +50,9 @@ export default function QuoteDetail() {
           .order('version_number', { ascending: false })
           .limit(1);
         if (error) return;
-        const v = Array.isArray(data) ? data[0]?.id : (data as any)?.id;
-        if (v) setVersionId(v as string);
+        if (Array.isArray(data) && data.length && data[0]?.id) {
+          setVersionId(String(data[0].id));
+        }
       } catch {}
     };
     loadLatestVersion();

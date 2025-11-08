@@ -11,7 +11,7 @@ export default function ChargeCategories() {
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await (supabase as any).from('charge_categories').select('*').order('name');
+    const { data } = await supabase.from('charge_categories').select('*').order('name');
     setItems(data ?? []);
   };
 
@@ -19,18 +19,18 @@ export default function ChargeCategories() {
 
   const add = async () => {
     if (!newItem.name) return;
-    await (supabase as any).from('charge_categories').insert({ ...newItem });
+    await supabase.from('charge_categories').insert({ ...newItem });
     setNewItem({ name: '', code: '', description: '' });
     load();
   };
 
   const update = async (id: string, patch: any) => {
-    await (supabase as any).from('charge_categories').update(patch).eq('id', id);
+    await supabase.from('charge_categories').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await (supabase as any).from('charge_categories').delete().eq('id', id);
+    await supabase.from('charge_categories').delete().eq('id', id);
     load();
   };
 

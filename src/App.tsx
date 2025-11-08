@@ -83,6 +83,10 @@ import DataManagement from "./pages/dashboard/DataManagement";
 import ServiceTypeMappings from "./pages/dashboard/ServiceTypeMappings";
 import ServiceTypes from "./pages/dashboard/ServiceTypes";
 import Services from "./pages/dashboard/Services";
+import Currencies from "./pages/dashboard/Currencies";
+import ContainerTypes from "./pages/dashboard/ContainerTypes";
+import ContainerSizes from "./pages/dashboard/ContainerSizes";
+import ChargeSides from "./pages/dashboard/ChargeSides";
 import ChargeCategories from "./pages/dashboard/ChargeCategories";
 import ChargeBases from "./pages/dashboard/ChargeBases";
 
@@ -453,6 +457,12 @@ const App = () => (
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
+            <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
+            <Route path="/dashboard/currencies" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Currencies /></ProtectedRoute>} />
+            <Route path="/dashboard/container-types" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerTypes /></ProtectedRoute>} />
+            <Route path="/dashboard/container-sizes" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerSizes /></ProtectedRoute>} />
+            <Route path="/dashboard/charge-sides" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeSides /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             {/* Logistics Routes */}
