@@ -9,6 +9,7 @@ interface FranchiseConfigFormProps {
   tenantIdOverride?: string;
 }
 
+
 export default function FranchiseConfigForm({ franchiseIdOverride, tenantIdOverride }: FranchiseConfigFormProps) {
   return (
     <Card>
