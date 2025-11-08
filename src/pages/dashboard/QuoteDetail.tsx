@@ -44,7 +44,7 @@ export default function QuoteDetail() {
       try {
         // Use untyped access for quote_versions to avoid typed Database relation issues
         const { data, error } = await (supabase as any)
-          .from('quote_versions')
+          .from('quotation_versions')
           .select('id, version_number')
           .eq('quote_id', resolvedId)
           .order('version_number', { ascending: false })
@@ -55,7 +55,7 @@ export default function QuoteDetail() {
         } else {
           // Create initial version if none exists
           const { data: v } = await (supabase as any)
-            .from('quote_versions')
+            .from('quotation_versions')
             .insert({ quote_id: resolvedId, version_number: 1, snapshot: {}, total: 0 })
             .select('id')
             .single();

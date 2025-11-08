@@ -22,7 +22,7 @@ export default function QuoteNew() {
       if (!createdQuoteId) return;
       // create version 1 for the new quote if none exists
       const { data: existing } = await (supabase as any)
-        .from('quote_versions')
+        .from('quotation_versions')
         .select('id, version_number')
         .eq('quote_id', createdQuoteId)
         .order('version_number', { ascending: false })
@@ -32,7 +32,7 @@ export default function QuoteNew() {
         return;
       }
       const { data: v } = await (supabase as any)
-        .from('quote_versions')
+        .from('quotation_versions')
         .insert({ quote_id: createdQuoteId, version_number: 1, snapshot: {}, total: 0 })
         .select('id')
         .single();
