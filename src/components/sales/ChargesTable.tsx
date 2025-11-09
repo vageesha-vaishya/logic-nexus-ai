@@ -30,7 +30,7 @@ type CombinedRow = {
   sell?: { idx: number; quantity?: number; rate?: number; amount?: number; charge_side_id?: string };
 };
 
-export default function ChargesTable({ charges, onChange }: { charges: ChargeRow[]; onChange: (rows: ChargeRow[]) => void }) {
+export default function ChargesTable({ charges, onChange, defaultCurrencyId }: { charges: ChargeRow[]; onChange: (rows: ChargeRow[]) => void; defaultCurrencyId?: string | null }) {
   const [sides, setSides] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [bases, setBases] = useState<any[]>([]);
@@ -88,7 +88,7 @@ export default function ChargesTable({ charges, onChange }: { charges: ChargeRow
         quantity: 1,
         rate: 0,
         amount: 0,
-        currency_id: currencies[0]?.id,
+        currency_id: defaultCurrencyId ?? currencies[0]?.id,
         note: null,
         sort_order: 1000,
       },
@@ -102,7 +102,7 @@ export default function ChargesTable({ charges, onChange }: { charges: ChargeRow
       category_id: categories[0]?.id,
       basis_id: bases[0]?.id,
       unit: '',
-      currency_id: currencies[0]?.id,
+      currency_id: defaultCurrencyId ?? currencies[0]?.id,
       note: null as string | null,
       sort_order: 1000,
     };
