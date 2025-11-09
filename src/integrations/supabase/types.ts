@@ -749,6 +749,60 @@ export type Database = {
         }
         Relationships: []
       }
+      cities: {
+        Row: {
+          code_national: string | null
+          country_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          latitude: number | null
+          longitude: number | null
+          name: string
+          state_id: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          code_national?: string | null
+          country_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          state_id?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          code_national?: string | null
+          country_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          state_id?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cities_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cities_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_checks: {
         Row: {
           check_details: Json | null
@@ -1065,6 +1119,83 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      continents: {
+        Row: {
+          code_international: string | null
+          code_national: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string | null
+        }
+        Insert: {
+          code_international?: string | null
+          code_national?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          tenant_id?: string | null
+        }
+        Update: {
+          code_international?: string | null
+          code_national?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      countries: {
+        Row: {
+          code_iso2: string | null
+          code_iso3: string | null
+          code_national: string | null
+          continent_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          phone_code: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          code_iso2?: string | null
+          code_iso3?: string | null
+          code_national?: string | null
+          continent_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone_code?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          code_iso2?: string | null
+          code_iso3?: string | null
+          code_national?: string | null
+          continent_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone_code?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "countries_continent_id_fkey"
+            columns: ["continent_id"]
+            isOneToOne: false
+            referencedRelation: "continents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       currencies: {
         Row: {
@@ -4082,6 +4213,47 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      states: {
+        Row: {
+          code_iso: string | null
+          code_national: string | null
+          country_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string | null
+        }
+        Insert: {
+          code_iso?: string | null
+          code_national?: string | null
+          country_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          tenant_id?: string | null
+        }
+        Update: {
+          code_iso?: string | null
+          code_national?: string | null
+          country_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "states_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
             referencedColumns: ["id"]
           },
         ]
