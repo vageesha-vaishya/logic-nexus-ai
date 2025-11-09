@@ -60,7 +60,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     })();
   }, []);
 
-  // Populate Services based on selected Service Type via mapping table (FK-based)
+  // Populate Services based on selected Service Type via mapping table (TEXT-based service_type)
   useEffect(() => {
     (async () => {
       if (!serviceTypeId) {
@@ -70,17 +70,35 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       const { data: userData } = await supabase.auth.getUser();
       // Prefer the option/quote tenant over user metadata to avoid cross-tenant mismatches
       const tenantId = mappingTenantId ?? ((userData?.user as any)?.user_metadata?.tenant_id ?? null);
-      // Fetch mappings for tenant or global (tenant_id NULL) using FK service_type_id
+      
+      // Get the service_type code from service_types table
+      const { data: serviceTypeData } = await supabase
+        .from('service_types')
+        .select('code')
+        .eq('id', serviceTypeId)
+        .single();
+      
+      if (!serviceTypeData?.code) {
+        console.warn('[QuoteComposer] No service type code found for id', serviceTypeId);
+        setServices([]);
+        return;
+      }
+      
+      // Extract base code (e.g., "ocean_freight" -> "ocean")
+      const baseCode = serviceTypeData.code.split('_')[0].toLowerCase();
+      
+      // Fetch mappings for tenant or global (tenant_id NULL) using TEXT service_type
       const { data: mappings } = await (supabase as any)
         .from('service_type_mappings')
         .select('service_id, tenant_id')
-        .eq('service_type_id', serviceTypeId)
+        .eq('service_type', baseCode)
         .eq('is_active', true)
         .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
         .order('priority');
+      
       const serviceIds = (mappings ?? []).map((m: any) => m.service_id).filter(Boolean);
       if (!serviceIds.length) {
-        console.warn('[QuoteComposer] No service mappings found for typeId', serviceTypeId, 'tenant', tenantId);
+        console.warn('[QuoteComposer] No service mappings found for service_type', baseCode, 'tenant', tenantId);
         toast({
           title: 'No mapped services',
           description: `No active services found for selected service type. Check mappings for your tenant or global entries.`,
@@ -90,12 +108,12 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       }
       const { data: sv } = await supabase
         .from('services')
-        .select('id, name')
+        .select('id, service_name')
         .in('id', serviceIds)
-        .order('name');
+        .order('service_name');
       let combined = (sv ?? []).map((s: any) => {
         const isTenant = (mappings ?? []).some((m: any) => m.service_id === s.id && m.tenant_id === tenantId);
-        return { ...s, scope: isTenant ? 'Tenant' : 'Global' };
+        return { id: s.id, name: s.service_name, scope: isTenant ? 'Tenant' : 'Global' };
       });
       // Tenant first, then Global, then by name
       combined = combined.sort((a: any, b: any) => {
