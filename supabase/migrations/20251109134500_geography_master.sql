@@ -5,7 +5,6 @@ BEGIN;
 -- Continents
 CREATE TABLE IF NOT EXISTS public.continents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NULL,
   name text NOT NULL,
   code_international text UNIQUE,
   code_national text UNIQUE,
@@ -16,7 +15,6 @@ CREATE TABLE IF NOT EXISTS public.continents (
 -- Countries
 CREATE TABLE IF NOT EXISTS public.countries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NULL,
   continent_id uuid REFERENCES public.continents(id) ON DELETE SET NULL,
   name text NOT NULL,
   code_iso2 text UNIQUE,
@@ -30,7 +28,6 @@ CREATE TABLE IF NOT EXISTS public.countries (
 -- States/Provinces
 CREATE TABLE IF NOT EXISTS public.states (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NULL,
   country_id uuid REFERENCES public.countries(id) ON DELETE CASCADE,
   name text NOT NULL,
   code_iso text,
@@ -42,7 +39,6 @@ CREATE TABLE IF NOT EXISTS public.states (
 -- Cities
 CREATE TABLE IF NOT EXISTS public.cities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NULL,
   country_id uuid REFERENCES public.countries(id) ON DELETE SET NULL,
   state_id uuid REFERENCES public.states(id) ON DELETE SET NULL,
   name text NOT NULL,
@@ -65,16 +61,17 @@ ALTER TABLE public.states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies: read global (tenant_id NULL) or same tenant, manage same tenant
-CREATE POLICY continents_read ON public.continents FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
-CREATE POLICY continents_manage ON public.continents FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
+-- Global-only RLS: allow read for authenticated users; manage limited to platform admins
+CREATE POLICY continents_read ON public.continents FOR SELECT USING (true);
+CREATE POLICY continents_manage ON public.continents FOR ALL USING (is_platform_admin(auth.uid())) WITH CHECK (is_platform_admin(auth.uid()));
 
-CREATE POLICY countries_read ON public.countries FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
-CREATE POLICY countries_manage ON public.countries FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
+CREATE POLICY countries_read ON public.countries FOR SELECT USING (true);
+CREATE POLICY countries_manage ON public.countries FOR ALL USING (is_platform_admin(auth.uid())) WITH CHECK (is_platform_admin(auth.uid()));
 
-CREATE POLICY states_read ON public.states FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
-CREATE POLICY states_manage ON public.states FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
+CREATE POLICY states_read ON public.states FOR SELECT USING (true);
+CREATE POLICY states_manage ON public.states FOR ALL USING (is_platform_admin(auth.uid())) WITH CHECK (is_platform_admin(auth.uid()));
 
-CREATE POLICY cities_read ON public.cities FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
-CREATE POLICY cities_manage ON public.cities FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
+CREATE POLICY cities_read ON public.cities FOR SELECT USING (true);
+CREATE POLICY cities_manage ON public.cities FOR ALL USING (is_platform_admin(auth.uid())) WITH CHECK (is_platform_admin(auth.uid()));
 
 COMMIT;
