@@ -1677,6 +1677,54 @@ export type Database = {
           },
         ]
       }
+      fx_rates: {
+        Row: {
+          created_at: string
+          effective_date: string
+          from_currency_id: string
+          id: string
+          rate: number
+          source: string | null
+          tenant_id: string
+          to_currency_id: string
+        }
+        Insert: {
+          created_at?: string
+          effective_date: string
+          from_currency_id: string
+          id?: string
+          rate: number
+          source?: string | null
+          tenant_id: string
+          to_currency_id: string
+        }
+        Update: {
+          created_at?: string
+          effective_date?: string
+          from_currency_id?: string
+          id?: string
+          rate?: number
+          source?: string | null
+          tenant_id?: string
+          to_currency_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fx_rates_from_currency_id_fkey"
+            columns: ["from_currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fx_rates_to_currency_id_fkey"
+            columns: ["to_currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incoterms: {
         Row: {
           created_at: string | null
@@ -2094,6 +2142,74 @@ export type Database = {
           },
         ]
       }
+      margin_methods: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      margin_profiles: {
+        Row: {
+          created_at: string
+          default_method_id: string
+          default_value: number
+          id: string
+          is_active: boolean
+          min_margin: number | null
+          rounding_rule: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_method_id: string
+          default_value: number
+          id?: string
+          is_active?: boolean
+          min_margin?: number | null
+          rounding_rule?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          default_method_id?: string
+          default_value?: number
+          id?: string
+          is_active?: boolean
+          min_margin?: number | null
+          rounding_rule?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_profiles_default_method_id_fkey"
+            columns: ["default_method_id"]
+            isOneToOne: false
+            referencedRelation: "margin_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oauth_configurations: {
         Row: {
           client_id: string
@@ -2427,6 +2543,33 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_types: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       quotation_packages: {
         Row: {
           created_at: string | null
@@ -2475,43 +2618,169 @@ export type Database = {
         }
         Relationships: []
       }
+      quotation_version_option_legs: {
+        Row: {
+          created_at: string
+          destination_location: string | null
+          id: string
+          leg_order: number
+          mode_id: string | null
+          origin_location: string | null
+          planned_arrival: string | null
+          planned_departure: string | null
+          provider_id: string | null
+          quotation_version_option_id: string
+          service_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          destination_location?: string | null
+          id?: string
+          leg_order?: number
+          mode_id?: string | null
+          origin_location?: string | null
+          planned_arrival?: string | null
+          planned_departure?: string | null
+          provider_id?: string | null
+          quotation_version_option_id: string
+          service_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          destination_location?: string | null
+          id?: string
+          leg_order?: number
+          mode_id?: string | null
+          origin_location?: string | null
+          planned_arrival?: string | null
+          planned_departure?: string | null
+          provider_id?: string | null
+          quotation_version_option_id?: string
+          service_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_version_option_legs_mode_id_fkey"
+            columns: ["mode_id"]
+            isOneToOne: false
+            referencedRelation: "service_modes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_option_legs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_option_legs_quotation_version_option_id_fkey"
+            columns: ["quotation_version_option_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_version_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_option_legs_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quotation_version_options: {
         Row: {
+          auto_margin_enabled: boolean
           carrier_rate_id: string
           created_at: string | null
           id: string
+          margin_method_id: string | null
+          margin_value: number | null
+          min_margin: number | null
+          provider_type_id: string | null
           quotation_version_id: string
+          quote_currency_id: string | null
           recommended: boolean | null
+          rounding_rule: string | null
           status: string | null
           tenant_id: string
+          trade_direction_id: string | null
           updated_at: string | null
         }
         Insert: {
+          auto_margin_enabled?: boolean
           carrier_rate_id: string
           created_at?: string | null
           id?: string
+          margin_method_id?: string | null
+          margin_value?: number | null
+          min_margin?: number | null
+          provider_type_id?: string | null
           quotation_version_id: string
+          quote_currency_id?: string | null
           recommended?: boolean | null
+          rounding_rule?: string | null
           status?: string | null
           tenant_id: string
+          trade_direction_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          auto_margin_enabled?: boolean
           carrier_rate_id?: string
           created_at?: string | null
           id?: string
+          margin_method_id?: string | null
+          margin_value?: number | null
+          min_margin?: number | null
+          provider_type_id?: string | null
           quotation_version_id?: string
+          quote_currency_id?: string | null
           recommended?: boolean | null
+          rounding_rule?: string | null
           status?: string | null
           tenant_id?: string
+          trade_direction_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "quotation_version_options_margin_method_id_fkey"
+            columns: ["margin_method_id"]
+            isOneToOne: false
+            referencedRelation: "margin_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_options_provider_type_id_fkey"
+            columns: ["provider_type_id"]
+            isOneToOne: false
+            referencedRelation: "provider_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotation_version_options_quotation_version_id_fkey"
             columns: ["quotation_version_id"]
             isOneToOne: false
             referencedRelation: "quotation_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_options_quote_currency_id_fkey"
+            columns: ["quote_currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_options_trade_direction_id_fkey"
+            columns: ["trade_direction_id"]
+            isOneToOne: false
+            referencedRelation: "trade_directions"
             referencedColumns: ["id"]
           },
         ]
@@ -3172,6 +3441,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_modes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+        }
+        Relationships: []
       }
       service_type_mappings: {
         Row: {
@@ -4045,6 +4341,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      trade_directions: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+        }
+        Relationships: []
       }
       usage_records: {
         Row: {
