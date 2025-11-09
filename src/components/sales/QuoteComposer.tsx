@@ -5,8 +5,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input';
 import ChargesTable from './ChargesTable';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quoteId: string; versionId: string; autoScroll?: boolean }) {
+  const { toast } = useToast();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
@@ -43,8 +45,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       setCarriers(c ?? []);
       const { data: st } = await supabase.from('service_types').select('id, name').order('name');
       setServiceTypes(st ?? []);
-      const { data: sv } = await supabase.from('services').select('id, name').order('name');
-      setServices(sv ?? []);
+      // Services will be populated based on selected service type via mapping table
+      setServices([]);
       const { data: ct } = await (supabase as any).from('container_types').select('id, name').order('name');
       setContainerTypes(ct ?? []);
       const { data: cs } = await (supabase as any).from('container_sizes').select('id, name').order('name');
@@ -55,6 +57,56 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       // const { data: mm } = await (supabase as any).from('margin_methods').select('id, name, code');
     })();
   }, []);
+
+  // Populate Services based on selected Service Type via mapping table (FK-based)
+  useEffect(() => {
+    (async () => {
+      if (!serviceTypeId) {
+        setServices([]);
+        return;
+      }
+      const { data: userData } = await supabase.auth.getUser();
+      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+      // Fetch mappings for tenant or global (tenant_id NULL) using FK service_type_id
+      const { data: mappings } = await (supabase as any)
+        .from('service_type_mappings')
+        .select('service_id, tenant_id')
+        .eq('service_type_id', serviceTypeId)
+        .eq('is_active', true)
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+        .order('priority');
+      const serviceIds = (mappings ?? []).map((m: any) => m.service_id).filter(Boolean);
+      if (!serviceIds.length) {
+        console.warn('[QuoteComposer] No service mappings found for typeId', serviceTypeId, 'tenant', tenantId);
+        toast({
+          title: 'No mapped services',
+          description: `No active services found for selected service type. Check mappings for your tenant or global entries.`,
+        });
+        setServices([]);
+        return;
+      }
+      const { data: sv } = await supabase
+        .from('services')
+        .select('id, name')
+        .in('id', serviceIds)
+        .order('name');
+      let combined = (sv ?? []).map((s: any) => {
+        const isTenant = (mappings ?? []).some((m: any) => m.service_id === s.id && m.tenant_id === tenantId);
+        return { ...s, scope: isTenant ? 'Tenant' : 'Global' };
+      });
+      // Tenant first, then Global, then by name
+      combined = combined.sort((a: any, b: any) => {
+        if (a.scope !== b.scope) {
+          return a.scope === 'Tenant' ? -1 : 1;
+        }
+        return (a.name ?? '').localeCompare(b.name ?? '');
+      });
+      setServices(combined);
+      // Reset provider selection when service type changes
+      setServiceId(null);
+      setProviderId(null);
+    })();
+  }, [serviceTypeId]);
 
   useEffect(() => {
     if (autoScroll !== false) {
@@ -256,32 +308,73 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   return (
     <Card ref={composerRef}>
       <CardHeader>
-        <CardTitle>Compose Quotation</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Compose Quotation</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const { data: userData } = await supabase.auth.getUser();
+                const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+                const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
+                const { data: leg } = await (supabase as any)
+                  .from('quotation_version_option_legs')
+                  .insert({ tenant_id: tenantId, quote_option_id: optionId, leg_order: nextOrder })
+                  .select('id, leg_order')
+                  .single();
+                if (leg?.id) {
+                  setLegs([...legs, { id: leg.id, leg_order: leg.leg_order }]);
+                  setCurrentLegId(leg.id);
+                  setChargesByLeg(prev => ({ ...prev, [leg.id]: [] }));
+                }
+              }}
+            >Add Leg</Button>
+            <Select value={currentLegId ?? ''} onValueChange={setCurrentLegId}>
+              <SelectTrigger className="w-48"><SelectValue placeholder="Select Leg" /></SelectTrigger>
+              <SelectContent>
+                {legs.map((l) => <SelectItem key={l.id} value={l.id}>Leg {l.leg_order}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Step 1-7: Leg builder and quote currency in required order */}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4">
             <Select value={serviceTypeId ?? ''} onValueChange={setServiceTypeId}>
-              <SelectTrigger><SelectValue placeholder="1) Service Type (Leg)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Service Type" /></SelectTrigger>
               <SelectContent>
                 {(serviceTypes ?? []).map((st) => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={serviceId ?? ''} onValueChange={setServiceId} disabled={!serviceTypeId}>
-              <SelectTrigger><SelectValue placeholder="2) Service (Leg)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
               <SelectContent>
-                {(services ?? []).map((sv) => <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>)}
+                {(services ?? []).map((sv) => (
+                  <SelectItem key={sv.id} value={sv.id}>
+                    {sv.name}
+                    <span
+                      className={
+                        `ml-2 text-xs rounded px-2 py-0.5 ` +
+                        (sv.scope === 'Tenant'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200')
+                      }
+                      title={sv.scope === 'Tenant' ? 'Tenant mapping (current org)' : 'Global mapping (seed)'}
+                    >{sv.scope}</span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={providerId ?? ''} onValueChange={setProviderId} disabled={!serviceId}>
-              <SelectTrigger><SelectValue placeholder="3) Service Provider (Leg)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Service Provider" /></SelectTrigger>
               <SelectContent>
                 {(carriers ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.carrier_name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={importExport} onValueChange={setImportExport} disabled={!providerId}>
-              <SelectTrigger><SelectValue placeholder="4) Trade Direction (Leg)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Trade Direction" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="import">Import</SelectItem>
                 <SelectItem value="export">Export</SelectItem>
@@ -289,24 +382,24 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
               </SelectContent>
             </Select>
             <Select value={containerTypeId ?? ''} onValueChange={setContainerTypeId} disabled={!importExport}>
-              <SelectTrigger><SelectValue placeholder="5) Container Type (Leg)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Container Type" /></SelectTrigger>
               <SelectContent>
                 {(containerTypes ?? []).map((ct) => <SelectItem key={ct.id} value={ct.id}>{ct.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={containerSizeId ?? ''} onValueChange={setContainerSizeId} disabled={!containerTypeId}>
-              <SelectTrigger><SelectValue placeholder="5) Container Size (Leg)" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Container Size" /></SelectTrigger>
               <SelectContent>
                 {(containerSizes ?? []).map((cs) => <SelectItem key={cs.id} value={cs.id}>{cs.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="6) Origin Port/Location" disabled={!containerSizeId} />
-            <Input value={destinationLocation} onChange={e => setDestinationLocation(e.target.value)} placeholder="6) Destination Port/Location" disabled={!containerSizeId} />
+            <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="Origin Port/Location" disabled={!containerSizeId} />
+            <Input value={destinationLocation} onChange={e => setDestinationLocation(e.target.value)} placeholder="Destination Port/Location" disabled={!containerSizeId} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} placeholder="Valid Until" />
             <Select value={currencyId ?? ''} onValueChange={setCurrencyId}>
-              <SelectTrigger><SelectValue placeholder="7) Quote Currency" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Quote Currency" /></SelectTrigger>
               <SelectContent>
                 {(currencies ?? []).map((cur) => <SelectItem key={cur.id} value={cur.id}>{cur.code}</SelectItem>)}
               </SelectContent>
@@ -338,53 +431,38 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
           </div>
         </div>
 
-        {/* Legs management */}
-        <div className="space-y-2">
-          <div className="flex gap-2 items-center">
-            <Select value={currentLegId ?? ''} onValueChange={setCurrentLegId}>
-              <SelectTrigger><SelectValue placeholder="Select Leg" /></SelectTrigger>
+        {/* Legs management: details for selected leg */}
+        {currentLegId && (
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={serviceId ?? ''} onValueChange={setServiceId}>
+              <SelectTrigger><SelectValue placeholder="Leg Service" /></SelectTrigger>
               <SelectContent>
-                {legs.map((l) => <SelectItem key={l.id} value={l.id}>Leg {l.leg_order}</SelectItem>)}
+                {(services ?? []).map((sv) => (
+                  <SelectItem key={sv.id} value={sv.id}>
+                    {sv.name}
+                    <span
+                      className={
+                        `ml-2 text-xs rounded px-2 py-0.5 ` +
+                        (sv.scope === 'Tenant'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200')
+                      }
+                      title={sv.scope === 'Tenant' ? 'Tenant mapping (current org)' : 'Global mapping (seed)'}
+                    >{sv.scope}</span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                const { data: userData } = await supabase.auth.getUser();
-                const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
-                const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
-                const { data: leg } = await (supabase as any)
-                  .from('quotation_version_option_legs')
-                  .insert({ tenant_id: tenantId, quote_option_id: optionId, leg_order: nextOrder })
-                  .select('id, leg_order')
-                  .single();
-                if (leg?.id) {
-                  setLegs([...legs, { id: leg.id, leg_order: leg.leg_order }]);
-                  setCurrentLegId(leg.id);
-                  setChargesByLeg(prev => ({ ...prev, [leg.id]: [] }));
-                }
-              }}
-            >Add Leg</Button>
+            <Select value={providerId ?? ''} onValueChange={setProviderId}>
+              <SelectTrigger><SelectValue placeholder="Leg Provider" /></SelectTrigger>
+              <SelectContent>
+                {(carriers ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.carrier_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="Leg Origin" />
+            <Input value={destinationLocation} onChange={e => setDestinationLocation(e.target.value)} placeholder="Leg Destination" />
           </div>
-          {currentLegId && (
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={serviceId ?? ''} onValueChange={setServiceId}>
-                <SelectTrigger><SelectValue placeholder="Leg Service" /></SelectTrigger>
-                <SelectContent>
-                  {(services ?? []).map((sv) => <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={providerId ?? ''} onValueChange={setProviderId}>
-                <SelectTrigger><SelectValue placeholder="Leg Provider" /></SelectTrigger>
-                <SelectContent>
-                  {(carriers ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.carrier_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="Leg Origin" />
-              <Input value={destinationLocation} onChange={e => setDestinationLocation(e.target.value)} placeholder="Leg Destination" />
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Step 9: Charges table */}
         <ChargesTable charges={currentLegId ? (chargesByLeg[currentLegId] ?? []) : []} defaultCurrencyId={currencyId} onChange={(rows) => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { Download, Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,11 +32,14 @@ export default function LeadsImportExport() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type === 'text/csv') {
+    if (!file) return;
+    const isCsv = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv');
+    const isXlsx = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.name.toLowerCase().endsWith('.xlsx');
+    if (isCsv || isXlsx) {
       setSelectedFile(file);
       setImportResult(null);
     } else {
-      toast.error('Please select a valid CSV file');
+      toast.error('Please select a valid CSV or Excel (.xlsx) file');
     }
   };
 
@@ -49,17 +53,41 @@ export default function LeadsImportExport() {
     setProgress(0);
     const result: ImportResult = { success: 0, failed: 0, errors: [] };
 
-    Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const rows = results.data as any[];
-        const total = rows.length;
+    const isCsv = selectedFile.type === 'text/csv' || selectedFile.name.toLowerCase().endsWith('.csv');
+    const parseCsv = () => new Promise<any[]>((resolve, reject) => {
+      Papa.parse(selectedFile!, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => resolve(results.data as any[]),
+        error: (error) => reject(error),
+      });
+    });
+    const parseXlsx = () => new Promise<any[]>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: 'array' });
+          const sheetName = wb.SheetNames[0];
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws);
+          resolve(rows as any[]);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read Excel file'));
+      reader.readAsArrayBuffer(selectedFile!);
+    });
 
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          
-          try {
+    try {
+      const rows = isCsv ? await parseCsv() : await parseXlsx();
+      const total = rows.length;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        
+        try {
             // Extract standard fields
             const leadData: any = {
               first_name: row.first_name || row.firstName,
@@ -94,6 +122,30 @@ export default function LeadsImportExport() {
               leadData.custom_fields = customFields;
             }
 
+            // Basic validation rules
+            const rowErrors: string[] = [];
+            if (!leadData.first_name || !leadData.last_name) {
+              rowErrors.push('first_name and last_name are required');
+            }
+            const hasContact = !!(leadData.email && String(leadData.email).trim()) || !!(leadData.phone && String(leadData.phone).trim());
+            if (!hasContact) {
+              rowErrors.push('At least one contact (email or phone) is required');
+            }
+            const allowedStatus = ['new','contacted','qualified','proposal','negotiation','won','lost'];
+            if (leadData.status && !allowedStatus.includes(String(leadData.status).toLowerCase())) {
+              rowErrors.push(`Invalid status '${leadData.status}'`);
+            }
+            const allowedSource = ['website','referral','email','phone','social','event','other'];
+            if (leadData.source && !allowedSource.includes(String(leadData.source).toLowerCase())) {
+              rowErrors.push(`Invalid source '${leadData.source}'`);
+            }
+            if (rowErrors.length > 0) {
+              result.failed++;
+              result.errors.push(`Row ${i + 1}: ${rowErrors.join('; ')}`);
+              setProgress(((i + 1) / total) * 100);
+              continue;
+            }
+
             const { error } = await supabase.from('leads').insert(leadData);
 
             if (error) {
@@ -110,21 +162,15 @@ export default function LeadsImportExport() {
           setProgress(((i + 1) / total) * 100);
         }
 
-        setImportResult(result);
-        setImporting(false);
-        
-        if (result.success > 0) {
-          toast.success(`Successfully imported ${result.success} leads`);
-        }
-        if (result.failed > 0) {
-          toast.error(`Failed to import ${result.failed} leads`);
-        }
-      },
-      error: (error) => {
-        toast.error(`CSV parsing error: ${error.message}`);
-        setImporting(false);
-      }
-    });
+      setImportResult(result);
+      setImporting(false);
+      if (result.success > 0) toast.success(`Successfully imported ${result.success} leads`);
+      if (result.failed > 0) toast.error(`Failed to import ${result.failed} leads`);
+    } catch (error: any) {
+      console.error('Import parsing error:', error);
+      toast.error(`Import parsing error: ${error?.message || 'Unknown error'}`);
+      setImporting(false);
+    }
   };
 
   const handleExport = async () => {
@@ -183,6 +229,53 @@ export default function LeadsImportExport() {
     }
   };
 
+  // Export leads to Excel (.xlsx)
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      let query = supabase.from('leads').select('*');
+
+      // Apply filters based on user context
+      if (context.franchiseId) {
+        query = query.eq('franchise_id', context.franchiseId);
+      } else if (context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+      }
+
+      const { data: leads, error } = await query;
+      if (error) throw error;
+
+      if (!leads || leads.length === 0) {
+        toast.error('No leads found to export');
+        setExporting(false);
+        return;
+      }
+
+      // Flatten custom fields for export
+      const exportData = leads.map((lead: any) => {
+        const { custom_fields, ...standardFields } = lead;
+        const customFieldsObj = (custom_fields && typeof custom_fields === 'object') ? (custom_fields as Record<string, any>) : {};
+        return {
+          ...standardFields,
+          ...customFieldsObj,
+        };
+      });
+
+      // Build workbook and download
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+      XLSX.writeFile(wb, `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+      toast.success(`Exported ${leads.length} leads to Excel`);
+    } catch (err) {
+      console.error('Export Excel error:', err);
+      toast.error('Failed to export Excel');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const downloadTemplate = () => {
     const template = [
       {
@@ -204,15 +297,21 @@ export default function LeadsImportExport() {
     ];
 
     const csv = Papa.unparse(template);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'leads_import_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const blobCsv = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const linkCsv = document.createElement('a');
+    const urlCsv = URL.createObjectURL(blobCsv);
+    linkCsv.setAttribute('href', urlCsv);
+    linkCsv.setAttribute('download', 'leads_import_template.csv');
+    linkCsv.style.visibility = 'hidden';
+    document.body.appendChild(linkCsv);
+    linkCsv.click();
+    document.body.removeChild(linkCsv);
+
+    // Excel template
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, 'leads_import_template.xlsx');
 
     toast.success('Template downloaded');
   };
@@ -361,21 +460,38 @@ export default function LeadsImportExport() {
                   </ul>
                 </div>
 
-                <Button
-                  onClick={handleExport}
-                  disabled={exporting}
-                  className="w-full"
-                  size="lg"
-                >
-                  {exporting ? (
-                    'Exporting...'
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Export All Leads
-                    </>
-                  )}
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {exporting ? (
+                      'Exporting...'
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export CSV
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleExportExcel}
+                    disabled={exporting}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {exporting ? (
+                      'Exporting...'
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Excel
+                      </>
+                    )}
+                  </Button>
+                </div>
 
                 <Alert>
                   <AlertCircle className="h-4 w-4" />

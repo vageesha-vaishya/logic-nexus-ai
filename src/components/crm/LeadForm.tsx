@@ -31,6 +31,13 @@ const leadSchema = z.object({
   franchise_id: z.string().optional(),
   service_id: z.string().optional(),
   attachments: z.array(z.any()).default([]),
+}).refine((data) => {
+  const hasEmail = !!(data.email && data.email.trim());
+  const hasPhone = !!(data.phone && data.phone.trim());
+  return hasEmail || hasPhone;
+}, {
+  path: ['email'],
+  message: 'Provide at least one contact: email or phone',
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
