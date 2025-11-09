@@ -34,8 +34,6 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [containerSizes, setContainerSizes] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
-  // Tenant context for mappings derived from current option/quote
-  const [mappingTenantId, setMappingTenantId] = useState<string | null>(null);
   // Legs management
   const [legs, setLegs] = useState<any[]>([]);
   const [currentLegId, setCurrentLegId] = useState<string | null>(null);
@@ -67,9 +65,6 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         setServices([]);
         return;
       }
-      const { data: userData } = await supabase.auth.getUser();
-      // Prefer the option/quote tenant over user metadata to avoid cross-tenant mismatches
-      const tenantId = mappingTenantId ?? ((userData?.user as any)?.user_metadata?.tenant_id ?? null);
       
       // Get the service_type code from service_types table
       const { data: serviceTypeData } = await supabase
@@ -79,7 +74,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .maybeSingle();
       
       if (!serviceTypeData?.code) {
-        console.warn('[QuoteComposer] No service type code found for id', serviceTypeId, 'tenant', tenantId);
+        console.warn('[QuoteComposer] No service type code found for id', serviceTypeId);
         toast({
           title: 'Service type unavailable',
           description: 'Could not resolve service type code. Try reselecting the service type.',
@@ -91,25 +86,45 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       // Extract base code (e.g., "ocean_freight" -> "ocean")
       const baseCode = serviceTypeData.code.split('_')[0].toLowerCase();
       
-      // Fetch mappings for tenant or global (tenant_id NULL) using TEXT service_type
+      // Fetch mappings using FK service_type_id when available; fallback to text baseCode
       let mappingsQuery = (supabase as any)
         .from('service_type_mappings')
-        .select('service_id, tenant_id')
-        .eq('service_type', baseCode)
+        .select('service_id')
         .eq('is_active', true)
         .order('priority');
-      if (tenantId) {
-        mappingsQuery = mappingsQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+      // Prefer FK column; if not present, fallback to text key
+      try {
+        const { data: fkMappings } = await mappingsQuery.eq('service_type_id', serviceTypeId);
+        if (fkMappings && fkMappings.length > 0) {
+          var mappings = fkMappings;
+          console.debug('[QuoteComposer] Mapping lookup by FK', { serviceTypeId, count: (mappings ?? []).length });
+        } else {
+          const { data: txtMappings } = await (supabase as any)
+            .from('service_type_mappings')
+            .select('service_id')
+            .eq('service_type', baseCode)
+            .eq('is_active', true)
+            .order('priority');
+          var mappings = txtMappings ?? [];
+          console.debug('[QuoteComposer] Mapping lookup by text', { baseCode, count: (mappings ?? []).length });
+        }
+      } catch (e) {
+        const { data: txtMappings } = await (supabase as any)
+          .from('service_type_mappings')
+          .select('service_id')
+          .eq('service_type', baseCode)
+          .eq('is_active', true)
+          .order('priority');
+        var mappings = txtMappings ?? [];
+        console.debug('[QuoteComposer] Mapping lookup by text (catch)', { baseCode, count: (mappings ?? []).length });
       }
-      const { data: mappings } = await mappingsQuery;
-      console.debug('[QuoteComposer] Mapping lookup', { baseCode, tenantId, count: (mappings ?? []).length });
       
       const serviceIds = (mappings ?? []).map((m: any) => m.service_id).filter(Boolean);
       if (!serviceIds.length) {
-        console.warn('[QuoteComposer] No service mappings found for service_type', baseCode, 'tenant', tenantId);
+        console.warn('[QuoteComposer] No service mappings found for service_type_id', serviceTypeId);
         toast({
           title: 'No mapped services',
-          description: `No active services found for selected service type. Check mappings for your tenant or global entries.`,
+          description: `No active services found for selected service type. Check Service Type Mappings module.`,
         });
         setServices([]);
         return;
@@ -119,48 +134,15 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .select('id, service_name')
         .in('id', serviceIds)
         .order('service_name');
-      let combined = (sv ?? []).map((s: any) => {
-        const isTenant = (mappings ?? []).some((m: any) => m.service_id === s.id && m.tenant_id === tenantId);
-        return { id: s.id, name: s.service_name, scope: isTenant ? 'Tenant' : 'Global' };
-      });
-      // Tenant first, then Global, then by name
-      combined = combined.sort((a: any, b: any) => {
-        if (a.scope !== b.scope) {
-          return a.scope === 'Tenant' ? -1 : 1;
-        }
-        return (a.name ?? '').localeCompare(b.name ?? '');
-      });
+      const combined = (sv ?? []).map((s: any) => ({ id: s.id, name: s.service_name }));
       setServices(combined);
       // Reset provider selection when service type changes
       setServiceId(null);
       setProviderId(null);
     })();
-  }, [serviceTypeId, mappingTenantId]);
+  }, [serviceTypeId]);
 
-  // Resolve mapping tenant from the current option or the quote as fallback
-  useEffect(() => {
-    (async () => {
-      if (!optionId && !quoteId) return;
-      let resolvedTenant: string | null = null;
-      if (optionId) {
-        const { data: opt } = await (supabase as any)
-          .from('quotation_version_options')
-          .select('tenant_id')
-          .eq('id', optionId)
-          .maybeSingle();
-        resolvedTenant = opt?.tenant_id ?? null;
-      }
-      if (!resolvedTenant && quoteId) {
-        const { data: q } = await (supabase as any)
-          .from('quotes')
-          .select('tenant_id')
-          .eq('id', quoteId)
-          .maybeSingle();
-        resolvedTenant = q?.tenant_id ?? null;
-      }
-      if (resolvedTenant) setMappingTenantId(resolvedTenant);
-    })();
-  }, [optionId, quoteId]);
+  // Removed tenant overlay for service mappings; Service Type Mappings module drives scoping.
 
   useEffect(() => {
     if (autoScroll !== false) {
@@ -406,18 +388,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
               <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
               <SelectContent>
                 {(services ?? []).map((sv) => (
-                  <SelectItem key={sv.id} value={sv.id}>
-                    {sv.name}
-                    <span
-                      className={
-                        `ml-2 text-xs rounded px-2 py-0.5 ` +
-                        (sv.scope === 'Tenant'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200')
-                      }
-                      title={sv.scope === 'Tenant' ? 'Tenant mapping (current org)' : 'Global mapping (seed)'}
-                    >{sv.scope}</span>
-                  </SelectItem>
+                  <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -492,18 +463,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
               <SelectTrigger><SelectValue placeholder="Leg Service" /></SelectTrigger>
               <SelectContent>
                 {(services ?? []).map((sv) => (
-                  <SelectItem key={sv.id} value={sv.id}>
-                    {sv.name}
-                    <span
-                      className={
-                        `ml-2 text-xs rounded px-2 py-0.5 ` +
-                        (sv.scope === 'Tenant'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200')
-                      }
-                      title={sv.scope === 'Tenant' ? 'Tenant mapping (current org)' : 'Global mapping (seed)'}
-                    >{sv.scope}</span>
-                  </SelectItem>
+                  <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

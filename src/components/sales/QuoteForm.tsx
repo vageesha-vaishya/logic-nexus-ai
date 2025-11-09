@@ -140,11 +140,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     return trimmed;
   };
 
-  const filteredServices = useMemo(() => {
-    if (!selectedServiceType) return [];
-    // Filter services by canonical type to tolerate code/name variations
-    return services.filter(service => canonicalType(service.service_type) === canonicalType(selectedServiceType));
-  }, [selectedServiceType, services]);
+  // filteredServices will be defined after form and serviceTypeId are available
 
   const form = useForm<z.infer<typeof quoteSchema>>({
     resolver: zodResolver(quoteSchema),
@@ -172,6 +168,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     },
   });
 
+  // Filter services by the currently selected service_type_id (FK-only)
+  const filteredServices = useMemo(() => {
+    const currentTypeId = form.getValues('service_type_id');
+    if (!currentTypeId) return [] as any[];
+    return services.filter((service: any) => String(service.service_type_id || '') === String(currentTypeId));
+  }, [form, services]);
+
   // Watch selected account to enable contact filtering
   const accountId = form.watch('account_id');
   // Watch selected carrier to ensure its label is available immediately
@@ -185,9 +188,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       let query = supabase
         .from('service_type_mappings')
-        .select('service_type, service_id, is_default, priority')
+        .select('service_type_id, service_id, is_default, priority')
         .eq('is_active', true)
-        .order('service_type')
         .order('priority', { ascending: false });
 
       if (tenantId) {
@@ -212,98 +214,27 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         for (const s of svcData || []) servicesById[String(s.id)] = s;
       }
 
-      // Extract unique service types for dropdown (codes like 'ocean', 'air')
-      const uniqueServiceTypes = [...new Set(mappingRows.map((m: any) => String(m.service_type)))];
+      // Extract unique service type ids for dropdown (FKs)
+      const uniqueTypeIds = [...new Set(mappingRows.map((m: any) => String(m.service_type_id)).filter(Boolean))];
 
-      // Resolve codes to canonical service_types (UUID id + name + code)
+      // Resolve service_type_id to canonical service_types (UUID id + name + code)
       let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
-      if (uniqueServiceTypes.length > 0) {
-        // Normalize helper for matching codes/names
-        const normalize = (s: any) => String(s || '').trim().toLowerCase().replace(/[\s\-]+/g, '_');
-        const synonyms = (norm: string): string[] => {
-          switch (norm) {
-            case 'ocean':
-            case 'sea':
-            case 'ocean_freight':
-            case 'sea_freight':
-            case 'maritime':
-              return ['ocean', 'sea', 'ocean_freight', 'sea_freight', 'maritime'];
-            case 'air':
-            case 'air_freight':
-            case 'air_cargo':
-              return ['air', 'air_freight', 'air_cargo'];
-            case 'road':
-            case 'truck':
-            case 'trucking':
-            case 'land':
-            case 'road_freight':
-              return ['road', 'truck', 'trucking', 'land', 'road_freight'];
-            case 'rail':
-            case 'train':
-            case 'rail_freight':
-              return ['rail', 'train', 'rail_freight'];
-            default:
-              return [norm];
-          }
-        };
-
-        // Fetch all active service types once and build a flexible index
-        const { data: allTypes, error: typesErr } = await (supabase as any)
+      if (uniqueTypeIds.length > 0) {
+        const { data: typeRows, error: typesErr } = await (supabase as any)
           .from('service_types')
           .select('id, name, code')
-          .eq('is_active', true);
-        const index = new Map<string, any>();
-        if (!typesErr && Array.isArray(allTypes)) {
-          for (const t of allTypes) {
-            const codeNorm = normalize(t.code);
-            const nameNorm = normalize(t.name);
-            const keys = new Set([codeNorm, nameNorm, ...synonyms(codeNorm), ...synonyms(nameNorm)]);
-            for (const k of keys) {
-              if (k) index.set(k, t);
-            }
-          }
-
-          const seen = new Set<string>();
-          for (const raw of uniqueServiceTypes) {
-            const norm = normalize(raw);
-            const keys = synonyms(norm);
-            let match: any = null;
-            for (const k of keys) {
-              if (index.has(k)) { match = index.get(k); break; }
-            }
-            if (match) {
-              const key = String(match.id);
-              if (!seen.has(key)) {
-                // IMPORTANT: Use the raw mapping code for `code` so downstream
-                // filtering against mappingRows/services (which store mapping codes)
-                // remains consistent. The `id`/`name` come from canonical service_types.
-                serviceTypesForDropdown.push({
-                  id: String(match.id),
-                  code: String(raw),
-                  name: match.name ?? String(match.code),
-                });
-                seen.add(key);
-              }
-            }
-          }
+          .in('id', uniqueTypeIds);
+        if (!typesErr && Array.isArray(typeRows)) {
+          serviceTypesForDropdown = typeRows.map((t: any) => ({
+            id: String(t.id),
+            code: String(t.code),
+            name: t.name || String(t.code),
+          }));
         }
       }
       // Fallback if service_types table didn't resolve some/any codes
       // Create a mapping for unresolved service types, but don't use them as IDs to avoid UUID errors
-      const normalizeMissing = (s: any) => String(s || '').trim().toLowerCase().replace(/[\s\-]+/g, '_');
-      const resolvedCodes = new Set(serviceTypesForDropdown.map(st => normalizeMissing(st.code)));
-      const unresolvedTypes = uniqueServiceTypes.filter(code => !resolvedCodes.has(normalizeMissing(code)));
-      
-      if (unresolvedTypes.length > 0) {
-        console.warn('Some service types could not be resolved to UUIDs:', unresolvedTypes);
-        // Add unresolved types with empty ID to prevent UUID errors
-        const unresolvedMappings = unresolvedTypes.map((code: string) => ({
-          id: '', // Empty ID to prevent UUID errors - these won't be selectable
-          code,
-          name: code.charAt(0).toUpperCase() + code.slice(1).replace('_', ' '),
-        }));
-        serviceTypesForDropdown = [...serviceTypesForDropdown, ...unresolvedMappings];
-      }
+      // No text fallback in FK-only mode
       
       // Build services list matched to mappings and available service records
       let servicesForDropdown = mappingRows
@@ -313,7 +244,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           return {
             id: svc.id,
             service_name: svc.service_name,
-            service_type: m.service_type,
+            service_type_id: m.service_type_id,
             is_default: m.is_default,
             priority: m.priority,
           };
@@ -985,28 +916,27 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, selectedServiceType, services, serviceTypes]);
 
-  // When service_type_id changes: filter services based on type and auto-select
+  // When service_type_id changes: filter services based on FK and auto-select
   useEffect(() => {
     if (isEditMode) return; // don't disturb existing selections in edit mode
-    if (!selectedServiceType) {
+    const selectedTypeId = form.getValues('service_type_id');
+    if (!selectedTypeId) {
       // No type selected: clear service
       const currentServiceId = form.getValues('service_id');
       if (currentServiceId) form.setValue('service_id', '', { shouldDirty: true });
       return;
     }
 
-    // Filter services by the service_type code from the mapping table
-    const matchingServices = services.filter((s: any) =>
-      String(s.service_type || '') === String(selectedServiceType)
-    );
+    // Filter services by service_type_id from the mapping table
+    const matchingServices = services.filter((s: any) => String(s.service_type_id || '') === String(selectedTypeId));
     
     const currentServiceId = form.getValues('service_id');
     
     // If current service doesn't match the type, select first matching service
     if (currentServiceId) {
       const svc = services.find((s: any) => String(s.id) === String(currentServiceId));
-      const svcTextType = String((svc as any)?.service_type || '');
-      const matches = svc && (svcTextType === String(selectedServiceType));
+      const svcTypeId = String((svc as any)?.service_type_id || '');
+      const matches = svc && (svcTypeId === String(selectedTypeId));
       if (!matches) {
         if (matchingServices.length > 0) {
           form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
@@ -1021,7 +951,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (matchingServices.length > 0) {
       form.setValue('service_id', String(matchingServices[0].id), { shouldDirty: true });
     }
-  }, [selectedServiceType, services, serviceTypes, isEditMode, form]);
+  }, [services, isEditMode, form]);
 
   const fetchData = async () => {
     const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
