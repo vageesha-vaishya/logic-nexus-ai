@@ -47,9 +47,20 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       setServiceTypes(st ?? []);
       // Services will be populated based on selected service type via mapping table
       setServices([]);
-      const { data: ct } = await (supabase as any).from('container_types').select('id, name').order('name');
+      // Fetch container types/sizes for current tenant, including global (tenant_id NULL)
+      const { data: userData } = await supabase.auth.getUser();
+      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+      const { data: ct } = await (supabase as any)
+        .from('container_types')
+        .select('id, name, tenant_id')
+        .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
+        .order('name');
       setContainerTypes(ct ?? []);
-      const { data: cs } = await (supabase as any).from('container_sizes').select('id, name').order('name');
+      const { data: cs } = await (supabase as any)
+        .from('container_sizes')
+        .select('id, name, tenant_id')
+        .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
+        .order('name');
       setContainerSizes(cs ?? []);
       const { data: cur } = await supabase.from('currencies').select('id, code').order('code');
       setCurrencies(cur ?? []);
