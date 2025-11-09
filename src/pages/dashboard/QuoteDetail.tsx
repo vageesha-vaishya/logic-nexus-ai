@@ -15,6 +15,7 @@ export default function QuoteDetail() {
   const [loading, setLoading] = useState(true);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkQuote = async () => {
@@ -23,12 +24,13 @@ export default function QuoteDetail() {
         // Allow navigating by either UUID id or quote_number (e.g., QT-2025-002)
         const { data, error } = await supabase
           .from('quotes')
-          .select('id')
+          .select('id, tenant_id')
           .or(`id.eq.${id},quote_number.eq.${id}`)
           .limit(1)
           .single();
         if (error) throw error;
         setResolvedId((data as any)?.id ?? null);
+        setTenantId((data as any)?.tenant_id ?? null);
         setLoading(false);
       } catch (err: any) {
         toast.error('Failed to load quote', { description: err.message });
@@ -42,12 +44,7 @@ export default function QuoteDetail() {
     const loadLatestVersion = async () => {
       if (!resolvedId) return;
       try {
-        // Use untyped access for quote_versions to avoid typed Database relation issues
-<<<<<<< HEAD
-        const { data, error } = await (supabase as any)
-=======
         const { data, error } = await supabase
->>>>>>> 14a07f6 (Qutotation Schema fix)
           .from('quotation_versions')
           .select('id, version_number')
           .eq('quote_id', resolvedId)
@@ -57,20 +54,21 @@ export default function QuoteDetail() {
         if (Array.isArray(data) && data.length && data[0]?.id) {
           setVersionId(String(data[0].id));
         } else {
-<<<<<<< HEAD
-          // Create initial version if none exists
-          const { data: v } = await (supabase as any)
-            .from('quotation_versions')
-            .insert({ quote_id: resolvedId, version_number: 1, snapshot: {}, total: 0 })
-=======
           // Create initial version if none exists (align with typed schema)
-          const { data: userData } = await supabase.auth.getUser();
-          const tenantId = (userData?.user as any)?.user_metadata?.tenant_id;
-          if (!tenantId) return;
+          if (!tenantId) {
+            // Fallback: fetch tenant from quote if not already set
+            const { data: qRow } = await supabase
+              .from('quotes')
+              .select('tenant_id')
+              .eq('id', resolvedId)
+              .single();
+            setTenantId((qRow as any)?.tenant_id ?? null);
+          }
+          if (!tenantId && !(await supabase.auth.getUser()).data?.user) return;
+          const finalTenantId = tenantId ?? ((await supabase.auth.getUser()).data?.user as any)?.user_metadata?.tenant_id;
           const { data: v } = await supabase
             .from('quotation_versions')
-            .insert({ quote_id: resolvedId, tenant_id: tenantId, version_number: 1 })
->>>>>>> 14a07f6 (Qutotation Schema fix)
+            .insert({ quote_id: resolvedId, tenant_id: finalTenantId, version_number: 1 })
             .select('id')
             .single();
           if (v?.id) setVersionId(String(v.id));
@@ -115,7 +113,7 @@ export default function QuoteDetail() {
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
         {resolvedId && versionId && (
-          <QuoteComposer quoteId={resolvedId} versionId={versionId} />
+          <QuoteComposer quoteId={resolvedId} versionId={versionId} autoScroll />
         )}
       </div>
     </DashboardLayout>

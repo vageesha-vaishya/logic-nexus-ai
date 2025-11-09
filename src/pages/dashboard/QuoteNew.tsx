@@ -11,10 +11,20 @@ export default function QuoteNew() {
   const { supabase } = useCRM();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
   const handleSuccess = (quoteId: string) => {
     // Instead of navigating immediately, create initial version and show composer inline
     setCreatedQuoteId(quoteId);
+    // Fetch tenant_id for the created quote to ensure version insert works
+    (async () => {
+      const { data } = await supabase
+        .from('quotes')
+        .select('tenant_id')
+        .eq('id', quoteId)
+        .single();
+      setTenantId((data as any)?.tenant_id ?? null);
+    })();
   };
 
   useEffect(() => {
@@ -32,12 +42,11 @@ export default function QuoteNew() {
         return;
       }
       // Insert initial version using allowed columns
-      const { data: userData } = await supabase.auth.getUser();
-      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id;
-      if (!tenantId) return;
+      const finalTenantId = tenantId ?? ((await supabase.auth.getUser()).data?.user as any)?.user_metadata?.tenant_id;
+      if (!finalTenantId) return;
       const { data: v } = await supabase
         .from('quotation_versions')
-        .insert({ quote_id: createdQuoteId, tenant_id: tenantId, version_number: 1 })
+        .insert({ quote_id: createdQuoteId, tenant_id: finalTenantId, version_number: 1 })
         .select('id')
         .single();
       if (v?.id) setVersionId(String(v.id));
@@ -68,7 +77,7 @@ export default function QuoteNew() {
         </div>
         <QuoteForm onSuccess={handleSuccess} />
         {createdQuoteId && versionId && (
-          <QuoteComposer quoteId={createdQuoteId} versionId={versionId} />
+          <QuoteComposer quoteId={createdQuoteId} versionId={versionId} autoScroll />
         )}
       </div>
     </DashboardLayout>
