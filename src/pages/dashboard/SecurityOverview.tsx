@@ -36,6 +36,12 @@ export default function SecurityOverview() {
   const [minWidthCh, setMinWidthCh] = useState(8);
   const [maxWidthCh, setMaxWidthCh] = useState(40);
   const [stickyHeader, setStickyHeader] = useState(true);
+  // Database Tables explorer state
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableRows, setTableRows] = useState<any[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
   // Horizontal scroll sync between top scrollbar and the main table container
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const topScrollRef = useRef<HTMLDivElement | null>(null);
@@ -177,6 +183,38 @@ export default function SecurityOverview() {
       }>;
     }
   });
+
+  // Auto-select first table when tables load
+  useEffect(() => {
+    if (!schemaTablesLoading && schemaTables && schemaTables.length > 0) {
+      if (!selectedTable) {
+        setSelectedTable(schemaTables[0].table_name);
+      }
+    }
+  }, [schemaTablesLoading, schemaTables, selectedTable]);
+
+  // Load rows for selected table
+  useEffect(() => {
+    (async () => {
+      if (!selectedTable) return;
+      setTableLoading(true);
+      setTableError(null);
+      try {
+        // Use dynamic table name with a loose type to avoid TS literal union overload errors
+        const { data, error } = await (supabase as any)
+          .from(selectedTable)
+          .select('*')
+          .limit(50);
+        if (error) throw error;
+        setTableRows(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        setTableError(err?.message || 'Failed to load table data');
+        setTableRows([]);
+      } finally {
+        setTableLoading(false);
+      }
+    })();
+  }, [selectedTable]);
 
   const { data: schemaConstraints, isLoading: schemaConstraintsLoading } = useQuery({
     queryKey: ['database-constraints'],
@@ -477,15 +515,16 @@ export default function SecurityOverview() {
           </div>
 
           <Tabs defaultValue={initialTab} className="w-full">
-            <TabsList>
-              <TabsTrigger value="sql">SQL Editor</TabsTrigger>
-              <TabsTrigger value="rls">RLS Status</TabsTrigger>
-              <TabsTrigger value="policies">Policies</TabsTrigger>
-              <TabsTrigger value="functions">Functions</TabsTrigger>
-              <TabsTrigger value="enums">Enums</TabsTrigger>
-              <TabsTrigger value="schema">Schema</TabsTrigger>
-              <TabsTrigger value="data-management">Data Management</TabsTrigger>
-            </TabsList>
+        <TabsList>
+          <TabsTrigger value="sql">SQL Editor</TabsTrigger>
+          <TabsTrigger value="rls">RLS Status</TabsTrigger>
+          <TabsTrigger value="policies">Policies</TabsTrigger>
+          <TabsTrigger value="functions">Functions</TabsTrigger>
+          <TabsTrigger value="enums">Enums</TabsTrigger>
+          <TabsTrigger value="schema">Schema</TabsTrigger>
+          <TabsTrigger value="tables">Database Tables</TabsTrigger>
+          <TabsTrigger value="data-management">Data Management</TabsTrigger>
+        </TabsList>
 
             <TabsContent value="sql" className="space-y-4">
               <Card>
@@ -1222,7 +1261,7 @@ export default function SecurityOverview() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="schema" className="space-y-4">
+        <TabsContent value="schema" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1335,7 +1374,107 @@ export default function SecurityOverview() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+        </TabsContent>
+
+        {/* Database Tables Explorer */}
+        <TabsContent value="tables" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Database Tables</CardTitle>
+                  <CardDescription>Select a table to view rows</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4">
+                {/* Explorer list */}
+                <div className="col-span-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Input
+                      placeholder="Search tables"
+                      value={tableSearch}
+                      onChange={(e) => setTableSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="border rounded h-80 overflow-auto">
+                    {schemaTablesLoading ? (
+                      <div className="p-3 text-sm text-muted-foreground">Loading tables...</div>
+                    ) : !schemaTables || schemaTables.length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground">No tables found</div>
+                    ) : (
+                      (schemaTables
+                        .filter(t => t.table_name.toLowerCase().includes(tableSearch.toLowerCase()))
+                        .map((t) => (
+                          <button
+                            key={t.table_name}
+                            className={`w-full text-left px-3 py-2 border-b hover:bg-muted ${selectedTable === t.table_name ? 'bg-muted' : ''}`}
+                            onClick={() => setSelectedTable(t.table_name)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{t.table_name}</span>
+                              <Badge variant="outline" className="ml-2">{t.row_estimate ?? 0}</Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t.table_type} · {t.column_count} cols · {t.index_count} idx
+                            </div>
+                          </button>
+                        )))
+                    )}
+                  </div>
+                </div>
+
+                {/* Data viewer */}
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Selected table</div>
+                      <div className="text-lg font-semibold">{selectedTable || '-'}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" onClick={() => selectedTable && setSelectedTable(selectedTable)} disabled={!selectedTable || tableLoading}>Refresh</Button>
+                    </div>
+                  </div>
+                  <div className="border rounded overflow-auto">
+                    {tableLoading ? (
+                      <div className="p-3 text-sm text-muted-foreground">Loading rows...</div>
+                    ) : tableError ? (
+                      <div className="p-3 text-sm text-destructive">{tableError}</div>
+                    ) : !tableRows || tableRows.length === 0 ? (
+                      <div className="p-3 text-sm text-muted-foreground">No rows found</div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {Object.keys(tableRows[0]).map((col) => (
+                              <TableHead key={col} className="whitespace-nowrap">{col}</TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tableRows.map((row, idx) => (
+                            <TableRow key={idx}>
+                              {Object.keys(tableRows[0]).map((col) => (
+                                <TableCell key={col}>
+                                  {row[col] === null || row[col] === undefined
+                                    ? ''
+                                    : typeof row[col] === 'object'
+                                      ? JSON.stringify(row[col])
+                                      : String(row[col])}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
           </Tabs>
         </div>
       </DashboardLayout>

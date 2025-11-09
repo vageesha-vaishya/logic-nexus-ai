@@ -89,6 +89,7 @@ import ContainerSizes from "./pages/dashboard/ContainerSizes";
 import ChargeSides from "./pages/dashboard/ChargeSides";
 import ChargeCategories from "./pages/dashboard/ChargeCategories";
 import ChargeBases from "./pages/dashboard/ChargeBases";
+import MasterDataGeography from "./pages/dashboard/MasterDataGeography";
 
 const queryClient = new QueryClient();
 
@@ -445,6 +446,10 @@ const App = () => (
             <Route 
               path="/dashboard/settings/data-management" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DataManagement /></ProtectedRoute>} 
+            />
+            <Route 
+              path="/dashboard/settings/master-data" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataGeography /></ProtectedRoute>} 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* Salesforce-style navigation placeholder routes */}

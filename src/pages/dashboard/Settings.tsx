@@ -131,6 +131,9 @@ export default function Settings() {
                     <Button variant="outline" onClick={() => navigate('/dashboard/security-overview?tab=data-management')}>
                       Data Management
                     </Button>
+                    <Button variant="outline" onClick={() => navigate('/dashboard/settings/master-data')}>
+                      Master Data (Geography)
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
