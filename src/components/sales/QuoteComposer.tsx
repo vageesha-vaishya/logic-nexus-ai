@@ -34,6 +34,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [containerSizes, setContainerSizes] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
+  // Tenant context for mappings derived from current option/quote
+  const [mappingTenantId, setMappingTenantId] = useState<string | null>(null);
   // Legs management
   const [legs, setLegs] = useState<any[]>([]);
   const [currentLegId, setCurrentLegId] = useState<string | null>(null);
@@ -66,7 +68,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         return;
       }
       const { data: userData } = await supabase.auth.getUser();
-      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+      // Prefer the option/quote tenant over user metadata to avoid cross-tenant mismatches
+      const tenantId = mappingTenantId ?? ((userData?.user as any)?.user_metadata?.tenant_id ?? null);
       // Fetch mappings for tenant or global (tenant_id NULL) using FK service_type_id
       const { data: mappings } = await (supabase as any)
         .from('service_type_mappings')
@@ -106,7 +109,20 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       setServiceId(null);
       setProviderId(null);
     })();
-  }, [serviceTypeId]);
+  }, [serviceTypeId, mappingTenantId]);
+
+  // Resolve mapping tenant from the current option (for edit flows or cross-tenant views)
+  useEffect(() => {
+    (async () => {
+      if (!optionId) return;
+      const { data } = await (supabase as any)
+        .from('quotation_version_options')
+        .select('tenant_id')
+        .eq('id', optionId)
+        .single();
+      if (data?.tenant_id) setMappingTenantId(data.tenant_id);
+    })();
+  }, [optionId]);
 
   useEffect(() => {
     if (autoScroll !== false) {
