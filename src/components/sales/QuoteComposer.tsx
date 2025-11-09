@@ -67,11 +67,11 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       const { data: userData } = await supabase.auth.getUser();
       const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
       const { data, error } = await (supabase as any)
-        .from('quote_options')
+        .from('quotation_version_options')
         .insert({
           tenant_id: tenantId,
-          quote_version_id: versionId,
-          currency_id: currencyId,
+          quotation_version_id: versionId,
+          quote_currency_id: currencyId,
         })
         .select('id')
         .single();
@@ -79,7 +79,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       // Initialize first leg
       if (!error && data?.id) {
         const { data: leg } = await (supabase as any)
-          .from('quote_option_legs')
+          .from('quotation_version_option_legs')
           .insert({ tenant_id: tenantId, quote_option_id: data.id, leg_order: 1 })
           .select('id')
           .single();
@@ -96,7 +96,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const patchOption = async (patch: Record<string, any>) => {
     if (!optionId) return;
     await (supabase as any)
-      .from('quote_options')
+      .from('quotation_version_options')
       .update(patch)
       .eq('id', optionId);
   };
@@ -130,7 +130,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         tradeDirectionId = Array.isArray(dir) && dir.length ? dir[0].id : null;
       }
       await (supabase as any)
-        .from('quote_option_legs')
+        .from('quotation_version_option_legs')
         .update({
           service_id: serviceId,
           provider_id: providerId,
@@ -186,7 +186,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         sell = Math.round(sell / step) * step;
       }
     }
-    await (supabase as any).from('quote_options').update({
+    await (supabase as any).from('quotation_version_options').update({
       buy_subtotal: buy,
       sell_subtotal: sell,
       margin_amount: sell - buy,
@@ -354,7 +354,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                 const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
                 const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
                 const { data: leg } = await (supabase as any)
-                  .from('quote_option_legs')
+                  .from('quotation_version_option_legs')
                   .insert({ tenant_id: tenantId, quote_option_id: optionId, leg_order: nextOrder })
                   .select('id, leg_order')
                   .single();

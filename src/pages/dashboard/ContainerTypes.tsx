@@ -19,7 +19,9 @@ export default function ContainerTypes() {
 
   const add = async () => {
     if (!newItem.name) return;
-    await supabase.from('container_types').insert({ ...newItem });
+    const { data: userData } = await supabase.auth.getUser();
+    const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+    await supabase.from('container_types').insert({ ...newItem, tenant_id: tenantId });
     setNewItem({ name: '', code: '' });
     load();
   };

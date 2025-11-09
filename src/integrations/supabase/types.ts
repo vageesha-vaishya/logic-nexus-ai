@@ -991,6 +991,81 @@ export type Database = {
           },
         ]
       }
+      container_sizes: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          description: string | null
+          height_ft: number | null
+          id: string
+          is_active: boolean | null
+          length_ft: number | null
+          max_weight_kg: number | null
+          name: string
+          tenant_id: string
+          updated_at: string | null
+          width_ft: number | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          description?: string | null
+          height_ft?: number | null
+          id?: string
+          is_active?: boolean | null
+          length_ft?: number | null
+          max_weight_kg?: number | null
+          name: string
+          tenant_id: string
+          updated_at?: string | null
+          width_ft?: number | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          description?: string | null
+          height_ft?: number | null
+          id?: string
+          is_active?: boolean | null
+          length_ft?: number | null
+          max_weight_kg?: number | null
+          name?: string
+          tenant_id?: string
+          updated_at?: string | null
+          width_ft?: number | null
+        }
+        Relationships: []
+      }
+      container_types: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       currencies: {
         Row: {
           code: string
@@ -2837,6 +2912,78 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_charges: {
+        Row: {
+          amount: number | null
+          basis_id: string | null
+          category_id: string | null
+          charge_side_id: string | null
+          created_at: string | null
+          currency_id: string | null
+          id: string
+          leg_id: string | null
+          note: string | null
+          quantity: number | null
+          quote_option_id: string
+          rate: number | null
+          sort_order: number | null
+          tenant_id: string
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          basis_id?: string | null
+          category_id?: string | null
+          charge_side_id?: string | null
+          created_at?: string | null
+          currency_id?: string | null
+          id?: string
+          leg_id?: string | null
+          note?: string | null
+          quantity?: number | null
+          quote_option_id: string
+          rate?: number | null
+          sort_order?: number | null
+          tenant_id: string
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          basis_id?: string | null
+          category_id?: string | null
+          charge_side_id?: string | null
+          created_at?: string | null
+          currency_id?: string | null
+          id?: string
+          leg_id?: string | null
+          note?: string | null
+          quantity?: number | null
+          quote_option_id?: string
+          rate?: number | null
+          sort_order?: number | null
+          tenant_id?: string
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_charges_leg_id_fkey"
+            columns: ["leg_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_version_option_legs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_charges_quote_option_id_fkey"
+            columns: ["quote_option_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_version_options"
             referencedColumns: ["id"]
           },
         ]
