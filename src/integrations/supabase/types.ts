@@ -1002,7 +1002,7 @@ export type Database = {
           length_ft: number | null
           max_weight_kg: number | null
           name: string
-          tenant_id: string
+          tenant_id: string | null
           updated_at: string | null
           width_ft: number | null
         }
@@ -1016,7 +1016,7 @@ export type Database = {
           length_ft?: number | null
           max_weight_kg?: number | null
           name: string
-          tenant_id: string
+          tenant_id?: string | null
           updated_at?: string | null
           width_ft?: number | null
         }
@@ -1030,7 +1030,7 @@ export type Database = {
           length_ft?: number | null
           max_weight_kg?: number | null
           name?: string
-          tenant_id?: string
+          tenant_id?: string | null
           updated_at?: string | null
           width_ft?: number | null
         }
@@ -1043,7 +1043,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
-          tenant_id: string
+          tenant_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1052,7 +1052,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
-          tenant_id: string
+          tenant_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1061,7 +1061,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
-          tenant_id?: string
+          tenant_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
