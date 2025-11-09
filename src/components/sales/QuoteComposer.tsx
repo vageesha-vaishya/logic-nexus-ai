@@ -76,10 +76,14 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .from('service_types')
         .select('code')
         .eq('id', serviceTypeId)
-        .single();
+        .maybeSingle();
       
       if (!serviceTypeData?.code) {
-        console.warn('[QuoteComposer] No service type code found for id', serviceTypeId);
+        console.warn('[QuoteComposer] No service type code found for id', serviceTypeId, 'tenant', tenantId);
+        toast({
+          title: 'Service type unavailable',
+          description: 'Could not resolve service type code. Try reselecting the service type.',
+        });
         setServices([]);
         return;
       }
@@ -88,13 +92,17 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       const baseCode = serviceTypeData.code.split('_')[0].toLowerCase();
       
       // Fetch mappings for tenant or global (tenant_id NULL) using TEXT service_type
-      const { data: mappings } = await (supabase as any)
+      let mappingsQuery = (supabase as any)
         .from('service_type_mappings')
         .select('service_id, tenant_id')
         .eq('service_type', baseCode)
         .eq('is_active', true)
-        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
         .order('priority');
+      if (tenantId) {
+        mappingsQuery = mappingsQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+      }
+      const { data: mappings } = await mappingsQuery;
+      console.debug('[QuoteComposer] Mapping lookup', { baseCode, tenantId, count: (mappings ?? []).length });
       
       const serviceIds = (mappings ?? []).map((m: any) => m.service_id).filter(Boolean);
       if (!serviceIds.length) {
@@ -129,18 +137,30 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     })();
   }, [serviceTypeId, mappingTenantId]);
 
-  // Resolve mapping tenant from the current option (for edit flows or cross-tenant views)
+  // Resolve mapping tenant from the current option or the quote as fallback
   useEffect(() => {
     (async () => {
-      if (!optionId) return;
-      const { data } = await (supabase as any)
-        .from('quotation_version_options')
-        .select('tenant_id')
-        .eq('id', optionId)
-        .single();
-      if (data?.tenant_id) setMappingTenantId(data.tenant_id);
+      if (!optionId && !quoteId) return;
+      let resolvedTenant: string | null = null;
+      if (optionId) {
+        const { data: opt } = await (supabase as any)
+          .from('quotation_version_options')
+          .select('tenant_id')
+          .eq('id', optionId)
+          .maybeSingle();
+        resolvedTenant = opt?.tenant_id ?? null;
+      }
+      if (!resolvedTenant && quoteId) {
+        const { data: q } = await (supabase as any)
+          .from('quotes')
+          .select('tenant_id')
+          .eq('id', quoteId)
+          .maybeSingle();
+        resolvedTenant = q?.tenant_id ?? null;
+      }
+      if (resolvedTenant) setMappingTenantId(resolvedTenant);
     })();
-  }, [optionId]);
+  }, [optionId, quoteId]);
 
   useEffect(() => {
     if (autoScroll !== false) {
