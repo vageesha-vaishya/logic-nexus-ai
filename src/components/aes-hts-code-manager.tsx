@@ -5,6 +5,7 @@ import { supabase as defaultSupabase } from '@/integrations/supabase/client';
 import { ActionsToolbar } from '@/components/ui/ActionsToolbar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { parseFileRows, exportCsv, exportExcel, exportJsonTemplate, downloadErrorsCsv, exportJson } from '@/lib/import-export';
 
 type CodeRecord = {
@@ -83,6 +84,13 @@ const AESHTSCodeManager: React.FC = () => {
     'uom2',
     'duty_rate',
     'special_provisions',
+  ];
+
+  // Predefined valid Units of Measure used across the app
+  const VALID_UOMS: string[] = [
+    'Number', 'Kilograms', 'Grams', 'Pounds', 'Ounces', 'Pieces', 'Each', 'Dozen', 'Set',
+    'Meters', 'Centimeters', 'Inches', 'Liters', 'Milliliters', 'Gallons', 'Square Meters', 'Cubic Meters',
+    'Pairs', 'Square Feet'
   ];
 
   // Initialize Supabase: use the application's default supabase client
@@ -211,6 +219,21 @@ const AESHTSCodeManager: React.FC = () => {
 
     setLoading(true);
     try {
+      // Basic validation for required fields
+      const required: Array<[string, string]> = [
+        ['hts_code', formData.hts_code?.trim() || ''],
+        ['category', formData.category?.trim() || ''],
+        ['description', formData.description?.trim() || ''],
+      ];
+      for (const [field, value] of required) {
+        if (!value) throw new Error(`Missing required field: ${field}`);
+      }
+      const u1 = (formData.uom1 || '').trim();
+      const u2 = (formData.uom2 || '').trim();
+      if (!u1) throw new Error('UOM1 (Primary Unit) is required');
+      if (!VALID_UOMS.includes(u1)) throw new Error('UOM1 must be a valid unit of measure');
+      if (u2 && !VALID_UOMS.includes(u2)) throw new Error('UOM2 must be a valid unit of measure');
+
       if (isEditing) {
         if (!editingId) {
           throw new Error('Missing record id for update');
@@ -219,13 +242,13 @@ const AESHTSCodeManager: React.FC = () => {
           .from('aes_hts_codes')
           .update({ ...formData, updated_at: new Date().toISOString() })
           .eq('id', editingId);
-        
+
         if (error) throw error;
       } else {
         const { error } = await client
           .from('aes_hts_codes')
           .insert([formData]);
-        
+
         if (error) throw error;
       }
       
@@ -346,10 +369,7 @@ const AESHTSCodeManager: React.FC = () => {
 
       // Row-level validation
       const htsRegex = /^\d{4}(?:\.\d{2}){0,3}$/;
-      const allowedUOM = new Set<string>([
-        'Number','Kilograms','Grams','Pounds','Ounces','Pieces','Each','Dozen','Set',
-        'Meters','Centimeters','Inches','Liters','Milliliters','Gallons','Square Meters','Cubic Meters'
-      ].map(v => v.toLowerCase()));
+      const allowedUOM = new Set<string>(VALID_UOMS.map(v => v.toLowerCase()));
       const errors: Array<{row: number;
         hts_code?: string; category?: string; description?: string; uom1?: string; uom2?: string; duty_rate?: string;
         hts_code_error?: string; category_error?: string; description_error?: string; uom1_error?: string; uom2_error?: string; duty_rate_error?: string
@@ -852,13 +872,16 @@ const AESHTSCodeManager: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     UOM1 (Primary Unit) *
                   </label>
-                  <input
-                    type="text"
-                    value={formData.uom1}
-                    onChange={(e) => setFormData({ ...formData, uom1: e.target.value })}
-                    placeholder="Number, Kilograms, Dozen"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <Select value={formData.uom1 || ''} onValueChange={(v) => setFormData({ ...formData, uom1: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VALID_UOMS.map((u) => (
+                        <SelectItem key={`uom1-${u}`} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="mt-1 text-xs text-gray-500">First Unit of Measurement for AES filing</p>
                 </div>
 
@@ -866,13 +889,20 @@ const AESHTSCodeManager: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     UOM2 (Secondary Unit)
                   </label>
-                  <input
-                    type="text"
-                    value={formData.uom2}
-                    onChange={(e) => setFormData({ ...formData, uom2: e.target.value })}
-                    placeholder="Pairs, Square Meters (optional)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <Select
+                    value={(formData.uom2 ?? '') === '' ? '__none__' : (formData.uom2 as string)}
+                    onValueChange={(v) => setFormData({ ...formData, uom2: v === '__none__' ? '' : v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Optional: select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {VALID_UOMS.map((u) => (
+                        <SelectItem key={`uom2-${u}`} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="mt-1 text-xs text-gray-500">Second Unit of Measurement for AES filing (optional)</p>
                 </div>
                 

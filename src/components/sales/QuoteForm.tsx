@@ -1019,11 +1019,34 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           const serviceTypeCode = serviceType?.code;
           
           if (serviceTypeCode) {
-            const carriersRes = await supabase
+            // Normalize to carrier_service_types.service_type values
+            const normCode = (() => {
+              const raw = String(serviceTypeCode).toLowerCase();
+              switch (raw) {
+                case 'ocean':
+                case 'ocean_freight':
+                  return 'ocean';
+                case 'air':
+                case 'air_freight':
+                  return 'air';
+                case 'inland_trucking':
+                case 'trucking':
+                case 'road':
+                  return 'trucking';
+                case 'courier':
+                  return 'courier';
+                case 'railway_transport':
+                case 'rail':
+                  return 'railway_transport';
+                default:
+                  return raw.split('_')[0];
+              }
+            })();
+            const carriersRes = await (supabase as any)
               .from('carrier_service_types')
               .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
-              .eq('tenant_id', tenantId)
-              .eq('service_type', serviceTypeCode)
+              .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
+              .eq('service_type', normCode)
               .eq('is_active', true);
             if (carriersRes.error) throw carriersRes.error;
             // Map carriers from join and de-duplicate by id to avoid double labels
@@ -1035,6 +1058,48 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               mappedById[String(c.id)] = c;
             }
             let mapped = Object.values(mappedById);
+
+            // Fallback: if no mappings present, use carriers table by mode/carrier_type
+            if (mapped.length === 0) {
+              const { data: allCarriers } = await (supabase as any)
+                .from('carriers')
+                .select('id, carrier_name, is_active, carrier_type, mode, tenant_id')
+                .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
+                .order('carrier_name');
+              const normalizeCarrierType = (mode?: string, type?: string) => {
+                const m = String(mode || '').toLowerCase();
+                const t = String(type || '').toLowerCase();
+                const key = m || t;
+                switch (key) {
+                  case 'ocean':
+                    return 'ocean';
+                  case 'air':
+                  case 'air_cargo':
+                    return 'air';
+                  case 'inland_trucking':
+                  case 'trucking':
+                  case 'road':
+                    return 'trucking';
+                  case 'courier':
+                    return 'courier';
+                  case 'movers_packers':
+                  case 'movers_and_packers':
+                  case 'moving':
+                    return 'moving';
+                  case 'railway_transport':
+                  case 'rail':
+                    return 'railway_transport';
+                  default:
+                    return key.split('_')[0];
+                }
+              };
+              const fallbacks = (allCarriers || [])
+                .filter((c: any) => c && c.is_active)
+                .filter((c: any) => normalizeCarrierType(c.mode, c.carrier_type) === normCode);
+              const fbById: Record<string, any> = {};
+              for (const c of fallbacks) fbById[String(c.id)] = c;
+              mapped = Object.values(fbById);
+            }
             // Ensure saved carrier (in edit mode) appears in the list even if not mapped
             const selectedCarrierId = form.getValues('carrier_id');
             if (selectedCarrierId && !mapped.some((c: any) => String(c.id) === String(selectedCarrierId))) {
@@ -1249,12 +1314,34 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         setCarriers([]);
         return;
       }
-      
-      const carriersRes: any = await supabase
+      // Normalize to carrier_service_types.service_type values and include global mappings
+      const normCode = (() => {
+        const raw = String(serviceTypeCode).toLowerCase();
+        switch (raw) {
+          case 'ocean':
+          case 'ocean_freight':
+            return 'ocean';
+          case 'air':
+          case 'air_freight':
+            return 'air';
+          case 'inland_trucking':
+          case 'trucking':
+          case 'road':
+            return 'trucking';
+          case 'courier':
+            return 'courier';
+          case 'railway_transport':
+          case 'rail':
+            return 'railway_transport';
+          default:
+            return raw.split('_')[0];
+        }
+      })();
+      const carriersRes: any = await (supabase as any)
         .from('carrier_service_types')
         .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
-        .eq('tenant_id', tenantId)
-        .eq('service_type', serviceTypeCode)
+        .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
+        .eq('service_type', normCode)
         .eq('is_active', true);
       if (carriersRes.error) {
         console.warn('Failed to fetch carriers by service type:', carriersRes.error);

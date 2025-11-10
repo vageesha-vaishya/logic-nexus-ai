@@ -29,6 +29,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
 
   const [charges, setCharges] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
+  const [filteredCarriers, setFilteredCarriers] = useState<any[]>([]);
   const [serviceTypes, setServiceTypes] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
@@ -150,6 +151,156 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       // Reset provider selection when service type changes
       setServiceId(null);
       setProviderId(null);
+    })();
+  }, [serviceTypeId]);
+
+  // Filter carriers (service providers) by selected service type via mappings → services.mode
+  useEffect(() => {
+    (async () => {
+      try {
+        setFilteredCarriers([]);
+        if (!serviceTypeId) return;
+        // 1) Find mapped services for this service type (prefer FK service_type_id)
+        let mappedServiceIds: string[] = [];
+        try {
+          const { data: m1 } = await (supabase as any)
+            .from('service_type_mappings')
+            .select('service_id')
+            .eq('service_type_id', serviceTypeId)
+            .eq('is_active', true)
+            .order('priority');
+          mappedServiceIds = (m1 ?? []).map((m: any) => String(m.service_id)).filter(Boolean);
+        } catch {}
+
+        // Fallback to text-based mapping if FK isn’t available
+        if (!mappedServiceIds.length) {
+          const { data: stData } = await supabase
+            .from('service_types')
+            .select('code, name')
+            .eq('id', serviceTypeId)
+            .maybeSingle();
+          const rawKey = stData?.code ?? stData?.name;
+          if (!rawKey) {
+            setFilteredCarriers([]);
+            return;
+          }
+          const norm = String(rawKey).toLowerCase().replace(/\s+/g, '_');
+          const baseCode = norm.split('_')[0];
+          const { data: m2 } = await (supabase as any)
+            .from('service_type_mappings')
+            .select('service_id')
+            .eq('service_type', baseCode)
+            .eq('is_active', true)
+            .order('priority');
+          mappedServiceIds = (m2 ?? []).map((m: any) => String(m.service_id)).filter(Boolean);
+        }
+
+        if (!mappedServiceIds.length) {
+          setFilteredCarriers([]);
+          return;
+        }
+
+        // 2) Load services to detect their transport mode
+        const { data: svcs } = await (supabase as any)
+          .from('services')
+          .select('id, mode, service_type, is_active')
+          .in('id', mappedServiceIds);
+        const activeSvcs = (svcs ?? []).filter((s: any) => s.is_active !== false);
+
+        // Normalize to carrier_service_types.service_type values
+        const toCstType = (m?: string, st?: string) => {
+          const raw = (m || st || '').toLowerCase();
+          // Normalize common service names to carrier_service_types.service_type values
+          switch (raw) {
+            case 'ocean':
+            case 'ocean_freight':
+              return 'ocean';
+            case 'air':
+            case 'air_freight':
+              return 'air';
+            case 'inland_trucking':
+            case 'trucking':
+            case 'road':
+              return 'trucking';
+            case 'courier':
+              return 'courier';
+            case 'railway_transport':
+            case 'rail':
+              return 'railway_transport';
+            case 'movers_packers':
+            case 'moving':
+              return 'moving';
+            default:
+              // Fallback to base segment if given compound like "ocean_lcl"
+              return raw.split('_')[0] || 'ocean';
+          }
+        };
+        const cstTypes = Array.from(new Set(activeSvcs.map((s: any) => toCstType(s.mode, s.service_type)).filter(Boolean)));
+        if (!cstTypes.length) {
+          setFilteredCarriers([]);
+          return;
+        }
+
+        // 3) Query carrier_service_types for those types and dedupe carriers
+        const { data: rows } = await (supabase as any)
+          .from('carrier_service_types')
+          .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, is_active)')
+          .eq('is_active', true)
+          .in('service_type', cstTypes);
+
+        const mappedRaw = (rows || [])
+          .map((row: any) => row.carriers)
+          .filter((c: any) => !!c && c.is_active !== false);
+        const byId: Record<string, any> = {};
+        for (const c of mappedRaw) byId[String(c.id)] = c;
+        let result = Object.values(byId);
+
+        // Fallback: if no mappings found, look up carriers by mode/carrier_type
+        if (result.length === 0) {
+          const { data: allCarriers } = await (supabase as any)
+            .from('carriers')
+            .select('id, carrier_name, is_active, carrier_type, mode, tenant_id')
+            .order('carrier_name');
+          const normalizeCarrierType = (mode?: string, type?: string) => {
+            const m = String(mode || '').toLowerCase();
+            const t = String(type || '').toLowerCase();
+            const key = m || t;
+            switch (key) {
+              case 'ocean':
+                return 'ocean';
+              case 'air':
+              case 'air_cargo':
+                return 'air';
+              case 'inland_trucking':
+              case 'trucking':
+              case 'road':
+                return 'trucking';
+              case 'courier':
+                return 'courier';
+              case 'movers_packers':
+              case 'movers_and_packers':
+              case 'moving':
+                return 'moving';
+              case 'railway_transport':
+              case 'rail':
+                return 'railway_transport';
+              default:
+                return key.split('_')[0];
+            }
+          };
+          const fallbacks = (allCarriers || [])
+            .filter((c: any) => c && c.is_active !== false)
+            .filter((c: any) => cstTypes.includes(normalizeCarrierType(c.mode, c.carrier_type)));
+          const fbById: Record<string, any> = {};
+          for (const c of fallbacks) fbById[String(c.id)] = c;
+          result = Object.values(fbById);
+        }
+
+        setFilteredCarriers(result);
+      } catch (e) {
+        console.warn('[QuoteComposer] Failed to filter carriers by service type', e);
+        setFilteredCarriers([]);
+      }
     })();
   }, [serviceTypeId]);
 
@@ -403,10 +554,14 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                 ))}
               </SelectContent>
             </Select>
-            <Select value={providerId ?? ''} onValueChange={setProviderId} disabled={!serviceId}>
+            <Select value={providerId ?? ''} onValueChange={setProviderId} disabled={!serviceTypeId}>
               <SelectTrigger><SelectValue placeholder="Service Provider" /></SelectTrigger>
               <SelectContent>
-                {(carriers ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.carrier_name}</SelectItem>)}
+                {(filteredCarriers ?? []).length > 0
+                  ? (filteredCarriers ?? []).map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.carrier_name}</SelectItem>
+                    ))
+                  : (<SelectItem disabled value="__no_providers__">No providers for selected type</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={importExport} onValueChange={setImportExport} disabled={!providerId}>
@@ -478,10 +633,14 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                 ))}
               </SelectContent>
             </Select>
-            <Select value={providerId ?? ''} onValueChange={setProviderId}>
+            <Select value={providerId ?? ''} onValueChange={setProviderId} disabled={!serviceTypeId}>
               <SelectTrigger><SelectValue placeholder="Leg Provider" /></SelectTrigger>
               <SelectContent>
-                {(carriers ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.carrier_name}</SelectItem>)}
+                {(filteredCarriers ?? []).length > 0
+                  ? (filteredCarriers ?? []).map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.carrier_name}</SelectItem>
+                    ))
+                  : (<SelectItem disabled value="__no_providers__">No providers for selected type</SelectItem>)}
               </SelectContent>
             </Select>
             <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="Leg Origin" />
