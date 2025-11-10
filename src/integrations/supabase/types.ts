@@ -229,6 +229,54 @@ export type Database = {
           },
         ]
       }
+      aes_hts_codes: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          duty_rate: string | null
+          hts_code: string
+          id: string
+          schedule_b: string | null
+          special_provisions: string | null
+          sub_category: string | null
+          sub_sub_category: string | null
+          uom1: string | null
+          uom2: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          duty_rate?: string | null
+          hts_code: string
+          id?: string
+          schedule_b?: string | null
+          special_provisions?: string | null
+          sub_category?: string | null
+          sub_sub_category?: string | null
+          uom1?: string | null
+          uom2?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          duty_rate?: string | null
+          hts_code?: string
+          id?: string
+          schedule_b?: string | null
+          special_provisions?: string | null
+          sub_category?: string | null
+          sub_sub_category?: string | null
+          uom1?: string | null
+          uom2?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
