@@ -134,6 +134,9 @@ export default function Settings() {
                     <Button variant="outline" onClick={() => navigate('/dashboard/settings/master-data')}>
                       Master Data (Geography)
                     </Button>
+                    <Button variant="outline" onClick={() => navigate('/dashboard/settings/master-data-hts')}>
+                      Master Data (HTS Codes)
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
