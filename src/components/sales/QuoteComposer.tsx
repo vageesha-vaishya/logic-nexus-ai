@@ -160,6 +160,11 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       try {
         setFilteredCarriers([]);
         if (!serviceTypeId) return;
+        
+        // Get tenantId
+        const { data: userData } = await supabase.auth.getUser();
+        const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+        
         // 1) Find mapped services for this service type (prefer FK service_type_id)
         let mappedServiceIds: string[] = [];
         try {
@@ -200,16 +205,16 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
           return;
         }
 
-        // 2) Load services to detect their transport mode
+        // 2) Load services to detect their transport mode (service_type only, no 'mode' column)
         const { data: svcs } = await (supabase as any)
           .from('services')
-          .select('id, mode, service_type, is_active')
+          .select('id, service_type, is_active')
           .in('id', mappedServiceIds);
         const activeSvcs = (svcs ?? []).filter((s: any) => s.is_active !== false);
 
         // Normalize to carrier_service_types.service_type values
-        const toCstType = (m?: string, st?: string) => {
-          const raw = (m || st || '').toLowerCase();
+        const toCstType = (st?: string) => {
+          const raw = (st || '').toLowerCase();
           // Normalize common service names to carrier_service_types.service_type values
           switch (raw) {
             case 'ocean':
@@ -235,16 +240,17 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
               return raw.split('_')[0] || 'ocean';
           }
         };
-        const cstTypes = Array.from(new Set(activeSvcs.map((s: any) => toCstType(s.mode, s.service_type)).filter(Boolean)));
+        const cstTypes = Array.from(new Set(activeSvcs.map((s: any) => toCstType(s.service_type)).filter(Boolean)));
         if (!cstTypes.length) {
           setFilteredCarriers([]);
           return;
         }
 
-        // 3) Query carrier_service_types for those types and dedupe carriers
+        // 3) Query carrier_service_types for those types and dedupe carriers (tenant+global)
         const { data: rows } = await (supabase as any)
           .from('carrier_service_types')
-          .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, is_active)')
+          .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
+          .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
           .eq('is_active', true)
           .in('service_type', cstTypes);
 
