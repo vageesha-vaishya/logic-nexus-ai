@@ -15,7 +15,8 @@ type CodeRecord = {
   sub_category?: string;
   sub_sub_category?: string;
   description: string;
-  unit_of_measure?: string;
+  uom1?: string;
+  uom2?: string;
   duty_rate?: string;
   special_provisions?: string;
   created_at?: string;
@@ -45,12 +46,14 @@ const AESHTSCodeManager: React.FC = () => {
     hts_code?: string;
     category?: string;
     description?: string;
-    unit_of_measure?: string;
+    uom1?: string;
+    uom2?: string;
     duty_rate?: string;
     hts_code_error?: string;
     category_error?: string;
     description_error?: string;
-    unit_of_measure_error?: string;
+    uom1_error?: string;
+    uom2_error?: string;
     duty_rate_error?: string;
   }>>([]);
   const [showErrorTable, setShowErrorTable] = useState<boolean>(false);
@@ -62,7 +65,8 @@ const AESHTSCodeManager: React.FC = () => {
     sub_category: '',
     sub_sub_category: '',
     description: '',
-    unit_of_measure: '',
+    uom1: '',
+    uom2: '',
     duty_rate: '',
     special_provisions: ''
   });
@@ -75,7 +79,8 @@ const AESHTSCodeManager: React.FC = () => {
     'sub_category',
     'sub_sub_category',
     'description',
-    'unit_of_measure',
+    'uom1',
+    'uom2',
     'duty_rate',
     'special_provisions',
   ];
@@ -130,7 +135,8 @@ const AESHTSCodeManager: React.FC = () => {
         sub_category: 'Helicopters',
         sub_sub_category: 'Unladen weight not exceeding 998 kg',
         description: 'Helicopters with an unladen weight not exceeding 998 kg',
-        unit_of_measure: 'Number',
+        uom1: 'Number',
+        uom2: '',
         duty_rate: 'Free',
         special_provisions: 'License may be required'
       },
@@ -142,7 +148,8 @@ const AESHTSCodeManager: React.FC = () => {
         sub_category: 'Helicopters',
         sub_sub_category: 'Unladen weight exceeding 998 kg',
         description: 'Helicopters with an unladen weight exceeding 998 kg',
-        unit_of_measure: 'Number',
+        uom1: 'Number',
+        uom2: '',
         duty_rate: 'Free',
         special_provisions: 'License may be required'
       },
@@ -154,7 +161,8 @@ const AESHTSCodeManager: React.FC = () => {
         sub_category: 'Portable automatic data processing machines',
         sub_sub_category: 'Weighing not more than 10 kg',
         description: 'Portable automatic data processing machines, weighing not more than 10 kg, consisting of at least a central processing unit, a keyboard and a display',
-        unit_of_measure: 'Number',
+        uom1: 'Number',
+        uom2: '',
         duty_rate: 'Free',
         special_provisions: 'FCC approval required'
       }
@@ -241,7 +249,8 @@ const AESHTSCodeManager: React.FC = () => {
       sub_category: code.sub_category ?? '',
       sub_sub_category: code.sub_sub_category ?? '',
       description: code.description,
-      unit_of_measure: code.unit_of_measure ?? '',
+      uom1: code.uom1 ?? '',
+      uom2: code.uom2 ?? '',
       duty_rate: code.duty_rate ?? '',
       special_provisions: code.special_provisions ?? ''
     });
@@ -282,7 +291,8 @@ const AESHTSCodeManager: React.FC = () => {
       sub_category: '',
       sub_sub_category: '',
       description: '',
-      unit_of_measure: '',
+      uom1: '',
+      uom2: '',
       duty_rate: '',
       special_provisions: ''
     });
@@ -328,7 +338,8 @@ const AESHTSCodeManager: React.FC = () => {
           sub_category: d['sub_category'] || '',
           sub_sub_category: d['sub_sub_category'] || '',
           description: d['description'] || '',
-          unit_of_measure: d['unit_of_measure'] || '',
+          uom1: d['uom1'] || '',
+          uom2: d['uom2'] || '',
           duty_rate: d['duty_rate'] || '',
           special_provisions: d['special_provisions'] || ''
       }));
@@ -340,8 +351,8 @@ const AESHTSCodeManager: React.FC = () => {
         'Meters','Centimeters','Inches','Liters','Milliliters','Gallons','Square Meters','Cubic Meters'
       ].map(v => v.toLowerCase()));
       const errors: Array<{row: number;
-        hts_code?: string; category?: string; description?: string; unit_of_measure?: string; duty_rate?: string;
-        hts_code_error?: string; category_error?: string; description_error?: string; unit_of_measure_error?: string; duty_rate_error?: string
+        hts_code?: string; category?: string; description?: string; uom1?: string; uom2?: string; duty_rate?: string;
+        hts_code_error?: string; category_error?: string; description_error?: string; uom1_error?: string; uom2_error?: string; duty_rate_error?: string
       }> = [];
 
       // Query live codes from Supabase right before import to avoid race conditions
@@ -364,7 +375,8 @@ const AESHTSCodeManager: React.FC = () => {
         const htsIssues: string[] = [];
         const categoryIssues: string[] = [];
         const descriptionIssues: string[] = [];
-        const uomIssues: string[] = [];
+        const uom1Issues: string[] = [];
+        const uom2Issues: string[] = [];
         const dutyIssues: string[] = [];
 
         const code = (r.hts_code || '').trim();
@@ -377,11 +389,19 @@ const AESHTSCodeManager: React.FC = () => {
         if (!r.category) categoryIssues.push('missing');
         if (!r.description) descriptionIssues.push('missing');
 
-        // unit_of_measure constrained list (if provided)
-        const uom = (r.unit_of_measure || '').trim();
-        if (uom) {
-          if (!allowedUOM.has(uom.toLowerCase())) {
-            uomIssues.push('invalid_value');
+        // uom1 constrained list (if provided)
+        const uom1 = (r.uom1 || '').trim();
+        if (uom1) {
+          if (!allowedUOM.has(uom1.toLowerCase())) {
+            uom1Issues.push('invalid_value');
+          }
+        }
+
+        // uom2 constrained list (if provided)
+        const uom2 = (r.uom2 || '').trim();
+        if (uom2) {
+          if (!allowedUOM.has(uom2.toLowerCase())) {
+            uom2Issues.push('invalid_value');
           }
         }
 
@@ -394,18 +414,20 @@ const AESHTSCodeManager: React.FC = () => {
           }
         }
 
-        if (htsIssues.length || categoryIssues.length || descriptionIssues.length || uomIssues.length || dutyIssues.length) {
+        if (htsIssues.length || categoryIssues.length || descriptionIssues.length || uom1Issues.length || uom2Issues.length || dutyIssues.length) {
           errors.push({
             row: rowNum,
             hts_code: r.hts_code,
             category: r.category,
             description: r.description,
-            unit_of_measure: r.unit_of_measure,
+            uom1: r.uom1,
+            uom2: r.uom2,
             duty_rate: r.duty_rate,
             hts_code_error: htsIssues.join('|') || undefined,
             category_error: categoryIssues.join('|') || undefined,
             description_error: descriptionIssues.join('|') || undefined,
-            unit_of_measure_error: uomIssues.join('|') || undefined,
+            uom1_error: uom1Issues.join('|') || undefined,
+            uom2_error: uom2Issues.join('|') || undefined,
             duty_rate_error: dutyIssues.join('|') || undefined,
           });
           return false;
@@ -433,7 +455,8 @@ const AESHTSCodeManager: React.FC = () => {
           sub_category: d['sub_category'] || '',
           sub_sub_category: d['sub_sub_category'] || '',
           description: d['description'] || '',
-          unit_of_measure: d['unit_of_measure'] || '',
+          uom1: d['uom1'] || '',
+          uom2: d['uom2'] || '',
           duty_rate: d['duty_rate'] || '',
           special_provisions: d['special_provisions'] || ''
         });
@@ -479,7 +502,8 @@ const AESHTSCodeManager: React.FC = () => {
           sub_category: 'Meat of bovine animals, fresh or chilled',
           sub_sub_category: 'Carcasses and half-carcasses',
           description: 'Carcasses and half-carcasses of bovine animals, fresh or chilled',
-          unit_of_measure: 'Kilograms',
+          uom1: 'Kilograms',
+          uom2: '',
           duty_rate: '4.4¢/kg',
           special_provisions: 'Subject to quota'
         },
@@ -490,7 +514,8 @@ const AESHTSCodeManager: React.FC = () => {
           sub_category: 'Men\'s or boys\' trousers and shorts',
           sub_sub_category: 'Of wool or fine animal hair',
           description: 'Men\'s or boys\' trousers, breeches and shorts of wool or fine animal hair',
-          unit_of_measure: 'Dozen',
+          uom1: 'Dozen',
+          uom2: 'Pieces',
           duty_rate: '16.2%',
           special_provisions: 'Category 347'
         }
@@ -825,15 +850,30 @@ const AESHTSCodeManager: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Unit of Measure
+                    UOM1 (Primary Unit) *
                   </label>
                   <input
                     type="text"
-                    value={formData.unit_of_measure}
-                    onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
+                    value={formData.uom1}
+                    onChange={(e) => setFormData({ ...formData, uom1: e.target.value })}
                     placeholder="Number, Kilograms, Dozen"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  <p className="mt-1 text-xs text-gray-500">First Unit of Measurement for AES filing</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    UOM2 (Secondary Unit)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.uom2}
+                    onChange={(e) => setFormData({ ...formData, uom2: e.target.value })}
+                    placeholder="Pairs, Square Meters (optional)"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Second Unit of Measurement for AES filing (optional)</p>
                 </div>
                 
                 <div>
@@ -993,12 +1033,14 @@ const AESHTSCodeManager: React.FC = () => {
                             <th className="px-2 py-1 text-left">HTS Code</th>
                             <th className="px-2 py-1 text-left">Category</th>
                             <th className="px-2 py-1 text-left">Description</th>
-                            <th className="px-2 py-1 text-left">Unit of Measure</th>
+                            <th className="px-2 py-1 text-left">UOM1</th>
+                            <th className="px-2 py-1 text-left">UOM2</th>
                             <th className="px-2 py-1 text-left">Duty Rate</th>
                             <th className="px-2 py-1 text-left">HTS Error</th>
                             <th className="px-2 py-1 text-left">Category Error</th>
                             <th className="px-2 py-1 text-left">Description Error</th>
-                            <th className="px-2 py-1 text-left">UOM Error</th>
+                            <th className="px-2 py-1 text-left">UOM1 Error</th>
+                            <th className="px-2 py-1 text-left">UOM2 Error</th>
                             <th className="px-2 py-1 text-left">Duty Error</th>
                           </tr>
                         </thead>
@@ -1009,12 +1051,14 @@ const AESHTSCodeManager: React.FC = () => {
                               <td className="px-2 py-1">{err.hts_code}</td>
                               <td className="px-2 py-1">{err.category}</td>
                               <td className="px-2 py-1">{err.description}</td>
-                              <td className="px-2 py-1">{err.unit_of_measure}</td>
+                              <td className="px-2 py-1">{err.uom1}</td>
+                              <td className="px-2 py-1">{err.uom2}</td>
                               <td className="px-2 py-1">{err.duty_rate}</td>
                               <td className="px-2 py-1 text-red-600">{err.hts_code_error}</td>
                               <td className="px-2 py-1 text-red-600">{err.category_error}</td>
                               <td className="px-2 py-1 text-red-600">{err.description_error}</td>
-                              <td className="px-2 py-1 text-red-600">{err.unit_of_measure_error}</td>
+                              <td className="px-2 py-1 text-red-600">{err.uom1_error}</td>
+                              <td className="px-2 py-1 text-red-600">{err.uom2_error}</td>
                               <td className="px-2 py-1 text-red-600">{err.duty_rate_error}</td>
                             </tr>
                           ))}
