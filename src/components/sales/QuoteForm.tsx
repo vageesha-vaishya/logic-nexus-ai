@@ -126,6 +126,30 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     }
   };
   
+  // Ensure unique carriers by normalized name; prefer current tenant entry when duplicates exist
+  const uniqueByCarrierName = (arr: any[], preferredTenantId?: string | null) => {
+    try {
+      const map: Record<string, any> = {};
+      for (const item of arr || []) {
+        const key = String((item as any)?.carrier_name || '').trim().toLowerCase();
+        if (!key) continue;
+        const existing = map[key];
+        if (!existing) {
+          map[key] = item;
+        } else {
+          const existingTenant = (existing as any)?.tenant_id ?? null;
+          const currentTenant = (item as any)?.tenant_id ?? null;
+          if (preferredTenantId && existingTenant !== preferredTenantId && currentTenant === preferredTenantId) {
+            map[key] = item;
+          }
+        }
+      }
+      return Object.values(map);
+    } catch {
+      return arr || [];
+    }
+  };
+  
   // Format carrier name defensively to avoid accidental repeated text in UI (e.g., "ABCABC")
   const formatCarrierName = (name: string) => {
     if (!name) return name;
@@ -1113,7 +1137,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 mapped = Object.values(mappedById);
               }
             }
-            setCarriers(mapped);
+            // Dedupe by name to avoid global + tenant duplicates; prefer tenant entry
+            setCarriers(uniqueByCarrierName(mapped, tenantId));
           } else {
             // No service type code found
             setCarriers([]);
@@ -1370,7 +1395,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           mapped = Object.values(mappedById);
         }
       }
-      setCarriers(mapped);
+      // Dedupe by name to avoid global + tenant duplicates; prefer tenant entry
+      setCarriers(uniqueByCarrierName(mapped, tenantId));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedServiceType, resolvedTenantId, isHydrating]);
@@ -2498,7 +2524,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                             {formatCarrierName(resolvedCarrierLabels[String(field.value)] || 'Selected Carrier')}
                           </SelectItem>
                         )}
-                        {carriers.map((carrier) => (
+                        {uniqueByCarrierName(uniqueById(carriers), resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id).map((carrier) => (
                           <SelectItem key={carrier.id} value={String(carrier.id)}>
                             {formatCarrierName(carrier.carrier_name)}
                           </SelectItem>

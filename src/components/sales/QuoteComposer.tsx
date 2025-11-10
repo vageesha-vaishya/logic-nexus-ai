@@ -8,6 +8,42 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quoteId: string; versionId: string; autoScroll?: boolean }) {
+  // Local helper to ensure unique items by id when rendering selects
+  const uniqueById = (arr: any[]) => {
+    try {
+      const map: Record<string, any> = {};
+      for (const item of arr || []) {
+        const id = (item as any)?.id;
+        if (id != null) map[String(id)] = item;
+      }
+      return Object.values(map);
+    } catch {
+      return arr || [];
+    }
+  };
+  // Dedupe carriers by normalized name; prefer tenant-scoped rows when available
+  const uniqueByCarrierName = (arr: any[], preferredTenantId?: string | null) => {
+    try {
+      const map: Record<string, any> = {};
+      for (const item of arr || []) {
+        const key = String((item as any)?.carrier_name || '').trim().toLowerCase();
+        if (!key) continue;
+        const existing = map[key];
+        if (!existing) {
+          map[key] = item;
+        } else {
+          const existingTenant = (existing as any)?.tenant_id ?? null;
+          const currentTenant = (item as any)?.tenant_id ?? null;
+          if (preferredTenantId && existingTenant !== preferredTenantId && currentTenant === preferredTenantId) {
+            map[key] = item;
+          }
+        }
+      }
+      return Object.values(map);
+    } catch {
+      return arr || [];
+    }
+  };
   const { toast } = useToast();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
@@ -35,10 +71,18 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [containerSizes, setContainerSizes] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
+  const [ports, setPorts] = useState<any[]>([]);
+  const [portFilterTypes, setPortFilterTypes] = useState<string[]>([]);
   // Legs management
   const [legs, setLegs] = useState<any[]>([]);
   const [currentLegId, setCurrentLegId] = useState<string | null>(null);
   const [chargesByLeg, setChargesByLeg] = useState<Record<string, any[]>>({});
+
+  const formatPortLabel = (p: any) => {
+    const name = String(p?.location_name || '').trim();
+    const code = String(p?.location_code || '').trim();
+    return code ? `${name} (${code})` : name;
+  };
 
   useEffect(() => {
     (async () => {
@@ -65,6 +109,19 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       setContainerSizes(cs ?? []);
       const { data: cur } = await supabase.from('currencies').select('id, code').order('code');
       setCurrencies(cur ?? []);
+      // Fetch ports/locations for current tenant (and global if available)
+      try {
+        const { data: pr } = await (supabase as any)
+          .from('ports_locations')
+          .select('id, location_name, location_code, location_type, tenant_id, is_active')
+          .eq('is_active', true)
+          .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
+          .order('location_name');
+        setPorts(pr ?? []);
+      } catch (e) {
+        console.warn('[QuoteComposer] Failed to load ports/locations', e);
+        setPorts([]);
+      }
       // Load margin methods for later if needed (optional)
       // const { data: mm } = await (supabase as any).from('margin_methods').select('id, name, code');
     })();
@@ -97,6 +154,23 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       
       // Extract base code (e.g., "ocean_freight" -> "ocean")
       const baseCode = serviceTypeData.code.split('_')[0].toLowerCase();
+      // Restrict visible ports by service type
+      switch (baseCode) {
+        case 'ocean':
+          setPortFilterTypes(['seaport']);
+          break;
+        case 'air':
+          setPortFilterTypes(['airport']);
+          break;
+        case 'trucking':
+          setPortFilterTypes(['inland_port', 'warehouse', 'terminal']);
+          break;
+        case 'courier':
+          setPortFilterTypes(['terminal', 'warehouse']);
+          break;
+        default:
+          setPortFilterTypes([]); // no restriction
+      }
       
       // Fetch mappings using FK service_type_id when available; fallback to text baseCode
       let mappingsQuery = (supabase as any)
@@ -302,7 +376,11 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
           result = Object.values(fbById);
         }
 
-        setFilteredCarriers(result);
+        // Dedupe by name to avoid global + tenant duplicates; prefer tenant entry
+        const deduped = uniqueByCarrierName(result, tenantId);
+        // Sort for stable UI order
+        deduped.sort((a: any, b: any) => String(a.carrier_name || '').localeCompare(String(b.carrier_name || '')));
+        setFilteredCarriers(deduped);
       } catch (e) {
         console.warn('[QuoteComposer] Failed to filter carriers by service type', e);
         setFilteredCarriers([]);
@@ -564,8 +642,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
               <SelectTrigger><SelectValue placeholder="Service Provider" /></SelectTrigger>
               <SelectContent>
                 {(filteredCarriers ?? []).length > 0
-                  ? (filteredCarriers ?? []).map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.carrier_name}</SelectItem>
+                  ? uniqueById(filteredCarriers ?? []).map((c: any) => (
+                      <SelectItem key={String(c.id)} value={String(c.id)}>{c.carrier_name}</SelectItem>
                     ))
                   : (<SelectItem disabled value="__no_providers__">No providers for selected type</SelectItem>)}
               </SelectContent>
@@ -590,8 +668,22 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                 {(containerSizes ?? []).map((cs) => <SelectItem key={cs.id} value={cs.id}>{cs.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="Origin Port/Location" disabled={!containerSizeId} />
-            <Input value={destinationLocation} onChange={e => setDestinationLocation(e.target.value)} placeholder="Destination Port/Location" disabled={!containerSizeId} />
+            <Select value={originLocation} onValueChange={setOriginLocation} disabled={!containerSizeId}>
+              <SelectTrigger><SelectValue placeholder="Origin Port/Location" /></SelectTrigger>
+              <SelectContent>
+                {uniqueById(ports).filter((p: any) => portFilterTypes.length ? portFilterTypes.includes(p.location_type) : true).map((p: any) => (
+                  <SelectItem key={String(p.id)} value={formatPortLabel(p)}>{formatPortLabel(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={destinationLocation} onValueChange={setDestinationLocation} disabled={!containerSizeId}>
+              <SelectTrigger><SelectValue placeholder="Destination Port/Location" /></SelectTrigger>
+              <SelectContent>
+                {uniqueById(ports).filter((p: any) => portFilterTypes.length ? portFilterTypes.includes(p.location_type) : true).map((p: any) => (
+                  <SelectItem key={String(p.id)} value={formatPortLabel(p)}>{formatPortLabel(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} placeholder="Valid Until" />
@@ -649,8 +741,22 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                   : (<SelectItem disabled value="__no_providers__">No providers for selected type</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input value={originLocation} onChange={e => setOriginLocation(e.target.value)} placeholder="Leg Origin" />
-            <Input value={destinationLocation} onChange={e => setDestinationLocation(e.target.value)} placeholder="Leg Destination" />
+            <Select value={originLocation} onValueChange={setOriginLocation}>
+              <SelectTrigger><SelectValue placeholder="Leg Origin" /></SelectTrigger>
+              <SelectContent>
+                {uniqueById(ports).filter((p: any) => portFilterTypes.length ? portFilterTypes.includes(p.location_type) : true).map((p: any) => (
+                  <SelectItem key={String(p.id)} value={formatPortLabel(p)}>{formatPortLabel(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={destinationLocation} onValueChange={setDestinationLocation}>
+              <SelectTrigger><SelectValue placeholder="Leg Destination" /></SelectTrigger>
+              <SelectContent>
+                {uniqueById(ports).filter((p: any) => portFilterTypes.length ? portFilterTypes.includes(p.location_type) : true).map((p: any) => (
+                  <SelectItem key={String(p.id)} value={formatPortLabel(p)}>{formatPortLabel(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 

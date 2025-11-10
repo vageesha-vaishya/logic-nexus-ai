@@ -12,6 +12,7 @@ import { PortLocationForm } from '@/components/logistics/PortLocationForm';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { seedPortsForTenant } from '@/integrations/supabase/seedPortsLocations';
 import {
   Table,
   TableBody,
@@ -68,39 +69,8 @@ export default function PortsLocations() {
       // Dev-only: auto-seed demo ports/locations if none exist (only when tenant scoped)
       if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
         try {
-          await supabase.from('ports_locations').insert([
-            {
-              tenant_id: tenantId,
-              location_name: 'Port of Los Angeles',
-              location_code: 'USLAX',
-              location_type: 'seaport',
-              country: 'United States',
-              city: 'Los Angeles',
-              customs_available: true,
-              is_active: true,
-            },
-            {
-              tenant_id: tenantId,
-              location_name: 'Singapore Changi Airport',
-              location_code: 'SIN',
-              location_type: 'airport',
-              country: 'Singapore',
-              city: 'Singapore',
-              customs_available: true,
-              is_active: true,
-            },
-            {
-              tenant_id: tenantId,
-              location_name: 'Mumbai Inland Port',
-              location_code: 'INBOM-IP',
-              location_type: 'inland_port',
-              country: 'India',
-              city: 'Mumbai',
-              customs_available: false,
-              is_active: true,
-            },
-          ]);
-          toast.success('Seeded demo ports/locations');
+          const count = await seedPortsForTenant(supabase, tenantId as string);
+          if (count > 0) toast.success(`Seeded ${count} demo ports/locations`);
           const { data: seeded } = await supabase
             .from('ports_locations')
             .select('*')
@@ -183,6 +153,16 @@ export default function PortsLocations() {
               <PortLocationForm onSuccess={handleSuccess} />
             </DialogContent>
           </Dialog>
+          {import.meta.env.DEV && (context.tenantId || roles?.[0]?.tenant_id) && (
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+                const count = await seedPortsForTenant(supabase, tenantId as string);
+                if (count > 0) fetchPorts();
+              }}
+            >Seed Demo Ports</Button>
+          )}
         </div>
 
         <Card>
