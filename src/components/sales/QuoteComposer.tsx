@@ -5,7 +5,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input';
 import ChargesTable from './ChargesTable';
 import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
+import { listCarrierRatesForQuote } from '@/integrations/supabase/carrierRatesActions';
 
 export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quoteId: string; versionId: string; autoScroll?: boolean }) {
   // Local helper to ensure unique items by id when rendering selects
@@ -45,6 +47,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     }
   };
   const { toast } = useToast();
+  const { context } = useCRM();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
@@ -84,6 +87,44 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     return code ? `${name} (${code})` : name;
   };
 
+  // Resolve tenant_id from context or parent quote/version
+  const getTenantId = async (): Promise<string | null> => {
+    try {
+      if (context?.tenantId) return context.tenantId;
+      // Try version -> tenant
+      if (versionId) {
+        const { data: v } = await (supabase as any)
+          .from('quotation_versions')
+          .select('tenant_id, quote_id')
+          .eq('id', versionId)
+          .maybeSingle();
+        const vt = v?.tenant_id ?? null;
+        if (vt) return vt;
+        const vq = v?.quote_id ?? null;
+        if (vq) {
+          const { data: q } = await (supabase as any)
+            .from('quotes')
+            .select('tenant_id')
+            .eq('id', vq)
+            .maybeSingle();
+          if (q?.tenant_id) return q.tenant_id;
+        }
+      }
+      // Fallback from quoteId directly
+      if (quoteId) {
+        const { data: q2 } = await (supabase as any)
+          .from('quotes')
+          .select('tenant_id')
+          .eq('id', quoteId)
+          .maybeSingle();
+        if (q2?.tenant_id) return q2.tenant_id;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     (async () => {
       const { data: c } = await supabase.from('carriers').select('id, carrier_name').order('carrier_name');
@@ -93,8 +134,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       // Services will be populated based on selected service type via mapping table
       setServices([]);
       // Fetch container types/sizes for current tenant, including global (tenant_id NULL)
-      const { data: userData } = await supabase.auth.getUser();
-      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+      const tenantId = await getTenantId();
       const { data: ct } = await (supabase as any)
         .from('container_types')
         .select('id, name, tenant_id')
@@ -398,23 +438,67 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
 
   useEffect(() => {
     (async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
-      const { data, error } = await (supabase as any)
-        .from('quotation_version_options')
-        .insert({
-          tenant_id: tenantId,
-          quotation_version_id: versionId,
-          quote_currency_id: currencyId,
-        })
-        .select('id')
-        .single();
-      if (!error && data?.id) setOptionId(data.id);
+      const tenantId = await getTenantId();
+      if (!tenantId) {
+        toast({ title: 'Failed to create option', description: 'Missing tenant scope. Open this screen from a tenant-scoped quote or select a tenant.' });
+        return;
+      }
+      // Try inserting option without carrier_rate_id; fallback if schema requires it
+      let createdOptionId: string | null = null;
+      try {
+        const { data, error } = await (supabase as any)
+          .from('quotation_version_options')
+          .insert({
+            tenant_id: tenantId,
+            quotation_version_id: versionId,
+            quote_currency_id: currencyId,
+          })
+          .select('id')
+          .single();
+        if (!error && data?.id) {
+          createdOptionId = data.id;
+          setOptionId(data.id);
+        } else if (error) {
+          const msg = String(error.message || error);
+          if (msg.includes('carrier_rate_id') && msg.includes('not-null')) {
+            const rates = await listCarrierRatesForQuote(quoteId, supabase as any);
+            const rid = rates?.[0]?.id || null;
+            if (rid) {
+              const { data: dataWithRate, error: rateInsertErr } = await (supabase as any)
+                .from('quotation_version_options')
+                .insert({
+                  tenant_id: tenantId,
+                  quotation_version_id: versionId,
+                  carrier_rate_id: rid,
+                  quote_currency_id: currencyId,
+                })
+                .select('id')
+                .single();
+              if (!rateInsertErr && dataWithRate?.id) {
+                createdOptionId = dataWithRate.id;
+                setOptionId(dataWithRate.id);
+              } else {
+                toast({ title: 'Failed to create option', description: String(rateInsertErr?.message || rateInsertErr || 'Unknown error while inserting with carrier_rate_id') });
+                return;
+              }
+            } else {
+              toast({ title: 'Failed to create option', description: 'Schema requires carrier_rate_id, but no carrier rates exist for this quote. Hydrate rates or apply the migration to allow NULL.' });
+              return;
+            }
+          } else {
+            toast({ title: 'Failed to create option', description: msg });
+            return;
+          }
+        }
+      } catch (e: any) {
+        toast({ title: 'Failed to create option', description: String(e?.message || e) });
+        return;
+      }
       // Initialize first leg
-      if (!error && data?.id) {
+      if (createdOptionId) {
         const { data: leg } = await (supabase as any)
           .from('quotation_version_option_legs')
-          .insert({ tenant_id: tenantId, quote_option_id: data.id, leg_order: 1 })
+          .insert({ tenant_id: tenantId, quotation_version_option_id: createdOptionId, leg_order: 1 })
           .select('id')
           .single();
         if (leg?.id) {
@@ -453,8 +537,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       // Map import/export to leg trade_direction
       let tradeDirectionId: string | null = null;
       if (importExport) {
-        const { data: userData } = await supabase.auth.getUser();
-        const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+        const tenantId = await getTenantId();
         const { data: dir } = await (supabase as any)
           .from('trade_directions')
           .select('id, code')
@@ -481,8 +564,11 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
 
   const saveCharges = async () => {
     if (!optionId || !currentLegId) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+    const tenantId = await getTenantId();
+    if (!tenantId) {
+      toast({ title: 'Failed to save charges', description: 'Missing tenant scope. Please ensure a tenant is selected.' });
+      return;
+    }
     const legCharges = chargesByLeg[currentLegId] ?? [];
     const payload = legCharges.map((c: any) => ({
       tenant_id: tenantId,
@@ -530,6 +616,79 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       rounding_rule: roundingRule,
       min_margin: minMargin,
     }).eq('id', optionId);
+  };
+
+  // Ensure an option and an initial leg exist; return leg id
+  const ensureOptionAndLeg = async (): Promise<string | null> => {
+    let legId = currentLegId;
+    let optId = optionId;
+    try {
+      const tenantId = await getTenantId();
+      if (!tenantId) {
+        toast({ title: 'Failed to create option', description: 'Missing tenant scope. Select a tenant or open via a tenant-scoped quote.' });
+        return null;
+      }
+      // Create option if missing
+      if (!optId) {
+        const { data: opt, error: optErr } = await (supabase as any)
+          .from('quotation_version_options')
+          .insert({ tenant_id: tenantId, quotation_version_id: versionId, quote_currency_id: currencyId })
+          .select('id')
+          .single();
+        if (optErr) {
+          const msg = String(optErr.message || optErr);
+          if (msg.includes('carrier_rate_id') && msg.includes('not-null')) {
+            const rates = await listCarrierRatesForQuote(quoteId, supabase as any);
+            const rid = rates?.[0]?.id || null;
+            if (rid) {
+              const { data: opt2, error: optErr2 } = await (supabase as any)
+                .from('quotation_version_options')
+                .insert({ tenant_id: tenantId, quotation_version_id: versionId, carrier_rate_id: rid, quote_currency_id: currencyId })
+                .select('id')
+                .single();
+              if (optErr2) {
+                toast({ title: 'Failed to create option', description: String(optErr2.message || optErr2) });
+                return null;
+              }
+              optId = opt2?.id ?? null;
+              if (optId) setOptionId(optId);
+            } else {
+              toast({ title: 'Failed to create option', description: 'No carrier rates found for this quote. Please hydrate carrier rates or update schema to allow NULL carrier_rate_id.' });
+              return null;
+            }
+          } else {
+            toast({ title: 'Failed to create option', description: msg });
+            return null;
+          }
+        } else {
+          optId = opt?.id ?? null;
+          if (optId) setOptionId(optId);
+        }
+      }
+      // Create leg if missing
+      if (!legId && optId) {
+        const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
+        const { data: leg, error: legErr } = await (supabase as any)
+          .from('quotation_version_option_legs')
+          .insert({ tenant_id: tenantId, quotation_version_option_id: optId, leg_order: nextOrder })
+          .select('id, leg_order')
+          .single();
+        if (legErr) {
+          toast({ title: 'Failed to create leg', description: String(legErr.message || legErr) });
+          return null;
+        }
+        if (leg?.id) {
+          legId = leg.id;
+          setLegs(prev => [...prev, { id: leg.id, leg_order: leg.leg_order }]);
+          setCurrentLegId(leg.id);
+          setChargesByLeg(prev => ({ ...prev, [leg.id]: prev[leg.id] ?? [] }));
+        }
+      }
+      return legId ?? null;
+    } catch (e: any) {
+      toast({ title: 'Setup error', description: String(e?.message || e) });
+      return null;
+    }
   };
 
   const hydrateCharges = async () => {
@@ -596,12 +755,15 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
             <Button
               variant="outline"
               onClick={async () => {
-                const { data: userData } = await supabase.auth.getUser();
-                const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+                const tenantId = await getTenantId();
+                if (!tenantId) {
+                  toast({ title: 'Failed to create leg', description: 'Missing tenant scope. Open via a tenant-scoped quote.' });
+                  return;
+                }
                 const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
                 const { data: leg } = await (supabase as any)
                   .from('quotation_version_option_legs')
-                  .insert({ tenant_id: tenantId, quote_option_id: optionId, leg_order: nextOrder })
+                  .insert({ tenant_id: tenantId, quotation_version_option_id: optionId, leg_order: nextOrder })
                   .select('id, leg_order')
                   .single();
                 if (leg?.id) {
@@ -761,10 +923,16 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         )}
 
         {/* Step 9: Charges table */}
-        <ChargesTable charges={currentLegId ? (chargesByLeg[currentLegId] ?? []) : []} defaultCurrencyId={currencyId} onChange={(rows) => {
-          if (!currentLegId) return;
-          setChargesByLeg(prev => ({ ...prev, [currentLegId]: rows }));
-        }} />
+        <ChargesTable
+          charges={currentLegId ? (chargesByLeg[currentLegId] ?? []) : []}
+          defaultCurrencyId={currencyId}
+          onChange={async (rows) => {
+            // Lazily ensure option/leg so adding charges always shows rows
+            const legId = await ensureOptionAndLeg();
+            if (!legId) return;
+            setChargesByLeg(prev => ({ ...prev, [legId]: rows }));
+          }}
+        />
 
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={hydrateCharges} disabled={!providerId || !serviceId || !currentLegId || !containerSizeId || !currencyId || !originLocation || !destinationLocation}>Hydrate Buy Charges (Leg)</Button>
