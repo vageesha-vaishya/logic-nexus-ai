@@ -1,12 +1,13 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRM } from '@/hooks/useCRM';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
@@ -28,7 +29,13 @@ export default function Settings() {
           </TabsList>
 
           <TabsContent value="general" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="flex items-center">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Appearance</h2>
+                  <div className="ml-4 flex-1 h-px bg-border"></div>
+                </div>
+              </div>
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -38,15 +45,15 @@ export default function Settings() {
               <CardDescription>Customize colors, gradients, and presets</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
+              <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:gap-4">
+                <div className="space-y-1 min-w-0 flex-1">
                   <p className="text-sm text-muted-foreground">Open the theme manager to create, save, and apply themes.</p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button variant="secondary" onClick={() => toggleDark(true)}>Enable Dark</Button>
                     <Button variant="secondary" onClick={() => toggleDark(false)}>Disable Dark</Button>
                   </div>
                 </div>
-                <Button variant="default" onClick={() => navigate('/dashboard/themes')}>
+                <Button className="w-full md:w-auto" variant="default" onClick={() => navigate('/dashboard/themes')}>
                   Open Manager
                 </Button>
               </div>
@@ -62,6 +69,12 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="flex items-center">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Account</h2>
+                  <div className="ml-4 flex-1 h-px bg-border"></div>
+                </div>
+              </div>
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -105,36 +118,61 @@ export default function Settings() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
-                <CardTitle>Notifications</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Notifications
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center cursor-help">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Configure notification preferences</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
               </div>
-              <CardDescription>Configure notification preferences</CardDescription>
+              
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Notification settings coming soon</p>
             </CardContent>
           </Card>
 
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="flex items-center">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Data</h2>
+                  <div className="ml-4 flex-1 h-px bg-border"></div>
+                </div>
+              </div>
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Database className="h-5 w-5 text-primary" />
-                    <CardTitle>Data Management Options</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      Data Management Options
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center cursor-help">
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Database insights and data tools</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
                   </div>
-                  <CardDescription>Database insights and data tools</CardDescription>
                 </CardHeader>
-                <CardContent className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">View RLS status, policies, and schema details.</p>
-                    <p className="text-xs text-muted-foreground">Or configure quote numbering and preview sequences.</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => navigate('/dashboard/security-overview?tab=data-management')}>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/security-overview?tab=data-management')}>
                       Data Management
                     </Button>
-                    <Button variant="outline" onClick={() => navigate('/dashboard/settings/master-data')}>
+                    <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/master-data')}>
                       Master Data (Geography)
                     </Button>
-                    <Button variant="outline" onClick={() => navigate('/dashboard/settings/master-data-hts')}>
+                    <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/master-data-hts')}>
                       Master Data (HTS Codes)
                     </Button>
                   </div>
@@ -145,11 +183,22 @@ export default function Settings() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-primary" />
-                <CardTitle>Subscription</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Subscription
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center cursor-help">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Manage your plan and usage</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
               </div>
-              <CardDescription>Manage your plan and usage</CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center justify-between">
+            <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-sm text-muted-foreground">View current plan, switch tiers, and track usage.</p>
               <Button variant="default" onClick={() => navigate('/dashboard/settings/subscription')}>
                 Manage
