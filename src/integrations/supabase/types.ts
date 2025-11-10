@@ -2949,9 +2949,11 @@ export type Database = {
       quotation_version_options: {
         Row: {
           auto_margin_enabled: boolean
-          carrier_rate_id: string
+          buy_subtotal: number
+          carrier_rate_id: string | null
           created_at: string | null
           id: string
+          margin_amount: number
           margin_method_id: string | null
           margin_value: number | null
           min_margin: number | null
@@ -2960,16 +2962,20 @@ export type Database = {
           quote_currency_id: string | null
           recommended: boolean | null
           rounding_rule: string | null
+          sell_subtotal: number
           status: string | null
           tenant_id: string
+          total_amount: number
           trade_direction_id: string | null
           updated_at: string | null
         }
         Insert: {
           auto_margin_enabled?: boolean
-          carrier_rate_id: string
+          buy_subtotal?: number
+          carrier_rate_id?: string | null
           created_at?: string | null
           id?: string
+          margin_amount?: number
           margin_method_id?: string | null
           margin_value?: number | null
           min_margin?: number | null
@@ -2978,16 +2984,20 @@ export type Database = {
           quote_currency_id?: string | null
           recommended?: boolean | null
           rounding_rule?: string | null
+          sell_subtotal?: number
           status?: string | null
           tenant_id: string
+          total_amount?: number
           trade_direction_id?: string | null
           updated_at?: string | null
         }
         Update: {
           auto_margin_enabled?: boolean
-          carrier_rate_id?: string
+          buy_subtotal?: number
+          carrier_rate_id?: string | null
           created_at?: string | null
           id?: string
+          margin_amount?: number
           margin_method_id?: string | null
           margin_value?: number | null
           min_margin?: number | null
@@ -2996,8 +3006,10 @@ export type Database = {
           quote_currency_id?: string | null
           recommended?: boolean | null
           rounding_rule?: string | null
+          sell_subtotal?: number
           status?: string | null
           tenant_id?: string
+          total_amount?: number
           trade_direction_id?: string | null
           updated_at?: string | null
         }
