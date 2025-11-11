@@ -3827,6 +3827,7 @@ export type Database = {
           priority: number | null
           service_id: string | null
           service_type: string
+          service_type_id: string | null
           tenant_id: string
           updated_at: string | null
         }
@@ -3839,6 +3840,7 @@ export type Database = {
           priority?: number | null
           service_id?: string | null
           service_type: string
+          service_type_id?: string | null
           tenant_id: string
           updated_at?: string | null
         }
@@ -3851,6 +3853,7 @@ export type Database = {
           priority?: number | null
           service_id?: string | null
           service_type?: string
+          service_type_id?: string | null
           tenant_id?: string
           updated_at?: string | null
         }
@@ -3860,6 +3863,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_type_mappings_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
