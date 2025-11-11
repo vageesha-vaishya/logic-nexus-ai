@@ -2885,6 +2885,7 @@ export type Database = {
           provider_id: string | null
           quotation_version_option_id: string
           service_id: string | null
+          service_type_id: string | null
           tenant_id: string
         }
         Insert: {
@@ -2899,6 +2900,7 @@ export type Database = {
           provider_id?: string | null
           quotation_version_option_id: string
           service_id?: string | null
+          service_type_id?: string | null
           tenant_id: string
         }
         Update: {
@@ -2913,6 +2915,7 @@ export type Database = {
           provider_id?: string | null
           quotation_version_option_id?: string
           service_id?: string | null
+          service_type_id?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -2942,6 +2945,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_version_option_legs_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
@@ -3856,7 +3866,7 @@ export type Database = {
       }
       service_types: {
         Row: {
-          code: string | null
+          code: string
           created_at: string | null
           description: string | null
           id: string
@@ -3865,7 +3875,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          code?: string | null
+          code: string
           created_at?: string | null
           description?: string | null
           id?: string
@@ -3874,7 +3884,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          code?: string | null
+          code?: string
           created_at?: string | null
           description?: string | null
           id?: string
