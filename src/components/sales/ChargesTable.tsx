@@ -156,8 +156,6 @@ export default function ChargesTable({ charges, onChange, defaultCurrencyId }: {
     <div className="space-y-2">
       <div className="flex gap-2">
         <Button variant="outline" onClick={addCombinedRow}>Add Combined Charge</Button>
-        <Button variant="outline" onClick={() => addRow('buy')}>Add Buy-Only</Button>
-        <Button onClick={() => addRow('sell')}>Add Sell-Only</Button>
       </div>
       <Table>
         <TableHeader>
