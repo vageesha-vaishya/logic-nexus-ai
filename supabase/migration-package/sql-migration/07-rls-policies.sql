@@ -676,7 +676,7 @@ CREATE POLICY "Users can view assignment queue"
   USING (tenant_id = public.get_user_tenant_id(auth.uid()));
 
 CREATE POLICY "System can manage assignment queue"
-  ON public.assignment_queue FOR ALL
+  ON public.lead_assignment_queue FOR ALL
   USING (tenant_id = public.get_user_tenant_id(auth.uid()));
 
 CREATE POLICY "Users can view their capacity"
