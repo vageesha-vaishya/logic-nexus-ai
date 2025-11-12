@@ -1,7 +1,8 @@
-// Ambient Deno typing for editors without Deno type support
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const Deno: any;
-// @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
+};
+// @ts-expect-error Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -81,7 +82,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Prepare payload mapping to Salesforce standard fields
-    const payload: Record<string, any> = {
+    const payload: Record<string, unknown> = {
       Name: opp.name,
       StageName: stageToSalesforce[(opp.stage || 'prospecting') as Stage] || 'Prospecting',
       Amount: opp.amount != null ? Number(opp.amount) : undefined,
@@ -134,9 +135,9 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return new Response(
-      JSON.stringify({ error: error?.message || 'Unknown error' }),
+      JSON.stringify({ error: (error instanceof Error) ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

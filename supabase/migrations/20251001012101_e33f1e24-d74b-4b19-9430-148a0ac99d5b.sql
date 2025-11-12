@@ -1,11 +1,143 @@
 -- Create CRM enums
-CREATE TYPE public.account_type AS ENUM ('prospect', 'customer', 'partner', 'vendor');
-CREATE TYPE public.account_status AS ENUM ('active', 'inactive', 'pending');
-CREATE TYPE public.lead_status AS ENUM ('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost');
-CREATE TYPE public.lead_source AS ENUM ('website', 'referral', 'email', 'phone', 'social', 'event', 'other');
-CREATE TYPE public.activity_type AS ENUM ('call', 'email', 'meeting', 'task', 'note');
-CREATE TYPE public.activity_status AS ENUM ('planned', 'in_progress', 'completed', 'cancelled');
-CREATE TYPE public.priority_level AS ENUM ('low', 'medium', 'high', 'urgent');
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'account_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.account_type AS ENUM ('prospect','customer','partner','vendor');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['prospect','customer','partner','vendor'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'account_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.account_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'account_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.account_status AS ENUM ('active','inactive','pending');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['active','inactive','pending'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'account_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.account_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'lead_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.lead_status AS ENUM ('new','contacted','qualified','proposal','negotiation','won','lost');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['new','contacted','qualified','proposal','negotiation','won','lost'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'lead_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.lead_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'lead_source' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.lead_source AS ENUM ('website','referral','email','phone','social','event','other');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['website','referral','email','phone','social','event','other'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'lead_source' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.lead_source ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'activity_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.activity_type AS ENUM ('call','email','meeting','task','note');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['call','email','meeting','task','note'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'activity_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.activity_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'activity_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.activity_status AS ENUM ('planned','in_progress','completed','cancelled');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['planned','in_progress','completed','cancelled'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'activity_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.activity_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'priority_level' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.priority_level AS ENUM ('low','medium','high','urgent');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['low','medium','high','urgent'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'priority_level' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.priority_level ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
 -- Accounts table (Companies/Organizations)
 CREATE TABLE public.accounts (

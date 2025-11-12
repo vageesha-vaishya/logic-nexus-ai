@@ -23,8 +23,8 @@ interface Shipment {
   shipment_number: string;
   shipment_type: string;
   status: string;
-  origin_address: any;
-  destination_address: any;
+  origin_address: unknown;
+  destination_address: unknown;
   pickup_date: string | null;
   estimated_delivery_date: string | null;
   total_packages: number | null;
@@ -77,6 +77,37 @@ export default function Shipments() {
     }
   };
 
+  const toCanonicalShipmentType = (name: string): string => {
+    const n = String(name || '').trim().toLowerCase();
+    const map: Record<string, string> = {
+      ocean: 'ocean',
+      'ocean_freight': 'ocean',
+      sea: 'ocean',
+      'sea_freight': 'ocean',
+      'sea_cargo': 'ocean',
+      air: 'air',
+      'air_freight': 'air',
+      'air_cargo': 'air',
+      trucking: 'inland_trucking',
+      'inland_trucking': 'inland_trucking',
+      road: 'inland_trucking',
+      'road_transport': 'inland_trucking',
+      ground: 'inland_trucking',
+      courier: 'courier',
+      express: 'courier',
+      'express_delivery': 'courier',
+      parcel: 'courier',
+      moving: 'movers_packers',
+      'movers_packers': 'movers_packers',
+      'packers_and_movers': 'movers_packers',
+      rail: 'rail',
+      railway: 'rail',
+      'railway_transport': 'rail',
+      'rail_transport': 'rail',
+    };
+    return map[n] || String(name);
+  };
+
   const filteredShipments = shipments.filter(shipment => {
     const globalQuery = searchQuery.trim().toLowerCase();
     const matchesGlobal = !globalQuery || [
@@ -88,7 +119,7 @@ export default function Shipments() {
     ].some(v => (v || '').toLowerCase().includes(globalQuery));
 
     const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
-    const matchesType = typeFilter === 'all' || shipment.shipment_type === typeFilter;
+    const matchesType = typeFilter === 'all' || toCanonicalShipmentType(shipment.shipment_type) === toCanonicalShipmentType(typeFilter);
 
     const matchesShipmentNo = matchText(shipment.shipment_number, filterShipmentNo, filterShipmentNoOp);
     const matchesCustomer = matchText(shipment.accounts?.name ?? '', filterCustomer, filterCustomerOp);
@@ -163,9 +194,16 @@ export default function Shipments() {
   };
 
   const formatShipmentType = (type: string) => {
-    return type.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    const t = toCanonicalShipmentType(type);
+    const labels: Record<string, string> = {
+      ocean: 'Ocean',
+      air: 'Air',
+      inland_trucking: 'Inland Trucking',
+      rail: 'Rail',
+      courier: 'Courier',
+      movers_packers: 'Movers & Packers',
+    };
+    return labels[t] || type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   };
 
   return (
@@ -269,10 +307,10 @@ export default function Shipments() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="ocean_freight">Ocean Freight</SelectItem>
-              <SelectItem value="air_freight">Air Freight</SelectItem>
+              <SelectItem value="ocean">Ocean</SelectItem>
+              <SelectItem value="air">Air</SelectItem>
               <SelectItem value="inland_trucking">Inland Trucking</SelectItem>
-              <SelectItem value="railway_transport">Railway Transport</SelectItem>
+              <SelectItem value="rail">Rail</SelectItem>
               <SelectItem value="courier">Courier</SelectItem>
               <SelectItem value="movers_packers">Movers & Packers</SelectItem>
             </SelectContent>

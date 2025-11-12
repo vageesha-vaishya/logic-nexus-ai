@@ -69,19 +69,245 @@ DROP TABLE IF EXISTS profiles CASCADE;
 DROP TABLE IF EXISTS franchises CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
 
--- Create enums
-CREATE TYPE app_role AS ENUM ('platform_admin', 'tenant_admin', 'franchise_admin', 'user');
-CREATE TYPE account_type AS ENUM ('prospect', 'customer', 'partner', 'competitor', 'other');
-CREATE TYPE account_status AS ENUM ('active', 'inactive', 'suspended');
-CREATE TYPE activity_type AS ENUM ('call', 'meeting', 'email', 'task', 'other');
-CREATE TYPE activity_status AS ENUM ('planned', 'in_progress', 'completed', 'cancelled');
-CREATE TYPE priority_level AS ENUM ('low', 'medium', 'high', 'urgent');
-CREATE TYPE lead_status AS ENUM ('new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost');
-CREATE TYPE lead_source AS ENUM ('website', 'referral', 'campaign', 'event', 'cold_call', 'partner', 'other');
-CREATE TYPE opportunity_stage AS ENUM ('prospecting', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost');
-CREATE TYPE shipment_type AS ENUM ('air', 'ocean', 'ground', 'rail', 'courier');
-CREATE TYPE quote_reset_policy AS ENUM ('none', 'daily', 'monthly', 'yearly');
-CREATE TYPE subscription_tier AS ENUM ('free', 'basic', 'professional', 'enterprise');
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'app_role' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.app_role AS ENUM ('platform_admin','tenant_admin','franchise_admin','user');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['platform_admin','tenant_admin','franchise_admin','user'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'app_role' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.app_role ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'account_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.account_type AS ENUM ('prospect','customer','partner','vendor','competitor','other');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['prospect','customer','partner','vendor','competitor','other'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'account_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.account_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'account_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.account_status AS ENUM ('active','inactive','pending','suspended');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['active','inactive','pending','suspended'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'account_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.account_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'activity_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.activity_type AS ENUM ('call','meeting','email','task','other');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['call','meeting','email','task','other'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'activity_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.activity_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'activity_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.activity_status AS ENUM ('planned','in_progress','completed','cancelled');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['planned','in_progress','completed','cancelled'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'activity_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.activity_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'priority_level' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.priority_level AS ENUM ('low','medium','high','urgent');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['low','medium','high','urgent'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'priority_level' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.priority_level ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'lead_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.lead_status AS ENUM ('new','contacted','qualified','proposal','negotiation','converted','lost');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['new','contacted','qualified','proposal','negotiation','converted','lost'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'lead_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.lead_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'lead_source' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.lead_source AS ENUM ('website','referral','campaign','event','cold_call','partner','other');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['website','referral','campaign','event','cold_call','partner','other'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'lead_source' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.lead_source ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'opportunity_stage' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.opportunity_stage AS ENUM ('prospecting','qualification','proposal','negotiation','closed_won','closed_lost');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['prospecting','qualification','proposal','negotiation','closed_won','closed_lost'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'opportunity_stage' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.opportunity_stage ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'shipment_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.shipment_type AS ENUM ('air','ocean','ground','rail','courier');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['air','ocean','ground','rail','courier'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'shipment_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.shipment_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'quote_reset_policy' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.quote_reset_policy AS ENUM ('none','daily','monthly','yearly');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['none','daily','monthly','yearly'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'quote_reset_policy' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.quote_reset_policy ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'subscription_tier' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.subscription_tier AS ENUM ('free','basic','professional','enterprise');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['free','basic','professional','enterprise'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'subscription_tier' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.subscription_tier ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
 -- ==========================================
 -- PHASE 2: CORE TABLES (NO DEPENDENCIES)

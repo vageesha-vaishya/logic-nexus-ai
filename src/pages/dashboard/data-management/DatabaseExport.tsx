@@ -60,6 +60,9 @@ export default function DatabaseExport() {
     tableData: true,
     fkOrderEnabled: true,
     dataChunkSize: 1000,
+    splitDataGroups: false,
+    dataGroupSize: 6,
+    rowFilterWhere: '',
   });
 
   // Storage settings
@@ -974,17 +977,18 @@ const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).leng
             const enumType = enumItem?.enum_type;
             const labelsText = (enumItem?.labels ?? '').toString();
             if (!enumType || labelsText.trim() === '') return;
-            const labels = labelsText
+            const labelArray = labelsText
               .replace(/^{|}$/g, '')
               .split(',')
               .map((l: string) => l.trim())
-              .filter((l: string) => l.length > 0)
+              .filter((l: string) => l.length > 0);
+            const labelsForCreate = labelArray
               .map((l: string) => `'${l.replace(/'/g, "''")}'`)
               .join(', ');
-            // Supabase SQL Editor compatibility: CREATE TYPE does not support IF NOT EXISTS in this context.
-            // Use a DO block with a conditional check and EXECUTE to create the enum type only if missing.
-            const labelsExec = labels.replace(/'/g, "''");
-            sqlContent += `DO $$\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1 FROM pg_type t\n    JOIN pg_namespace n ON n.oid = t.typnamespace\n    WHERE t.typname = '${enumType}' AND n.nspname = 'public'\n  ) THEN\n    EXECUTE 'CREATE TYPE "${enumType}" AS ENUM (${labelsExec})';\n  END IF;\nEND $$;\n`;
+            const arrayLiteral = labelArray
+              .map((l: string) => `'${l.replace(/'/g, "''")}'`)
+              .join(', ');
+            sqlContent += `DO $$\nDECLARE lbl text;\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1 FROM pg_type t\n    JOIN pg_namespace n ON n.oid = t.typnamespace\n    WHERE t.typname = '${enumType}' AND n.nspname = 'public'\n  ) THEN\n    EXECUTE 'CREATE TYPE public."${enumType}" AS ENUM (${labelsForCreate})';\n  ELSE\n    FOREACH lbl IN ARRAY ARRAY[${arrayLiteral}] LOOP\n      IF NOT EXISTS (\n        SELECT 1 FROM pg_enum e\n        JOIN pg_type t ON t.oid = e.enumtypid\n        JOIN pg_namespace n ON n.oid = t.typnamespace\n        WHERE t.typname = '${enumType}' AND n.nspname = 'public' AND e.enumlabel = lbl\n      ) THEN\n        EXECUTE 'ALTER TYPE public."${enumType}" ADD VALUE ' || quote_literal(lbl) || ';';\n      END IF;\n    END LOOP;\n  END IF;\nEND $$;\n`;
           });
           sqlContent += "\n";
         }
@@ -1609,8 +1613,13 @@ $$;\n`;
             }
           }
 
-          sqlContent += "\n-- Table Data (triggers temporarily disabled to reduce interference)\n";
-          sqlContent += "SET session_replication_role = replica;\n";
+          const split = Boolean((exportOptions as any).splitDataGroups);
+          const groupSize = Math.max(1, Number((exportOptions as any).dataGroupSize) || 6);
+          if (!split) {
+            sqlContent += "\nBEGIN;\n";
+            sqlContent += "SET row_security = off;\n";
+            sqlContent += "SET session_replication_role = replica;\n";
+          }
 
           const escapeStr = (s: string) => s.replace(/'/g, "''");
 
@@ -1704,42 +1713,130 @@ $$;\n`;
             return `${asText(String(value))}`;
           };
 
-          for (const table of chosen) {
-            const schema = (table as any).table_schema || 'public';
-            const client: any = (supabase as any).schema ? (supabase as any).schema(schema) : supabase;
-            let wroteHeader = false;
-            const colTypes = typeMapByTable[table.table_name] || {};
-            let columns: string[] | null = Object.keys(colTypes).length > 0 ? Object.keys(colTypes) : null;
-            const chunkSize = Number((exportOptions as any).dataChunkSize) || 1000;
-            let offset = 0;
-            while (true) {
-              const { data, error } = await client.from(table.table_name).select("*").range(offset, offset + chunkSize - 1);
-              if (error) {
-                console.error(`Failed exporting ${schema}.${table.table_name}:`, error.message);
-                break;
+          const generateGroupSql = async (tablesForGroup: any[]) => {
+            let groupSql = "BEGIN;\n";
+            groupSql += "SET row_security = off;\n";
+            groupSql += "SET session_replication_role = replica;\n";
+            for (const table of tablesForGroup) {
+              const schema = (table as any).table_schema || 'public';
+              const client: any = (supabase as any).schema ? (supabase as any).schema(schema) : supabase;
+              let wroteHeader = false;
+              const colTypes = typeMapByTable[table.table_name] || {};
+              let columns: string[] | null = Object.keys(colTypes).length > 0 ? Object.keys(colTypes) : null;
+              const chunkSize = Number((exportOptions as any).dataChunkSize) || 1000;
+              let offset = 0;
+              while (true) {
+                const where = String((exportOptions as any).rowFilterWhere || '').trim();
+                let data: any[] | null = null;
+                let error: any = null;
+                if (where) {
+                  const cols = (columns && columns.length > 0 ? columns : Object.keys(colTypes)).map((c) => `"${c}"`).join(", ") || "*";
+                  const query_text = `SELECT ${cols} FROM "${schema}"."${table.table_name}" WHERE ${where} OFFSET ${offset} LIMIT ${chunkSize};`;
+                  const { data: raw, error: rpcErr } = await supabase.rpc("execute_sql_query", { query_text });
+                  data = Array.isArray(raw) ? raw : [];
+                  error = rpcErr || null;
+                } else {
+                  const resp = await client.from(table.table_name).select("*").range(offset, offset + chunkSize - 1);
+                  data = resp.data || null;
+                  error = resp.error || null;
+                }
+                if (error) {
+                  console.error(`Failed exporting ${schema}.${table.table_name}:`, error.message);
+                  break;
+                }
+                if (!data || data.length === 0) break;
+                if (!wroteHeader) {
+                  groupSql += `\n-- Data for table: ${schema}.${table.table_name}\n`;
+                  wroteHeader = true;
+                }
+                if (!columns) columns = Object.keys(data[0]);
+                const columnNames = (columns || []).map((col) => `"${col}"`).join(", ");
+                data.forEach((row: any) => {
+                  const values = (columns || [])
+                    .map((col) => formatValue(row[col], colTypes[col]))
+                    .join(", ");
+                  groupSql += `INSERT INTO "${schema}"."${table.table_name}" (${columnNames}) VALUES (${values});\n`;
+                });
+                offset += chunkSize;
               }
-              if (!data || data.length === 0) break;
-
-              if (!wroteHeader) {
-                sqlContent += `\n-- Data for table: ${schema}.${table.table_name}\n`;
-                wroteHeader = true;
-              }
-
-              if (!columns) columns = Object.keys(data[0]);
-              const columnNames = (columns || []).map((col) => `"${col}"`).join(", ");
-
-              data.forEach((row: any) => {
-                const values = (columns || [])
-                  .map((col) => formatValue(row[col], colTypes[col]))
-                  .join(", ");
-                sqlContent += `INSERT INTO "${schema}"."${table.table_name}" (${columnNames}) VALUES (${values});\n`;
-              });
-
-              offset += chunkSize;
             }
-          }
+            groupSql += "\nSET session_replication_role = origin;\n";
+            groupSql += "SET row_security = on;\n";
+            groupSql += "COMMIT;\n";
+            return groupSql;
+          };
 
-          sqlContent += "\nSET session_replication_role = origin;\n";
+          if (split) {
+            const files: Array<{ name: string; content: string; type: string }> = [];
+            const ddlName = `schema-export-ddl.sql`;
+            files.push({ name: ddlName, content: sqlContent, type: "text/plain" });
+            const groups: any[][] = [];
+            for (let i = 0; i < chosen.length; i += groupSize) {
+              groups.push(chosen.slice(i, i + groupSize));
+            }
+            for (let i = 0; i < groups.length; i++) {
+              const groupSql = await generateGroupSql(groups[i]);
+              const idx = String(i + 1).padStart(2, '0');
+              const fname = `schema-export-data-group-${idx}.sql`;
+              files.push({ name: fname, content: groupSql, type: "text/plain" });
+            }
+            let postSql = "";
+            try {
+              const { data: constraintsDataAfter } = await supabase.rpc("get_table_constraints");
+              const deferredChecks: { table: string; name: string; clause: string }[] = [];
+              if (constraintsDataAfter && Array.isArray(constraintsDataAfter)) {
+                for (const constraint of constraintsDataAfter) {
+                  const type = (constraint.constraint_type || '').toString().toUpperCase();
+                  if (type === 'CHECK') {
+                    const tableName = String(constraint.table_name);
+                    const cname = String(constraint.constraint_name);
+                    const detailsRaw = (constraint.constraint_details || '').toString();
+                    const clause = (() => {
+                      const s = detailsRaw.trim();
+                      if (s.startsWith('(') && s.endsWith(')')) return `CHECK ${s}`;
+                      return `CHECK (${s})`;
+                    })();
+                    deferredChecks.push({ table: tableName, name: cname, clause });
+                  }
+                }
+              }
+              if (deferredChecks.length > 0) {
+                postSql += "\n";
+                deferredChecks.forEach((c) => {
+                  postSql += `ALTER TABLE "public"."${c.table}" ADD CONSTRAINT "${c.name}" ${c.clause} NOT VALID;\n`;
+                  postSql += `DO $$ BEGIN BEGIN ALTER TABLE "public"."${c.table}" VALIDATE CONSTRAINT "${c.name}"; EXCEPTION WHEN check_violation THEN RAISE NOTICE 'CHECK % failed validation on %', '${c.name}', '${c.table}'; END; END $$;\n`;
+                });
+              }
+            } catch {}
+            try {
+              const { data: seqOwners } = await supabase.rpc("execute_sql_query", {
+                query_text:
+                  "SELECT rel.relname AS table_name, att.attname AS column_name, regexp_replace(pg_get_expr(def.adbin, def.adrelid), 'nextval\\(''([^'']+)''::regclass\\)', '\\1') AS sequence_name FROM pg_class rel JOIN pg_namespace n ON n.oid=rel.relnamespace JOIN pg_attribute att ON att.attrelid=rel.oid AND att.attnum>0 JOIN pg_attrdef def ON def.adrelid=rel.oid AND def.adnum=att.attnum WHERE n.nspname='public' AND pg_get_expr(def.adbin, def.adrelid) LIKE 'nextval(%'",
+              });
+              if (Array.isArray(seqOwners)) {
+                postSql += "\n";
+                seqOwners.forEach((row: any) => {
+                  const seq = row.sequence_name;
+                  const tbl = row.table_name;
+                  const col = row.column_name;
+                  if (seq && tbl && col) {
+                    postSql += `SELECT setval('"${seq}"', COALESCE((SELECT MAX("${col}") FROM "${tbl}"), 1));\n`;
+                  }
+                });
+              }
+            } catch {}
+            if (postSql.trim().length > 0) {
+              files.push({ name: "schema-export-post.sql", content: postSql, type: "text/plain" });
+            }
+            await saveMultipleFiles(files);
+            const exportedItems = Object.entries(exportOptions)
+              .filter(([_, v]) => v)
+              .map(([k]) => k)
+              .join(", ");
+            toast.success("SQL Export complete", { description: `Exported: ${exportedItems}; groups: ${Math.ceil(chosen.length / groupSize)}` });
+            setLoading(false);
+            return;
+          }
 
           // Re-add deferred CHECK constraints and validate after data import
           try {
@@ -2275,6 +2372,14 @@ $$;\n`;
               <li>CLI Wizard: Generate `pg_dump`, `pg_restore`, and `psql` commands, analyze output.</li>
               <li>Downloads: Manage manual download links staged by the app.</li>
             </ul>
+            <div className="mt-3 space-y-2">
+              <Label htmlFor="overview-row-filter" className="text-sm font-medium">Row filter (SQL WHERE)</Label>
+              <Input id="overview-row-filter" value={(exportOptions as any).rowFilterWhere} onChange={(e) => setExportOptions(prev => ({ ...prev, rowFilterWhere: e.target.value }))} placeholder="e.g., received_at >= '2024-01-01' AND tenant_id = '...'" />
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={exportSchemaSQL} disabled={loading}>Quick Export SQL</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Applies to selected tables and respects the WHERE filter.</p>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -3130,7 +3235,39 @@ pg_restore --version</code></pre>
                     onChange={(e) => setExportOptions(prev => ({ ...prev, dataChunkSize: Number(e.target.value) || 1000 }))}
                   />
                 </div>
+                <div className="flex items-center gap-2 w-full">
+                  <Label htmlFor="row-filter-where" className="text-sm">Row filter (SQL WHERE)</Label>
+                  <Input
+                    id="row-filter-where"
+                    className="flex-1"
+                    placeholder="e.g., received_at >= '2024-01-01' AND tenant_id = '..." 
+                    value={(exportOptions as any).rowFilterWhere}
+                    onChange={(e) => setExportOptions(prev => ({ ...prev, rowFilterWhere: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="split-data-groups" 
+                    checked={(exportOptions as any).splitDataGroups}
+                    onCheckedChange={(v: any) => setExportOptions(prev => ({ ...prev, splitDataGroups: Boolean(v) }))}
+                  />
+                  <label htmlFor="split-data-groups" className="text-sm">Split data into groups</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="data-group-size" className="text-sm">Tables per group</Label>
+                  <Input 
+                    id="data-group-size" 
+                    type="number" 
+                    min={1} 
+                    step={1} 
+                    className="w-28"
+                    value={(exportOptions as any).dataGroupSize}
+                    onChange={(e) => setExportOptions(prev => ({ ...prev, dataGroupSize: Math.max(1, Number(e.target.value) || 6) }))}
+                    disabled={!(exportOptions as any).splitDataGroups}
+                  />
+                </div>
               </div>
+              {dbTab === 'backup' && (
               <div className="flex items-center justify-between mb-3">
                 <div className="text-sm font-medium">Select tables to export:</div>
                 <div className="flex items-center gap-3">
@@ -3166,6 +3303,7 @@ pg_restore --version</code></pre>
                   </TableBody>
                 </Table>
               </div>
+              )}
             </div>
           )}
 
@@ -3180,19 +3318,21 @@ pg_restore --version</code></pre>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Read-only SQL Runner</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={6} />
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={runQuery} disabled={loading}>Run</Button>
-            <Button onClick={exportQueryCSV} disabled={loading || queryResult.length === 0}>Export Result CSV</Button>
-          </div>
-          <div className="text-sm text-muted-foreground">Rows: {queryResult.length}</div>
-        </CardContent>
-      </Card>
+      {dbTab === 'overview' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Read-only SQL Runner</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={6} />
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={runQuery} disabled={loading}>Run</Button>
+              <Button onClick={exportQueryCSV} disabled={loading || queryResult.length === 0}>Export Result CSV</Button>
+            </div>
+            <div className="text-sm text-muted-foreground">Rows: {queryResult.length}</div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

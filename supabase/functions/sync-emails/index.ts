@@ -7,6 +7,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+type GmailHeader = { name: string; value: string };
+type GmailMessagePart = {
+  mimeType?: string;
+  body?: { data?: string };
+  headers?: GmailHeader[];
+  parts?: GmailMessagePart[];
+  filename?: string | null;
+};
+type GraphRecipient = { emailAddress?: { address?: string; name?: string } };
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,7 +33,7 @@ serve(async (req) => {
       requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    let payload: any;
+    let payload: { accountId: string } | null;
     try {
       payload = await req.json();
     } catch {
@@ -32,7 +42,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const { accountId } = payload || {};
+    const { accountId } = (payload || {}) as { accountId: string };
 
     if (!accountId) {
       throw new Error("Missing required field: accountId");
@@ -172,8 +182,8 @@ serve(async (req) => {
               syncedCount++;
               console.log(`Synced email: ${subject}`);
             }
-          } catch (msgError: any) {
-            console.error(`Error processing IMAP message ${msgId}:`, msgError.message);
+          } catch (msgError: unknown) {
+            console.error(`Error processing IMAP message ${msgId}:`, msgError instanceof Error ? msgError.message : String(msgError));
           }
         }
 
@@ -182,9 +192,10 @@ serve(async (req) => {
         conn.close();
 
         console.log(`IMAP sync completed: ${syncedCount} emails synced`);
-      } catch (imapError: any) {
+      } catch (imapError: unknown) {
         console.error("IMAP error:", imapError);
-        throw new Error(`Failed to sync via IMAP: ${imapError.message}`);
+        const msg = imapError instanceof Error ? imapError.message : String(imapError);
+        throw new Error(`Failed to sync via IMAP: ${msg}`);
       }
     } else if (account.provider === "gmail") {
       // Use Gmail API
@@ -249,7 +260,7 @@ serve(async (req) => {
           console.log("Gmail access token refreshed");
           return true;
         } catch (e) {
-          console.error("Exception while refreshing Gmail token:", (e as any)?.message);
+          console.error("Exception while refreshing Gmail token:", e instanceof Error ? e.message : String(e));
           return false;
         }
       };
@@ -312,10 +323,10 @@ serve(async (req) => {
             const msgData = await msgResponse.json();
             
             // Parse email headers
-            const headers = msgData.payload.headers.reduce((acc: any, h: any) => {
+            const headers = (msgData.payload.headers as GmailHeader[]).reduce((acc: Record<string, string>, h: GmailHeader) => {
               acc[h.name.toLowerCase()] = h.value;
               return acc;
-            }, {});
+            }, {} as Record<string, string>);
 
             const subject = headers.subject || "(No Subject)";
             const from = headers.from || "";
@@ -334,7 +345,7 @@ serve(async (req) => {
             let bodyHtml = "";
             let hasInlineImages = false;
             
-            const getBody = (part: any): void => {
+            const getBody = (part: GmailMessagePart): void => {
               if (part.mimeType === "text/plain" && part.body?.data) {
                 bodyText = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
               } else if (part.mimeType === "text/html" && part.body?.data) {
@@ -343,7 +354,7 @@ serve(async (req) => {
                 if (bodyHtml.includes('cid:') || bodyHtml.includes('data:image/')) {
                   hasInlineImages = true;
                 }
-              } else if (part.mimeType?.startsWith('image/') && part.headers?.find((h: any) => h.name === 'Content-ID')) {
+              } else if (part.mimeType?.startsWith('image/') && part.headers?.find((h: GmailHeader) => h.name === 'Content-ID')) {
                 hasInlineImages = true;
               } else if (part.parts) {
                 part.parts.forEach(getBody);
@@ -381,7 +392,7 @@ serve(async (req) => {
               body_text: bodyText || bodyHtml.replace(/<[^>]*>/g, ""),
               body_html: bodyHtml || bodyText,
               snippet: msgData.snippet || "",
-              has_attachments: msgData.payload.parts?.some((p: any) => p.filename) || false,
+              has_attachments: (msgData.payload.parts as GmailMessagePart[] | undefined)?.some((p: GmailMessagePart) => !!p.filename) || false,
               attachments: [],
               direction: "inbound",
               status: "received",
@@ -427,8 +438,8 @@ serve(async (req) => {
               syncedCount++;
               console.log(`Synced email: ${subject}`);
             }
-          } catch (msgError: any) {
-            console.error(`Error processing message ${msg.id}:`, msgError.message);
+          } catch (msgError: unknown) {
+            console.error(`Error processing message ${msg.id}:`, msgError instanceof Error ? msgError.message : String(msgError));
             // Attempt to log the error
             try {
               await supabase.from("emails").insert({
@@ -442,10 +453,10 @@ serve(async (req) => {
                 to_emails: [],
                 direction: "inbound",
                 status: "error",
-                sync_error: msgError.message,
+                sync_error: msgError instanceof Error ? msgError.message : String(msgError),
                 last_sync_attempt: new Date().toISOString(),
               });
-            } catch {}
+            } catch { void 0; }
           }
         }
       }
@@ -625,9 +636,9 @@ serve(async (req) => {
           const fromAddr = m.from?.emailAddress?.address || m.sender?.emailAddress?.address || "";
           const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddr;
 
-          const toRecipients = (m.toRecipients || []).map((r: any) => ({ email: r.emailAddress?.address || "" }));
-          const ccRecipients = (m.ccRecipients || []).map((r: any) => ({ email: r.emailAddress?.address || "" }));
-          const bccRecipients = (m.bccRecipients || []).map((r: any) => ({ email: r.emailAddress?.address || "" }));
+          const toRecipients = (m.toRecipients || []).map((r: GraphRecipient) => ({ email: r.emailAddress?.address || "" }));
+          const ccRecipients = (m.ccRecipients || []).map((r: GraphRecipient) => ({ email: r.emailAddress?.address || "" }));
+          const bccRecipients = (m.bccRecipients || []).map((r: GraphRecipient) => ({ email: r.emailAddress?.address || "" }));
 
           const bodyContentType = m.body?.contentType || "text";
           const bodyContent = m.body?.content || "";
@@ -714,8 +725,9 @@ serve(async (req) => {
             syncedCount++;
             console.log(`Successfully synced email: ${subject}`);
           }
-        } catch (msgErr: any) {
-          console.error("Error processing Office365 message:", msgErr?.message || msgErr);
+        } catch (msgErr: unknown) {
+          const msg = msgErr instanceof Error ? msgErr.message : String(msgErr);
+          console.error("Error processing Office365 message:", msg);
         }
       }
     }
@@ -741,12 +753,12 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error syncing emails:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: (error instanceof Error) ? error.message : String(error),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

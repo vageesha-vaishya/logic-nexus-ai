@@ -1,10 +1,85 @@
 -- Phase 0: Subscription & Billing Infrastructure
 
 -- Create enum types for subscription system
-CREATE TYPE subscription_tier AS ENUM ('starter', 'professional', 'business', 'enterprise');
-CREATE TYPE billing_period AS ENUM ('monthly', 'annual');
-CREATE TYPE subscription_status AS ENUM ('active', 'trial', 'past_due', 'canceled', 'expired');
-CREATE TYPE plan_type AS ENUM ('crm_base', 'service_addon', 'bundle');
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'subscription_tier' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.subscription_tier AS ENUM ('free','basic','starter','business','professional','enterprise');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['free','basic','starter','business','professional','enterprise'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'subscription_tier' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.subscription_tier ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'billing_period' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.billing_period AS ENUM ('monthly','annual');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['monthly','annual'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'billing_period' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.billing_period ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'subscription_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.subscription_status AS ENUM ('active','trial','past_due','canceled','expired');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['active','trial','past_due','canceled','expired'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'subscription_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.subscription_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'plan_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.plan_type AS ENUM ('crm_base','service_addon','bundle');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['crm_base','service_addon','bundle'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'plan_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.plan_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
 -- 1. Subscription Plans Table
 CREATE TABLE public.subscription_plans (

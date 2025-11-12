@@ -1,57 +1,103 @@
 -- Create enums for logistics
-CREATE TYPE public.shipment_status AS ENUM (
-  'draft',
-  'confirmed',
-  'in_transit',
-  'customs',
-  'out_for_delivery',
-  'delivered',
-  'cancelled',
-  'on_hold',
-  'returned'
-);
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'shipment_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.shipment_status AS ENUM ('draft','confirmed','in_transit','customs','out_for_delivery','delivered','cancelled','on_hold','returned');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['draft','confirmed','in_transit','customs','out_for_delivery','delivered','cancelled','on_hold','returned'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'shipment_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.shipment_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
-CREATE TYPE public.shipment_type AS ENUM (
-  'ocean_freight',
-  'air_freight',
-  'inland_trucking',
-  'railway_transport',
-  'courier',
-  'movers_packers'
-);
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'shipment_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.shipment_type AS ENUM ('ocean_freight','air_freight','inland_trucking','railway_transport','courier','movers_packers');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['ocean_freight','air_freight','inland_trucking','railway_transport','courier','movers_packers'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'shipment_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.shipment_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
-CREATE TYPE public.container_type AS ENUM (
-  '20ft_standard',
-  '40ft_standard',
-  '40ft_high_cube',
-  '45ft_high_cube',
-  'reefer',
-  'open_top',
-  'flat_rack',
-  'tank'
-);
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'container_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.container_type AS ENUM ('20ft_standard','40ft_standard','40ft_high_cube','45ft_high_cube','reefer','open_top','flat_rack','tank');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['20ft_standard','40ft_standard','40ft_high_cube','45ft_high_cube','reefer','open_top','flat_rack','tank'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'container_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.container_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
-CREATE TYPE public.vehicle_status AS ENUM (
-  'available',
-  'in_use',
-  'maintenance',
-  'out_of_service'
-);
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'vehicle_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.vehicle_status AS ENUM ('available','in_use','maintenance','out_of_service');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['available','in_use','maintenance','out_of_service'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'vehicle_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.vehicle_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
-CREATE TYPE public.tracking_event_type AS ENUM (
-  'created',
-  'confirmed',
-  'picked_up',
-  'in_transit',
-  'customs_clearance',
-  'customs_released',
-  'arrived_at_hub',
-  'out_for_delivery',
-  'delivered',
-  'delayed',
-  'exception',
-  'returned'
-);
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'tracking_event_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.tracking_event_type AS ENUM ('created','confirmed','picked_up','in_transit','customs_clearance','customs_released','arrived_at_hub','out_for_delivery','delivered','delayed','exception','returned');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['created','confirmed','picked_up','in_transit','customs_clearance','customs_released','arrived_at_hub','out_for_delivery','delivered','delayed','exception','returned'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'tracking_event_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.tracking_event_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
 -- Warehouses table
 CREATE TABLE public.warehouses (

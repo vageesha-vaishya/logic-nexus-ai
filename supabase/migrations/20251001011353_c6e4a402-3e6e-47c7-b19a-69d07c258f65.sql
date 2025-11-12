@@ -1,10 +1,22 @@
--- Create app_role enum
-CREATE TYPE public.app_role AS ENUM (
-  'platform_admin',
-  'tenant_admin',
-  'franchise_admin',
-  'user'
-);
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'app_role' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.app_role AS ENUM ('platform_admin','tenant_admin','franchise_admin','user');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['platform_admin','tenant_admin','franchise_admin','user'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'app_role' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.app_role ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
 -- Create tenants table
 CREATE TABLE public.tenants (

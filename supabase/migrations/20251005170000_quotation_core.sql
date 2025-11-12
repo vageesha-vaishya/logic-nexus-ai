@@ -1,10 +1,102 @@
--- Quotation Module Core Schema
--- Enums
-CREATE TYPE public.transport_mode AS ENUM ('ocean', 'air', 'inland_trucking', 'courier', 'movers_packers');
-CREATE TYPE public.contract_type AS ENUM ('spot', 'contracted');
-CREATE TYPE public.quote_status AS ENUM ('draft', 'sent', 'accepted', 'expired', 'cancelled');
-CREATE TYPE public.compliance_status AS ENUM ('pass', 'warn', 'fail');
-CREATE TYPE public.document_type AS ENUM ('commercial_invoice', 'bill_of_lading', 'air_waybill', 'packing_list', 'customs_form', 'quote_pdf');
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'transport_mode' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.transport_mode AS ENUM ('ocean','air','inland_trucking','courier','movers_packers');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['ocean','air','inland_trucking','courier','movers_packers'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'transport_mode' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.transport_mode ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'contract_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.contract_type AS ENUM ('spot','contracted');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['spot','contracted'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'contract_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.contract_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'quote_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.quote_status AS ENUM ('draft','sent','accepted','expired','cancelled');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['draft','sent','accepted','expired','cancelled'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'quote_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.quote_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'compliance_status' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.compliance_status AS ENUM ('pass','warn','fail');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['pass','warn','fail'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'compliance_status' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.compliance_status ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'document_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.document_type AS ENUM ('commercial_invoice','bill_of_lading','air_waybill','packing_list','customs_form','quote_pdf');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['commercial_invoice','bill_of_lading','air_waybill','packing_list','customs_form','quote_pdf'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'document_type' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.document_type ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
 
 -- Carriers
 CREATE TABLE public.carriers (

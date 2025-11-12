@@ -1,7 +1,8 @@
-// Ambient Deno typing for editors without Deno type support
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const Deno: any;
-// @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
+};
+// @ts-expect-error Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -9,8 +10,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// @ts-ignore Deno serve types
-Deno.serve(async (req: any) => {
+// @ts-expect-error Deno global in Edge runtime
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -26,7 +27,15 @@ Deno.serve(async (req: any) => {
       requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    let payload: any;
+    let payload: {
+      accountId: string;
+      to: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject: string;
+      body: string;
+      attachments?: unknown[];
+    } | null;
     try {
       payload = await req.json();
     } catch {
@@ -35,7 +44,15 @@ Deno.serve(async (req: any) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const { accountId, to, cc, bcc, subject, body, attachments } = payload || {};
+    const { accountId, to, cc, bcc, subject, body, attachments } = (payload || {}) as {
+      accountId: string;
+      to: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject: string;
+      body: string;
+      attachments?: unknown[];
+    };
 
     if (!accountId || !to || !subject) {
       throw new Error("Missing required fields: accountId, to, subject");
@@ -145,13 +162,13 @@ Deno.serve(async (req: any) => {
       const boundary = `mixed_boundary_${Date.now()}`;
       const plainBody = (body || "").replace(/<[^>]+>/g, "");
 
-      let message = [
+      const message = [
         senderEmail ? `From: ${senderEmail}` : "",
         `To: ${toList}`,
         ccList ? `Cc: ${ccList}` : "",
         `Subject: ${subject}`,
         "MIME-Version: 1.0",
-        `Content-Type: multipart/alternative; boundary=\"${boundary}\"`,
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
         "",
         `--${boundary}`,
         `Content-Type: text/plain; charset=UTF-8`,
@@ -314,7 +331,7 @@ Deno.serve(async (req: any) => {
         try {
           const j = JSON.parse(errorText);
           errorText = j?.error?.message || j?.message || errorText;
-        } catch {}
+        } catch { void 0; }
         console.error("Microsoft Graph SendMail error:", errorText);
         throw new Error(`Failed to send email via Office 365: ${errorText}`);
       }
@@ -332,16 +349,18 @@ Deno.serve(async (req: any) => {
         );
         if (sentItemsRes.ok) {
           const list = await sentItemsRes.json();
-          const messages: any[] = Array.isArray(list?.value) ? list.value : [];
+          type GraphRecipient = { emailAddress?: { address?: string } };
+          type GraphMessage = { subject?: string; toRecipients?: GraphRecipient[] };
+          const messages: GraphMessage[] = Array.isArray(list?.value) ? list.value : [];
           const normalizedSubject = String(subject || "").trim().toLowerCase();
           const toSet = new Set((to as string[]).map((a) => a.toLowerCase()));
 
           verified = messages.some((m) => {
             const subj = String(m?.subject || "").trim().toLowerCase();
             if (subj !== normalizedSubject) return false;
-            const msgTo = (Array.isArray(m?.toRecipients) ? m.toRecipients : []).map((r: any) => String(r?.emailAddress?.address || "").toLowerCase());
-            // Confirm at least one of provided recipients is in message
-            return msgTo.some((addr: string) => toSet.has(addr));
+            const msgTo = (Array.isArray(m?.toRecipients) ? m.toRecipients : [])
+              .map((r) => String(r?.emailAddress?.address || "").toLowerCase());
+            return msgTo.some((addr) => toSet.has(addr));
           });
         }
       } catch (verErr) {
@@ -392,12 +411,12 @@ Deno.serve(async (req: any) => {
         status: 200,
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error sending email:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: (error instanceof Error) ? error.message : String(error),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

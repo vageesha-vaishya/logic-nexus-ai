@@ -1,8 +1,22 @@
 -- Create enum for quote reset policy if it doesn't exist
-DO $$ BEGIN
-  CREATE TYPE quote_reset_policy AS ENUM ('none', 'daily', 'monthly', 'yearly');
-EXCEPTION
-  WHEN duplicate_object THEN null;
+DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'quote_reset_policy' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.quote_reset_policy AS ENUM ('none','daily','monthly','yearly');
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY['none','daily','monthly','yearly'] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'quote_reset_policy' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE 'ALTER TYPE public.quote_reset_policy ADD VALUE ' || quote_literal(lbl) || ';';
+      END IF;
+    END LOOP;
+  END IF;
 END $$;
 
 -- Create charge_sides table (Buy/Sell)

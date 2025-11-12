@@ -24,7 +24,7 @@ serve(async (req) => {
     const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(baseUrl, serviceKey);
 
-    let payload: any;
+    let payload: { tenantId: string; franchiseId?: string; limit?: number } | null;
     try {
       payload = await req.json();
     } catch {
@@ -34,7 +34,8 @@ serve(async (req) => {
       );
     }
 
-    let { tenantId, franchiseId, limit = 50 } = payload || {};
+    const { tenantId, franchiseId } = (payload || {}) as { tenantId: string; franchiseId?: string; limit?: number };
+    let { limit = 50 } = (payload || {}) as { tenantId: string; franchiseId?: string; limit?: number };
 
     if (!tenantId) {
       throw new Error("Missing required field: tenantId");
@@ -86,10 +87,10 @@ serve(async (req) => {
       JSON.stringify({ success: true, accountsProcessed: (accounts || []).length, totalSynced: synced }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error syncing all mailboxes:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error instanceof Error) ? error.message : String(error) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
     );
   }

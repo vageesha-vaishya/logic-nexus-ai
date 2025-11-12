@@ -1,6 +1,8 @@
-// @ts-ignore
-declare const Deno: any;
-// @ts-ignore - suppress editor diagnostics for URL imports in edge functions
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
+};
+// @ts-expect-error Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -25,7 +27,15 @@ Deno.serve(async (req: Request) => {
       requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    let payload: any;
+    type SearchPayload = {
+      email: string;
+      tenantId?: string | null;
+      accountId?: string | null;
+      direction?: string | null;
+      page?: number;
+      pageSize?: number;
+    };
+    let payload: SearchPayload | null;
     try {
       payload = await req.json();
     } catch {
@@ -35,16 +45,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    let { email, tenantId, accountId, direction, page = 1, pageSize = 25 } = payload || {};
+    const { email, tenantId, accountId, direction } = payload || ({} as SearchPayload);
+    let { page = 1, pageSize = 25 } = payload || ({} as SearchPayload);
 
     if (!email) {
       throw new Error("Missing required field: email");
     }
 
     const targetEmail = String(email).toLowerCase().trim();
-    const fromFilters: any = {
-      select: "*",
-    };
 
     // Base query builder
     let baseQuery = supabase.from("emails").select("*");
@@ -97,15 +105,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Merge and de-duplicate by id
-    const byId: Record<string, any> = {};
+    const byId: Record<string, unknown> = {};
     for (const arr of [fromMatches || [], toMatches || [], ccMatches || [], bccMatches || []]) {
-      for (const e of arr) {
-        byId[e.id] = e;
+      for (const e of arr as unknown[]) {
+        const id = (e as { id?: string })?.id;
+        if (id) byId[id] = e;
       }
     }
-    const merged = Object.values(byId).sort(
-      (a: any, b: any) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime()
-    );
+    const toReceivedAt = (x: unknown): number => {
+      const v = (x as { received_at?: string })?.received_at;
+      return v ? new Date(v).getTime() : 0;
+    };
+    const merged = Object.values(byId).sort((a, b) => toReceivedAt(b) - toReceivedAt(a));
 
     return new Response(
       JSON.stringify({
@@ -115,10 +126,10 @@ Deno.serve(async (req: Request) => {
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error searching emails:", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error instanceof Error) ? error.message : String(error) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
     );
   }
