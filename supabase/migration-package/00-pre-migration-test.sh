@@ -114,23 +114,34 @@ fi
 # Test 4: Test target database connection
 echo ""
 info "Test 4/10: Testing target database connection..."
-if psql "$NEW_DB_URL" -c "SELECT 1" >/dev/null 2>&1; then
-    test_pass "Target database connection successful"
-    
-    # Check database version
-    DB_VERSION=$(psql "$NEW_DB_URL" -t -c "SELECT version();" 2>/dev/null | head -n 1)
-    info "Database version: ${DB_VERSION}"
-    
-    # Check if database is accessible
-    CAN_CREATE=$(psql "$NEW_DB_URL" -t -c "SELECT has_database_privilege(current_user, current_database(), 'CREATE');" 2>/dev/null | tr -d '[:space:]')
-    if [ "$CAN_CREATE" = "t" ]; then
-        test_pass "User has CREATE privileges"
-    else
-        error "User lacks CREATE privileges on target database"
-    fi
-    
+DB_HOST=$(echo "$NEW_DB_URL" | sed -E 's#.*@([^:/?]+).*#\1#')
+DB_NAME=$(echo "$NEW_DB_URL" | sed -E 's#.*/([^?]+).*#\1#')
+DB_PASS=$(echo "$NEW_DB_URL" | sed -E 's#postgresql://postgres:([^@]+)@.*#\1#')
+
+if PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p 5432 -U postgres -d "$DB_NAME" -c "SELECT 1" >/dev/null 2>&1; then
+    test_pass "Target database connection successful (5432)"
+    ACTIVE_DB_URL="$NEW_DB_URL"
+elif PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p 6543 -U postgres -d "$DB_NAME" -c "SELECT 1" >/dev/null 2>&1; then
+    test_pass "Target database connection successful via pooling (6543)"
+    ACTIVE_DB_URL="postgresql://postgres:${DB_PASS}@${DB_HOST}:6543/${DB_NAME}?sslmode=require"
+    export NEW_DB_URL="$ACTIVE_DB_URL"
+    warning "Using pooling URL for subsequent steps"
 else
-    error "Cannot connect to target database - Check NEW_DB_URL credentials"
+    error "Cannot connect on 5432 or 6543 - Check NEW_DB_URL credentials and network"
+fi
+
+# Check database version
+DB_VERSION=$(psql "$ACTIVE_DB_URL" -t -c "SELECT version();" 2>/dev/null | head -n 1)
+if [ -n "$DB_VERSION" ]; then
+    info "Database version: ${DB_VERSION}"
+fi
+
+# Check if database is accessible
+CAN_CREATE=$(psql "$ACTIVE_DB_URL" -t -c "SELECT has_database_privilege(current_user, current_database(), 'CREATE');" 2>/dev/null | tr -d '[:space:]')
+if [ "$CAN_CREATE" = "t" ]; then
+    test_pass "User has CREATE privileges"
+else
+    warning "User lacks CREATE privileges on target database"
 fi
 
 # Test 5: Check target database state

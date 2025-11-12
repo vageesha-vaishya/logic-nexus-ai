@@ -79,11 +79,24 @@ load_config() {
 test_connection() {
     log "Testing connection to new Supabase database..."
     
-    if psql "$NEW_DB_URL" -c "SELECT 1" > /dev/null 2>&1; then
-        log "✓ Connection successful"
+    # Parse and attempt direct then pooling
+    local DB_HOST DB_NAME DB_PASS
+    DB_HOST=$(echo "$NEW_DB_URL" | sed -E 's#.*@([^:/?]+).*#\1#')
+    DB_NAME=$(echo "$NEW_DB_URL" | sed -E 's#.*/([^?]+).*#\1#')
+    DB_PASS=$(echo "$NEW_DB_URL" | sed -E 's#postgresql://postgres:([^@]+)@.*#\1#')
+    
+    if PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p 5432 -U postgres -d "$DB_NAME" -c "SELECT 1" > /dev/null 2>&1; then
+        log "✓ Direct connection successful (5432)"
     else
-        error "Cannot connect to new database. Check credentials."
-        exit 1
+        warning "Direct connection (5432) failed; trying pooling (6543)."
+        if PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p 6543 -U postgres -d "$DB_NAME" -c "SELECT 1" > /dev/null 2>&1; then
+            NEW_DB_URL="postgresql://postgres:${DB_PASS}@${DB_HOST}:6543/${DB_NAME}?sslmode=require"
+            export NEW_DB_URL
+            log "✓ Pooling connection successful (6543). Using updated NEW_DB_URL."
+        else
+            error "Cannot connect on 5432 or 6543. Check credentials, firewall, and network access."
+            exit 1
+        fi
     fi
 }
 
