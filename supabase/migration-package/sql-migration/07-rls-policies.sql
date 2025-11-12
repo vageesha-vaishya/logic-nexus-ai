@@ -405,7 +405,7 @@ CREATE POLICY "Users can view quote options"
     EXISTS (
       SELECT 1 FROM public.quotation_versions qv
       JOIN public.quotes q ON q.id = qv.quote_id
-      WHERE qv.id = quotation_version_options.quotation_version_id
+      WHERE qv.id = quotation_version_id
         AND q.tenant_id = public.get_user_tenant_id(auth.uid())
     )
   );
@@ -416,7 +416,7 @@ CREATE POLICY "Users can manage quote options"
     EXISTS (
       SELECT 1 FROM public.quotation_versions qv
       JOIN public.quotes q ON q.id = qv.quote_id
-      WHERE qv.id = quotation_version_options.quotation_version_id
+      WHERE qv.id = quotation_version_id
         AND q.tenant_id = public.get_user_tenant_id(auth.uid())
     )
   );
@@ -694,11 +694,11 @@ CREATE POLICY "Admins can manage user capacity"
   );
 
 CREATE POLICY "Users can view territories in their tenant"
-  ON public.territories FOR SELECT
+  ON public.territory_assignments FOR SELECT
   USING (tenant_id = public.get_user_tenant_id(auth.uid()));
 
 CREATE POLICY "Admins can manage territories"
-  ON public.territories FOR ALL
+  ON public.territory_assignments FOR ALL
   USING (
     tenant_id = public.get_user_tenant_id(auth.uid()) AND
     (public.has_role(auth.uid(), 'tenant_admin') OR public.has_role(auth.uid(), 'franchise_admin'))
