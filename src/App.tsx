@@ -91,6 +91,7 @@ import ChargeCategories from "./pages/dashboard/ChargeCategories";
 import ChargeBases from "./pages/dashboard/ChargeBases";
 import MasterDataGeography from "./pages/dashboard/MasterDataGeography";
 import MasterDataHTS from "./pages/dashboard/MasterDataHTS";
+import DatabaseExport from "./pages/dashboard/data-management/DatabaseExport";
 
 const queryClient = new QueryClient();
 
@@ -447,6 +448,10 @@ const App = () => (
             <Route 
               path="/dashboard/settings/data-management" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DataManagement /></ProtectedRoute>} 
+            />
+            <Route 
+              path="/dashboard/settings/database-export" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DatabaseExport /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/master-data" 

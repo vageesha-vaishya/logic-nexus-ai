@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,8 +49,30 @@ export default function Auth() {
     const { error } = await signIn(email, password);
 
     if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        toast.error('Invalid email or password');
+      // If initial admin credentials fail, attempt to auto-seed the admin account
+      const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
+      if (error.message.includes('Invalid login credentials') && isAdminEmail) {
+        try {
+          const { data, error: seedError } = await supabase.functions.invoke('seed-platform-admin', {
+            body: { email, password }
+          });
+
+          if (seedError) {
+            // Fall back to guidance if seeding fails
+            toast.error('Admin account not found. Use Setup to create it.');
+          } else if (data?.success) {
+            toast.success('Admin created. Signing you in...');
+            const { error: retryError } = await signIn(email, password);
+            if (!retryError) {
+              navigate(from, { replace: true });
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (e: any) {
+          // Edge function may not be deployed; guide the user
+          toast.error('Setup required. Please run Platform Setup.');
+        }
       } else if (error.message.includes('Email not confirmed')) {
         toast.error('Please verify your email address');
       } else {
@@ -111,6 +134,9 @@ export default function Auth() {
                 'Sign In'
               )}
             </Button>
+            <div className="pt-2 text-center text-sm text-muted-foreground">
+              First time setup? <a href="/setup-admin" className="text-primary underline">Create Platform Admin</a>
+            </div>
           </form>
         </CardContent>
       </Card>
