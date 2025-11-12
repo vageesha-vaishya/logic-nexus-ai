@@ -1,14 +1,23 @@
 # SQL Migration Scripts for Supabase Cloud
 
 ## Overview
-This directory contains ready-to-execute SQL migration scripts that can be directly copied and pasted into Supabase Cloud SQL Editor.
+This directory contains ready-to-execute SQL migration scripts for clean migration to Supabase Cloud. Each script includes DROP statements to remove existing objects before creation, ensuring a clean slate.
+
+## Clean Migration Features
+
+- **DROP CASCADE**: All objects are dropped with CASCADE to handle dependencies automatically
+- **Reverse Order Drops**: Objects are dropped in reverse dependency order to prevent errors
+- **Idempotent**: Scripts can be run multiple times safely using `DROP IF EXISTS` clauses
+- **Complete Cleanup**: Drops types, tables, functions, triggers, indexes, and sequences
+- **Safe Execution**: Uses `IF EXISTS` to avoid errors when objects don't exist
 
 ## Migration Order (CRITICAL - Follow Exactly)
 
 Execute scripts in this exact order:
 
 ### 1. **01-schema-and-types.sql** (10-15 min)
-   - Creates all enums and types
+   - **Drops**: All existing types, tables, functions, triggers (complete cleanup)
+   - **Creates**: All enums and types
    - Creates core tables with no dependencies
    - Creates geography master data tables
    - Creates logistics master data tables
@@ -16,7 +25,8 @@ Execute scripts in this exact order:
    - Sets up indexes and triggers
 
 ### 2. **02-configuration-tables.sql** (5-10 min)
-   - Creates custom roles and permissions
+   - **Drops**: All configuration tables
+   - **Creates**: Custom roles and permissions
    - Creates subscription management tables
    - Creates quote number configuration
    - Creates lead assignment tables
@@ -26,24 +36,28 @@ Execute scripts in this exact order:
    - Creates margin profiles
 
 ### 3. **03-crm-tables.sql** (5-10 min)
-   - Creates accounts, contacts, leads
+   - **Drops**: All CRM tables (accounts, contacts, leads, etc.)
+   - **Creates**: Accounts, contacts, leads
    - Creates opportunities and items
    - Creates activities and campaigns
    - Creates emails table
 
 ### 4. **04-quotes-shipments-tables.sql** (5-10 min)
-   - Creates services and rates
+   - **Drops**: All quotes and shipments tables
+   - **Creates**: Services and rates
    - Creates quotes and quotations
    - Creates shipments and cargo
    - Creates tracking events
 
 ### 5. **05-audit-system-tables.sql** (2-5 min)
-   - Creates audit logs
+   - **Drops**: Audit and system tables
+   - **Creates**: Audit logs
    - Creates notifications
    - Creates system settings
 
 ### 6. **06-database-functions.sql** (5 min)
-   - Creates all helper functions
+   - **Drops**: All existing functions and triggers
+   - **Creates**: All helper functions
    - Creates triggers
    - Required for RLS policies
 
@@ -204,14 +218,23 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ## Troubleshooting
 
 ### Error: "relation already exists"
-If you need to re-run scripts:
+**This should NOT happen** - all scripts include DROP statements. If it does:
 ```sql
+-- Nuclear option: Complete database reset
 DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO public;
 ```
 Then start from script 01 again.
+
+### Using the Shell Script (Alternative)
+If you prefer automated cleanup, use the shell script:
+```bash
+cd supabase/migration-package
+./02-cleanup-existing.sh
+```
+This will drop ALL objects from the database before you run the SQL scripts.
 
 ### Error: "function does not exist"
 Make sure you executed `06-database-functions.sql` before `07-rls-policies.sql`.

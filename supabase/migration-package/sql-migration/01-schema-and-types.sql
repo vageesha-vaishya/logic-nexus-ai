@@ -3,19 +3,60 @@
 -- ==========================================
 -- Execute this first in Supabase Cloud SQL Editor
 
--- Drop existing types if recreating
-DROP TYPE IF EXISTS app_role CASCADE;
-DROP TYPE IF EXISTS account_type CASCADE;
-DROP TYPE IF EXISTS account_status CASCADE;
-DROP TYPE IF EXISTS activity_type CASCADE;
-DROP TYPE IF EXISTS activity_status CASCADE;
-DROP TYPE IF EXISTS priority_level CASCADE;
-DROP TYPE IF EXISTS lead_status CASCADE;
-DROP TYPE IF EXISTS lead_source CASCADE;
-DROP TYPE IF EXISTS opportunity_stage CASCADE;
-DROP TYPE IF EXISTS shipment_type CASCADE;
-DROP TYPE IF EXISTS quote_reset_policy CASCADE;
+-- Drop existing types (in reverse dependency order)
 DROP TYPE IF EXISTS subscription_tier CASCADE;
+DROP TYPE IF EXISTS quote_reset_policy CASCADE;
+DROP TYPE IF EXISTS shipment_type CASCADE;
+DROP TYPE IF EXISTS opportunity_stage CASCADE;
+DROP TYPE IF EXISTS lead_source CASCADE;
+DROP TYPE IF EXISTS lead_status CASCADE;
+DROP TYPE IF EXISTS priority_level CASCADE;
+DROP TYPE IF EXISTS activity_status CASCADE;
+DROP TYPE IF EXISTS activity_type CASCADE;
+DROP TYPE IF EXISTS account_status CASCADE;
+DROP TYPE IF EXISTS account_type CASCADE;
+DROP TYPE IF EXISTS app_role CASCADE;
+
+-- Drop existing tables (reverse dependency order)
+DROP TABLE IF EXISTS tracking_events CASCADE;
+DROP TABLE IF EXISTS cargo_details CASCADE;
+DROP TABLE IF EXISTS shipments CASCADE;
+DROP TABLE IF EXISTS rate_calculations CASCADE;
+DROP TABLE IF EXISTS customer_selections CASCADE;
+DROP TABLE IF EXISTS quote_packages CASCADE;
+DROP TABLE IF EXISTS quote_charges CASCADE;
+DROP TABLE IF EXISTS quote_legs CASCADE;
+DROP TABLE IF EXISTS quotation_version_options CASCADE;
+DROP TABLE IF EXISTS quotation_versions CASCADE;
+DROP TABLE IF EXISTS quotes CASCADE;
+DROP TABLE IF EXISTS shipping_rates CASCADE;
+DROP TABLE IF EXISTS carrier_rate_charges CASCADE;
+DROP TABLE IF EXISTS carrier_rates CASCADE;
+DROP TABLE IF EXISTS services CASCADE;
+DROP TABLE IF EXISTS charge_bases CASCADE;
+DROP TABLE IF EXISTS charge_categories CASCADE;
+DROP TABLE IF EXISTS charge_sides CASCADE;
+DROP TABLE IF EXISTS warehouses CASCADE;
+DROP TABLE IF EXISTS vehicles CASCADE;
+DROP TABLE IF EXISTS incoterms CASCADE;
+DROP TABLE IF EXISTS consignees CASCADE;
+DROP TABLE IF EXISTS carriers CASCADE;
+DROP TABLE IF EXISTS container_sizes CASCADE;
+DROP TABLE IF EXISTS container_types CASCADE;
+DROP TABLE IF EXISTS package_sizes CASCADE;
+DROP TABLE IF EXISTS package_categories CASCADE;
+DROP TABLE IF EXISTS cargo_types CASCADE;
+DROP TABLE IF EXISTS service_type_mappings CASCADE;
+DROP TABLE IF EXISTS service_types CASCADE;
+DROP TABLE IF EXISTS currencies CASCADE;
+DROP TABLE IF EXISTS ports_locations CASCADE;
+DROP TABLE IF EXISTS cities CASCADE;
+DROP TABLE IF EXISTS countries CASCADE;
+DROP TABLE IF EXISTS continents CASCADE;
+DROP TABLE IF EXISTS user_roles CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+DROP TABLE IF EXISTS franchises CASCADE;
+DROP TABLE IF EXISTS tenants CASCADE;
 
 -- Create enums
 CREATE TYPE app_role AS ENUM ('platform_admin', 'tenant_admin', 'franchise_admin', 'user');

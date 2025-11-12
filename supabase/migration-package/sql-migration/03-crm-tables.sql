@@ -3,6 +3,19 @@
 -- ==========================================
 -- Execute this after Phase 2
 
+-- Drop existing CRM tables
+DROP TABLE IF EXISTS emails CASCADE;
+DROP TABLE IF EXISTS campaign_members CASCADE;
+DROP TABLE IF EXISTS campaigns CASCADE;
+DROP TABLE IF EXISTS activities CASCADE;
+DROP TABLE IF EXISTS opportunity_items CASCADE;
+DROP TABLE IF EXISTS opportunities CASCADE;
+DROP TABLE IF EXISTS lead_assignment_history CASCADE;
+DROP TABLE IF EXISTS lead_assignment_queue CASCADE;
+DROP TABLE IF EXISTS leads CASCADE;
+DROP TABLE IF EXISTS contacts CASCADE;
+DROP TABLE IF EXISTS accounts CASCADE;
+
 -- Accounts
 CREATE TABLE IF NOT EXISTS accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
