@@ -1,7 +1,24 @@
 -- ==========================================
--- PHASE 4: QUOTES AND SHIPMENTS TABLES
+-- PHASE 4: QUOTES & SHIPMENTS TABLES
 -- ==========================================
 -- Execute this after Phase 3
+
+-- Drop existing quotes and shipments tables
+DROP TABLE IF EXISTS tracking_events CASCADE;
+DROP TABLE IF EXISTS cargo_details CASCADE;
+DROP TABLE IF EXISTS shipments CASCADE;
+DROP TABLE IF EXISTS rate_calculations CASCADE;
+DROP TABLE IF EXISTS customer_selections CASCADE;
+DROP TABLE IF EXISTS quote_packages CASCADE;
+DROP TABLE IF EXISTS quote_charges CASCADE;
+DROP TABLE IF EXISTS quote_legs CASCADE;
+DROP TABLE IF EXISTS quotation_version_options CASCADE;
+DROP TABLE IF EXISTS quotation_versions CASCADE;
+DROP TABLE IF EXISTS quotes CASCADE;
+DROP TABLE IF EXISTS shipping_rates CASCADE;
+DROP TABLE IF EXISTS carrier_rate_charges CASCADE;
+DROP TABLE IF EXISTS carrier_rates CASCADE;
+DROP TABLE IF EXISTS services CASCADE;
 
 -- Services
 CREATE TABLE IF NOT EXISTS services (

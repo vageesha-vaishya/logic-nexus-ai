@@ -1,7 +1,24 @@
 -- ==========================================
--- PHASE 6: DATABASE FUNCTIONS
+-- PHASE 6: DATABASE FUNCTIONS & TRIGGERS
 -- ==========================================
 -- Execute this after Phase 5
+
+-- Drop existing triggers
+DROP TRIGGER IF EXISTS auto_generate_quote_number_trigger ON quotes CASCADE;
+DROP TRIGGER IF EXISTS update_lead_score_trigger ON leads CASCADE;
+
+-- Drop existing functions
+DROP FUNCTION IF EXISTS tenant_has_feature(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS decrement_user_lead_count(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS increment_user_lead_count(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS auto_generate_quote_number() CASCADE;
+DROP FUNCTION IF EXISTS generate_quote_number(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS update_lead_score() CASCADE;
+DROP FUNCTION IF EXISTS calculate_lead_score(UUID) CASCADE;
+DROP FUNCTION IF EXISTS get_user_franchise_id(UUID) CASCADE;
+DROP FUNCTION IF EXISTS get_user_tenant_id(UUID) CASCADE;
+DROP FUNCTION IF EXISTS has_role(UUID, app_role) CASCADE;
+DROP FUNCTION IF EXISTS is_platform_admin(UUID) CASCADE;
 
 -- Helper functions for RLS
 CREATE OR REPLACE FUNCTION is_platform_admin(check_user_id UUID)

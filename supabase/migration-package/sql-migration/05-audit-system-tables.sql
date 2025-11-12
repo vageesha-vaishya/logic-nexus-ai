@@ -1,7 +1,12 @@
 -- ==========================================
--- PHASE 5: AUDIT AND SYSTEM TABLES
+-- PHASE 5: AUDIT & SYSTEM TABLES
 -- ==========================================
 -- Execute this after Phase 4
+
+-- Drop existing audit and system tables
+DROP TABLE IF EXISTS system_settings CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS audit_logs CASCADE;
 
 -- Audit Logs
 CREATE TABLE IF NOT EXISTS audit_logs (

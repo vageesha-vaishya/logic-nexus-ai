@@ -3,6 +3,28 @@
 -- ==========================================
 -- Execute this after Phase 1
 
+-- Drop existing configuration tables
+DROP TABLE IF EXISTS margin_profiles CASCADE;
+DROP TABLE IF EXISTS margin_methods CASCADE;
+DROP TABLE IF EXISTS compliance_rules CASCADE;
+DROP TABLE IF EXISTS document_templates CASCADE;
+DROP TABLE IF EXISTS email_templates CASCADE;
+DROP TABLE IF EXISTS email_filters CASCADE;
+DROP TABLE IF EXISTS email_accounts CASCADE;
+DROP TABLE IF EXISTS territory_assignments CASCADE;
+DROP TABLE IF EXISTS assignment_rules CASCADE;
+DROP TABLE IF EXISTS user_capacity CASCADE;
+DROP TABLE IF EXISTS quote_number_sequences CASCADE;
+DROP TABLE IF EXISTS quote_number_config_franchise CASCADE;
+DROP TABLE IF EXISTS quote_number_config_tenant CASCADE;
+DROP TABLE IF EXISTS subscription_invoices CASCADE;
+DROP TABLE IF EXISTS usage_records CASCADE;
+DROP TABLE IF EXISTS tenant_subscriptions CASCADE;
+DROP TABLE IF EXISTS subscription_plans CASCADE;
+DROP TABLE IF EXISTS user_custom_roles CASCADE;
+DROP TABLE IF EXISTS custom_role_permissions CASCADE;
+DROP TABLE IF EXISTS custom_roles CASCADE;
+
 -- Custom Roles
 CREATE TABLE IF NOT EXISTS custom_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
