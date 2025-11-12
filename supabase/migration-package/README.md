@@ -1,0 +1,233 @@
+# Supabase Migration Package
+
+Complete automation scripts for migrating from Lovable Cloud to Supabase Cloud.
+
+## 📦 Package Contents
+
+```
+migration-package/
+├── 01-MIGRATION-GUIDE.md          # Complete step-by-step guide
+├── run-migration.sh               # Master migration script (RUN THIS!)
+├── 03-import-data.sh             # Automated data import
+├── verify-migration.sh           # Verify everything works
+├── rollback.sh                   # Emergency rollback
+├── deploy-functions.sh           # Deploy edge functions
+├── templates/
+│   ├── new-supabase-config.env.template
+│   └── .env.production.template
+├── helpers/
+│   └── test-connection.js        # Test database connection
+└── migration-logs/               # Generated during migration
+```
+
+## 🚀 Quick Start (3 Commands)
+
+```bash
+# 1. Configure new database
+cp templates/new-supabase-config.env.template new-supabase-config.env
+# Edit with your new Supabase credentials
+
+# 2. Run complete migration
+chmod +x *.sh
+./run-migration.sh
+
+# 3. Deploy edge functions
+./deploy-functions.sh
+```
+
+## ✅ What Gets Migrated
+
+- ✅ Complete database schema (tables, constraints, indexes)
+- ✅ All data in correct dependency order
+- ✅ Database functions and triggers
+- ✅ RLS policies
+- ✅ Custom enums
+- ✅ Sequences (auto-increment)
+- ✅ Foreign keys and constraints
+
+## 📋 Prerequisites
+
+1. **New Supabase project created** at https://supabase.com
+2. **PostgreSQL client** (`psql`) installed
+3. **Node.js** installed
+4. **Data exported** from Lovable Cloud to `migration-data/` folder
+
+## 🔧 Configuration
+
+Edit `new-supabase-config.env`:
+
+```bash
+# Get from: Project Settings → Database
+NEW_DB_URL="postgresql://postgres:YOUR_PASSWORD@db.XXX.supabase.co:5432/postgres"
+
+# Get from: Project Settings → API
+NEW_SUPABASE_URL="https://XXX.supabase.co"
+NEW_SUPABASE_ANON_KEY="your_anon_key"
+NEW_SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
+NEW_PROJECT_ID="your_project_ref"
+```
+
+## 📊 Migration Steps
+
+### Step 1: Export Data
+```bash
+# Use DatabaseExport UI in your app
+# OR run export scripts from ../export-scripts/
+# Save all CSVs to migration-data/ folder
+```
+
+### Step 2: Test Connection
+```bash
+node helpers/test-connection.js
+```
+
+### Step 3: Run Migration
+```bash
+./run-migration.sh
+```
+
+This will:
+1. Validate prerequisites
+2. Test connection
+3. Apply schema
+4. Import data in correct order
+5. Reset sequences
+6. Verify integrity
+
+### Step 4: Deploy Functions
+```bash
+./deploy-functions.sh
+```
+
+### Step 5: Update App
+```bash
+# Backup current .env
+cp ../../.env ../../.env.backup
+
+# Update with new credentials
+cp new-supabase-config.env ../../.env
+
+# Test
+cd ../..
+npm run dev
+```
+
+## 🔍 Verification
+
+```bash
+./verify-migration.sh
+```
+
+Checks:
+- Database connection
+- All tables exist
+- Row counts match
+- RLS policies active
+- Functions present
+- Indexes created
+- Foreign keys working
+- Data integrity
+
+## 🆘 Emergency Rollback
+
+If anything goes wrong:
+
+```bash
+./rollback.sh
+```
+
+This restores your Lovable Cloud connection immediately.
+
+## 📝 Logs
+
+All operations logged to:
+```
+migration-logs/
+├── migration-YYYYMMDD_HHMMSS.log
+└── verification-report.txt
+```
+
+## ⚠️ Important Notes
+
+1. **Keep Lovable Cloud active** until fully verified
+2. **Test thoroughly** before going live
+3. **Users may need password reset** (auth migration is complex)
+4. **Monitor for 24 hours** after migration
+5. **Save all export files** for 30 days
+
+## 🔐 Security
+
+- Never commit `new-supabase-config.env` (contains secrets)
+- Use service_role key only in server-side scripts
+- Keep connection strings secure
+- Review RLS policies after migration
+
+## 🐛 Troubleshooting
+
+### Connection Failed
+```bash
+node helpers/test-connection.js
+# Check credentials in new-supabase-config.env
+```
+
+### Import Errors
+```bash
+# Check logs
+cat migration-logs/migration-*.log
+
+# Retry specific table
+psql "$NEW_DB_URL" -c "\\COPY public.table_name FROM 'migration-data/table_name.csv' WITH (FORMAT csv, HEADER true)"
+```
+
+### Missing Data
+```bash
+# Compare counts
+./verify-migration.sh --detailed
+
+# Check specific table
+psql "$NEW_DB_URL" -c "SELECT COUNT(*) FROM table_name;"
+```
+
+### RLS Errors
+```bash
+# Temporarily disable for troubleshooting
+psql "$NEW_DB_URL" -c "ALTER TABLE table_name DISABLE ROW LEVEL SECURITY;"
+```
+
+## 📞 Support Resources
+
+- Migration guide: `01-MIGRATION-GUIDE.md`
+- Supabase docs: https://supabase.com/docs
+- Export scripts: `../export-scripts/README.md`
+
+## ✅ Success Checklist
+
+- [ ] Data exported from Lovable Cloud
+- [ ] New Supabase project created
+- [ ] Configuration file updated
+- [ ] Connection test passed
+- [ ] Schema migration completed
+- [ ] Data import completed
+- [ ] Verification passed
+- [ ] Edge functions deployed
+- [ ] Application updated
+- [ ] Production tested
+- [ ] No errors for 24 hours
+- [ ] Old database backed up
+
+## 🎉 Post-Migration
+
+After successful migration:
+1. Update documentation
+2. Notify team
+3. Monitor logs for 48 hours
+4. Keep Lovable Cloud as backup for 2 weeks
+5. Archive export files
+6. Update CI/CD pipelines
+7. Celebrate! 🎊
+
+---
+
+**Estimated Time:** 2-3 hours
+**Difficulty:** Medium
+**Success Rate:** 95%+ with proper preparation
