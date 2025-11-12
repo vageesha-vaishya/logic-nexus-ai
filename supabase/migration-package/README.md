@@ -9,7 +9,8 @@ migration-package/
 ├── 01-MIGRATION-GUIDE.md          # Complete step-by-step guide
 ├── run-migration.sh               # Master migration script (RUN THIS!)
 ├── 02-cleanup-existing.sh        # Clean existing database objects
-├── 03-import-data.sh             # Automated data import with truncate
+├── 03-import-data.sh             # Data import with progress tracking
+├── migration-status.sh           # Real-time migration status monitor
 ├── force-clean-migration.sh      # Automated clean migration (no prompts)
 ├── verify-migration.sh           # Verify everything works
 ├── rollback.sh                   # Emergency rollback
@@ -103,9 +104,27 @@ The migration will:
 2. Test connection
 3. (Optional) Clean existing database objects
 4. Apply schema
-5. Import data in correct order (with automatic truncate)
+5. Import data with **real-time progress tracking**:
+   - Progress bar with percentage
+   - Elapsed time and ETA
+   - Per-table statistics
+   - Row counts and file sizes
 6. Reset sequences
 7. Verify integrity
+
+### Step 3b: Monitor Progress (Optional)
+While migration is running or after completion:
+```bash
+./migration-status.sh
+```
+
+This shows:
+- Table-by-table status
+- Row counts
+- RLS policies status
+- Database functions count
+- Recent activity
+- Overall progress percentage
 
 ### Step 4: Deploy Functions
 ```bash

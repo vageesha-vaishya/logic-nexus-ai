@@ -193,12 +193,14 @@ main() {
     log "=========================================="
     echo ""
     info "Next steps:"
-    info "1. Deploy edge functions: supabase functions deploy"
-    info "2. Update app .env file with new credentials"
-    info "3. Test application thoroughly"
-    info "4. Monitor for 24 hours before decommissioning old database"
+    info "1. Check migration status: ./migration-status.sh"
+    info "2. Deploy edge functions: ./deploy-functions.sh"
+    info "3. Update app .env file with new credentials"
+    info "4. Test application thoroughly"
+    info "5. Monitor for 24 hours before decommissioning old database"
     echo ""
     info "Log file: $LOG_FILE"
+    info "View status: ./migration-status.sh"
     echo ""
 }
 
