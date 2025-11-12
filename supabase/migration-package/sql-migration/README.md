@@ -1,7 +1,18 @@
 # SQL Migration Scripts for Supabase Cloud
 
 ## Overview
-This directory contains ready-to-execute SQL migration scripts for clean migration to Supabase Cloud. Each script includes DROP statements to remove existing objects before creation, ensuring a clean slate.
+These SQL scripts provide a complete database migration package for Supabase Cloud, including schema, functions, RLS policies, and data export tools.
+
+## ✅ Migration Status
+
+Scripts completed so far:
+- ✅ **01-schema-and-types.sql** - Base enums and types
+- ✅ **02-configuration-tables.sql** - Configuration and tenant tables
+- ✅ **03-crm-tables.sql** - CRM tables (accounts, contacts, leads, opportunities)
+- ✅ **04-quotes-shipments-tables.sql** - Quotes and shipments tables
+- ✅ **05-audit-system-tables.sql** - Audit and tracking tables
+- ✅ **06-database-functions.sql** - Database functions and triggers
+- ✅ **07-rls-policies.sql** - Row Level Security policies
 
 ## Clean Migration Features
 
@@ -11,11 +22,11 @@ This directory contains ready-to-execute SQL migration scripts for clean migrati
 - **Complete Cleanup**: Drops types, tables, functions, triggers, indexes, and sequences
 - **Safe Execution**: Uses `IF EXISTS` to avoid errors when objects don't exist
 
-## Migration Order (CRITICAL - Follow Exactly)
+## 📋 Complete Execution Order
 
 Execute scripts in this exact order:
 
-### 1. **01-schema-and-types.sql** (10-15 min)
+### 1. **01-schema-and-types.sql** ✅
    - **Drops**: All existing types, tables, functions, triggers (complete cleanup)
    - **Creates**: All enums and types
    - Creates core tables with no dependencies
