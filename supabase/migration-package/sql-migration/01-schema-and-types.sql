@@ -357,14 +357,14 @@ CREATE TABLE IF NOT EXISTS charge_bases (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_franchises_tenant ON franchises(tenant_id);
-CREATE INDEX idx_user_roles_user ON user_roles(user_id);
-CREATE INDEX idx_user_roles_tenant ON user_roles(tenant_id);
-CREATE INDEX idx_countries_continent ON countries(continent_id);
-CREATE INDEX idx_cities_country ON cities(country_id);
-CREATE INDEX idx_ports_country ON ports_locations(country_id);
-CREATE INDEX idx_carriers_tenant ON carriers(tenant_id);
-CREATE INDEX idx_consignees_tenant ON consignees(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_franchises_tenant ON franchises(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_tenant ON user_roles(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_countries_continent ON countries(continent_id);
+CREATE INDEX IF NOT EXISTS idx_cities_country ON cities(country_id);
+CREATE INDEX IF NOT EXISTS idx_ports_country ON ports_locations(country_id);
+CREATE INDEX IF NOT EXISTS idx_carriers_tenant ON carriers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_consignees_tenant ON consignees(tenant_id);
 
 -- Update timestamp trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
