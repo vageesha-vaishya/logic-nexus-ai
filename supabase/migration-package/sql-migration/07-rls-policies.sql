@@ -727,7 +727,7 @@ CREATE POLICY "Users can view emails in their scope"
       public.has_role(auth.uid(), 'tenant_admin') OR
       EXISTS (
         SELECT 1 FROM public.email_accounts ea
-        WHERE ea.id = email_account_id AND ea.user_id = auth.uid()
+        WHERE ea.id = account_id AND ea.user_id = auth.uid()
       )
     )
   );
@@ -869,7 +869,12 @@ CREATE POLICY "Admins can view audit logs in their scope"
   ON public.audit_logs FOR SELECT
   USING (
     public.is_platform_admin(auth.uid()) OR
-    (tenant_id = public.get_user_tenant_id(auth.uid()) AND public.has_role(auth.uid(), 'tenant_admin'))
+    EXISTS (
+      SELECT 1 FROM public.user_roles ur
+      WHERE ur.user_id = audit_logs.user_id
+        AND ur.tenant_id = public.get_user_tenant_id(auth.uid())
+        AND public.has_role(auth.uid(), 'tenant_admin')
+    )
   );
 
 CREATE POLICY "System can insert audit logs"
