@@ -405,7 +405,7 @@ CREATE POLICY "Users can view quote options"
     EXISTS (
       SELECT 1 FROM public.quotation_versions qv
       JOIN public.quotes q ON q.id = qv.quote_id
-      WHERE qv.id = version_id
+      WHERE qv.id = quotation_version_options.quotation_version_id
         AND q.tenant_id = public.get_user_tenant_id(auth.uid())
     )
   );
@@ -416,7 +416,7 @@ CREATE POLICY "Users can manage quote options"
     EXISTS (
       SELECT 1 FROM public.quotation_versions qv
       JOIN public.quotes q ON q.id = qv.quote_id
-      WHERE qv.id = version_id
+      WHERE qv.id = quotation_version_options.quotation_version_id
         AND q.tenant_id = public.get_user_tenant_id(auth.uid())
     )
   );
