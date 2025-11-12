@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS emails CASCADE;
 DROP TABLE IF EXISTS campaign_members CASCADE;
 DROP TABLE IF EXISTS campaigns CASCADE;
 DROP TABLE IF EXISTS activities CASCADE;
+DROP TABLE IF EXISTS opportunity_line_items CASCADE;
 DROP TABLE IF EXISTS opportunity_items CASCADE;
 DROP TABLE IF EXISTS opportunities CASCADE;
 DROP TABLE IF EXISTS lead_assignment_history CASCADE;
@@ -145,19 +146,21 @@ CREATE TABLE IF NOT EXISTS opportunities (
   closed_at TIMESTAMPTZ
 );
 
--- Opportunity Items
-CREATE TABLE IF NOT EXISTS opportunity_items (
+-- Opportunity Line Items
+CREATE TABLE IF NOT EXISTS opportunity_line_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   opportunity_id UUID NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  service_id UUID REFERENCES services(id) ON DELETE SET NULL,
   product_code TEXT,
-  product_name TEXT NOT NULL,
+  product_name TEXT,
   quantity NUMERIC DEFAULT 1,
   unit_price NUMERIC DEFAULT 0,
-  discount NUMERIC DEFAULT 0,
-  total_price NUMERIC DEFAULT 0,
+  discount_percent NUMERIC DEFAULT 0,
+  tax_percent NUMERIC DEFAULT 0,
+  line_total NUMERIC DEFAULT 0,
   description TEXT,
-  sort_order INTEGER DEFAULT 1000,
+  sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -264,4 +267,5 @@ CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON accounts FOR EACH ROW
 CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON contacts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_leads_updated_at BEFORE UPDATE ON leads FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_opportunities_updated_at BEFORE UPDATE ON opportunities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_opportunity_line_items_updated_at BEFORE UPDATE ON opportunity_line_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON activities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
