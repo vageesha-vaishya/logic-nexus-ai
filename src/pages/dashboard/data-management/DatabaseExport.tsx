@@ -3196,15 +3196,41 @@ pg_restore --version</code></pre>
     </div>
   );
 }
-  // DNS-over-HTTPS resolver (Google)
-  const dnsResolveHost = async (host: string): Promise<{ status: number; addresses: string[] }> => {
-    const url = `https://dns.google/resolve?name=${encodeURIComponent(host)}&type=A`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/dns-json' } });
-    if (!res.ok) throw new Error(`DNS query failed: ${res.status} ${res.statusText}`);
-    const json = await res.json();
-    const answers = Array.isArray(json.Answer) ? json.Answer : [];
-    const addresses = answers.filter((a: any) => a && a.type === 1 && a.data).map((a: any) => String(a.data));
-    return { status: Number(json.Status ?? 2), addresses };
+  const dnsResolveHost = async (host: string): Promise<{ status: number; addresses: string[]; provider?: string }> => {
+    const providers = [
+      { name: 'Google', base: 'https://dns.google/resolve' },
+      { name: 'Cloudflare', base: 'https://cloudflare-dns.com/dns-query' },
+      { name: 'Quad9', base: 'https://dns.quad9.net/dns-query' },
+    ];
+
+    const resolveWithProvider = async (provider: { name: string; base: string }) => {
+      const url = `${provider.base}?name=${encodeURIComponent(host)}&type=A`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await fetch(url, { headers: { Accept: 'application/dns-json' }, signal: controller.signal });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const json = await res.json();
+        const answers = Array.isArray(json.Answer) ? json.Answer : [];
+        const addresses = answers.filter((a: any) => a && a.type === 1 && a.data).map((a: any) => String(a.data));
+        const status = Number(json.Status ?? 2);
+        return { status, addresses, provider: provider.name };
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    const errors: string[] = [];
+    for (const p of providers) {
+      try {
+        const result = await resolveWithProvider(p);
+        if (result.status === 0 && result.addresses.length > 0) return result;
+        errors.push(`${p.name}: status ${result.status}, addresses ${result.addresses.length}`);
+      } catch (e: any) {
+        errors.push(`${p.name}: ${e?.message || String(e)}`);
+      }
+    }
+    throw new Error(errors.join(' | '));
   };
 
   const testDbConnection = async () => {
@@ -3221,7 +3247,7 @@ pg_restore --version</code></pre>
       const dnsOk = dns.status === 0 && dns.addresses.length > 0;
       const pooling = isSupabasePoolerHostname(parsed.host);
       setConnResult({
-        dns: { ok: dnsOk, addresses: dns.addresses, message: dnsOk ? 'Resolved via Google DNS' : 'No A records found or non-zero DNS status' },
+        dns: { ok: dnsOk, addresses: dns.addresses, message: dnsOk ? `Resolved via ${dns.provider} DNS` : 'No A records found or non-zero DNS status' },
         tcp: { ok: undefined, message: 'TCP port check is not possible from browser. Use Preflight in terminal.' },
         pooling,
       });
