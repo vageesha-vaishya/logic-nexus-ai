@@ -195,17 +195,17 @@ COPY (SELECT * FROM public.tracking_events) TO STDOUT WITH (FORMAT csv, HEADER t
 -- Save to: tracking_events.csv
 
 -- 29. ASSIGNMENT SYSTEM
-COPY (SELECT * FROM public.territories) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
--- Save to: territories.csv
+COPY (SELECT * FROM public.territory_assignments) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
+-- Save to: territory_assignments.csv
 
 COPY (SELECT * FROM public.assignment_rules) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: assignment_rules.csv
 
-COPY (SELECT * FROM public.assignment_history) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
--- Save to: assignment_history.csv
+COPY (SELECT * FROM public.lead_assignment_history) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
+-- Save to: lead_assignment_history.csv
 
-COPY (SELECT * FROM public.assignment_queue) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
--- Save to: assignment_queue.csv
+COPY (SELECT * FROM public.lead_assignment_queue) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
+-- Save to: lead_assignment_queue.csv
 
 -- 30. EMAIL SYSTEM
 COPY (SELECT * FROM public.emails) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');

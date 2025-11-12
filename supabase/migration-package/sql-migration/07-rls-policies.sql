@@ -51,9 +51,9 @@ ALTER TABLE public.charge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.charge_sides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.charge_bases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assignment_rules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.assignment_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.assignment_queue ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.territories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lead_assignment_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lead_assignment_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.territory_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emails ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
@@ -667,7 +667,7 @@ CREATE POLICY "Admins can manage assignment rules"
   );
 
 CREATE POLICY "Users can view assignment history in their scope"
-  ON public.assignment_history FOR SELECT
+  ON public.lead_assignment_history FOR SELECT
   USING (
     tenant_id = public.get_user_tenant_id(auth.uid()) AND
     (
@@ -678,11 +678,11 @@ CREATE POLICY "Users can view assignment history in their scope"
   );
 
 CREATE POLICY "System can insert assignment history"
-  ON public.assignment_history FOR INSERT
+  ON public.lead_assignment_history FOR INSERT
   WITH CHECK (tenant_id = public.get_user_tenant_id(auth.uid()));
 
 CREATE POLICY "Users can view assignment queue"
-  ON public.assignment_queue FOR SELECT
+  ON public.lead_assignment_queue FOR SELECT
   USING (tenant_id = public.get_user_tenant_id(auth.uid()));
 
 CREATE POLICY "System can manage assignment queue"
