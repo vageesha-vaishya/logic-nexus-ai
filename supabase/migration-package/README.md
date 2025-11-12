@@ -11,6 +11,7 @@ migration-package/
 ├── run-migration.sh               # Master migration script (RUN THIS!)
 ├── 02-cleanup-existing.sh        # Clean existing database objects
 ├── 03-import-data.sh             # Data import with progress tracking
+├── 04-post-migration-validation.sh # Data integrity validation ⭐ NEW
 ├── migration-status.sh           # Real-time migration status monitor
 ├── force-clean-migration.sh      # Automated clean migration (no prompts)
 ├── verify-migration.sh           # Verify everything works
@@ -22,6 +23,9 @@ migration-package/
 ├── helpers/
 │   └── test-connection.js        # Test database connection
 └── migration-logs/               # Generated during migration
+    ├── migration-*.log
+    ├── verification-report.txt
+    └── validation-report-*.txt   # Detailed comparison ⭐ NEW
 ```
 
 ## 🚀 Quick Start
@@ -130,6 +134,7 @@ The migration will:
    - Row counts and file sizes
 6. Reset sequences
 7. Verify integrity
+8. **Run post-migration validation** (compares source vs target) ⭐ NEW
 
 ### Step 3b: Monitor Progress (Optional)
 While migration is running or after completion:
@@ -165,6 +170,7 @@ npm run dev
 
 ## 🔍 Verification
 
+### Basic Verification
 ```bash
 ./verify-migration.sh
 ```
@@ -172,12 +178,33 @@ npm run dev
 Checks:
 - Database connection
 - All tables exist
-- Row counts match
+- Row counts reasonable
 - RLS policies active
 - Functions present
 - Indexes created
 - Foreign keys working
 - Data integrity
+
+### Detailed Validation (Recommended) ⭐ NEW
+```bash
+./04-post-migration-validation.sh
+```
+
+Comprehensive validation that compares source and target:
+- ✅ **Row count comparison** per table
+- ✅ **Data checksums** for sample data
+- ✅ **Primary key integrity** (no NULLs, no duplicates)
+- ✅ **Foreign key constraints** validated
+- ✅ **RLS policy count** comparison
+- ✅ **Database function count** comparison
+- ✅ **Sequence values** recorded
+- ✅ **Detailed report** generated
+
+**Note:** To enable full validation, add `SOURCE_DB_URL` to `new-supabase-config.env`:
+```bash
+# Optional: For detailed comparison
+SOURCE_DB_URL="postgresql://postgres:PASSWORD@OLD_HOST:5432/postgres"
+```
 
 ## 🆘 Emergency Rollback
 
@@ -189,14 +216,23 @@ If anything goes wrong:
 
 This restores your Lovable Cloud connection immediately.
 
-## 📝 Logs
+## 📝 Logs & Reports
 
 All operations logged to:
 ```
 migration-logs/
-├── migration-YYYYMMDD_HHMMSS.log
-└── verification-report.txt
+├── migration-YYYYMMDD_HHMMSS.log      # Full migration log
+├── verification-report.txt            # Basic verification
+└── validation-report-YYYYMMDD.txt     # Detailed comparison ⭐ NEW
 ```
+
+The validation report includes:
+- Table-by-table row count comparison
+- Primary key integrity check
+- Foreign key validation
+- Duplicate detection
+- Sample data checksums
+- Security policy comparison
 
 ## ⚠️ Important Notes
 

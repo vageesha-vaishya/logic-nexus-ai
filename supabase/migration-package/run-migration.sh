@@ -194,11 +194,25 @@ main() {
     
     echo ""
     if [ "$clean_confirm" = "yes" ]; then
-        log "Step 4/4: Verifying migration..."
+        log "Step 4/5: Verifying migration..."
     else
-        log "Step 3/3: Verifying migration..."
+        log "Step 3/4: Verifying migration..."
     fi
     verify_migration
+    
+    echo ""
+    if [ "$clean_confirm" = "yes" ]; then
+        log "Step 5/5: Running post-migration validation..."
+    else
+        log "Step 4/4: Running post-migration validation..."
+    fi
+    
+    if [ -f "04-post-migration-validation.sh" ]; then
+        bash 04-post-migration-validation.sh >> "$LOG_FILE" 2>&1
+        log "✓ Post-migration validation completed"
+    else
+        warning "Post-migration validation script not found, skipping..."
+    fi
     
     echo ""
     log "=========================================="
@@ -206,14 +220,15 @@ main() {
     log "=========================================="
     echo ""
     info "Next steps:"
-    info "1. Check migration status: ./migration-status.sh"
-    info "2. Deploy edge functions: ./deploy-functions.sh"
-    info "3. Update app .env file with new credentials"
-    info "4. Test application thoroughly"
-    info "5. Monitor for 24 hours before decommissioning old database"
+    info "1. Check validation report: migration-logs/validation-report-*.txt"
+    info "2. Check migration status: ./migration-status.sh"
+    info "3. Deploy edge functions: ./deploy-functions.sh"
+    info "4. Update app .env file with new credentials"
+    info "5. Test application thoroughly"
+    info "6. Monitor for 24 hours before decommissioning old database"
     echo ""
     info "Log file: $LOG_FILE"
-    info "View status: ./migration-status.sh"
+    info "View detailed validation: cat migration-logs/validation-report-*.txt"
     echo ""
 }
 
