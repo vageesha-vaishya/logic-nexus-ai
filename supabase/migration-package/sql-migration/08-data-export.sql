@@ -55,9 +55,6 @@ COPY (SELECT * FROM public.charge_sides) TO STDOUT WITH (FORMAT csv, HEADER true
 COPY (SELECT * FROM public.charge_bases) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: charge_bases.csv
 
-COPY (SELECT * FROM public.hts_codes) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
--- Save to: hts_codes.csv
-
 COPY (SELECT * FROM public.service_type_mappings) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: service_type_mappings.csv
 
@@ -99,27 +96,23 @@ COPY (SELECT * FROM public.custom_role_permissions) TO STDOUT WITH (FORMAT csv, 
 COPY (SELECT * FROM public.user_custom_roles) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: user_custom_roles.csv
 
--- 9. OAUTH CONFIGURATIONS (depends on tenants)
-COPY (SELECT * FROM public.oauth_configurations) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
--- Save to: oauth_configurations.csv
-
--- 10. EMAIL ACCOUNTS (depends on users, tenants, franchises)
+-- 9. EMAIL ACCOUNTS (depends on users, tenants, franchises)
 COPY (SELECT * FROM public.email_accounts) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: email_accounts.csv
 
--- 11. CARRIERS (depends on tenants)
+-- 10. CARRIERS (depends on tenants)
 COPY (SELECT * FROM public.carriers) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: carriers.csv
 
--- 12. SERVICES (depends on carriers, tenants, service_types)
+-- 11. SERVICES (depends on carriers, tenants, service_types)
 COPY (SELECT * FROM public.services) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: services.csv
 
--- 13. CARRIER RATES (depends on carriers, services)
+-- 12. CARRIER RATES (depends on carriers, services)
 COPY (SELECT * FROM public.carrier_rates) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: carrier_rates.csv
 
--- 14. TENANT-SPECIFIC MASTER DATA
+-- 13. TENANT-SPECIFIC MASTER DATA
 COPY (SELECT * FROM public.warehouses) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: warehouses.csv
 
@@ -132,35 +125,35 @@ COPY (SELECT * FROM public.consignees) TO STDOUT WITH (FORMAT csv, HEADER true, 
 COPY (SELECT * FROM public.cargo_details) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: cargo_details.csv
 
--- 15. CRM: ACCOUNTS (depends on tenants, franchises)
+-- 14. CRM: ACCOUNTS (depends on tenants, franchises)
 COPY (SELECT * FROM public.accounts) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: accounts.csv
 
--- 16. CRM: CONTACTS (depends on accounts)
+-- 15. CRM: CONTACTS (depends on accounts)
 COPY (SELECT * FROM public.contacts) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: contacts.csv
 
--- 17. CRM: CAMPAIGNS (depends on tenants, franchises)
+-- 16. CRM: CAMPAIGNS (depends on tenants, franchises)
 COPY (SELECT * FROM public.campaigns) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: campaigns.csv
 
--- 18. CRM: LEADS (depends on accounts, contacts, campaigns)
+-- 17. CRM: LEADS (depends on accounts, contacts, campaigns)
 COPY (SELECT * FROM public.leads) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: leads.csv
 
--- 19. CRM: OPPORTUNITIES (depends on accounts, contacts, leads)
+-- 18. CRM: OPPORTUNITIES (depends on accounts, contacts, leads)
 COPY (SELECT * FROM public.opportunities) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: opportunities.csv
 
--- 20. OPPORTUNITY LINE ITEMS (depends on opportunities, services)
+-- 19. OPPORTUNITY LINE ITEMS (depends on opportunities, services)
 COPY (SELECT * FROM public.opportunity_line_items) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: opportunity_line_items.csv
 
--- 21. ACTIVITIES (depends on accounts, contacts, leads, opportunities)
+-- 20. ACTIVITIES (depends on accounts, contacts, leads, opportunities)
 COPY (SELECT * FROM public.activities) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: activities.csv
 
--- 22. QUOTE NUMBER CONFIGURATION (depends on tenants, franchises)
+-- 21. QUOTE NUMBER CONFIGURATION (depends on tenants, franchises)
 COPY (SELECT * FROM public.quote_number_config_tenant) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: quote_number_config_tenant.csv
 
@@ -170,31 +163,31 @@ COPY (SELECT * FROM public.quote_number_config_franchise) TO STDOUT WITH (FORMAT
 COPY (SELECT * FROM public.quote_number_sequences) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: quote_number_sequences.csv
 
--- 23. QUOTES (depends on opportunities, accounts, contacts)
+-- 22. QUOTES (depends on opportunities, accounts, contacts)
 COPY (SELECT * FROM public.quotes) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: quotes.csv
 
--- 24. QUOTATION VERSIONS (depends on quotes)
+-- 23. QUOTATION VERSIONS (depends on quotes)
 COPY (SELECT * FROM public.quotation_versions) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: quotation_versions.csv
 
--- 25. QUOTATION VERSION OPTIONS (depends on quotation_versions, services, carriers)
+-- 24. QUOTATION VERSION OPTIONS (depends on quotation_versions, services, carriers)
 COPY (SELECT * FROM public.quotation_version_options) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: quotation_version_options.csv
 
--- 26. CUSTOMER SELECTIONS (depends on quotes, quotation_versions, quotation_version_options)
+-- 25. CUSTOMER SELECTIONS (depends on quotes, quotation_versions, quotation_version_options)
 COPY (SELECT * FROM public.customer_selections) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: customer_selections.csv
 
--- 27. SHIPMENTS (depends on quotes, carriers, services, warehouses)
+-- 26. SHIPMENTS (depends on quotes, carriers, services, warehouses)
 COPY (SELECT * FROM public.shipments) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: shipments.csv
 
--- 28. TRACKING EVENTS (depends on shipments)
+-- 27. TRACKING EVENTS (depends on shipments)
 COPY (SELECT * FROM public.tracking_events) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: tracking_events.csv
 
--- 29. ASSIGNMENT SYSTEM
+-- 28. ASSIGNMENT SYSTEM
 COPY (SELECT * FROM public.territory_assignments) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: territory_assignments.csv
 
@@ -207,14 +200,14 @@ COPY (SELECT * FROM public.lead_assignment_history) TO STDOUT WITH (FORMAT csv, 
 COPY (SELECT * FROM public.lead_assignment_queue) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: lead_assignment_queue.csv
 
--- 30. EMAIL SYSTEM
+-- 29. EMAIL SYSTEM
 COPY (SELECT * FROM public.emails) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: emails.csv
 
 COPY (SELECT * FROM public.email_templates) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: email_templates.csv
 
--- 31. AUDIT LOGS (depends on tenants, users)
+-- 30. AUDIT LOGS (depends on tenants, users)
 COPY (SELECT * FROM public.audit_logs) TO STDOUT WITH (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"');
 -- Save to: audit_logs.csv
 

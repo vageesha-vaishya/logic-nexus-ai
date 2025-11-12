@@ -57,11 +57,9 @@ ALTER TABLE public.territory_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emails ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.oauth_configurations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_config_tenant ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_config_franchise ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_sequences ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.hts_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
@@ -597,14 +595,6 @@ CREATE POLICY "Platform admins can manage charge bases"
   ON public.charge_bases FOR ALL
   USING (public.is_platform_admin(auth.uid()));
 
-CREATE POLICY "Anyone can view HTS codes"
-  ON public.hts_codes FOR SELECT
-  USING (true);
-
-CREATE POLICY "Platform admins can manage HTS codes"
-  ON public.hts_codes FOR ALL
-  USING (public.is_platform_admin(auth.uid()));
-
 -- =====================================================
 -- TENANT-SPECIFIC MASTER DATA POLICIES
 -- =====================================================
@@ -786,14 +776,6 @@ CREATE POLICY "Tenant admins can view their usage"
     tenant_id = public.get_user_tenant_id(auth.uid()) AND
     public.has_role(auth.uid(), 'tenant_admin')
   );
-
-CREATE POLICY "Platform admins can view OAuth configs"
-  ON public.oauth_configurations FOR SELECT
-  USING (public.is_platform_admin(auth.uid()));
-
-CREATE POLICY "Platform admins can manage OAuth configs"
-  ON public.oauth_configurations FOR ALL
-  USING (public.is_platform_admin(auth.uid()));
 
 CREATE POLICY "Tenant admins can view their quote number config"
   ON public.quote_number_config_tenant FOR SELECT
