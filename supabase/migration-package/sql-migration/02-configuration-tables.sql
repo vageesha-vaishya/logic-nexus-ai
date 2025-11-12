@@ -3,7 +3,7 @@
 -- ==========================================
 -- Execute this after Phase 1
 
--- Drop existing configuration tables
+-- Drop existing configuration tables (in dependency order)
 DROP TABLE IF EXISTS margin_profiles CASCADE;
 DROP TABLE IF EXISTS margin_methods CASCADE;
 DROP TABLE IF EXISTS compliance_rules CASCADE;
