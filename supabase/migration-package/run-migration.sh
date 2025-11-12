@@ -136,9 +136,22 @@ main() {
     
     log "Starting migration process..."
     
-    check_prerequisites
-    load_config
-    test_connection
+    # Run pre-migration tests
+    if [ -f "00-pre-migration-test.sh" ]; then
+        log "Running pre-migration environment tests..."
+        bash 00-pre-migration-test.sh
+        
+        if [ $? -ne 0 ]; then
+            error "Pre-migration tests failed. Please fix errors before continuing."
+            exit 1
+        fi
+        echo ""
+    else
+        warning "Pre-migration test script not found, skipping tests..."
+        check_prerequisites
+        load_config
+        test_connection
+    fi
     
     echo ""
     warning "About to migrate database. This will:"

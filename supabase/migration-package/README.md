@@ -6,6 +6,7 @@ Complete automation scripts for migrating from Lovable Cloud to Supabase Cloud.
 
 ```
 migration-package/
+├── 00-pre-migration-test.sh      # Pre-migration environment tests ⭐ NEW
 ├── 01-MIGRATION-GUIDE.md          # Complete step-by-step guide
 ├── run-migration.sh               # Master migration script (RUN THIS!)
 ├── 02-cleanup-existing.sh        # Clean existing database objects
@@ -79,6 +80,24 @@ NEW_PROJECT_ID="your_project_ref"
 
 ## 📊 Migration Steps
 
+### Step 0: Pre-Migration Testing (Recommended) ⭐ NEW
+Run comprehensive environment tests before migration:
+
+```bash
+./00-pre-migration-test.sh
+```
+
+This validates:
+- ✓ PostgreSQL client and Node.js installation
+- ✓ Configuration files and credentials
+- ✓ Target database connectivity and permissions
+- ✓ Schema and data export files present
+- ✓ Disk space availability
+- ✓ Migration scripts integrity
+- ✓ Supabase connection test
+
+**Note:** The main migration script (`run-migration.sh`) automatically runs these tests, but you can run them independently first.
+
 ### Step 1: Export Data
 ```bash
 # Use DatabaseExport UI in your app
@@ -86,7 +105,7 @@ NEW_PROJECT_ID="your_project_ref"
 # Save all CSVs to migration-data/ folder
 ```
 
-### Step 2: Test Connection
+### Step 2: Test Connection (Optional)
 ```bash
 node helpers/test-connection.js
 ```
@@ -100,7 +119,7 @@ node helpers/test-connection.js
 ```
 
 The migration will:
-1. Validate prerequisites
+1. **Run pre-migration tests** (validates entire environment)
 2. Test connection
 3. (Optional) Clean existing database objects
 4. Apply schema
@@ -196,6 +215,15 @@ migration-logs/
 
 ## 🐛 Troubleshooting
 
+### Pre-Migration Test Failed
+```bash
+# Run tests independently to identify issues
+./00-pre-migration-test.sh
+
+# Fix reported issues, then retry migration
+./run-migration.sh
+```
+
 ### Connection Failed
 ```bash
 node helpers/test-connection.js
@@ -253,6 +281,7 @@ The scripts now support clean re-runs:
 - [ ] Data exported from Lovable Cloud
 - [ ] New Supabase project created
 - [ ] Configuration file updated
+- [ ] **Pre-migration tests passed** ⭐ NEW
 - [ ] Connection test passed
 - [ ] Schema migration completed
 - [ ] Data import completed
