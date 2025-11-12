@@ -142,11 +142,13 @@ main() {
     
     echo ""
     warning "About to migrate database. This will:"
-    warning "1. Apply schema to new database"
-    warning "2. Import all data"
-    warning "3. Verify data integrity"
+    warning "1. Clean existing database objects (if any)"
+    warning "2. Apply fresh schema"
+    warning "3. Import all data"
+    warning "4. Verify data integrity"
     echo ""
-    read -p "Continue? (yes/no): " confirm
+    read -p "Do you want to clean existing database first? (yes/no): " clean_confirm
+    read -p "Continue with migration? (yes/no): " confirm
     
     if [ "$confirm" != "yes" ]; then
         error "Migration cancelled by user"
@@ -154,15 +156,35 @@ main() {
     fi
     
     echo ""
-    log "Step 1/3: Applying schema..."
+    if [ "$clean_confirm" = "yes" ]; then
+        log "Step 1/4: Cleaning existing database..."
+        if [ -f "02-cleanup-existing.sh" ]; then
+            bash 02-cleanup-existing.sh >> "$LOG_FILE" 2>&1
+            log "✓ Database cleaned"
+        else
+            warning "Cleanup script not found, skipping..."
+        fi
+        echo ""
+        log "Step 2/4: Applying schema..."
+    else
+        log "Step 1/3: Applying schema (skipping cleanup)..."
+    fi
     apply_schema
     
     echo ""
-    log "Step 2/3: Importing data..."
+    if [ "$clean_confirm" = "yes" ]; then
+        log "Step 3/4: Importing data..."
+    else
+        log "Step 2/3: Importing data..."
+    fi
     import_data
     
     echo ""
-    log "Step 3/3: Verifying migration..."
+    if [ "$clean_confirm" = "yes" ]; then
+        log "Step 4/4: Verifying migration..."
+    else
+        log "Step 3/3: Verifying migration..."
+    fi
     verify_migration
     
     echo ""

@@ -34,6 +34,9 @@ import_table() {
     
     log "Importing $table_name..."
     
+    # Truncate existing data first (for re-runs)
+    psql "$NEW_DB_URL" -c "TRUNCATE TABLE public.$table_name CASCADE;" 2>/dev/null || true
+    
     # Temporarily disable RLS and triggers for faster import
     psql "$NEW_DB_URL" -c "ALTER TABLE public.$table_name DISABLE ROW LEVEL SECURITY;" 2>/dev/null || true
     psql "$NEW_DB_URL" -c "ALTER TABLE public.$table_name DISABLE TRIGGER ALL;" 2>/dev/null || true

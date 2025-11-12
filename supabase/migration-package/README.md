@@ -8,7 +8,9 @@ Complete automation scripts for migrating from Lovable Cloud to Supabase Cloud.
 migration-package/
 ├── 01-MIGRATION-GUIDE.md          # Complete step-by-step guide
 ├── run-migration.sh               # Master migration script (RUN THIS!)
-├── 03-import-data.sh             # Automated data import
+├── 02-cleanup-existing.sh        # Clean existing database objects
+├── 03-import-data.sh             # Automated data import with truncate
+├── force-clean-migration.sh      # Automated clean migration (no prompts)
 ├── verify-migration.sh           # Verify everything works
 ├── rollback.sh                   # Emergency rollback
 ├── deploy-functions.sh           # Deploy edge functions
@@ -20,19 +22,26 @@ migration-package/
 └── migration-logs/               # Generated during migration
 ```
 
-## 🚀 Quick Start (3 Commands)
+## 🚀 Quick Start
 
+### Standard Migration (with cleanup option)
 ```bash
 # 1. Configure new database
 cp templates/new-supabase-config.env.template new-supabase-config.env
 # Edit with your new Supabase credentials
 
-# 2. Run complete migration
+# 2. Run migration (will prompt for cleanup)
 chmod +x *.sh
 ./run-migration.sh
 
 # 3. Deploy edge functions
 ./deploy-functions.sh
+```
+
+### Force Clean Migration (for re-runs)
+```bash
+# One-command clean migration (deletes all existing data)
+./force-clean-migration.sh
 ```
 
 ## ✅ What Gets Migrated
@@ -84,15 +93,19 @@ node helpers/test-connection.js
 ### Step 3: Run Migration
 ```bash
 ./run-migration.sh
+
+# OR for force clean migration (if re-running)
+./force-clean-migration.sh
 ```
 
-This will:
+The migration will:
 1. Validate prerequisites
 2. Test connection
-3. Apply schema
-4. Import data in correct order
-5. Reset sequences
-6. Verify integrity
+3. (Optional) Clean existing database objects
+4. Apply schema
+5. Import data in correct order (with automatic truncate)
+6. Reset sequences
+7. Verify integrity
 
 ### Step 4: Deploy Functions
 ```bash
@@ -179,6 +192,16 @@ cat migration-logs/migration-*.log
 psql "$NEW_DB_URL" -c "\\COPY public.table_name FROM 'migration-data/table_name.csv' WITH (FORMAT csv, HEADER true)"
 ```
 
+### Existing Data Conflicts
+```bash
+# Clean existing database and retry
+./02-cleanup-existing.sh
+./run-migration.sh
+
+# OR use force clean migration
+./force-clean-migration.sh
+```
+
 ### Missing Data
 ```bash
 # Compare counts
@@ -193,6 +216,12 @@ psql "$NEW_DB_URL" -c "SELECT COUNT(*) FROM table_name;"
 # Temporarily disable for troubleshooting
 psql "$NEW_DB_URL" -c "ALTER TABLE table_name DISABLE ROW LEVEL SECURITY;"
 ```
+
+### Re-running Migration
+The scripts now support clean re-runs:
+- `03-import-data.sh` automatically truncates tables before import
+- Use `./force-clean-migration.sh` for complete clean slate
+- Or run `./02-cleanup-existing.sh` manually before migration
 
 ## 📞 Support Resources
 
