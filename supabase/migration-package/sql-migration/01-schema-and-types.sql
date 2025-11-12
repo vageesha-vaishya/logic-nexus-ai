@@ -397,6 +397,28 @@ CREATE TABLE IF NOT EXISTS charge_bases (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- ==========================================
+-- PHASE 6: SERVICES (NEEDED EARLY FOR CRM)
+-- ==========================================
+
+-- Services (must be created before CRM tables reference it)
+CREATE TABLE IF NOT EXISTS services (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  service_type_id UUID REFERENCES service_types(id) ON DELETE SET NULL,
+  service_code TEXT NOT NULL,
+  service_name TEXT NOT NULL,
+  service_type TEXT NOT NULL,
+  description TEXT,
+  pricing_unit TEXT,
+  base_price NUMERIC,
+  transit_time_days INTEGER,
+  is_active BOOLEAN DEFAULT true,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_franchises_tenant ON franchises(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
@@ -406,6 +428,7 @@ CREATE INDEX IF NOT EXISTS idx_cities_country ON cities(country_id);
 CREATE INDEX IF NOT EXISTS idx_ports_country ON ports_locations(country_id);
 CREATE INDEX IF NOT EXISTS idx_carriers_tenant ON carriers(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_consignees_tenant ON consignees(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_services_tenant ON services(tenant_id);
 
 -- Update timestamp trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -421,3 +444,4 @@ CREATE TRIGGER update_tenants_updated_at BEFORE UPDATE ON tenants FOR EACH ROW E
 CREATE TRIGGER update_franchises_updated_at BEFORE UPDATE ON franchises FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_roles_updated_at BEFORE UPDATE ON user_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

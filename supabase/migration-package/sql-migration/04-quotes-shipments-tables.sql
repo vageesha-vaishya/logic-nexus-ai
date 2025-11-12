@@ -18,25 +18,8 @@ DROP TABLE IF EXISTS quotes CASCADE;
 DROP TABLE IF EXISTS shipping_rates CASCADE;
 DROP TABLE IF EXISTS carrier_rate_charges CASCADE;
 DROP TABLE IF EXISTS carrier_rates CASCADE;
-DROP TABLE IF EXISTS services CASCADE;
 
--- Services
-CREATE TABLE IF NOT EXISTS services (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  service_type_id UUID REFERENCES service_types(id) ON DELETE SET NULL,
-  service_code TEXT NOT NULL,
-  service_name TEXT NOT NULL,
-  service_type TEXT NOT NULL,
-  description TEXT,
-  pricing_unit TEXT,
-  base_price NUMERIC,
-  transit_time_days INTEGER,
-  is_active BOOLEAN DEFAULT true,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+-- NOTE: services table created in script 01
 
 -- Carrier Rates
 CREATE TABLE IF NOT EXISTS carrier_rates (
@@ -321,7 +304,6 @@ CREATE TABLE IF NOT EXISTS tracking_events (
 );
 
 -- Indexes
-CREATE INDEX idx_services_tenant ON services(tenant_id);
 CREATE INDEX idx_carrier_rates_carrier ON carrier_rates(carrier_id);
 CREATE INDEX idx_quotes_tenant ON quotes(tenant_id);
 CREATE INDEX idx_quotes_franchise ON quotes(franchise_id);
@@ -333,6 +315,5 @@ CREATE INDEX idx_shipments_quote ON shipments(quote_id);
 CREATE INDEX idx_tracking_events_shipment ON tracking_events(shipment_id);
 
 -- Triggers
-CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_quotes_updated_at BEFORE UPDATE ON quotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_shipments_updated_at BEFORE UPDATE ON shipments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
