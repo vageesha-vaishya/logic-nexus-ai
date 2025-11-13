@@ -143,14 +143,15 @@ WHERE EXISTS (SELECT 1 FROM service_types LIMIT 1);
 -- ==========================================
 -- Cargo Types
 -- ==========================================
-SELECT 'INSERT INTO cargo_types (id, tenant_id, cargo_type_name, cargo_type_code, description, is_active, created_at, updated_at) VALUES ' ||
-  string_agg(
-    format(
-      '(%L, %L, %L, %L, %L, %L, %L, %L)',
-      id, tenant_id, cargo_type_name, cargo_type_code, description, is_active, created_at, updated_at
-    ),
-    ', '
-  ) || ' ON CONFLICT (id) DO NOTHING;'
+SELECT string_agg(
+  format(
+    'INSERT INTO cargo_types (id, tenant_id, cargo_type_name, cargo_code, requires_special_handling, hazmat_class, temperature_controlled, description, is_active, created_at, updated_at) \
+     SELECT %L, %L, %L, %L, %L, %L, %L, %L, %L, %L, %L \
+     WHERE EXISTS (SELECT 1 FROM tenants t WHERE t.id = %L) ON CONFLICT (id) DO NOTHING;',
+    id, tenant_id, cargo_type_name, cargo_code, requires_special_handling, hazmat_class, temperature_controlled, description, is_active, created_at, updated_at, tenant_id
+  ),
+  E'\n'
+)
 FROM cargo_types
 WHERE EXISTS (SELECT 1 FROM cargo_types LIMIT 1);
 
@@ -213,14 +214,15 @@ WHERE EXISTS (SELECT 1 FROM container_sizes LIMIT 1);
 -- ==========================================
 -- Carriers
 -- ==========================================
-SELECT 'INSERT INTO carriers (id, tenant_id, carrier_name, carrier_code, carrier_type, contact_person, contact_email, contact_phone, website, address, service_routes, rating, notes, mode, scac, iata, mc_dot, is_active, created_at, updated_at) VALUES ' ||
-  string_agg(
-    format(
-      '(%L, %L, %L, %L, %L, %L, %L, %L, %L, %L::jsonb, %L::jsonb, %L, %L, %L, %L, %L, %L, %L, %L, %L)',
-      id, tenant_id, carrier_name, carrier_code, carrier_type, contact_person, contact_email, contact_phone, website, address::text, service_routes::text, rating, notes, mode, scac, iata, mc_dot, is_active, created_at, updated_at
-    ),
-    ', '
-  ) || ' ON CONFLICT (id) DO NOTHING;'
+SELECT string_agg(
+  format(
+    'INSERT INTO carriers (id, tenant_id, carrier_name, carrier_code, carrier_type, contact_person, contact_email, contact_phone, website, address, service_routes, rating, notes, mode, scac, iata, mc_dot, is_active, created_at, updated_at) \
+     SELECT %L, %L, %L, %L, %L, %L, %L, %L, %L, %L::jsonb, %L::jsonb, %L, %L, %L, %L, %L, %L, %L, %L, %L \
+     WHERE EXISTS (SELECT 1 FROM tenants t WHERE t.id = %L) ON CONFLICT (id) DO NOTHING;',
+    id, tenant_id, carrier_name, carrier_code, carrier_type, contact_person, contact_email, contact_phone, website, address::text, service_routes::text, rating, notes, mode, scac, iata, mc_dot, is_active, created_at, updated_at, tenant_id
+  ),
+  E'\n'
+)
 FROM carriers
 WHERE EXISTS (SELECT 1 FROM carriers LIMIT 1);
 

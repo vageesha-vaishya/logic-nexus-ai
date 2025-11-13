@@ -111,6 +111,36 @@ import_table() {
         return
     fi
     
+    local csv_to_use="$csv_file"
+    local table_cols
+    table_cols=$(psql "$NEW_DB_URL" -t -A -c "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='${table_name}' ORDER BY ordinal_position;")
+    if command -v python3 >/dev/null 2>&1; then
+        local header mismatch tmp_file
+        header=$(head -n1 "$csv_file")
+        mismatch=0
+        IFS=',' read -r -a header_cols <<< "${header}"
+        for hc in "${header_cols[@]}"; do
+            hc_clean=$(echo "$hc" | sed -E 's/^\"|\"$//g' | tr -d '\r')
+            echo "$table_cols" | grep -qx "$hc_clean" || mismatch=1
+        done
+        if [ "$mismatch" -eq 1 ]; then
+            tmp_file="migration-data/.tmp_${table_name}.csv"
+            python3 - "$csv_file" "$tmp_file" "$table_cols" << 'PY'
+import sys, csv
+in_path, out_path, allowed_str = sys.argv[1], sys.argv[2], sys.argv[3]
+allowed = [c for c in allowed_str.split('\n') if c]
+with open(in_path, newline='') as inf, open(out_path, 'w', newline='') as outf:
+    r = csv.DictReader(inf)
+    fieldnames = [c for c in r.fieldnames if c in allowed]
+    w = csv.DictWriter(outf, fieldnames=fieldnames)
+    w.writeheader()
+    for row in r:
+        w.writerow({c: row.get(c) for c in fieldnames})
+PY
+            csv_to_use="$tmp_file"
+        fi
+    fi
+
     show_progress
     echo "" # New line after progress bar
     log "Importing $table_name..."
@@ -125,7 +155,7 @@ import_table() {
     psql "$NEW_DB_URL" -c "ALTER TABLE public.$table_name DISABLE TRIGGER ALL;" 2>/dev/null || true
     
     # Import data
-    psql "$NEW_DB_URL" -c "\\COPY public.$table_name FROM '$csv_file' WITH (FORMAT csv, HEADER true, QUOTE '\"')" 2>&1 | grep -v "^$" || true
+    psql "$NEW_DB_URL" -c "\\COPY public.$table_name FROM '$csv_to_use' WITH (FORMAT csv, HEADER true, QUOTE '\"')" 2>&1 | grep -v "^$" || true
     
     # Re-enable triggers and RLS
     psql "$NEW_DB_URL" -c "ALTER TABLE public.$table_name ENABLE TRIGGER ALL;" 2>/dev/null || true
@@ -151,6 +181,46 @@ echo ""
 # Count tables first
 count_tables
 echo ""
+
+# Pre-Phase: Auth Users (schema: auth)
+if [ -f "migration-data/auth_users.csv" ]; then
+    log "Pre-Phase: Importing auth.users"
+    # Determine auth.users columns
+    AUTH_COLS=$(psql "$NEW_DB_URL" -t -A -c "SELECT column_name FROM information_schema.columns WHERE table_schema='auth' AND table_name='users' ORDER BY ordinal_position;")
+    CSV_TO_USE="migration-data/auth_users.csv"
+    if command -v python3 >/dev/null 2>&1; then
+        header=$(head -n1 "$CSV_TO_USE")
+        mismatch=0
+        IFS=',' read -r -a header_cols <<< "${header}"
+        for hc in "${header_cols[@]}"; do
+            hc_clean=$(echo "$hc" | sed -E 's/^\"|\"$//g' | tr -d '\r')
+            echo "$AUTH_COLS" | grep -qx "$hc_clean" || mismatch=1
+        done
+        if [ "$mismatch" -eq 1 ]; then
+            tmp_file="migration-data/.tmp_auth_users.csv"
+            python3 - "$CSV_TO_USE" "$tmp_file" "$AUTH_COLS" << 'PY'
+import sys, csv
+in_path, out_path, allowed_str = sys.argv[1], sys.argv[2], sys.argv[3]
+allowed = [c for c in allowed_str.split('\n') if c]
+with open(in_path, newline='') as inf, open(out_path, 'w', newline='') as outf:
+    r = csv.DictReader(inf)
+    fieldnames = [c for c in r.fieldnames if c in allowed]
+    w = csv.DictWriter(outf, fieldnames=fieldnames)
+    w.writeheader()
+    for row in r:
+        w.writerow({c: row.get(c) for c in fieldnames})
+PY
+            CSV_TO_USE="$tmp_file"
+        fi
+    fi
+    # Disable RLS and triggers if any
+    psql "$NEW_DB_URL" -c "ALTER TABLE auth.users DISABLE TRIGGER ALL;" 2>/dev/null || true
+    # Import
+    psql "$NEW_DB_URL" -c "\\COPY auth.users FROM '$CSV_TO_USE' WITH (FORMAT csv, HEADER true, QUOTE '\"')" 2>&1 | grep -v "^$" || true
+    # Re-enable triggers
+    psql "$NEW_DB_URL" -c "ALTER TABLE auth.users ENABLE TRIGGER ALL;" 2>/dev/null || true
+    log "✓ Imported auth.users"
+fi
 
 # Phase 1: Master Data (no dependencies)
 log ""
@@ -279,7 +349,7 @@ BEGIN
 END $$;
 EOF
 
-log "✓ Sequences reset"
+    log "✓ Sequences reset"
 
 show_progress
 echo "" # New line after final progress

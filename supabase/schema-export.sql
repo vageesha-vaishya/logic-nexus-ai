@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS "cargo_details" (
 CREATE TABLE IF NOT EXISTS "cargo_types" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" uuid NOT NULL,
-  "cargo_type_name" text NOT NULL,
+  "name" text NOT NULL,
   "cargo_code" text,
   "requires_special_handling" boolean DEFAULT false,
   "hazmat_class" text,

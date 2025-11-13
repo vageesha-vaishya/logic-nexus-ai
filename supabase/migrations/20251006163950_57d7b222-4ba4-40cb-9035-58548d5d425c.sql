@@ -42,7 +42,8 @@ AS $$
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- Create function to get database tables overview
-CREATE OR REPLACE FUNCTION public.get_database_tables()
+DROP FUNCTION IF EXISTS public.get_database_tables();
+CREATE FUNCTION public.get_database_tables()
 RETURNS TABLE (
   table_name text,
   table_type text,

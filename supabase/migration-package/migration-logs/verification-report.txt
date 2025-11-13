@@ -1,0 +1,12 @@
+Migration Verification Report
+Generated: Thu Nov 13 18:12:52 IST 2025
+Database: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+Tables Verified: 11
+RLS Policies:    130
+Database Functions:     12
+Indexes:    152
+Foreign Keys:    189
+Custom Enums:     19
+
+Status: See detailed output above

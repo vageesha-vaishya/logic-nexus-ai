@@ -58,7 +58,8 @@ source new-supabase-config.env
 # Show target host and credentials info
 DB_HOST=$(echo "$NEW_DB_URL" | sed -E 's#.*@([^:/?]+).*#\1#')
 DB_NAME=$(echo "$NEW_DB_URL" | sed -E 's#.*/([^?]+).*#\1#')
-DB_PASS=$(echo "$NEW_DB_URL" | sed -E 's#postgresql://postgres:([^@]+)@.*#\1#')
+# Capture password between the last ':' before the password and the last '@' before host
+DB_PASS=$(echo "$NEW_DB_URL" | sed -E 's#postgresql://[^:]+:(.*)@[^/]+/.*#\1#')
 DB_USER="postgres"
 
 echo -e "${GREEN}Target Configuration:${NC}"
@@ -82,6 +83,12 @@ case "$DB_PASS" in
     USE_PGPASS=1
   ;;
 esac
+
+# If password contains whitespace, force PGPASSWORD auth (URI cannot safely carry raw spaces)
+if echo "$DB_PASS" | grep -q '[[:space:]]'; then
+  echo -e "${YELLOW}Parameter check:${NC} Password contains whitespace; using PGPASSWORD authentication"
+  USE_PGPASS=1
+fi
 
 DNS_OK=0
 echo -e "${YELLOW}[1/3] Testing DNS resolution...${NC}"
@@ -115,7 +122,7 @@ fi
 # Database authentication check (SSL required)
 echo -e "${YELLOW}[3/3] Testing database authentication...${NC}"
 
-encode_pw() { printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/@/%40/g' -e 's/:/%3A/g' -e 's=/=%2F=g' -e 's/\?/%3F/g' -e 's/#/%23/g' -e 's/&/%26/g'; }
+encode_pw() { printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/@/%40/g' -e 's/:/%3A/g' -e 's=/=%2F=g' -e 's/\?/%3F/g' -e 's/#/%23/g' -e 's/&/%26/g' -e 's/ /%20/g'; }
 ENC_PASS=$(encode_pw "$DB_PASS")
 DB_URI_5432="postgresql://postgres:${ENC_PASS}@${DB_HOST}:5432/${DB_NAME}?sslmode=require&connect_timeout=10"
 DB_URI_6543="postgresql://postgres:${ENC_PASS}@${DB_HOST}:6543/${DB_NAME}?sslmode=require&connect_timeout=10"
@@ -203,11 +210,38 @@ bash 02-cleanup-existing.sh
 # Step 2: Apply schema
 echo ""
 echo -e "${GREEN}[2/4] Applying fresh schema...${NC}"
+
+SCHEMA_SCRIPTS=(
+  "sql-migration/01-schema-and-types.sql"
+  "sql-migration/02-configuration-tables.sql"
+  "sql-migration/03-crm-tables.sql"
+  "sql-migration/04-quotes-shipments-tables.sql"
+  "sql-migration/05-audit-system-tables.sql"
+  "sql-migration/06-database-functions.sql"
+  "sql-migration/07-rls-policies.sql"
+)
+
 if [ "$USE_PGPASS" -eq 1 ]; then
   PORT=$(echo "$NEW_DB_URL" | sed -E 's#.*:([0-9]+)/.*#\1#')
-  PGPASSWORD="$DB_PASS" PGSSLMODE="require" psql -h "$DB_HOST" -p "$PORT" -U "$DB_USER" -d "$DB_NAME" -f "../schema-export.sql"
+  for script in "${SCHEMA_SCRIPTS[@]}"; do
+    if [ -f "$script" ]; then
+      echo -e "Applying $(basename "$script")..."
+      PGPASSWORD="$DB_PASS" PGSSLMODE="require" psql -h "$DB_HOST" -p "$PORT" -U "$DB_USER" -d "$DB_NAME" -f "$script"
+    else
+      echo -e "${RED}Missing schema script: $script${NC}"
+      exit 1
+    fi
+  done
 else
-  psql "$NEW_DB_URL" -f "../schema-export.sql"
+  for script in "${SCHEMA_SCRIPTS[@]}"; do
+    if [ -f "$script" ]; then
+      echo -e "Applying $(basename "$script")..."
+      psql "$NEW_DB_URL" -f "$script"
+    else
+      echo -e "${RED}Missing schema script: $script${NC}"
+      exit 1
+    fi
+  done
 fi
 
 # Step 3: Import data

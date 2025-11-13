@@ -63,6 +63,13 @@ export default function DatabaseExport() {
     splitDataGroups: false,
     dataGroupSize: 6,
     rowFilterWhere: '',
+    logSkippedRows: 'file',
+    columnRenameMap: {},
+    skipUniqueConflicts: true,
+    customDataSql: '',
+    continuousRunOnError: false,
+    retryDelayMs: 1000,
+    maxRetries: 10,
   });
 
   // Storage settings
@@ -1488,6 +1495,51 @@ $$;\n`;
 
       // Export table data as INSERT statements
       if (exportOptions.tableData) {
+        try {
+          const { data: enumsData } = await supabase.rpc("get_database_enums");
+          if (Array.isArray(enumsData) && enumsData.length > 0) {
+            enumsData.forEach((enumItem: any) => {
+              const enumType = enumItem?.enum_type;
+              const labelsText = (enumItem?.labels ?? '').toString();
+              if (!enumType || labelsText.trim() === '') return;
+              const labelArray = labelsText
+                .replace(/^{|}$/g, '')
+                .split(',')
+                .map((l: string) => l.trim())
+                .filter((l: string) => l.length > 0);
+              const labelsQuotedForCreate = labelArray
+                .map((l: string) => `quote_literal('${l.replace(/'/g, "''")}')`)
+                .join(', ');
+              const arrayLiteral = labelArray
+                .map((l: string) => `'${l.replace(/'/g, "''")}'`)
+                .join(', ');
+              sqlContent += `DO $$
+DECLARE lbl text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = '${enumType}' AND n.nspname = 'public'
+  ) THEN
+    EXECUTE format('CREATE TYPE public.%I AS ENUM (%s)', '${enumType}', array_to_string(ARRAY[${labelsQuotedForCreate}], ', '));
+  ELSE
+    FOREACH lbl IN ARRAY ARRAY[${arrayLiteral}] LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON t.oid = e.enumtypid
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = '${enumType}' AND n.nspname = 'public' AND e.enumlabel = lbl
+      ) THEN
+        EXECUTE format('ALTER TYPE public.%I ADD VALUE %L', '${enumType}', lbl);
+      END IF;
+    END LOOP;
+  END IF;
+END $$;
+`;
+            });
+          }
+        } catch {}
+
         // If none selected, export all tables to meet full-restore requirement
         let chosen = tables.filter(t => selected[t.table_name])?.length > 0
           ? tables.filter(t => selected[t.table_name])
@@ -1558,6 +1610,52 @@ $$;\n`;
           });
         } catch (e) {
           console.warn('Failed to enrich type map from information_schema, proceeding with base mapping', e);
+        }
+
+        let fkMapByTable: Record<string, { column_name: string; foreign_table_schema: string; foreign_table_name: string; foreign_column_name: string }[]> = {};
+        try {
+          const { data: fkRows } = await supabase.rpc("execute_sql_query", {
+            query_text:
+              "SELECT tc.table_schema, tc.table_name, kcu.column_name, ccu.table_schema AS foreign_table_schema, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema NOT IN ('pg_catalog','information_schema')",
+          });
+          (fkRows || []).forEach((r: any) => {
+            const tbl = (r.table_name || '').toString();
+            if (!tbl) return;
+            if (!fkMapByTable[tbl]) fkMapByTable[tbl] = [];
+            fkMapByTable[tbl].push({
+              column_name: (r.column_name || '').toString(),
+              foreign_table_schema: (r.foreign_table_schema || 'public').toString(),
+              foreign_table_name: (r.foreign_table_name || '').toString(),
+              foreign_column_name: (r.foreign_column_name || '').toString(),
+            });
+          });
+        } catch (e) {
+          console.warn('Failed to fetch foreign keys from information_schema', e);
+        }
+
+        let uniqueKeysByTable: Record<string, { table_schema: string; columns: string[] }[]> = {};
+        try {
+          const { data: uniqRows } = await supabase.rpc("execute_sql_query", {
+            query_text:
+              "SELECT tc.table_schema, tc.table_name, kcu.constraint_name, kcu.ordinal_position, kcu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema WHERE tc.constraint_type IN ('UNIQUE','PRIMARY KEY') AND tc.table_schema NOT IN ('pg_catalog','information_schema') ORDER BY tc.table_schema, tc.table_name, kcu.constraint_name, kcu.ordinal_position",
+          });
+          const byConstraint: Record<string, { table_schema: string; table_name: string; columns: string[] }> = {};
+          (uniqRows || []).forEach((r: any) => {
+            const schema = (r.table_schema || 'public').toString();
+            const tbl = (r.table_name || '').toString();
+            const cname = (r.constraint_name || '').toString();
+            const col = (r.column_name || '').toString();
+            if (!tbl || !cname || !col) return;
+            const key = `${schema}.${tbl}.${cname}`;
+            if (!byConstraint[key]) byConstraint[key] = { table_schema: schema, table_name: tbl, columns: [] };
+            byConstraint[key].columns.push(col);
+          });
+          Object.values(byConstraint).forEach((c) => {
+            if (!uniqueKeysByTable[c.table_name]) uniqueKeysByTable[c.table_name] = [];
+            uniqueKeysByTable[c.table_name].push({ table_schema: c.table_schema, columns: c.columns });
+          });
+        } catch (e) {
+          console.warn('Failed to fetch unique constraints from information_schema', e);
         }
 
         if (chosen.length > 0) {
@@ -1684,9 +1782,12 @@ $$;\n`;
               if (dt === 'timestamp without time zone') return `${asText(value)}::timestamp`;
               if (dt === 'time with time zone') return `${asText(value)}::timetz`;
               if (dt === 'time without time zone') return `${asText(value)}::time`;
-              // Treat unknown/user-defined as text to avoid invalid casts
-              if (!dt || dt === 'user-defined' || ['text','character varying','varchar','citext'].includes(dt)) {
+              // Treat only plain text types as text; handle enums/user-defined via explicit cast
+              if (!dt || ['text','character varying','varchar','citext'].includes(dt)) {
                 return `${asText(value)}`;
+              }
+              if (dt === 'user-defined') {
+                return `${asText(value)}::${dtRaw}`;
               }
               // Use the resolved type name directly (may be schema-qualified or quoted)
               return `${asText(value)}::${dtRaw}`;
@@ -1713,18 +1814,46 @@ $$;\n`;
             return `${asText(String(value))}`;
           };
 
-          const generateGroupSql = async (tablesForGroup: any[]) => {
-            let groupSql = "BEGIN;\n";
-            groupSql += "SET row_security = off;\n";
-            groupSql += "SET session_replication_role = replica;\n";
+          const generateGroupSql = async (tablesForGroup: any[], withTx: boolean = true, logSkippedRows: boolean | 'file' = true, reportCollector?: string[]) => {
+            let groupSql = "";
+            if (withTx) {
+              groupSql += "BEGIN;\n";
+              groupSql += "SET row_security = off;\n";
+              groupSql += "SET session_replication_role = replica;\n";
+            }
             for (const table of tablesForGroup) {
               const schema = (table as any).table_schema || 'public';
               const client: any = (supabase as any).schema ? (supabase as any).schema(schema) : supabase;
               let wroteHeader = false;
               const colTypes = typeMapByTable[table.table_name] || {};
               let columns: string[] | null = Object.keys(colTypes).length > 0 ? Object.keys(colTypes) : null;
+              let actualColumns: string[] = [];
+              try {
+                const { data: colRows } = await supabase.rpc("execute_sql_query", {
+                  query_text: `SELECT column_name FROM information_schema.columns WHERE table_schema='${schema}' AND table_name='${table.table_name}' ORDER BY ordinal_position;`,
+                });
+                actualColumns = Array.isArray(colRows) ? colRows.map((r: any) => String(r.column_name)) : [];
+                if (actualColumns.length > 0) {
+                  actualColumns.forEach((c) => {
+                    if (!colTypes[c]) colTypes[c] = 'text';
+                  });
+                } else {
+                  actualColumns = columns || [];
+                }
+              } catch {
+                actualColumns = columns || [];
+              }
+              const renameMapByTable: Record<string, Record<string, string>> = (exportOptions as any).columnRenameMap || {};
+              const renameMapOldToNew: Record<string, string> = renameMapByTable[table.table_name] || {};
+              const renameMapNewToOld: Record<string, string> = Object.keys(renameMapOldToNew).reduce((acc: Record<string,string>, oldCol: string) => {
+                const newCol = renameMapOldToNew[oldCol];
+                if (newCol) acc[newCol] = oldCol;
+                return acc;
+              }, {});
               const chunkSize = Number((exportOptions as any).dataChunkSize) || 1000;
               let offset = 0;
+              const conflictClause = (exportOptions as any).skipUniqueConflicts ? ' ON CONFLICT DO NOTHING' : '';
+              columns = actualColumns;
               while (true) {
                 const where = String((exportOptions as any).rowFilterWhere || '').trim();
                 let data: any[] | null = null;
@@ -1744,26 +1873,94 @@ $$;\n`;
                   console.error(`Failed exporting ${schema}.${table.table_name}:`, error.message);
                   break;
                 }
-                if (!data || data.length === 0) break;
-                if (!wroteHeader) {
-                  groupSql += `\n-- Data for table: ${schema}.${table.table_name}\n`;
-                  wroteHeader = true;
-                }
-                if (!columns) columns = Object.keys(data[0]);
-                const columnNames = (columns || []).map((col) => `"${col}"`).join(", ");
-                data.forEach((row: any) => {
-                  const values = (columns || [])
-                    .map((col) => formatValue(row[col], colTypes[col]))
-                    .join(", ");
-                  groupSql += `INSERT INTO "${schema}"."${table.table_name}" (${columnNames}) VALUES (${values});\n`;
-                });
-                offset += chunkSize;
+              if (!data || data.length === 0) break;
+              if (!wroteHeader) {
+                groupSql += `\n-- Data for table: ${schema}.${table.table_name}\n`;
+                
+                wroteHeader = true;
               }
-            }
-            groupSql += "\nSET session_replication_role = origin;\n";
-            groupSql += "SET row_security = on;\n";
-            groupSql += "COMMIT;\n";
-            return groupSql;
+              columns = actualColumns;
+              const columnNames = (columns || []).map((col) => `"${renameMapOldToNew[col] || col}"`).join(", ");
+              data.forEach((row: any) => {
+                const valuesExprs = (columns || [])
+                  .map((col) => {
+                    const src = renameMapNewToOld[col] || col;
+                    return formatValue(row[src], colTypes[col]);
+                  })
+                  .join(", ");
+                const fks = fkMapByTable[table.table_name] || [];
+                const uniques = uniqueKeysByTable[table.table_name] || [];
+                const dupCondition = uniques.length > 0
+                  ? uniques
+                      .map((u) => {
+                        const preds = u.columns
+                          .map((c) => {
+                            const src = renameMapNewToOld[c] || c;
+                            return `"${c}" = ${formatValue(row[src], colTypes[c])}`;
+                          })
+                          .join(' AND ');
+                        return `(EXISTS (SELECT 1 FROM "${schema}"."${table.table_name}" WHERE ${preds}))`;
+                      })
+                      .join(' OR ')
+                  : '';
+                const hasTenantId = (columns || []).includes('tenant_id');
+                const tenantValExpr = hasTenantId ? formatValue(row['tenant_id'], colTypes['tenant_id']) : '';
+                const tenantCond = hasTenantId
+                  ? `(${tenantValExpr} IS NULL OR EXISTS (SELECT 1 FROM "public"."tenants" WHERE "id" = ${tenantValExpr}))`
+                  : '';
+                if (fks.length > 0) {
+                  const conditions = fks
+                    .map((fk) => {
+                      const col = fk.column_name;
+                      const src = renameMapNewToOld[col] || col;
+                      const valExpr = formatValue(row[src], colTypes[col]);
+                      const refSchema = fk.foreign_table_schema || 'public';
+                      const refTbl = fk.foreign_table_name;
+                      const refCol = fk.foreign_column_name;
+                      return `(${valExpr} IS NULL OR EXISTS (SELECT 1 FROM "${refSchema}"."${refTbl}" WHERE "${refCol}" = ${valExpr}))`;
+                    })
+                    .join(" AND ");
+                  groupSql += `INSERT INTO "${schema}"."${table.table_name}" (${columnNames}) SELECT ${valuesExprs} WHERE ${conditions}${conflictClause};\n`;
+                  if (logSkippedRows === true || (logSkippedRows === 'file' && !Array.isArray(reportCollector))) {
+                    const rowText = `${asText(JSON.stringify(row))}`;
+                    groupSql += `DO $$ BEGIN IF NOT (${conditions}) THEN RAISE NOTICE 'SKIPPED row due to missing FK on %.%: %', '${schema}', '${table.table_name}', ${rowText}; END IF; END $$;\n`;
+                  } else if (logSkippedRows === 'file' && Array.isArray(reportCollector)) {
+                    const rowText = `${asText(JSON.stringify(row))}`;
+                    reportCollector.push(`INSERT INTO "public"."import_skipped_rows" ("schema","table","row") SELECT ${asText(schema)}, ${asText(table.table_name)}, ${rowText}::jsonb WHERE NOT (${conditions});\n`);
+                    if (dupCondition) {
+                      reportCollector.push(`INSERT INTO "public"."import_skipped_rows" ("schema","table","row") SELECT ${asText(schema)}, ${asText(table.table_name)}, ${rowText}::jsonb WHERE (${conditions}) AND (${dupCondition});\n`);
+                    }
+                  }
+                } else if (tenantCond) {
+                  groupSql += `INSERT INTO "${schema}"."${table.table_name}" (${columnNames}) SELECT ${valuesExprs} WHERE ${tenantCond}${conflictClause};\n`;
+                  if (logSkippedRows === true || (logSkippedRows === 'file' && !Array.isArray(reportCollector))) {
+                    const rowText = `${asText(JSON.stringify(row))}`;
+                    groupSql += `DO $$ BEGIN IF NOT (${tenantCond}) THEN RAISE NOTICE 'SKIPPED row due to missing tenant on %.%: %', '${schema}', '${table.table_name}', ${rowText}; END IF; END $$;\n`;
+                  } else if (logSkippedRows === 'file' && Array.isArray(reportCollector)) {
+                    const rowText = `${asText(JSON.stringify(row))}`;
+                    reportCollector.push(`INSERT INTO "public"."import_skipped_rows" ("schema","table","row") SELECT ${asText(schema)}, ${asText(table.table_name)}, ${rowText}::jsonb WHERE NOT (${tenantCond});\n`);
+                    if (dupCondition) {
+                      reportCollector.push(`INSERT INTO "public"."import_skipped_rows" ("schema","table","row") SELECT ${asText(schema)}, ${asText(table.table_name)}, ${rowText}::jsonb WHERE (${tenantCond}) AND (${dupCondition});\n`);
+                    }
+                  }
+                } else {
+                  groupSql += `INSERT INTO "${schema}"."${table.table_name}" (${columnNames}) VALUES (${valuesExprs})${conflictClause};\n`;
+                  if (logSkippedRows === 'file' && Array.isArray(reportCollector) && dupCondition) {
+                    const rowText = `${asText(JSON.stringify(row))}`;
+                    reportCollector.push(`INSERT INTO "public"."import_skipped_rows" ("schema","table","row") SELECT ${asText(schema)}, ${asText(table.table_name)}, ${rowText}::jsonb WHERE (${dupCondition});\n`);
+                  }
+                }
+              });
+              offset += chunkSize;
+              }
+              
+              }
+              if (withTx) {
+                groupSql += "\nSET session_replication_role = origin;\n";
+                groupSql += "SET row_security = on;\n";
+                groupSql += "COMMIT;\n";
+              }
+              return groupSql;
           };
 
           if (split) {
@@ -1774,13 +1971,25 @@ $$;\n`;
             for (let i = 0; i < chosen.length; i += groupSize) {
               groups.push(chosen.slice(i, i + groupSize));
             }
+            const reportParts: string[] = [];
             for (let i = 0; i < groups.length; i++) {
-              const groupSql = await generateGroupSql(groups[i]);
+              const groupSql = await generateGroupSql(
+                groups[i],
+                true,
+                (exportOptions as any).logSkippedRows,
+                (exportOptions as any).logSkippedRows === 'file' ? reportParts : undefined
+              );
               const idx = String(i + 1).padStart(2, '0');
               const fname = `schema-export-data-group-${idx}.sql`;
               files.push({ name: fname, content: groupSql, type: "text/plain" });
             }
+            if ((exportOptions as any).logSkippedRows === 'file' && reportParts.length > 0) {
+              const header = `CREATE TABLE IF NOT EXISTS "public"."import_skipped_rows" ("schema" text, "table" text, "row" jsonb, "created_at" timestamptz DEFAULT now());\n`;
+              const report = header + reportParts.join("");
+              files.push({ name: "skipped-rows-report.sql", content: report, type: "text/plain" });
+            }
             let postSql = "";
+            if (exportOptions.constraints) {
             try {
               const { data: constraintsDataAfter } = await supabase.rpc("get_table_constraints");
               const deferredChecks: { table: string; name: string; clause: string }[] = [];
@@ -1808,6 +2017,8 @@ $$;\n`;
                 });
               }
             } catch {}
+            }
+            if (exportOptions.schema) {
             try {
               const { data: seqOwners } = await supabase.rpc("execute_sql_query", {
                 query_text:
@@ -1825,6 +2036,7 @@ $$;\n`;
                 });
               }
             } catch {}
+            }
             if (postSql.trim().length > 0) {
               files.push({ name: "schema-export-post.sql", content: postSql, type: "text/plain" });
             }
@@ -1837,8 +2049,13 @@ $$;\n`;
             setLoading(false);
             return;
           }
+          if (!split) {
+            const dataSql = await generateGroupSql(chosen, true, (exportOptions as any).logSkippedRows);
+            sqlContent += dataSql;
+          }
 
           // Re-add deferred CHECK constraints and validate after data import
+          if (exportOptions.constraints) {
           try {
             // We can only emit this if we actually collected deferred checks above.
             // Find any previously deferred checks by scanning what we appended earlier; alternatively,
@@ -1871,8 +2088,10 @@ $$;\n`;
               });
             }
           } catch {}
+          }
 
           // Reset sequences to max values (best effort)
+          if (exportOptions.schema) {
           try {
             const { data: seqOwners } = await supabase.rpc("execute_sql_query", {
               query_text:
@@ -1890,6 +2109,20 @@ $$;\n`;
               });
             }
           } catch {}
+          }
+        }
+      }
+
+      const customSqlRaw = String((exportOptions as any).customDataSql || '').trim();
+      if (customSqlRaw.length > 0) {
+        const useRetry = Boolean((exportOptions as any).continuousRunOnError);
+        if (useRetry) {
+          const delayMs = Number((exportOptions as any).retryDelayMs) || 1000;
+          const maxRetries = Number((exportOptions as any).maxRetries) || 10;
+          const escaped = customSqlRaw.replace(/\\/g, "\\\\").replace(/'/g, "''");
+          sqlContent += `DO $$\nDECLARE attempts int := 0; delay_ms int := ${delayMs}; max_retries int := ${maxRetries}; sql_text text := '${escaped}'; stmts text[]; stmt text;\nBEGIN\n  stmts := regexp_split_to_array(sql_text, ';');\n  LOOP\n    BEGIN\n      FOREACH stmt IN ARRAY stmts LOOP\n        stmt := btrim(stmt);\n        IF stmt <> '' THEN EXECUTE stmt; END IF;\n      END LOOP;\n      EXIT;\n    EXCEPTION WHEN OTHERS THEN\n      attempts := attempts + 1;\n      IF attempts >= max_retries THEN RAISE; END IF;\n      PERFORM pg_sleep(delay_ms::numeric / 1000.0);\n    END;\n  END LOOP;\nEND $$;\n`;
+        } else {
+          sqlContent += customSqlRaw.endsWith(';') ? customSqlRaw + '\n' : customSqlRaw + ';\n';
         }
       }
 
@@ -2377,6 +2610,29 @@ $$;\n`;
               <Input id="overview-row-filter" value={(exportOptions as any).rowFilterWhere} onChange={(e) => setExportOptions(prev => ({ ...prev, rowFilterWhere: e.target.value }))} placeholder="e.g., received_at >= '2024-01-01' AND tenant_id = '...'" />
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={exportSchemaSQL} disabled={loading}>Quick Export SQL</Button>
+              </div>
+              <div className="mt-3 space-y-2">
+                <Label className="text-sm font-medium">Custom Data SQL (optional)</Label>
+                <Textarea value={(exportOptions as any).customDataSql}
+                  onChange={(e) => setExportOptions(prev => ({ ...prev, customDataSql: e.target.value }))}
+                  placeholder="Enter SQL statements to insert table data. Separate statements with semicolons." />
+                <div className="grid gap-2 md:grid-cols-3">
+                  <div className="flex items-center space-x-2">
+                    <Switch checked={Boolean((exportOptions as any).continuousRunOnError)}
+                      onCheckedChange={(v) => setExportOptions(prev => ({ ...prev, continuousRunOnError: v }))} />
+                    <Label className="font-normal cursor-pointer">Continuous run on error</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label className="font-normal">Retry delay (ms)</Label>
+                    <Input type="number" value={Number((exportOptions as any).retryDelayMs) || 0}
+                      onChange={(e) => setExportOptions(prev => ({ ...prev, retryDelayMs: Number(e.target.value || 0) }))} />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label className="font-normal">Max retries</Label>
+                    <Input type="number" value={Number((exportOptions as any).maxRetries) || 0}
+                      onChange={(e) => setExportOptions(prev => ({ ...prev, maxRetries: Number(e.target.value || 0) }))} />
+                  </div>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">Applies to selected tables and respects the WHERE filter.</p>
             </div>
@@ -3267,43 +3523,45 @@ pg_restore --version</code></pre>
                   />
                 </div>
               </div>
-              {dbTab === 'backup' && (
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-medium">Select tables to export:</div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
-                    <label htmlFor="select-all-tables" className="text-sm">Select all tables</label>
+              {dbTab === 'backup' ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-medium">Select tables to export:</div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
+                        <label htmlFor="select-all-tables" className="text-sm">Select all tables</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border rounded-md max-h-72 overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead style={{ width: 50 }}></TableHead>
+                          <TableHead>Table</TableHead>
+                          <TableHead>Rows (est.)</TableHead>
+                          <TableHead>RLS</TableHead>
+                          <TableHead>Policies</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tables.map((t) => (
+                          <TableRow key={t.table_name}>
+                            <TableCell>
+                              <Checkbox checked={!!selected[t.table_name]} onCheckedChange={(v: any) => toggle(t.table_name, Boolean(v))} />
+                            </TableCell>
+                            <TableCell>{t.table_name}</TableCell>
+                            <TableCell>{t.row_estimate}</TableCell>
+                            <TableCell>{t.rls_enabled ? 'On' : 'Off'}</TableCell>
+                            <TableCell>{t.policy_count}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
-              </div>
-              <div className="border rounded-md max-h-[300px] overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>Table</TableHead>
-                      <TableHead>Rows (est.)</TableHead>
-                      <TableHead>RLS</TableHead>
-                      <TableHead>Policies</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tables.map((t) => (
-                      <TableRow key={t.table_name}>
-                        <TableCell>
-                          <Checkbox checked={!!selected[t.table_name]} onCheckedChange={(v: any) => toggle(t.table_name, Boolean(v))} />
-                        </TableCell>
-                        <TableCell>{t.table_name}</TableCell>
-                        <TableCell>{t.row_estimate}</TableCell>
-                        <TableCell>{t.rls_enabled ? "On" : "Off"}</TableCell>
-                        <TableCell>{t.policy_count}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              )}
+              ) : null}
             </div>
           )}
 

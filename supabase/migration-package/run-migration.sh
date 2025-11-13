@@ -106,26 +106,60 @@ apply_schema() {
     
     info "This may take 5-10 minutes for large schemas..."
     
-    # Apply schema from export
-    if [ -f "../schema-export.sql" ]; then
-        psql "$NEW_DB_URL" -f "../schema-export.sql" >> "$LOG_FILE" 2>&1
-        log "✓ Schema applied successfully"
-    else
-        error "schema-export.sql not found"
-        exit 1
-    fi
+    local scripts=(
+        "sql-migration/01-schema-and-types.sql"
+        "sql-migration/02-configuration-tables.sql"
+        "sql-migration/03-crm-tables.sql"
+        "sql-migration/04-quotes-shipments-tables.sql"
+        "sql-migration/05-audit-system-tables.sql"
+        "sql-migration/06-database-functions.sql"
+        "sql-migration/07-rls-policies.sql"
+    )
+
+    for script in "${scripts[@]}"; do
+        if [ -f "$script" ]; then
+            log "Applying $(basename "$script")"
+            psql "$NEW_DB_URL" -f "$script" >> "$LOG_FILE" 2>&1
+        else
+            error "Missing schema script: $script"
+            exit 1
+        fi
+    done
+
+    log "✓ Schema applied successfully"
 }
 
 # Import data
 import_data() {
     log "Importing data..."
     
+    if [ ! -d "migration-data" ] || [ -z "$(ls -A migration-data/*.csv 2>/dev/null)" ]; then
+        warning "No data files found in migration-data/"
+        
+        local latest_export
+        latest_export=$(ls -dt migration-export-*/ 2>/dev/null | head -n1)
+        if [ -n "$latest_export" ] && [ -d "${latest_export}/data" ]; then
+            log "Staging CSVs from ${latest_export} to migration-data/"
+            mkdir -p migration-data
+            for f in ${latest_export}/data/*.csv; do
+                [ -e "$f" ] || continue
+                local base name
+                base=$(basename "$f")
+                name=$(echo "$base" | sed -E 's/^[0-9]+-//')
+                cp "$f" "migration-data/$name"
+            done
+            log "✓ Staging complete"
+        else
+            warning "No export directory found (migration-export-*/data)."
+            warning "Please export data first using export scripts"
+        fi
+    fi
+
     if [ -d "migration-data" ] && [ "$(ls -A migration-data/*.csv 2>/dev/null)" ]; then
         bash 03-import-data.sh >> "$LOG_FILE" 2>&1
         log "✓ Data imported successfully"
     else
-        warning "No data files found in migration-data/"
-        warning "Please export data first using export scripts"
+        warning "No data files found after staging"
     fi
 }
 

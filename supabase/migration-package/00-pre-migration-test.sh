@@ -259,6 +259,57 @@ else
     info "Connection test helper not available"
 fi
 
+# Additional Test: Enum value formatting for export/import
+echo ""
+info "Additional Test: Enum value formatting for export/import"
+if [ -n "$ACTIVE_DB_URL" ]; then
+    if psql "$ACTIVE_DB_URL" -v ON_ERROR_STOP=1 << 'EOF' > /dev/null 2>&1; then
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'test_activity_type' AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public."test_activity_type" AS ENUM ('note','call','email');
+  END IF;
+END $$;
+
+DROP TABLE IF EXISTS public.__enum_test;
+CREATE TABLE public.__enum_test (
+  id serial PRIMARY KEY,
+  activity public."test_activity_type" NOT NULL
+);
+
+INSERT INTO public.__enum_test(activity)
+VALUES (
+  convert_from(decode(encode('note'::bytea,'hex'),'hex'),'UTF8')::public."test_activity_type"
+), (
+  convert_from(decode(encode('call'::bytea,'hex'),'hex'),'UTF8')::public."test_activity_type"
+);
+
+DO $$
+DECLARE cnt int;
+BEGIN
+  SELECT COUNT(*) INTO cnt FROM public.__enum_test WHERE activity = 'note';
+  IF cnt >= 1 THEN
+    RAISE NOTICE 'Enum insert test passed (% entries with note)', cnt;
+  ELSE
+    RAISE EXCEPTION 'Enum insert test failed';
+  END IF;
+END $$;
+
+DROP TABLE public.__enum_test;
+EOF
+    then
+        test_pass "Enum formatting test passed"
+    else
+        error "Enum formatting test failed"
+    fi
+else
+    warning "Skipping enum formatting test: database connection inactive"
+fi
+
 # Summary
 echo ""
 echo "=========================================="

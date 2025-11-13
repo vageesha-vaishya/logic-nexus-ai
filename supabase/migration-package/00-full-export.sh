@@ -40,6 +40,13 @@ if [ -z "$SOURCE_DB_URL" ]; then
   exit 1
 fi
 
+# Parse SOURCE_DB_URL into components to handle special characters in password
+DB_USER=$(echo "$SOURCE_DB_URL" | sed -E 's#^.*://([^:]+):.*$#\1#')
+DB_PASS=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:(.*)@.*#\1#')
+DB_HOST=$(echo "$SOURCE_DB_URL" | sed -E 's#.*@(.*):([0-9]+)/.*#\1#')
+DB_PORT=$(echo "$SOURCE_DB_URL" | sed -E 's#.*@(.*):([0-9]+)/.*#\2#')
+DB_NAME=$(echo "$SOURCE_DB_URL" | sed -E 's#.*/([^?/]+)(\?.*)?$#\1#')
+
 # Create export directory structure
 mkdir -p "$EXPORT_DIR"/{schema,data,functions,docs}
 
@@ -52,8 +59,8 @@ echo ""
 echo -e "${BLUE}[1/6] Exporting Schema (Tables, Enums, Constraints, Indexes)...${NC}"
 
 # Export complete schema in dependency order
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
-psql "$SOURCE_DB_URL" > "$EXPORT_DIR/schema/01-complete-schema.sql" <<'EOF'
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" > "$EXPORT_DIR/schema/01-complete-schema.sql" <<'EOF'
 -- ==========================================
 -- COMPLETE SCHEMA EXPORT
 -- Generated: NOW()
@@ -83,7 +90,7 @@ BEGIN
 END $$;
 
 -- Export schema
-\! pg_dump "$SOURCE_DB_URL" --schema-only --schema=public \
+\! PGPASSWORD="$DB_PASS" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" --schema-only --schema=public \
   --exclude-table=spatial_ref_sys \
   --no-owner --no-acl
 
@@ -97,8 +104,8 @@ echo ""
 # ==========================================
 echo -e "${BLUE}[2/6] Exporting Database Functions...${NC}"
 
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
-psql "$SOURCE_DB_URL" -t -A > "$EXPORT_DIR/schema/02-functions.sql" <<'EOF'
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -A > "$EXPORT_DIR/schema/02-functions.sql" <<'EOF'
 SELECT pg_get_functiondef(p.oid) || ';'
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -114,8 +121,8 @@ echo ""
 # ==========================================
 echo -e "${BLUE}[3/6] Exporting RLS Policies...${NC}"
 
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
-psql "$SOURCE_DB_URL" > "$EXPORT_DIR/schema/03-rls-policies.sql" <<'EOF'
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" > "$EXPORT_DIR/schema/03-rls-policies.sql" <<'EOF'
 -- ==========================================
 -- RLS POLICIES EXPORT
 -- ==========================================
@@ -166,10 +173,18 @@ echo ""
 # ==========================================
 echo -e "${BLUE}[4/6] Exporting Table Data (Dependency Order)...${NC}"
 
+# Pre-Phase: Auth Users (needed for foreign keys)
+echo -e "${YELLOW}  Pre-Phase: Auth Users...${NC}"
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<EOF
+\copy (SELECT id, email, phone, created_at, updated_at, instance_id, aud, role, email_confirmed_at, phone_confirmed_at, confirmation_sent_at, recovery_sent_at, last_sign_in_at, is_super_admin, raw_user_meta_data, user_metadata FROM auth.users ORDER BY created_at) TO '$EXPORT_DIR/data/00-auth_users.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
+EOF
+echo -e "${GREEN}  ✓ Auth users exported${NC}"
+
 # Phase 1: Master Data (no dependencies)
 echo -e "${YELLOW}  Phase 1: Master Data...${NC}"
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
-psql "$SOURCE_DB_URL" <<EOF
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<EOF
 -- Tenants (root)
 \copy (SELECT * FROM tenants ORDER BY created_at) TO '$EXPORT_DIR/data/01-tenants.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
 
@@ -213,8 +228,8 @@ echo -e "${GREEN}  ✓ Phase 1 complete${NC}"
 
 # Phase 2: Configuration Data
 echo -e "${YELLOW}  Phase 2: Configuration Data...${NC}"
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
-psql "$SOURCE_DB_URL" <<EOF
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<EOF
 \copy (SELECT * FROM custom_roles ORDER BY created_at) TO '$EXPORT_DIR/data/25-custom_roles.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
 \copy (SELECT * FROM custom_role_permissions ORDER BY created_at) TO '$EXPORT_DIR/data/26-custom_role_permissions.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
 \copy (SELECT * FROM user_custom_roles ORDER BY created_at) TO '$EXPORT_DIR/data/27-user_custom_roles.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
@@ -241,8 +256,8 @@ echo -e "${GREEN}  ✓ Phase 2 complete${NC}"
 
 # Phase 3: CRM Data
 echo -e "${YELLOW}  Phase 3: CRM Data...${NC}"
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
-psql "$SOURCE_DB_URL" <<EOF
+PGPASSWORD="$DB_PASS" \
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<EOF
 \copy (SELECT * FROM accounts ORDER BY created_at) TO '$EXPORT_DIR/data/45-accounts.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
 \copy (SELECT * FROM contacts ORDER BY created_at) TO '$EXPORT_DIR/data/46-contacts.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
 \copy (SELECT * FROM leads ORDER BY created_at) TO '$EXPORT_DIR/data/47-leads.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
@@ -260,7 +275,7 @@ echo -e "${GREEN}  ✓ Phase 3 complete${NC}"
 
 # Phase 4: Quotes & Shipments
 echo -e "${YELLOW}  Phase 4: Quotes & Shipments...${NC}"
-PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:([^@]+)@.*#\1#') \
+PGPASSWORD=$(echo "$SOURCE_DB_URL" | sed -E 's#.*:(.*)@.*#\1#') \
 psql "$SOURCE_DB_URL" <<EOF
 \copy (SELECT * FROM services ORDER BY created_at) TO '$EXPORT_DIR/data/56-services.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
 \copy (SELECT * FROM carrier_rates ORDER BY created_at) TO '$EXPORT_DIR/data/57-carrier_rates.csv' WITH (FORMAT CSV, HEADER true, QUOTE '"');
