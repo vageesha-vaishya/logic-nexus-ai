@@ -1,4 +1,6 @@
 {
   "nodeModulesDir": "auto",
-  "importMap": "./import_map.json"
+  "imports": {
+    "openai": "npm:openai@^4.52.5"
+  }
 }
