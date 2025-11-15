@@ -29,7 +29,9 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    const { email, password } = await req.json();
+    const body = await req.json();
+    const email = body.email || 'Bahuguna.vimal@gmail.com';
+    const password = body.password || 'Vimal@1234';
 
     // Validate inputs
     if (!email || !password) {
