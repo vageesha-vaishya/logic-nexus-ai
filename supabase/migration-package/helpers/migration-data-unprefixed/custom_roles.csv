@@ -1,0 +1,2 @@
+id,tenant_id,name,description,is_active,is_system_role,created_by,created_at,updated_at
+b8a8b290-986b-4b6a-a996-0051ffc08da1,ce4c64f5-cd8c-4d2d-bbbd-04972c4a7768,Franchisee Manager,,true,false,,2025-10-02T13:37:37.078028+00:00,2025-10-02T13:37:37.078028+00:00

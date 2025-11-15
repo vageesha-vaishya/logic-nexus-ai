@@ -1,0 +1,5 @@
+id,role_id,permission_key,created_at,access_type
+b52d1657-a528-41bf-b5b5-37e643b2d6f4,b8a8b290-986b-4b6a-a996-0051ffc08da1,accounts.view,2025-10-02T13:37:37.367716+00:00,grant
+1de09e33-243a-4ec3-9723-e1d87cc5130b,b8a8b290-986b-4b6a-a996-0051ffc08da1,activities.view,2025-10-02T13:37:37.367716+00:00,grant
+b544a6d6-ab49-4167-8c6b-bfdb49322dc2,b8a8b290-986b-4b6a-a996-0051ffc08da1,contacts.view,2025-10-02T13:37:37.367716+00:00,grant
+76d87cfa-1c59-4bd0-af1d-74f1d42946fc,b8a8b290-986b-4b6a-a996-0051ffc08da1,dashboards.view,2025-10-02T13:37:37.367716+00:00,grant

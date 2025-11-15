@@ -14,7 +14,12 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Load config
+PRESET_DB_HOSTADDR_OVERRIDE="${DB_HOSTADDR_OVERRIDE:-}"
 source new-supabase-config.env
+# Respect preset override if provided externally
+if [ -n "$PRESET_DB_HOSTADDR_OVERRIDE" ]; then
+    export DB_HOSTADDR_OVERRIDE="$PRESET_DB_HOSTADDR_OVERRIDE"
+fi
 
 # Progress tracking
 TOTAL_TABLES=0
@@ -35,6 +40,73 @@ info() {
 
 progress() {
     echo -e "${CYAN}[PROGRESS]${NC} $1"
+}
+
+# Optional: limit import to specific tables via env var IMPORT_ONLY_TABLES (comma-separated)
+# Example: IMPORT_ONLY_TABLES="auth.users,profiles"
+IMPORT_ONLY_TABLES="${IMPORT_ONLY_TABLES:-}"
+ONLY_TABLES_ARR=()
+if [ -n "$IMPORT_ONLY_TABLES" ]; then
+    IFS=',' read -r -a ONLY_TABLES_ARR <<< "$IMPORT_ONLY_TABLES"
+fi
+
+# Returns 0 (true) if the given table should be imported under the filter
+# Accepts names like "profiles" and "public.profiles"; special-case "auth.users"
+in_only_list() {
+    local name="$1"
+    # If no filter provided, import everything
+    if [ -z "$IMPORT_ONLY_TABLES" ]; then
+        return 0
+    fi
+    # Normalize input
+    local name_pub="public.$name"
+    for t in "${ONLY_TABLES_ARR[@]}"; do
+        # trim spaces
+        local t_trim
+        t_trim=$(echo "$t" | xargs)
+        if [ "$t_trim" = "$name" ] || [ "$t_trim" = "$name_pub" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Attempt to auto-fix DNS resolution for the DB host by using DNS-over-HTTPS
+# and adding hostaddr=<IP> to the connection URI while preserving host=<name>
+ensure_db_dns_fallback() {
+    # Extract DB host from NEW_DB_URL
+    local db_host
+    db_host=$(echo "$NEW_DB_URL" | sed -nE 's#^postgresql://[^@]+@([^:/]+).*#\1#p')
+    if [ -z "$db_host" ]; then
+        return
+    fi
+
+    # Quick connectivity probe; don't terminate on failure
+    if ! psql "$NEW_DB_URL" -c "SELECT 1" >/dev/null 2>&1; then
+        info "DB host lookup failed for $db_host; applying hostaddr fallback via DNS-over-HTTPS"
+        # If user provided an override, use that first
+        if [ -n "${DB_HOSTADDR_OVERRIDE:-}" ]; then
+            ip="$DB_HOSTADDR_OVERRIDE"
+        else
+            # Resolve IP using Google DNS over HTTPS
+            local ip
+            ip=$(curl -s "https://dns.google/resolve?name=${db_host}&type=A" | grep -oE '"data":"[0-9\.]+"' | head -n1 | sed -E 's/"data":"([0-9\.]+)"/\1/')
+            # Fallback to Cloudflare DNS over HTTPS if Google fails
+            if [ -z "$ip" ]; then
+                ip=$(curl -s -H 'accept: application/dns-json' "https://cloudflare-dns.com/dns-query?name=${db_host}&type=A" | grep -oE '"data":"[0-9\.]+"' | head -n1 | sed -E 's/"data":"([0-9\.]+)"/\1/')
+            fi
+        fi
+        if [ -n "$ip" ]; then
+            # Append hostaddr, preserving existing query params
+            case "$NEW_DB_URL" in
+                *\?*) NEW_DB_URL="${NEW_DB_URL}&hostaddr=${ip}" ;;
+                *) NEW_DB_URL="${NEW_DB_URL}?hostaddr=${ip}" ;;
+            esac
+            info "Using hostaddr ${ip} with host ${db_host}"
+        else
+            error "Failed to resolve IP for ${db_host} via DNS-over-HTTPS"
+        fi
+    fi
 }
 
 # Calculate elapsed time
@@ -96,9 +168,15 @@ count_tables() {
                  customer_selections rate_calculations cargo_details shipments tracking_events documents \
                  audit_logs notifications system_settings; do
         if [ -f "migration-data/${table}.csv" ]; then
-            ((TOTAL_TABLES++))
+            if in_only_list "$table"; then
+                ((TOTAL_TABLES++))
+            fi
         fi
     done
+    # Include auth.users if present and selected
+    if [ -f "migration-data/auth_users.csv" ] && in_only_list "auth.users"; then
+        ((TOTAL_TABLES++))
+    fi
     info "Found $TOTAL_TABLES tables to import"
 }
 
@@ -106,8 +184,14 @@ count_tables() {
 import_table() {
     local table_name=$1
     local csv_file="migration-data/${table_name}.csv"
-    
+
     if [ ! -f "$csv_file" ]; then
+        return
+    fi
+
+    # Respect IMPORT_ONLY_TABLES filter
+    if ! in_only_list "$table_name"; then
+        info "Skipping $table_name (limited import)"
         return
     fi
     
@@ -178,13 +262,17 @@ log "Data Import Process with Progress Tracking"
 log "=========================================="
 echo ""
 
+# Ensure DB connectivity even if local DNS is flaky
+ensure_db_dns_fallback
+
 # Count tables first
 count_tables
 echo ""
 
 # Pre-Phase: Auth Users (schema: auth)
 if [ -f "migration-data/auth_users.csv" ]; then
-    log "Pre-Phase: Importing auth.users"
+    if in_only_list "auth.users"; then
+        log "Pre-Phase: Importing auth.users"
     # Determine auth.users columns
     AUTH_COLS=$(psql "$NEW_DB_URL" -t -A -c "SELECT column_name FROM information_schema.columns WHERE table_schema='auth' AND table_name='users' ORDER BY ordinal_position;")
     CSV_TO_USE="migration-data/auth_users.csv"
@@ -220,6 +308,9 @@ PY
     # Re-enable triggers
     psql "$NEW_DB_URL" -c "ALTER TABLE auth.users ENABLE TRIGGER ALL;" 2>/dev/null || true
     log "✓ Imported auth.users"
+    else
+        info "Skipping auth.users (limited import)"
+    fi
 fi
 
 # Phase 1: Master Data (no dependencies)

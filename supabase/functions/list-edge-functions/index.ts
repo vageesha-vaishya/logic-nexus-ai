@@ -1,19 +1,23 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
+  readDir(path: string): AsyncIterable<{ name: string; isDirectory: boolean }>;
+  stat(path: string): Promise<unknown>;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Environment variables are available in Edge runtime; no Supabase client is needed here.
     
     // List all edge functions by reading the functions directory
     const functionsDir = new URL('../', import.meta.url).pathname;

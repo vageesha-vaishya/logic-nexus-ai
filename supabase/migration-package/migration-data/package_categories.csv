@@ -1,0 +1,5 @@
+id,tenant_id,category_name,category_code,description,is_active,created_at,updated_at
+c0d110f5-f15a-42d5-84fb-c2372457896c,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Standard Container,STD,Standard dry cargo container,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+20e819ff-8d54-403f-a8b2-08f01ac0d49e,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Open Top Container,OT,Container with removable top,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+fb0584d1-369b-4df1-b428-96576467cff2,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Flat Rack Container,FR,Flat rack for oversized cargo,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+d2c1a5e7-0c3d-45fa-9656-6d39cf8be4f5,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Refrigerated Container,REEFER,Temperature controlled container,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00

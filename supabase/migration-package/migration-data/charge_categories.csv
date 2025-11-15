@@ -1,0 +1,10 @@
+id,name,code,description,is_active,created_at,updated_at
+0f99fb27-1065-4136-8bbf-d943cbb17f1b,Freight,freight,Main transportation charge,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+2e69724a-4458-41b5-a6b7-3006ff4d74c6,Fuel Surcharge,fuel,Fuel adjustment charge,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+be558f0e-8b21-4632-b6af-2eb8f3f73742,Security,security,Security screening charges,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+5708ad0b-e123-428d-93b5-a1f59211b1f8,Handling,handling,Cargo handling fees,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+23a1582c-a25e-45f3-a701-42bc5d1c6399,Documentation,doc,Document processing fees,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+53ac9c21-8508-4c7c-8627-c3c1d196547f,Insurance,insurance,Cargo insurance,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+9ef62216-384b-48fc-a4c6-84a0f5b757d1,Customs,customs,Customs clearance fees,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+7818c0bf-f5d5-48fd-83e2-cac0a3a70926,Storage,storage,Warehousing and storage,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+dfe746e2-3f41-4dc1-a98f-236605edc686,Other,other,Miscellaneous charges,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00

@@ -1,0 +1,5 @@
+id,tenant_id,incoterm_code,incoterm_name,description,is_active,created_at,updated_at
+ed65e9e8-c13e-4f77-80a0-af9b03c0376d,9e2686ba-ef3c-42df-aea6-dcc880436b9f,FOB,Free on Board,"Seller delivers goods on board vessel, buyer assumes risk from that point",true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+78536fd0-d4ae-4a8b-be71-ec81db938b64,9e2686ba-ef3c-42df-aea6-dcc880436b9f,CIF,"Cost, Insurance and Freight",Seller pays freight and insurance to destination port,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+8b2659be-6b0e-4222-a55b-4d24e132804b,9e2686ba-ef3c-42df-aea6-dcc880436b9f,EXW,Ex Works,Buyer collects goods from seller premises,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+ee6f26d5-c28f-4d24-b3c7-dbe583fc4ad4,9e2686ba-ef3c-42df-aea6-dcc880436b9f,DDP,Delivered Duty Paid,Seller responsible for all costs including import duties,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00

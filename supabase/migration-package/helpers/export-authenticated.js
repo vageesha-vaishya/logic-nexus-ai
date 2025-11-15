@@ -5,8 +5,8 @@ import Papa from 'papaparse'
 
 const srcUrl = process.env.SOURCE_SUPABASE_URL || 'https://pqptgpntbthrisnuwwzi.supabase.co'
 const srcAnonKey = process.env.SOURCE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcHRncG50YnRocmlzbnV3d3ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzU3NzIsImV4cCI6MjA3NDgxMTc3Mn0.sfNBAUjS9EuhcNb-EPG7pKjPG9s6fx_kaWY_B7k2yjM'
-const adminEmail = 'bahuguna.vimal@gmail.com'
-const adminPassword = '#!#Vimal@2025'
+const adminEmail = process.env.SOURCE_PLATFORM_ADMIN_EMAIL || 'bahuguna.vimal@gmail.com'
+const adminPassword = process.env.SOURCE_PLATFORM_ADMIN_PASSWORD || 'Vimal@1234'
 
 const supabase = createClient(srcUrl, srcAnonKey)
 

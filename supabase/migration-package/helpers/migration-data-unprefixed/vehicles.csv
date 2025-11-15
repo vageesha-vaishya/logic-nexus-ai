@@ -1,0 +1,5 @@
+id,tenant_id,franchise_id,vehicle_number,vehicle_type,make,model,year,capacity_kg,capacity_cbm,status,current_location,last_maintenance_date,next_maintenance_date,insurance_expiry,registration_expiry,driver_id,is_active,created_at,updated_at
+4adfc999-ddc4-4ec7-97e2-4463830ab615,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,,TRK-001,truck,Freightliner,Cascadia,2022,10000,40,available,,,,,,,true,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00
+25a87ca8-566d-4e10-86b4-1ea723296471,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,,VAN-002,van,Ford,Transit,2023,2000,15,available,,,,,,,true,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00
+6209e97c-0086-4ef7-bac1-141d9478f14d,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,,TRK-003,refrigerated_truck,Volvo,VNL,2021,8000,35,in_use,,,,,,,true,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00
+91d0c0eb-cea5-4895-b57b-e4038c6ee68f,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,,TRK-004,flatbed,Peterbilt,579,2020,12000,45,available,,,,,,,true,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00

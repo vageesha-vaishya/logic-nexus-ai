@@ -33,36 +33,32 @@ if [ -f "../../.git/config" ]; then
 fi
 
 echo ""
-echo -e "${BLUE}Deploying edge functions...${NC}"
+echo -e "${BLUE}Discovering and deploying edge functions...${NC}"
 echo ""
 
-# List of functions to deploy
-FUNCTIONS=(
-    "create-user"
-    "exchange-oauth-token"
-    "get-account-label"
-    "get-contact-label"
-    "get-opportunity-full"
-    "get-opportunity-label"
-    "get-service-label"
-    "list-edge-functions"
-    "process-lead-assignments"
-    "salesforce-sync-opportunity"
-    "search-emails"
-    "seed-platform-admin"
-    "send-email"
-    "sync-all-mailboxes"
-    "sync-emails"
-)
-
-# Deploy each function
-for func in "${FUNCTIONS[@]}"; do
-    echo -e "${BLUE}Deploying $func...${NC}"
-    cd ../..
-    supabase functions deploy "$func" --project-ref "$NEW_PROJECT_ID"
-    cd supabase/migration-package
-    echo -e "${GREEN}✓ $func deployed${NC}"
+# Discover all function directories under supabase/functions (excluding _shared)
+cd ../..
+FUNCTIONS_DIR="supabase/functions"
+FUNCTIONS=()
+for d in "$FUNCTIONS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    [ "$name" = "_shared" ] && continue
+    FUNCTIONS+=("$name")
 done
+
+if [ ${#FUNCTIONS[@]} -eq 0 ]; then
+    echo -e "${YELLOW}No edge functions found to deploy in $FUNCTIONS_DIR${NC}"
+    cd supabase/migration-package
+else
+    echo -e "${BLUE}Functions to deploy:${NC} ${FUNCTIONS[*]}"
+    for func in "${FUNCTIONS[@]}"; do
+        echo -e "${BLUE}Deploying $func...${NC}"
+        supabase functions deploy "$func" --project-ref "$NEW_PROJECT_ID"
+        echo -e "${GREEN}✓ $func deployed${NC}"
+    done
+    cd supabase/migration-package
+fi
 
 echo ""
 echo -e "${GREEN}=========================================="

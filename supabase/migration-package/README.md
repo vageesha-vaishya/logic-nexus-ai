@@ -82,6 +82,16 @@ NEW_SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
 NEW_PROJECT_ID="your_project_ref"
 ```
 
+### OpenAPI Guard and Debugging (Importer)
+- `STRICT_OPENAPI_GUARD` (default `true`): trims payloads to only columns exposed by PostgREST OpenAPI to avoid `PGRST204` cache errors.
+- `LOG_TRIMMED_FIELDS` (default `false`): when `true`, logs per-table which input fields were trimmed by the guard.
+
+Example:
+```bash
+ALLOW_INSECURE_SSL=true STRICT_OPENAPI_GUARD=true LOG_TRIMMED_FIELDS=true ./run-rest-import.sh
+```
+
+
 ## 📊 Migration Steps
 
 ### Step 0: Pre-Migration Testing (Recommended) ⭐ NEW

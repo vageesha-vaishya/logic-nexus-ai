@@ -1,0 +1,5 @@
+id,tenant_id,company_name,contact_person,contact_email,contact_phone,address,tax_id,customs_id,is_active,notes,created_at,updated_at
+14399f6b-31aa-4650-bd0d-8f3537e9bd0c,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,Auto Parts Distributors,David Wilson,david@autoparts.com,+1-312-555-4567,[object Object],,,true,,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00
+06f4a614-34ac-49c0-a5d5-fa66b65c4e8d,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,Fashion Retail Group,Emma Thompson,emma@fashionretail.com,+1-212-555-8901,[object Object],,,true,,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00
+1766c552-c6a8-4f6c-8cd8-514963181682,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,Pharma Solutions Inc,Dr. Robert Lee,robert@pharmasol.com,+1-617-555-2345,[object Object],,,true,,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00
+1ae7f4c0-5074-465d-993d-e59fc8fe9934,37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,Home Furniture Warehouse,Lisa Martinez,lisa@homefurniture.com,+1-404-555-6789,[object Object],,,true,,2025-10-06T03:16:19.262521+00:00,2025-10-06T03:16:19.262521+00:00

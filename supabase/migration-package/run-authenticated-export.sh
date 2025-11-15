@@ -10,6 +10,11 @@ echo "  Authenticated Data Export"
 echo "============================================"
 echo ""
 
+# Load environment from new-supabase-config.env
+set -a
+. ./new-supabase-config.env
+set +a
+
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
     echo "❌ Node.js is not installed. Please install Node.js first."
@@ -22,7 +27,6 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
-# Navigate to helpers directory
 cd "$(dirname "$0")/helpers"
 
 # Install dependencies if needed
@@ -31,12 +35,14 @@ if [ ! -d "node_modules" ]; then
     npm install @supabase/supabase-js papaparse
 fi
 
-# Run the export
 echo ""
-echo "🚀 Starting authenticated export..."
-echo ""
-
-node export-authenticated.js
+if [ -n "$SOURCE_SUPABASE_SERVICE_ROLE_KEY" ]; then
+  echo "🔑 Service-role key detected. Running full REST export (bypasses RLS)..."
+  node export-rest.js
+else
+  echo "⚠️ No service-role key provided. Running authenticated admin export (may be limited by RLS)."
+  node export-authenticated.js
+fi
 
 echo ""
 echo "============================================"

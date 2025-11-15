@@ -1,0 +1,584 @@
+{
+  "currencies": {
+    "map": {
+      "code": "code",
+      "name": "name",
+      "symbol": "symbol",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["code", "tenant_id"],
+    "on_conflict": ["code", "tenant_id"],
+    "drop": ["created_at", "updated_at", "id"]
+  },
+  "service_types": {
+    "map": {
+      "code": "code",
+      "name": "name",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["code", "tenant_id"],
+    "on_conflict": ["code", "tenant_id"],
+    "drop": ["description", "created_at", "updated_at", "id"]
+  },
+  "package_categories": {
+    "map": {
+      "category_name": "name",
+      "category_code": "code",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["code", "tenant_id"],
+    "dedupe_key": ["code", "tenant_id"],
+    "drop": ["created_at", "updated_at", "id"]
+  },
+  "package_sizes": {
+    "map": {
+      "size_name": "name",
+      "max_weight_kg": "weight_kg",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["name", "tenant_id"],
+    "dedupe_key": ["name", "tenant_id"],
+    "drop": ["created_at", "updated_at", "id", "size_code", "length_ft", "width_ft", "height_ft", "description"]
+  },
+  "container_sizes": {
+    "map": {
+      "length_ft": "size_feet",
+      "max_weight_kg": "max_weight_kg",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "derive": {
+      "size_feet": "from_name_or_code"
+    },
+    "match_on": ["size_feet", "tenant_id"],
+    "on_conflict": ["size_feet", "tenant_id"],
+    "drop": ["created_at", "updated_at", "id", "name", "code", "width_ft", "height_ft", "description"]
+  },
+  "container_types": {
+    "map": {
+      "name": "name",
+      "code": "code",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["code", "tenant_id"],
+    "on_conflict": ["code", "tenant_id"],
+    "drop": ["created_at", "updated_at", "id"]
+  },
+  "ports_locations": {
+    "map": {
+      "location_name": "name",
+      "location_code": "code",
+      "location_type": "port_type",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "derive_fk": {
+      "country_id": {
+        "from": "country",
+        "lookup_table": "countries",
+        "lookup_key": "name",
+        "lookup_target": "id",
+        "aliases": {
+          "US": "United States",
+          "U.S.": "United States",
+          "USA": "United States",
+          "U.S.A.": "United States",
+          "UK": "United Kingdom",
+          "U.K.": "United Kingdom",
+          "UAE": "United Arab Emirates",
+          "KSA": "Saudi Arabia",
+          "Brasil": "Brazil",
+          "Viet Nam": "Vietnam",
+          "Cote d'Ivoire": "Côte d’Ivoire"
+        }
+      },
+      "city_id": {
+        "from": "city",
+        "lookup_table": "cities",
+        "lookup_key": "name",
+        "lookup_target": "id",
+        "aliases": {
+          "NYC": "New York",
+          "LA": "Los Angeles",
+          "SFO": "San Francisco",
+          "SJ": "San Jose",
+          "Dxb": "Dubai",
+          "Abu Dhabi": "Abu Dhabi",
+          "HCM": "Ho Chi Minh City",
+          "Saigon": "Ho Chi Minh City",
+          "Bkk": "Bangkok"
+        }
+      }
+    },
+    "match_on": ["code", "tenant_id"],
+    "on_conflict": ["code", "tenant_id"],
+    "drop": [
+      "coordinates",
+      "facilities",
+      "operating_hours",
+      "country",
+      "city",
+      "state_province",
+      "postal_code",
+      "customs_available",
+      "notes",
+      "created_at",
+      "updated_at",
+      "id"
+    ]
+  },
+  "cargo_types": {
+    "map": {
+      "cargo_type_name": "name",
+      "cargo_code": "code",
+      "requires_special_handling": "is_hazardous",
+      "temperature_controlled": "requires_temperature_control",
+      "description": "description",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["code", "tenant_id"],
+    "dedupe_key": ["code", "tenant_id"],
+    "drop": ["created_at", "updated_at", "id"]
+  },
+  "service_type_mappings": {
+    "map": {
+      "service_id": "external_code",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "set": {
+      "external_system": "core"
+    },
+    "derive_fk": {
+      "service_type_id": {
+        "from": "service_type",
+        "lookup_table": "service_types",
+        "lookup_key": "code",
+        "lookup_target": "id",
+        "aliases": {
+          "air": "air_freight",
+          "ocean": "ocean_freight",
+          "courier": "courier_service"
+        }
+      }
+    },
+    "match_on": ["external_system", "external_code", "service_type_id", "tenant_id"],
+    "dedupe_key": ["external_system", "external_code", "service_type_id", "tenant_id"],
+    "drop": ["conditions", "service_type", "is_default", "priority", "created_at", "updated_at", "id"]
+  },
+  
+  "tenants": {
+    "map": {
+      "id": "id",
+      "name": "name",
+      "slug": "slug",
+      "logo_url": "logo_url",
+      "domain": "domain",
+      "subscription_tier": "subscription_tier",
+      "is_active": "is_active",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "match_on": ["slug"],
+    "on_conflict": ["slug"],
+    "drop": ["settings", "stripe_customer_id", "billing_email", "payment_method", "billing_address"]
+  },
+  "franchises": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "name": "name",
+      "code": "code",
+      "is_active": "is_active",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "derive_fk": {
+      "tenant_id": {
+        "from": "tenant_slug",
+        "lookup_table": "tenants",
+        "lookup_key": "slug",
+        "lookup_target": "id"
+      }
+    },
+    "match_on": ["code"],
+    "on_conflict": ["code"],
+    "drop": ["address", "manager_id"]
+  },
+  "accounts": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "franchise_id": "franchise_id",
+      "name": "name",
+      "account_type": "account_type",
+      "status": "status",
+      "industry": "industry",
+      "website": "website",
+      "phone": "phone",
+      "email": "email",
+      "annual_revenue": "annual_revenue",
+      "employee_count": "employee_count",
+      "description": "description",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "derive_fk": {
+      "tenant_id": {
+        "from": "tenant_slug",
+        "lookup_table": "tenants",
+        "lookup_key": "slug",
+        "lookup_target": "id"
+      },
+      "franchise_id": {
+        "from": "franchise_code",
+        "lookup_table": "franchises",
+        "lookup_key": "code",
+        "lookup_target": "id"
+      }
+    },
+    "on_conflict": ["id"],
+    "drop": ["billing_address", "shipping_address", "owner_id", "created_by"]
+  },
+  "contacts": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "franchise_id": "franchise_id",
+      "account_id": "account_id",
+      "first_name": "first_name",
+      "last_name": "last_name",
+      "title": "title",
+      "email": "email",
+      "phone": "phone",
+      "mobile": "mobile",
+      "linkedin_url": "linkedin_url",
+      "is_primary": "is_primary",
+      "notes": "notes",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "derive_fk": {
+      "tenant_id": {
+        "from": "tenant_slug",
+        "lookup_table": "tenants",
+        "lookup_key": "slug",
+        "lookup_target": "id"
+      },
+      "franchise_id": {
+        "from": "franchise_code",
+        "lookup_table": "franchises",
+        "lookup_key": "code",
+        "lookup_target": "id"
+      },
+      "account_id": {
+        "from": "account_name",
+        "lookup_table": "accounts",
+        "lookup_key": "name",
+        "lookup_target": "id"
+      }
+    },
+    "on_conflict": ["id"],
+    "drop": ["address", "owner_id", "created_by"]
+  },
+  "leads": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "franchise_id": "franchise_id",
+      "first_name": "first_name",
+      "last_name": "last_name",
+      "company": "company",
+      "title": "title",
+      "email": "email",
+      "phone": "phone",
+      "status": "status",
+      "source": "source",
+      "estimated_value": "estimated_value",
+      "expected_close_date": "expected_close_date",
+      "description": "description",
+      "notes": "notes",
+      "converted_account_id": "converted_account_id",
+      "converted_contact_id": "converted_contact_id",
+      "converted_at": "converted_at",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "on_conflict": ["id"],
+    "drop": ["owner_id", "created_by", "lead_score", "qualification_status", "last_activity_date", "conversion_probability", "custom_fields"]
+  },
+  "opportunities": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "franchise_id": "franchise_id",
+      "name": "name",
+      "description": "description",
+      "stage": "stage",
+      "amount": "amount",
+      "probability": "probability",
+      "close_date": "close_date",
+      "account_id": "account_id",
+      "contact_id": "contact_id",
+      "lead_id": "lead_id",
+      "next_step": "next_step",
+      "loss_reason": "loss_reason",
+      "notes": "notes",
+      "created_at": "created_at",
+      "updated_at": "updated_at",
+      "closed_at": "closed_at"
+    },
+    "derive_fk": {
+      "tenant_id": {
+        "from": "tenant_slug",
+        "lookup_table": "tenants",
+        "lookup_key": "slug",
+        "lookup_target": "id"
+      },
+      "franchise_id": {
+        "from": "franchise_code",
+        "lookup_table": "franchises",
+        "lookup_key": "code",
+        "lookup_target": "id"
+      },
+      "account_id": {
+        "from": "account_name",
+        "lookup_table": "accounts",
+        "lookup_key": "name",
+        "lookup_target": "id"
+      },
+      "contact_id": {
+        "from": "contact_email",
+        "lookup_table": "contacts",
+        "lookup_key": "email",
+        "lookup_target": "id"
+      },
+      "lead_id": {
+        "from": "lead_email",
+        "lookup_table": "leads",
+        "lookup_key": "email",
+        "lookup_target": "id"
+      }
+    },
+    "on_conflict": ["id"],
+    "drop": [
+      "owner_id",
+      "created_by",
+      "lead_source",
+      "competitors",
+      "campaign_id",
+      "type",
+      "forecast_category",
+      "expected_revenue"
+    ]
+  },
+  "quotes": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "franchise_id": "franchise_id",
+      "quote_number": "quote_number",
+      "title": "title",
+      "description": "description",
+      "opportunity_id": "opportunity_id",
+      "account_id": "account_id",
+      "contact_id": "contact_id",
+      "owner_id": "owner_id",
+      "status": "status",
+      "valid_until": "valid_until",
+      "subtotal": "subtotal",
+      "discount_amount": "discount_amount",
+      "discount_percent": "discount_percent",
+      "tax_amount": "tax_amount",
+      "tax_percent": "tax_percent",
+      "shipping_amount": "shipping_amount",
+      "total_amount": "total_amount",
+      "currency": "currency",
+      "terms_conditions": "terms_conditions",
+      "notes": "notes",
+      "created_by": "created_by",
+      "created_at": "created_at",
+      "updated_at": "updated_at",
+      "accepted_at": "accepted_at",
+      "rejected_at": "rejected_at"
+    },
+    "derive_fk": {
+      "tenant_id": {
+        "from": "tenant_slug",
+        "lookup_table": "tenants",
+        "lookup_key": "slug",
+        "lookup_target": "id"
+      },
+      "franchise_id": {
+        "from": "franchise_code",
+        "lookup_table": "franchises",
+        "lookup_key": "code",
+        "lookup_target": "id"
+      },
+      "account_id": {
+        "from": "account_name",
+        "lookup_table": "accounts",
+        "lookup_key": "name",
+        "lookup_target": "id"
+      },
+      "contact_id": {
+        "from": "contact_email",
+        "lookup_table": "contacts",
+        "lookup_key": "email",
+        "lookup_target": "id"
+      },
+      "opportunity_id": {
+        "from": "opportunity_name",
+        "lookup_table": "opportunities",
+        "lookup_key": "name",
+        "lookup_target": "id"
+      }
+    },
+    "on_conflict": ["id"],
+    "drop": [
+      "billing_address", "shipping_address",
+      "incoterms", "origin_location", "destination_location",
+      "cargo_details", "special_handling", "regulatory_data", "compliance_status",
+      "carrier_id", "service_id", "consignee_id",
+      "origin_port_id", "destination_port_id",
+      "cost_price", "sell_price", "margin_amount", "margin_percentage",
+      "additional_costs", "incoterm_id", "payment_terms", "service_type_id"
+    ]
+  },
+  "activities": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "franchise_id": "franchise_id",
+      "activity_type": "activity_type",
+      "status": "status",
+      "priority": "priority",
+      "subject": "subject",
+      "description": "description",
+      "due_date": "due_date",
+      "completed_at": "completed_at",
+      "account_id": "account_id",
+      "contact_id": "contact_id",
+      "lead_id": "lead_id",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "on_conflict": ["id"],
+    "drop": ["assigned_to", "created_by"]
+  },
+  "custom_roles": {
+    "map": {
+      "id": "id",
+      "tenant_id": "tenant_id",
+      "name": "role_name",
+      "description": "description",
+      "is_active": "is_active",
+      "created_at": "created_at",
+      "updated_at": "updated_at"
+    },
+    "on_conflict": ["id"],
+    "drop": ["created_by", "is_system_role"]
+  },
+  "custom_role_permissions": {
+    "map": {
+      "id": "id",
+      "role_id": "role_id",
+      "permission_key": "permission_key",
+      "access_type": "access_type",
+      "created_at": "created_at"
+    },
+    "derive_fk": {
+      "role_id": {
+        "from": "role_name",
+        "lookup_table": "custom_roles",
+        "lookup_key": "role_name",
+        "lookup_target": "id"
+      }
+    },
+    "on_conflict": ["id"]
+  }
+  ,
+  "charge_sides": {
+    "map": {
+      "code": "code",
+      "name": "name",
+      "description": "description",
+      "is_active": "is_active"
+    },
+    "match_on": ["code"],
+    "on_conflict": ["code"],
+    "drop": ["id", "created_at", "updated_at"]
+  },
+  "charge_categories": {
+    "map": {
+      "code": "code",
+      "name": "name",
+      "description": "description",
+      "is_active": "is_active"
+    },
+    "match_on": ["code"],
+    "on_conflict": ["code"],
+    "drop": ["id", "created_at", "updated_at"]
+  },
+  "charge_bases": {
+    "map": {
+      "code": "code",
+      "name": "name",
+      "description": "description",
+      "is_active": "is_active"
+    },
+    "match_on": ["code"],
+    "on_conflict": ["code"],
+    "drop": ["id", "created_at", "updated_at"]
+  },
+  "incoterms": {
+    "map": {
+      "incoterm_code": "incoterm_code",
+      "incoterm_name": "incoterm_name",
+      "description": "description",
+      "is_active": "is_active",
+      "tenant_id": "tenant_id"
+    },
+    "match_on": ["incoterm_code", "tenant_id"],
+    "dedupe_key": ["incoterm_code", "tenant_id"],
+    "drop": ["id", "created_at", "updated_at"]
+  },
+  "services": {
+    "map": {
+      "tenant_id": "tenant_id",
+      "service_code": "service_code",
+      "service_name": "service_name",
+      "service_type": "service_type",
+      "description": "description",
+      "base_price": "base_price",
+      "pricing_unit": "pricing_unit",
+      "transit_time_days": "transit_time_days",
+      "is_active": "is_active"
+    },
+    "derive_fk": {
+      "service_type_id": {
+        "from": "service_type",
+        "lookup_table": "service_types",
+        "lookup_key": "code",
+        "lookup_target": "id",
+        "aliases": {
+          "air": "air_freight",
+          "ocean": "ocean_freight",
+          "courier": "courier_service",
+          "moving": "moving_services",
+          "trucking": "trucking",
+          "road": "road_freight"
+        }
+      }
+    },
+    "match_on": ["tenant_id", "service_code"],
+    "on_conflict": ["tenant_id", "service_code"],
+    "drop": ["id", "created_at", "updated_at", "metadata"]
+  }
+}

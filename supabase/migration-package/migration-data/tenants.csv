@@ -1,0 +1,4 @@
+id,name,slug,logo_url,domain,settings,subscription_tier,is_active,created_at,updated_at,stripe_customer_id,billing_email,payment_method,billing_address
+9e2686ba-ef3c-42df-aea6-dcc880436b9f,Miami Global Lines,miami-global,https://www.miamigloballines.com/,miamigloballibes.com,,,true,2025-10-01T01:41:31.831298+00:00,2025-10-01T01:41:31.831298+00:00,,,[object Object],[object Object]
+b133b3ee-5427-4f54-8204-522d12b35870,Tricornio,tri-tt,,,,,true,2025-10-02T10:22:31.714042+00:00,2025-10-02T10:22:31.714042+00:00,,,[object Object],[object Object]
+37a4d9ca-626d-4ed3-9e71-5d416e7ccaf8,SOS Services,sos-serv,https://sosservices.in,sosservices.in,,,true,2025-10-02T12:31:45.583493+00:00,2025-10-02T12:31:45.583493+00:00,,,[object Object],[object Object]

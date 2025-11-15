@@ -2,7 +2,6 @@ declare const Deno: {
   env: { get(name: string): string | undefined };
   serve(handler: (req: Request) => Promise<Response> | Response): void;
 };
-// @ts-expect-error Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -17,14 +16,14 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const requireEnv = (name: string) => {
-      const v = Deno.env.get(name);
-      if (!v) throw new Error(`Missing environment variable: ${name}`);
+    const requireEnv = (name: string, alt?: string) => {
+      const v = Deno.env.get(name) || (alt ? Deno.env.get(alt) : undefined);
+      if (!v) throw new Error(`Missing environment variable: ${name}${alt ? ` or ${alt}` : ''}`);
       return v;
     };
     const supabase = createClient(
       requireEnv("SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY")
     );
 
     let payload: {

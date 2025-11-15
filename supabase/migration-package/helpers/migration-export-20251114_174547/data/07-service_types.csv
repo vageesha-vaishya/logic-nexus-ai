@@ -1,0 +1,17 @@
+id,name,description,is_active,created_at,updated_at,code
+5e75dd4a-d85f-4b41-8033-c546a61d5181,express_delivery,Express and courier services,true,2025-10-09T08:39:32.492383+00:00,2025-10-15T03:11:22.368831+00:00,express_delivery
+44c6ad07-4d4d-481b-adaa-55a909c12050,inland_waterway,Inland waterway transportation,true,2025-10-09T08:39:32.492383+00:00,2025-10-15T03:11:22.368831+00:00,inland_waterway
+cc59617a-ec62-454a-a3ba-aabf9b1cd3e9,multimodal,Combined transportation modes,true,2025-10-09T08:39:32.492383+00:00,2025-10-15T03:11:22.368831+00:00,multimodal
+67f9f8fb-3cdb-4474-be5e-2b00c76a34fd,Trucking,Ground transportation by truck,true,2025-10-09T09:43:35.111913+00:00,2025-10-15T03:11:22.368831+00:00,trucking
+6e4fbd44-1a03-44bc-9ff5-020bdb6a2ec3,Air Freight,Air cargo transportation services,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,air_freight
+da87dc9c-be32-43ca-bba4-9800ed97a45c,Ocean Freight,Sea cargo transportation services,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,ocean_freight
+115d7fe1-c78e-42ea-a78f-10020e7029bd,Road Freight,Ground transportation by truck,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,road_freight
+0b2fc9bc-a2ba-4c2f-9fe3-aafb70d70982,Break Bulk,Ocean break bulk (non-containerized),true,2025-11-11T02:05:48.311078+00:00,2025-11-11T02:06:27.535945+00:00,ocean_breakbulk
+bb8cdc0c-b236-4354-ba00-c9e3fd4e073c,LCL,Less than container load ocean freight,true,2025-11-11T02:05:48.311078+00:00,2025-11-11T02:06:27.535945+00:00,ocean_lcl
+5aa997e2-a1fe-435a-a3df-78997fb4e0ab,RORO,Roll-on/roll-off vehicle cargo,true,2025-11-11T02:05:48.311078+00:00,2025-11-11T02:06:27.535945+00:00,ocean_roro
+d21173f9-2101-4a60-bdf9-9d7de726e239,Rail Freight,Railway cargo transportation,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,rail_freight
+fbcf8670-f075-41cc-892f-cefb0f5a3b6a,Courier Service,Express delivery and courier services,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,courier_service
+60fe7676-bc01-49cc-adf4-9b97d9bed88c,Warehousing,Storage and distribution services,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,warehousing
+ba4bf460-ce26-48b3-b924-46cc41274ed3,Customs Clearance,Import/export customs processing,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,customs_clearance
+d7f79053-c368-4f33-8a99-c08053f1043d,Freight Forwarding,Multi-modal logistics coordination,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,freight_forwarding
+06ded360-e597-4e56-ada0-59a748feba0b,Moving Services,Residential and commercial moving,true,2025-10-09T09:42:35.159866+00:00,2025-10-15T03:11:22.368831+00:00,moving_services

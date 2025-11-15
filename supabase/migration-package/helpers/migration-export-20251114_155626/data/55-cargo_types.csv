@@ -1,0 +1,6 @@
+id,tenant_id,cargo_type_name,cargo_code,requires_special_handling,hazmat_class,temperature_controlled,description,is_active,created_at,updated_at
+3fd552c1-8521-4956-84ef-82afa3220640,9e2686ba-ef3c-42df-aea6-dcc880436b9f,General Cargo,GEN,false,,false,,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+380d2fa4-cf1d-4bee-b0ce-71d3c0bbce9c,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Perishable Goods,PERISH,true,,true,,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+34a63451-b060-47ef-9e00-20207e292727,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Heavy Machinery,HEAVY,true,,false,,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+242f70fc-d028-4317-abdd-9350d2f4bfca,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Electronics,ELEC,true,,false,,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
+d61bccee-ca4b-4f24-8477-2b99b34e71e6,9e2686ba-ef3c-42df-aea6-dcc880436b9f,Hazardous Materials,HAZMAT,true,,false,,true,2025-10-06T02:59:26.417337+00:00,2025-10-06T02:59:26.417337+00:00
