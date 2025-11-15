@@ -98,6 +98,9 @@ export default function Accounts() {
         </div>
         <div className="flex items-center gap-2">
           <ViewToggle value={viewMode} onChange={setViewMode} />
+          <Button asChild variant="outline">
+            <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
+          </Button>
           <Button asChild>
             <Link to="/dashboard/accounts/new">
               <Plus className="mr-2 h-4 w-4" />

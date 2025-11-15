@@ -68,6 +68,7 @@ import TenantSubscription from "./pages/dashboard/TenantSubscription";
 import Quotes from "./pages/dashboard/Quotes";
 import QuoteNew from "./pages/dashboard/QuoteNew";
 import QuoteDetail from "./pages/dashboard/QuoteDetail";
+import QuotesPipeline from "./pages/dashboard/QuotesPipeline";
 import Carriers from "./pages/dashboard/Carriers";
 import Consignees from "./pages/dashboard/Consignees";
 import PortsLocations from "./pages/dashboard/PortsLocations";
@@ -92,6 +93,9 @@ import ChargeBases from "./pages/dashboard/ChargeBases";
 import MasterDataGeography from "./pages/dashboard/MasterDataGeography";
 import MasterDataHTS from "./pages/dashboard/MasterDataHTS";
 import DatabaseExport from "./pages/dashboard/data-management/DatabaseExport";
+import AccountsPipeline from "./pages/dashboard/AccountsPipeline";
+import ContactsPipeline from "./pages/dashboard/ContactsPipeline";
+import CustomsClearancePipeline from "./pages/dashboard/CustomsClearancePipeline";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +145,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/accounts/pipeline" 
+              element={
+                <ProtectedRoute requiredPermissions={["accounts.view"]}>
+                  <AccountsPipeline />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/contacts" 
               element={
                 <ProtectedRoute requiredPermissions={["contacts.view"]}>
@@ -161,6 +173,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["contacts.view"]}>
                   <ContactDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/contacts/pipeline" 
+              element={
+                <ProtectedRoute requiredPermissions={["contacts.view"]}>
+                  <ContactsPipeline />
                 </ProtectedRoute>
               } 
             />
@@ -365,6 +385,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/quotes/pipeline" 
+              element={
+                <ProtectedRoute>
+                  <QuotesPipeline />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/quotes/new" 
               element={
                 <ProtectedRoute>
@@ -484,6 +512,7 @@ const App = () => (
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/pipeline" element={<ProtectedRoute><ShipmentsPipeline /></ProtectedRoute>} />
+            <Route path="/dashboard/customs-clearance/pipeline" element={<ProtectedRoute><CustomsClearancePipeline /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/:id" element={<ProtectedRoute><ShipmentDetail /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />

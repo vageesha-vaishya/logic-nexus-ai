@@ -78,6 +78,9 @@ export default function Contacts() {
         </div>
         <div className="flex items-center gap-2">
           <ViewToggle value={viewMode} onChange={setViewMode} />
+          <Button asChild variant="outline">
+            <Link to="/dashboard/contacts/pipeline">Pipeline View</Link>
+          </Button>
           <Button asChild>
             <Link to="/dashboard/contacts/new">
               <Plus className="mr-2 h-4 w-4" />

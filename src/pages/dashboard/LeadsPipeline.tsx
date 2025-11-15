@@ -19,8 +19,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
-type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'converted' | 'lost';
-type DatabaseLeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'converted' | 'lost' | 'negotiation' | 'won';
+type LeadStatus = 'new' | 'contacted' | 'negotiation' | 'proposal' | 'qualified' | 'lost' | 'won';
+type DatabaseLeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 interface Lead {
   id: string;
@@ -37,15 +37,16 @@ interface Lead {
 }
 
 const statusConfig: Record<LeadStatus, { label: string; color: string }> = {
-  new: { label: "New", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300" },
-  contacted: { label: "Contacted", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300" },
-  qualified: { label: "Qualified", color: "bg-green-500/10 text-green-700 dark:text-green-300" },
-  proposal: { label: "Proposal", color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300" },
-  converted: { label: "Converted", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  lost: { label: "Lost", color: "bg-red-500/10 text-red-700 dark:text-red-300" },
+  new: { label: "🔍 New Inquiry", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300" },
+  contacted: { label: "📞 Contact Attempted", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300" },
+  negotiation: { label: "💬 In Discussion", color: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
+  proposal: { label: "📋 Requirements Gathering", color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300" },
+  qualified: { label: "🎯 Qualified Lead", color: "bg-green-500/10 text-green-700 dark:text-green-300" },
+  lost: { label: "❌ Disqualified", color: "bg-red-500/10 text-red-700 dark:text-red-300" },
+  won: { label: "✅ Converted to Opportunity", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
 };
 
-const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'proposal', 'converted', 'lost'];
+const stages: LeadStatus[] = ['new', 'contacted', 'negotiation', 'proposal', 'qualified', 'lost', 'won'];
 
 export default function LeadsPipeline() {
   const navigate = useNavigate();
@@ -69,10 +70,11 @@ export default function LeadsPipeline() {
   const [wipLimits, setWipLimits] = useState<Record<LeadStatus, number>>({
     new: 20,
     contacted: 15,
-    qualified: 10,
-    proposal: 8,
-    converted: 999,
+    negotiation: 12,
+    proposal: 10,
+    qualified: 8,
     lost: 999,
+    won: 999,
   });
   
   // Card customization
@@ -579,7 +581,7 @@ export default function LeadsPipeline() {
                       <Separator />
                       <h4 className="font-medium">WIP Limits</h4>
                       <div className="space-y-2">
-                        {stages.slice(0, 4).map(stage => (
+                        {stages.slice(0, 5).map(stage => (
                           <div key={stage} className="flex items-center justify-between">
                             <Label className="text-xs">{statusConfig[stage].label}</Label>
                             <Input

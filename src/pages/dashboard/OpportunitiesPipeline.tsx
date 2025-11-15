@@ -47,17 +47,17 @@ const stageColors: Record<Stage, string> = {
 };
 
 const stageLabels: Record<Stage, string> = {
-  prospecting: 'Prospecting',
-  qualification: 'Qualification',
-  needs_analysis: 'Needs Analysis',
-  value_proposition: 'Value Proposition',
-  proposal: 'Proposal',
-  negotiation: 'Negotiation',
-  closed_won: 'Closed Won',
-  closed_lost: 'Closed Lost',
+  prospecting: '🆕 New Opportunity',
+  qualification: '💰 Quote Requested',
+  needs_analysis: '📋 Requirements Gathering',
+  proposal: '📄 Quote Submitted',
+  negotiation: '🤝 Negotiation',
+  value_proposition: '📝 Contract Review',
+  closed_won: '✅ Won',
+  closed_lost: '❌ Lost',
 };
 
-const stages: Stage[] = ['prospecting', 'qualification', 'needs_analysis', 'value_proposition', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
+const stages: Stage[] = ['prospecting', 'qualification', 'proposal', 'negotiation', 'value_proposition', 'needs_analysis', 'closed_won', 'closed_lost'];
 
 export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
