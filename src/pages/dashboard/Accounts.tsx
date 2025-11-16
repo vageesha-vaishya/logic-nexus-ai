@@ -10,7 +10,7 @@ import { useSort } from '@/hooks/useSort';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface Account {
@@ -26,7 +26,6 @@ interface Account {
 }
 
 export default function Accounts() {
-  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,12 +97,10 @@ export default function Accounts() {
           <p className="text-muted-foreground">Manage your company accounts</p>
         </div>
         <div className="flex items-center gap-2">
-          <ViewToggle
-            value={viewMode}
-            modes={['pipeline','card','grid','list']}
-            onChange={(v) => v === 'pipeline' ? navigate('/dashboard/accounts/pipeline') : setViewMode(v)}
-          />
-          {/* Removed standalone Pipeline View button; use ViewToggle with Pipeline first */}
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+          <Button asChild variant="outline">
+            <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
+          </Button>
           <Button asChild>
             <Link to="/dashboard/accounts/new">
               <Plus className="mr-2 h-4 w-4" />

@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import TenantConfigForm from './data-management/TenantConfigForm';
 import FranchiseConfigForm from './data-management/FranchiseConfigForm';
@@ -18,6 +18,9 @@ export default function DataManagement() {
   const [tenantId, setTenantId] = useState<string | undefined>(context?.tenantId || undefined);
   const [franchiseId, setFranchiseId] = useState<string | undefined>(context?.franchiseId || undefined);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<{ restored?: number; errors?: number; details?: any } | null>(null);
 
   useEffect(() => {
     const loadTenants = async () => {
@@ -75,6 +78,34 @@ export default function DataManagement() {
       toast.error('Failed to export database');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleImportData = async (file: File | null) => {
+    if (!file) {
+      toast.message('No file selected', { description: 'Choose a JSON export file first' });
+      return;
+    }
+    setIsImporting(true);
+    setImportResult(null);
+    try {
+      const text = await file.text();
+      let payload: any;
+      try {
+        payload = JSON.parse(text);
+      } catch (e: any) {
+        toast.error('Invalid file', { description: 'Expected JSON content' });
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke('import-data', { body: payload });
+      if (error) throw error;
+      setImportResult(data || null);
+      toast.success('Import completed');
+    } catch (e: any) {
+      console.error('Import failed:', e);
+      toast.error('Failed to import data');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -162,6 +193,28 @@ export default function DataManagement() {
                 <p className="text-sm text-muted-foreground mt-4">
                   This will export all tables including: tenants, franchises, profiles, leads, opportunities, quotes, shipments, and more.
                 </p>
+
+                <div className="mt-6 space-y-3">
+                  <div className="text-sm font-medium">Import to current database</div>
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                    <input type="file" accept="application/json" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                    <Button size="sm" variant="outline" onClick={() => handleImportData(importFile)} disabled={!importFile || isImporting}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Import Selected JSON
+                    </Button>
+                  </div>
+                  {isImporting && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importing...
+                    </div>
+                  )}
+                  {importResult && (
+                    <div className="text-xs text-muted-foreground">
+                      Restored: {Number(importResult.restored || 0)} • Errors: {Number(importResult.errors || 0)}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

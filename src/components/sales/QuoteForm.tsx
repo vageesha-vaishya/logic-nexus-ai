@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { CarrierQuotesSection } from './CarrierQuotesSection';
+import QuoteComposer from '@/components/sales/QuoteComposer';
 import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
@@ -99,6 +99,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   const [carrierQuotes, setCarrierQuotes] = useState<CarrierQuote[]>([]);
   const [existingRateIds, setExistingRateIds] = useState<string[]>([]);
+  const [composerVersionId, setComposerVersionId] = useState<string | null>(null);
   // Display-only hint; actual quote_number is generated in DB
   const [quoteNumberPreview, setQuoteNumberPreview] = useState<string>('Auto-generated on save');
   // Resolved labels for hidden contacts
@@ -2126,7 +2127,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             )}
           </CardHeader>
           <CardContent className="space-y-1">
-            <div className="ef-grid">
+            <div className="ef-grid hidden">
               {/* Compact top grid spacing */}
               <FormField
                 control={form.control}
@@ -2460,7 +2461,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 control={form.control}
                 name="origin_port_id"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="hidden">
                     <FormLabel>Origin Port/Location</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
@@ -2485,7 +2486,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 control={form.control}
                 name="destination_port_id"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="hidden">
                     <FormLabel>Destination Port/Location</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
@@ -2509,7 +2510,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 control={form.control}
                 name="carrier_id"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="hidden">
                     <FormLabel>Carrier</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
@@ -2543,45 +2544,65 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   onOpenChange={async (open) => {
                     try {
                       if (!open) return;
-                      if (!quoteId) return;
-                      // Only auto-hydrate on open if nothing is loaded yet
-                      if (carrierQuotes.length > 0) return;
-                      const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
-                      const mapped = (rows || []).map((r: any) => ({
-                        carrier_rate_id: String(r.id),
-                        carrier_id: String(r.carrier_id),
-                        mode: r.mode || selectedServiceType || undefined,
-                        buying_charges: (r.charges || []).map((c: any) => ({
-                          type: (() => {
-                            const ct = String(c.charge_type || '').toUpperCase();
-                            if (ct === 'AFT' || ct === 'OFT') return 'freight';
-                            if (ct === 'BAF') return 'fuel';
-                            if (ct === 'THC') return 'handling';
-                            if (ct === 'DOC') return 'documentation';
-                            if (ct === 'ISF' || ct === 'AMS' || ct === 'ISPS') return 'customs';
-                            return 'other';
-                          })(),
-                          amount: Number(c.amount || 0),
-                          currency: c.currency || 'USD',
-                          note: c.notes || undefined,
-                          basis: c.basis || undefined,
-                          quantity: c.quantity ?? 1,
-                        })),
-                        selling_charges: [],
-                      }));
-                      if (mapped.length > 0) {
+                      if (!quoteId) {
+                        toast.error('Save the quote before capturing rates');
+                        return;
+                      }
+                      const { data: existing } = await supabase
+                        .from('quotation_versions')
+                        .select('id, version_number')
+                        .eq('quote_id', quoteId)
+                        .order('version_number', { ascending: false })
+                        .limit(1);
+                      if (Array.isArray(existing) && existing.length && existing[0]?.id) {
+                        setComposerVersionId(String(existing[0].id));
+                      } else {
+                        const finalTenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
+                        if (!finalTenantId) {
+                          toast.error('Missing tenant context');
+                          return;
+                        }
+                        const { data: v } = await supabase
+                          .from('quotation_versions')
+                          .insert({ quote_id: quoteId, tenant_id: finalTenantId, version_number: 1 })
+                          .select('id')
+                          .single();
+                        if (v?.id) setComposerVersionId(String(v.id));
+                      }
+                      if (carrierQuotes.length === 0) {
+                        const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
+                        const mapped = (rows || []).map((r: any) => ({
+                          carrier_rate_id: String(r.id),
+                          carrier_id: String(r.carrier_id),
+                          mode: r.mode || selectedServiceType || undefined,
+                          buying_charges: (r.charges || []).map((c: any) => ({
+                            type: (() => {
+                              const ct = String(c.charge_type || '').toUpperCase();
+                              if (ct === 'AFT' || ct === 'OFT') return 'freight';
+                              if (ct === 'BAF') return 'fuel';
+                              if (ct === 'THC') return 'handling';
+                              if (ct === 'DOC') return 'documentation';
+                              if (ct === 'ISF' || ct === 'AMS' || ct === 'ISPS') return 'customs';
+                              return 'other';
+                            })(),
+                            amount: Number(c.amount || 0),
+                            currency: c.currency || 'USD',
+                            note: c.notes || undefined,
+                            basis: c.basis || undefined,
+                            quantity: c.quantity ?? 1,
+                          })),
+                          selling_charges: [],
+                        }));
                         if (debugHydration) {
                           try {
                             console.debug('[modal:rates] auto-hydrate on open', { quoteId, rows: (rows || []).length, mapped: mapped.length });
-                            console.debug('[modal:rates]', { quoteId, rows: (rows || []).length, mapped: mapped.length });
                           } catch {}
                         }
                         setCarrierQuotes(mapped);
                         setExistingRateIds((rows || []).map((r: any) => String(r.id)));
                       }
                     } catch (e: any) {
-                      // Non-blocking hydration failure; keep modal usable for manual reload
-                      console.warn('Auto-hydrate carrier rates on open failed', e);
+                      console.warn('Prepare composer & hydrate rates failed', e);
                     }
                   }}
                 >
@@ -2600,104 +2621,25 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       Capture Carrier Rates
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+                  <DialogContent className="sm:max-w-6xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Carrier Rates</DialogTitle>
+                      <DialogTitle>Quotation Composer</DialogTitle>
                     </DialogHeader>
-                    <CarrierQuotesSection
-                      carriers={carriers}
-                      selectedServiceType={selectedServiceType}
-                      carrierQuotes={carrierQuotes}
-                      setCarrierQuotes={setCarrierQuotes}
-                      onSave={async () => {
-                        try {
-                          // Prefer the quote/context tenant to ensure RLS visibility on reload
-                          const tenantId = context.tenantId || roles?.[0]?.tenant_id || resolvedTenantId;
-                          if (!tenantId) {
-                            toast.error('Missing tenant context');
-                            return;
-                          }
-                          if (!quoteId) {
-                            toast.error('Save the quote before saving carrier rates');
-                            return;
-                          }
-                          const values = form.getValues();
-                          const rateIds = await upsertRatesAndChargesForQuote(
-                            quoteId,
-                            String(tenantId),
-                            values.service_id || null,
-                            values.origin_port_id || null,
-                            values.destination_port_id || null,
-                            carrierQuotes.map((cq) => ({
-                              carrier_rate_id: cq.carrier_rate_id,
-                              carrier_id: cq.carrier_id,
-                              mode: cq.mode || selectedServiceType || undefined,
-                              buying_charges: cq.buying_charges || [],
-                              selling_charges: cq.selling_charges || [],
-                            })),
-                            existingRateIds,
-                            supabase as any,
-                          );
-                          // Persist returned IDs for subsequent updates; also attach to local items to avoid duplicates/deletes later
-                          const normalizedIds = rateIds.map((id) => String(id));
-                          setExistingRateIds(normalizedIds);
-                          setCarrierQuotes((prev) => {
-                            const next = [...prev];
-                            for (let i = 0; i < next.length && i < normalizedIds.length; i++) {
-                              // Only set if not already present
-                              if (!next[i].carrier_rate_id) {
-                                (next[i] as any).carrier_rate_id = normalizedIds[i];
-                              }
-                            }
-                            return next;
-                          });
-                          toast.success('Carrier rates saved');
-                        } catch (e: any) {
-                          toast.error(e.message || 'Failed to save carrier rates');
-                        }
-                      }}
-                      onReload={async () => {
-                        try {
-                          if (!quoteId) {
-                            toast.error('Quote not saved yet');
-                            return;
-                          }
-                          const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
-                          const mapped = (rows || []).map((r: any) => ({
-                            carrier_rate_id: String(r.id),
-                            carrier_id: String(r.carrier_id),
-                            mode: r.mode || selectedServiceType || undefined,
-                            buying_charges: (r.charges || []).map((c: any) => ({
-                              type: (() => {
-                                const ct = String(c.charge_type || '').toUpperCase();
-                                if (ct === 'AFT' || ct === 'OFT') return 'freight';
-                                if (ct === 'BAF') return 'fuel';
-                                if (ct === 'THC') return 'handling';
-                                if (ct === 'DOC') return 'documentation';
-                                if (ct === 'ISF' || ct === 'AMS' || ct === 'ISPS') return 'customs';
-                                return 'other';
-                              })(),
-                              amount: Number(c.amount || 0),
-                              currency: c.currency || 'USD',
-                              note: c.notes || undefined,
-                              basis: c.basis || undefined,
-                              quantity: c.quantity ?? 1,
-                            })),
-                            selling_charges: [],
-                          }));
-                          if (debugHydration) {
-                            try {
-                              console.debug('[reload:rates] rows', (rows || []).length, 'mapped', mapped.length);
-                            } catch {}
-                          }
-                          setCarrierQuotes(mapped);
-                          setExistingRateIds((rows || []).map((r: any) => String(r.id)));
-                          toast.success('Reloaded saved carrier rates');
-                        } catch (e: any) {
-                          toast.error(e.message || 'Failed to reload carrier rates');
-                        }
-                      }}
-                    />
+                    {quoteId && composerVersionId ? (
+                      <QuoteComposer quoteId={quoteId} versionId={composerVersionId} autoScroll />
+                    ) : (
+                      <div className="p-4 text-sm text-muted-foreground">Preparing composer...</div>
+                    )}
+                    <div className="hidden">
+                      <CarrierQuotesSection
+                        carriers={carriers}
+                        selectedServiceType={selectedServiceType}
+                        carrierQuotes={carrierQuotes}
+                        setCarrierQuotes={setCarrierQuotes}
+                        onSave={async () => {}}
+                        onReload={async () => {}}
+                      />
+                    </div>
                   </DialogContent>
                 </Dialog>
               </div>
