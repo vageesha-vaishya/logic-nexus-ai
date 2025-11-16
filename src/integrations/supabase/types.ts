@@ -4068,6 +4068,12 @@ export type Database = {
           origin_warehouse_id: string | null
           other_charges: number | null
           pickup_date: string | null
+          pod_documents: Json | null
+          pod_notes: string | null
+          pod_received_at: string | null
+          pod_received_by: string | null
+          pod_signature_url: string | null
+          pod_status: string | null
           priority_level: string | null
           purchase_order_number: string | null
           reference_number: string | null
@@ -4113,6 +4119,12 @@ export type Database = {
           origin_warehouse_id?: string | null
           other_charges?: number | null
           pickup_date?: string | null
+          pod_documents?: Json | null
+          pod_notes?: string | null
+          pod_received_at?: string | null
+          pod_received_by?: string | null
+          pod_signature_url?: string | null
+          pod_status?: string | null
           priority_level?: string | null
           purchase_order_number?: string | null
           reference_number?: string | null
@@ -4158,6 +4170,12 @@ export type Database = {
           origin_warehouse_id?: string | null
           other_charges?: number | null
           pickup_date?: string | null
+          pod_documents?: Json | null
+          pod_notes?: string | null
+          pod_received_at?: string | null
+          pod_received_by?: string | null
+          pod_signature_url?: string | null
+          pod_status?: string | null
           priority_level?: string | null
           purchase_order_number?: string | null
           reference_number?: string | null
