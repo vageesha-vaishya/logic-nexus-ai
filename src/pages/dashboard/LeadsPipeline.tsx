@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, UserPlus, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +36,7 @@ interface Lead {
   lead_score: number | null;
   created_at: string;
   owner_id: string | null;
+  franchise_id: string | null;
 }
 
 const statusConfig: Record<LeadStatus, { label: string; color: string }> = {
@@ -52,11 +54,13 @@ const stages: LeadStatus[] = ['new', 'contacted', 'negotiation', 'proposal', 'qu
 export default function LeadsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context } = useCRM();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [franchiseFilter, setFranchiseFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'none' | 'score' | 'value' | 'owner'>('none');
   const [users, setUsers] = useState<Array<{ id: string; email: string }>>([]);
@@ -107,15 +111,35 @@ export default function LeadsPipeline() {
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from("leads")
         .select("*")
         .order("created_at", { ascending: false });
 
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       // Normalize incoming lead records to our UI Lead type.
       // Some databases may use a 'converted' status; map it to 'won' for the UI.
-      const normalized = (data || []).map((l: any) => {
+      const normalized = (data || []).map((l: {
+        id: string;
+        first_name: string;
+        last_name: string;
+        company: string | null;
+        email: string | null;
+        phone: string | null;
+        status: DatabaseLeadStatus | 'converted';
+        estimated_value: number | null;
+        lead_score: number | null;
+        created_at: string;
+        owner_id: string | null;
+        franchise_id: string | null;
+      }) => {
         const status = l.status === 'converted' ? 'won' : l.status;
         return {
           id: l.id,
@@ -129,6 +153,7 @@ export default function LeadsPipeline() {
           lead_score: l.lead_score ?? null,
           created_at: l.created_at,
           owner_id: l.owner_id ?? null,
+          franchise_id: l.franchise_id ?? null,
         } as Lead;
       });
       setLeads(normalized);
@@ -147,10 +172,17 @@ export default function LeadsPipeline() {
   const fetchUsers = async () => {
     try {
       // Get unique owner_ids from leads first
-      const { data: leadsData, error: leadsError } = await supabase
+      let ownerQuery = supabase
         .from("leads")
         .select("owner_id")
         .not("owner_id", "is", null);
+
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) ownerQuery = ownerQuery.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) ownerQuery = ownerQuery.eq("tenant_id", context.tenantId as string);
+      }
+
+      const { data: leadsData, error: leadsError } = await ownerQuery;
 
       if (leadsError) throw leadsError;
       
@@ -245,6 +277,7 @@ export default function LeadsPipeline() {
       (scoreFilter === "low" && (lead.lead_score || 0) < 40);
 
     const matchesOwner = ownerFilter === "all" || lead.owner_id === ownerFilter;
+    const matchesFranchise = franchiseFilter === "all" || lead.franchise_id === franchiseFilter;
     
     // Value range filter
     const leadValue = lead.estimated_value || 0;
@@ -256,7 +289,7 @@ export default function LeadsPipeline() {
     const matchesDateFrom = !dateFrom || leadDate >= new Date(dateFrom);
     const matchesDateTo = !dateTo || leadDate <= new Date(dateTo);
 
-    return matchesSearch && matchesScore && matchesOwner && matchesMinValue && matchesMaxValue && matchesDateFrom && matchesDateTo;
+    return matchesSearch && matchesScore && matchesOwner && matchesFranchise && matchesMinValue && matchesMaxValue && matchesDateFrom && matchesDateTo;
   });
   
   const toggleLeadSelection = (leadId: string) => {
@@ -440,6 +473,15 @@ export default function LeadsPipeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStages]);
 
+  useEffect(() => {
+    const fr = searchParams.get('franchise');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    if (fr) setFranchiseFilter(fr);
+    if (from) setDateFrom(from);
+    if (to) setDateTo(to);
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -544,7 +586,7 @@ export default function LeadsPipeline() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
                   <SelectTrigger className="w-full md:w-[180px]">
                     <Layers className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Group By" />

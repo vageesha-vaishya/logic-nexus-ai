@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ interface Opportunity {
   created_at: string;
   account_id: string | null;
   owner_id: string | null;
+  franchise_id: string | null;
   accounts?: { name: string } | null;
   contacts?: { first_name: string; last_name: string } | null;
 }
@@ -63,6 +65,7 @@ const stages: Stage[] = ['prospecting', 'qualification', 'proposal', 'negotiatio
 export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,6 +74,9 @@ export default function OpportunitiesPipeline() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'none' | 'probability' | 'value' | 'account'>('none');
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  const [franchiseFilter, setFranchiseFilter] = useState<string>("all");
+  const [createdFrom, setCreatedFrom] = useState<string>("");
+  const [createdTo, setCreatedTo] = useState<string>("");
 
   // Advanced filters
   const [minAmount, setMinAmount] = useState<string>("");
@@ -119,7 +125,7 @@ export default function OpportunitiesPipeline() {
   const fetchOpportunities = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from("opportunities")
         .select(`
           *,
@@ -127,6 +133,13 @@ export default function OpportunitiesPipeline() {
           contacts:contact_id(first_name, last_name)
         `)
         .order("created_at", { ascending: false });
+
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setOpportunities((data || []) as Opportunity[]);
@@ -144,10 +157,16 @@ export default function OpportunitiesPipeline() {
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("accounts")
         .select("id, name")
-        .limit(100);
+        .limit(100)
+        .order("name");
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       setAccounts(data || []);
@@ -219,6 +238,8 @@ export default function OpportunitiesPipeline() {
 
     const matchesAccount = accountFilter === "all" || opportunity.account_id === accountFilter;
 
+    const matchesFranchise = franchiseFilter === "all" || opportunity.franchise_id === franchiseFilter;
+
     // Amount range filter
     const amount = opportunity.amount || 0;
     const matchesMinAmount = !minAmount || amount >= parseFloat(minAmount);
@@ -229,7 +250,11 @@ export default function OpportunitiesPipeline() {
     const matchesDateFrom = !dateFrom || (closeDate && closeDate >= new Date(dateFrom));
     const matchesDateTo = !dateTo || (closeDate && closeDate <= new Date(dateTo));
 
-    return matchesSearch && matchesProbability && matchesAccount && matchesMinAmount && matchesMaxAmount && matchesDateFrom && matchesDateTo;
+    const createdAt = new Date(opportunity.created_at);
+    const matchesCreatedFrom = !createdFrom || createdAt >= new Date(createdFrom);
+    const matchesCreatedTo = !createdTo || createdAt <= new Date(createdTo);
+
+    return matchesSearch && matchesProbability && matchesAccount && matchesFranchise && matchesMinAmount && matchesMaxAmount && matchesDateFrom && matchesDateTo && matchesCreatedFrom && matchesCreatedTo;
   });
 
   const toggleOpportunitySelection = (opportunityId: string) => {
@@ -412,6 +437,17 @@ export default function OpportunitiesPipeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStages]);
 
+  useEffect(() => {
+    const acc = searchParams.get('account');
+    const fr = searchParams.get('franchise');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    if (acc) setAccountFilter(acc);
+    if (fr) setFranchiseFilter(fr);
+    if (from) setCreatedFrom(from);
+    if (to) setCreatedTo(to);
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -517,7 +553,7 @@ export default function OpportunitiesPipeline() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                  <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
                     <SelectTrigger className="w-full md:w-[200px]">
                       <Layers className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Group By" />

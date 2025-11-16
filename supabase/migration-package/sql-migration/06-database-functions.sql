@@ -27,10 +27,7 @@ LANGUAGE SQL
 STABLE SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM user_roles
-    WHERE user_id = check_user_id AND role = 'platform_admin'
-  );
+  SELECT public.has_role(check_user_id, 'platform_admin'::public.app_role);
 $$;
 
 CREATE OR REPLACE FUNCTION has_role(check_user_id UUID, check_role app_role)

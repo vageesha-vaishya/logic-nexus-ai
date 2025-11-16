@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, AlertCircle, LayoutGrid } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ interface Account {
   phone: string | null;
   email: string | null;
   created_at: string;
+  franchise_id: string | null;
 }
 
 const stageLabels: Record<AccountStage, string> = {
@@ -59,12 +61,14 @@ const stages: AccountStage[] = ['new_account','kyc_pending','active','vip','paym
 export default function AccountsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context } = useCRM();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'none' | 'type'>('none');
+  const [franchiseFilter, setFranchiseFilter] = useState<string>('all');
 
   const [wipLimits, setWipLimits] = useState<Record<AccountStage, number>>({
     new_account: 50,
@@ -98,10 +102,17 @@ export default function AccountsPipeline() {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from("accounts")
         .select("*")
         .order("created_at", { ascending: false });
+
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setAccounts((data || []) as Account[]);
@@ -128,7 +139,8 @@ export default function AccountsPipeline() {
     const s = searchQuery.toLowerCase();
     const matchesSearch = !searchQuery || a.name.toLowerCase().includes(s) || (a.industry || '').toLowerCase().includes(s);
     const matchesType = typeFilter === 'all' || (a.account_type || '') === typeFilter;
-    return matchesSearch && matchesType;
+    const matchesFranchise = franchiseFilter === 'all' || a.franchise_id === franchiseFilter;
+    return matchesSearch && matchesType && matchesFranchise;
   });
 
   const grouped: Record<AccountStage, Account[]> = stages.reduce((acc, stage) => {
@@ -216,6 +228,11 @@ export default function AccountsPipeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStages]);
 
+  useEffect(() => {
+    const fr = searchParams.get('franchise');
+    if (fr) setFranchiseFilter(fr);
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -300,7 +317,7 @@ export default function AccountsPipeline() {
                     <SelectItem value="vendor">Vendor</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
                   <SelectTrigger className="w-full md:w-[200px]">
                     <Layers className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Group By" />

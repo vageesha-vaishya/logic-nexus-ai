@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +44,7 @@ interface Quote {
   created_at: string;
   account_id: string | null;
   opportunity_id: string | null;
+  franchise_id: string | null;
   accounts?: { name: string } | null;
   opportunities?: { name: string } | null;
 }
@@ -74,6 +76,7 @@ const stages: QuoteStatus[] = [
 export default function QuotesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context } = useCRM();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,6 +84,7 @@ export default function QuotesPipeline() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'none' | 'value' | 'margin' | 'account'>('none');
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  const [franchiseFilter, setFranchiseFilter] = useState<string>("all");
 
   // Advanced filters
   const [minValue, setMinValue] = useState<string>("");
@@ -131,7 +135,7 @@ export default function QuotesPipeline() {
   const fetchQuotes = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from("quotes")
         .select(`
           *,
@@ -139,6 +143,13 @@ export default function QuotesPipeline() {
           opportunities:opportunity_id(name)
         `)
         .order("created_at", { ascending: false });
+
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setQuotes((data || []) as Quote[]);
@@ -156,10 +167,16 @@ export default function QuotesPipeline() {
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("accounts")
         .select("id, name")
-        .limit(100);
+        .limit(100)
+        .order("name");
+      if (!context.isPlatformAdmin) {
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       setAccounts(data || []);
@@ -226,6 +243,8 @@ export default function QuotesPipeline() {
 
     const matchesAccount = accountFilter === "all" || quote.account_id === accountFilter;
 
+    const matchesFranchise = franchiseFilter === "all" || quote.franchise_id === franchiseFilter;
+
     // Value range filter
     const quoteValue = quote.sell_price || 0;
     const matchesMinValue = !minValue || quoteValue >= parseFloat(minValue);
@@ -240,7 +259,8 @@ export default function QuotesPipeline() {
     const matchesDateFrom = !dateFrom || quoteDate >= new Date(dateFrom);
     const matchesDateTo = !dateTo || quoteDate <= new Date(dateTo);
 
-    return matchesSearch && matchesAccount && matchesMinValue && matchesMaxValue && matchesMinMargin && matchesDateFrom && matchesDateTo;
+
+    return matchesSearch && matchesAccount && matchesFranchise && matchesMinValue && matchesMaxValue && matchesMinMargin && matchesDateFrom && matchesDateTo;
   });
 
   const toggleQuoteSelection = (quoteId: string) => {
@@ -423,6 +443,17 @@ export default function QuotesPipeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStages]);
 
+  useEffect(() => {
+    const acc = searchParams.get('account');
+    const fr = searchParams.get('franchise');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    if (acc) setAccountFilter(acc);
+    if (fr) setFranchiseFilter(fr);
+    if (from) setDateFrom(from);
+    if (to) setDateTo(to);
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -516,7 +547,7 @@ export default function QuotesPipeline() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                  <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
                     <SelectTrigger className="w-full md:w-[200px]">
                       <Layers className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Group By" />
