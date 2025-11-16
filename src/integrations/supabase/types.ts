@@ -5326,6 +5326,17 @@ export type Database = {
           table_type: string
         }[]
       }
+      get_platform_admins: {
+        Args: never
+        Returns: {
+          assigned_at: string
+          email: string
+          first_name: string
+          is_active: boolean
+          last_name: string
+          user_id: string
+        }[]
+      }
       get_rls_policies: {
         Args: never
         Returns: {
@@ -5394,6 +5405,7 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
+      is_current_user_platform_admin: { Args: never; Returns: boolean }
       is_platform_admin: { Args: { check_user_id: string }; Returns: boolean }
       preview_next_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
