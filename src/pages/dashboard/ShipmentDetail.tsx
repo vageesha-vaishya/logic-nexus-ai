@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,9 @@ export default function ShipmentDetail() {
   const [shipment, setShipment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [attachments, setAttachments] = useState<any[]>([]);
-  const { supabase } = useCRM();
+  const [podUploading, setPodUploading] = useState(false);
+  const { supabase, context } = useCRM();
+  const [podFile, setPodFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -60,6 +62,58 @@ export default function ShipmentDetail() {
       setAttachments(withUrls);
     } catch (error: any) {
       console.warn('Failed to load attachments', error);
+    }
+  };
+
+  const handleUploadPOD = async () => {
+    try {
+      if (!id || !podFile) {
+        toast.error('Select a POD file to upload');
+        return;
+      }
+      setPodUploading(true);
+      const safeName = podFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${id}/pod_${Date.now()}_${safeName}`;
+      const { error: uploadError } = await (supabase as any).storage
+        .from('shipments')
+        .upload(path, podFile, { contentType: podFile.type || 'application/octet-stream', upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = (supabase as any).storage
+        .from('shipments')
+        .getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl ?? null;
+
+      const { error: metaErr } = await (supabase as any)
+        .from('shipment_attachments')
+        .insert([{
+          shipment_id: id,
+          tenant_id: context?.tenantId,
+          franchise_id: context?.franchiseId,
+          created_by: context?.userId,
+          name: podFile.name,
+          path,
+          size: podFile.size,
+          content_type: podFile.type || null,
+          public_url: publicUrl,
+          document_type: 'proof_of_delivery',
+        }]);
+      if (metaErr) throw metaErr;
+
+      const { error: updErr } = await (supabase as any)
+        .from('shipments')
+        .update({ pod_received: true, pod_received_at: new Date().toISOString() })
+        .eq('id', id);
+      if (updErr) throw updErr;
+
+      toast.success('POD uploaded and marked as received');
+      setPodFile(null);
+      await Promise.all([fetchAttachments(), fetchShipment()]);
+    } catch (error: any) {
+      console.error('POD upload failed:', error);
+      toast.error('Failed to upload POD: ' + (error?.message || 'Unknown error'));
+    } finally {
+      setPodUploading(false);
     }
   };
 
@@ -115,6 +169,17 @@ export default function ShipmentDetail() {
             <Badge className={getStatusColor(shipment.status)}>
               {shipment.status.replace('_', ' ')}
             </Badge>
+            {shipment.pod_received ? (
+              <Badge className="bg-green-500/10 text-green-600 flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4" /> POD Received
+              </Badge>
+            ) : (
+              shipment.status === 'delivered' && (
+                <Badge className="bg-red-500/10 text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" /> POD Pending
+                </Badge>
+              )
+            )}
           </div>
           <Button>
             <Edit className="mr-2 h-4 w-4" />
@@ -237,11 +302,62 @@ export default function ShipmentDetail() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* POD upload control */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4 p-3 border rounded-md">
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Proof of Delivery</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={(e) => setPodFile(e.target.files?.[0] || null)}
+                />
+                <Button onClick={handleUploadPOD} disabled={podUploading || !podFile}>
+                  {podUploading ? 'Uploading…' : 'Upload POD'}
+                </Button>
+              </div>
+            </div>
+
             {attachments.length === 0 ? (
               <p className="text-sm text-muted-foreground">No attachments yet.</p>
             ) : (
               <ul className="space-y-2">
-                {attachments.map((att) => {
+                {/* Show POD attachments first */}
+                {attachments
+                  .filter((a) => a.document_type === 'proof_of_delivery')
+                  .map((att) => {
+                    const url = att.resolved_url;
+                    return (
+                      <li key={`pod-${att.id}`} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <div>
+                            <p className="font-medium leading-tight">POD: {att.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {att.content_type || 'file'} • {att.size ? `${Math.round(att.size / 1024)} KB` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        {url && (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-primary hover:underline"
+                          >
+                            <Download className="h-4 w-4" />
+                            View
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                {/* Other attachments */}
+                {attachments
+                  .filter((a) => a.document_type !== 'proof_of_delivery')
+                  .map((att) => {
                   const url = att.resolved_url;
                   return (
                     <li key={att.id} className="flex items-center justify-between">

@@ -7,7 +7,7 @@ import TitleStrip from '@/components/ui/title-strip';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
 import { useSort } from '@/hooks/useSort';
 import { Badge } from '@/components/ui/badge';
-import { Plus, TrendingUp, LayoutGrid } from 'lucide-react';
+import { Plus, TrendingUp } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
@@ -143,11 +143,12 @@ export default function Opportunities() {
             <p className="text-muted-foreground">Manage your sales pipeline</p>
           </div>
           <div className="flex gap-2 items-center">
-            <ViewToggle value={viewMode} onChange={setViewMode} />
-            <Button variant="outline" onClick={() => navigate('/dashboard/opportunities/pipeline')}>
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Pipeline View
-            </Button>
+            <ViewToggle
+              value={viewMode}
+              modes={['pipeline','card','grid','list']}
+              onChange={(v) => v === 'pipeline' ? navigate('/dashboard/opportunities/pipeline') : setViewMode(v)}
+            />
+            {/* Removed standalone Pipeline View button; use ViewToggle with Pipeline first */}
             <Button onClick={() => navigate('/dashboard/opportunities/new')}>
               <Plus className="mr-2 h-4 w-4" />
               New Opportunity

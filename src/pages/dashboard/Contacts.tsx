@@ -10,7 +10,7 @@ import { useSort } from '@/hooks/useSort';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface Contact {
@@ -26,6 +26,7 @@ interface Contact {
 }
 
 export default function Contacts() {
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,10 +78,12 @@ export default function Contacts() {
           <p className="text-muted-foreground">Manage your business contacts</p>
         </div>
         <div className="flex items-center gap-2">
-          <ViewToggle value={viewMode} onChange={setViewMode} />
-          <Button asChild variant="outline">
-            <Link to="/dashboard/contacts/pipeline">Pipeline View</Link>
-          </Button>
+          <ViewToggle
+            value={viewMode}
+            modes={['pipeline','card','grid','list']}
+            onChange={(v) => v === 'pipeline' ? navigate('/dashboard/contacts/pipeline') : setViewMode(v)}
+          />
+          {/* Removed standalone Pipeline View button; use ViewToggle with Pipeline first */}
           <Button asChild>
             <Link to="/dashboard/contacts/new">
               <Plus className="mr-2 h-4 w-4" />

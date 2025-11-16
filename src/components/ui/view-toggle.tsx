@@ -1,33 +1,45 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export type ViewMode = 'card' | 'grid' | 'list';
+export type ViewMode = 'pipeline' | 'card' | 'grid' | 'list';
 
 interface ViewToggleProps {
   value: ViewMode;
   onChange: (value: ViewMode) => void;
   className?: string;
+  modes?: ViewMode[];
 }
 
-export function ViewToggle({ value, onChange, className }: ViewToggleProps) {
-  const modes: { key: ViewMode; label: string }[] = [
-    { key: 'card', label: 'Card' },
-    { key: 'grid', label: 'Grid' },
-    { key: 'list', label: 'List' },
-  ];
+const labelFor = (mode: ViewMode): string => {
+  switch (mode) {
+    case 'pipeline':
+      return 'Pipeline';
+    case 'card':
+      return 'Card';
+    case 'grid':
+      return 'Grid';
+    case 'list':
+      return 'List';
+    default:
+      return String(mode);
+  }
+};
+
+export function ViewToggle({ value, onChange, className, modes }: ViewToggleProps) {
+  const available: ViewMode[] = modes ?? ['card', 'grid', 'list'];
 
   return (
     <div className={cn('inline-flex items-center gap-px rounded-md border', className)}>
-      {modes.map((m) => (
+      {available.map((key) => (
         <Button
-          key={m.key}
+          key={key}
           type="button"
-          variant={value === m.key ? 'default' : 'ghost'}
+          variant={value === key ? 'default' : 'ghost'}
           size="sm"
-          className={cn('rounded-none', value === m.key && 'pointer-events-none')}
-          onClick={() => onChange(m.key)}
+          className={cn('rounded-none', value === key && 'pointer-events-none')}
+          onClick={() => onChange(key)}
         >
-          {m.label}
+          {labelFor(key)}
         </Button>
       ))}
     </div>

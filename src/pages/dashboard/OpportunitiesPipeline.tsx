@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type Stage = 'prospecting' | 'qualification' | 'needs_analysis' | 'value_proposition' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
 
@@ -393,13 +394,44 @@ export default function OpportunitiesPipeline() {
 
   const activeOpportunity = activeId ? opportunities.find((o) => o.id === activeId) : null;
 
+  // Multi-stage selection with deep-linking via `stage` query param
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStagesParam = searchParams.get('stage');
+  const initialSelectedStages = (initialStagesParam ? initialStagesParam.split(',') : [])
+    .filter((s): s is Stage => (stages as string[]).includes(s));
+  const [selectedStages, setSelectedStages] = useState<Stage[]>(initialSelectedStages);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedStages.length > 0) {
+      next.set('stage', selectedStages.join(','));
+    } else {
+      next.delete('stage');
+    }
+    setSearchParams(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStages]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Opportunities Pipeline</h1>
-            <p className="text-muted-foreground">Manage opportunities through stages</p>
+            <p className="text-muted-foreground">
+              Manage opportunities through stages
+              {(() => {
+                const selectedTotal = selectedStages.length
+                  ? selectedStages.reduce((acc, s) => acc + (groupedOpportunities[s]?.length || 0), 0)
+                  : filteredOpportunities.length;
+                const fullTotal = filteredOpportunities.length;
+                return (
+                  <span className="ml-2 text-xs">
+                    {selectedStages.length > 0 ? `Selected: ${selectedTotal} of ${fullTotal}` : `Total: ${fullTotal}`}
+                  </span>
+                );
+              })()}
+            </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/opportunities")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -412,6 +444,42 @@ export default function OpportunitiesPipeline() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-4">
+                {(() => {
+                  const labelMap: Record<Stage, string> = Object.fromEntries(
+                    stages.map((s) => [s, stageLabels[s]])
+                  ) as Record<Stage, string>;
+                  const colorMap: Record<Stage, string> = Object.fromEntries(
+                    stages.map((s) => [s, stageColors[s]])
+                  ) as Record<Stage, string>;
+                  const baseCountMap: Record<Stage, number> = Object.fromEntries(
+                    stages.map((s) => [s, (groupedOpportunities[s]?.length || 0)])
+                  ) as Record<Stage, number>;
+                  const countMap: Record<Stage, number> = selectedStages.length > 0
+                    ? Object.fromEntries(stages.map((s) => [s, selectedStages.includes(s) ? baseCountMap[s] : 0])) as Record<Stage, number>
+                    : baseCountMap;
+                  const totalCount = selectedStages.length > 0
+                    ? selectedStages.reduce((acc, s) => acc + baseCountMap[s], 0)
+                    : filteredOpportunities.length;
+
+                  return (
+                    <KanbanFunnel
+                      stages={stages}
+                      labels={labelMap}
+                      colors={colorMap}
+                      counts={countMap}
+                      total={totalCount}
+                      activeStages={selectedStages}
+                      onStageClick={(s) => {
+                        setSelectedStages((prev) => {
+                          const exists = prev.includes(s);
+                          const nextSel = exists ? prev.filter((x) => x !== s) : [...prev, s];
+                          return nextSel.sort((a, b) => stages.indexOf(a) - stages.indexOf(b));
+                        });
+                      }}
+                      onClearStage={() => setSelectedStages([])}
+                    />
+                  );
+                })()}
                 {/* Main Filters */}
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 relative">
@@ -532,7 +600,7 @@ export default function OpportunitiesPipeline() {
                             <SelectValue placeholder="Change Stage" />
                           </SelectTrigger>
                           <SelectContent>
-                            {stages.map(stage => (
+{(selectedStages.length ? selectedStages : stages).map(stage => (
                               <SelectItem key={stage} value={stage}>
                                 {stageLabels[stage]}
                               </SelectItem>
@@ -624,7 +692,7 @@ export default function OpportunitiesPipeline() {
                       ]}
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-                        {stages.map((stage) => (
+{(selectedStages.length ? selectedStages : stages).map((stage) => (
                           <Droppable key={stage} id={stage}>
                             <Card className="h-full transition-all duration-200 hover:shadow-md">
                               <CardHeader className="pb-3">

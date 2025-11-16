@@ -17,7 +17,6 @@ import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { LayoutGrid } from 'lucide-react';
 
 export default function Quotes() {
   const navigate = useNavigate();
@@ -231,11 +230,12 @@ export default function Quotes() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <ViewToggle value={viewMode} onChange={setViewMode} />
-            <Button variant="outline" onClick={() => navigate('/dashboard/quotes/pipeline')}>
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Pipeline View
-            </Button>
+            <ViewToggle
+              value={viewMode}
+              modes={['pipeline','card','grid','list']}
+              onChange={(v) => v === 'pipeline' ? navigate('/dashboard/quotes/pipeline') : setViewMode(v)}
+            />
+            {/* Removed standalone Pipeline View button; use ViewToggle with Pipeline first */}
             <Button onClick={() => navigate('/dashboard/quotes/new')}>New Quote</Button>
           </div>
         </div>

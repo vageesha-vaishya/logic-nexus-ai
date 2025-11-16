@@ -26,7 +26,7 @@ const modules: AppModule[] = [
     name: "Leads",
     description: "Manage and track leads",
     icon: FileText,
-    path: "/dashboard/leads",
+    path: "/dashboard/leads/pipeline",
     color: "text-blue-500",
   },
   {
@@ -34,7 +34,7 @@ const modules: AppModule[] = [
     name: "Accounts",
     description: "Customer accounts",
     icon: Building2,
-    path: "/dashboard/accounts",
+    path: "/dashboard/accounts/pipeline",
     color: "text-purple-500",
   },
   {
@@ -42,7 +42,7 @@ const modules: AppModule[] = [
     name: "Contacts",
     description: "Contact management",
     icon: Users,
-    path: "/dashboard/contacts",
+    path: "/dashboard/contacts/pipeline",
     color: "text-green-500",
   },
   {
@@ -50,7 +50,7 @@ const modules: AppModule[] = [
     name: "Quotes",
     description: "Sales quotes",
     icon: Package,
-    path: "/dashboard/quotes",
+    path: "/dashboard/quotes/pipeline",
     color: "text-orange-500",
   },
   {
@@ -58,7 +58,7 @@ const modules: AppModule[] = [
     name: "Opportunities",
     description: "Sales pipeline",
     icon: TrendingUp,
-    path: "/dashboard/opportunities",
+    path: "/dashboard/opportunities/pipeline",
     color: "text-emerald-500",
   },
   {

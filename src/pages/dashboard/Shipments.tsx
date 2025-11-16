@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, Filter, LayoutGrid } from 'lucide-react';
+import { Plus, Search, Package, Filter } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -249,11 +249,12 @@ export default function Shipments() {
             </Pagination>
           </div>
           <div className="flex gap-2 items-center">
-            <ViewToggle value={viewMode} onChange={setViewMode} />
-            <Button variant="outline" onClick={() => navigate('/dashboard/shipments/pipeline')}>
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Pipeline View
-            </Button>
+            <ViewToggle
+              value={viewMode}
+              modes={['pipeline','card','grid','list']}
+              onChange={(v) => v === 'pipeline' ? navigate('/dashboard/shipments/pipeline') : setViewMode(v)}
+            />
+            {/* Removed standalone Pipeline View button; use ViewToggle with Pipeline first */}
             <Button asChild>
               <Link to="/dashboard/shipments/new">
                 <Plus className="mr-2 h-4 w-4" />

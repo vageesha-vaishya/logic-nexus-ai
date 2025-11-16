@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -16,6 +16,7 @@ import { SwimLane } from "@/components/kanban/SwimLane";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
 
@@ -59,6 +60,7 @@ const stages: ContactStage[] = ['new_contact','verified','key_decision_maker','a
 
 export default function ContactsPipeline() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -67,10 +69,25 @@ export default function ContactsPipeline() {
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<'none' | 'account'>('none');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const initialStagesParam = searchParams.get('stage');
+  const initialSelectedStages = (initialStagesParam ? initialStagesParam.split(',') : [])
+    .filter((s): s is ContactStage => (stages as string[]).includes(s));
+  const [selectedStages, setSelectedStages] = useState<ContactStage[]>(initialSelectedStages);
   const [wipLimits, setWipLimits] = useState<Record<ContactStage, number>>({
     new_contact: 999, verified: 999, key_decision_maker: 999, active: 999, inactive: 999, bounced_invalid: 999,
   });
   const [showFields, setShowFields] = useState({ email: true, phone: true, title: true });
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedStages.length > 0) {
+      next.set('stage', selectedStages.join(','));
+    } else {
+      next.delete('stage');
+    }
+    setSearchParams(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStages]);
 
   useEffect(() => {
     fetchData();
@@ -128,6 +145,26 @@ export default function ContactsPipeline() {
     return acc;
   }, {} as Record<ContactStage, Contact[]>);
 
+  // Maps for KanbanFunnel props
+  const labelMap: Record<ContactStage, string> = Object.fromEntries(
+    stages.map((s) => [s, stageLabels[s]])
+  ) as Record<ContactStage, string>;
+  const colorMap: Record<ContactStage, string> = Object.fromEntries(
+    stages.map((s) => [s, stageColors[s]])
+  ) as Record<ContactStage, string>;
+  const baseCountMap: Record<ContactStage, number> = Object.fromEntries(
+    stages.map((s) => [s, grouped[s].length])
+  ) as Record<ContactStage, number>;
+  const countMap: Record<ContactStage, number> = selectedStages.length > 0
+    ? Object.fromEntries(stages.map((s) => [s, selectedStages.includes(s) ? baseCountMap[s] : 0])) as Record<ContactStage, number>
+    : baseCountMap;
+
+  const totalCount = selectedStages.length > 0
+    ? selectedStages.reduce((acc, s) => acc + baseCountMap[s], 0)
+    : filtered.length;
+
+  const stagesToRender = selectedStages.length ? selectedStages : stages;
+
   const handleDragStart = (e: DragStartEvent) => setActiveId(e.active.id as string);
   const handleDragEnd = (e: DragEndEvent) => setActiveId(null);
 
@@ -159,6 +196,23 @@ export default function ContactsPipeline() {
             Back to List
           </Button>
         </div>
+
+                <KanbanFunnel
+                  stages={stages}
+                  labels={labelMap}
+                  colors={colorMap}
+                  counts={countMap}
+                  total={totalCount}
+                  activeStages={selectedStages}
+                  onStageClick={(s) => {
+                    setSelectedStages((prev) => {
+                      const exists = prev.includes(s);
+                      const next = exists ? prev.filter((x) => x !== s) : [...prev, s];
+                      return next.sort((a, b) => stages.indexOf(a) - stages.indexOf(b));
+                    });
+                  }}
+                  onClearStage={() => setSelectedStages([])}
+                />
 
         <Card>
           <CardContent className="pt-6">
@@ -207,7 +261,7 @@ export default function ContactsPipeline() {
                 return (
                   <SwimLane key={lane.id} id={lane.id} title={lane.title} count={lane.items.length}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                      {stages.map((stage) => (
+                      {stagesToRender.map((stage) => (
                         <Droppable key={stage} id={stage}>
                           <Card className="h-full transition-all duration-200 hover:shadow-md">
                             <CardHeader className="pb-3">

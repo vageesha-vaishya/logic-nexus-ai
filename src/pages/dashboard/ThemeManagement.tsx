@@ -293,7 +293,7 @@ export default function ThemeManagement() {
                   <div className="p-3 flex items-center justify-between">
                     <div className="font-medium truncate">{p.name}</div>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => {
+                      <Button size="sm" onClick={async () => {
                         const isDarkPreset = typeof p.dark === 'boolean' ? p.dark : dark;
                         applyTheme({
                           start: p.start,
@@ -313,7 +313,33 @@ export default function ThemeManagement() {
                           tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
                           tableBackground: (p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'),
                         });
-                        if (canWrite) setActive(p.name);
+                        // Persist preset as a scoped theme if not yet saved, then set as default for scope
+                        if (canWrite) {
+                          const exists = themes.some(t => t.name === p.name);
+                          if (!exists) {
+                            await saveTheme({
+                              name: p.name,
+                              start: p.start,
+                              end: p.end,
+                              primary: p.primary,
+                              accent: p.accent,
+                              angle: p.angle ?? angle,
+                              radius: p.radius ?? radius,
+                              sidebarBackground: p.sidebarBackground ?? sidebarBackground,
+                              sidebarAccent: p.sidebarAccent ?? sidebarAccent,
+                              dark: isDarkPreset,
+                              bgStart: (p as any).bgStart ?? p.start,
+                              bgEnd: (p as any).bgEnd ?? p.end,
+                              bgAngle: (p as any).bgAngle ?? p.angle ?? angle,
+                              tableHeaderText: (p as any).tableHeaderText ?? '0 0% 100%',
+                              tableHeaderSeparator: (p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
+                              tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
+                              tableBackground: (p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'),
+                              tableForeground: (p as any).tableForeground ?? (isDarkPreset ? '210 40% 98%' : '222.2 84% 4.9%'),
+                            });
+                          }
+                          setActive(p.name);
+                        }
                       }}>Apply</Button>
                       <Button size="sm" variant="secondary" onClick={() => {
                         setName(`${p.name} Copy`);

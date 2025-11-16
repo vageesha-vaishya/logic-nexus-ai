@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
 import { Draggable } from "@/components/kanban/Draggable";
 import { SwimLane } from "@/components/kanban/SwimLane";
+import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type CustomsStage =
   | 'documents_pending'
@@ -26,9 +27,8 @@ type CustomsStage =
 
 interface Shipment {
   id: string;
-  job_number: string;
-  customer_name: string | null;
-  service_type: string | null;
+  shipment_number: string;
+  service_type?: string | null;
   origin: string | null;
   destination: string | null;
   customs_required: boolean | null;
@@ -91,6 +91,22 @@ export default function CustomsClearancePipeline() {
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<'none' | 'service_type'>('none');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStagesParam = searchParams.get('stage');
+  const initialSelectedStages = (initialStagesParam ? initialStagesParam.split(',') : [])
+    .filter((s): s is CustomsStage => (stages as string[]).includes(s));
+  const [selectedStages, setSelectedStages] = useState<CustomsStage[]>(initialSelectedStages);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedStages.length > 0) {
+      next.set('stage', selectedStages.join(','));
+    } else {
+      next.delete('stage');
+    }
+    setSearchParams(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStages]);
 
   useEffect(() => {
     fetchData();
@@ -101,8 +117,8 @@ export default function CustomsClearancePipeline() {
       setLoading(true);
       const { data: s, error: se } = await supabase
         .from('shipments')
-        .select('id, job_number, customer_name, service_type, origin, destination, customs_required')
-        .order('job_number', { ascending: false })
+        .select('id, shipment_number, origin, destination, customs_required')
+        .order('shipment_number', { ascending: false })
         .limit(500);
       if (se) throw se;
       setShipments((s || []) as Shipment[]);
@@ -163,7 +179,7 @@ export default function CustomsClearancePipeline() {
 
   const filtered = shipments.filter((s) => {
     const q = searchQuery.toLowerCase();
-    const str = `${s.job_number} ${s.customer_name || ''} ${s.origin || ''} ${s.destination || ''}`.toLowerCase();
+    const str = `${s.shipment_number} ${s.origin || ''} ${s.destination || ''}`.toLowerCase();
     return !searchQuery || str.includes(q);
   });
 
@@ -171,6 +187,24 @@ export default function CustomsClearancePipeline() {
     acc[stage] = filtered.filter((s) => computeStage(s) === stage);
     return acc;
   }, {} as Record<CustomsStage, Shipment[]>);
+
+  // Maps for KanbanFunnel props
+  const labelMap: Record<CustomsStage, string> = Object.fromEntries(
+    stages.map((s) => [s, stageLabels[s]])
+  ) as Record<CustomsStage, string>;
+  const colorMap: Record<CustomsStage, string> = Object.fromEntries(
+    stages.map((s) => [s, stageColors[s]])
+  ) as Record<CustomsStage, string>;
+  const baseCountMap: Record<CustomsStage, number> = Object.fromEntries(
+    stages.map((s) => [s, grouped[s].length])
+  ) as Record<CustomsStage, number>;
+  const countMap: Record<CustomsStage, number> = selectedStages.length > 0
+    ? Object.fromEntries(stages.map((s) => [s, selectedStages.includes(s) ? baseCountMap[s] : 0])) as Record<CustomsStage, number>
+    : baseCountMap;
+  const stagesToRender = selectedStages.length ? selectedStages : stages;
+  const totalCount = selectedStages.length > 0
+    ? selectedStages.reduce((acc, s) => acc + baseCountMap[s], 0)
+    : filtered.length;
 
   const getSwimLanes = () => {
     if (groupBy === 'none') return [{ id: 'all', title: 'All Shipments', items: filtered }];
@@ -198,6 +232,23 @@ export default function CustomsClearancePipeline() {
             Back to Shipments
           </Button>
         </div>
+
+        <KanbanFunnel
+          stages={stages}
+          labels={labelMap}
+          colors={colorMap}
+          counts={countMap}
+          total={totalCount}
+          activeStages={selectedStages}
+          onStageClick={(s) => {
+            setSelectedStages((prev) => {
+              const exists = prev.includes(s);
+              const next = exists ? prev.filter((x) => x !== s) : [...prev, s];
+              return next.sort((a, b) => stages.indexOf(a) - stages.indexOf(b));
+            });
+          }}
+          onClearStage={() => setSelectedStages([])}
+        />
 
         <Card>
           <CardContent className="pt-6">
@@ -236,7 +287,7 @@ export default function CustomsClearancePipeline() {
                 return (
                   <SwimLane key={lane.id} id={lane.id} title={lane.title} count={lane.items.length}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8 gap-4">
-                      {stages.map((stage) => (
+                      {stagesToRender.map((stage) => (
                         <Droppable key={stage} id={stage}>
                           <Card className="h-full transition-all duration-200 hover:shadow-md">
                             <CardHeader className="pb-3">
@@ -250,9 +301,9 @@ export default function CustomsClearancePipeline() {
                                 <Draggable key={s.id} id={s.id}>
                                   <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in" onClick={() => navigate(`/dashboard/shipments/${s.id}`)}>
                                     <CardContent className="p-3 space-y-2">
-                                      <div className="font-medium text-sm">{s.job_number}</div>
+                                      <div className="font-medium text-sm">{s.shipment_number}</div>
                                       <div className="text-xs text-muted-foreground">{s.origin || ''} → {s.destination || ''}</div>
-                                      {s.customer_name && (<div className="text-xs text-muted-foreground">{s.customer_name}</div>)}
+                                      {/* Customer name removed: not present in shipments schema */}
                                     </CardContent>
                                   </Card>
                                 </Draggable>

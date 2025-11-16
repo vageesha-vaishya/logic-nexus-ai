@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, UserPlus, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type LeadStatus = 'new' | 'contacted' | 'negotiation' | 'proposal' | 'qualified' | 'lost' | 'won';
 type DatabaseLeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -112,7 +113,25 @@ export default function LeadsPipeline() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setLeads(data || []);
+      // Normalize incoming lead records to our UI Lead type.
+      // Some databases may use a 'converted' status; map it to 'won' for the UI.
+      const normalized = (data || []).map((l: any) => {
+        const status = l.status === 'converted' ? 'won' : l.status;
+        return {
+          id: l.id,
+          first_name: l.first_name,
+          last_name: l.last_name,
+          company: l.company ?? null,
+          email: l.email ?? null,
+          phone: l.phone ?? null,
+          status: status as DatabaseLeadStatus,
+          estimated_value: l.estimated_value ?? null,
+          lead_score: l.lead_score ?? null,
+          created_at: l.created_at,
+          owner_id: l.owner_id ?? null,
+        } as Lead;
+      });
+      setLeads(normalized);
     } catch (error) {
       console.error("Error fetching leads:", error);
       toast({
@@ -403,20 +422,87 @@ export default function LeadsPipeline() {
 
   const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
 
+  // Multi-stage selection with deep-linking via `stage` query param
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStagesParam = searchParams.get('stage');
+  const initialSelectedStages = (initialStagesParam ? initialStagesParam.split(',') : [])
+    .filter((s): s is LeadStatus => (stages as string[]).includes(s));
+  const [selectedStages, setSelectedStages] = useState<LeadStatus[]>(initialSelectedStages);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedStages.length > 0) {
+      next.set('stage', selectedStages.join(','));
+    } else {
+      next.delete('stage');
+    }
+    setSearchParams(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStages]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Leads Pipeline</h1>
-            <p className="text-muted-foreground">Manage leads through stages</p>
+            <p className="text-muted-foreground">
+              Manage leads through stages
+              {(() => {
+                const selectedTotal = selectedStages.length
+                  ? selectedStages.reduce((acc, s) => acc + (groupedLeads[s]?.length || 0), 0)
+                  : filteredLeads.length;
+                const fullTotal = filteredLeads.length;
+                return (
+                  <span className="ml-2 text-xs">
+                    {selectedStages.length > 0 ? `Selected: ${selectedTotal} of ${fullTotal}` : `Total: ${fullTotal}`}
+                  </span>
+                );
+              })()}
+            </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/leads")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to List
           </Button>
         </div>
-      <div className="space-y-4">
+              <div className="space-y-4">
+                {(() => {
+                  const labelMap: Record<LeadStatus, string> = Object.fromEntries(
+                    stages.map((s) => [s, statusConfig[s].label])
+                  ) as Record<LeadStatus, string>;
+                  const colorMap: Record<LeadStatus, string> = Object.fromEntries(
+                    stages.map((s) => [s, statusConfig[s].color])
+                  ) as Record<LeadStatus, string>;
+                  const baseCountMap: Record<LeadStatus, number> = Object.fromEntries(
+                    stages.map((s) => [s, (groupedLeads[s]?.length || 0)])
+                  ) as Record<LeadStatus, number>;
+                  const countMap: Record<LeadStatus, number> = selectedStages.length > 0
+                    ? Object.fromEntries(stages.map((s) => [s, selectedStages.includes(s) ? baseCountMap[s] : 0])) as Record<LeadStatus, number>
+                    : baseCountMap;
+                  const totalCount = selectedStages.length > 0
+                    ? selectedStages.reduce((acc, s) => acc + baseCountMap[s], 0)
+                    : filteredLeads.length;
+
+                  return (
+                    <KanbanFunnel
+                      stages={stages}
+                      labels={labelMap}
+                      colors={colorMap}
+                      counts={countMap}
+                      total={totalCount}
+                      activeStages={selectedStages}
+                      onStageClick={(s) => {
+                        setSelectedStages((prev) => {
+                          const exists = prev.includes(s);
+                          const nextSel = exists ? prev.filter((x) => x !== s) : [...prev, s];
+                          return nextSel.sort((a, b) => stages.indexOf(a) - stages.indexOf(b));
+                        });
+                      }}
+                      onClearStage={() => setSelectedStages([])}
+                    />
+                  );
+                })()}
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
@@ -541,7 +627,7 @@ export default function LeadsPipeline() {
                           <SelectValue placeholder="Change Status" />
                         </SelectTrigger>
                         <SelectContent>
-                          {stages.map(stage => (
+{(selectedStages.length ? selectedStages : stages).map(stage => (
                             <SelectItem key={stage} value={stage}>
                               {statusConfig[stage].label}
                             </SelectItem>
@@ -633,7 +719,7 @@ export default function LeadsPipeline() {
                     ]}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                      {stages.map((stage) => (
+{(selectedStages.length ? selectedStages : stages).map((stage) => (
                         <Droppable key={stage} id={stage}>
                           <Card className="h-full transition-all duration-200 hover:shadow-md">
                             <CardHeader className="pb-3">

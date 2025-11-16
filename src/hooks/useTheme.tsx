@@ -152,8 +152,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const found = parsed.find(t => t.name === active);
         if (found) applyTheme(found);
       } else {
-        // Apply Original Logistics theme by default when no active theme is set
-        const preset = THEME_PRESETS.find(p => p.name === 'Original Logistics');
+        // Apply Default Simple theme by default when no active theme is set
+        const preset = THEME_PRESETS.find(p => p.name === 'Default Simple');
         if (preset) {
           applyTheme({
             start: preset.start,

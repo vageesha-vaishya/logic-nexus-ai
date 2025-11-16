@@ -1,9 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-// Ambient module declaration to satisfy local TypeScript diagnostics
-declare module "https://esm.sh/@supabase/supabase-js@2.58.0" {
-  export function createClient(...args: any[]): any;
-}
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,8 +12,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const projectUrl = Deno.env.get('PROJECT_URL') ?? Deno.env.get('SUPABASE_URL') ?? Deno.env.get('VITE_SUPABASE_URL') ?? '';
-    const serviceKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    // Use logical OR to treat empty strings as missing and fall back correctly
+    const projectUrl = Deno.env.get('PROJECT_URL') || Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL') || '';
+    const serviceKey = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     const supabaseAdmin = createClient(
       projectUrl,
       serviceKey,

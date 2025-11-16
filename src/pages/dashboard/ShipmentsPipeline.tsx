@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Package, MapPin, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Search, Filter, Package, MapPin, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type ShipmentStatus = 'draft' | 'confirmed' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'customs' | 'cancelled' | 'on_hold' | 'returned';
 
@@ -36,6 +37,8 @@ interface Shipment {
   current_location: any;
   priority_level: string | null;
   created_at: string;
+  pod_received?: boolean;
+  pod_received_at?: string | null;
 }
 
 interface Carrier {
@@ -55,7 +58,7 @@ const statusConfig: Record<ShipmentStatus, { label: string; color: string }> = {
   returned: { label: "Returned", color: "bg-pink-500/10 text-pink-700 dark:text-pink-300" },
 };
 
-const stages: ShipmentStatus[] = ['draft', 'confirmed', 'in_transit', 'out_for_delivery', 'delivered', 'customs', 'cancelled', 'on_hold'];
+const stages: ShipmentStatus[] = ['draft', 'confirmed', 'in_transit', 'out_for_delivery', 'delivered', 'customs', 'cancelled', 'on_hold', 'returned'];
 
 export default function ShipmentsPipeline() {
   const navigate = useNavigate();
@@ -70,6 +73,8 @@ export default function ShipmentsPipeline() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'none' | 'priority' | 'carrier'>('none');
+  const [selectedStages, setSelectedStages] = useState<ShipmentStatus[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Advanced filters
   const [minCharges, setMinCharges] = useState<string>("");
@@ -115,6 +120,28 @@ export default function ShipmentsPipeline() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Initialize selected stages from URL
+  useEffect(() => {
+    const stagesParam = searchParams.get('stages');
+    if (stagesParam) {
+      const values = stagesParam
+        .split(',')
+        .map(s => s.trim())
+        .filter((s): s is ShipmentStatus => (stages as string[]).includes(s));
+      setSelectedStages(values);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist selected stages to URL
+  useEffect(() => {
+    if (selectedStages.length > 0) {
+      setSearchParams({ stages: selectedStages.join(',') }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  }, [selectedStages, setSearchParams]);
 
   const fetchData = async () => {
     try {
@@ -306,10 +333,75 @@ export default function ShipmentsPipeline() {
     }
   };
 
+  const handleBulkMarkPodReceived = async () => {
+    if (selectedShipments.size === 0) return;
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("shipments")
+        .update({ pod_received: true, pod_received_at: now } as any)
+        .in("id", Array.from(selectedShipments));
+      if (error) throw error;
+      setShipments(prev => prev.map(s =>
+        selectedShipments.has(s.id) ? { ...s, pod_received: true, pod_received_at: now } : s
+      ));
+      setSelectedShipments(new Set());
+      toast({ title: "Success", description: "Marked POD received for selected shipments" });
+    } catch (error) {
+      console.error("Error marking POD received:", error);
+      toast({ title: "Error", description: "Failed to mark POD received", variant: "destructive" });
+    }
+  };
+
+  const handleMarkPodReceived = async (shipmentId: string) => {
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("shipments")
+        .update({ pod_received: true, pod_received_at: now } as any)
+        .eq("id", shipmentId);
+      if (error) throw error;
+      setShipments(prev => prev.map(s => s.id === shipmentId ? { ...s, pod_received: true, pod_received_at: now } : s));
+      toast({ title: "Success", description: "POD marked received" });
+    } catch (error) {
+      console.error("Error marking POD received:", error);
+      toast({ title: "Error", description: "Failed to mark POD received", variant: "destructive" });
+    }
+  };
+
   const groupedShipments = stages.reduce((acc, stage) => {
     acc[stage] = filteredShipments.filter((shipment) => shipment.status === stage);
     return acc;
   }, {} as Record<ShipmentStatus, Shipment[]>);
+
+  // Maps for KanbanFunnel props
+  const labelMap: Record<ShipmentStatus, string> = Object.fromEntries(
+    stages.map((s) => [s, statusConfig[s].label])
+  ) as Record<ShipmentStatus, string>;
+  const colorMap: Record<ShipmentStatus, string> = Object.fromEntries(
+    stages.map((s) => [s, statusConfig[s].color])
+  ) as Record<ShipmentStatus, string>;
+  const countMap: Record<ShipmentStatus, number> = Object.fromEntries(
+    stages.map((s) => [
+      s,
+      selectedStages.length > 0
+        ? (selectedStages.includes(s) ? groupedShipments[s].length : 0)
+        : groupedShipments[s].length,
+    ])
+  ) as Record<ShipmentStatus, number>;
+
+  // Per-stage sorting configuration
+  const [stageSort, setStageSort] = useState<Record<ShipmentStatus, 'default' | 'created_at' | 'pickup_date' | 'charges'>>({
+    draft: 'default',
+    confirmed: 'default',
+    in_transit: 'default',
+    out_for_delivery: 'default',
+    delivered: 'default',
+    customs: 'default',
+    cancelled: 'default',
+    on_hold: 'default',
+    returned: 'default',
+  });
 
   // Group shipments by swim lane
   const getSwimLanes = () => {
@@ -393,6 +485,17 @@ export default function ShipmentsPipeline() {
             Back to List
           </Button>
         </div>
+
+        <KanbanFunnel
+          stages={stages}
+          labels={labelMap}
+          colors={colorMap}
+          counts={countMap}
+          total={filteredShipments.length}
+          activeStages={selectedStages}
+          onStageClick={(s) => setSelectedStages(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+          onClearStage={() => setSelectedStages([])}
+        />
 
         {/* Filters */}
         <Card>
@@ -516,6 +619,14 @@ export default function ShipmentsPipeline() {
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBulkMarkPodReceived}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Mark POD Received
+                      </Button>
                       <Select onValueChange={handleBulkStatusChange}>
                         <SelectTrigger className="w-[180px] h-9">
                           <SelectValue placeholder="Change Status" />
@@ -611,7 +722,7 @@ export default function ShipmentsPipeline() {
                     ]}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-                      {stages.map((stage) => (
+                      {(selectedStages.length > 0 ? selectedStages : stages).map((stage) => (
                         <Droppable key={stage} id={stage}>
                           <Card className="h-full transition-all duration-200 hover:shadow-md">
                             <CardHeader className="pb-3">
@@ -624,6 +735,17 @@ export default function ShipmentsPipeline() {
                                   >
                                     {laneGroupedShipments[stage].length}
                                   </Badge>
+                                  <Select value={stageSort[stage]} onValueChange={(v) => setStageSort(prev => ({ ...prev, [stage]: v as any }))}>
+                                    <SelectTrigger className="h-7 w-[120px] text-xs">
+                                      <SelectValue placeholder="Sort" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="default">Default</SelectItem>
+                                      <SelectItem value="created_at">Newest</SelectItem>
+                                      <SelectItem value="pickup_date">Pickup Date</SelectItem>
+                                      <SelectItem value="charges">Charges</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                   {wipLimits[stage] < 999 && laneGroupedShipments[stage].length >= wipLimits[stage] && (
                                     <AlertCircle className="h-4 w-4 text-destructive" />
                                   )}
@@ -641,7 +763,32 @@ export default function ShipmentsPipeline() {
                               )}
                             </CardHeader>
                             <CardContent className="space-y-2 min-h-[200px]">
-                              {laneGroupedShipments[stage].map((shipment) => (
+                              {(() => {
+                                const stageShipments = [...laneGroupedShipments[stage]];
+                                const mode = stageSort[stage];
+                                stageShipments.sort((a, b) => {
+                                  switch (mode) {
+                                    case 'pickup_date': {
+                                      const ad = new Date(a.pickup_date || a.created_at).getTime();
+                                      const bd = new Date(b.pickup_date || b.created_at).getTime();
+                                      return ad - bd;
+                                    }
+                                    case 'charges': {
+                                      const ac = a.total_charges || 0;
+                                      const bc = b.total_charges || 0;
+                                      return bc - ac; // high to low
+                                    }
+                                    case 'created_at': {
+                                      const ac = new Date(a.created_at).getTime();
+                                      const bc = new Date(b.created_at).getTime();
+                                      return bc - ac; // newest first
+                                    }
+                                    default:
+                                      return 0;
+                                  }
+                                });
+                                return stageShipments;
+                              })().map((shipment) => (
                                 <Draggable key={shipment.id} id={shipment.id}>
                                   <Card
                                     className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in relative"
@@ -666,20 +813,25 @@ export default function ShipmentsPipeline() {
                                       )}
                                       <div className="flex items-start justify-between">
                                         <div className="font-medium text-sm">{shipment.shipment_number}</div>
-                                        {shipment.priority_level && (
-                                          <Badge
-                                            variant="outline"
-                                            className={`transition-all duration-200 ${
-                                              shipment.priority_level === "high"
-                                                ? "bg-red-500/10 hover:bg-red-500/20"
-                                                : shipment.priority_level === "medium"
-                                                ? "bg-yellow-500/10 hover:bg-yellow-500/20"
-                                                : "bg-blue-500/10 hover:bg-blue-500/20"
-                                            }`}
-                                          >
-                                            {shipment.priority_level}
-                                          </Badge>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                          {!shipment.pod_received && shipment.status === 'delivered' && (
+                                            <Badge className="bg-red-500/10 text-red-600">POD Pending</Badge>
+                                          )}
+                                          {shipment.priority_level && (
+                                            <Badge
+                                              variant="outline"
+                                              className={`transition-all duration-200 ${
+                                                shipment.priority_level === "high"
+                                                  ? "bg-red-500/10 hover:bg-red-500/20"
+                                                  : shipment.priority_level === "medium"
+                                                  ? "bg-yellow-500/10 hover:bg-yellow-500/20"
+                                                  : "bg-blue-500/10 hover:bg-blue-500/20"
+                                              }`}
+                                            >
+                                              {shipment.priority_level}
+                                            </Badge>
+                                          )}
+                                        </div>
                                       </div>
                                       {showFields.origin && (
                                         <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -717,6 +869,18 @@ export default function ShipmentsPipeline() {
                                       {shipment.total_charges && (
                                         <div className="text-xs font-semibold text-primary">
                                           {formatCurrency(shipment.total_charges, shipment.currency)}
+                                        </div>
+                                      )}
+                                      {!shipment.pod_received && shipment.status === 'delivered' && (
+                                        <div className="flex items-center justify-end">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={(e) => { e.stopPropagation(); handleMarkPodReceived(shipment.id); }}
+                                          >
+                                            <CheckCircle2 className="h-4 w-4 mr-1" /> Mark POD Received
+                                          </Button>
                                         </div>
                                       )}
                                     </CardContent>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type QuoteStatus =
   | 'draft'
@@ -404,13 +405,44 @@ export default function QuotesPipeline() {
 
   const activeQuote = activeId ? quotes.find((q) => q.id === activeId) : null;
 
+  // Multi-stage selection with deep-linking via `stage` query param
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStagesParam = searchParams.get('stage');
+  const initialSelectedStages = (initialStagesParam ? initialStagesParam.split(',') : [])
+    .filter((s): s is QuoteStatus => (stages as string[]).includes(s));
+  const [selectedStages, setSelectedStages] = useState<QuoteStatus[]>(initialSelectedStages);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedStages.length > 0) {
+      next.set('stage', selectedStages.join(','));
+    } else {
+      next.delete('stage');
+    }
+    setSearchParams(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStages]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Quotes Pipeline</h1>
-            <p className="text-muted-foreground">Manage quotes through stages</p>
+            <p className="text-muted-foreground">
+              Manage quotes through stages
+              {(() => {
+                const selectedTotal = selectedStages.length
+                  ? selectedStages.reduce((acc, s) => acc + (groupedQuotes[s]?.length || 0), 0)
+                  : filteredQuotes.length;
+                const fullTotal = filteredQuotes.length;
+                return (
+                  <span className="ml-2 text-xs">
+                    {selectedStages.length > 0 ? `Selected: ${selectedTotal} of ${fullTotal}` : `Total: ${fullTotal}`}
+                  </span>
+                );
+              })()}
+            </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/quotes")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -423,6 +455,42 @@ export default function QuotesPipeline() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-4">
+                {(() => {
+                  const labelMap: Record<QuoteStatus, string> = Object.fromEntries(
+                    stages.map((s) => [s, statusConfig[s].label])
+                  ) as Record<QuoteStatus, string>;
+                  const colorMap: Record<QuoteStatus, string> = Object.fromEntries(
+                    stages.map((s) => [s, statusConfig[s].color])
+                  ) as Record<QuoteStatus, string>;
+                  const baseCountMap: Record<QuoteStatus, number> = Object.fromEntries(
+                    stages.map((s) => [s, (groupedQuotes[s]?.length || 0)])
+                  ) as Record<QuoteStatus, number>;
+                  const countMap: Record<QuoteStatus, number> = selectedStages.length > 0
+                    ? Object.fromEntries(stages.map((s) => [s, selectedStages.includes(s) ? baseCountMap[s] : 0])) as Record<QuoteStatus, number>
+                    : baseCountMap;
+                  const totalCount = selectedStages.length > 0
+                    ? selectedStages.reduce((acc, s) => acc + baseCountMap[s], 0)
+                    : filteredQuotes.length;
+
+                  return (
+                    <KanbanFunnel
+                      stages={stages}
+                      labels={labelMap}
+                      colors={colorMap}
+                      counts={countMap}
+                      total={totalCount}
+                      activeStages={selectedStages}
+                      onStageClick={(s) => {
+                        setSelectedStages((prev) => {
+                          const exists = prev.includes(s);
+                          const nextSel = exists ? prev.filter((x) => x !== s) : [...prev, s];
+                          return nextSel.sort((a, b) => stages.indexOf(a) - stages.indexOf(b));
+                        });
+                      }}
+                      onClearStage={() => setSelectedStages([])}
+                    />
+                  );
+                })()}
                 {/* Main Filters */}
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 relative">
@@ -532,7 +600,7 @@ export default function QuotesPipeline() {
                             <SelectValue placeholder="Change Status" />
                           </SelectTrigger>
                           <SelectContent>
-                            {stages.map(stage => (
+{(selectedStages.length ? selectedStages : stages).map(stage => (
                               <SelectItem key={stage} value={stage}>
                                 {statusConfig[stage].label}
                               </SelectItem>
@@ -622,7 +690,7 @@ export default function QuotesPipeline() {
                       ]}
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        {stages.map((stage) => (
+{(selectedStages.length ? selectedStages : stages).map((stage) => (
                           <Droppable key={stage} id={stage}>
                             <Card className="h-full transition-all duration-200 hover:shadow-md">
                               <CardHeader className="pb-3">

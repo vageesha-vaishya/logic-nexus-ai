@@ -16,6 +16,21 @@ export type ThemePreset = {
 };
 
 export const THEME_PRESETS: ThemePreset[] = [
+  {
+    name: 'Default Simple',
+    start: '220 80% 98%',
+    end: '220 70% 94%',
+    primary: '220 90% 55%',
+    accent: '200 70% 50%',
+    angle: 120,
+    radius: '0.5rem',
+    sidebarBackground: '0 0% 100%',
+    sidebarAccent: '220 15% 95%',
+    dark: false,
+    bgStart: '0 0% 100%',
+    bgEnd: '220 20% 97%',
+    bgAngle: 120,
+  },
   { name: 'Ocean Breeze', start: '200 90% 56%', end: '187 92% 45%', primary: '199 89% 48%', accent: '187 92% 45%' },
   { name: 'Sunset Glow', start: '12 88% 60%', end: '340 82% 52%', primary: '12 88% 60%', accent: '340 82% 52%' },
   { name: 'Royal Purple', start: '262 83% 58%', end: '292 76% 55%', primary: '262 83% 58%', accent: '292 76% 55%' },

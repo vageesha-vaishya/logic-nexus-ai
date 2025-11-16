@@ -29,11 +29,11 @@ export const APP_MENU: MenuModule[] = [
       // Place Home at the top
       { name: 'Home', path: '/dashboard', icon: Home, description: 'Overview homepage' },
       // Workflow sequence
-      { name: 'Accounts', path: '/dashboard/accounts', icon: Building2, description: 'Organizations and customers' },
-      { name: 'Contacts', path: '/dashboard/contacts', icon: Users, description: 'People tied to accounts' },
+      { name: 'Accounts', path: '/dashboard/accounts/pipeline', icon: Building2, description: 'Organizations and customers' },
+      { name: 'Contacts', path: '/dashboard/contacts/pipeline', icon: Users, description: 'People tied to accounts' },
       {
         name: 'Leads',
-        path: '/dashboard/leads',
+        path: '/dashboard/leads/pipeline',
         icon: UserPlus,
         description: 'Prospects to qualify',
         screens: [
@@ -44,8 +44,8 @@ export const APP_MENU: MenuModule[] = [
         ],
       },
       { name: 'Tasks/Activities', path: '/dashboard/activities', icon: CheckSquare, description: 'Activity management' },
-      { name: 'Opportunities', path: '/dashboard/opportunities', icon: TrendingUp, description: 'Deals and pipeline' },
-      { name: 'Quotes', path: '/dashboard/quotes', icon: FileCheck, description: 'Sales quotes and proposals' },
+      { name: 'Opportunities', path: '/dashboard/opportunities/pipeline', icon: TrendingUp, description: 'Deals and pipeline' },
+      { name: 'Quotes', path: '/dashboard/quotes/pipeline', icon: FileCheck, description: 'Sales quotes and proposals' },
 
       // Remaining items
       { name: 'Files', path: '/dashboard/files', icon: FileText, description: 'Documents and attachments' },
@@ -61,7 +61,7 @@ export const APP_MENU: MenuModule[] = [
   {
     label: 'Logistics',
     items: [
-      { name: 'Shipments', path: '/dashboard/shipments', icon: Package, description: 'Track shipments' },
+      { name: 'Shipments', path: '/dashboard/shipments/pipeline', icon: Package, description: 'Track shipments' },
       { name: 'Warehouses', path: '/dashboard/warehouses', icon: Warehouse, description: 'Manage warehouses' },
       { name: 'Vehicles', path: '/dashboard/vehicles', icon: Truck, description: 'Fleet management' },
       { name: 'Carriers', path: '/dashboard/carriers', icon: Ship, description: 'Shipping carriers' },
