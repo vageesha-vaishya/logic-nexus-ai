@@ -4709,6 +4709,65 @@ export type Database = {
           },
         ]
       }
+      themes: {
+        Row: {
+          borders: Json | null
+          colors: Json | null
+          created_at: string | null
+          created_by: string | null
+          custom_css: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          shadows: Json | null
+          spacing: Json | null
+          tenant_id: string | null
+          typography: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          borders?: Json | null
+          colors?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          custom_css?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          shadows?: Json | null
+          spacing?: Json | null
+          tenant_id?: string | null
+          typography?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          borders?: Json | null
+          colors?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          custom_css?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          shadows?: Json | null
+          spacing?: Json | null
+          tenant_id?: string | null
+          typography?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "themes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracking_events: {
         Row: {
           created_at: string | null
