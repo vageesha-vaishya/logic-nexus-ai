@@ -43,6 +43,11 @@ export function KanbanDashboard() {
   const [franchiseFilter, setFranchiseFilter] = useState<string>("all");
   const [franchises, setFranchises] = useState<Array<{ id: string; name: string }>>([]);
 
+  const LABEL_TEXT_DARK = "#0f172a";
+  const LABEL_TEXT_LIGHT = "#ffffff";
+  const LABEL_SHADOW_OPACITY_LIGHT = 0.40;
+  const LABEL_SHADOW_OPACITY_DARK = 0.30;
+
   const fetchKanbanStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -233,36 +238,36 @@ export function KanbanDashboard() {
   };
 
   const leadFunnel = [
-    { key: "new", label: "🔍 New Inquiry", color: "#3b82f6", value: stats.leads.byStage.new || 0 },
-    { key: "contacted", label: "📞 Contact Attempted", color: "#a855f7", value: stats.leads.byStage.contacted || 0 },
-    { key: "negotiation", label: "💬 In Discussion", color: "#06b6d4", value: stats.leads.byStage.negotiation || 0 },
-    { key: "proposal", label: "📋 Requirements Gathering", color: "#f59e0b", value: stats.leads.byStage.proposal || 0 },
-    { key: "qualified", label: "🎯 Qualified Lead", color: "#10b981", value: stats.leads.byStage.qualified || 0 },
-    { key: "lost", label: "❌ Disqualified", color: "#ef4444", value: stats.leads.byStage.lost || 0 },
-    { key: "won", label: "✅ Converted", color: "#10b981", value: stats.leads.byStage.won || 0 },
+    { key: "new", label: "🔍 New Inquiry", color: "#3b82f6", fill: "#3b82f6", value: stats.leads.byStage.new || 0 },
+    { key: "contacted", label: "📞 Contact Attempted", color: "#a855f7", fill: "#a855f7", value: stats.leads.byStage.contacted || 0 },
+    { key: "negotiation", label: "💬 In Discussion", color: "#06b6d4", fill: "#06b6d4", value: stats.leads.byStage.negotiation || 0 },
+    { key: "proposal", label: "📋 Requirements Gathering", color: "#f59e0b", fill: "#f59e0b", value: stats.leads.byStage.proposal || 0 },
+    { key: "qualified", label: "🎯 Qualified Lead", color: "#10b981", fill: "#10b981", value: stats.leads.byStage.qualified || 0 },
+    { key: "lost", label: "❌ Disqualified", color: "#ef4444", fill: "#ef4444", value: stats.leads.byStage.lost || 0 },
+    { key: "won", label: "✅ Converted", color: "#10b981", fill: "#10b981", value: stats.leads.byStage.won || 0 },
   ];
 
   const oppFunnel = [
-    { key: "prospecting", label: "🆕 New Opportunity", color: "#64748b", value: stats.opportunities.byStage.prospecting || 0 },
-    { key: "qualification", label: "💰 Quote Requested", color: "#3b82f6", value: stats.opportunities.byStage.qualification || 0 },
-    { key: "proposal", label: "📄 Quote Submitted", color: "#a855f7", value: stats.opportunities.byStage.proposal || 0 },
-    { key: "negotiation", label: "🤝 Negotiation", color: "#f97316", value: stats.opportunities.byStage.negotiation || 0 },
-    { key: "value_proposition", label: "📝 Contract Review", color: "#6366f1", value: stats.opportunities.byStage.value_proposition || 0 },
-    { key: "needs_analysis", label: "📋 Requirements Gathering", color: "#06b6d4", value: stats.opportunities.byStage.needs_analysis || 0 },
-    { key: "closed_won", label: "✅ Won", color: "#10b981", value: stats.opportunities.byStage.closed_won || 0 },
-    { key: "closed_lost", label: "❌ Lost", color: "#ef4444", value: stats.opportunities.byStage.closed_lost || 0 },
+    { key: "prospecting", label: "🆕 New Opportunity", color: "#64748b", fill: "#64748b", value: stats.opportunities.byStage.prospecting || 0 },
+    { key: "qualification", label: "💰 Quote Requested", color: "#3b82f6", fill: "#3b82f6", value: stats.opportunities.byStage.qualification || 0 },
+    { key: "proposal", label: "📄 Quote Submitted", color: "#a855f7", fill: "#a855f7", value: stats.opportunities.byStage.proposal || 0 },
+    { key: "negotiation", label: "🤝 Negotiation", color: "#f97316", fill: "#f97316", value: stats.opportunities.byStage.negotiation || 0 },
+    { key: "value_proposition", label: "📝 Contract Review", color: "#6366f1", fill: "#6366f1", value: stats.opportunities.byStage.value_proposition || 0 },
+    { key: "needs_analysis", label: "📋 Requirements Gathering", color: "#06b6d4", fill: "#06b6d4", value: stats.opportunities.byStage.needs_analysis || 0 },
+    { key: "closed_won", label: "✅ Won", color: "#10b981", fill: "#10b981", value: stats.opportunities.byStage.closed_won || 0 },
+    { key: "closed_lost", label: "❌ Lost", color: "#ef4444", fill: "#ef4444", value: stats.opportunities.byStage.closed_lost || 0 },
   ];
 
   const quoteFunnel = [
-    { key: "draft", label: "✏️ Draft", color: "#6b7280", value: stats.quotes.byStatus.draft || 0 },
-    { key: "pricing_review", label: "🔍 Pricing Review", color: "#6366f1", value: stats.quotes.byStatus.pricing_review || 0 },
-    { key: "approved", label: "✅ Approved", color: "#10b981", value: stats.quotes.byStatus.approved || 0 },
-    { key: "sent", label: "📧 Sent", color: "#3b82f6", value: stats.quotes.byStatus.sent || 0 },
-    { key: "customer_reviewing", label: "👀 Reviewing", color: "#06b6d4", value: stats.quotes.byStatus.customer_reviewing || 0 },
-    { key: "revision_requested", label: "🔄 Revision", color: "#f59e0b", value: stats.quotes.byStatus.revision_requested || 0 },
-    { key: "accepted", label: "✅ Accepted", color: "#10b981", value: stats.quotes.byStatus.accepted || 0 },
-    { key: "rejected", label: "❌ Rejected", color: "#ef4444", value: stats.quotes.byStatus.rejected || 0 },
-    { key: "expired", label: "⏰ Expired", color: "#fb923c", value: stats.quotes.byStatus.expired || 0 },
+    { key: "draft", label: "✏️ Draft", color: "#6b7280", fill: "#6b7280", value: stats.quotes.byStatus.draft || 0 },
+    { key: "pricing_review", label: "🔍 Pricing Review", color: "#6366f1", fill: "#6366f1", value: stats.quotes.byStatus.pricing_review || 0 },
+    { key: "approved", label: "✅ Approved", color: "#10b981", fill: "#10b981", value: stats.quotes.byStatus.approved || 0 },
+    { key: "sent", label: "📧 Sent", color: "#3b82f6", fill: "#3b82f6", value: stats.quotes.byStatus.sent || 0 },
+    { key: "customer_reviewing", label: "👀 Reviewing", color: "#06b6d4", fill: "#06b6d4", value: stats.quotes.byStatus.customer_reviewing || 0 },
+    { key: "revision_requested", label: "🔄 Revision", color: "#f59e0b", fill: "#f59e0b", value: stats.quotes.byStatus.revision_requested || 0 },
+    { key: "accepted", label: "✅ Accepted", color: "#10b981", fill: "#10b981", value: stats.quotes.byStatus.accepted || 0 },
+    { key: "rejected", label: "❌ Rejected", color: "#ef4444", fill: "#ef4444", value: stats.quotes.byStatus.rejected || 0 },
+    { key: "expired", label: "⏰ Expired", color: "#fb923c", fill: "#fb923c", value: stats.quotes.byStatus.expired || 0 },
   ];
 
   type ChartClickPayload = { payload?: { key?: string } };
@@ -286,6 +291,59 @@ export function KanbanDashboard() {
       rates.push(prev > 0 ? Math.round((curr / prev) * 100) : 0);
     }
     return rates;
+  };
+
+  type FunnelLabelProps = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    value: number;
+    index: number;
+    payload: { label?: string; value?: number; fill?: string; color?: string };
+  };
+
+  const renderFunnelLabel = ({ x, y, width, height, value, payload }: FunnelLabelProps) => {
+    const label = payload?.label ?? "";
+    const text = `${label}: ${value ?? 0}`;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const color = (payload?.fill || payload?.color || "#3b82f6").toString();
+    const hex = color.startsWith("#") ? color.slice(1) : color;
+    const parse = (h: string) => {
+      if (h.length === 3) return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)] as const;
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)] as const;
+    };
+    const [r, g, b] = parse(hex);
+    const toLinear = (c: number) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    const rgbDark: [number, number, number] = [15, 23, 42];
+    const rgbLight: [number, number, number] = [255, 255, 255];
+    const lumFor = ([rr, gg, bb]: [number, number, number]) => 0.2126 * toLinear(rr) + 0.7152 * toLinear(gg) + 0.0722 * toLinear(bb);
+    const contrast = (L1: number, L2: number) => {
+      const a = Math.max(L1, L2);
+      const b2 = Math.min(L1, L2);
+      return (a + 0.05) / (b2 + 0.05);
+    };
+    const ratioDark = contrast(luminance, lumFor(rgbDark));
+    const ratioLight = contrast(luminance, lumFor(rgbLight));
+    const useLight = ratioLight >= ratioDark;
+    const textFill = useLight ? LABEL_TEXT_LIGHT : LABEL_TEXT_DARK;
+    const shadowFill = useLight ? "#000000" : "#ffffff";
+    const shadowOpacity = useLight ? LABEL_SHADOW_OPACITY_LIGHT : LABEL_SHADOW_OPACITY_DARK;
+    return (
+      <g>
+        <text x={cx + 1} y={cy + 1} textAnchor="middle" dominantBaseline="middle" fill={shadowFill} fontSize={12} opacity={shadowOpacity}>
+          {text}
+        </text>
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill={textFill} fontSize={12}>
+          {text}
+        </text>
+      </g>
+    );
   };
 
   const kanbanModules = [
@@ -499,8 +557,8 @@ export function KanbanDashboard() {
                     <ChartContainer config={{}} className="h-64">
                       <FunnelChart>
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Funnel data={leadFunnel} dataKey="value" isAnimationActive onClick={(d: ChartClickPayload) => navigateWithFilters('/dashboard/leads/pipeline', d.payload?.key)}>
-                          <LabelList dataKey="label" position="right" />
+                        <Funnel data={leadFunnel} dataKey="value" nameKey="label" isAnimationActive onClick={(d: ChartClickPayload) => navigateWithFilters('/dashboard/leads/pipeline', d.payload?.key)}>
+                          <LabelList dataKey="value" position="inside" content={renderFunnelLabel} />
                         </Funnel>
                       </FunnelChart>
                     </ChartContainer>
@@ -520,8 +578,8 @@ export function KanbanDashboard() {
                     <ChartContainer config={{}} className="h-64">
                       <FunnelChart>
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Funnel data={oppFunnel} dataKey="value" isAnimationActive onClick={(d: ChartClickPayload) => navigateWithFilters('/dashboard/opportunities/pipeline', d.payload?.key)}>
-                          <LabelList dataKey="label" position="right" />
+                        <Funnel data={oppFunnel} dataKey="value" nameKey="label" isAnimationActive onClick={(d: ChartClickPayload) => navigateWithFilters('/dashboard/opportunities/pipeline', d.payload?.key)}>
+                          <LabelList dataKey="value" position="inside" content={renderFunnelLabel} />
                         </Funnel>
                       </FunnelChart>
                     </ChartContainer>
@@ -541,8 +599,8 @@ export function KanbanDashboard() {
                     <ChartContainer config={{}} className="h-64">
                       <FunnelChart>
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Funnel data={quoteFunnel} dataKey="value" isAnimationActive onClick={(d: ChartClickPayload) => navigateWithFilters('/dashboard/quotes/pipeline', d.payload?.key)}>
-                          <LabelList dataKey="label" position="right" />
+                        <Funnel data={quoteFunnel} dataKey="value" nameKey="label" isAnimationActive onClick={(d: ChartClickPayload) => navigateWithFilters('/dashboard/quotes/pipeline', d.payload?.key)}>
+                          <LabelList dataKey="value" position="inside" content={renderFunnelLabel} />
                         </Funnel>
                       </FunnelChart>
                     </ChartContainer>
