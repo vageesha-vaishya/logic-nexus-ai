@@ -980,7 +980,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                     });
                     updateRows(next);
                   };
-                  const updateSide = (sideIdx: any, patch: any) => {
+                  const updateSide = (rowRef: any, sideIdx: any, patch: any) => {
                     if (typeof sideIdx !== 'number') return;
                     const next = data.slice();
                     next[sideIdx] = { ...next[sideIdx], ...patch };
@@ -988,8 +988,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                     const r = next[sideIdx].rate ?? 0;
                     next[sideIdx].amount = Number(next[sideIdx].amount ?? r * q);
                     if (autoMarginEnabled && marginMethod === 'percent') {
-                      const buyIdx = row.buy?.idx;
-                      const sellIdx = row.sell?.idx;
+                      const buyIdx = rowRef.buy?.idx;
+                      const sellIdx = rowRef.sell?.idx;
                       if (typeof buyIdx === 'number' && typeof sellIdx === 'number') {
                         const br = next[buyIdx].rate ?? 0;
                         const bq = next[buyIdx].quantity ?? 1;
@@ -1033,12 +1033,12 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                           </SelectContent>
                         </Select>
                       </td>
-                      <td className="p-2 text-right"><Input type="number" value={row.buy?.quantity ?? 1} onChange={(e) => updateSide(row.buy?.idx, { quantity: Number(e.target.value) })} /></td>
-                      <td className="p-2 text-right"><Input type="number" value={row.buy?.rate ?? 0} onChange={(e) => updateSide(row.buy?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.buy?.quantity || 1) })} /></td>
-                      <td className="p-2 text-right"><Input type="number" value={row.buy?.amount ?? 0} onChange={(e) => updateSide(row.buy?.idx, { amount: Number(e.target.value) })} /></td>
-                      <td className="p-2 text-right"><Input type="number" value={row.sell?.quantity ?? 1} onChange={(e) => updateSide(row.sell?.idx, { quantity: Number(e.target.value) })} /></td>
-                      <td className="p-2 text-right"><Input type="number" value={row.sell?.rate ?? 0} onChange={(e) => updateSide(row.sell?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.sell?.quantity || 1) })} /></td>
-                      <td className="p-2 text-right"><Input type="number" value={row.sell?.amount ?? 0} onChange={(e) => updateSide(row.sell?.idx, { amount: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buy?.quantity ?? 1} onChange={(e) => updateSide(row, row.buy?.idx, { quantity: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buy?.rate ?? 0} onChange={(e) => updateSide(row, row.buy?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.buy?.quantity || 1) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buy?.amount ?? 0} onChange={(e) => updateSide(row, row.buy?.idx, { amount: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sell?.quantity ?? 1} onChange={(e) => updateSide(row, row.sell?.idx, { quantity: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sell?.rate ?? 0} onChange={(e) => updateSide(row, row.sell?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.sell?.quantity || 1) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sell?.amount ?? 0} onChange={(e) => updateSide(row, row.sell?.idx, { amount: Number(e.target.value) })} /></td>
                       <td className="p-2"><Input value={row.note ?? ''} onChange={(e) => updateShared(row, { note: e.target.value })} /></td>
                       <td className="p-2"><Button variant="secondary" size="sm" onClick={() => setBasisDialog({ type: 'leg', rowIdx: row.buy?.idx })}>Set Basis</Button></td>
                       <td className="p-2"><Button variant="destructive" size="sm" onClick={() => removeCombinedRow(row)}>Remove</Button></td>
