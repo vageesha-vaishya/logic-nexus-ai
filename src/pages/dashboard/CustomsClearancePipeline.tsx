@@ -26,7 +26,7 @@ type CustomsStage =
 
 interface Shipment {
   id: string;
-  job_number: string;
+  shipment_number: string | null;
   customer_name: string | null;
   service_type: string | null;
   origin: string | null;
@@ -101,11 +101,20 @@ export default function CustomsClearancePipeline() {
       setLoading(true);
       const { data: s, error: se } = await supabase
         .from('shipments')
-        .select('id, job_number, customer_name, service_type, origin, destination, customs_required')
-        .order('job_number', { ascending: false })
+        .select('id, shipment_number, account_id, service_level, origin_address, destination_address, customs_required')
+        .order('shipment_number', { ascending: false })
         .limit(500);
       if (se) throw se;
-      setShipments((s || []) as Shipment[]);
+      const mapped = (s || []).map((ship: any) => ({
+        id: ship.id,
+        shipment_number: ship.shipment_number,
+        customer_name: null,
+        service_type: ship.service_level,
+        origin: null,
+        destination: null,
+        customs_required: ship.customs_required
+      }));
+      setShipments(mapped);
       const { data: e, error: ee } = await supabase
         .from('tracking_events')
         .select('id, shipment_id, event_type, created_at, notes')
@@ -163,7 +172,7 @@ export default function CustomsClearancePipeline() {
 
   const filtered = shipments.filter((s) => {
     const q = searchQuery.toLowerCase();
-    const str = `${s.job_number} ${s.customer_name || ''} ${s.origin || ''} ${s.destination || ''}`.toLowerCase();
+    const str = `${s.shipment_number || ''} ${s.customer_name || ''} ${s.origin || ''} ${s.destination || ''}`.toLowerCase();
     return !searchQuery || str.includes(q);
   });
 
@@ -250,7 +259,7 @@ export default function CustomsClearancePipeline() {
                                 <Draggable key={s.id} id={s.id}>
                                   <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in" onClick={() => navigate(`/dashboard/shipments/${s.id}`)}>
                                     <CardContent className="p-3 space-y-2">
-                                      <div className="font-medium text-sm">{s.job_number}</div>
+                                      <div className="font-medium text-sm">{s.shipment_number || 'N/A'}</div>
                                       <div className="text-xs text-muted-foreground">{s.origin || ''} → {s.destination || ''}</div>
                                       {s.customer_name && (<div className="text-xs text-muted-foreground">{s.customer_name}</div>)}
                                     </CardContent>

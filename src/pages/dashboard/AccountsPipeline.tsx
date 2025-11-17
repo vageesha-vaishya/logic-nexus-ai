@@ -22,7 +22,7 @@ import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
 type AccountType = 'prospect' | 'customer' | 'partner' | 'vendor';
-type AccountStatusDB = 'active' | 'inactive' | 'pending' | 'suspended';
+type AccountStatusDB = 'active' | 'inactive' | 'pending';
 
 interface Account {
   id: string;
@@ -158,8 +158,7 @@ export default function AccountsPipeline() {
 
   const handleStageChange = async (accountId: string, newStage: AccountStage) => {
     const updates: { status: AccountStatusDB } = { status: 'pending' };
-    if (newStage === 'blocked') updates.status = 'suspended';
-    else if (newStage === 'inactive') updates.status = 'inactive';
+    if (newStage === 'blocked' || newStage === 'inactive') updates.status = 'inactive';
     else if (newStage === 'active' || newStage === 'vip') updates.status = 'active';
     else updates.status = 'pending';
     try {
