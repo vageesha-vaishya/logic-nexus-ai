@@ -3174,6 +3174,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_quote_charges_leg"
+            columns: ["leg_id"]
+            isOneToOne: false
+            referencedRelation: "quote_legs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quote_charges_leg_id_fkey"
             columns: ["leg_id"]
             isOneToOne: false
@@ -3310,6 +3317,78 @@ export type Database = {
             columns: ["service_type_id"]
             isOneToOne: false
             referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_legs: {
+        Row: {
+          arrival_date: string | null
+          carrier_id: string | null
+          created_at: string | null
+          departure_date: string | null
+          destination_location: string | null
+          id: string
+          leg_number: number
+          mode: string | null
+          notes: string | null
+          origin_location: string | null
+          quote_option_id: string
+          service_type_id: string | null
+          sort_order: number | null
+          tenant_id: string
+          transit_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          arrival_date?: string | null
+          carrier_id?: string | null
+          created_at?: string | null
+          departure_date?: string | null
+          destination_location?: string | null
+          id?: string
+          leg_number?: number
+          mode?: string | null
+          notes?: string | null
+          origin_location?: string | null
+          quote_option_id: string
+          service_type_id?: string | null
+          sort_order?: number | null
+          tenant_id: string
+          transit_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          arrival_date?: string | null
+          carrier_id?: string | null
+          created_at?: string | null
+          departure_date?: string | null
+          destination_location?: string | null
+          id?: string
+          leg_number?: number
+          mode?: string | null
+          notes?: string | null
+          origin_location?: string | null
+          quote_option_id?: string
+          service_type_id?: string | null
+          sort_order?: number | null
+          tenant_id?: string
+          transit_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_quote_legs_option"
+            columns: ["quote_option_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_version_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_quote_legs_tenant"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
