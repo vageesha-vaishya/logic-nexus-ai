@@ -2313,6 +2313,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             </section>
             <div className="ef-divider" />
 
+            {false && (
             <div className="ef-grid">
               {/* Arrange Valid Until, Service Type, Service, Import/Export in one row */}
               <FormField
@@ -2455,8 +2456,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 )}
               />
             </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {false && (
               <FormField
                 control={form.control}
                 name="origin_port_id"
@@ -2481,7 +2484,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
+              )}
 
+              {false && (
               <FormField
                 control={form.control}
                 name="destination_port_id"
@@ -2506,6 +2511,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
+              )}
+              {false && (
               <FormField
                 control={form.control}
                 name="carrier_id"
@@ -2536,6 +2543,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   </FormItem>
                 )}
               />
+              )}
 
               {/* Fourth column: Capture Carrier Rates label and button/dialog */}
               <div className="space-y-2">
@@ -2630,16 +2638,6 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     ) : (
                       <div className="p-4 text-sm text-muted-foreground">Preparing composer...</div>
                     )}
-                    <div className="hidden">
-                      <CarrierQuotesSection
-                        carriers={carriers}
-                        selectedServiceType={selectedServiceType}
-                        carrierQuotes={carrierQuotes}
-                        setCarrierQuotes={setCarrierQuotes}
-                        onSave={async () => {}}
-                        onReload={async () => {}}
-                      />
-                    </div>
                   </DialogContent>
                 </Dialog>
               </div>

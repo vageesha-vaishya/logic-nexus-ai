@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import ChargesTable from './ChargesTable';
+ 
 import { supabase } from '@/integrations/supabase/client';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
@@ -74,12 +74,18 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [containerSizes, setContainerSizes] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
+  const [chargeCategories, setChargeCategories] = useState<any[]>([]);
+  const [chargeBases, setChargeBases] = useState<any[]>([]);
+  const [sides, setSides] = useState<any[]>([]);
+  const [tradeDirections, setTradeDirections] = useState<any[]>([]);
   const [ports, setPorts] = useState<any[]>([]);
   const [portFilterTypes, setPortFilterTypes] = useState<string[]>([]);
   // Legs management
   const [legs, setLegs] = useState<any[]>([]);
   const [currentLegId, setCurrentLegId] = useState<string | null>(null);
   const [chargesByLeg, setChargesByLeg] = useState<Record<string, any[]>>({});
+  const [combinedCharges, setCombinedCharges] = useState<any[]>([]);
+  const [basisDialog, setBasisDialog] = useState<any | null>(null);
 
   const formatPortLabel = (p: any) => {
     const name = String(p?.location_name || '').trim();
@@ -149,6 +155,14 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       setContainerSizes(cs ?? []);
       const { data: cur } = await supabase.from('currencies').select('id, code').order('code');
       setCurrencies(cur ?? []);
+      const { data: cc } = await (supabase as any).from('charge_categories').select('id, name').order('name');
+      setChargeCategories(cc ?? []);
+      const { data: bb } = await (supabase as any).from('charge_bases').select('id, name').order('name');
+      setChargeBases(bb ?? []);
+      const { data: ss } = await (supabase as any).from('charge_sides').select('id, code');
+      setSides(ss ?? []);
+      const { data: td } = await (supabase as any).from('trade_directions').select('id, name, code');
+      setTradeDirections(td ?? []);
       // Fetch ports/locations for current tenant (and global if available)
       try {
         const { data: pr } = await (supabase as any)
@@ -540,9 +554,9 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         const tenantId = await getTenantId();
         const { data: dir } = await (supabase as any)
           .from('trade_directions')
-          .select('id, code')
-          .eq('tenant_id', tenantId)
+          .select('id, code, tenant_id')
           .eq('code', importExport)
+          .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
           .limit(1);
         tradeDirectionId = Array.isArray(dir) && dir.length ? dir[0].id : null;
       }
@@ -750,7 +764,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     <Card ref={composerRef}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Compose Quotation</CardTitle>
+          <CardTitle>Quotation Composer</CardTitle>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -783,82 +797,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Step 1-7: Leg builder and quote currency in required order */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-4">
-            <Select value={serviceTypeId ?? ''} onValueChange={setServiceTypeId}>
-              <SelectTrigger><SelectValue placeholder="Service Type" /></SelectTrigger>
-              <SelectContent>
-                {(serviceTypes ?? []).map((st) => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={serviceId ?? ''} onValueChange={setServiceId} disabled={!serviceTypeId}>
-              <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
-              <SelectContent>
-                {(services ?? []).map((sv) => (
-                  <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={providerId ?? ''} onValueChange={setProviderId} disabled={!serviceTypeId}>
-              <SelectTrigger><SelectValue placeholder="Service Provider" /></SelectTrigger>
-              <SelectContent>
-                {(filteredCarriers ?? []).length > 0
-                  ? uniqueById(filteredCarriers ?? []).map((c: any) => (
-                      <SelectItem key={String(c.id)} value={String(c.id)}>{c.carrier_name}</SelectItem>
-                    ))
-                  : (<SelectItem disabled value="__no_providers__">No providers for selected type</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={importExport} onValueChange={setImportExport} disabled={!providerId}>
-              <SelectTrigger><SelectValue placeholder="Trade Direction" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="import">Import</SelectItem>
-                <SelectItem value="export">Export</SelectItem>
-                <SelectItem value="inland">Inland</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={containerTypeId ?? ''} onValueChange={setContainerTypeId} disabled={!importExport}>
-              <SelectTrigger><SelectValue placeholder="Container Type" /></SelectTrigger>
-              <SelectContent>
-                {(containerTypes ?? []).map((ct) => <SelectItem key={ct.id} value={ct.id}>{ct.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={containerSizeId ?? ''} onValueChange={setContainerSizeId} disabled={!containerTypeId}>
-              <SelectTrigger><SelectValue placeholder="Container Size" /></SelectTrigger>
-              <SelectContent>
-                {(containerSizes ?? []).map((cs) => <SelectItem key={cs.id} value={cs.id}>{cs.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={originLocation} onValueChange={setOriginLocation} disabled={!containerSizeId}>
-              <SelectTrigger><SelectValue placeholder="Origin Port/Location" /></SelectTrigger>
-              <SelectContent>
-                {uniqueById(ports).filter((p: any) => portFilterTypes.length ? portFilterTypes.includes(p.location_type) : true).map((p: any) => (
-                  <SelectItem key={String(p.id)} value={formatPortLabel(p)}>{formatPortLabel(p)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={destinationLocation} onValueChange={setDestinationLocation} disabled={!containerSizeId}>
-              <SelectTrigger><SelectValue placeholder="Destination Port/Location" /></SelectTrigger>
-              <SelectContent>
-                {uniqueById(ports).filter((p: any) => portFilterTypes.length ? portFilterTypes.includes(p.location_type) : true).map((p: any) => (
-                  <SelectItem key={String(p.id)} value={formatPortLabel(p)}>{formatPortLabel(p)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} placeholder="Valid Until" />
-            <Select value={currencyId ?? ''} onValueChange={setCurrencyId}>
-              <SelectTrigger><SelectValue placeholder="Quote Currency" /></SelectTrigger>
-              <SelectContent>
-                {(currencies ?? []).map((cur) => <SelectItem key={cur.id} value={cur.id}>{cur.code}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {false && (<div />)}
 
-        {/* Margin Controls */}
         <div className="grid grid-cols-2 gap-4">
           <Select value={autoMarginEnabled ? 'on' : 'off'} onValueChange={(v) => setAutoMarginEnabled(v === 'on')}>
             <SelectTrigger><SelectValue placeholder="Auto Margin" /></SelectTrigger>
@@ -867,23 +807,11 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
               <SelectItem value="on">Auto Margin On</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={marginMethod} onValueChange={(v) => setMarginMethod(v as any)}>
-            <SelectTrigger><SelectValue placeholder="Margin Method" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="fixed">Fixed Amount</SelectItem>
-              <SelectItem value="percent">Percent of Buy</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="grid grid-cols-3 gap-2 col-span-2">
-            <Input type="number" value={marginValue} onChange={e => setMarginValue(Number(e.target.value))} placeholder="Margin Value" />
-            <Input type="number" value={minMargin} onChange={e => setMinMargin(Number(e.target.value))} placeholder="Min Margin" />
-            <Input value={roundingRule} onChange={e => setRoundingRule(e.target.value)} placeholder="Rounding (e.g., nearest_10)" />
-          </div>
+          <Input type="number" value={marginValue} onChange={e => setMarginValue(Number(e.target.value))} placeholder="Margin Percent" />
         </div>
 
-        {/* Legs management: details for selected leg */}
-        {currentLegId && (
+        {/* Legs management: hide duplicate leg-level selectors */}
+        {false && currentLegId && (
           <div className="grid grid-cols-2 gap-2">
             <Select value={serviceId ?? ''} onValueChange={setServiceId}>
               <SelectTrigger><SelectValue placeholder="Leg Service" /></SelectTrigger>
@@ -922,29 +850,541 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
           </div>
         )}
 
-        {/* Step 9: Charges table */}
-        <ChargesTable
-          charges={currentLegId ? (chargesByLeg[currentLegId] ?? []) : []}
-          defaultCurrencyId={currencyId}
-          onChange={async (rows) => {
-            // Lazily ensure option/leg so adding charges always shows rows
-            const legId = await ensureOptionAndLeg();
-            if (!legId) return;
-            setChargesByLeg(prev => ({ ...prev, [legId]: rows }));
-          }}
-        />
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={hydrateCharges} disabled={!providerId || !serviceId || !currentLegId || !containerSizeId || !currencyId || !originLocation || !destinationLocation}>Hydrate Buy Charges (Leg)</Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!currentLegId) return;
-              setChargesByLeg(prev => ({ ...prev, [currentLegId]: [] }));
-            }}
-          >Clear</Button>
-          <Button onClick={saveCharges} disabled={!optionId || !currentLegId}>Save Charges</Button>
+        {/* Combined Charge section */}
+        <div className="space-y-2">
+          <div className="flex gap-2 justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const legId = await ensureOptionAndLeg();
+                  if (!legId) return;
+                const buySide = (sides ?? []).find((s: any) => s.code === 'buy');
+                const sellSide = (sides ?? []).find((s: any) => s.code === 'sell');
+                const base = {
+                  category_id: chargeCategories[0]?.id,
+                  basis_id: chargeBases[0]?.id,
+                  unit: '',
+                  currency_id: currencyId,
+                  note: null as any,
+                  sort_order: 1000,
+                };
+                const newRows = [
+                  { ...base, side: 'buy', charge_side_id: buySide?.id, quantity: 1, rate: 0, amount: 0 },
+                  { ...base, side: 'sell', charge_side_id: sellSide?.id, quantity: 1, rate: 0, amount: 0 },
+                ];
+                setChargesByLeg(prev => ({ ...prev, [legId]: [ ...(prev[legId] ?? []), ...newRows ] }));
+              }}
+            >Add Combined Charge</Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  const tenantId = await getTenantId();
+                  if (!tenantId || !optionId) return;
+                  const { data: sidesData } = await supabase.from('charge_sides').select('id, code');
+                  const buySide = (sidesData ?? []).find((s: any) => s.code === 'buy');
+                  const sellSide = (sidesData ?? []).find((s: any) => s.code === 'sell');
+                  const payload = combinedCharges.flatMap((c: any) => [
+                    {
+                      tenant_id: tenantId,
+                      quote_option_id: optionId,
+                      leg_id: null,
+                      charge_side_id: buySide?.id,
+                      category_id: c.category_id,
+                      basis_id: c.basis_id,
+                      quantity: c.buyQty ?? 1,
+                      unit: c.unit ?? null,
+                      rate: c.buyRate ?? 0,
+                      amount: c.buyAmount ?? ((c.buyRate ?? 0) * (c.buyQty ?? 1)),
+                      currency_id: c.currency_id ?? currencyId,
+                      note: c.note ?? null,
+                      sort_order: c.sort_order ?? 1000,
+                    },
+                    {
+                      tenant_id: tenantId,
+                      quote_option_id: optionId,
+                      leg_id: null,
+                      charge_side_id: sellSide?.id,
+                      category_id: c.category_id,
+                      basis_id: c.basis_id,
+                      quantity: c.sellQty ?? 1,
+                      unit: c.unit ?? null,
+                      rate: c.sellRate ?? 0,
+                      amount: c.sellAmount ?? ((c.sellRate ?? 0) * (c.sellQty ?? 1)),
+                      currency_id: c.currency_id ?? currencyId,
+                      note: c.note ?? null,
+                      sort_order: c.sort_order ?? 1000,
+                    },
+                  ]);
+                  if (payload.length) await (supabase as any).from('quote_charges').insert(payload);
+                }}
+                disabled={!optionId}
+              >Save Charges</Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left p-2">Charge</th>
+                  <th className="text-left p-2">Basis</th>
+                  <th className="text-left p-2">Unit</th>
+                  <th className="text-left p-2">Currency</th>
+                  <th className="text-right p-2">Buy Qty</th>
+                  <th className="text-right p-2">Buy Rate</th>
+                  <th className="text-right p-2">Buy Amount</th>
+                  <th className="text-right p-2">Sell Qty</th>
+                  <th className="text-right p-2">Sell Rate</th>
+                  <th className="text-right p-2">Sell Amount</th>
+                  <th className="text-left p-2">Remark Note</th>
+                  <th className="text-left p-2">Basis</th>
+                  <th className="p-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const data = currentLegId ? (chargesByLeg[currentLegId] ?? []) : [];
+                  const groupKey = (c: any) => [c.category_id ?? '', c.basis_id ?? '', c.currency_id ?? '', c.unit ?? '', c.note ?? ''].join('|');
+                  const map = new Map<string, any>();
+                  data.forEach((c: any, idx: number) => {
+                    const key = groupKey(c);
+                    const entry = map.get(key) ?? {
+                      key,
+                      category_id: c.category_id,
+                      basis_id: c.basis_id,
+                      unit: c.unit ?? '',
+                      currency_id: c.currency_id,
+                      note: c.note ?? '',
+                      buy: undefined as any,
+                      sell: undefined as any,
+                    };
+                    const sideRef = { idx, quantity: c.quantity, rate: c.rate, amount: c.amount, charge_side_id: c.charge_side_id };
+                    if (c.side === 'buy') entry.buy = sideRef; else if (c.side === 'sell') entry.sell = sideRef;
+                    map.set(key, entry);
+                  });
+                  const combined = Array.from(map.values());
+                  const updateRows = (next: any[]) => {
+                    if (!currentLegId) return;
+                    setChargesByLeg(prev => ({ ...prev, [currentLegId]: next }));
+                  };
+                  const updateShared = (row: any, patch: any) => {
+                    const next = data.slice();
+                    [row.buy?.idx, row.sell?.idx].forEach((i: any) => {
+                      if (typeof i === 'number') {
+                        next[i] = { ...next[i], ...patch };
+                        const q = next[i].quantity ?? 1;
+                        const r = next[i].rate ?? 0;
+                        next[i].amount = Number(next[i].amount ?? r * q);
+                      }
+                    });
+                    updateRows(next);
+                  };
+                  const updateSide = (sideIdx: any, patch: any) => {
+                    if (typeof sideIdx !== 'number') return;
+                    const next = data.slice();
+                    next[sideIdx] = { ...next[sideIdx], ...patch };
+                    const q = next[sideIdx].quantity ?? 1;
+                    const r = next[sideIdx].rate ?? 0;
+                    next[sideIdx].amount = Number(next[sideIdx].amount ?? r * q);
+                    if (autoMarginEnabled && marginMethod === 'percent') {
+                      const buyIdx = row.buy?.idx;
+                      const sellIdx = row.sell?.idx;
+                      if (typeof buyIdx === 'number' && typeof sellIdx === 'number') {
+                        const br = next[buyIdx].rate ?? 0;
+                        const bq = next[buyIdx].quantity ?? 1;
+                        next[sellIdx].rate = br * (1 + (marginValue / 100));
+                        next[sellIdx].quantity = bq;
+                        next[sellIdx].amount = (next[sellIdx].rate ?? 0) * (next[sellIdx].quantity ?? 1);
+                      }
+                    }
+                    updateRows(next);
+                  };
+                  const removeCombinedRow = (row: any) => {
+                    const next = data.slice();
+                    const indexes = [row.buy?.idx, row.sell?.idx].filter((x: any) => typeof x === 'number').sort((a: number,b: number) => b-a);
+                    indexes.forEach((i: number) => next.splice(i, 1));
+                    updateRows(next);
+                  };
+                  return combined.map((row: any) => (
+                    <tr key={row.key}>
+                      <td className="p-2">
+                        <Select value={row.category_id ?? ''} onValueChange={(val) => updateShared(row, { category_id: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(chargeCategories ?? []).map((cat: any) => <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2">
+                        <Select value={row.basis_id ?? ''} onValueChange={(val) => updateShared(row, { basis_id: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(chargeBases ?? []).map((b: any) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2"><Input value={row.unit ?? ''} onChange={(e) => updateShared(row, { unit: e.target.value })} /></td>
+                      <td className="p-2">
+                        <Select value={row.currency_id ?? ''} onValueChange={(val) => updateShared(row, { currency_id: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(currencies ?? []).map((cur: any) => <SelectItem key={cur.id} value={String(cur.id)}>{cur.code}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buy?.quantity ?? 1} onChange={(e) => updateSide(row.buy?.idx, { quantity: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buy?.rate ?? 0} onChange={(e) => updateSide(row.buy?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.buy?.quantity || 1) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buy?.amount ?? 0} onChange={(e) => updateSide(row.buy?.idx, { amount: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sell?.quantity ?? 1} onChange={(e) => updateSide(row.sell?.idx, { quantity: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sell?.rate ?? 0} onChange={(e) => updateSide(row.sell?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.sell?.quantity || 1) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sell?.amount ?? 0} onChange={(e) => updateSide(row.sell?.idx, { amount: Number(e.target.value) })} /></td>
+                      <td className="p-2"><Input value={row.note ?? ''} onChange={(e) => updateShared(row, { note: e.target.value })} /></td>
+                      <td className="p-2"><Button variant="secondary" size="sm" onClick={() => setBasisDialog({ type: 'leg', rowIdx: row.buy?.idx })}>Set Basis</Button></td>
+                      <td className="p-2"><Button variant="destructive" size="sm" onClick={() => removeCombinedRow(row)}>Remove</Button></td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+            </table>
+          </div>
+          {(() => {
+            const d = currentLegId ? (chargesByLeg[currentLegId] ?? []) : [];
+            const buy = d.filter((c: any) => c.side === 'buy').reduce((s: number, c: any) => s + (c.amount || (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const sell = d.filter((c: any) => c.side === 'sell').reduce((s: number, c: any) => s + (c.amount || (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const margin = sell - buy;
+            return (
+              <div className="flex items-center justify-end gap-6 text-sm">
+                <div>Buy: <span className="font-semibold">{buy.toFixed(2)}</span></div>
+                <div>Sell: <span className="font-semibold">{sell.toFixed(2)}</span></div>
+                <div>Margin: <span className="font-semibold">{margin.toFixed(2)}</span></div>
+                <Button onClick={saveCharges} disabled={!optionId || !currentLegId}>Save Charges</Button>
+              </div>
+            );
+          })()}
         </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="font-semibold">Combined Charges</div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const base = {
+                    id: String(Date.now()),
+                    category_id: chargeCategories[0]?.id,
+                    basis_id: chargeBases[0]?.id,
+                    unit: '',
+                    currency_id: currencyId,
+                    buyQty: 1,
+                    buyRate: 0,
+                    buyAmount: 0,
+                    sellQty: 1,
+                    sellRate: 0,
+                    sellAmount: 0,
+                    note: '',
+                    sort_order: 1000,
+                    basisDetails: null,
+                  };
+                  setCombinedCharges(prev => [...prev, base]);
+                }}
+              >Add Combined Charge</Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left p-2">Charge</th>
+                  <th className="text-left p-2">Basis</th>
+                  <th className="text-left p-2">Unit</th>
+                  <th className="text-left p-2">Currency</th>
+                  <th className="text-right p-2">Buy Qty</th>
+                  <th className="text-right p-2">Buy Rate</th>
+                  <th className="text-right p-2">Buy Amount</th>
+                  <th className="text-right p-2">Sell Qty</th>
+                  <th className="text-right p-2">Sell Rate</th>
+                  <th className="text-right p-2">Sell Amount</th>
+                  <th className="text-left p-2">Remark Note</th>
+                  <th className="text-left p-2">Basis</th>
+                  <th className="p-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {combinedCharges.map((row) => {
+                  const setRow = (patch: any) => {
+                    setCombinedCharges(prev => prev.map(x => x.id === row.id ? { ...x, ...patch } : x));
+                  };
+                  const updateAmounts = (next: any) => {
+                    next.buyAmount = (next.buyQty || 0) * (next.buyRate || 0);
+                    next.sellAmount = (next.sellQty || 0) * (next.sellRate || 0);
+                  };
+                  const updateBuy = (patch: any) => {
+                    const next = { ...row, ...patch };
+                    updateAmounts(next);
+                    if (autoMarginEnabled && marginMethod === 'percent') {
+                      next.sellRate = (next.buyRate || 0) * (1 + (marginValue / 100));
+                      next.sellQty = next.buyQty;
+                      updateAmounts(next);
+                    }
+                    setRow(next);
+                  };
+                  const updateSell = (patch: any) => {
+                    const next = { ...row, ...patch };
+                    updateAmounts(next);
+                    setRow(next);
+                  };
+                  return (
+                    <tr key={row.id}>
+                      <td className="p-2">
+                        <Select value={row.category_id ?? ''} onValueChange={(val) => setRow({ category_id: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(chargeCategories ?? []).map((cat: any) => <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2">
+                        <Select value={row.basis_id ?? ''} onValueChange={(val) => setRow({ basis_id: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(chargeBases ?? []).map((b: any) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2"><Input value={row.unit ?? ''} onChange={(e) => setRow({ unit: e.target.value })} /></td>
+                      <td className="p-2">
+                        <Select value={row.currency_id ?? ''} onValueChange={(val) => setRow({ currency_id: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(currencies ?? []).map((cur: any) => <SelectItem key={cur.id} value={String(cur.id)}>{cur.code}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buyQty ?? 0} onChange={(e) => updateBuy({ buyQty: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buyRate ?? 0} onChange={(e) => updateBuy({ buyRate: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.buyAmount ?? 0} onChange={(e) => updateBuy({ buyAmount: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sellQty ?? 0} onChange={(e) => updateSell({ sellQty: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sellRate ?? 0} onChange={(e) => updateSell({ sellRate: Number(e.target.value) })} /></td>
+                      <td className="p-2 text-right"><Input type="number" value={row.sellAmount ?? 0} onChange={(e) => updateSell({ sellAmount: Number(e.target.value) })} /></td>
+                      <td className="p-2"><Input value={row.note ?? ''} onChange={(e) => setRow({ note: e.target.value })} /></td>
+                      <td className="p-2">
+                        <Button variant="secondary" size="sm" onClick={() => setBasisDialog({ type: 'combined', row })}>Set Basis</Button>
+                      </td>
+                      <td className="p-2"><Button variant="destructive" size="sm" onClick={() => setCombinedCharges(prev => prev.filter(x => x.id !== row.id))}>Remove</Button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {(() => {
+            const legData = currentLegId ? (chargesByLeg[currentLegId] ?? []) : [];
+            const legBuy = legData.filter((c: any) => c.side === 'buy').reduce((s: number, c: any) => s + (c.amount || (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const legSell = legData.filter((c: any) => c.side === 'sell').reduce((s: number, c: any) => s + (c.amount || (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const combBuy = combinedCharges.reduce((s, c) => s + (c.buyAmount || 0), 0);
+            const combSell = combinedCharges.reduce((s, c) => s + (c.sellAmount || 0), 0);
+            const totalBuy = legBuy + combBuy;
+            const totalSell = legSell + combSell;
+            const totalMargin = totalSell - totalBuy;
+            return (
+              <div className="flex items-center justify-end gap-6 text-sm">
+                <div>Buy: <span className="font-semibold">{totalBuy.toFixed(2)}</span></div>
+                <div>Sell: <span className="font-semibold">{totalSell.toFixed(2)}</span></div>
+                <div>Margin: <span className="font-semibold">{totalMargin.toFixed(2)}</span></div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {false && (<div />)}
+
+        {/* Summary by legs */}
+        <div className="space-y-6">
+          {legs.map((l) => {
+            const data = chargesByLeg[l.id] ?? [];
+            const buy = data.filter((c: any) => c.side === 'buy').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const sell = data.filter((c: any) => c.side === 'sell').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const margin = sell - buy;
+            const groupKey = (c: any) => [c.category_id ?? '', c.basis_id ?? '', c.currency_id ?? '', c.unit ?? '', c.note ?? ''].join('|');
+            const map = new Map<string, any>();
+            data.forEach((c: any) => {
+              const key = groupKey(c);
+              const e = map.get(key) ?? { key, category_id: c.category_id, basis_id: c.basis_id, unit: c.unit ?? null, currency_id: c.currency_id, note: c.note ?? null, buy: null as any, sell: null as any };
+              if (c.side === 'buy') e.buy = { quantity: c.quantity, rate: c.rate, amount: c.amount };
+              if (c.side === 'sell') e.sell = { quantity: c.quantity, rate: c.rate, amount: c.amount };
+              map.set(key, e);
+            });
+            const rows = Array.from(map.values());
+            const catName = (id?: string) => (chargeCategories.find((x: any) => String(x.id) === String(id))?.name ?? id ?? '');
+            const basisName = (id?: string) => (chargeBases.find((x: any) => String(x.id) === String(id))?.name ?? id ?? '');
+            const currencyCode = (id?: string) => (currencies.find((x: any) => String(x.id) === String(id))?.code ?? id ?? '');
+            return (
+              <div key={l.id} className="space-y-2">
+                <div className="font-semibold">Leg Name {l.leg_order}</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left p-2">Category</th>
+                        <th className="text-left p-2">Basis</th>
+                        <th className="text-left p-2">Unit</th>
+                        <th className="text-left p-2">Currency</th>
+                        <th className="text-right p-2">Buy Qty</th>
+                        <th className="text-right p-2">Buy Rate</th>
+                        <th className="text-right p-2">Buy Amount</th>
+                        <th className="text-right p-2">Sell Qty</th>
+                        <th className="text-right p-2">Sell Rate</th>
+                        <th className="text-right p-2">Sell Amount</th>
+                        <th className="text-left p-2">Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r: any) => (
+                        <tr key={r.key}>
+                          <td className="p-2">{catName(r.category_id)}</td>
+                          <td className="p-2">{basisName(r.basis_id)}</td>
+                          <td className="p-2">{r.unit ?? ''}</td>
+                          <td className="p-2">{currencyCode(r.currency_id)}</td>
+                          <td className="p-2 text-right">{r.buy?.quantity ?? ''}</td>
+                          <td className="p-2 text-right">{r.buy?.rate ?? ''}</td>
+                          <td className="p-2 text-right">{(r.buy?.amount ?? 0).toFixed ? r.buy?.amount?.toFixed(2) : (r.buy?.amount ?? '')}</td>
+                          <td className="p-2 text-right">{r.sell?.quantity ?? ''}</td>
+                          <td className="p-2 text-right">{r.sell?.rate ?? ''}</td>
+                          <td className="p-2 text-right">{(r.sell?.amount ?? 0).toFixed ? r.sell?.amount?.toFixed(2) : (r.sell?.amount ?? '')}</td>
+                          <td className="p-2">{r.note ?? ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-end gap-6 text-sm">
+                  <div>Buy: <span className="font-semibold">{buy.toFixed(2)}</span></div>
+                  <div>Sell: <span className="font-semibold">{sell.toFixed(2)}</span></div>
+                  <div>Margin: <span className="font-semibold">{margin.toFixed(2)}</span></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={async () => {
+            await saveCharges();
+            const tenantId = await getTenantId();
+            if (!tenantId || !optionId) return;
+            const { data: sidesData } = await supabase.from('charge_sides').select('id, code');
+            const buySide = (sidesData ?? []).find((s: any) => s.code === 'buy');
+            const sellSide = (sidesData ?? []).find((s: any) => s.code === 'sell');
+            const payload = combinedCharges.flatMap((c: any) => [
+              {
+                tenant_id: tenantId,
+                quote_option_id: optionId,
+                leg_id: null,
+                charge_side_id: buySide?.id,
+                category_id: c.category_id,
+                basis_id: c.basis_id,
+                quantity: c.buyQty ?? 1,
+                unit: c.unit ?? null,
+                rate: c.buyRate ?? 0,
+                amount: c.buyAmount ?? ((c.buyRate ?? 0) * (c.buyQty ?? 1)),
+                currency_id: c.currency_id ?? currencyId,
+                note: c.note ?? null,
+                sort_order: c.sort_order ?? 1000,
+              },
+              {
+                tenant_id: tenantId,
+                quote_option_id: optionId,
+                leg_id: null,
+                charge_side_id: sellSide?.id,
+                category_id: c.category_id,
+                basis_id: c.basis_id,
+                quantity: c.sellQty ?? 1,
+                unit: c.unit ?? null,
+                rate: c.sellRate ?? 0,
+                amount: c.sellAmount ?? ((c.sellRate ?? 0) * (c.sellQty ?? 1)),
+                currency_id: c.currency_id ?? currencyId,
+                note: c.note ?? null,
+                sort_order: c.sort_order ?? 1000,
+              },
+            ]);
+            if (payload.length) {
+              const { error } = await (supabase as any).from('quote_charges').insert(payload);
+              if (error) return;
+            }
+            const allLeg = Object.values(chargesByLeg).flat();
+            const legBuy = allLeg.filter((x: any) => x.side === 'buy').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            let legSell = allLeg.filter((x: any) => x.side === 'sell').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
+            const combBuy = combinedCharges.reduce((s, c) => s + (c.buyAmount || 0), 0);
+            let combSell = combinedCharges.reduce((s, c) => s + (c.sellAmount || 0), 0);
+            if (autoMarginEnabled && marginMethod === 'percent') {
+              combSell = combBuy * (1 + (marginValue / 100));
+            } else if (autoMarginEnabled && marginMethod === 'fixed') {
+              combSell = combBuy + marginValue;
+            }
+            const buyTotal = legBuy + combBuy;
+            const sellTotal = legSell + combSell;
+            const marginTotal = sellTotal - buyTotal;
+            await (supabase as any)
+              .from('quotation_version_options')
+              .update({ total_cost: buyTotal, total_price: sellTotal, margin: marginTotal })
+              .eq('id', optionId);
+          }} disabled={!optionId}>Save Quotation</Button>
+        </div>
+
+        {basisDialog && (
+          <div>
+            <div className="fixed inset-0 bg-black/50" onClick={() => setBasisDialog(null)} />
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-neutral-900 rounded-md p-4 w-full max-w-lg space-y-3">
+                <div className="font-semibold">Set Basis</div>
+                <Select value={basisDialog?.current?.tradeDirection ?? ''} onValueChange={(val) => setBasisDialog((prev: any) => ({ ...prev, current: { ...(prev?.current ?? {}), tradeDirection: val } }))}>
+                  <SelectTrigger><SelectValue placeholder="Trade Direction" /></SelectTrigger>
+                  <SelectContent>
+                    {(tradeDirections ?? []).map((d: any) => <SelectItem key={d.id} value={String(d.code)}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={basisDialog?.current?.containerType ?? ''} onValueChange={(val) => setBasisDialog((prev: any) => ({ ...prev, current: { ...(prev?.current ?? {}), containerType: val } }))}>
+                  <SelectTrigger><SelectValue placeholder="Container Type" /></SelectTrigger>
+                  <SelectContent>
+                    {(containerTypes ?? []).map((ct: any) => <SelectItem key={ct.id} value={String(ct.id)}>{ct.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={basisDialog?.current?.containerSize ?? ''} onValueChange={(val) => setBasisDialog((prev: any) => ({ ...prev, current: { ...(prev?.current ?? {}), containerSize: val } }))}>
+                  <SelectTrigger><SelectValue placeholder="Container Size" /></SelectTrigger>
+                  <SelectContent>
+                    {(containerSizes ?? []).map((cs: any) => <SelectItem key={cs.id} value={String(cs.id)}>{cs.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input type="number" value={basisDialog?.current?.quantity ?? 1} onChange={(e) => setBasisDialog((prev: any) => ({ ...prev, current: { ...(prev?.current ?? {}), quantity: Number(e.target.value) } }))} placeholder="Quantity" />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setBasisDialog(null)}>Cancel</Button>
+                  <Button onClick={() => {
+                    if (!basisDialog?.current) return;
+                    const qty = basisDialog.current.quantity ?? 1;
+                    const sizeId = basisDialog.current.containerSize;
+                    const sizeName = (containerSizes.find((s: any) => String(s.id) === String(sizeId))?.name ?? '') || String(sizeId ?? '');
+                    const unitText = `${qty}x${sizeName}`;
+                    if (basisDialog.type === 'combined') {
+                      setCombinedCharges(prev => prev.map(x => x.id === basisDialog.row.id ? { ...x, basisDetails: basisDialog.current, unit: unitText, buyQty: qty, sellQty: qty } : x));
+                    } else if (basisDialog.type === 'leg' && typeof basisDialog.rowIdx === 'number') {
+                      const legId = currentLegId;
+                      if (!legId) return;
+                      setChargesByLeg(prev => {
+                        const data = prev[legId] ?? [];
+                        const next = data.slice();
+                        next[basisDialog.rowIdx] = { ...next[basisDialog.rowIdx], unit: unitText, quantity: qty };
+                        return { ...prev, [legId]: next };
+                      });
+                    }
+                    setBasisDialog(null);
+                  }}>Save</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

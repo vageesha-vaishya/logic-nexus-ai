@@ -30,7 +30,7 @@ type CombinedRow = {
   sell?: { idx: number; quantity?: number; rate?: number; amount?: number; charge_side_id?: string };
 };
 
-export default function ChargesTable({ charges, onChange, defaultCurrencyId }: { charges: ChargeRow[]; onChange: (rows: ChargeRow[]) => void; defaultCurrencyId?: string | null }) {
+export default function ChargesTable({ charges, onChange, defaultCurrencyId, onSaveClick, saveDisabled }: { charges: ChargeRow[]; onChange: (rows: ChargeRow[]) => void; defaultCurrencyId?: string | null; onSaveClick?: () => void; saveDisabled?: boolean }) {
   const [sides, setSides] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [bases, setBases] = useState<any[]>([]);
@@ -218,6 +218,9 @@ export default function ChargesTable({ charges, onChange, defaultCurrencyId }: {
         <div>Buy: <span className="font-semibold">{totals.buy.toFixed(2)}</span></div>
         <div>Sell: <span className="font-semibold">{totals.sell.toFixed(2)}</span></div>
         <div>Margin: <span className="font-semibold">{totals.margin.toFixed(2)}</span></div>
+        {onSaveClick && (
+          <Button onClick={onSaveClick} disabled={!!saveDisabled}>Save Charges</Button>
+        )}
       </div>
     </div>
   );

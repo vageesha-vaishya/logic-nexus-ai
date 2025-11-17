@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteForm } from '@/components/sales/QuoteForm';
 import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
-import QuoteComposer from '@/components/sales/QuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
@@ -112,9 +111,7 @@ export default function QuoteDetail() {
           </div>
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
-        {resolvedId && versionId && (
-          <QuoteComposer quoteId={resolvedId} versionId={versionId} autoScroll />
-        )}
+        {/* Quotation Composer is now only available via the Capture Carrier Rates popup in QuoteForm */}
       </div>
     </DashboardLayout>
   );
