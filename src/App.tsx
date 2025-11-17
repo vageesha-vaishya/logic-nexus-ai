@@ -69,6 +69,7 @@ import Quotes from "./pages/dashboard/Quotes";
 import QuoteNew from "./pages/dashboard/QuoteNew";
 import QuoteDetail from "./pages/dashboard/QuoteDetail";
 import QuotesPipeline from "./pages/dashboard/QuotesPipeline";
+import MultiModalQuote from "./pages/dashboard/MultiModalQuote";
 import Carriers from "./pages/dashboard/Carriers";
 import Consignees from "./pages/dashboard/Consignees";
 import PortsLocations from "./pages/dashboard/PortsLocations";
@@ -405,6 +406,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <QuoteDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/quotes/multi-modal" 
+              element={
+                <ProtectedRoute>
+                  <MultiModalQuote />
                 </ProtectedRoute>
               } 
             />
