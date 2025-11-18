@@ -9,6 +9,7 @@ import { ChargeRow } from './ChargeRow';
 interface Leg {
   id: string;
   mode: string;
+  serviceTypeId: string;
   origin: string;
   destination: string;
   charges: any[];
@@ -23,6 +24,7 @@ interface ChargesManagementStepProps {
   tradeDirections: any[];
   containerTypes: any[];
   containerSizes: any[];
+  serviceTypes: any[];
   autoMargin: boolean;
   marginPercent: number;
   onAutoMarginChange: (enabled: boolean) => void;
@@ -46,6 +48,7 @@ export function ChargesManagementStep({
   tradeDirections,
   containerTypes,
   containerSizes,
+  serviceTypes,
   autoMargin,
   marginPercent,
   onAutoMarginChange,
@@ -86,25 +89,27 @@ export function ChargesManagementStep({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Auto Margin Settings */}
-        <div className="flex items-center gap-4 p-4 bg-accent/20 rounded-lg">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4 p-4 bg-primary/5 border border-border rounded-lg">
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
               checked={autoMargin}
               onChange={(e) => onAutoMarginChange(e.target.checked)}
               id="auto-margin"
-              className="h-4 w-4"
+              className="h-4 w-4 rounded border-border"
             />
-            <Label htmlFor="auto-margin" className="font-semibold">Auto Calculate Margin</Label>
+            <Label htmlFor="auto-margin" className="font-semibold cursor-pointer">
+              Auto Calculate Margin
+            </Label>
           </div>
           {autoMargin && (
-            <div className="flex items-center gap-2">
-              <Label>Margin %:</Label>
+            <div className="flex items-center gap-3 ml-4 pl-4 border-l border-border">
+              <Label className="text-sm font-medium">Margin %:</Label>
               <Input
                 type="number"
                 value={marginPercent}
                 onChange={(e) => onMarginPercentChange(Number(e.target.value))}
-                className="w-24"
+                className="w-20"
                 min={0}
                 max={100}
               />
@@ -126,15 +131,18 @@ export function ChargesManagementStep({
             const totals = calculateTotals(leg.charges);
             const margin = totals.sell - totals.buy;
             const marginPercent = totals.buy > 0 ? ((margin / totals.buy) * 100).toFixed(2) : '0.00';
+            const serviceType = serviceTypes.find(st => st.id === leg.serviceTypeId);
 
             return (
               <TabsContent key={leg.id} value={leg.id} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-semibold">
-                      {leg.origin || 'Origin'} → {leg.destination || 'Destination'}
+                    <h4 className="font-semibold text-lg">
+                      Leg {legIdx + 1}: {serviceType?.name || leg.mode.toUpperCase()}
                     </h4>
-                    <p className="text-sm text-muted-foreground">{leg.mode.toUpperCase()} Transport</p>
+                    <p className="text-sm text-muted-foreground">
+                      {leg.origin || 'Origin'} → {leg.destination || 'Destination'}
+                    </p>
                   </div>
                   <Button onClick={() => onAddCharge(leg.id)} size="sm">
                     <Plus className="mr-2 h-4 w-4" />
@@ -143,23 +151,23 @@ export function ChargesManagementStep({
                 </div>
 
                 {leg.charges.length > 0 ? (
-                  <div className="overflow-x-auto border rounded-lg">
+                  <div className="overflow-x-auto border rounded-lg shadow-sm">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted">
+                      <thead className="bg-muted/50">
                         <tr>
-                          <th className="p-2 text-left">Category</th>
-                          <th className="p-2 text-left">Basis</th>
-                          <th className="p-2 text-left">Unit</th>
-                          <th className="p-2 text-left">Currency</th>
-                          <th className="p-2 text-right">Buy Qty</th>
-                          <th className="p-2 text-right">Buy Rate</th>
-                          <th className="p-2 text-right">Buy Amt</th>
-                          <th className="p-2 text-right">Sell Qty</th>
-                          <th className="p-2 text-right">Sell Rate</th>
-                          <th className="p-2 text-right">Sell Amt</th>
-                          <th className="p-2 text-right">Margin</th>
-                          <th className="p-2 text-left">Notes</th>
-                          <th className="p-2 text-center">Actions</th>
+                          <th className="p-3 text-left font-semibold">Category</th>
+                          <th className="p-3 text-left font-semibold">Basis</th>
+                          <th className="p-3 text-left font-semibold">Unit</th>
+                          <th className="p-3 text-left font-semibold">Currency</th>
+                          <th className="p-3 text-right font-semibold">Buy Qty</th>
+                          <th className="p-3 text-right font-semibold">Buy Rate</th>
+                          <th className="p-3 text-right font-semibold">Buy Amt</th>
+                          <th className="p-3 text-right font-semibold">Sell Qty</th>
+                          <th className="p-3 text-right font-semibold">Sell Rate</th>
+                          <th className="p-3 text-right font-semibold">Sell Amt</th>
+                          <th className="p-3 text-right font-semibold">Margin</th>
+                          <th className="p-3 text-left font-semibold">Notes</th>
+                          <th className="p-3 text-center font-semibold">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -177,13 +185,13 @@ export function ChargesManagementStep({
                           />
                         ))}
                       </tbody>
-                      <tfoot className="bg-muted font-bold">
+                      <tfoot className="bg-muted/30 font-semibold border-t-2">
                         <tr>
-                          <td colSpan={6} className="p-2 text-right">Totals:</td>
-                          <td className="p-2 text-right">{totals.buy.toFixed(2)}</td>
-                          <td colSpan={2} className="p-2"></td>
-                          <td className="p-2 text-right">{totals.sell.toFixed(2)}</td>
-                          <td className={`p-2 text-right ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <td colSpan={6} className="p-3 text-right">Totals:</td>
+                          <td className="p-3 text-right">{totals.buy.toFixed(2)}</td>
+                          <td colSpan={2} className="p-3"></td>
+                          <td className="p-3 text-right">{totals.sell.toFixed(2)}</td>
+                          <td className={`p-3 text-right font-bold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                             {margin.toFixed(2)} ({marginPercent}%)
                           </td>
                           <td colSpan={2}></td>
@@ -192,8 +200,10 @@ export function ChargesManagementStep({
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-muted-foreground border rounded-lg">
-                    <p>No charges added yet. Click "Add Charge" to begin.</p>
+                  <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">
+                    <Plus className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-base font-medium">No charges added yet</p>
+                    <p className="text-sm mt-1">Click "Add Charge" to begin adding costs for this leg</p>
                   </div>
                 )}
               </TabsContent>
@@ -202,18 +212,18 @@ export function ChargesManagementStep({
       </Tabs>
 
       {/* Combined Charges */}
-      <Card className="mt-6">
-        <CardHeader>
+      <Card className="mt-6 border-2">
+        <CardHeader className="bg-muted/20">
           <CardTitle>Combined Charges</CardTitle>
-          <CardDescription>Charges not tied to a specific leg</CardDescription>
+          <CardDescription>Charges applicable across all legs (e.g., documentation, insurance)</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Apply charges across the whole option</p>
+              <p className="text-sm text-muted-foreground">These charges apply to the entire shipment</p>
             </div>
             {onAddCombinedCharge && (
-              <Button onClick={() => onAddCombinedCharge?.()} size="sm">
+              <Button onClick={() => onAddCombinedCharge?.()} size="sm" variant="outline">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Combined Charge
               </Button>
@@ -221,23 +231,23 @@ export function ChargesManagementStep({
           </div>
 
           {combinedCharges.length > 0 ? (
-            <div className="overflow-x-auto border rounded-lg">
+            <div className="overflow-x-auto border rounded-lg shadow-sm">
               <table className="w-full text-sm">
-                <thead className="bg-muted">
+                <thead className="bg-muted/50">
                   <tr>
-                    <th className="p-2 text-left">Category</th>
-                    <th className="p-2 text-left">Basis</th>
-                    <th className="p-2 text-left">Unit</th>
-                    <th className="p-2 text-left">Currency</th>
-                    <th className="p-2 text-right">Buy Qty</th>
-                    <th className="p-2 text-right">Buy Rate</th>
-                    <th className="p-2 text-right">Buy Amt</th>
-                    <th className="p-2 text-right">Sell Qty</th>
-                    <th className="p-2 text-right">Sell Rate</th>
-                    <th className="p-2 text-right">Sell Amt</th>
-                    <th className="p-2 text-right">Margin</th>
-                    <th className="p-2 text-left">Notes</th>
-                    <th className="p-2 text-center">Actions</th>
+                    <th className="p-3 text-left font-semibold">Category</th>
+                    <th className="p-3 text-left font-semibold">Basis</th>
+                    <th className="p-3 text-left font-semibold">Unit</th>
+                    <th className="p-3 text-left font-semibold">Currency</th>
+                    <th className="p-3 text-right font-semibold">Buy Qty</th>
+                    <th className="p-3 text-right font-semibold">Buy Rate</th>
+                    <th className="p-3 text-right font-semibold">Buy Amt</th>
+                    <th className="p-3 text-right font-semibold">Sell Qty</th>
+                    <th className="p-3 text-right font-semibold">Sell Rate</th>
+                    <th className="p-3 text-right font-semibold">Sell Amt</th>
+                    <th className="p-3 text-right font-semibold">Margin</th>
+                    <th className="p-3 text-left font-semibold">Notes</th>
+                    <th className="p-3 text-center font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -255,13 +265,13 @@ export function ChargesManagementStep({
                     />
                   ))}
                 </tbody>
-                <tfoot className="bg-muted font-bold">
+                <tfoot className="bg-muted/30 font-semibold border-t-2">
                   <tr>
-                    <td colSpan={6} className="p-2 text-right">Totals:</td>
-                    <td className="p-2 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
-                    <td colSpan={2} className="p-2"></td>
-                    <td className="p-2 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
-                    <td className="p-2 text-right">
+                    <td colSpan={6} className="p-3 text-right">Totals:</td>
+                    <td className="p-3 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
+                    <td colSpan={2} className="p-3"></td>
+                    <td className="p-3 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
+                    <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                       {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)}
                     </td>
                     <td colSpan={2}></td>
@@ -270,8 +280,10 @@ export function ChargesManagementStep({
               </table>
             </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground border rounded-lg">
-              <p>No combined charges. Click "Add Combined Charge" to begin.</p>
+            <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">
+              <Plus className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-base font-medium">No combined charges yet</p>
+              <p className="text-sm mt-1">Add charges that apply to the entire shipment</p>
             </div>
           )}
         </CardContent>

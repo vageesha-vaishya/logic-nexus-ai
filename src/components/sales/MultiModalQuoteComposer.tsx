@@ -687,6 +687,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           tradeDirections={tradeDirections}
           containerTypes={containerTypes}
           containerSizes={containerSizes}
+          serviceTypes={serviceTypes}
           autoMargin={autoMargin}
           marginPercent={marginPercent}
           onAutoMarginChange={setAutoMargin}
