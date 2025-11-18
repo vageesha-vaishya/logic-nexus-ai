@@ -162,7 +162,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         
         if (field.includes('.')) {
           const [parent, child] = field.split('.');
-          charge[parent] = { ...charge[parent], [child]: value };
+          charge[parent] = { ...(charge[parent] || {}), [child]: value };
         } else {
           charge[field] = value;
         }
