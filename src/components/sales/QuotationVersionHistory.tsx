@@ -145,15 +145,114 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
     }
   };
 
+  const chunk = (arr: string[], size: number) => {
+    const out: string[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  };
+
+  const deleteVersionsByIds = async (versionIds: string[]) => {
+    if (!versionIds.length) return;
+    setLoading(true);
+    try {
+      const { data: opts, error: oErr } = await supabase
+        .from('quotation_version_options')
+        .select('id')
+        .in('quotation_version_id', versionIds);
+      if (oErr) throw oErr;
+      const optionIds = (opts ?? []).map((o: any) => String(o.id));
+
+      let quoteLegIds: string[] = [];
+      if (optionIds.length) {
+        const { data: legs1, error: lErr1 } = await supabase
+          .from('quote_legs')
+          .select('id')
+          .in('quote_option_id', optionIds);
+        if (lErr1) throw lErr1;
+        quoteLegIds = (legs1 ?? []).map((l: any) => String(l.id));
+      }
+
+      let compLegIds: string[] = [];
+      if (optionIds.length) {
+        const { data: legs2, error: lErr2 } = await supabase
+          .from('quotation_version_option_legs')
+          .select('id')
+          .in('quotation_version_option_id', optionIds);
+        if (lErr2) throw lErr2;
+        compLegIds = (legs2 ?? []).map((l: any) => String(l.id));
+      }
+
+      for (const b of chunk(optionIds, 1000)) {
+        if (!b.length) continue;
+        const { error } = await supabase.from('quote_charges').delete().in('quote_option_id', b);
+        if (error) throw error;
+      }
+      for (const b of chunk(quoteLegIds, 1000)) {
+        if (!b.length) continue;
+        const { error } = await supabase.from('quote_charges').delete().in('leg_id', b);
+        if (error) throw error;
+      }
+
+      for (const b of chunk(quoteLegIds, 1000)) {
+        if (!b.length) continue;
+        const { error } = await supabase.from('quote_legs').delete().in('id', b);
+        if (error) throw error;
+      }
+      for (const b of chunk(compLegIds, 1000)) {
+        if (!b.length) continue;
+        const { error } = await supabase.from('quotation_version_option_legs').delete().in('id', b);
+        if (error) throw error;
+      }
+
+      for (const b of chunk(optionIds, 1000)) {
+        if (!b.length) continue;
+        const { error } = await supabase.from('quotation_version_options').delete().in('id', b);
+        if (error) throw error;
+      }
+      for (const b of chunk(versionIds, 1000)) {
+        if (!b.length) continue;
+        const { error } = await supabase.from('quotation_versions').delete().in('id', b);
+        if (error) throw error;
+      }
+
+      toast({ title: 'Deleted versions', description: `Removed ${versionIds.length} version(s)` });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Delete failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteVersion = async (versionId: string) => {
+    const ok = window.confirm('Delete this version and all its options/legs/charges?');
+    if (!ok) return;
+    await deleteVersionsByIds([versionId]);
+  };
+
+  const deleteByKind = async (kind: 'minor' | 'major') => {
+    const ids = versions.filter(v => v.kind === kind).map(v => v.id);
+    if (!ids.length) {
+      toast({ title: 'No versions', description: `No ${kind} versions to delete` });
+      return;
+    }
+    const ok = window.confirm(`Delete all ${kind} versions and their data?`);
+    if (!ok) return;
+    await deleteVersionsByIds(ids);
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Version History</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-3">
           <Button disabled={loading} onClick={() => createVersion('minor')}>Create Minor Version</Button>
           <Button variant="secondary" disabled={loading} onClick={() => createVersion('major')}>Create Major Version</Button>
+          <Separator orientation="vertical" className="mx-2 h-6" />
+          <Button variant="destructive" disabled={loading} onClick={() => deleteByKind('minor')}>Delete Minor Versions</Button>
+          <Button variant="destructive" disabled={loading} onClick={() => deleteByKind('major')}>Delete Major Versions</Button>
         </div>
         <Separator className="mb-3" />
         {versions.length === 0 && (
@@ -184,6 +283,9 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
                 {(optionsByVersion[v.id] ?? []).length === 0 && (
                   <div className="text-xs text-muted-foreground">No options created for this version.</div>
                 )}
+                <div className="flex justify-end">
+                  <Button variant="destructive" size="sm" disabled={loading} onClick={() => deleteVersion(v.id)}>Delete This Version</Button>
+                </div>
               </div>
             </div>
           ))}
