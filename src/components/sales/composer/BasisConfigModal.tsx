@@ -1,8 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface BasisConfig {
   tradeDirection: string;
@@ -33,86 +33,70 @@ export function BasisConfigModal({
   containerSizes
 }: BasisConfigModalProps) {
   const handleSave = () => {
-    if (!config.tradeDirection || !config.containerType || !config.containerSize) {
+    const finalTradeDirection = config.tradeDirection || String(tradeDirections[0]?.id || '');
+    const finalContainerType = config.containerType || String(containerTypes[0]?.id || '');
+    const finalContainerSize = config.containerSize || String(containerSizes[0]?.id || '');
+    const finalQuantity = Math.max(1, Number(config.quantity || 1));
+
+    if (!finalContainerSize) {
       alert('Please fill all required fields');
       return;
     }
-    onSave(config);
+
+    onSave({
+      tradeDirection: finalTradeDirection,
+      containerType: finalContainerType,
+      containerSize: finalContainerSize,
+      quantity: finalQuantity,
+    });
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Configure Charge Basis</DialogTitle>
+          <DialogTitle>Container Basis Configuration</DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          <div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
             <Label>Trade Direction *</Label>
-            <Select
-              value={config.tradeDirection}
-              onValueChange={(val) => onChange({ tradeDirection: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select direction" />
-              </SelectTrigger>
-              <SelectContent>
-                {tradeDirections.map((dir) => (
-                  <SelectItem key={dir.id} value={dir.id}>
-                    {dir.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ToggleGroup type="single" value={config.tradeDirection} onValueChange={(val) => onChange({ tradeDirection: String(val || '') })} className="flex flex-wrap gap-2">
+              {tradeDirections.map((d) => (
+                <ToggleGroupItem key={d.id} value={String(d.id)} variant="outline" size="lg" className="min-w-[140px]">{d.name}</ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label>Container Type *</Label>
-            <Select
-              value={config.containerType}
-              onValueChange={(val) => onChange({ containerType: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {containerTypes.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ToggleGroup type="single" value={config.containerType} onValueChange={(val) => onChange({ containerType: String(val || '') })} className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {containerTypes.map((ct) => (
+                <ToggleGroupItem key={ct.id} value={String(ct.id)} variant="outline" size="lg" className="justify-start">
+                  {ct.name}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label>Container Size *</Label>
-            <Select
-              value={config.containerSize}
-              onValueChange={(val) => onChange({ containerSize: val })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select size" />
-              </SelectTrigger>
-              <SelectContent>
-                {containerSizes.map((size) => (
-                  <SelectItem key={size.id} value={size.id}>
-                    {size.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ToggleGroup type="single" value={config.containerSize} onValueChange={(val) => onChange({ containerSize: String(val || '') })} className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {containerSizes.map((cs) => (
+                <ToggleGroupItem key={cs.id} value={String(cs.id)} variant="outline" size="lg" className="justify-start">
+                  {cs.name}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
 
-          <div>
-            <Label>Quantity</Label>
-            <Input
-              type="number"
-              value={config.quantity}
-              onChange={(e) => onChange({ quantity: Number(e.target.value) })}
-              min={1}
-            />
+          <div className="space-y-2">
+            <Label>Number of Containers</Label>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => onChange({ quantity: Math.max(1, (config.quantity || 1) - 1) })}>-</Button>
+              <Input className="w-20 text-center" type="number" value={config.quantity} onChange={(e) => onChange({ quantity: Math.max(1, Number(e.target.value) || 1) })} min={1} />
+              <Button type="button" variant="outline" size="sm" onClick={() => onChange({ quantity: (config.quantity || 1) + 1 })}>+</Button>
+            </div>
           </div>
         </div>
 

@@ -198,6 +198,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const openBasisModal = (legId: string, chargeIdx: number) => {
     setBasisChargeIndex({ legId, chargeIdx });
+    const tdId = String(tradeDirections?.[0]?.id ?? '');
+    const ctId = String(containerTypes?.[0]?.id ?? '');
+    const csId = String(containerSizes?.[0]?.id ?? '');
+    setCurrentBasisConfig({ tradeDirection: tdId, containerType: ctId, containerSize: csId, quantity: 1 });
     setBasisModalOpen(true);
   };
 
