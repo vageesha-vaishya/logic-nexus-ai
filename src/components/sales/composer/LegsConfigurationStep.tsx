@@ -65,46 +65,48 @@ export function LegsConfigurationStep({
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label>Service Type</Label>
+                      <Label className="text-sm font-medium mb-2 block">Service Type *</Label>
                       <Select
                         value={leg.serviceTypeId}
                         onValueChange={(val) => onUpdateLeg(leg.id, { serviceTypeId: val })}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select service" />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select service type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {serviceTypes.map((st) => (
-                            <SelectItem key={st.id} value={st.id}>
-                              {st.name}
-                            </SelectItem>
-                          ))}
+                          {serviceTypes
+                            .filter((st) => st.mode?.toLowerCase() === leg.mode.toLowerCase())
+                            .map((st) => (
+                              <SelectItem key={st.id} value={st.id}>
+                                {st.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div>
-                      <Label>Origin</Label>
+                      <Label className="text-sm font-medium mb-2 block">Origin *</Label>
                       <div className="relative">
-                        <MapPin className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           value={leg.origin}
                           onChange={(e) => onUpdateLeg(leg.id, { origin: e.target.value })}
-                          placeholder="Origin location"
-                          className="pl-8"
+                          placeholder="e.g., Shanghai Port"
+                          className="pl-9"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <Label>Destination</Label>
+                      <Label className="text-sm font-medium mb-2 block">Destination *</Label>
                       <div className="relative">
-                        <MapPin className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           value={leg.destination}
                           onChange={(e) => onUpdateLeg(leg.id, { destination: e.target.value })}
-                          placeholder="Destination location"
-                          className="pl-8"
+                          placeholder="e.g., Los Angeles Port"
+                          className="pl-9"
                         />
                       </div>
                     </div>
