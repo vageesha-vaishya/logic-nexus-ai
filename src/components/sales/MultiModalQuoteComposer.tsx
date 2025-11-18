@@ -40,6 +40,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [saving, setSaving] = useState(false);
   const [optionId, setOptionId] = useState<string | null>(initialOptionId || null);
   const [legs, setLegs] = useState<Leg[]>([]);
+  const [combinedCharges, setCombinedCharges] = useState<any[]>([]);
   const [quoteData, setQuoteData] = useState<any>({});
   const [autoMargin, setAutoMargin] = useState(false);
   const [marginPercent, setMarginPercent] = useState(15);
@@ -62,7 +63,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     containerSize: '',
     quantity: 1
   });
-  const [basisChargeIndex, setBasisChargeIndex] = useState<{ legId: string; chargeIdx: number } | null>(null);
+  const [basisTarget, setBasisTarget] = useState<{ type: 'leg' | 'combined'; legId?: string; chargeIdx: number } | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -175,6 +176,39 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         setLegs(legsWithCharges);
       }
+      // Load combined charges (leg_id IS NULL) and pair buy/sell
+      const { data: combinedData, error: combinedErr } = await supabase
+        .from('quote_charges' as any)
+        .select(`*, charge_sides(code)`)
+        .eq('quote_option_id', optionId)
+        .is('leg_id', null)
+        .order('sort_order', { ascending: true });
+      if (combinedErr) throw combinedErr;
+      if (Array.isArray(combinedData)) {
+        const map = new Map<string, any>();
+        combinedData.forEach((row: any) => {
+          const key = `${row.category_id}-${row.basis_id}-${row.note || ''}`;
+          const existing = map.get(key) || {
+            id: row.id,
+            category_id: row.category_id,
+            basis_id: row.basis_id,
+            unit: row.unit,
+            currency_id: row.currency_id,
+            note: row.note,
+            buy: { quantity: 0, rate: 0 },
+            sell: { quantity: 0, rate: 0 }
+          };
+          if (row.charge_sides?.code === 'buy') {
+            existing.buy = { quantity: row.quantity || 0, rate: row.rate || 0 };
+          } else if (row.charge_sides?.code === 'sell') {
+            existing.sell = { quantity: row.quantity || 0, rate: row.rate || 0 };
+          }
+          map.set(key, existing);
+        });
+        setCombinedCharges(Array.from(map.values()));
+      } else {
+        setCombinedCharges([]);
+      }
     } catch (error: any) {
       toast({ title: 'Error loading data', description: error.message, variant: 'destructive' });
     } finally {
@@ -268,8 +302,61 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }));
   };
 
+  // Combined charges handlers
+  const addCombinedCharge = () => {
+    setCombinedCharges(prev => ([
+      ...prev,
+      {
+        id: `combined-${Date.now()}`,
+        category_id: '',
+        basis_id: '',
+        unit: '',
+        currency_id: currencies[0]?.id || '',
+        buy: { quantity: 1, rate: 0 },
+        sell: { quantity: 1, rate: 0 },
+        note: ''
+      }
+    ]));
+  };
+
+  const updateCombinedCharge = (chargeIdx: number, field: string, value: any) => {
+    setCombinedCharges(prev => {
+      const next = [...prev];
+      const charge = { ...next[chargeIdx] };
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.');
+        charge[parent] = { ...(charge[parent] || {}), [child]: value };
+      } else {
+        charge[field] = value;
+      }
+      if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
+        const buyAmount = (charge.buy?.quantity || 1) * (charge.buy?.rate || 0);
+        const sellRate = (charge.buy?.rate || 0) * (1 + marginPercent / 100);
+        charge.sell = {
+          quantity: charge.buy?.quantity || 1,
+          rate: sellRate
+        };
+      }
+      next[chargeIdx] = charge;
+      return next;
+    });
+  };
+
+  const removeCombinedCharge = (chargeIdx: number) => {
+    setCombinedCharges(prev => prev.filter((_, idx) => idx !== chargeIdx));
+  };
+
   const openBasisModal = (legId: string, chargeIdx: number) => {
-    setBasisChargeIndex({ legId, chargeIdx });
+    setBasisTarget({ type: 'leg', legId, chargeIdx });
+    const tdId = String(tradeDirections?.[0]?.id ?? '');
+    const ctId = String(containerTypes?.[0]?.id ?? '');
+    const csId = String(containerSizes?.[0]?.id ?? '');
+    setCurrentBasisConfig({ tradeDirection: tdId, containerType: ctId, containerSize: csId, quantity: 1 });
+    setBasisModalOpen(true);
+  };
+
+  const openCombinedBasisModal = (chargeIdx: number) => {
+    setBasisTarget({ type: 'combined', chargeIdx });
     const tdId = String(tradeDirections?.[0]?.id ?? '');
     const ctId = String(containerTypes?.[0]?.id ?? '');
     const csId = String(containerSizes?.[0]?.id ?? '');
@@ -278,26 +365,40 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const saveBasisConfig = (config: any) => {
-    if (!basisChargeIndex) return;
-    
-    const { legId, chargeIdx } = basisChargeIndex;
+    if (!basisTarget) return;
     const size = containerSizes.find(s => s.id === config.containerSize);
-    
-    setLegs(legs.map(leg => {
-      if (leg.id === legId) {
-        const charges = [...leg.charges];
-        charges[chargeIdx] = {
-          ...charges[chargeIdx],
+
+    if (basisTarget.type === 'leg' && basisTarget.legId) {
+      const { legId, chargeIdx } = basisTarget;
+      setLegs(legs.map(leg => {
+        if (leg.id === legId) {
+          const charges = [...leg.charges];
+          charges[chargeIdx] = {
+            ...charges[chargeIdx],
+            unit: `${config.quantity}x${size?.name || ''}`,
+            buy: { ...charges[chargeIdx].buy, quantity: config.quantity },
+            sell: { ...charges[chargeIdx].sell, quantity: config.quantity },
+            basisDetails: config
+          };
+          return { ...leg, charges };
+        }
+        return leg;
+      }));
+    } else if (basisTarget.type === 'combined') {
+      const { chargeIdx } = basisTarget;
+      setCombinedCharges(prev => {
+        const next = [...prev];
+        next[chargeIdx] = {
+          ...next[chargeIdx],
           unit: `${config.quantity}x${size?.name || ''}`,
-          buy: { ...charges[chargeIdx].buy, quantity: config.quantity },
-          sell: { ...charges[chargeIdx].sell, quantity: config.quantity },
+          buy: { ...(next[chargeIdx].buy || {}), quantity: config.quantity },
+          sell: { ...(next[chargeIdx].sell || {}), quantity: config.quantity },
           basisDetails: config
         };
-        return { ...leg, charges };
-      }
-      return leg;
-    }));
-    
+        return next;
+      });
+    }
+
     setBasisModalOpen(false);
     setCurrentBasisConfig({ tradeDirection: '', containerType: '', containerSize: '', quantity: 1 });
   };
@@ -339,6 +440,31 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const buySideId = buySideRes.data.id;
       const sellSideId = sellSideRes.data.id;
 
+      // Remove deleted legs and their charges
+      const { data: existingLegs } = await supabase
+        .from('quote_legs' as any)
+        .select('id')
+        .eq('quote_option_id', currentOptionId);
+      const stateLegIds = new Set(
+        (legs || [])
+          .filter(l => !String(l.id).startsWith('leg-'))
+          .map(l => String(l.id))
+      );
+      const toDeleteLegIds = (existingLegs || [])
+        .map((l: any) => String(l.id))
+        .filter((id: string) => !stateLegIds.has(id));
+      if (toDeleteLegIds.length) {
+        await supabase
+          .from('quote_charges' as any)
+          .delete()
+          .in('leg_id', toDeleteLegIds)
+          .eq('quote_option_id', currentOptionId);
+        await supabase
+          .from('quote_legs' as any)
+          .delete()
+          .in('id', toDeleteLegIds);
+      }
+
       // Save legs and charges
       for (let i = 0; i < legs.length; i++) {
         const leg = legs[i];
@@ -379,53 +505,98 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           if (updateError) throw updateError;
         }
 
-        // Save charges (batch insert for new charges)
-        const newCharges: any[] = [];
-        
-        for (const charge of leg.charges) {
-          if (charge.id.startsWith('charge-')) {
-            // Prepare buy side
-            newCharges.push({
-              quote_option_id: currentOptionId,
-              leg_id: legId,
-              charge_side_id: buySideId,
-              category_id: charge.category_id || null,
-              basis_id: charge.basis_id || null,
-              quantity: charge.buy?.quantity || 1,
-              rate: charge.buy?.rate || 0,
-              amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
-              currency_id: charge.currency_id || null,
-              unit: charge.unit || null,
-              note: charge.note || null,
-              tenant_id: tenantId
-            });
+        // Replace charges for this leg
+        await supabase
+          .from('quote_charges' as any)
+          .delete()
+          .eq('quote_option_id', currentOptionId)
+          .eq('leg_id', legId);
 
-            // Prepare sell side
-            newCharges.push({
-              quote_option_id: currentOptionId,
-              leg_id: legId,
-              charge_side_id: sellSideId,
-              category_id: charge.category_id || null,
-              basis_id: charge.basis_id || null,
-              quantity: charge.sell?.quantity || 1,
-              rate: charge.sell?.rate || 0,
-              amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
-              currency_id: charge.currency_id || null,
-              unit: charge.unit || null,
-              note: charge.note || null,
-              tenant_id: tenantId
-            });
-          }
+        const newCharges: any[] = [];
+        for (const charge of leg.charges) {
+          // Prepare buy side
+          newCharges.push({
+            quote_option_id: currentOptionId,
+            leg_id: legId,
+            charge_side_id: buySideId,
+            category_id: charge.category_id || null,
+            basis_id: charge.basis_id || null,
+            quantity: charge.buy?.quantity || 1,
+            rate: charge.buy?.rate || 0,
+            amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
+            currency_id: charge.currency_id || null,
+            unit: charge.unit || null,
+            note: charge.note || null,
+            tenant_id: tenantId
+          });
+
+          // Prepare sell side
+          newCharges.push({
+            quote_option_id: currentOptionId,
+            leg_id: legId,
+            charge_side_id: sellSideId,
+            category_id: charge.category_id || null,
+            basis_id: charge.basis_id || null,
+            quantity: charge.sell?.quantity || 1,
+            rate: charge.sell?.rate || 0,
+            amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
+            currency_id: charge.currency_id || null,
+            unit: charge.unit || null,
+            note: charge.note || null,
+            tenant_id: tenantId
+          });
         }
 
-        // Batch insert new charges
         if (newCharges.length > 0) {
           const { error: chargeError } = await supabase
-            .from('quote_charges')
+            .from('quote_charges' as any)
             .insert(newCharges);
-          
           if (chargeError) throw chargeError;
         }
+      }
+
+      // Persist combined charges (leg_id IS NULL)
+      await supabase
+        .from('quote_charges' as any)
+        .delete()
+        .eq('quote_option_id', currentOptionId)
+        .is('leg_id', null);
+
+      const combinedPayload = (combinedCharges || []).flatMap((charge: any) => [
+        {
+          quote_option_id: currentOptionId,
+          leg_id: null,
+          charge_side_id: buySideId,
+          category_id: charge.category_id || null,
+          basis_id: charge.basis_id || null,
+          quantity: charge.buy?.quantity || 1,
+          rate: charge.buy?.rate || 0,
+          amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
+          currency_id: charge.currency_id || null,
+          unit: charge.unit || null,
+          note: charge.note || null,
+          tenant_id: tenantId
+        },
+        {
+          quote_option_id: currentOptionId,
+          leg_id: null,
+          charge_side_id: sellSideId,
+          category_id: charge.category_id || null,
+          basis_id: charge.basis_id || null,
+          quantity: charge.sell?.quantity || 1,
+          rate: charge.sell?.rate || 0,
+          amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
+          currency_id: charge.currency_id || null,
+          unit: charge.unit || null,
+          note: charge.note || null,
+          tenant_id: tenantId
+        }
+      ]);
+      if (combinedPayload.length) {
+        const { error: combErr } = await supabase
+          .from('quote_charges' as any)
+          .insert(combinedPayload);
+        if (combErr) throw combErr;
       }
 
       toast({ title: 'Success', description: 'Quotation saved successfully' });
@@ -509,6 +680,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       {currentStep === 3 && (
         <ChargesManagementStep
           legs={legs}
+          combinedCharges={combinedCharges}
           chargeCategories={chargeCategories}
           chargeBases={chargeBases}
           currencies={currencies}
@@ -523,6 +695,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onUpdateCharge={updateCharge}
           onRemoveCharge={removeCharge}
           onConfigureBasis={openBasisModal}
+          onAddCombinedCharge={addCombinedCharge}
+          onUpdateCombinedCharge={updateCombinedCharge}
+          onRemoveCombinedCharge={removeCombinedCharge}
+          onConfigureCombinedBasis={openCombinedBasisModal}
         />
       )}
 

@@ -1433,10 +1433,13 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       }
       const legIdSet = new Set<string>((legs ?? []).map(l => String(l.id)));
       const grouped: Record<string, any[]> = {};
+      // Ensure we always group by a valid composer leg id
       byLeg.forEach((c: any) => {
         const lid = String(c.leg_id);
         const mapped = toComposerId[lid];
-        const key = mapped ?? (legIdSet.has(lid) ? lid : lid);
+        // Strict mapping: only place charges under the matching composer leg id
+        const key = mapped ?? (legIdSet.has(lid) ? lid : null);
+        if (!key) return; // Skip if we cannot resolve a composer leg id
         const arr = grouped[key] ?? [];
         arr.push({
           side: sideById[String(c.charge_side_id)] === 'buy' ? 'buy' : 'sell',

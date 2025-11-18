@@ -16,6 +16,7 @@ interface Leg {
 
 interface ChargesManagementStepProps {
   legs: Leg[];
+  combinedCharges?: any[];
   chargeCategories: any[];
   chargeBases: any[];
   currencies: any[];
@@ -30,10 +31,15 @@ interface ChargesManagementStepProps {
   onUpdateCharge: (legId: string, chargeIdx: number, field: string, value: any) => void;
   onRemoveCharge: (legId: string, chargeIdx: number) => void;
   onConfigureBasis: (legId: string, chargeIdx: number) => void;
+  onAddCombinedCharge?: () => void;
+  onUpdateCombinedCharge?: (chargeIdx: number, field: string, value: any) => void;
+  onRemoveCombinedCharge?: (chargeIdx: number) => void;
+  onConfigureCombinedBasis?: (chargeIdx: number) => void;
 }
 
 export function ChargesManagementStep({
   legs,
+  combinedCharges = [],
   chargeCategories,
   chargeBases,
   currencies,
@@ -47,7 +53,11 @@ export function ChargesManagementStep({
   onAddCharge,
   onUpdateCharge,
   onRemoveCharge,
-  onConfigureBasis
+  onConfigureBasis,
+  onAddCombinedCharge,
+  onUpdateCombinedCharge,
+  onRemoveCombinedCharge,
+  onConfigureCombinedBasis
 }: ChargesManagementStepProps) {
   const calculateTotals = (charges: any[]) => {
     return charges.reduce((acc, charge) => ({
@@ -189,8 +199,84 @@ export function ChargesManagementStep({
               </TabsContent>
             );
           })}
-        </Tabs>
-      </CardContent>
-    </Card>
+      </Tabs>
+
+      {/* Combined Charges */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Combined Charges</CardTitle>
+          <CardDescription>Charges not tied to a specific leg</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Apply charges across the whole option</p>
+            </div>
+            {onAddCombinedCharge && (
+              <Button onClick={() => onAddCombinedCharge?.()} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Combined Charge
+              </Button>
+            )}
+          </div>
+
+          {combinedCharges.length > 0 ? (
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="p-2 text-left">Category</th>
+                    <th className="p-2 text-left">Basis</th>
+                    <th className="p-2 text-left">Unit</th>
+                    <th className="p-2 text-left">Currency</th>
+                    <th className="p-2 text-right">Buy Qty</th>
+                    <th className="p-2 text-right">Buy Rate</th>
+                    <th className="p-2 text-right">Buy Amt</th>
+                    <th className="p-2 text-right">Sell Qty</th>
+                    <th className="p-2 text-right">Sell Rate</th>
+                    <th className="p-2 text-right">Sell Amt</th>
+                    <th className="p-2 text-right">Margin</th>
+                    <th className="p-2 text-left">Notes</th>
+                    <th className="p-2 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {combinedCharges.map((charge, idx) => (
+                    <ChargeRow
+                      key={charge.id || `combined-${idx}`}
+                      charge={charge}
+                      categories={chargeCategories}
+                      bases={chargeBases}
+                      currencies={currencies}
+                      onUpdate={(field, value) => onUpdateCombinedCharge?.(idx, field, value)}
+                      onRemove={() => onRemoveCombinedCharge?.(idx)}
+                      onConfigureBasis={() => onConfigureCombinedBasis?.(idx)}
+                      showBuySell={true}
+                    />
+                  ))}
+                </tbody>
+                <tfoot className="bg-muted font-bold">
+                  <tr>
+                    <td colSpan={6} className="p-2 text-right">Totals:</td>
+                    <td className="p-2 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
+                    <td colSpan={2} className="p-2"></td>
+                    <td className="p-2 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
+                    <td className="p-2 text-right">
+                      {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground border rounded-lg">
+              <p>No combined charges. Click "Add Combined Charge" to begin.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </CardContent>
+  </Card>
   );
 }
