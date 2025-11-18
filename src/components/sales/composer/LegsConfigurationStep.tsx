@@ -50,7 +50,7 @@ export function LegsConfigurationStep({
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">
-                      Leg {index + 1} - {leg.mode.toUpperCase()}
+                      Leg {index + 1} - {serviceTypes.find((st) => st.id === leg.serviceTypeId)?.name || leg.mode.toUpperCase()}
                     </CardTitle>
                     <Button
                       variant="ghost"
