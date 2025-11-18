@@ -478,7 +478,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         if (leg.id.startsWith('leg-')) {
           // New leg
           const { data: newLeg, error: legError } = await supabase
-            .from('quote_legs' as any)
+            .from('quotation_version_option_legs')
             .insert({
               quotation_version_option_id: currentOptionId,
               mode: leg.mode,
@@ -562,7 +562,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Persist combined charges (leg_id IS NULL)
       await supabase
-        .from('quote_charges' as any)
+        .from('quote_charges')
         .delete()
         .eq('quote_option_id', currentOptionId)
         .is('leg_id', null);
@@ -599,7 +599,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       ]);
       if (combinedPayload.length) {
         const { error: combErr } = await supabase
-          .from('quote_charges' as any)
+          .from('quote_charges')
           .insert(combinedPayload);
         if (combErr) throw combErr;
       }
