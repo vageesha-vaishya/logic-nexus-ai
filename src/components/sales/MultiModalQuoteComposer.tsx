@@ -217,10 +217,15 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const addLeg = (mode: string) => {
+    const lowerMode = mode.toLowerCase();
+    const defaultServiceType =
+      serviceTypes.find((st) => st.code?.toLowerCase().startsWith(lowerMode)) ||
+      serviceTypes[0];
+
     const newLeg: Leg = {
       id: `leg-${Date.now()}`,
       mode,
-      serviceTypeId: '',
+      serviceTypeId: defaultServiceType?.id || '',
       origin: '',
       destination: '',
       charges: []
