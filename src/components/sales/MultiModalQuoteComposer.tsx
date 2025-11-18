@@ -480,13 +480,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           const { data: newLeg, error: legError } = await supabase
             .from('quote_legs' as any)
             .insert({
-              quote_option_id: currentOptionId,
+              quotation_version_option_id: currentOptionId,
               mode: leg.mode,
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
               tenant_id: tenantId,
-              leg_number: i + 1
+              sort_order: i
             })
             .select()
             .single();
@@ -497,13 +497,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         } else {
           // Update existing leg
           const { error: updateError } = await supabase
-            .from('quote_legs' as any)
+            .from('quotation_version_option_legs')
             .update({
               mode: leg.mode,
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
-              leg_number: i + 1
+              sort_order: i
             })
             .eq('id', legId);
           
@@ -512,7 +512,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         // Replace charges for this leg
         await supabase
-          .from('quote_charges' as any)
+          .from('quote_charges')
           .delete()
           .eq('quote_option_id', currentOptionId)
           .eq('leg_id', legId);
@@ -554,7 +554,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         if (newCharges.length > 0) {
           const { error: chargeError } = await supabase
-            .from('quote_charges' as any)
+            .from('quote_charges')
             .insert(newCharges);
           if (chargeError) throw chargeError;
         }
