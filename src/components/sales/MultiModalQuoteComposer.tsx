@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Save, MapPin, DollarSign, Calendar } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { TransportModeSelector } from './composer/TransportModeSelector';
+import { QuotationWorkflowStepper } from './composer/QuotationWorkflowStepper';
+import { QuoteDetailsStep } from './composer/QuoteDetailsStep';
+import { LegsConfigurationStep } from './composer/LegsConfigurationStep';
+import { ChargesManagementStep } from './composer/ChargesManagementStep';
+import { ReviewAndSaveStep } from './composer/ReviewAndSaveStep';
 import { BasisConfigModal } from './composer/BasisConfigModal';
-import { ChargeRow } from './composer/ChargeRow';
 
 interface Leg {
   id: string;
@@ -27,13 +26,24 @@ interface MultiModalQuoteComposerProps {
   optionId?: string;
 }
 
+const STEPS = [
+  { id: 1, title: 'Quote Details', description: 'Basic information' },
+  { id: 2, title: 'Transport Legs', description: 'Configure routes' },
+  { id: 3, title: 'Charges', description: 'Add costs' },
+  { id: 4, title: 'Review & Save', description: 'Finalize quote' }
+];
+
 export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId }: MultiModalQuoteComposerProps) {
   const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [optionId, setOptionId] = useState<string | null>(initialOptionId || null);
   const [legs, setLegs] = useState<Leg[]>([]);
-  const [currentLegId, setCurrentLegId] = useState<string | null>(null);
+  const [quoteData, setQuoteData] = useState<any>({});
   const [autoMargin, setAutoMargin] = useState(false);
-  const [marginPercent, setMarginPercent] = useState(0);
+  const [marginPercent, setMarginPercent] = useState(15);
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
   // Reference data
   const [serviceTypes, setServiceTypes] = useState<any[]>([]);
@@ -46,7 +56,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   // Basis configuration modal
   const [basisModalOpen, setBasisModalOpen] = useState(false);
-  const [currentBasisConfig, setCurrentBasisConfig] = useState({
+  const [currentBasisConfig, setCurrentBasisConfig] = useState<any>({
     tradeDirection: '',
     containerType: '',
     containerSize: '',
@@ -55,61 +65,120 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [basisChargeIndex, setBasisChargeIndex] = useState<{ legId: string; chargeIdx: number } | null>(null);
 
   useEffect(() => {
-    loadReferenceData();
-    if (optionId) {
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (optionId && tenantId) {
       loadOptionData();
     }
-  }, [optionId]);
+  }, [optionId, tenantId]);
 
-  const loadReferenceData = async () => {
-    const [st, cc, cb, cu, td, ct, cs] = await Promise.all([
-      supabase.from('service_types').select('*').eq('is_active', true),
-      supabase.from('charge_categories').select('*').eq('is_active', true),
-      supabase.from('charge_bases').select('*').eq('is_active', true),
-      supabase.from('currencies').select('*').eq('is_active', true),
-      supabase.from('trade_directions').select('*').eq('is_active', true),
-      supabase.from('container_types').select('*').eq('is_active', true),
-      supabase.from('container_sizes').select('*').eq('is_active', true),
-    ]);
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userTenantId = user?.user_metadata?.tenant_id;
+      setTenantId(userTenantId);
 
-    setServiceTypes(st.data || []);
-    setChargeCategories(cc.data || []);
-    setChargeBases(cb.data || []);
-    setCurrencies(cu.data || []);
-    setTradeDirections(td.data || []);
-    setContainerTypes(ct.data || []);
-    setContainerSizes(cs.data || []);
+      const [st, cc, cb, cu, td, ct, cs] = await Promise.all([
+        supabase.from('service_types').select('*').eq('is_active', true),
+        supabase.from('charge_categories').select('*').eq('is_active', true),
+        supabase.from('charge_bases').select('*').eq('is_active', true),
+        supabase.from('currencies').select('*').eq('is_active', true),
+        supabase.from('trade_directions').select('*').eq('is_active', true),
+        supabase.from('container_types').select('*').eq('is_active', true),
+        supabase.from('container_sizes').select('*').eq('is_active', true),
+      ]);
+
+      setServiceTypes(st.data || []);
+      setChargeCategories(cc.data || []);
+      setChargeBases(cb.data || []);
+      setCurrencies(cu.data || []);
+      setTradeDirections(td.data || []);
+      setContainerTypes(ct.data || []);
+      setContainerSizes(cs.data || []);
+
+      // Set default currency
+      if (cu.data && cu.data.length > 0) {
+        setQuoteData((prev: any) => ({ ...prev, currencyId: cu.data[0].id }));
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadOptionData = async () => {
-    // Load existing legs and charges
-    const { data: legData } = await supabase
-      .from('quote_legs' as any)
-      .select('*')
-      .eq('quote_option_id', optionId);
+    if (!optionId || !tenantId) return;
+    
+    setLoading(true);
+    try {
+      // Load legs with charges in a single optimized query
+      const { data: legData, error: legError } = await supabase
+        .from('quote_legs' as any)
+        .select(`
+          *,
+          quote_charges(
+            *,
+            charge_sides(code),
+            charge_categories(name, code),
+            charge_bases(name, code),
+            currencies(code, symbol)
+          )
+        `)
+        .eq('quote_option_id', optionId)
+        .order('leg_number');
 
-    if (legData && legData.length > 0) {
-      const legsWithCharges = await Promise.all(
-        legData.map(async (leg: any) => {
-          const { data: charges } = await supabase
-            .from('quote_charges')
-            .select('*')
-            .eq('leg_id', leg.id);
+      if (legError) throw legError;
+
+      if (legData && legData.length > 0) {
+        // Group charges by leg and pair buy/sell
+        const legsWithCharges = legData.map((leg: any) => {
+          const chargesMap = new Map();
           
+          // Group charges by their base properties (category, basis, etc.)
+          leg.quote_charges?.forEach((charge: any) => {
+            const key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
+            if (!chargesMap.has(key)) {
+              chargesMap.set(key, {
+                id: charge.id,
+                category_id: charge.category_id,
+                basis_id: charge.basis_id,
+                unit: charge.unit,
+                currency_id: charge.currency_id,
+                note: charge.note,
+                buy: { quantity: 0, rate: 0 },
+                sell: { quantity: 0, rate: 0 }
+              });
+            }
+            
+            const chargeObj = chargesMap.get(key);
+            const side = charge.charge_sides?.code;
+            if (side === 'buy') {
+              chargeObj.buy = { quantity: charge.quantity || 0, rate: charge.rate || 0 };
+            } else if (side === 'sell') {
+              chargeObj.sell = { quantity: charge.quantity || 0, rate: charge.rate || 0 };
+            }
+          });
+
           return {
             id: leg.id,
             mode: leg.mode || 'ocean',
             serviceTypeId: leg.service_type_id || '',
             origin: leg.origin_location || '',
             destination: leg.destination_location || '',
-            charges: charges || []
+            charges: Array.from(chargesMap.values())
           };
-        })
-      );
-      setLegs(legsWithCharges);
-      if (legsWithCharges.length > 0) {
-        setCurrentLegId(legsWithCharges[0].id);
+        });
+
+        setLegs(legsWithCharges);
       }
+    } catch (error: any) {
+      toast({ title: 'Error loading data', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -123,11 +192,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       charges: []
     };
     setLegs([...legs, newLeg]);
-    setCurrentLegId(newLeg.id);
   };
 
   const updateLeg = (legId: string, updates: Partial<Leg>) => {
     setLegs(legs.map(leg => leg.id === legId ? { ...leg, ...updates } : leg));
+  };
+
+  const removeLeg = (legId: string) => {
+    setLegs(legs.filter(leg => leg.id !== legId));
   };
 
   const addCharge = (legId: string) => {
@@ -231,15 +303,20 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const saveQuotation = async () => {
+    setSaving(true);
     try {
-      // Save or create option if needed
+      if (!tenantId) {
+        throw new Error('Tenant ID not found');
+      }
+
+      // Create option if needed
       let currentOptionId = optionId;
       if (!currentOptionId) {
         const { data: newOption, error: optError } = await supabase
           .from('quotation_version_options')
           .insert({
             quotation_version_id: versionId,
-            tenant_id: (await supabase.auth.getUser()).data.user?.user_metadata?.tenant_id
+            tenant_id: tenantId
           })
           .select()
           .single();
@@ -249,42 +326,69 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         setOptionId(currentOptionId);
       }
 
+      // Get charge side IDs
+      const [buySideRes, sellSideRes] = await Promise.all([
+        supabase.from('charge_sides').select('id').eq('code', 'buy').single(),
+        supabase.from('charge_sides').select('id').eq('code', 'sell').single()
+      ]);
+
+      if (buySideRes.error || sellSideRes.error || !buySideRes.data || !sellSideRes.data) {
+        throw new Error('Failed to fetch charge sides');
+      }
+
+      const buySideId = buySideRes.data.id;
+      const sellSideId = sellSideRes.data.id;
+
       // Save legs and charges
-      for (const leg of legs) {
+      for (let i = 0; i < legs.length; i++) {
+        const leg = legs[i];
         let legId = leg.id;
         
         if (leg.id.startsWith('leg-')) {
           // New leg
-          const { data: newLeg, error: legError } = await (supabase as any)
-            .from('quote_legs')
+          const { data: newLeg, error: legError } = await supabase
+            .from('quote_legs' as any)
             .insert({
               quote_option_id: currentOptionId,
               mode: leg.mode,
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
-              tenant_id: (await supabase.auth.getUser()).data.user?.user_metadata?.tenant_id,
-              leg_number: legs.indexOf(leg) + 1
+              tenant_id: tenantId,
+              leg_number: i + 1
             })
             .select()
             .single();
           
           if (legError) throw legError;
+          if (!newLeg) throw new Error('Failed to create leg');
           legId = (newLeg as any).id;
+        } else {
+          // Update existing leg
+          const { error: updateError } = await supabase
+            .from('quote_legs' as any)
+            .update({
+              mode: leg.mode,
+              service_type_id: leg.serviceTypeId || null,
+              origin_location: leg.origin,
+              destination_location: leg.destination,
+              leg_number: i + 1
+            })
+            .eq('id', legId);
+          
+          if (updateError) throw updateError;
         }
 
-        // Save charges
+        // Save charges (batch insert for new charges)
+        const newCharges: any[] = [];
+        
         for (const charge of leg.charges) {
           if (charge.id.startsWith('charge-')) {
-            // New charge - need to insert buy and sell sides
-            const buySide = await supabase.from('charge_sides').select('id').eq('code', 'buy').single();
-            const sellSide = await supabase.from('charge_sides').select('id').eq('code', 'sell').single();
-
-            // Insert buy side
-            await supabase.from('quote_charges').insert({
+            // Prepare buy side
+            newCharges.push({
               quote_option_id: currentOptionId,
               leg_id: legId,
-              charge_side_id: buySide.data?.id,
+              charge_side_id: buySideId,
               category_id: charge.category_id || null,
               basis_id: charge.basis_id || null,
               quantity: charge.buy?.quantity || 1,
@@ -293,14 +397,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               currency_id: charge.currency_id || null,
               unit: charge.unit || null,
               note: charge.note || null,
-              tenant_id: (await supabase.auth.getUser()).data.user?.user_metadata?.tenant_id
+              tenant_id: tenantId
             });
 
-            // Insert sell side
-            await supabase.from('quote_charges').insert({
+            // Prepare sell side
+            newCharges.push({
               quote_option_id: currentOptionId,
               leg_id: legId,
-              charge_side_id: sellSide.data?.id,
+              charge_side_id: sellSideId,
               category_id: charge.category_id || null,
               basis_id: charge.basis_id || null,
               quantity: charge.sell?.quantity || 1,
@@ -309,205 +413,153 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               currency_id: charge.currency_id || null,
               unit: charge.unit || null,
               note: charge.note || null,
-              tenant_id: (await supabase.auth.getUser()).data.user?.user_metadata?.tenant_id
+              tenant_id: tenantId
             });
           }
+        }
+
+        // Batch insert new charges
+        if (newCharges.length > 0) {
+          const { error: chargeError } = await supabase
+            .from('quote_charges')
+            .insert(newCharges);
+          
+          if (chargeError) throw chargeError;
         }
       }
 
       toast({ title: 'Success', description: 'Quotation saved successfully' });
+      
+      // Reload data
+      if (currentOptionId) {
+        await loadOptionData();
+      }
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const currentLeg = legs.find(l => l.id === currentLegId);
-  const totals = currentLeg?.charges.reduce((acc, charge) => ({
-    buy: acc.buy + ((charge.buy?.quantity || 1) * (charge.buy?.rate || 0)),
-    sell: acc.sell + ((charge.sell?.quantity || 1) * (charge.sell?.rate || 0))
-  }), { buy: 0, sell: 0 }) || { buy: 0, sell: 0 };
+  const handleNext = () => {
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return quoteData.currencyId;
+      case 2:
+        return legs.length > 0 && legs.every(leg => leg.origin && leg.destination);
+      case 3:
+        return legs.every(leg => leg.charges.length > 0);
+      default:
+        return true;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-12 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Multi-Modal Quotation Composer</span>
-            <Button onClick={saveQuotation}>
-              <Save className="mr-2 h-4 w-4" />
-              Save Quotation
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Transport Mode Selection */}
-          <div>
-            <Label className="text-base font-semibold mb-3 block">Select Transport Mode</Label>
-            <TransportModeSelector
-              selectedMode={null}
-              onSelect={addLeg}
-            />
-          </div>
+        <CardContent className="pt-6">
+          <QuotationWorkflowStepper
+            currentStep={currentStep}
+            onStepClick={setCurrentStep}
+            steps={STEPS}
+          />
+        </CardContent>
+      </Card>
 
-          {/* Auto Margin Settings */}
-          <div className="flex items-center gap-4 p-4 bg-accent/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={autoMargin}
-                onChange={(e) => setAutoMargin(e.target.checked)}
-                id="auto-margin"
-                className="h-4 w-4"
-              />
-              <Label htmlFor="auto-margin">Auto Margin</Label>
-            </div>
-            {autoMargin && (
-              <div className="flex items-center gap-2">
-                <Label>Margin %:</Label>
-                <Input
-                  type="number"
-                  value={marginPercent}
-                  onChange={(e) => setMarginPercent(Number(e.target.value))}
-                  className="w-24"
-                  min={0}
-                  max={100}
-                />
-              </div>
+      {currentStep === 1 && (
+        <QuoteDetailsStep
+          quoteData={quoteData}
+          currencies={currencies}
+          onChange={(field, value) => setQuoteData({ ...quoteData, [field]: value })}
+        />
+      )}
+
+      {currentStep === 2 && (
+        <LegsConfigurationStep
+          legs={legs}
+          serviceTypes={serviceTypes}
+          onAddLeg={addLeg}
+          onUpdateLeg={updateLeg}
+          onRemoveLeg={removeLeg}
+        />
+      )}
+
+      {currentStep === 3 && (
+        <ChargesManagementStep
+          legs={legs}
+          chargeCategories={chargeCategories}
+          chargeBases={chargeBases}
+          currencies={currencies}
+          tradeDirections={tradeDirections}
+          containerTypes={containerTypes}
+          containerSizes={containerSizes}
+          autoMargin={autoMargin}
+          marginPercent={marginPercent}
+          onAutoMarginChange={setAutoMargin}
+          onMarginPercentChange={setMarginPercent}
+          onAddCharge={addCharge}
+          onUpdateCharge={updateCharge}
+          onRemoveCharge={removeCharge}
+          onConfigureBasis={openBasisModal}
+        />
+      )}
+
+      {currentStep === 4 && (
+        <ReviewAndSaveStep
+          legs={legs}
+          quoteData={quoteData}
+          currencies={currencies}
+        />
+      )}
+
+      {/* Navigation */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              disabled={currentStep === 1}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+
+            {currentStep < 4 ? (
+              <Button onClick={handleNext} disabled={!canProceed()}>
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button onClick={saveQuotation} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Save className="mr-2 h-4 w-4" />
+                Save Quotation
+              </Button>
             )}
           </div>
-
-          {/* Legs Tabs */}
-          {legs.length > 0 && (
-            <Tabs value={currentLegId || ''} onValueChange={setCurrentLegId}>
-              <TabsList className="w-full">
-                {legs.map((leg, idx) => (
-                  <TabsTrigger key={leg.id} value={leg.id}>
-                    Leg {idx + 1} - {leg.mode}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              {legs.map((leg) => (
-                <TabsContent key={leg.id} value={leg.id} className="space-y-4">
-                  {/* Leg Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Service Type</Label>
-                      <Select
-                        value={leg.serviceTypeId}
-                        onValueChange={(val) => updateLeg(leg.id, { serviceTypeId: val })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {serviceTypes.map((st) => (
-                            <SelectItem key={st.id} value={st.id}>
-                              {st.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Origin</Label>
-                      <div className="relative">
-                        <MapPin className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          value={leg.origin}
-                          onChange={(e) => updateLeg(leg.id, { origin: e.target.value })}
-                          placeholder="Origin location"
-                          className="pl-8"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Destination</Label>
-                      <div className="relative">
-                        <MapPin className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          value={leg.destination}
-                          onChange={(e) => updateLeg(leg.id, { destination: e.target.value })}
-                          placeholder="Destination location"
-                          className="pl-8"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Charges Table */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <Label className="text-base font-semibold">Charges</Label>
-                      <Button onClick={() => addCharge(leg.id)} size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Charge
-                      </Button>
-                    </div>
-
-                    <div className="overflow-x-auto border rounded-lg">
-                      <table className="w-full">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="p-2 text-left text-sm">Category</th>
-                            <th className="p-2 text-left text-sm">Basis</th>
-                            <th className="p-2 text-left text-sm">Unit</th>
-                            <th className="p-2 text-left text-sm">Currency</th>
-                            <th className="p-2 text-right text-sm">Buy Qty</th>
-                            <th className="p-2 text-right text-sm">Buy Rate</th>
-                            <th className="p-2 text-right text-sm">Buy Amount</th>
-                            <th className="p-2 text-right text-sm">Sell Qty</th>
-                            <th className="p-2 text-right text-sm">Sell Rate</th>
-                            <th className="p-2 text-right text-sm">Sell Amount</th>
-                            <th className="p-2 text-right text-sm">Margin</th>
-                            <th className="p-2 text-left text-sm">Notes</th>
-                            <th className="p-2 text-center text-sm">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {leg.charges.map((charge, idx) => (
-                            <ChargeRow
-                              key={charge.id}
-                              charge={charge}
-                              categories={chargeCategories}
-                              bases={chargeBases}
-                              currencies={currencies}
-                              onUpdate={(field, value) => updateCharge(leg.id, idx, field, value)}
-                              onRemove={() => removeCharge(leg.id, idx)}
-                              onConfigureBasis={() => openBasisModal(leg.id, idx)}
-                              showBuySell={true}
-                            />
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-muted font-bold">
-                          <tr>
-                            <td colSpan={6} className="p-2 text-right">Totals:</td>
-                            <td className="p-2 text-right">{totals.buy.toFixed(2)}</td>
-                            <td colSpan={2} className="p-2"></td>
-                            <td className="p-2 text-right">{totals.sell.toFixed(2)}</td>
-                            <td className={`p-2 text-right ${
-                              totals.sell - totals.buy >= 0 ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {(totals.sell - totals.buy).toFixed(2)}
-                            </td>
-                            <td colSpan={2}></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          )}
-
-          {legs.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Select a transport mode above to start building your quotation</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
