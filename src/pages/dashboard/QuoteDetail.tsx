@@ -111,7 +111,7 @@ export default function QuoteDetail() {
           </div>
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
-        {/* Quotation Composer is now only available via the Capture Carrier Rates popup in QuoteForm */}
+        <QuotationVersionHistory quoteId={resolvedId ?? id as string} />
       </div>
     </DashboardLayout>
   );

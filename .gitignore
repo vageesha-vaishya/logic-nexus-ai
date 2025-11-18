@@ -25,3 +25,4 @@ dist-ssr
 ### 1. Configure .gitignore
 .env.local
 .env.local.backup
+supabase/migration-package/new-supabase-config.env

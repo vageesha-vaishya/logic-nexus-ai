@@ -851,19 +851,12 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       buySideId = (sidesData ?? []).find((s: any) => s.code === 'buy')?.id ?? null;
       sellSideId = (sidesData ?? []).find((s: any) => s.code === 'sell')?.id ?? null;
     } catch {}
-    if (optionId) {
-      if (quoteLegId) {
-        await (supabase as any)
-          .from('quote_charges')
-          .delete()
-          .eq('quote_option_id', optionId)
-          .eq('leg_id', quoteLegId);
-      }
+    if (optionId && quoteLegId) {
       await (supabase as any)
         .from('quote_charges')
         .delete()
         .eq('quote_option_id', optionId)
-        .eq('leg_id', legId);
+        .eq('leg_id', quoteLegId);
     }
     const payload = legCharges.map((c: any) => ({
       tenant_id: tenantId,
@@ -1047,15 +1040,38 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   };
 
   const updateSideForLeg = (rowRef: any, sideIdx: any, patch: any) => {
-    if (typeof sideIdx !== 'number') return;
     const next = legData.slice();
-    const prev = next[sideIdx];
-    next[sideIdx] = { ...prev, ...patch };
+    let targetIdx = sideIdx;
+    if (typeof targetIdx !== 'number') {
+      const isSellIntent = !rowRef.sell || typeof rowRef.sell?.idx !== 'number' || sideIdx === rowRef.sell?.idx;
+      const sideCode = isSellIntent ? 'sell' : 'buy';
+      let sideId: string | null = null;
+      const found = (sides ?? []).find((s: any) => s.code === sideCode);
+      sideId = found?.id ?? null;
+      const base = {
+        side: sideCode,
+        charge_side_id: sideId,
+        category_id: rowRef.category_id ?? null,
+        basis_id: rowRef.basis_id ?? null,
+        quantity: (isSellIntent ? (rowRef.sell?.quantity ?? rowRef.buy?.quantity ?? 1) : (rowRef.buy?.quantity ?? 1)),
+        unit: rowRef.unit ?? null,
+        rate: 0,
+        amount: 0,
+        currency_id: rowRef.currency_id ?? null,
+        note: rowRef.note ?? null,
+        sort_order: rowRef.sort_order ?? 1000,
+        derived: isSellIntent ? true : false,
+      } as any;
+      next.push(base);
+      targetIdx = next.length - 1;
+    }
+    const prev = next[targetIdx];
+    next[targetIdx] = { ...prev, ...patch };
     const sellIdxDirect = rowRef.sell?.idx;
     const buyIdxDirect = rowRef.buy?.idx;
-    const isSellSide = typeof sellIdxDirect === 'number' && sideIdx === sellIdxDirect;
-    const qRaw: any = next[sideIdx].quantity;
-    const rRaw: any = next[sideIdx].rate;
+    const isSellSide = typeof sellIdxDirect === 'number' ? (targetIdx === sellIdxDirect) : (prev?.side === 'sell');
+    const qRaw: any = next[targetIdx].quantity;
+    const rRaw: any = next[targetIdx].rate;
     let qCandidate: any = qRaw;
     if (isSellSide && (qCandidate === null || qCandidate === undefined || (typeof qCandidate === 'string' && qCandidate === ''))) {
       const buyQ = typeof buyIdxDirect === 'number' ? next[buyIdxDirect]?.quantity : undefined;
@@ -1064,13 +1080,13 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     const qNum = typeof qCandidate === 'string' && qCandidate === '' ? NaN : Number(qCandidate ?? 1);
     const rNum = typeof rRaw === 'string' && rRaw === '' ? NaN : Number(rRaw ?? 0);
     if (Number.isFinite(qNum) && Number.isFinite(rNum)) {
-      next[sideIdx].amount = Number(next[sideIdx].amount ?? (rNum * qNum));
+      next[targetIdx].amount = Number(next[targetIdx].amount ?? (rNum * qNum));
     }
     if (autoMarginEnabled) {
       const buyIdx = buyIdxDirect;
       const sellIdx = sellIdxDirect;
       // Only auto-derive sell when BUY side is edited; respect manual SELL edits
-      if (typeof buyIdx === 'number' && typeof sellIdx === 'number' && sideIdx === buyIdx) {
+      if (typeof buyIdx === 'number' && typeof sellIdx === 'number' && targetIdx === buyIdx) {
         const brRaw: any = next[buyIdx].rate;
         const bqRaw: any = next[buyIdx].quantity;
         const br = typeof brRaw === 'string' && brRaw === '' ? 0 : Number(brRaw ?? 0);
@@ -1092,7 +1108,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         next[sellIdx].derived = true;
       }
     }
-    if (typeof sellIdxDirect === 'number' && sideIdx === sellIdxDirect) {
+    if (typeof sellIdxDirect === 'number' && targetIdx === sellIdxDirect) {
       next[sellIdxDirect].derived = false;
     }
     updateRowsForLeg(next);
@@ -1389,12 +1405,32 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .from('quotation_version_option_legs')
         .select('id, leg_order')
         .eq('quotation_version_option_id', optionId);
-      const compByOrder = new Map<number, string>((compLegs ?? []).map((l: any) => [Number(l.leg_order ?? 0), String(l.id)]));
+      let compLegsRows: any[] = compLegs ?? [];
+      const desiredOrders = new Set<number>((quoteLegs ?? []).map((l: any) => Number(l.leg_number ?? 0)));
+      const existingOrders = new Set<number>((compLegsRows ?? []).map((l: any) => Number(l.leg_order ?? 0)));
+      const missingOrders = Array.from(desiredOrders).filter((o) => !existingOrders.has(o));
+      if (missingOrders.length) {
+        await (supabase as any)
+          .from('quotation_version_option_legs')
+          .insert(missingOrders.map((order) => ({ tenant_id: tenantId, quotation_version_option_id: optionId, leg_order: order })));
+        const { data: compLegsNew } = await (supabase as any)
+          .from('quotation_version_option_legs')
+          .select('id, leg_order')
+          .eq('quotation_version_option_id', optionId);
+        compLegsRows = compLegsNew ?? compLegsRows;
+      }
+      const compByOrder = new Map<number, string>((compLegsRows ?? []).map((l: any) => [Number(l.leg_order ?? 0), String(l.id)]));
       const toComposerId: Record<string, string> = {};
       (quoteLegs ?? []).forEach((l: any) => {
         const cid = compByOrder.get(Number(l.leg_number ?? 0));
         if (cid) toComposerId[String(l.id)] = cid;
       });
+      if (Object.keys(toComposerId).length === 0 && Array.isArray(quoteLegs) && quoteLegs.length) {
+        const fallbackComposerLegId = (legs && legs.length) ? String(legs[0].id) : (Array.isArray(compLegsRows) && compLegsRows[0]?.id ? String(compLegsRows[0].id) : (currentLegId ? String(currentLegId) : null));
+        if (fallbackComposerLegId) {
+          quoteLegs.forEach((l: any) => { toComposerId[String(l.id)] = fallbackComposerLegId; });
+        }
+      }
       const legIdSet = new Set<string>((legs ?? []).map(l => String(l.id)));
       const grouped: Record<string, any[]> = {};
       byLeg.forEach((c: any) => {
@@ -1417,7 +1453,36 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         });
         grouped[key] = arr;
       });
+      // Deduplicate per leg by (side, category, basis, unit, currency)
+      Object.keys(grouped).forEach((k) => {
+        const seen = new Set<string>();
+        const uniq: any[] = [];
+        for (const row of grouped[k]) {
+          const skey = [row.side, String(row.category_id ?? ''), String(row.basis_id ?? ''), String(row.unit ?? ''), String(row.currency_id ?? '')].join('|');
+          if (seen.has(skey)) continue;
+          seen.add(skey);
+          uniq.push(row);
+        }
+        grouped[k] = uniq;
+      });
       setChargesByLeg(prev => ({ ...prev, ...grouped }));
+      if (Array.isArray(compLegsRows) && compLegsRows.length) {
+        setLegs(compLegsRows.map((r: any) => ({ id: r.id, leg_order: r.leg_order })));
+      }
+      const groupedKeys = Object.keys(grouped);
+      if (groupedKeys.length) {
+        const preferredId = groupedKeys.includes(String(currentLegId)) ? String(currentLegId) : groupedKeys[0];
+        if (!currentLegId || String(currentLegId) !== preferredId) setCurrentLegId(preferredId);
+        const legExists = (legs ?? []).some(l => String(l.id) === preferredId);
+        if (!legExists) {
+          const compRow = (Array.isArray(compLegs) ? compLegs : []).find((r: any) => String(r.id) === preferredId);
+          const orderNum = Number(compRow?.leg_order ?? 1);
+          setLegs(prev => {
+            const has = prev.some(l => String(l.id) === preferredId);
+            return has ? prev : [...prev, { id: preferredId, leg_order: orderNum }];
+          });
+        }
+      }
     } catch {} finally {
       isHydratingRef.current = false;
     }
@@ -1543,7 +1608,10 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                   return;
                 }
                 if (!leg?.id) return;
-                setLegs([...legs, { id: leg.id, leg_order: leg.leg_order }]);
+                setLegs(prev => {
+                  const has = prev.some(l => String(l.id) === String(leg.id));
+                  return has ? prev : [...prev, { id: leg.id, leg_order: leg.leg_order }];
+                });
                 setCurrentLegId(leg.id);
                 setChargesByLeg(prev => ({ ...prev, [leg.id]: [] }));
                 setLegNames(prev => ({ ...prev, [leg.id]: `Leg ${leg.leg_order}` }));
@@ -1802,15 +1870,16 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                               </div>
                               <div>
                                 <div className="text-xs font-medium">Buy Rate</div>
-                                <Input className="text-right" type="number" inputMode="decimal" step="any" value={row.buy?.rate ?? ''} onChange={(e) => {
+                                <Input className="text-right" type="number" inputMode="decimal" step="any" value={(row.buy?.rate === null || row.buy?.rate === undefined) ? '' : String(row.buy?.rate)} onChange={(e) => {
                                   const v = e.target.value;
                                   if (v === '') {
                                     updateSideForLeg(row, row.buy?.idx, { rate: null });
                                   } else {
-                                    const num = Number(v);
+                                    const num = parseFloat(v);
                                     const q = typeof row.buy?.quantity === 'number' ? row.buy?.quantity : (typeof row.sell?.quantity === 'number' ? row.sell?.quantity : 1);
-                                    const canCalc = Number.isFinite(num) && Number.isFinite(Number(q));
-                                    updateSideForLeg(row, row.buy?.idx, canCalc ? { rate: num, amount: num * Number(q) } : { rate: num });
+                                    const qNum = Number(q);
+                                    const canCalc = Number.isFinite(num) && Number.isFinite(qNum);
+                                    updateSideForLeg(row, row.buy?.idx, canCalc ? { rate: num, amount: num * qNum } : { rate: num });
                                   }
                                 }} tabIndex={125 + idx * 20} />
                               </div>
@@ -1832,12 +1901,12 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                               </div>
                               <div>
                                 <div className="text-xs font-medium flex items-center gap-2">Sell Rate {row.sell?.derived ? <Badge variant="outline" className="text-[10px]">auto</Badge> : <Badge variant="secondary" className="text-[10px]">manual</Badge>}</div>
-                                <Input className="text-right" type="number" inputMode="decimal" step="any" value={row.sell?.rate ?? ''} onChange={(e) => {
+                                <Input className="text-right" type="number" inputMode="decimal" step="any" value={(row.sell?.rate === null || row.sell?.rate === undefined) ? '' : String(row.sell?.rate)} onChange={(e) => {
                                   const v = e.target.value;
                                   if (v === '') {
                                     updateSideForLeg(row, row.sell?.idx, { rate: null });
                                   } else {
-                                    const num = Number(v);
+                                    const num = parseFloat(v);
                                     const qtyCandidate = typeof row.sell?.quantity === 'number' ? row.sell?.quantity : (typeof row.buy?.quantity === 'number' ? row.buy?.quantity : 1);
                                     const q = Number(qtyCandidate);
                                     const canCalc = Number.isFinite(num) && Number.isFinite(q);

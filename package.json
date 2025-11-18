@@ -8,7 +8,16 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync:legs": "node supabase/migration-package/helpers/sync-legs.js",
+    "sync:legs:reindex": "node supabase/migration-package/helpers/sync-legs.js --reindex",
+    "sync:legs:dry": "node supabase/migration-package/helpers/sync-legs.js --dry-run",
+    "sync:legs:reindex:dry": "node supabase/migration-package/helpers/sync-legs.js --reindex --dry-run",
+    "dedupe:charges": "node supabase/migration-package/helpers/dedupe-quote-charges.js",
+    "dedupe:charges:dry": "node supabase/migration-package/helpers/dedupe-quote-charges.js --dry-run",
+    "clear:versions": "node supabase/migration-package/helpers/clear-quotation-versions.js",
+    "clear:versions:dry": "node supabase/migration-package/helpers/clear-quotation-versions.js --dry-run",
+    "clear:versions:quo": "node supabase/migration-package/helpers/clear-quotation-versions.js --quotation-number=QUO-000002"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
