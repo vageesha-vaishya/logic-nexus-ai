@@ -93,6 +93,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const [legServiceTypeIds, setLegServiceTypeIds] = useState<Record<string, string | null>>({});
   const [chargesByLeg, setChargesByLeg] = useState<Record<string, any[]>>({});
   const [combinedCharges, setCombinedCharges] = useState<any[]>([]);
+  const [saveState, setSaveState] = useState<{ saving: boolean; lastSavedAt?: number; savingCombined: boolean; lastCombinedSavedAt?: number }>({ saving: false, savingCombined: false });
   const [basisDialog, setBasisDialog] = useState<any | null>(null);
   const [editingLegId, setEditingLegId] = useState<string | null>(null);
   const [legDialog, setLegDialog] = useState<any | null>(null);
@@ -729,6 +730,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   }, [serviceTypeId, currentLegId, serviceTypes]);
 
   const saveCharges = async () => {
+    setSaveState(prev => ({ ...prev, saving: true }));
     if (!optionId || !currentLegId) {
       const ensuredLegId = await ensureOptionAndLeg();
       if (!optionId || !ensuredLegId) return;
@@ -756,13 +758,6 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
           .eq('quote_option_id', optionId)
           .eq('leg_id', quoteLegId);
       }
-      if (currentLegId) {
-        await (supabase as any)
-          .from('quote_charges')
-          .delete()
-          .eq('quote_option_id', optionId)
-          .eq('leg_id', currentLegId);
-      }
     }
     const payload = legCharges.map((c: any) => ({
       tenant_id: tenantId,
@@ -779,26 +774,15 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       note: c.note ?? null,
       sort_order: c.sort_order ?? 1000,
     }));
+    if (!quoteLegId) {
+      toast({ title: 'Failed to save charges', description: 'Missing leg mapping. Please ensure legs are created and try again.' });
+      return;
+    }
     const { error } = await (supabase as any).from('quote_charges').insert(payload);
     if (error) {
-      const msg = String(error?.message || error || '');
-      if (msg.includes('fk_quote_charges_leg') || msg.includes('quote_charges_leg_id_fkey')) {
-        // Retry with leg_id equal to composer leg id to satisfy FK to quotation_version_option_legs
-        const retry = payload.map((p: any) => ({ ...p, leg_id: currentLegId }));
-        const { error: errRetry } = await (supabase as any).from('quote_charges').insert(retry);
-        if (errRetry) {
-          // Final fallback: allow saving without leg linkage
-          const fallback = payload.map((p: any) => ({ ...p, leg_id: null }));
-          const { error: err2 } = await (supabase as any).from('quote_charges').insert(fallback);
-          if (err2) {
-            toast({ title: 'Failed to save charges', description: String(err2?.message || err2) });
-            return;
-          }
-        }
-      } else {
-        toast({ title: 'Failed to save charges', description: msg });
-        return;
-      }
+      toast({ title: 'Failed to save charges', description: String(error?.message || error) });
+      setSaveState(prev => ({ ...prev, saving: false }));
+      return;
     }
 
     const all = Object.values(chargesByLeg).flat();
@@ -830,10 +814,12 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       min_margin: minMargin,
     }).eq('id', optionId);
     await loadChargesForOption();
+    setSaveState(prev => ({ ...prev, saving: false, lastSavedAt: Date.now() }));
     toast({ title: 'Charges saved' });
   };
 
   const saveChargesForLeg = async (legId: string) => {
+    setSaveState(prev => ({ ...prev, saving: true }));
     if (!optionId || !legId) {
       const ensuredLegId = await ensureOptionAndLeg();
       if (!optionId || !ensuredLegId) return;
@@ -852,11 +838,11 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       sellSideId = (sidesData ?? []).find((s: any) => s.code === 'sell')?.id ?? null;
     } catch {}
     if (optionId && quoteLegId) {
-      await (supabase as any)
-        .from('quote_charges')
-        .delete()
-        .eq('quote_option_id', optionId)
-        .eq('leg_id', quoteLegId);
+    await (supabase as any)
+      .from('quote_charges')
+      .delete()
+      .eq('quote_option_id', optionId)
+      .eq('leg_id', quoteLegId);
     }
     const payload = legCharges.map((c: any) => ({
       tenant_id: tenantId,
@@ -875,6 +861,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     }));
     await (supabase as any).from('quote_charges').insert(payload);
     await loadChargesForOption();
+    setSaveState(prev => ({ ...prev, saving: false, lastSavedAt: Date.now() }));
     toast({ title: 'Charges saved' });
   };
 
@@ -901,6 +888,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   }, [currentLegId, chargesByLeg[currentLegId!]]);
 
   const saveCombinedChargesAuto = async () => {
+    setSaveState(prev => ({ ...prev, savingCombined: true }));
     const tenantId = await getTenantId();
     if (!tenantId || !optionId) return;
     const buySide = (sides ?? []).find((s: any) => s.code === 'buy');
@@ -945,6 +933,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .is('leg_id', null);
       await (supabase as any).from('quote_charges').insert(payload);
     }
+    setSaveState(prev => ({ ...prev, savingCombined: false, lastCombinedSavedAt: Date.now() }));
   };
 
   const combinedAutoSaveTimerRef = useRef<any>(null);
@@ -1009,7 +998,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     overscan: 5,
   });
 
-  const altOptionAttemptRef = useRef<boolean>(false);
+  // Removed altOptionAttemptRef-based option switching to avoid ambiguity
 
   // Helper views data for current leg
   const legData = currentLegId ? (chargesByLeg[currentLegId] ?? []) : [];
@@ -1328,32 +1317,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .select('leg_id, charge_side_id, category_id, basis_id, quantity, unit, rate, amount, currency_id, note, sort_order')
         .eq('quote_option_id', optionId)
         .order('sort_order', { ascending: true });
-      if ((!allCharges || allCharges.length === 0) && !altOptionAttemptRef.current) {
-        altOptionAttemptRef.current = true;
-        try {
-          const { data: otherOpts } = await (supabase as any)
-            .from('quotation_version_options')
-            .select('id')
-            .eq('quotation_version_id', versionId)
-            .order('updated_at', { ascending: false })
-            .limit(5);
-          if (Array.isArray(otherOpts)) {
-            for (const row of otherOpts) {
-              const oid = row?.id;
-              if (!oid || String(oid) === String(optionId)) continue;
-              const { data: chk } = await (supabase as any)
-                .from('quote_charges')
-                .select('id')
-                .eq('quote_option_id', oid)
-                .limit(1);
-              if (Array.isArray(chk) && chk.length) {
-                setOptionId(String(oid));
-                return; // exit early; effect will re-run for new optionId
-              }
-            }
-          }
-        } catch {}
-      }
+      // Do not auto-switch options when charges are empty; keep current context
       const combinedRaw = (allCharges ?? []).filter((c: any) => !c.leg_id);
       const makeKey = (c: any) => [
         String(c.category_id ?? ''),
@@ -1425,12 +1389,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         const cid = compByOrder.get(Number(l.leg_number ?? 0));
         if (cid) toComposerId[String(l.id)] = cid;
       });
-      if (Object.keys(toComposerId).length === 0 && Array.isArray(quoteLegs) && quoteLegs.length) {
-        const fallbackComposerLegId = (legs && legs.length) ? String(legs[0].id) : (Array.isArray(compLegsRows) && compLegsRows[0]?.id ? String(compLegsRows[0].id) : (currentLegId ? String(currentLegId) : null));
-        if (fallbackComposerLegId) {
-          quoteLegs.forEach((l: any) => { toComposerId[String(l.id)] = fallbackComposerLegId; });
-        }
-      }
+      // Strict mapping: do not fallback to the first composer leg; require leg_number alignment
       const legIdSet = new Set<string>((legs ?? []).map(l => String(l.id)));
       const grouped: Record<string, any[]> = {};
       // Ensure we always group by a valid composer leg id
@@ -1822,6 +1781,10 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                 }}
               >+ Add Charge</Button>
               <Button onClick={saveCharges} disabled={!optionId || !currentLegId} tabIndex={110}>Save Charges</Button>
+              <Button variant="outline" onClick={loadChargesForOption} disabled={!optionId} tabIndex={111}>Reload Data</Button>
+              <div className="text-xs text-muted-foreground ml-2">
+                {saveState.saving ? 'Saving…' : (saveState.lastSavedAt ? `Saved ${Math.max(1, Math.floor((Date.now() - saveState.lastSavedAt) / 1000))}s ago` : '')}
+              </div>
             </div>
           </div>
             <div className="space-y-4">
@@ -2232,6 +2195,10 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                 }}
                 disabled={!optionId}
               >Save Combined Charges</Button>
+              <Button variant="outline" onClick={loadChargesForOption} disabled={!optionId} tabIndex={210}>Reload Data</Button>
+              <div className="text-xs text-muted-foreground ml-2">
+                {saveState.savingCombined ? 'Saving…' : (saveState.lastCombinedSavedAt ? `Saved ${Math.max(1, Math.floor((Date.now() - saveState.lastCombinedSavedAt) / 1000))}s ago` : '')}
+              </div>
             </div>
           </div>
           {(() => {
