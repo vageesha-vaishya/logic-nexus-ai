@@ -75,7 +75,10 @@ export function LegsConfigurationStep({
                         </SelectTrigger>
                         <SelectContent>
                           {serviceTypes
-                            .filter((st) => st.mode?.toLowerCase() === leg.mode.toLowerCase())
+                            .filter((st) => 
+                              st.is_active && 
+                              st.code?.toLowerCase().startsWith(leg.mode.toLowerCase())
+                            )
                             .map((st) => (
                               <SelectItem key={st.id} value={st.id}>
                                 {st.name}
