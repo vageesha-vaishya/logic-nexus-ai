@@ -830,6 +830,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       min_margin: minMargin,
     }).eq('id', optionId);
     await loadChargesForOption();
+    toast({ title: 'Charges saved' });
   };
 
   const saveChargesForLeg = async (legId: string) => {
@@ -880,6 +881,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
       sort_order: c.sort_order ?? 1000,
     }));
     await (supabase as any).from('quote_charges').insert(payload);
+    await loadChargesForOption();
+    toast({ title: 'Charges saved' });
   };
 
   const autoSaveTimerRef = useRef<any>(null);
@@ -975,7 +978,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
 
   const combinedRowsMemo = useMemo(() => {
     const data = currentLegId ? (chargesByLeg[currentLegId] ?? []) : [];
-    const groupKey = (c: any) => [c.category_id ?? '', c.basis_id ?? '', c.currency_id ?? '', c.unit ?? '', c.note ?? ''].join('|');
+    const groupKey = (c: any) => [c.category_id ?? '', c.basis_id ?? '', c.currency_id ?? '', c.unit ?? ''].join('|');
     const map = new Map<string, any>();
     data.forEach((c: any, idx: number) => {
       const key = groupKey(c);
@@ -1013,6 +1016,8 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     overscan: 5,
   });
 
+  const altOptionAttemptRef = useRef<boolean>(false);
+
   // Helper views data for current leg
   const legData = currentLegId ? (chargesByLeg[currentLegId] ?? []) : [];
 
@@ -1025,10 +1030,17 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
     const next = legData.slice();
     [row.buy?.idx, row.sell?.idx].forEach((i: any) => {
       if (typeof i === 'number') {
-        next[i] = { ...next[i], ...patch };
-        const q = next[i].quantity ?? 1;
-        const rate = next[i].rate ?? 0;
-        next[i].amount = Number(next[i].amount ?? rate * q);
+        const prev = next[i];
+        next[i] = { ...prev, ...patch };
+        if ('rate' in patch || 'quantity' in patch || 'amount' in patch) {
+          const qRaw: any = next[i].quantity;
+          const rRaw: any = next[i].rate;
+          const qNum = typeof qRaw === 'string' && qRaw === '' ? NaN : Number(qRaw ?? 1);
+          const rNum = typeof rRaw === 'string' && rRaw === '' ? NaN : Number(rRaw ?? 0);
+          if (Number.isFinite(qNum) && Number.isFinite(rNum)) {
+            next[i].amount = Number(next[i].amount ?? (rNum * qNum));
+          }
+        }
       }
     });
     updateRowsForLeg(next);
@@ -1037,29 +1049,49 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
   const updateSideForLeg = (rowRef: any, sideIdx: any, patch: any) => {
     if (typeof sideIdx !== 'number') return;
     const next = legData.slice();
-    next[sideIdx] = { ...next[sideIdx], ...patch };
-    const q = next[sideIdx].quantity ?? 1;
-    const rate = next[sideIdx].rate ?? 0;
-    next[sideIdx].amount = Number(next[sideIdx].amount ?? rate * q);
+    const prev = next[sideIdx];
+    next[sideIdx] = { ...prev, ...patch };
+    const sellIdxDirect = rowRef.sell?.idx;
+    const buyIdxDirect = rowRef.buy?.idx;
+    const isSellSide = typeof sellIdxDirect === 'number' && sideIdx === sellIdxDirect;
+    const qRaw: any = next[sideIdx].quantity;
+    const rRaw: any = next[sideIdx].rate;
+    let qCandidate: any = qRaw;
+    if (isSellSide && (qCandidate === null || qCandidate === undefined || (typeof qCandidate === 'string' && qCandidate === ''))) {
+      const buyQ = typeof buyIdxDirect === 'number' ? next[buyIdxDirect]?.quantity : undefined;
+      qCandidate = buyQ;
+    }
+    const qNum = typeof qCandidate === 'string' && qCandidate === '' ? NaN : Number(qCandidate ?? 1);
+    const rNum = typeof rRaw === 'string' && rRaw === '' ? NaN : Number(rRaw ?? 0);
+    if (Number.isFinite(qNum) && Number.isFinite(rNum)) {
+      next[sideIdx].amount = Number(next[sideIdx].amount ?? (rNum * qNum));
+    }
     if (autoMarginEnabled) {
-      const buyIdx = rowRef.buy?.idx;
-      const sellIdx = rowRef.sell?.idx;
+      const buyIdx = buyIdxDirect;
+      const sellIdx = sellIdxDirect;
       // Only auto-derive sell when BUY side is edited; respect manual SELL edits
       if (typeof buyIdx === 'number' && typeof sellIdx === 'number' && sideIdx === buyIdx) {
-        const br = next[buyIdx].rate ?? 0;
-        const bq = next[buyIdx].quantity ?? 1;
+        const brRaw: any = next[buyIdx].rate;
+        const bqRaw: any = next[buyIdx].quantity;
+        const br = typeof brRaw === 'string' && brRaw === '' ? 0 : Number(brRaw ?? 0);
+        const bq = typeof bqRaw === 'string' && bqRaw === '' ? 1 : Number(bqRaw ?? 1);
         if (marginMethod === 'percent') {
           next[sellIdx].rate = br * (1 + (marginValue / 100));
-          next[sellIdx].quantity = bq;
+          const sq = next[sellIdx].quantity;
+          if (sq === null || sq === undefined || (typeof sq === 'string' && sq === '')) {
+            next[sellIdx].quantity = bq;
+          }
         } else if (marginMethod === 'fixed') {
           next[sellIdx].rate = br + (marginValue ?? 0);
-          next[sellIdx].quantity = bq;
+          const sq = next[sellIdx].quantity;
+          if (sq === null || sq === undefined || (typeof sq === 'string' && sq === '')) {
+            next[sellIdx].quantity = bq;
+          }
         }
         next[sellIdx].amount = (next[sellIdx].rate ?? 0) * (next[sellIdx].quantity ?? 1);
         next[sellIdx].derived = true;
       }
     }
-    const sellIdxDirect = rowRef.sell?.idx;
     if (typeof sellIdxDirect === 'number' && sideIdx === sellIdxDirect) {
       next[sellIdxDirect].derived = false;
     }
@@ -1085,7 +1117,38 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         toast({ title: 'Failed to create option', description: 'Missing tenant scope. Select a tenant or open via a tenant-scoped quote.' });
         return null;
       }
-      // Create option if missing
+      // Create or reuse option if missing
+      if (!optId) {
+        try {
+          const { data: existingOpts } = await (supabase as any)
+            .from('quotation_version_options')
+            .select('id')
+            .eq('quotation_version_id', versionId)
+            .order('updated_at', { ascending: false })
+            .limit(5);
+          let selectedId: string | null = null;
+          if (Array.isArray(existingOpts) && existingOpts.length) {
+            for (const row of existingOpts) {
+              const oid = row?.id;
+              if (!oid) continue;
+              const { data: ch } = await (supabase as any)
+                .from('quote_charges')
+                .select('id')
+                .eq('quote_option_id', oid)
+                .limit(1);
+              if (Array.isArray(ch) && ch.length) {
+                selectedId = oid;
+                break;
+              }
+            }
+            if (!selectedId) selectedId = existingOpts[0]?.id ?? null;
+          }
+          if (selectedId) {
+            optId = selectedId;
+            setOptionId(selectedId);
+          }
+        } catch {}
+      }
       if (!optId) {
         let defaultCurrencyId = currencyId;
         if (!defaultCurrencyId) {
@@ -1130,40 +1193,61 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
           if (optId) setOptionId(optId);
         }
       }
-      // Create leg if missing (guard against concurrent inserts)
+      // Create leg if missing (guard against concurrent inserts), or reuse existing
       if (!legId && optId) {
-        if (creatingLegRef.current) return null;
-        creatingLegRef.current = true;
-        const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
-        const createLegWithRetry = async (): Promise<any | null> => {
-          const start = Date.now();
-          for (let attempt = 0; attempt < 2; attempt++) {
-            const { data: leg, error: legErr } = await (supabase as any)
-              .from('quotation_version_option_legs')
-              .insert({ tenant_id: tenantId, quotation_version_option_id: optId, leg_order: nextOrder })
-              .select('id, leg_order')
-              .single();
-            if (!legErr && leg?.id) return leg;
-            const msg = String(legErr?.message || legErr || '');
-            if (msg.toLowerCase().includes('statement timeout')) {
-              await new Promise(r => setTimeout(r, 400));
-              continue;
-            }
-            toast({ title: 'Failed to create leg', description: msg });
-            return null;
+        try {
+          const { data: existingLegs } = await (supabase as any)
+            .from('quotation_version_option_legs')
+            .select('id, leg_order')
+            .eq('quotation_version_option_id', optId)
+            .order('leg_order')
+            .limit(1);
+          const firstLeg = Array.isArray(existingLegs) && existingLegs[0]?.id ? existingLegs[0] : null;
+          if (firstLeg) {
+            legId = firstLeg.id;
+            setLegs(prev => {
+              const has = prev.some(l => String(l.id) === String(firstLeg.id));
+              return has ? prev : [...prev, { id: firstLeg.id, leg_order: firstLeg.leg_order }];
+            });
+            setCurrentLegId(firstLeg.id);
+            setChargesByLeg(prev => ({ ...prev, [firstLeg.id]: prev[firstLeg.id] ?? [] }));
+            setLegNames(prev => ({ ...prev, [firstLeg.id]: `Leg ${firstLeg.leg_order}` }));
           }
-          const elapsed = Date.now() - start;
-          toast({ title: 'Failed to create leg', description: `Timeout after ${elapsed}ms` });
-          return null;
-        };
-        const leg = await createLegWithRetry();
-        creatingLegRef.current = false;
-        if (!leg) return null;
-        legId = leg.id;
-        setLegs(prev => [...prev, { id: leg.id, leg_order: leg.leg_order }]);
-        setCurrentLegId(leg.id);
-        setChargesByLeg(prev => ({ ...prev, [leg.id]: prev[leg.id] ?? [] }));
-        setLegNames(prev => ({ ...prev, [leg.id]: `Leg ${leg.leg_order}` }));
+        } catch {}
+        if (!legId) {
+          if (creatingLegRef.current) return null;
+          creatingLegRef.current = true;
+          const nextOrder = (legs[legs.length - 1]?.leg_order ?? 0) + 1;
+          const createLegWithRetry = async (): Promise<any | null> => {
+            const start = Date.now();
+            for (let attempt = 0; attempt < 2; attempt++) {
+              const { data: leg, error: legErr } = await (supabase as any)
+                .from('quotation_version_option_legs')
+                .insert({ tenant_id: tenantId, quotation_version_option_id: optId, leg_order: nextOrder })
+                .select('id, leg_order')
+                .single();
+              if (!legErr && leg?.id) return leg;
+              const msg = String(legErr?.message || legErr || '');
+              if (msg.toLowerCase().includes('statement timeout')) {
+                await new Promise(r => setTimeout(r, 400));
+                continue;
+              }
+              toast({ title: 'Failed to create leg', description: msg });
+              return null;
+            }
+            const elapsed = Date.now() - start;
+            toast({ title: 'Failed to create leg', description: `Timeout after ${elapsed}ms` });
+            return null;
+          };
+          const leg = await createLegWithRetry();
+          creatingLegRef.current = false;
+          if (!leg) return null;
+          legId = leg.id;
+          setLegs(prev => [...prev, { id: leg.id, leg_order: leg.leg_order }]);
+          setCurrentLegId(leg.id);
+          setChargesByLeg(prev => ({ ...prev, [leg.id]: prev[leg.id] ?? [] }));
+          setLegNames(prev => ({ ...prev, [leg.id]: `Leg ${leg.leg_order}` }));
+        }
       }
       return legId ?? null;
     } catch (e: any) {
@@ -1228,6 +1312,32 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
         .select('leg_id, charge_side_id, category_id, basis_id, quantity, unit, rate, amount, currency_id, note, sort_order')
         .eq('quote_option_id', optionId)
         .order('sort_order', { ascending: true });
+      if ((!allCharges || allCharges.length === 0) && !altOptionAttemptRef.current) {
+        altOptionAttemptRef.current = true;
+        try {
+          const { data: otherOpts } = await (supabase as any)
+            .from('quotation_version_options')
+            .select('id')
+            .eq('quotation_version_id', versionId)
+            .order('updated_at', { ascending: false })
+            .limit(5);
+          if (Array.isArray(otherOpts)) {
+            for (const row of otherOpts) {
+              const oid = row?.id;
+              if (!oid || String(oid) === String(optionId)) continue;
+              const { data: chk } = await (supabase as any)
+                .from('quote_charges')
+                .select('id')
+                .eq('quote_option_id', oid)
+                .limit(1);
+              if (Array.isArray(chk) && chk.length) {
+                setOptionId(String(oid));
+                return; // exit early; effect will re-run for new optionId
+              }
+            }
+          }
+        } catch {}
+      }
       const combinedRaw = (allCharges ?? []).filter((c: any) => !c.leg_id);
       const makeKey = (c: any) => [
         String(c.category_id ?? ''),
@@ -1685,29 +1795,62 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
                               </div>
                               <div>
                                 <div className="text-xs font-medium">Buy Qty</div>
-                                <Input className="text-right" type="number" value={row.buy?.quantity ?? 1} onChange={(e) => updateSideForLeg(row, row.buy?.idx, { quantity: Number(e.target.value) })} tabIndex={124 + idx * 20} />
+                                <Input className="text-right" type="number" inputMode="numeric" step="1" value={row.buy?.quantity ?? ''} onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateSideForLeg(row, row.buy?.idx, { quantity: v === '' ? null : Number(v) });
+                                }} tabIndex={124 + idx * 20} />
                               </div>
                               <div>
                                 <div className="text-xs font-medium">Buy Rate</div>
-                                <Input className="text-right" type="number" value={row.buy?.rate ?? 0} onChange={(e) => updateSideForLeg(row, row.buy?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.buy?.quantity || 1) })} tabIndex={125 + idx * 20} />
+                                <Input className="text-right" type="number" inputMode="decimal" step="any" value={row.buy?.rate ?? ''} onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v === '') {
+                                    updateSideForLeg(row, row.buy?.idx, { rate: null });
+                                  } else {
+                                    const num = Number(v);
+                                    const q = typeof row.buy?.quantity === 'number' ? row.buy?.quantity : (typeof row.sell?.quantity === 'number' ? row.sell?.quantity : 1);
+                                    const canCalc = Number.isFinite(num) && Number.isFinite(Number(q));
+                                    updateSideForLeg(row, row.buy?.idx, canCalc ? { rate: num, amount: num * Number(q) } : { rate: num });
+                                  }
+                                }} tabIndex={125 + idx * 20} />
                               </div>
                               <div>
                                 <div className="text-xs font-medium">Buy Amount</div>
-                                <Input className="text-right" type="number" value={row.buy?.amount ?? 0} onChange={(e) => updateSideForLeg(row, row.buy?.idx, { amount: Number(e.target.value) })} tabIndex={126 + idx * 20} />
+                                <Input className="text-right" type="number" value={row.buy?.amount ?? ''} onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateSideForLeg(row, row.buy?.idx, { amount: v === '' ? null : Number(v) });
+                                }} tabIndex={126 + idx * 20} />
                               </div>
                             </div>
                             <div className="grid grid-cols-1 lg:grid-cols-7 gap-3 items-end">
                               <div>
                                 <div className="text-xs font-medium">Sell Qty</div>
-                                <Input className="text-right" type="number" value={row.sell?.quantity ?? 1} onChange={(e) => updateSideForLeg(row, row.sell?.idx, { quantity: Number(e.target.value) })} tabIndex={127 + idx * 20} />
+                                <Input className="text-right" type="number" inputMode="numeric" step="1" placeholder={typeof row.buy?.quantity === 'number' ? String(row.buy?.quantity) : ''} value={row.sell?.quantity ?? ''} onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateSideForLeg(row, row.sell?.idx, { quantity: v === '' ? null : Number(v) });
+                                }} tabIndex={127 + idx * 20} />
                               </div>
                               <div>
                                 <div className="text-xs font-medium flex items-center gap-2">Sell Rate {row.sell?.derived ? <Badge variant="outline" className="text-[10px]">auto</Badge> : <Badge variant="secondary" className="text-[10px]">manual</Badge>}</div>
-                                <Input className="text-right" type="number" value={row.sell?.rate ?? 0} onChange={(e) => updateSideForLeg(row, row.sell?.idx, { rate: Number(e.target.value), amount: Number(e.target.value) * (row.sell?.quantity || 1) })} tabIndex={128 + idx * 20} />
+                                <Input className="text-right" type="number" inputMode="decimal" step="any" value={row.sell?.rate ?? ''} onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v === '') {
+                                    updateSideForLeg(row, row.sell?.idx, { rate: null });
+                                  } else {
+                                    const num = Number(v);
+                                    const qtyCandidate = typeof row.sell?.quantity === 'number' ? row.sell?.quantity : (typeof row.buy?.quantity === 'number' ? row.buy?.quantity : 1);
+                                    const q = Number(qtyCandidate);
+                                    const canCalc = Number.isFinite(num) && Number.isFinite(q);
+                                    updateSideForLeg(row, row.sell?.idx, canCalc ? { rate: num, amount: num * q } : { rate: num });
+                                  }
+                                }} tabIndex={128 + idx * 20} />
                               </div>
                               <div>
                                 <div className="text-xs font-medium">Sell Amount</div>
-                                <Input className="text-right" type="number" value={row.sell?.amount ?? 0} onChange={(e) => updateSideForLeg(row, row.sell?.idx, { amount: Number(e.target.value) })} tabIndex={129 + idx * 20} />
+                                <Input className="text-right" type="number" value={row.sell?.amount ?? ''} onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateSideForLeg(row, row.sell?.idx, { amount: v === '' ? null : Number(v) });
+                                }} tabIndex={129 + idx * 20} />
                               </div>
                               <div className="lg:col-span-3">
                                 <div className="text-xs font-medium">Remark Note</div>
@@ -1772,7 +1915,7 @@ export default function QuoteComposer({ quoteId, versionId, autoScroll }: { quot
             const buy = data.filter((c: any) => c.side === 'buy').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
             const sell = data.filter((c: any) => c.side === 'sell').reduce((s: number, c: any) => s + (c.amount ?? (c.rate ?? 0) * (c.quantity ?? 1)), 0);
             const margin = sell - buy;
-            const groupKey = (c: any) => [c.category_id ?? '', c.basis_id ?? '', c.currency_id ?? '', c.unit ?? '', c.note ?? ''].join('|');
+            const groupKey = (c: any) => [c.category_id ?? '', c.basis_id ?? '', c.currency_id ?? '', c.unit ?? ''].join('|');
             const map = new Map<string, any>();
             data.forEach((c: any) => {
               const key = groupKey(c);
