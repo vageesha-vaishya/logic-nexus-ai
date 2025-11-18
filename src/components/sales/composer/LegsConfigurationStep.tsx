@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, MapPin } from 'lucide-react';
+import { Trash2, MapPin } from 'lucide-react';
 import { TransportModeSelector } from './TransportModeSelector';
 
 interface Leg {
@@ -75,10 +75,7 @@ export function LegsConfigurationStep({
                         </SelectTrigger>
                         <SelectContent>
                           {serviceTypes
-                            .filter((st) => 
-                              st.is_active && 
-                              st.code?.toLowerCase().startsWith(leg.mode.toLowerCase())
-                            )
+                            .filter((st) => st.is_active)
                             .map((st) => (
                               <SelectItem key={st.id} value={st.id}>
                                 {st.name}
