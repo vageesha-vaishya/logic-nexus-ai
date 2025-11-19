@@ -2,7 +2,6 @@ declare const Deno: {
   env: { get(name: string): string | undefined };
   serve(handler: (req: Request) => Promise<Response> | Response): void;
 };
-// @ts-expect-error Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
