@@ -347,6 +347,40 @@ export async function createQuotationVersionWithOptions(
   return { version_id, option_ids };
 }
 
+export async function createBlankOption(
+  tenant_id: string,
+  version_id: string,
+  client = defaultClient
+): Promise<string> {
+  // Generate option name using the database function
+  const { data: optionName, error: nameError } = await (client as any).rpc('generate_next_option_name', {
+    p_version_id: version_id
+  });
+
+  if (nameError) throw nameError;
+
+  // Create the blank option
+  const { data, error } = await (client as any)
+    .from('quotation_version_options')
+    .insert({
+      tenant_id,
+      quotation_version_id: version_id,
+      option_name: optionName,
+      status: 'active',
+      recommended: false,
+      auto_margin_enabled: false,
+      buy_subtotal: 0,
+      sell_subtotal: 0,
+      margin_amount: 0,
+      total_amount: 0
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return data.id;
+}
+
 export async function recordCustomerSelection(
   tenant_id: string,
   quote_id: string,
