@@ -509,52 +509,51 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           if (updateError) throw updateError;
         }
 
-        // Replace charges for this leg
+        // Save charges for this leg (delete and recreate for simplicity)
         await supabase
           .from('quote_charges')
           .delete()
           .eq('quote_option_id', currentOptionId)
           .eq('leg_id', legId);
 
-        const newCharges: any[] = [];
+        const legCharges: any[] = [];
         for (const charge of leg.charges) {
-          // Prepare buy side
-          newCharges.push({
-            quote_option_id: currentOptionId,
-            leg_id: legId,
-            charge_side_id: buySideId,
-            category_id: charge.category_id || null,
-            basis_id: charge.basis_id || null,
-            quantity: charge.buy?.quantity || 1,
-            rate: charge.buy?.rate || 0,
-            amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
-            currency_id: charge.currency_id || null,
-            unit: charge.unit || null,
-            note: charge.note || null,
-            tenant_id: tenantId
-          });
-
-          // Prepare sell side
-          newCharges.push({
-            quote_option_id: currentOptionId,
-            leg_id: legId,
-            charge_side_id: sellSideId,
-            category_id: charge.category_id || null,
-            basis_id: charge.basis_id || null,
-            quantity: charge.sell?.quantity || 1,
-            rate: charge.sell?.rate || 0,
-            amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
-            currency_id: charge.currency_id || null,
-            unit: charge.unit || null,
-            note: charge.note || null,
-            tenant_id: tenantId
-          });
+          legCharges.push(
+            {
+              quote_option_id: currentOptionId,
+              leg_id: legId,
+              charge_side_id: buySideId,
+              category_id: charge.category_id || null,
+              basis_id: charge.basis_id || null,
+              quantity: charge.buy?.quantity || 1,
+              rate: charge.buy?.rate || 0,
+              amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
+              currency_id: charge.currency_id || null,
+              unit: charge.unit || null,
+              note: charge.note || null,
+              tenant_id: tenantId
+            },
+            {
+              quote_option_id: currentOptionId,
+              leg_id: legId,
+              charge_side_id: sellSideId,
+              category_id: charge.category_id || null,
+              basis_id: charge.basis_id || null,
+              quantity: charge.sell?.quantity || 1,
+              rate: charge.sell?.rate || 0,
+              amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
+              currency_id: charge.currency_id || null,
+              unit: charge.unit || null,
+              note: charge.note || null,
+              tenant_id: tenantId
+            }
+          );
         }
 
-        if (newCharges.length > 0) {
+        if (legCharges.length > 0) {
           const { error: chargeError } = await supabase
             .from('quote_charges')
-            .insert(newCharges);
+            .insert(legCharges);
           if (chargeError) throw chargeError;
         }
       }
