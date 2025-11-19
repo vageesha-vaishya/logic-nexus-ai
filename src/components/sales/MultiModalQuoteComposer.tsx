@@ -113,12 +113,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const loadOptionData = async () => {
     if (!optionId || !tenantId) return;
-    
+
     setLoading(true);
     try {
-      // Load legs with charges in a single optimized query
+      // Load legs from quotation_version_option_legs to align with FK on quote_charges.leg_id
       const { data: legData, error: legError } = await supabase
-        .from('quote_legs' as any)
+        .from('quotation_version_option_legs')
         .select(`
           *,
           quote_charges(
@@ -129,8 +129,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             currencies(code, symbol)
           )
         `)
-        .eq('quote_option_id', optionId)
-        .order('leg_number');
+        .eq('quotation_version_option_id', optionId)
+        .order('sort_order', { ascending: true });
 
       if (legError) throw legError;
 
@@ -138,7 +138,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         // Group charges by leg and pair buy/sell
         const legsWithCharges = legData.map((leg: any) => {
           const chargesMap = new Map();
-          
+
           // Group charges by their base properties (category, basis, etc.)
           leg.quote_charges?.forEach((charge: any) => {
             const key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
@@ -154,7 +154,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 sell: { quantity: 0, rate: 0 }
               });
             }
-            
+
             const chargeObj = chargesMap.get(key);
             const side = charge.charge_sides?.code;
             if (side === 'buy') {
@@ -270,7 +270,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (leg.id === legId) {
         const charges = [...leg.charges];
         const charge = { ...charges[chargeIdx] };
-        
+
         if (field.includes('.')) {
           const [parent, child] = field.split('.');
           charge[parent] = { ...(charge[parent] || {}), [child]: value };
@@ -280,7 +280,6 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         // Apply auto margin if enabled
         if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
-          const buyAmount = (charge.buy?.quantity || 1) * (charge.buy?.rate || 0);
           const sellRate = (charge.buy?.rate || 0) * (1 + marginPercent / 100);
           charge.sell = {
             quantity: charge.buy?.quantity || 1,
@@ -445,11 +444,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const buySideId = buySideRes.data.id;
       const sellSideId = sellSideRes.data.id;
 
-      // Remove deleted legs and their charges
+      // Remove deleted legs and their charges (aligned to quotation_version_option_legs)
       const { data: existingLegs } = await supabase
-        .from('quote_legs' as any)
+        .from('quotation_version_option_legs')
         .select('id')
-        .eq('quote_option_id', currentOptionId);
+        .eq('quotation_version_option_id', currentOptionId);
       const stateLegIds = new Set(
         (legs || [])
           .filter(l => !String(l.id).startsWith('leg-'))
@@ -460,12 +459,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         .filter((id: string) => !stateLegIds.has(id));
       if (toDeleteLegIds.length) {
         await supabase
-          .from('quote_charges' as any)
+          .from('quote_charges')
           .delete()
           .in('leg_id', toDeleteLegIds)
           .eq('quote_option_id', currentOptionId);
         await supabase
-          .from('quote_legs' as any)
+          .from('quotation_version_option_legs')
           .delete()
           .in('id', toDeleteLegIds);
       }

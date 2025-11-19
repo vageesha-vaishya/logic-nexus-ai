@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteForm } from '@/components/sales/QuoteForm';
-import { useCRM } from '@/hooks/useCRM';
+import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
+import { useCRM } from '@/hooks/useCRM';
 
 export default function QuoteNew() {
   const navigate = useNavigate();
@@ -77,6 +78,9 @@ export default function QuoteNew() {
         <QuoteForm onSuccess={handleSuccess} />
         {/* Quotation Composer is now only available via the Capture Carrier Rates popup in QuoteForm */}
       </div>
+      {createdQuoteId && versionId && (
+        <MultiModalQuoteComposer quoteId={createdQuoteId} versionId={versionId} />
+      )}
     </DashboardLayout>
   );
 }

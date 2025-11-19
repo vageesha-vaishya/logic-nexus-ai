@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteForm } from '@/components/sales/QuoteForm';
 import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
+import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
@@ -113,6 +114,9 @@ export default function QuoteDetail() {
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
         <QuotationVersionHistory quoteId={resolvedId ?? id as string} />
       </div>
+      {resolvedId && versionId && (
+        <MultiModalQuoteComposer quoteId={resolvedId} versionId={versionId} />
+      )}
     </DashboardLayout>
   );
 }
