@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { toast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { createQuotationVersionWithOptions, recordCustomerSelection, createBlankOption } from '@/integrations/supabase/carrierRatesActions';
+import { VersionCard } from './quotation-versions/VersionCard';
+import { VersionActions } from './quotation-versions/VersionActions';
+import { EmptyState } from './quotation-versions/EmptyState';
+import { Loader2 } from 'lucide-react';
 
 type Version = {
   id: string;
@@ -15,6 +16,7 @@ type Version = {
   kind: 'minor' | 'major';
   status: string | null;
   created_at: string;
+  is_current?: boolean;
 };
 
 type Option = {
@@ -25,6 +27,10 @@ type Option = {
   total_amount: number;
   currency: string;
   transit_time_days: number | null;
+  total_buy?: number;
+  total_sell?: number;
+  margin_amount?: number;
+  margin_percentage?: number;
 };
 
 export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
@@ -39,17 +45,43 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const load = async () => {
     setLoading(true);
     try {
+      // Get current version ID from quote
+      const { data: quoteData } = await supabase
+        .from('quotes')
+        .select('current_version_id')
+        .eq('id', quoteId)
+        .maybeSingle();
+
+      const currentVersionId = quoteData?.current_version_id;
+
       const { data: vs, error: vErr } = await supabase
         .from('quotation_versions')
         .select('*')
         .eq('quote_id', quoteId)
         .order('version_number', { ascending: false });
       if (vErr) throw vErr;
-      const versionIds = (vs ?? []).map((v: any) => v.id);
+
+      // Mark current version
+      const versionsWithCurrent = (vs ?? []).map(v => ({
+        ...v,
+        is_current: v.id === currentVersionId,
+      })) as Version[];
+
+      const versionIds = versionsWithCurrent.map((v: any) => v.id);
       if (versionIds.length > 0) {
         const { data: opts, error: oErr } = await supabase
           .from('quotation_version_options')
-          .select('id, quotation_version_id, carrier_rate_id, option_name')
+          .select(`
+            id,
+            quotation_version_id,
+            carrier_rate_id,
+            option_name,
+            total_buy,
+            total_sell,
+            total_amount,
+            margin_amount,
+            margin_percentage
+          `)
           .in('quotation_version_id', versionIds);
         if (oErr) throw oErr;
         const carrierRateIds = (opts ?? []).map((o: any) => o.carrier_rate_id).filter(Boolean);
@@ -71,9 +103,13 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
             quotation_version_id: key,
             option_name: o.option_name || null,
             carrier_name: r.carrier_name || 'Carrier',
-            total_amount: Number(r.base_rate ?? 0),
+            total_amount: Number(o.total_amount ?? r.base_rate ?? 0),
             currency: r.currency || 'USD',
             transit_time_days: null,
+            total_buy: o.total_buy ? Number(o.total_buy) : undefined,
+            total_sell: o.total_sell ? Number(o.total_sell) : undefined,
+            margin_amount: o.margin_amount ? Number(o.margin_amount) : undefined,
+            margin_percentage: o.margin_percentage ? Number(o.margin_percentage) : undefined,
           };
           grouped[key] = grouped[key] || [];
           grouped[key].push(opt);
@@ -82,7 +118,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       } else {
         setOptionsByVersion({});
       }
-      setVersions((vs ?? []) as Version[]);
+      setVersions(versionsWithCurrent);
     } catch (e: any) {
       toast({ title: 'Failed to load versions', description: e.message, variant: 'destructive' });
     } finally {
@@ -274,65 +310,60 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
     }
   };
 
+  const handleSetCurrent = async (versionId: string) => {
+    try {
+      const { error } = await supabase.rpc('set_current_version', {
+        p_version_id: versionId,
+      });
+      if (error) throw error;
+      toast({ title: 'Success', description: 'Current version updated' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Version History</CardTitle>
+        <CardTitle>Quotation Versions</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2 mb-3">
-          <Button disabled={loading} onClick={() => createVersion('minor')}>Create Minor Version</Button>
-          <Button variant="secondary" disabled={loading} onClick={() => createVersion('major')}>Create Major Version</Button>
-          <Separator orientation="vertical" className="mx-2 h-6" />
-          <Button variant="destructive" disabled={loading} onClick={() => deleteByKind('minor')}>Delete Minor Versions</Button>
-          <Button variant="destructive" disabled={loading} onClick={() => deleteByKind('major')}>Delete Major Versions</Button>
-        </div>
-        <Separator className="mb-3" />
-        {versions.length === 0 && (
-          <div className="text-sm text-muted-foreground">No versions yet. Create one above.</div>
+      <CardContent className="space-y-6">
+        <VersionActions
+          loading={loading}
+          onCreateMinor={() => createVersion('minor')}
+          onCreateMajor={() => createVersion('major')}
+          onDeleteMinor={() => deleteByKind('minor')}
+          onDeleteMajor={() => deleteByKind('major')}
+        />
+
+        {loading && versions.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : versions.length === 0 ? (
+          <EmptyState onCreateMinor={() => createVersion('minor')} loading={loading} />
+        ) : (
+          <div className="space-y-4">
+            {versions.map((version) => (
+              <VersionCard
+                key={version.id}
+                version={version}
+                options={optionsByVersion[version.id] ?? []}
+                quoteId={quoteId}
+                onCreateOption={createNewOption}
+                onEditOption={(vId, optId) =>
+                  navigate(`/dashboard/multimodal-quote?quoteId=${quoteId}&versionId=${vId}&optionId=${optId}`)
+                }
+                onSelectOption={selectOption}
+                onDeleteVersion={deleteVersion}
+                onSetCurrent={handleSetCurrent}
+                onStatusChange={load}
+                loading={loading}
+              />
+            ))}
+          </div>
         )}
-        <div className="space-y-4">
-          {versions.map(v => (
-            <div key={v.id} className="border rounded p-3">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">Version {v.version_number} ({v.kind})</div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => createNewOption(v.id)}>
-                    Create New Option
-                  </Button>
-                  <Badge variant="outline">{v.status ?? 'draft'}</Badge>
-                </div>
-              </div>
-              <div className="mt-2 grid gap-2">
-                {(optionsByVersion[v.id] ?? []).map(opt => (
-                  <div key={opt.id} className="flex items-center justify-between rounded border p-2">
-                    <div className="flex items-center gap-3">
-                      <Badge>{opt.option_name || opt.carrier_name}</Badge>
-                      <div className="text-sm">
-                        {opt.currency} {Number(opt.total_amount).toFixed(2)}
-                        {opt.transit_time_days != null && (
-                          <span className="text-muted-foreground"> • {opt.transit_time_days} days</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/multimodal-quote?quoteId=${quoteId}&versionId=${v.id}&optionId=${opt.id}`)}>
-                        Edit
-                      </Button>
-                      <Button size="sm" onClick={() => selectOption(v.id, opt.id)}>Select</Button>
-                    </div>
-                  </div>
-                ))}
-                {(optionsByVersion[v.id] ?? []).length === 0 && (
-                  <div className="text-xs text-muted-foreground">No options created for this version.</div>
-                )}
-                <div className="flex justify-end">
-                  <Button variant="destructive" size="sm" disabled={loading} onClick={() => deleteVersion(v.id)}>Delete This Version</Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </CardContent>
     </Card>
   );
