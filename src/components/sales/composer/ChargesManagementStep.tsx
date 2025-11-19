@@ -167,10 +167,6 @@ export function ChargesManagementStep({
                           <th className="p-3 text-right font-semibold">Buy Qty</th>
                           <th className="p-3 text-right font-semibold">Buy Rate</th>
                           <th className="p-3 text-right font-semibold">Buy Amt</th>
-                          <th className="p-3 text-right font-semibold">Sell Qty</th>
-                          <th className="p-3 text-right font-semibold">Sell Rate</th>
-                          <th className="p-3 text-right font-semibold">Sell Amt</th>
-                          <th className="p-3 text-right font-semibold">Margin</th>
                           <th className="p-3 text-center font-semibold">Actions</th>
                         </tr>
                       </thead>
@@ -246,10 +242,6 @@ export function ChargesManagementStep({
                     <th className="p-3 text-right font-semibold">Buy Qty</th>
                     <th className="p-3 text-right font-semibold">Buy Rate</th>
                     <th className="p-3 text-right font-semibold">Buy Amt</th>
-                    <th className="p-3 text-right font-semibold">Sell Qty</th>
-                    <th className="p-3 text-right font-semibold">Sell Rate</th>
-                    <th className="p-3 text-right font-semibold">Sell Amt</th>
-                    <th className="p-3 text-right font-semibold">Margin</th>
                     <th className="p-3 text-center font-semibold">Actions</th>
                   </tr>
                 </thead>
