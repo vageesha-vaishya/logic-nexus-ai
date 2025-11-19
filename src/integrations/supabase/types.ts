@@ -5504,6 +5504,20 @@ export type Database = {
     }
     Functions: {
       calculate_lead_score: { Args: { lead_id: string }; Returns: number }
+      calculate_next_version_number: {
+        Args: { p_quote_id: string }
+        Returns: number
+      }
+      calculate_option_margins: {
+        Args: { p_option_id: string }
+        Returns: {
+          charge_count: number
+          margin_amount: number
+          margin_percentage: number
+          total_buy: number
+          total_sell: number
+        }[]
+      }
       calculate_option_totals: {
         Args: { p_option_id: string }
         Returns: {
@@ -5516,6 +5530,10 @@ export type Database = {
       check_usage_limit: {
         Args: { _feature_key: string; _tenant_id: string }
         Returns: boolean
+      }
+      compare_versions: {
+        Args: { p_version_id_1: string; p_version_id_2: string }
+        Returns: Json
       }
       decrement_user_lead_count: {
         Args: { p_tenant_id: string; p_user_id: string }
@@ -5671,6 +5689,10 @@ export type Database = {
           p_user_id: string
           p_version_id: string
         }
+        Returns: undefined
+      }
+      set_current_version: {
+        Args: { p_version_id: string }
         Returns: undefined
       }
       tenant_has_feature: {
