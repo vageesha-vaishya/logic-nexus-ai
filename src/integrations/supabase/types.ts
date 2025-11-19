@@ -3061,6 +3061,7 @@ export type Database = {
           locked: boolean | null
           margin_amount: number
           margin_method_id: string | null
+          margin_percentage: number | null
           margin_value: number | null
           min_margin: number | null
           option_name: string | null
@@ -3092,6 +3093,7 @@ export type Database = {
           locked?: boolean | null
           margin_amount?: number
           margin_method_id?: string | null
+          margin_percentage?: number | null
           margin_value?: number | null
           min_margin?: number | null
           option_name?: string | null
@@ -3123,6 +3125,7 @@ export type Database = {
           locked?: boolean | null
           margin_amount?: number
           margin_method_id?: string | null
+          margin_percentage?: number | null
           margin_value?: number | null
           min_margin?: number | null
           option_name?: string | null
