@@ -2974,6 +2974,7 @@ export type Database = {
           margin_method_id: string | null
           margin_value: number | null
           min_margin: number | null
+          option_name: string | null
           provider_type_id: string | null
           quotation_version_id: string
           quote_currency_id: string | null
@@ -2997,6 +2998,7 @@ export type Database = {
           margin_method_id?: string | null
           margin_value?: number | null
           min_margin?: number | null
+          option_name?: string | null
           provider_type_id?: string | null
           quotation_version_id: string
           quote_currency_id?: string | null
@@ -3020,6 +3022,7 @@ export type Database = {
           margin_method_id?: string | null
           margin_value?: number | null
           min_margin?: number | null
+          option_name?: string | null
           provider_type_id?: string | null
           quotation_version_id?: string
           quote_currency_id?: string | null
@@ -5359,6 +5362,10 @@ export type Database = {
         Returns: undefined
       }
       execute_sql_query: { Args: { query_text: string }; Returns: Json }
+      generate_next_option_name: {
+        Args: { p_version_id: string }
+        Returns: string
+      }
       generate_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
