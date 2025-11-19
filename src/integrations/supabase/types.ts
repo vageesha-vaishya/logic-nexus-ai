@@ -2950,6 +2950,7 @@ export type Database = {
         Row: {
           created_at: string
           destination_location: string | null
+          franchise_id: string | null
           id: string
           mode: string | null
           mode_id: string | null
@@ -2967,6 +2968,7 @@ export type Database = {
         Insert: {
           created_at?: string
           destination_location?: string | null
+          franchise_id?: string | null
           id?: string
           mode?: string | null
           mode_id?: string | null
@@ -2984,6 +2986,7 @@ export type Database = {
         Update: {
           created_at?: string
           destination_location?: string | null
+          franchise_id?: string | null
           id?: string
           mode?: string | null
           mode_id?: string | null
@@ -2999,6 +3002,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "quotation_version_option_legs_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotation_version_option_legs_mode_id_fkey"
             columns: ["mode_id"]
@@ -3044,6 +3054,7 @@ export type Database = {
           charge_count: number | null
           created_at: string | null
           created_by: string | null
+          franchise_id: string | null
           id: string
           last_calculated_at: string | null
           leg_count: number | null
@@ -3074,6 +3085,7 @@ export type Database = {
           charge_count?: number | null
           created_at?: string | null
           created_by?: string | null
+          franchise_id?: string | null
           id?: string
           last_calculated_at?: string | null
           leg_count?: number | null
@@ -3104,6 +3116,7 @@ export type Database = {
           charge_count?: number | null
           created_at?: string | null
           created_by?: string | null
+          franchise_id?: string | null
           id?: string
           last_calculated_at?: string | null
           leg_count?: number | null
@@ -3128,6 +3141,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "quotation_version_options_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotation_version_options_margin_method_id_fkey"
             columns: ["margin_method_id"]
@@ -3170,6 +3190,7 @@ export type Database = {
           change_reason: string | null
           created_at: string | null
           created_by: string | null
+          franchise_id: string | null
           id: string
           is_active: boolean | null
           is_current: boolean | null
@@ -3189,6 +3210,7 @@ export type Database = {
           change_reason?: string | null
           created_at?: string | null
           created_by?: string | null
+          franchise_id?: string | null
           id?: string
           is_active?: boolean | null
           is_current?: boolean | null
@@ -3208,6 +3230,7 @@ export type Database = {
           change_reason?: string | null
           created_at?: string | null
           created_by?: string | null
+          franchise_id?: string | null
           id?: string
           is_active?: boolean | null
           is_current?: boolean | null
@@ -3225,6 +3248,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "quotation_versions_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quotation_versions_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -3241,6 +3271,7 @@ export type Database = {
           charge_side_id: string | null
           created_at: string | null
           currency_id: string | null
+          franchise_id: string | null
           id: string
           leg_id: string
           note: string | null
@@ -3259,6 +3290,7 @@ export type Database = {
           charge_side_id?: string | null
           created_at?: string | null
           currency_id?: string | null
+          franchise_id?: string | null
           id?: string
           leg_id: string
           note?: string | null
@@ -3277,6 +3309,7 @@ export type Database = {
           charge_side_id?: string | null
           created_at?: string | null
           currency_id?: string | null
+          franchise_id?: string | null
           id?: string
           leg_id?: string
           note?: string | null
@@ -3289,6 +3322,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "quote_charges_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quote_charges_leg_id_fkey"
             columns: ["leg_id"]

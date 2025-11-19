@@ -49,6 +49,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [autoMargin, setAutoMargin] = useState(false);
   const [marginPercent, setMarginPercent] = useState(15);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [franchiseId, setFranchiseId] = useState<string | null>(null);
   
   // Track charges to delete
   const [chargesToDelete, setChargesToDelete] = useState<string[]>([]);
@@ -139,10 +140,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         try {
           const { data: quoteRow } = await supabase
             .from('quotes')
-            .select('tenant_id')
+            .select('tenant_id, franchise_id')
             .eq('id', quoteId)
             .single();
           resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
+          if ((quoteRow as any)?.franchise_id) {
+            setFranchiseId((quoteRow as any).franchise_id);
+          }
         } catch {}
       }
 
@@ -827,6 +831,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               origin_location: leg.origin,
               destination_location: leg.destination,
               tenant_id: finalTenantId,
+              franchise_id: franchiseId,
               sort_order: i
             })
             .select()
@@ -861,7 +866,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             currency_id: charge.currency_id || null,
             unit: charge.unit || null,
             note: charge.note || null,
-            tenant_id: finalTenantId
+            tenant_id: finalTenantId,
+            franchise_id: franchiseId
           };
 
           // Handle buy side
