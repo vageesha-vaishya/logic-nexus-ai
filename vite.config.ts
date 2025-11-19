@@ -10,19 +10,6 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     strictPort: true,
     headers: {
-      // Explicitly disable Privacy Sandbox/FLEDGE trial features to silence devtools warnings
-      // These features are origin-trial controlled; disabling prevents noisy console errors
-      "Permissions-Policy": [
-        "browsing-topics=()",
-        "run-ad-auction=()",
-        "join-ad-interest-group=()",
-        "private-state-token-redemption=()",
-        "private-state-token-issuance=()"
-      ].join(", "),
-    },
-    headers: {
-      // Explicitly disable Privacy Sandbox/FLEDGE trial features to silence devtools warnings
-      // These features are origin-trial controlled; disabling prevents noisy console errors
       "Permissions-Policy": [
         "browsing-topics=()",
         "run-ad-auction=()",
