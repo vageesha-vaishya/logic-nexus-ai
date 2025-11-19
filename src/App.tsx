@@ -84,6 +84,7 @@ import QuoteNumberSettings from "./pages/dashboard/QuoteNumberSettings";
 import DataManagement from "./pages/dashboard/DataManagement";
 import ServiceTypeMappings from "./pages/dashboard/ServiceTypeMappings";
 import ServiceTypes from "./pages/dashboard/ServiceTypes";
+import TransportModes from "./pages/dashboard/TransportModes";
 import Services from "./pages/dashboard/Services";
 import Currencies from "./pages/dashboard/Currencies";
 import ContainerTypes from "./pages/dashboard/ContainerTypes";
@@ -545,6 +546,7 @@ const App = () => (
              <Route path="/dashboard/cargo-details" element={<ProtectedRoute><CargoDetails /></ProtectedRoute>} />
               <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
              <Route path="/dashboard/service-types" element={<ProtectedRoute><ServiceTypes /></ProtectedRoute>} />
+             <Route path="/dashboard/transport-modes" element={<ProtectedRoute><TransportModes /></ProtectedRoute>} />
              <Route path="/dashboard/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
              <Route path="/dashboard/service-type-mappings" element={<ProtectedRoute><ServiceTypeMappings /></ProtectedRoute>} />
             {/* Subscription & Billing Routes */}

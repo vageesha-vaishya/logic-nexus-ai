@@ -4119,6 +4119,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          mode_id: string | null
           name: string
           updated_at: string | null
         }
@@ -4128,6 +4129,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          mode_id?: string | null
           name: string
           updated_at?: string | null
         }
@@ -4137,10 +4139,19 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          mode_id?: string | null
           name?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "service_types_mode_id_fkey"
+            columns: ["mode_id"]
+            isOneToOne: false
+            referencedRelation: "transport_modes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       services: {
         Row: {
@@ -5080,6 +5091,42 @@ export type Database = {
           is_active?: boolean
           name?: string
           tenant_id?: string
+        }
+        Relationships: []
+      }
+      transport_modes: {
+        Row: {
+          code: string
+          color: string
+          created_at: string | null
+          display_order: number
+          icon_name: string
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          color: string
+          created_at?: string | null
+          display_order?: number
+          icon_name: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          color?: string
+          created_at?: string | null
+          display_order?: number
+          icon_name?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
