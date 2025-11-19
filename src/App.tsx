@@ -97,6 +97,7 @@ import CustomsClearancePipeline from "./pages/dashboard/CustomsClearancePipeline
 import DatabaseExport from "./pages/dashboard/data-management/DatabaseExport";
 import AccountsPipeline from "./pages/dashboard/AccountsPipeline";
 import ContactsPipeline from "./pages/dashboard/ContactsPipeline";
+import QuotationTests from "./pages/testing/QuotationTests";
     
 const queryClient = new QueryClient();
 
@@ -418,7 +419,15 @@ const App = () => (
               } 
             />
             <Route
-              path="/dashboard/lead-routing" 
+              path="/testing/quotations" 
+              element={
+                <ProtectedRoute>
+                  <QuotationTests />
+                </ProtectedRoute>
+              } 
+            />
+            <Route
+              path="/dashboard/lead-routing"
               element={
                 <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>
                   <LeadRouting />
