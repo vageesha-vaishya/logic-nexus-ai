@@ -13,6 +13,7 @@ import { BasisConfigModal } from './composer/BasisConfigModal';
 import { DeleteConfirmDialog } from './composer/DeleteConfirmDialog';
 import { SaveProgress } from './composer/SaveProgress';
 import { ErrorBoundary } from './composer/ErrorBoundary';
+import { ValidationFeedback } from './composer/ValidationFeedback';
 
 interface Leg {
   id: string;
@@ -67,6 +68,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     show: false,
     steps: []
   });
+  
+  // Validation feedback
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
   // Reference data
   const [serviceTypes, setServiceTypes] = useState<any[]>([]);
@@ -89,7 +94,31 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+    
+    // Keyboard shortcuts
+    const handleKeyboard = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + S to save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (currentStep === 4 && !saving) {
+          saveQuotation();
+        }
+      }
+      // Cmd/Ctrl + → to go next
+      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (canProceed()) handleNext();
+      }
+      // Cmd/Ctrl + ← to go back
+      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleBack();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [currentStep, saving]);
 
   useEffect(() => {
     if (optionId && tenantId) {
@@ -506,6 +535,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const validateQuotation = () => {
     const errors: string[] = [];
+    const warnings: string[] = [];
 
     // Validate legs
     if (legs.length === 0) {
@@ -517,12 +547,21 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (!leg.origin) errors.push(`Leg ${idx + 1}: Origin is required`);
       if (!leg.destination) errors.push(`Leg ${idx + 1}: Destination is required`);
       
+      if (leg.charges.length === 0) {
+        warnings.push(`Leg ${idx + 1}: No charges added. Consider adding at least one charge.`);
+      }
+      
       leg.charges.forEach((charge, chargeIdx) => {
         if (!charge.category_id) {
           errors.push(`Leg ${idx + 1}, Charge ${chargeIdx + 1}: Category is required`);
         }
         if (!charge.currency_id) {
           errors.push(`Leg ${idx + 1}, Charge ${chargeIdx + 1}: Currency is required`);
+        }
+        
+        // Warn about zero rates
+        if (charge.sell?.rate === 0) {
+          warnings.push(`Leg ${idx + 1}, Charge ${chargeIdx + 1}: Sell rate is zero`);
         }
       });
     });
@@ -536,17 +575,25 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         errors.push(`Combined Charge ${idx + 1}: Currency is required`);
       }
     });
+    
+    // Check if all legs have zero charges and no combined charges
+    if (legs.every(leg => leg.charges.length === 0) && combinedCharges.length === 0) {
+      errors.push('At least one leg must have charges, or add combined charges');
+    }
 
-    return errors;
+    return { errors, warnings };
   };
 
   const saveQuotation = async () => {
     // Validate first
-    const validationErrors = validateQuotation();
-    if (validationErrors.length > 0) {
+    const validation = validateQuotation();
+    setValidationErrors(validation.errors);
+    setValidationWarnings(validation.warnings);
+    
+    if (validation.errors.length > 0) {
       toast({
         title: 'Validation Error',
-        description: validationErrors.join('; '),
+        description: `Please fix ${validation.errors.length} error${validation.errors.length > 1 ? 's' : ''} before saving`,
         variant: 'destructive'
       });
       return;
@@ -860,6 +907,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       // Clear deletion queue after successful save
       setChargesToDelete([]);
       
+      // Clear validation feedback
+      setValidationErrors([]);
+      setValidationWarnings([]);
+      
       updateProgress(5); // Complete
       
       // Keep success display for a moment
@@ -885,12 +936,20 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const handleNext = () => {
+    // Clear validation on navigation
+    setValidationErrors([]);
+    setValidationWarnings([]);
+    
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handleBack = () => {
+    // Clear validation on navigation
+    setValidationErrors([]);
+    setValidationWarnings([]);
+    
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
@@ -927,6 +986,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   return (
     <div className="space-y-6">
+      {/* Validation Feedback */}
+      {(validationErrors.length > 0 || validationWarnings.length > 0) && (
+        <ValidationFeedback errors={validationErrors} warnings={validationWarnings} />
+      )}
+      
       <Card>
         <CardContent className="pt-6">
           <QuotationWorkflowStepper
@@ -1009,13 +1073,19 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={saveQuotation} disabled={saving}>
+              <Button onClick={saveQuotation} disabled={saving} size="lg">
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <Save className="mr-2 h-4 w-4" />
                 Save Quotation
+                <span className="ml-2 text-xs opacity-70">(Ctrl+S)</span>
               </Button>
             )}
           </div>
+          
+          {/* Keyboard shortcuts hint */}
+          <p className="text-xs text-center text-muted-foreground mt-4">
+            💡 Tip: Use <kbd className="px-2 py-1 bg-muted rounded text-xs">Ctrl</kbd> + <kbd className="px-2 py-1 bg-muted rounded text-xs">←</kbd> / <kbd className="px-2 py-1 bg-muted rounded text-xs">→</kbd> to navigate, <kbd className="px-2 py-1 bg-muted rounded text-xs">Ctrl</kbd> + <kbd className="px-2 py-1 bg-muted rounded text-xs">S</kbd> to save
+          </p>
         </CardContent>
       </Card>
 
