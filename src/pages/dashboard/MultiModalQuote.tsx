@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MultiModalQuoteComposer } from "@/components/sales/MultiModalQuoteComposer";
+import { ErrorBoundary } from "@/components/sales/composer/ErrorBoundary";
 
 export default function MultiModalQuote() {
   const navigate = useNavigate();
@@ -30,20 +31,22 @@ export default function MultiModalQuote() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
+      <ErrorBoundary>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          </div>
 
-        <MultiModalQuoteComposer
-          quoteId={quoteId}
-          versionId={versionId}
-          optionId={optionId || undefined}
-        />
-      </div>
+          <MultiModalQuoteComposer
+            quoteId={quoteId}
+            versionId={versionId}
+            optionId={optionId || undefined}
+          />
+        </div>
+      </ErrorBoundary>
     </DashboardLayout>
   );
 }

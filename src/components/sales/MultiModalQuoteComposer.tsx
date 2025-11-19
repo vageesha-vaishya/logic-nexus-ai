@@ -12,6 +12,7 @@ import { ReviewAndSaveStep } from './composer/ReviewAndSaveStep';
 import { BasisConfigModal } from './composer/BasisConfigModal';
 import { DeleteConfirmDialog } from './composer/DeleteConfirmDialog';
 import { SaveProgress } from './composer/SaveProgress';
+import { ErrorBoundary } from './composer/ErrorBoundary';
 
 interface Leg {
   id: string;
@@ -898,11 +899,16 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const canProceed = () => {
     switch (currentStep) {
       case 1:
+        // Quote details - require at least currency
         return quoteData.currencyId;
       case 2:
-        return legs.length > 0 && legs.every(leg => leg.origin && leg.destination);
+        // Legs - require at least one valid leg
+        return legs.length > 0 && legs.every(leg => 
+          leg.mode && leg.origin && leg.destination
+        );
       case 3:
-        return legs.every(leg => leg.charges.length > 0);
+        // Charges - at least one leg should have charges OR there should be combined charges
+        return legs.some(leg => leg.charges.length > 0) || combinedCharges.length > 0;
       default:
         return true;
     }
@@ -911,8 +917,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   if (loading) {
     return (
       <Card>
-        <CardContent className="py-12 flex items-center justify-center">
+        <CardContent className="py-12 flex flex-col items-center justify-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading quotation data...</p>
         </CardContent>
       </Card>
     );
@@ -979,6 +986,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           legs={legs}
           quoteData={quoteData}
           currencies={currencies}
+          combinedCharges={combinedCharges}
         />
       )}
 
