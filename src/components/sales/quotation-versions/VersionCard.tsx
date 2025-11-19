@@ -1,9 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Clock, Trash2, Plus, CheckCircle } from 'lucide-react';
+import { Clock, Trash2, Plus, CheckCircle, GitCompare, FileText } from 'lucide-react';
 import { VersionStatusSelector } from '../VersionStatusSelector';
 import { OptionCard } from './OptionCard';
+import { ApprovalWorkflow } from './ApprovalWorkflow';
+import { PDFGenerator } from './PDFGenerator';
 
 interface Option {
   id: string;
@@ -39,6 +41,7 @@ interface VersionCardProps {
   onDeleteVersion: (versionId: string) => void;
   onSetCurrent: (versionId: string) => void;
   onStatusChange: () => void;
+  onCompare?: (versionId: string) => void;
   loading: boolean;
 }
 
@@ -52,6 +55,7 @@ export function VersionCard({
   onDeleteVersion,
   onSetCurrent,
   onStatusChange,
+  onCompare,
   loading,
 }: VersionCardProps) {
   const formattedDate = new Date(version.created_at).toLocaleDateString('en-US', {
@@ -90,7 +94,23 @@ export function VersionCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <PDFGenerator
+              versionId={version.id}
+              versionNumber={version.version_number}
+              quoteId={quoteId}
+            />
+            {onCompare && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onCompare(version.id)}
+                disabled={loading}
+              >
+                <GitCompare className="w-4 h-4 mr-1" />
+                Compare
+              </Button>
+            )}
             <VersionStatusSelector
               versionId={version.id}
               currentStatus={(version.status as any) || 'draft'}

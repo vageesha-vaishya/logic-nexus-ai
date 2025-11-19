@@ -7,6 +7,8 @@ import { createQuotationVersionWithOptions, recordCustomerSelection, createBlank
 import { VersionCard } from './quotation-versions/VersionCard';
 import { VersionActions } from './quotation-versions/VersionActions';
 import { EmptyState } from './quotation-versions/EmptyState';
+import { VersionComparison } from './quotation-versions/VersionComparison';
+import { CustomerSelectionDialog } from './quotation-versions/CustomerSelectionDialog';
 import { Loader2 } from 'lucide-react';
 
 type Version = {
@@ -40,6 +42,9 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [franchiseId, setFranchiseId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [compareVersionIds, setCompareVersionIds] = useState<{ v1: string; v2: string } | null>(null);
+  const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
+  const [selectedVersionForCustomer, setSelectedVersionForCustomer] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const load = async () => {
@@ -170,22 +175,52 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   };
 
   const selectOption = async (versionId: string, optionId: string) => {
+    setSelectedVersionForCustomer(versionId);
+    setSelectionDialogOpen(true);
+  };
+
+  const handleConfirmSelection = async (optionId: string, reason: string) => {
+    if (!tenantId || !userId || !selectedVersionForCustomer) return;
     try {
-      if (!tenantId || !userId) throw new Error('Missing tenant or user context');
       await recordCustomerSelection(
         tenantId,
         quoteId,
-        versionId,
+        selectedVersionForCustomer,
         optionId,
-        null,
+        reason,
         userId,
         supabase as any,
       );
-      toast({ title: 'Customer selection recorded' });
+      toast({ title: 'Success', description: 'Customer selection recorded' });
       await load();
     } catch (e: any) {
-      toast({ title: 'Selection failed', description: e.message, variant: 'destructive' });
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
+  };
+
+  const handleCompare = (versionId: string) => {
+    // If no comparison started, set first version
+    if (!compareVersionIds) {
+      setCompareVersionIds({ v1: versionId, v2: '' });
+      toast({ 
+        title: 'Select second version', 
+        description: 'Click compare on another version to compare' 
+      });
+      return;
+    }
+
+    // If first version selected, set second and open comparison
+    if (compareVersionIds.v1 && !compareVersionIds.v2) {
+      setCompareVersionIds({ v1: compareVersionIds.v1, v2: versionId });
+      return;
+    }
+
+    // Reset if already comparing
+    setCompareVersionIds({ v1: versionId, v2: '' });
+    toast({ 
+      title: 'Select second version', 
+      description: 'Click compare on another version to compare' 
+    });
   };
 
   const chunk = (arr: string[], size: number) => {
@@ -359,11 +394,34 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
                 onDeleteVersion={deleteVersion}
                 onSetCurrent={handleSetCurrent}
                 onStatusChange={load}
+                onCompare={handleCompare}
                 loading={loading}
               />
             ))}
           </div>
         )}
+
+        {/* Version Comparison Dialog */}
+        {compareVersionIds?.v1 && compareVersionIds?.v2 && (
+          <VersionComparison
+            open={true}
+            onClose={() => setCompareVersionIds(null)}
+            version1Id={compareVersionIds.v1}
+            version2Id={compareVersionIds.v2}
+          />
+        )}
+
+        {/* Customer Selection Dialog */}
+        <CustomerSelectionDialog
+          open={selectionDialogOpen}
+          onClose={() => {
+            setSelectionDialogOpen(false);
+            setSelectedVersionForCustomer(null);
+          }}
+          versionId={selectedVersionForCustomer || ''}
+          options={selectedVersionForCustomer ? (optionsByVersion[selectedVersionForCustomer] || []) : []}
+          onConfirm={handleConfirmSelection}
+        />
       </CardContent>
     </Card>
   );
