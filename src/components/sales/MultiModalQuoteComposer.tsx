@@ -269,9 +269,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const addLeg = (mode: string) => {
     const lowerMode = mode.toLowerCase();
-    const defaultServiceType =
-      serviceTypes.find((st) => st.code?.toLowerCase().startsWith(lowerMode)) ||
-      serviceTypes[0];
+    // Filter service types by mode and select the first active one
+    const matchingServiceTypes = serviceTypes.filter(
+      (st) => st.is_active && st.mode?.toLowerCase() === lowerMode
+    );
+    const defaultServiceType = matchingServiceTypes[0];
 
     const newLeg: Leg = {
       id: `leg-${Date.now()}`,
@@ -282,6 +284,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       charges: []
     };
     setLegs([...legs, newLeg]);
+    
+    // Show toast if service type was auto-selected
+    if (defaultServiceType) {
+      toast({
+        title: 'Service Type Auto-Selected',
+        description: `${defaultServiceType.name} has been automatically selected for ${mode} transport.`,
+      });
+    }
   };
 
   const updateLeg = (legId: string, updates: Partial<Leg>) => {
