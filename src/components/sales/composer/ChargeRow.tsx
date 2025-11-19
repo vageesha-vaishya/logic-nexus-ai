@@ -134,13 +134,6 @@ export function ChargeRow({
                 {buyAmount.toFixed(2)}
               </div>
             </td>
-            
-            <td className="p-2">
-              <div className={`w-24 text-right font-semibold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                {margin.toFixed(2)}
-                <div className="text-xs opacity-70">({marginPercent.toFixed(1)}%)</div>
-              </div>
-            </td>
           </>
         )}
         
@@ -161,35 +154,8 @@ export function ChargeRow({
       {/* Second Row - Sell fields and Note field */}
       {showBuySell && (
         <tr className="border-b bg-accent/20">
-          <td className="p-2">
-            <Input
-              type="number"
-              value={charge.sell?.quantity || 1}
-              onChange={(e) => onUpdate('sell.quantity', Number(e.target.value))}
-              className="w-20 text-right"
-            />
-          </td>
-          <td className="p-2">
-            <Input
-              type="number"
-              value={charge.sell?.rate || 0}
-              onChange={(e) => onUpdate('sell.rate', Number(e.target.value))}
-              className="w-24 text-right"
-              step="0.01"
-            />
-          </td>
-          <td className="p-2">
-            <div className="w-24 text-right font-medium">
-              {sellAmount.toFixed(2)}
-            </div>
-          </td>
-          <td className="p-2">
-            <div className={`w-24 text-right font-semibold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-              {margin.toFixed(2)}
-              <div className="text-xs opacity-70">({marginPercent.toFixed(1)}%)</div>
-            </div>
-          </td>
-          <td colSpan={5} className="p-2">
+          {/* Note in first column */}
+          <td className="p-2 align-top">
             <div className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Note</span>
               <Textarea
@@ -200,6 +166,51 @@ export function ChargeRow({
               />
             </div>
           </td>
+
+          {/* Empty cells to align sell fields under Buy columns */}
+          <td className="p-2"></td>
+          <td className="p-2"></td>
+          <td className="p-2"></td>
+
+          {/* Sell Qty under Buy Qty */}
+          <td className="p-2">
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Sell Qty</span>
+              <Input
+                type="number"
+                value={charge.sell?.quantity || 1}
+                onChange={(e) => onUpdate('sell.quantity', Number(e.target.value))}
+                className="w-20 text-right"
+              />
+            </div>
+          </td>
+
+          {/* Sell Rate under Buy Rate */}
+          <td className="p-2">
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Sell Rate</span>
+              <Input
+                type="number"
+                value={charge.sell?.rate || 0}
+                onChange={(e) => onUpdate('sell.rate', Number(e.target.value))}
+                className="w-24 text-right"
+                step="0.01"
+              />
+            </div>
+          </td>
+
+          {/* Sell Amount under Buy Amount */}
+          <td className="p-2">
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Sell Amt</span>
+              <div className="w-24 text-right font-medium">
+                {sellAmount.toFixed(2)}
+              </div>
+            </div>
+          </td>
+
+          {/* Actions column placeholder */}
+          <td className="p-2"></td>
         </tr>
       )}
     </>

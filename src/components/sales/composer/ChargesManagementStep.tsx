@@ -185,16 +185,17 @@ export function ChargesManagementStep({
                           />
                         ))}
                       </tbody>
-                      <tfoot className="bg-muted/30 font-semibold border-t-2">
+                      <tfoot className="bg-muted/30 font-semibold border-t">
                         <tr>
-                          <td colSpan={6} className="p-3 text-right">Totals:</td>
+                          <td colSpan={5} className="p-3 text-right">Totals:</td>
+                          {/* Below Buy Rate */}
                           <td className="p-3 text-right">{totals.buy.toFixed(2)}</td>
-                          <td colSpan={2} className="p-3"></td>
+                          {/* Below Buy Amt / Sell Amt */}
                           <td className="p-3 text-right">{totals.sell.toFixed(2)}</td>
-                          <td className={`p-3 text-right font-bold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                          {/* Margin total with percent */}
+                          <td className={`p-3 text-right font-bold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}> 
                             {margin.toFixed(2)} ({marginPercent}%)
                           </td>
-                          <td></td>
                         </tr>
                       </tfoot>
                     </table>

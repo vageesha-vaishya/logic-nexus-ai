@@ -131,7 +131,46 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const userTenantId = user?.user_metadata?.tenant_id;
-      setTenantId(userTenantId);
+      // Resolve tenant from multiple sources to avoid save failures for platform admins
+      let resolvedTenantId: string | null = userTenantId ?? null;
+
+      // Fallback 1: fetch from quote context
+      if (!resolvedTenantId && quoteId) {
+        try {
+          const { data: quoteRow } = await supabase
+            .from('quotes')
+            .select('tenant_id')
+            .eq('id', quoteId)
+            .single();
+          resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
+        } catch {}
+      }
+
+      // Fallback 2: fetch from quotation version
+      if (!resolvedTenantId && versionId) {
+        try {
+          const { data: versionRow } = await supabase
+            .from('quotation_versions')
+            .select('tenant_id')
+            .eq('id', versionId)
+            .single();
+          resolvedTenantId = (versionRow as any)?.tenant_id ?? null;
+        } catch {}
+      }
+
+      // Fallback 3: fetch from existing option if provided
+      if (!resolvedTenantId && optionId) {
+        try {
+          const { data: optionRow } = await supabase
+            .from('quotation_version_options')
+            .select('tenant_id')
+            .eq('id', optionId)
+            .single();
+          resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
+        } catch {}
+      }
+
+      setTenantId(resolvedTenantId);
 
       const [st, cc, cb, cu, td, ct, cs] = await Promise.all([
         supabase.from('service_types').select('*').eq('is_active', true),
@@ -159,6 +198,43 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper to ensure tenantId exists at save time
+  const ensureTenantForSave = async (): Promise<string | null> => {
+    if (tenantId) return tenantId;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      let resolved: string | null = user?.user_metadata?.tenant_id ?? null;
+      if (!resolved && quoteId) {
+        const { data: q } = await supabase
+          .from('quotes')
+          .select('tenant_id')
+          .eq('id', quoteId)
+          .single();
+        resolved = (q as any)?.tenant_id ?? null;
+      }
+      if (!resolved && versionId) {
+        const { data: v } = await supabase
+          .from('quotation_versions')
+          .select('tenant_id')
+          .eq('id', versionId)
+          .single();
+        resolved = (v as any)?.tenant_id ?? null;
+      }
+      if (!resolved && optionId) {
+        const { data: o } = await supabase
+          .from('quotation_version_options')
+          .select('tenant_id')
+          .eq('id', optionId)
+          .single();
+        resolved = (o as any)?.tenant_id ?? null;
+      }
+      if (resolved) setTenantId(resolved);
+      return resolved;
+    } catch {
+      return null;
     }
   };
 
@@ -629,8 +705,17 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     };
 
     try {
-      if (!tenantId) {
-        throw new Error('Tenant ID not found');
+      // Ensure tenant is resolved before proceeding
+      const finalTenantId = await ensureTenantForSave();
+      if (!finalTenantId) {
+        toast({
+          title: 'Save Failed',
+          description: 'Tenant ID not found. Please ensure the quote belongs to a tenant or your user has a tenant assigned.',
+          variant: 'destructive'
+        });
+        setSaving(false);
+        setSaveProgress({ show: false, steps: [] });
+        return;
       }
 
       updateProgress(0); // Validation complete
@@ -642,7 +727,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .from('quotation_version_options')
           .insert({
             quotation_version_id: versionId,
-            tenant_id: tenantId
+            tenant_id: finalTenantId
           })
           .select()
           .single();
@@ -741,7 +826,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
-              tenant_id: tenantId,
+              tenant_id: finalTenantId,
               sort_order: i
             })
             .select()
@@ -776,7 +861,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             currency_id: charge.currency_id || null,
             unit: charge.unit || null,
             note: charge.note || null,
-            tenant_id: tenantId
+            tenant_id: finalTenantId
           };
 
           // Handle buy side
@@ -847,7 +932,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           currency_id: charge.currency_id || null,
           unit: charge.unit || null,
           note: charge.note || null,
-          tenant_id: tenantId
+          tenant_id: finalTenantId
         };
 
         // Handle buy side
