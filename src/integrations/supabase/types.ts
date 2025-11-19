@@ -2824,6 +2824,80 @@ export type Database = {
         }
         Relationships: []
       }
+      quotation_audit_log: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          quotation_version_id: string | null
+          quotation_version_option_id: string | null
+          quote_id: string | null
+          tenant_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          quotation_version_id?: string | null
+          quotation_version_option_id?: string | null
+          quote_id?: string | null
+          tenant_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          quotation_version_id?: string | null
+          quotation_version_option_id?: string | null
+          quote_id?: string | null
+          tenant_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_audit_log_quotation_version_id_fkey"
+            columns: ["quotation_version_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_audit_log_quotation_version_option_id_fkey"
+            columns: ["quotation_version_option_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_version_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_audit_log_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quotation_packages: {
         Row: {
           created_at: string | null
@@ -2967,9 +3041,13 @@ export type Database = {
           auto_margin_enabled: boolean
           buy_subtotal: number
           carrier_rate_id: string | null
+          charge_count: number | null
           created_at: string | null
           created_by: string | null
           id: string
+          last_calculated_at: string | null
+          leg_count: number | null
+          locked: boolean | null
           margin_amount: number
           margin_method_id: string | null
           margin_value: number | null
@@ -2984,6 +3062,8 @@ export type Database = {
           status: string | null
           tenant_id: string
           total_amount: number
+          total_buy: number | null
+          total_sell: number | null
           trade_direction_id: string | null
           updated_at: string | null
         }
@@ -2991,9 +3071,13 @@ export type Database = {
           auto_margin_enabled?: boolean
           buy_subtotal?: number
           carrier_rate_id?: string | null
+          charge_count?: number | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          last_calculated_at?: string | null
+          leg_count?: number | null
+          locked?: boolean | null
           margin_amount?: number
           margin_method_id?: string | null
           margin_value?: number | null
@@ -3008,6 +3092,8 @@ export type Database = {
           status?: string | null
           tenant_id: string
           total_amount?: number
+          total_buy?: number | null
+          total_sell?: number | null
           trade_direction_id?: string | null
           updated_at?: string | null
         }
@@ -3015,9 +3101,13 @@ export type Database = {
           auto_margin_enabled?: boolean
           buy_subtotal?: number
           carrier_rate_id?: string | null
+          charge_count?: number | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          last_calculated_at?: string | null
+          leg_count?: number | null
+          locked?: boolean | null
           margin_amount?: number
           margin_method_id?: string | null
           margin_value?: number | null
@@ -3032,6 +3122,8 @@ export type Database = {
           status?: string | null
           tenant_id?: string
           total_amount?: number
+          total_buy?: number | null
+          total_sell?: number | null
           trade_direction_id?: string | null
           updated_at?: string | null
         }
@@ -3080,7 +3172,10 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean | null
+          is_current: boolean | null
           kind: string | null
+          locked_at: string | null
+          locked_by: string | null
           major: number
           minor: number
           quote_id: string
@@ -3096,7 +3191,10 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean | null
+          is_current?: boolean | null
           kind?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
           major?: number
           minor?: number
           quote_id: string
@@ -3112,7 +3210,10 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean | null
+          is_current?: boolean | null
           kind?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
           major?: number
           minor?: number
           quote_id?: string
@@ -3141,7 +3242,7 @@ export type Database = {
           created_at: string | null
           currency_id: string | null
           id: string
-          leg_id: string | null
+          leg_id: string
           note: string | null
           quantity: number | null
           quote_option_id: string
@@ -3159,7 +3260,7 @@ export type Database = {
           created_at?: string | null
           currency_id?: string | null
           id?: string
-          leg_id?: string | null
+          leg_id: string
           note?: string | null
           quantity?: number | null
           quote_option_id: string
@@ -3177,7 +3278,7 @@ export type Database = {
           created_at?: string | null
           currency_id?: string | null
           id?: string
-          leg_id?: string | null
+          leg_id?: string
           note?: string | null
           quantity?: number | null
           quote_option_id?: string
@@ -3541,6 +3642,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           currency: string | null
+          current_version_id: string | null
           description: string | null
           destination_location: Json | null
           destination_port_id: string | null
@@ -3592,6 +3694,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          current_version_id?: string | null
           description?: string | null
           destination_location?: Json | null
           destination_port_id?: string | null
@@ -3643,6 +3746,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          current_version_id?: string | null
           description?: string | null
           destination_location?: Json | null
           destination_port_id?: string | null
@@ -3700,6 +3804,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_current_version_id_fkey"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_versions"
             referencedColumns: ["id"]
           },
           {
@@ -5353,6 +5464,15 @@ export type Database = {
     }
     Functions: {
       calculate_lead_score: { Args: { lead_id: string }; Returns: number }
+      calculate_option_totals: {
+        Args: { p_option_id: string }
+        Returns: {
+          charge_count: number
+          leg_count: number
+          total_buy: number
+          total_sell: number
+        }[]
+      }
       check_usage_limit: {
         Args: { _feature_key: string; _tenant_id: string }
         Returns: boolean
