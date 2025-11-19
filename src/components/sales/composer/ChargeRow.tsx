@@ -32,7 +32,7 @@ export function ChargeRow({
 
   return (
     <>
-      {/* First Row - Main charge details */}
+      {/* First Row - Main charge details with Buy fields */}
       <tr className="border-b hover:bg-accent/50 transition-colors">
         <td className="p-2">
           <Select
@@ -136,29 +136,6 @@ export function ChargeRow({
             </td>
             
             <td className="p-2">
-              <Input
-                type="number"
-                value={charge.sell?.quantity || 1}
-                onChange={(e) => onUpdate('sell.quantity', Number(e.target.value))}
-                className="w-20 text-right"
-              />
-            </td>
-            <td className="p-2">
-              <Input
-                type="number"
-                value={charge.sell?.rate || 0}
-                onChange={(e) => onUpdate('sell.rate', Number(e.target.value))}
-                className="w-24 text-right"
-                step="0.01"
-              />
-            </td>
-            <td className="p-2">
-              <div className="w-24 text-right font-medium">
-                {sellAmount.toFixed(2)}
-              </div>
-            </td>
-            
-            <td className="p-2">
               <div className={`w-24 text-right font-semibold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                 {margin.toFixed(2)}
                 <div className="text-xs opacity-70">({marginPercent.toFixed(1)}%)</div>
@@ -181,9 +158,41 @@ export function ChargeRow({
         </td>
       </tr>
       
-      {/* Second Row - Note/Remark field */}
+      {/* Second Row - Sell fields */}
+      {showBuySell && (
+        <tr className="border-b bg-accent/20">
+          <td colSpan={4} className="p-2">
+            <span className="text-xs font-medium text-muted-foreground">Sell Details:</span>
+          </td>
+          <td className="p-2">
+            <Input
+              type="number"
+              value={charge.sell?.quantity || 1}
+              onChange={(e) => onUpdate('sell.quantity', Number(e.target.value))}
+              className="w-20 text-right"
+            />
+          </td>
+          <td className="p-2">
+            <Input
+              type="number"
+              value={charge.sell?.rate || 0}
+              onChange={(e) => onUpdate('sell.rate', Number(e.target.value))}
+              className="w-24 text-right"
+              step="0.01"
+            />
+          </td>
+          <td className="p-2">
+            <div className="w-24 text-right font-medium">
+              {sellAmount.toFixed(2)}
+            </div>
+          </td>
+          <td colSpan={2}></td>
+        </tr>
+      )}
+      
+      {/* Third Row - Note/Remark field */}
       <tr className="border-b bg-muted/20">
-        <td colSpan={showBuySell ? 12 : 5} className="p-2">
+        <td colSpan={showBuySell ? 9 : 5} className="p-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Note:</span>
             <Textarea
