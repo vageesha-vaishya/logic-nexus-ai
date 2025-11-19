@@ -295,6 +295,7 @@ export async function listCarrierRatesForQuote(
 
 export async function createQuotationVersionWithOptions(
   tenant_id: string,
+  franchise_id: string,
   quote_id: string,
   carrier_rate_ids: string[],
   opts: { major?: number; minor?: number; change_reason?: string; valid_until?: string; created_by?: string | null; version_number?: number; kind?: 'minor' | 'major' } = {},
@@ -303,6 +304,7 @@ export async function createQuotationVersionWithOptions(
   // Allow creating versions without carrier rates (can be added later)
   const versionPayload: any = {
     tenant_id,
+    franchise_id,
     quote_id,
     major: opts.major ?? 1,
     minor: opts.minor ?? 0,
@@ -328,6 +330,7 @@ export async function createQuotationVersionWithOptions(
   if (carrier_rate_ids.length > 0) {
     const optionRows = carrier_rate_ids.map((rid) => ({
       tenant_id,
+      franchise_id,
       quotation_version_id: version_id,
       carrier_rate_id: rid,
       recommended: false,
@@ -349,6 +352,7 @@ export async function createQuotationVersionWithOptions(
 
 export async function createBlankOption(
   tenant_id: string,
+  franchise_id: string,
   version_id: string,
   client = defaultClient
 ): Promise<string> {
@@ -364,6 +368,7 @@ export async function createBlankOption(
     .from('quotation_version_options')
     .insert({
       tenant_id,
+      franchise_id,
       quotation_version_id: version_id,
       option_name: optionName,
       status: 'active',

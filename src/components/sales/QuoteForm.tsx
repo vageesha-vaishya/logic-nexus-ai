@@ -2081,6 +2081,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           if (rateIds.length > 0) {
             await createQuotationVersionWithOptions(
               tenantId!,
+              franchiseId!,
               quote.id,
               rateIds,
               {

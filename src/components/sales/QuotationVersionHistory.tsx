@@ -32,6 +32,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const [optionsByVersion, setOptionsByVersion] = useState<Record<string, Option[]>>({});
   const [loading, setLoading] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [franchiseId, setFranchiseId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -94,10 +95,11 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       try {
         const { data: q } = await supabase
           .from('quotes')
-          .select('tenant_id')
+          .select('tenant_id, franchise_id')
           .eq('id', quoteId)
           .maybeSingle();
         if (q?.tenant_id) setTenantId(String(q.tenant_id));
+        if (q?.franchise_id) setFranchiseId(String(q.franchise_id));
         const { data: auth } = await supabase.auth.getUser();
         setUserId(auth?.user?.id ?? null);
       } catch {}
@@ -114,9 +116,10 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const createVersion = async (kind: 'minor' | 'major') => {
     try {
       const nextNumber = kind === 'minor' ? latestVersionNumber + 1 : 1;
-      if (!tenantId) throw new Error('Missing tenant context');
+      if (!tenantId || !franchiseId) throw new Error('Missing tenant or franchise context');
       const res = await createQuotationVersionWithOptions(
         tenantId,
+        franchiseId,
         quoteId,
         [],
         { kind, version_number: nextNumber, created_by: userId || null },
@@ -246,13 +249,13 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   };
 
   const createNewOption = async (versionId: string) => {
-    if (!tenantId) {
-      toast({ title: 'Error', description: 'Tenant ID not found', variant: 'destructive' });
+    if (!tenantId || !franchiseId) {
+      toast({ title: 'Error', description: 'Tenant ID or Franchise ID not found', variant: 'destructive' });
       return;
     }
 
     try {
-      const optionId = await createBlankOption(tenantId, versionId);
+      const optionId = await createBlankOption(tenantId, franchiseId, versionId);
       
       toast({
         title: 'Success',
