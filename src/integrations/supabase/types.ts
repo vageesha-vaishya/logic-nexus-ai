@@ -2877,7 +2877,7 @@ export type Database = {
           created_at: string
           destination_location: string | null
           id: string
-          leg_order: number
+          mode: string | null
           mode_id: string | null
           origin_location: string | null
           planned_arrival: string | null
@@ -2886,13 +2886,15 @@ export type Database = {
           quotation_version_option_id: string
           service_id: string | null
           service_type_id: string | null
+          sort_order: number
           tenant_id: string
+          updated_at: string | null
         }
         Insert: {
           created_at?: string
           destination_location?: string | null
           id?: string
-          leg_order?: number
+          mode?: string | null
           mode_id?: string | null
           origin_location?: string | null
           planned_arrival?: string | null
@@ -2901,13 +2903,15 @@ export type Database = {
           quotation_version_option_id: string
           service_id?: string | null
           service_type_id?: string | null
+          sort_order?: number
           tenant_id: string
+          updated_at?: string | null
         }
         Update: {
           created_at?: string
           destination_location?: string | null
           id?: string
-          leg_order?: number
+          mode?: string | null
           mode_id?: string | null
           origin_location?: string | null
           planned_arrival?: string | null
@@ -2916,7 +2920,9 @@ export type Database = {
           quotation_version_option_id?: string
           service_id?: string | null
           service_type_id?: string | null
+          sort_order?: number
           tenant_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -2962,6 +2968,7 @@ export type Database = {
           buy_subtotal: number
           carrier_rate_id: string | null
           created_at: string | null
+          created_by: string | null
           id: string
           margin_amount: number
           margin_method_id: string | null
@@ -2984,6 +2991,7 @@ export type Database = {
           buy_subtotal?: number
           carrier_rate_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           id?: string
           margin_amount?: number
           margin_method_id?: string | null
@@ -3006,6 +3014,7 @@ export type Database = {
           buy_subtotal?: number
           carrier_rate_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           id?: string
           margin_amount?: number
           margin_method_id?: string | null
@@ -3067,6 +3076,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          is_active: boolean | null
           kind: string | null
           major: number
           minor: number
@@ -3082,6 +3092,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_active?: boolean | null
           kind?: string | null
           major?: number
           minor?: number
@@ -3097,6 +3108,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_active?: boolean | null
           kind?: string | null
           major?: number
           minor?: number
@@ -3173,13 +3185,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "fk_quote_charges_leg"
-            columns: ["leg_id"]
-            isOneToOne: false
-            referencedRelation: "quote_legs"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "quote_charges_leg_id_fkey"
             columns: ["leg_id"]
