@@ -10,6 +10,8 @@ import { LegsConfigurationStep } from './composer/LegsConfigurationStep';
 import { ChargesManagementStep } from './composer/ChargesManagementStep';
 import { ReviewAndSaveStep } from './composer/ReviewAndSaveStep';
 import { BasisConfigModal } from './composer/BasisConfigModal';
+import { DeleteConfirmDialog } from './composer/DeleteConfirmDialog';
+import { SaveProgress } from './composer/SaveProgress';
 
 interface Leg {
   id: string;
@@ -45,6 +47,25 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [autoMargin, setAutoMargin] = useState(false);
   const [marginPercent, setMarginPercent] = useState(15);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  
+  // Track charges to delete
+  const [chargesToDelete, setChargesToDelete] = useState<string[]>([]);
+  
+  // Delete confirmation state
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    type: 'leg' | 'charge' | 'combinedCharge';
+    target?: any;
+  }>({ open: false, type: 'leg' });
+
+  // Save progress tracking
+  const [saveProgress, setSaveProgress] = useState<{
+    show: boolean;
+    steps: { label: string; completed: boolean }[];
+  }>({
+    show: false,
+    steps: []
+  });
 
   // Reference data
   const [serviceTypes, setServiceTypes] = useState<any[]>([]);
@@ -237,8 +258,37 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     setLegs(legs.map(leg => leg.id === legId ? { ...leg, ...updates } : leg));
   };
 
+  const confirmRemoveLeg = (legId: string) => {
+    const leg = legs.find(l => l.id === legId);
+    const hasCharges = leg && leg.charges.length > 0;
+    
+    if (hasCharges) {
+      setDeleteDialog({
+        open: true,
+        type: 'leg',
+        target: legId
+      });
+    } else {
+      removeLeg(legId);
+    }
+  };
+
   const removeLeg = (legId: string) => {
+    // Track charges that need to be deleted from DB
+    const legToRemove = legs.find(leg => leg.id === legId);
+    if (legToRemove) {
+      const chargeIdsToDelete: string[] = [];
+      legToRemove.charges.forEach(charge => {
+        if (charge.buy?.dbChargeId) chargeIdsToDelete.push(charge.buy.dbChargeId);
+        if (charge.sell?.dbChargeId) chargeIdsToDelete.push(charge.sell.dbChargeId);
+      });
+      if (chargeIdsToDelete.length > 0) {
+        setChargesToDelete(prev => [...prev, ...chargeIdsToDelete]);
+      }
+    }
+    
     setLegs(legs.filter(leg => leg.id !== legId));
+    setDeleteDialog({ open: false, type: 'leg' });
   };
 
   const addCharge = (legId: string) => {
@@ -294,9 +344,29 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }));
   };
 
+  const confirmRemoveCharge = (legId: string, chargeIdx: number) => {
+    setDeleteDialog({
+      open: true,
+      type: 'charge',
+      target: { legId, chargeIdx }
+    });
+  };
+
   const removeCharge = (legId: string, chargeIdx: number) => {
     setLegs(legs.map(leg => {
       if (leg.id === legId) {
+        const chargeToRemove = leg.charges[chargeIdx];
+        
+        // Track DB charge IDs for deletion
+        if (chargeToRemove) {
+          const idsToDelete: string[] = [];
+          if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
+          if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
+          if (idsToDelete.length > 0) {
+            setChargesToDelete(prev => [...prev, ...idsToDelete]);
+          }
+        }
+        
         return {
           ...leg,
           charges: leg.charges.filter((_, idx) => idx !== chargeIdx)
@@ -304,6 +374,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
       return leg;
     }));
+    
+    setDeleteDialog({ open: false, type: 'charge' });
   };
 
   // Combined charges handlers
@@ -346,8 +418,32 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     });
   };
 
+  const confirmRemoveCombinedCharge = (chargeIdx: number) => {
+    setDeleteDialog({
+      open: true,
+      type: 'combinedCharge',
+      target: chargeIdx
+    });
+  };
+
   const removeCombinedCharge = (chargeIdx: number) => {
-    setCombinedCharges(prev => prev.filter((_, idx) => idx !== chargeIdx));
+    setCombinedCharges(prev => {
+      const chargeToRemove = prev[chargeIdx];
+      
+      // Track DB charge IDs for deletion
+      if (chargeToRemove) {
+        const idsToDelete: string[] = [];
+        if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
+        if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
+        if (idsToDelete.length > 0) {
+          setChargesToDelete(prevIds => [...prevIds, ...idsToDelete]);
+        }
+      }
+      
+      return prev.filter((_, idx) => idx !== chargeIdx);
+    });
+    
+    setDeleteDialog({ open: false, type: 'combinedCharge' });
   };
 
   const openBasisModal = (legId: string, chargeIdx: number) => {
@@ -456,10 +552,30 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }
 
     setSaving(true);
+    
+    // Initialize progress tracking
+    const progressSteps = [
+      { label: 'Validating data...', completed: false },
+      { label: 'Creating quotation option...', completed: false },
+      { label: 'Cleaning up deleted items...', completed: false },
+      { label: 'Saving transport legs...', completed: false },
+      { label: 'Saving charges...', completed: false },
+      { label: 'Finalizing...', completed: false }
+    ];
+    
+    setSaveProgress({ show: true, steps: progressSteps });
+    
+    const updateProgress = (stepIndex: number) => {
+      progressSteps[stepIndex].completed = true;
+      setSaveProgress({ show: true, steps: [...progressSteps] });
+    };
+
     try {
       if (!tenantId) {
         throw new Error('Tenant ID not found');
       }
+
+      updateProgress(0); // Validation complete
 
       // Create option if needed
       let currentOptionId = optionId;
@@ -477,6 +593,24 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         currentOptionId = newOption.id;
         setOptionId(currentOptionId);
       }
+      
+      updateProgress(1); // Option created
+
+      // Delete tracked charges first
+      if (chargesToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('quote_charges')
+          .delete()
+          .in('id', chargesToDelete);
+        
+        if (deleteError) {
+          console.error('Error deleting charges:', deleteError);
+          throw new Error(`Failed to delete charges: ${deleteError.message}`);
+        }
+        
+        // Clear the deletion queue
+        setChargesToDelete([]);
+      }
 
       // Get charge side IDs
       const [buySideRes, sellSideRes] = await Promise.all([
@@ -491,30 +625,48 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const buySideId = buySideRes.data.id;
       const sellSideId = sellSideRes.data.id;
 
-      // Remove deleted legs and their charges (aligned to quotation_version_option_legs)
+      // Clean up orphaned legs and their charges
       const { data: existingLegs } = await supabase
         .from('quotation_version_option_legs')
         .select('id')
         .eq('quotation_version_option_id', currentOptionId);
+      
       const stateLegIds = new Set(
         (legs || [])
           .filter(l => !String(l.id).startsWith('leg-'))
           .map(l => String(l.id))
       );
+      
       const toDeleteLegIds = (existingLegs || [])
         .map((l: any) => String(l.id))
         .filter((id: string) => !stateLegIds.has(id));
-      if (toDeleteLegIds.length) {
-        await supabase
+      
+      if (toDeleteLegIds.length > 0) {
+        // Delete charges associated with removed legs
+        const { error: chargeDeleteError } = await supabase
           .from('quote_charges')
           .delete()
           .in('leg_id', toDeleteLegIds)
           .eq('quote_option_id', currentOptionId);
-        await supabase
+        
+        if (chargeDeleteError) {
+          console.error('Error deleting leg charges:', chargeDeleteError);
+          throw new Error(`Failed to delete leg charges: ${chargeDeleteError.message}`);
+        }
+        
+        // Delete the legs themselves
+        const { error: legDeleteError } = await supabase
           .from('quotation_version_option_legs')
           .delete()
           .in('id', toDeleteLegIds);
+        
+        if (legDeleteError) {
+          console.error('Error deleting legs:', legDeleteError);
+          throw new Error(`Failed to delete legs: ${legDeleteError.message}`);
+        }
       }
+      
+      updateProgress(2); // Cleanup complete
 
       // Save legs and charges
       for (let i = 0; i < legs.length; i++) {
@@ -624,6 +776,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           }
         }
       }
+      
+      updateProgress(3); // Legs saved
 
       // Save combined charges with UPDATE/INSERT logic
       for (const charge of combinedCharges || []) {
@@ -688,16 +842,37 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           if (insertError) throw insertError;
         }
       }
-
-      toast({ title: 'Success', description: 'Quotation saved successfully' });
       
-      // Reload data
+      updateProgress(4); // Charges saved
+
+      toast({ 
+        title: 'Success', 
+        description: 'Quotation saved successfully',
+        duration: 3000
+      });
+      
+      // Reload data to sync with database
       if (currentOptionId) {
         await loadOptionData();
       }
+      
+      // Clear deletion queue after successful save
+      setChargesToDelete([]);
+      
+      updateProgress(5); // Complete
+      
+      // Keep success display for a moment
+      setTimeout(() => {
+        setSaveProgress({ show: false, steps: [] });
+      }, 1000);
+      
     } catch (error: any) {
       console.error('Save quotation error:', error);
       const errorMessage = error.message || 'Failed to save quotation';
+      
+      // Hide progress on error
+      setSaveProgress({ show: false, steps: [] });
+      
       toast({ 
         title: 'Save Failed', 
         description: errorMessage,
@@ -769,7 +944,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           serviceTypes={serviceTypes}
           onAddLeg={addLeg}
           onUpdateLeg={updateLeg}
-          onRemoveLeg={removeLeg}
+          onRemoveLeg={confirmRemoveLeg}
         />
       )}
 
@@ -790,11 +965,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onMarginPercentChange={setMarginPercent}
           onAddCharge={addCharge}
           onUpdateCharge={updateCharge}
-          onRemoveCharge={removeCharge}
+          onRemoveCharge={confirmRemoveCharge}
           onConfigureBasis={openBasisModal}
           onAddCombinedCharge={addCombinedCharge}
           onUpdateCombinedCharge={updateCombinedCharge}
-          onRemoveCombinedCharge={removeCombinedCharge}
+          onRemoveCombinedCharge={confirmRemoveCombinedCharge}
           onConfigureCombinedBasis={openCombinedBasisModal}
         />
       )}
@@ -847,6 +1022,36 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         containerTypes={containerTypes}
         containerSizes={containerSizes}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+        onConfirm={() => {
+          if (deleteDialog.type === 'leg' && deleteDialog.target) {
+            removeLeg(deleteDialog.target);
+          } else if (deleteDialog.type === 'charge' && deleteDialog.target) {
+            removeCharge(deleteDialog.target.legId, deleteDialog.target.chargeIdx);
+          } else if (deleteDialog.type === 'combinedCharge' && typeof deleteDialog.target === 'number') {
+            removeCombinedCharge(deleteDialog.target);
+          }
+        }}
+        title={
+          deleteDialog.type === 'leg' 
+            ? 'Delete Transport Leg' 
+            : deleteDialog.type === 'charge'
+            ? 'Delete Charge'
+            : 'Delete Combined Charge'
+        }
+        description={
+          deleteDialog.type === 'leg'
+            ? 'This will remove the leg and all its associated charges. This action cannot be undone.'
+          : 'This will remove this charge. This action cannot be undone.'
+        }
+      />
+      
+      {/* Save Progress Overlay */}
+      <SaveProgress show={saveProgress.show} steps={saveProgress.steps} />
     </div>
   );
 }
