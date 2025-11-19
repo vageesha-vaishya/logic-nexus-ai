@@ -158,47 +158,35 @@ export function ChargeRow({
         </td>
       </tr>
       
-      {/* Second Row - Sell fields with labels and Note field */}
+      {/* Second Row - Sell fields and Note field */}
       {showBuySell && (
         <tr className="border-b bg-accent/20">
           <td className="p-2">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Sell Qty</span>
-              <Input
-                type="number"
-                value={charge.sell?.quantity || 1}
-                onChange={(e) => onUpdate('sell.quantity', Number(e.target.value))}
-                className="w-20 text-right"
-              />
+            <Input
+              type="number"
+              value={charge.sell?.quantity || 1}
+              onChange={(e) => onUpdate('sell.quantity', Number(e.target.value))}
+              className="w-20 text-right"
+            />
+          </td>
+          <td className="p-2">
+            <Input
+              type="number"
+              value={charge.sell?.rate || 0}
+              onChange={(e) => onUpdate('sell.rate', Number(e.target.value))}
+              className="w-24 text-right"
+              step="0.01"
+            />
+          </td>
+          <td className="p-2">
+            <div className="w-24 text-right font-medium">
+              {sellAmount.toFixed(2)}
             </div>
           </td>
           <td className="p-2">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Sell Rate</span>
-              <Input
-                type="number"
-                value={charge.sell?.rate || 0}
-                onChange={(e) => onUpdate('sell.rate', Number(e.target.value))}
-                className="w-24 text-right"
-                step="0.01"
-              />
-            </div>
-          </td>
-          <td className="p-2">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Sell Amt</span>
-              <div className="w-24 text-right font-medium h-9 flex items-center justify-end">
-                {sellAmount.toFixed(2)}
-              </div>
-            </div>
-          </td>
-          <td className="p-2">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">Margin</span>
-              <div className={`w-24 text-right font-semibold h-9 flex flex-col items-end justify-center ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                <span>{margin.toFixed(2)}</span>
-                <span className="text-xs opacity-70">({marginPercent.toFixed(1)}%)</span>
-              </div>
+            <div className={`w-24 text-right font-semibold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+              {margin.toFixed(2)}
+              <div className="text-xs opacity-70">({marginPercent.toFixed(1)}%)</div>
             </div>
           </td>
           <td colSpan={5} className="p-2">
