@@ -171,14 +171,13 @@ export function ChargesManagementStep({
                           <th className="p-3 text-right font-semibold">Sell Rate</th>
                           <th className="p-3 text-right font-semibold">Sell Amt</th>
                           <th className="p-3 text-right font-semibold">Margin</th>
-                          <th className="p-3 text-left font-semibold">Notes</th>
                           <th className="p-3 text-center font-semibold">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {leg.charges.map((charge, idx) => (
                           <ChargeRow
-                            key={charge.id}
+                            key={charge.id || idx}
                             charge={charge}
                             categories={chargeCategories}
                             bases={chargeBases}
@@ -199,7 +198,7 @@ export function ChargesManagementStep({
                           <td className={`p-3 text-right font-bold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                             {margin.toFixed(2)} ({marginPercent}%)
                           </td>
-                          <td colSpan={2}></td>
+                          <td></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -251,7 +250,6 @@ export function ChargesManagementStep({
                     <th className="p-3 text-right font-semibold">Sell Rate</th>
                     <th className="p-3 text-right font-semibold">Sell Amt</th>
                     <th className="p-3 text-right font-semibold">Margin</th>
-                    <th className="p-3 text-left font-semibold">Notes</th>
                     <th className="p-3 text-center font-semibold">Actions</th>
                   </tr>
                 </thead>
@@ -279,7 +277,7 @@ export function ChargesManagementStep({
                     <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                       {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)}
                     </td>
-                    <td colSpan={2}></td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </table>
