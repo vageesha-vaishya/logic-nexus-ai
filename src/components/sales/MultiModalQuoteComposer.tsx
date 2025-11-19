@@ -254,8 +254,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               basis_id: '',
               unit: '',
               currency_id: currencies[0]?.id || '',
-              buy: { quantity: 1, rate: 0 },
-              sell: { quantity: 1, rate: 0 },
+              buy: { quantity: 1, rate: 0, dbChargeId: null },
+              sell: { quantity: 1, rate: 0, dbChargeId: null },
               note: ''
             }
           ]
@@ -316,8 +316,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         basis_id: '',
         unit: '',
         currency_id: currencies[0]?.id || '',
-        buy: { quantity: 1, rate: 0 },
-        sell: { quantity: 1, rate: 0 },
+        buy: { quantity: 1, rate: 0, dbChargeId: null },
+        sell: { quantity: 1, rate: 0, dbChargeId: null },
         note: ''
       }
     ]));
@@ -407,7 +407,54 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     setCurrentBasisConfig({ tradeDirection: '', containerType: '', containerSize: '', quantity: 1 });
   };
 
+  const validateQuotation = () => {
+    const errors: string[] = [];
+
+    // Validate legs
+    if (legs.length === 0) {
+      errors.push('At least one transport leg is required');
+    }
+
+    legs.forEach((leg, idx) => {
+      if (!leg.mode) errors.push(`Leg ${idx + 1}: Mode is required`);
+      if (!leg.origin) errors.push(`Leg ${idx + 1}: Origin is required`);
+      if (!leg.destination) errors.push(`Leg ${idx + 1}: Destination is required`);
+      
+      leg.charges.forEach((charge, chargeIdx) => {
+        if (!charge.category_id) {
+          errors.push(`Leg ${idx + 1}, Charge ${chargeIdx + 1}: Category is required`);
+        }
+        if (!charge.currency_id) {
+          errors.push(`Leg ${idx + 1}, Charge ${chargeIdx + 1}: Currency is required`);
+        }
+      });
+    });
+
+    // Validate combined charges
+    combinedCharges.forEach((charge, idx) => {
+      if (!charge.category_id) {
+        errors.push(`Combined Charge ${idx + 1}: Category is required`);
+      }
+      if (!charge.currency_id) {
+        errors.push(`Combined Charge ${idx + 1}: Currency is required`);
+      }
+    });
+
+    return errors;
+  };
+
   const saveQuotation = async () => {
+    // Validate first
+    const validationErrors = validateQuotation();
+    if (validationErrors.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: validationErrors.join('; '),
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       if (!tenantId) {
@@ -509,97 +556,137 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           if (updateError) throw updateError;
         }
 
-        // Save charges for this leg (delete and recreate for simplicity)
-        await supabase
-          .from('quote_charges')
-          .delete()
-          .eq('quote_option_id', currentOptionId)
-          .eq('leg_id', legId);
-
-        const legCharges: any[] = [];
+        // Save charges with UPDATE/INSERT logic
         for (const charge of leg.charges) {
-          legCharges.push(
-            {
-              quote_option_id: currentOptionId,
-              leg_id: legId,
-              charge_side_id: buySideId,
-              category_id: charge.category_id || null,
-              basis_id: charge.basis_id || null,
-              quantity: charge.buy?.quantity || 1,
-              rate: charge.buy?.rate || 0,
-              amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
-              currency_id: charge.currency_id || null,
-              unit: charge.unit || null,
-              note: charge.note || null,
-              tenant_id: tenantId
-            },
-            {
-              quote_option_id: currentOptionId,
-              leg_id: legId,
-              charge_side_id: sellSideId,
-              category_id: charge.category_id || null,
-              basis_id: charge.basis_id || null,
-              quantity: charge.sell?.quantity || 1,
-              rate: charge.sell?.rate || 0,
-              amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
-              currency_id: charge.currency_id || null,
-              unit: charge.unit || null,
-              note: charge.note || null,
-              tenant_id: tenantId
-            }
-          );
-        }
+          const chargeData = {
+            quote_option_id: currentOptionId,
+            leg_id: legId,
+            category_id: charge.category_id || null,
+            basis_id: charge.basis_id || null,
+            currency_id: charge.currency_id || null,
+            unit: charge.unit || null,
+            note: charge.note || null,
+            tenant_id: tenantId
+          };
 
-        if (legCharges.length > 0) {
-          const { error: chargeError } = await supabase
-            .from('quote_charges')
-            .insert(legCharges);
-          if (chargeError) throw chargeError;
+          // Handle buy side
+          if (charge.buy?.dbChargeId) {
+            // Update existing
+            const { error: updateError } = await supabase
+              .from('quote_charges')
+              .update({
+                ...chargeData,
+                quantity: charge.buy.quantity || 1,
+                rate: charge.buy.rate || 0,
+                amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
+              })
+              .eq('id', charge.buy.dbChargeId);
+            if (updateError) throw updateError;
+          } else {
+            // Insert new
+            const { error: insertError } = await supabase
+              .from('quote_charges')
+              .insert({
+                ...chargeData,
+                charge_side_id: buySideId,
+                quantity: charge.buy?.quantity || 1,
+                rate: charge.buy?.rate || 0,
+                amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
+              });
+            if (insertError) throw insertError;
+          }
+
+          // Handle sell side
+          if (charge.sell?.dbChargeId) {
+            // Update existing
+            const { error: updateError } = await supabase
+              .from('quote_charges')
+              .update({
+                ...chargeData,
+                quantity: charge.sell.quantity || 1,
+                rate: charge.sell.rate || 0,
+                amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
+              })
+              .eq('id', charge.sell.dbChargeId);
+            if (updateError) throw updateError;
+          } else {
+            // Insert new
+            const { error: insertError } = await supabase
+              .from('quote_charges')
+              .insert({
+                ...chargeData,
+                charge_side_id: sellSideId,
+                quantity: charge.sell?.quantity || 1,
+                rate: charge.sell?.rate || 0,
+                amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
+              });
+            if (insertError) throw insertError;
+          }
         }
       }
 
-      // Persist combined charges (leg_id IS NULL)
-      await supabase
-        .from('quote_charges')
-        .delete()
-        .eq('quote_option_id', currentOptionId)
-        .is('leg_id', null);
+      // Save combined charges with UPDATE/INSERT logic
+      for (const charge of combinedCharges || []) {
+        const chargeData = {
+          quote_option_id: currentOptionId,
+          leg_id: null,
+          category_id: charge.category_id || null,
+          basis_id: charge.basis_id || null,
+          currency_id: charge.currency_id || null,
+          unit: charge.unit || null,
+          note: charge.note || null,
+          tenant_id: tenantId
+        };
 
-      const combinedPayload = (combinedCharges || []).flatMap((charge: any) => [
-        {
-          quote_option_id: currentOptionId,
-          leg_id: null,
-          charge_side_id: buySideId,
-          category_id: charge.category_id || null,
-          basis_id: charge.basis_id || null,
-          quantity: charge.buy?.quantity || 1,
-          rate: charge.buy?.rate || 0,
-          amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0),
-          currency_id: charge.currency_id || null,
-          unit: charge.unit || null,
-          note: charge.note || null,
-          tenant_id: tenantId
-        },
-        {
-          quote_option_id: currentOptionId,
-          leg_id: null,
-          charge_side_id: sellSideId,
-          category_id: charge.category_id || null,
-          basis_id: charge.basis_id || null,
-          quantity: charge.sell?.quantity || 1,
-          rate: charge.sell?.rate || 0,
-          amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0),
-          currency_id: charge.currency_id || null,
-          unit: charge.unit || null,
-          note: charge.note || null,
-          tenant_id: tenantId
+        // Handle buy side
+        if (charge.buy?.dbChargeId) {
+          const { error: updateError } = await supabase
+            .from('quote_charges')
+            .update({
+              ...chargeData,
+              quantity: charge.buy.quantity || 1,
+              rate: charge.buy.rate || 0,
+              amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
+            })
+            .eq('id', charge.buy.dbChargeId);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase
+            .from('quote_charges')
+            .insert({
+              ...chargeData,
+              charge_side_id: buySideId,
+              quantity: charge.buy?.quantity || 1,
+              rate: charge.buy?.rate || 0,
+              amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
+            });
+          if (insertError) throw insertError;
         }
-      ]);
-      if (combinedPayload.length) {
-        const { error: combErr } = await supabase
-          .from('quote_charges')
-          .insert(combinedPayload);
-        if (combErr) throw combErr;
+
+        // Handle sell side
+        if (charge.sell?.dbChargeId) {
+          const { error: updateError } = await supabase
+            .from('quote_charges')
+            .update({
+              ...chargeData,
+              quantity: charge.sell.quantity || 1,
+              rate: charge.sell.rate || 0,
+              amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
+            })
+            .eq('id', charge.sell.dbChargeId);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase
+            .from('quote_charges')
+            .insert({
+              ...chargeData,
+              charge_side_id: sellSideId,
+              quantity: charge.sell?.quantity || 1,
+              rate: charge.sell?.rate || 0,
+              amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
+            });
+          if (insertError) throw insertError;
+        }
       }
 
       toast({ title: 'Success', description: 'Quotation saved successfully' });
@@ -609,7 +696,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         await loadOptionData();
       }
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      console.error('Save quotation error:', error);
+      const errorMessage = error.message || 'Failed to save quotation';
+      toast({ 
+        title: 'Save Failed', 
+        description: errorMessage,
+        variant: 'destructive' 
+      });
     } finally {
       setSaving(false);
     }
