@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { ChargeRow } from './ChargeRow';
+import { HelpTooltip } from './HelpTooltip';
 
 interface Leg {
   id: string;
@@ -84,7 +85,10 @@ export function ChargesManagementStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Manage Charges</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Manage Charges
+          <HelpTooltip content="Add buy and sell charges for each transport leg. The system will calculate profit margins automatically if auto margin is enabled." />
+        </CardTitle>
         <CardDescription>Add and configure charges for each leg</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -98,8 +102,9 @@ export function ChargesManagementStep({
               id="auto-margin"
               className="h-4 w-4 rounded border-border"
             />
-            <Label htmlFor="auto-margin" className="font-semibold cursor-pointer">
+            <Label htmlFor="auto-margin" className="font-semibold cursor-pointer flex items-center gap-2">
               Auto Calculate Margin
+              <HelpTooltip content="When enabled, sell rates will automatically be calculated based on buy rates plus the margin percentage." />
             </Label>
           </div>
           {autoMargin && (

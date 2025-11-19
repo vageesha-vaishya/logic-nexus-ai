@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, MapPin } from 'lucide-react';
 import { TransportModeSelector } from './TransportModeSelector';
+import { HelpTooltip } from './HelpTooltip';
 
 interface Leg {
   id: string;
@@ -33,7 +34,10 @@ export function LegsConfigurationStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Configure Transport Legs</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Configure Transport Legs
+          <HelpTooltip content="Add one or more transport legs for your multi-modal shipment. Each leg represents a segment of the journey (e.g., ocean, air, truck)." />
+        </CardTitle>
         <CardDescription>Add and configure each leg of the journey</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
