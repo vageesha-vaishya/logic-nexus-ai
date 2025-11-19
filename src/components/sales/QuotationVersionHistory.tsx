@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/components/ui/use-toast';
-import { createQuotationVersionWithOptions, recordCustomerSelection } from '@/integrations/supabase/carrierRatesActions';
+import { useNavigate } from 'react-router-dom';
+import { createQuotationVersionWithOptions, recordCustomerSelection, createBlankOption } from '@/integrations/supabase/carrierRatesActions';
 
 type Version = {
   id: string;
@@ -19,6 +20,7 @@ type Version = {
 type Option = {
   id: string;
   quotation_version_id: string;
+  option_name?: string | null;
   carrier_name: string;
   total_amount: number;
   currency: string;
@@ -31,6 +33,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const [loading, setLoading] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const load = async () => {
     setLoading(true);
@@ -45,7 +48,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       if (versionIds.length > 0) {
         const { data: opts, error: oErr } = await supabase
           .from('quotation_version_options')
-          .select('id, quotation_version_id, carrier_rate_id')
+          .select('id, quotation_version_id, carrier_rate_id, option_name')
           .in('quotation_version_id', versionIds);
         if (oErr) throw oErr;
         const carrierRateIds = (opts ?? []).map((o: any) => o.carrier_rate_id).filter(Boolean);
@@ -65,6 +68,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
           const opt: Option = {
             id: o.id,
             quotation_version_id: key,
+            option_name: o.option_name || null,
             carrier_name: r.carrier_name || 'Carrier',
             total_amount: Number(r.base_rate ?? 0),
             currency: r.currency || 'USD',
@@ -241,6 +245,32 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
     await deleteVersionsByIds(ids);
   };
 
+  const createNewOption = async (versionId: string) => {
+    if (!tenantId) {
+      toast({ title: 'Error', description: 'Tenant ID not found', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const optionId = await createBlankOption(tenantId, versionId);
+      
+      toast({
+        title: 'Success',
+        description: 'New option created successfully',
+      });
+
+      // Navigate to the composer with the new option
+      navigate(`/dashboard/multimodal-quote?quoteId=${quoteId}&versionId=${versionId}&optionId=${optionId}`);
+    } catch (error) {
+      console.error('Failed to create option:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create new option',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -263,13 +293,18 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
             <div key={v.id} className="border rounded p-3">
               <div className="flex items-center justify-between">
                 <div className="font-medium">Version {v.version_number} ({v.kind})</div>
-                <Badge variant="outline">{v.status ?? 'draft'}</Badge>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => createNewOption(v.id)}>
+                    Create New Option
+                  </Button>
+                  <Badge variant="outline">{v.status ?? 'draft'}</Badge>
+                </div>
               </div>
               <div className="mt-2 grid gap-2">
                 {(optionsByVersion[v.id] ?? []).map(opt => (
                   <div key={opt.id} className="flex items-center justify-between rounded border p-2">
                     <div className="flex items-center gap-3">
-                      <Badge>{opt.carrier_name}</Badge>
+                      <Badge>{opt.option_name || opt.carrier_name}</Badge>
                       <div className="text-sm">
                         {opt.currency} {Number(opt.total_amount).toFixed(2)}
                         {opt.transit_time_days != null && (
@@ -277,7 +312,12 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
                         )}
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => selectOption(v.id, opt.id)}>Select</Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/multimodal-quote?quoteId=${quoteId}&versionId=${v.id}&optionId=${opt.id}`)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" onClick={() => selectOption(v.id, opt.id)}>Select</Button>
+                    </div>
                   </div>
                 ))}
                 {(optionsByVersion[v.id] ?? []).length === 0 && (
