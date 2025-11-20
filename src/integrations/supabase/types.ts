@@ -320,7 +320,9 @@ export type Database = {
       }
       cargo_details: {
         Row: {
+          actual_weight_kg: number | null
           cargo_type_id: string | null
+          chargeable_weight_kg: number | null
           commodity_description: string | null
           created_at: string | null
           created_by: string | null
@@ -341,10 +343,13 @@ export type Database = {
           value_amount: number | null
           value_currency: string | null
           volume_cbm: number | null
+          volumetric_weight_kg: number | null
           weight_kg: number | null
         }
         Insert: {
+          actual_weight_kg?: number | null
           cargo_type_id?: string | null
+          chargeable_weight_kg?: number | null
           commodity_description?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -365,10 +370,13 @@ export type Database = {
           value_amount?: number | null
           value_currency?: string | null
           volume_cbm?: number | null
+          volumetric_weight_kg?: number | null
           weight_kg?: number | null
         }
         Update: {
+          actual_weight_kg?: number | null
           cargo_type_id?: string | null
+          chargeable_weight_kg?: number | null
           commodity_description?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -389,6 +397,7 @@ export type Database = {
           value_amount?: number | null
           value_currency?: string | null
           volume_cbm?: number | null
+          volumetric_weight_kg?: number | null
           weight_kg?: number | null
         }
         Relationships: []
@@ -926,6 +935,89 @@ export type Database = {
           },
         ]
       }
+      charge_weight_breaks: {
+        Row: {
+          carrier_id: string | null
+          created_at: string | null
+          currency_id: string | null
+          description: string | null
+          effective_from: string
+          effective_until: string | null
+          id: string
+          is_active: boolean | null
+          max_weight_kg: number | null
+          min_weight_kg: number
+          name: string
+          rate_per_kg: number
+          service_type_id: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_id?: string | null
+          created_at?: string | null
+          currency_id?: string | null
+          description?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_weight_kg?: number | null
+          min_weight_kg: number
+          name: string
+          rate_per_kg: number
+          service_type_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_id?: string | null
+          created_at?: string | null
+          currency_id?: string | null
+          description?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_weight_kg?: number | null
+          min_weight_kg?: number
+          name?: string
+          rate_per_kg?: number
+          service_type_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charge_weight_breaks_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_weight_breaks_currency_id_fkey"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_weight_breaks_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_weight_breaks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           code_national: string | null
@@ -1227,9 +1319,13 @@ export type Database = {
           code: string | null
           created_at: string | null
           description: string | null
+          has_temperature_control: boolean | null
+          has_ventilation: boolean | null
           height_ft: number | null
           id: string
           is_active: boolean | null
+          is_flat_rack: boolean | null
+          is_open_top: boolean | null
           length_ft: number | null
           max_weight_kg: number | null
           name: string
@@ -1241,9 +1337,13 @@ export type Database = {
           code?: string | null
           created_at?: string | null
           description?: string | null
+          has_temperature_control?: boolean | null
+          has_ventilation?: boolean | null
           height_ft?: number | null
           id?: string
           is_active?: boolean | null
+          is_flat_rack?: boolean | null
+          is_open_top?: boolean | null
           length_ft?: number | null
           max_weight_kg?: number | null
           name: string
@@ -1255,9 +1355,13 @@ export type Database = {
           code?: string | null
           created_at?: string | null
           description?: string | null
+          has_temperature_control?: boolean | null
+          has_ventilation?: boolean | null
           height_ft?: number | null
           id?: string
           is_active?: boolean | null
+          is_flat_rack?: boolean | null
+          is_open_top?: boolean | null
           length_ft?: number | null
           max_weight_kg?: number | null
           name?: string
@@ -1273,7 +1377,10 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          is_special: boolean | null
           name: string
+          ownership_type: string | null
+          special_type: string | null
           tenant_id: string | null
           updated_at: string | null
         }
@@ -1282,7 +1389,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_special?: boolean | null
           name: string
+          ownership_type?: string | null
+          special_type?: string | null
           tenant_id?: string | null
           updated_at?: string | null
         }
@@ -1291,7 +1401,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_special?: boolean | null
           name?: string
+          ownership_type?: string | null
+          special_type?: string | null
           tenant_id?: string | null
           updated_at?: string | null
         }
@@ -4291,31 +4404,37 @@ export type Database = {
           code: string
           created_at: string | null
           description: string | null
+          dim_divisor: number | null
           id: string
           is_active: boolean | null
           mode_id: string | null
           name: string
           updated_at: string | null
+          use_dimensional_weight: boolean | null
         }
         Insert: {
           code: string
           created_at?: string | null
           description?: string | null
+          dim_divisor?: number | null
           id?: string
           is_active?: boolean | null
           mode_id?: string | null
           name: string
           updated_at?: string | null
+          use_dimensional_weight?: boolean | null
         }
         Update: {
           code?: string
           created_at?: string | null
           description?: string | null
+          dim_divisor?: number | null
           id?: string
           is_active?: boolean | null
           mode_id?: string | null
           name?: string
           updated_at?: string | null
+          use_dimensional_weight?: boolean | null
         }
         Relationships: [
           {
@@ -5724,6 +5843,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_dimensional_weight: {
+        Args: {
+          p_divisor?: number
+          p_height_cm: number
+          p_length_cm: number
+          p_width_cm: number
+        }
+        Returns: number
+      }
       calculate_lead_score: { Args: { lead_id: string }; Returns: number }
       calculate_next_version_number: {
         Args: { p_quote_id: string }
@@ -5768,6 +5896,10 @@ export type Database = {
       generate_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
+      }
+      get_chargeable_weight: {
+        Args: { p_actual_weight_kg: number; p_volumetric_weight_kg: number }
+        Returns: number
       }
       get_database_enums: {
         Args: never
@@ -5890,6 +6022,22 @@ export type Database = {
         Returns: string
       }
       get_user_tenant_id: { Args: { check_user_id: string }; Returns: string }
+      get_weight_break_rate: {
+        Args: {
+          p_carrier_id: string
+          p_effective_date?: string
+          p_service_type_id: string
+          p_tenant_id: string
+          p_weight_kg: number
+        }
+        Returns: {
+          currency_id: string
+          id: string
+          max_weight_kg: number
+          min_weight_kg: number
+          rate_per_kg: number
+        }[]
+      }
       has_role: {
         Args: {
           check_role: Database["public"]["Enums"]["app_role"]
