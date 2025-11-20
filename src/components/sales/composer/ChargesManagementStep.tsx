@@ -127,11 +127,16 @@ export function ChargesManagementStep({
         {/* Legs Tabs */}
         <Tabs defaultValue={legs[0]?.id}>
           <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${legs.length}, 1fr)` }}>
-            {legs.map((leg, idx) => (
-              <TabsTrigger key={leg.id} value={leg.id}>
-                Leg {idx + 1} - {leg.mode}
-              </TabsTrigger>
-            ))}
+            {legs.map((leg, idx) => {
+              const serviceType = serviceTypes.find(st => st.id === leg.serviceTypeId);
+              const legName = serviceType?.name || leg.mode.toUpperCase();
+              
+              return (
+                <TabsTrigger key={leg.id} value={leg.id}>
+                  Leg {idx + 1} - {legName}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
           {legs.map((leg, legIdx) => {
