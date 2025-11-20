@@ -184,7 +184,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const [st, tm, cc, cb, cu, td, ct, cs] = await Promise.all([
         supabase
           .from('service_types')
-          .select('*, transport_modes(code, name)')
+          .select('*')
           .eq('is_active', true),
         supabase.from('transport_modes').select('*').eq('is_active', true),
         supabase.from('charge_categories').select('*').eq('is_active', true),
@@ -754,9 +754,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             tenant_id: finalTenantId
           })
           .select()
-          .single();
+          .maybeSingle();
         
-        if (optError) throw optError;
+        if (optError) {
+          console.error('Error creating option:', optError);
+          throw new Error(`Failed to create quotation option: ${optError.message}`);
+        }
         currentOptionId = newOption.id;
         setOptionId(currentOptionId);
       }
