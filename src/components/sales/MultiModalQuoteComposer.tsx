@@ -133,85 +133,384 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   }, [optionId, tenantId]);
 
   const loadInitialData = async () => {
+    console.log('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
     setLoading(true);
+    
+    const errors: string[] = [];
+    
     try {
+      // Step 1: Resolve tenant ID
+      console.log('[Composer] Step 1: Resolving tenant ID');
       const { data: { user } } = await supabase.auth.getUser();
       const userTenantId = user?.user_metadata?.tenant_id;
-      // Resolve tenant from multiple sources to avoid save failures for platform admins
       let resolvedTenantId: string | null = userTenantId ?? null;
 
       // Fallback 1: fetch from quote context
       if (!resolvedTenantId && quoteId) {
         try {
-          const { data: quoteRow } = await supabase
+          const { data: quoteRow, error: quoteError } = await supabase
             .from('quotes')
             .select('tenant_id, franchise_id')
             .eq('id', quoteId)
             .maybeSingle();
-          resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
-          if ((quoteRow as any)?.franchise_id) {
-            setFranchiseId((quoteRow as any).franchise_id);
+          
+          if (quoteError) {
+            console.error('[Composer] Error fetching quote:', quoteError);
+            errors.push('Failed to load quote details');
+          } else if (quoteRow) {
+            resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
+            if ((quoteRow as any)?.franchise_id) {
+              setFranchiseId((quoteRow as any).franchise_id);
+            }
+            console.log('[Composer] Resolved tenant from quote:', resolvedTenantId);
           }
-        } catch {}
+        } catch (error) {
+          console.error('[Composer] Exception fetching quote:', error);
+        }
       }
 
       // Fallback 2: fetch from quotation version
       if (!resolvedTenantId && versionId) {
         try {
-          const { data: versionRow } = await supabase
+          const { data: versionRow, error: versionError } = await supabase
             .from('quotation_versions')
             .select('tenant_id')
             .eq('id', versionId)
             .maybeSingle();
-          resolvedTenantId = (versionRow as any)?.tenant_id ?? null;
-        } catch {}
+          
+          if (versionError) {
+            console.error('[Composer] Error fetching version:', versionError);
+          } else if (versionRow) {
+            resolvedTenantId = (versionRow as any)?.tenant_id ?? null;
+            console.log('[Composer] Resolved tenant from version:', resolvedTenantId);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception fetching version:', error);
+        }
       }
 
       // Fallback 3: fetch from existing option if provided
-      if (!resolvedTenantId && optionId) {
+      if (!resolvedTenantId && initialOptionId) {
         try {
-          const { data: optionRow } = await supabase
+          const { data: optionRow, error: optionError } = await supabase
             .from('quotation_version_options')
             .select('tenant_id')
-            .eq('id', optionId)
+            .eq('id', initialOptionId)
             .maybeSingle();
-          resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
-        } catch {}
+          
+          if (optionError) {
+            console.error('[Composer] Error fetching option:', optionError);
+          } else if (optionRow) {
+            resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
+            console.log('[Composer] Resolved tenant from option:', resolvedTenantId);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception fetching option:', error);
+        }
+      }
+
+      if (!resolvedTenantId) {
+        console.error('[Composer] Failed to resolve tenant ID');
+        errors.push('Could not determine tenant context');
       }
 
       setTenantId(resolvedTenantId);
 
-      const [st, tm, cc, cb, cu, td, ct, cs] = await Promise.all([
-        supabase
-          .from('service_types')
-          .select('*')
-          .eq('is_active', true),
-        supabase.from('transport_modes').select('*').eq('is_active', true),
-        supabase.from('charge_categories').select('*').eq('is_active', true),
-        supabase.from('charge_bases').select('*').eq('is_active', true),
-        supabase.from('currencies').select('*').eq('is_active', true),
-        supabase.from('trade_directions').select('*').eq('is_active', true),
-        supabase.from('container_types').select('*').eq('is_active', true),
-        supabase.from('container_sizes').select('*').eq('is_active', true),
-      ]);
+      // Step 2: Load reference data with individual error handling
+      console.log('[Composer] Step 2: Loading reference data');
+      
+      const loadReferenceData = async () => {
+        const results = {
+          serviceTypes: [] as any[],
+          transportModes: [] as any[],
+          chargeCategories: [] as any[],
+          chargeBases: [] as any[],
+          currencies: [] as any[],
+          tradeDirections: [] as any[],
+          containerTypes: [] as any[],
+          containerSizes: [] as any[]
+        };
 
-      setServiceTypes(st.data || []);
-      setTransportModes(tm.data || []);
-      setChargeCategories(cc.data || []);
-      setChargeBases(cb.data || []);
-      setCurrencies(cu.data || []);
-      setTradeDirections(td.data || []);
-      setContainerTypes(ct.data || []);
-      setContainerSizes(cs.data || []);
+        // Load service types
+        try {
+          const { data, error } = await supabase
+            .from('service_types')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading service_types:', error);
+            errors.push('Failed to load service types');
+          } else {
+            results.serviceTypes = data || [];
+            console.log('[Composer] Loaded service types:', results.serviceTypes.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading service_types:', error);
+          errors.push('Failed to load service types');
+        }
+
+        // Load transport modes
+        try {
+          const { data, error } = await supabase
+            .from('transport_modes')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading transport_modes:', error);
+            errors.push('Failed to load transport modes');
+          } else {
+            results.transportModes = data || [];
+            console.log('[Composer] Loaded transport modes:', results.transportModes.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading transport_modes:', error);
+          errors.push('Failed to load transport modes');
+        }
+
+        // Load charge categories
+        try {
+          const { data, error } = await supabase
+            .from('charge_categories')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading charge_categories:', error);
+            errors.push('Failed to load charge categories');
+          } else {
+            results.chargeCategories = data || [];
+            console.log('[Composer] Loaded charge categories:', results.chargeCategories.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading charge_categories:', error);
+          errors.push('Failed to load charge categories');
+        }
+
+        // Load charge bases
+        try {
+          const { data, error } = await supabase
+            .from('charge_bases')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading charge_bases:', error);
+            errors.push('Failed to load charge bases');
+          } else {
+            results.chargeBases = data || [];
+            console.log('[Composer] Loaded charge bases:', results.chargeBases.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading charge_bases:', error);
+          errors.push('Failed to load charge bases');
+        }
+
+        // Load currencies
+        try {
+          const { data, error } = await supabase
+            .from('currencies')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading currencies:', error);
+            errors.push('Failed to load currencies');
+          } else {
+            results.currencies = data || [];
+            console.log('[Composer] Loaded currencies:', results.currencies.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading currencies:', error);
+          errors.push('Failed to load currencies');
+        }
+
+        // Load trade directions
+        try {
+          const { data, error } = await supabase
+            .from('trade_directions')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading trade_directions:', error);
+            errors.push('Failed to load trade directions');
+          } else {
+            results.tradeDirections = data || [];
+            console.log('[Composer] Loaded trade directions:', results.tradeDirections.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading trade_directions:', error);
+          errors.push('Failed to load trade directions');
+        }
+
+        // Load container types
+        try {
+          const { data, error } = await supabase
+            .from('container_types')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading container_types:', error);
+            errors.push('Failed to load container types');
+          } else {
+            results.containerTypes = data || [];
+            console.log('[Composer] Loaded container types:', results.containerTypes.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading container_types:', error);
+          errors.push('Failed to load container types');
+        }
+
+        // Load container sizes
+        try {
+          const { data, error } = await supabase
+            .from('container_sizes')
+            .select('*')
+            .eq('is_active', true);
+          
+          if (error) {
+            console.error('[Composer] Error loading container_sizes:', error);
+            errors.push('Failed to load container sizes');
+          } else {
+            results.containerSizes = data || [];
+            console.log('[Composer] Loaded container sizes:', results.containerSizes.length);
+          }
+        } catch (error) {
+          console.error('[Composer] Exception loading container_sizes:', error);
+          errors.push('Failed to load container sizes');
+        }
+
+        return results;
+      };
+
+      const refData = await loadReferenceData();
+      
+      setServiceTypes(refData.serviceTypes);
+      setTransportModes(refData.transportModes);
+      setChargeCategories(refData.chargeCategories);
+      setChargeBases(refData.chargeBases);
+      setCurrencies(refData.currencies);
+      setTradeDirections(refData.tradeDirections);
+      setContainerTypes(refData.containerTypes);
+      setContainerSizes(refData.containerSizes);
 
       // Set default currency
-      if (cu.data && cu.data.length > 0) {
-        setQuoteData((prev: any) => ({ ...prev, currencyId: cu.data[0].id }));
+      if (refData.currencies.length > 0) {
+        setQuoteData((prev: any) => ({ ...prev, currencyId: refData.currencies[0].id }));
+        console.log('[Composer] Set default currency:', refData.currencies[0].id);
+      }
+
+      // Step 3: Ensure option exists if we have a versionId
+      if (versionId && resolvedTenantId) {
+        await ensureOptionExists(resolvedTenantId);
+      }
+
+      console.log('[Composer] Initial data load complete. Errors:', errors.length);
+      
+      if (errors.length > 0) {
+        toast({ 
+          title: 'Partial Load', 
+          description: `Some data failed to load: ${errors.join(', ')}`, 
+          variant: 'destructive' 
+        });
       }
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      console.error('[Composer] Critical error in loadInitialData:', error);
+      toast({ title: 'Error', description: 'Failed to initialize composer: ' + error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Ensure an option exists for this version
+  const ensureOptionExists = async (resolvedTenantId: string) => {
+    console.log('[Composer] Ensuring option exists for version:', versionId);
+    
+    try {
+      // Check if we already have an optionId from props
+      if (initialOptionId) {
+        console.log('[Composer] Using initial optionId:', initialOptionId);
+        setOptionId(initialOptionId);
+        return;
+      }
+
+      // Query for existing options
+      const { data: existingOptions, error: queryError } = await supabase
+        .from('quotation_version_options')
+        .select('id, created_at')
+        .eq('quotation_version_id', versionId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (queryError) {
+        console.error('[Composer] Error querying options:', queryError);
+        return;
+      }
+
+      if (existingOptions && existingOptions.length > 0) {
+        const existingId = existingOptions[0].id;
+        console.log('[Composer] Found existing option:', existingId);
+        setOptionId(existingId);
+        
+        // Update URL to include optionId to prevent duplicates on reload
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has('optionId')) {
+          url.searchParams.set('optionId', existingId);
+          window.history.replaceState({}, '', url.toString());
+          console.log('[Composer] Updated URL with optionId');
+        }
+        return;
+      }
+
+      // Create new option only if none exists
+      console.log('[Composer] Creating new option for version');
+      const { data: newOption, error: insertError } = await supabase
+        .from('quotation_version_options')
+        .insert({
+          quotation_version_id: versionId,
+          tenant_id: resolvedTenantId
+        })
+        .select()
+        .maybeSingle();
+
+      if (insertError) {
+        console.error('[Composer] Error creating option:', insertError);
+        
+        // Check if option was created by another process
+        const { data: retry } = await supabase
+          .from('quotation_version_options')
+          .select('id')
+          .eq('quotation_version_id', versionId)
+          .limit(1)
+          .maybeSingle();
+
+        if (retry?.id) {
+          console.log('[Composer] Option found on retry:', retry.id);
+          setOptionId(retry.id);
+          
+          // Update URL
+          const url = new URL(window.location.href);
+          url.searchParams.set('optionId', retry.id);
+          window.history.replaceState({}, '', url.toString());
+        }
+        return;
+      }
+
+      if (newOption?.id) {
+        console.log('[Composer] Created new option:', newOption.id);
+        setOptionId(newOption.id);
+        
+        // Update URL with new optionId
+        const url = new URL(window.location.href);
+        url.searchParams.set('optionId', newOption.id);
+        window.history.replaceState({}, '', url.toString());
+        console.log('[Composer] Updated URL with new optionId');
+      }
+    } catch (error) {
+      console.error('[Composer] Unexpected error in ensureOptionExists:', error);
     }
   };
 
@@ -744,24 +1043,48 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       updateProgress(0); // Validation complete
 
-      // Create option if needed
+      // Ensure we have an option to save to
+      console.log('[Composer] Ensuring option exists before save. Current optionId:', optionId);
       let currentOptionId = optionId;
+      
       if (!currentOptionId) {
-        const { data: newOption, error: optError } = await supabase
+        // This should rarely happen now that we call ensureOptionExists in loadInitialData
+        console.log('[Composer] No optionId - checking for existing options');
+        const { data: existingOptions } = await supabase
           .from('quotation_version_options')
-          .insert({
-            quotation_version_id: versionId,
-            tenant_id: finalTenantId
-          })
-          .select()
-          .maybeSingle();
-        
-        if (optError) {
-          console.error('Error creating option:', optError);
-          throw new Error(`Failed to create quotation option: ${optError.message}`);
+          .select('id')
+          .eq('quotation_version_id', versionId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (existingOptions && existingOptions.length > 0) {
+          currentOptionId = existingOptions[0].id;
+          setOptionId(currentOptionId);
+          console.log('[Composer] Using existing option:', currentOptionId);
+        } else {
+          console.log('[Composer] Creating new option during save');
+          const { data: newOption, error: optError } = await supabase
+            .from('quotation_version_options')
+            .insert({
+              quotation_version_id: versionId,
+              tenant_id: finalTenantId
+            })
+            .select()
+            .maybeSingle();
+          
+          if (optError) {
+            console.error('[Composer] Error creating option:', optError);
+            throw new Error(`Failed to create quotation option: ${optError.message}`);
+          }
+          
+          if (newOption?.id) {
+            currentOptionId = newOption.id;
+            setOptionId(currentOptionId);
+            console.log('[Composer] Created option:', currentOptionId);
+          }
         }
-        currentOptionId = newOption.id;
-        setOptionId(currentOptionId);
+      } else {
+        console.log('[Composer] Using existing optionId:', currentOptionId);
       }
       
       updateProgress(1); // Option created

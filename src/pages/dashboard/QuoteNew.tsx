@@ -30,27 +30,70 @@ export default function QuoteNew() {
   useEffect(() => {
     const ensureVersion = async () => {
       if (!createdQuoteId) return;
-      // create version 1 for the new quote if none exists
-      const { data: existing } = await supabase
-        .from('quotation_versions')
-        .select('id, version_number')
-        .eq('quote_id', createdQuoteId)
-        .order('version_number', { ascending: false })
-        .limit(1);
-      if (Array.isArray(existing) && existing.length && existing[0]?.id) {
-        setVersionId(String(existing[0].id));
-        return;
+      
+      console.log('[QuoteNew] Ensuring version exists for quote:', createdQuoteId);
+      
+      try {
+        // Check if version already exists
+        const { data: existing, error: queryError } = await supabase
+          .from('quotation_versions')
+          .select('id, version_number')
+          .eq('quote_id', createdQuoteId)
+          .order('version_number', { ascending: false })
+          .limit(1);
+        
+        if (queryError) {
+          console.error('[QuoteNew] Error querying versions:', queryError);
+          return;
+        }
+        
+        if (Array.isArray(existing) && existing.length && existing[0]?.id) {
+          console.log('[QuoteNew] Found existing version:', existing[0].id);
+          setVersionId(String(existing[0].id));
+          return;
+        }
+        
+        // Create initial version only if none exists
+        console.log('[QuoteNew] No version found, creating version 1');
+        const finalTenantId = tenantId ?? ((await supabase.auth.getUser()).data?.user as any)?.user_metadata?.tenant_id;
+        
+        if (!finalTenantId) {
+          console.error('[QuoteNew] Cannot create version: no tenant_id available');
+          return;
+        }
+        
+        const { data: v, error: insertError } = await supabase
+          .from('quotation_versions')
+          .insert({ quote_id: createdQuoteId, tenant_id: finalTenantId, version_number: 1 })
+          .select('id')
+          .maybeSingle();
+        
+        if (insertError) {
+          console.error('[QuoteNew] Error creating version:', insertError);
+          // Check if version was created by another process
+          const { data: retry } = await supabase
+            .from('quotation_versions')
+            .select('id')
+            .eq('quote_id', createdQuoteId)
+            .limit(1)
+            .maybeSingle();
+          
+          if (retry?.id) {
+            console.log('[QuoteNew] Version found on retry:', retry.id);
+            setVersionId(String(retry.id));
+          }
+          return;
+        }
+        
+        if (v?.id) {
+          console.log('[QuoteNew] Created version:', v.id);
+          setVersionId(String(v.id));
+        }
+      } catch (error) {
+        console.error('[QuoteNew] Unexpected error in ensureVersion:', error);
       }
-      // Insert initial version using allowed columns
-      const finalTenantId = tenantId ?? ((await supabase.auth.getUser()).data?.user as any)?.user_metadata?.tenant_id;
-      if (!finalTenantId) return;
-      const { data: v } = await supabase
-        .from('quotation_versions')
-        .insert({ quote_id: createdQuoteId, tenant_id: finalTenantId, version_number: 1 })
-        .select('id')
-        .single();
-      if (v?.id) setVersionId(String(v.id));
     };
+    
     ensureVersion();
   }, [createdQuoteId]);
 
