@@ -7,6 +7,8 @@ interface Leg {
   origin: string;
   destination: string;
   charges: any[];
+  legType?: 'transport' | 'service';
+  serviceOnlyCategory?: string;
 }
 
 interface ReviewAndSaveStepProps {
@@ -80,21 +82,27 @@ export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges
 
         {/* Legs Summary */}
         <div>
-          <h3 className="font-semibold mb-3">Transport Legs</h3>
+          <h3 className="font-semibold mb-3">Transport Legs & Services</h3>
           <div className="space-y-4">
             {legs.map((leg, idx) => {
               const legTotalSell = calculateLegTotal(leg, 'sell');
               const legTotalBuy = calculateLegTotal(leg, 'buy');
               const legProfit = legTotalSell - legTotalBuy;
+              const isServiceLeg = leg.legType === 'service';
               
               return (
                 <Card key={leg.id} className="border-2">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <p className="font-semibold">Leg {idx + 1} - {leg.mode.toUpperCase()}</p>
+                        <p className="font-semibold">
+                          {isServiceLeg ? 'Service' : 'Leg'} {idx + 1} - {leg.mode.toUpperCase()}
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          {leg.origin || 'Origin'} → {leg.destination || 'Destination'}
+                          {isServiceLeg 
+                            ? `Service: ${leg.serviceOnlyCategory || 'Not specified'}`
+                            : `${leg.origin || 'Origin'} → ${leg.destination || 'Destination'}`
+                          }
                         </p>
                       </div>
                       <div className="text-right">

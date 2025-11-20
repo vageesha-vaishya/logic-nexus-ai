@@ -14,6 +14,8 @@ interface Leg {
   origin: string;
   destination: string;
   charges: any[];
+  legType?: 'transport' | 'service';
+  serviceOnlyCategory?: string;
 }
 
 interface ChargesManagementStepProps {
