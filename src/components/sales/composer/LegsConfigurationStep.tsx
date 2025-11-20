@@ -164,7 +164,15 @@ export function LegsConfigurationStep({
                             </SelectTrigger>
                             <SelectContent>
                               {serviceTypes
-                                .filter((st) => st.is_active && st.mode_id === leg.mode)
+                                .filter((st) => {
+                                  if (!st.is_active) return false;
+                                  const transportMode = (st as any).transport_modes;
+                                  const currentMode = (leg.mode || '').toLowerCase();
+                                  if (transportMode?.code) {
+                                    return transportMode.code.toLowerCase() === currentMode;
+                                  }
+                                  return st.mode_id === leg.mode;
+                                })
                                 .map((st) => (
                                   <SelectItem key={st.id} value={st.id}>
                                     {st.name}
