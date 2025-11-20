@@ -43,6 +43,9 @@ export default function QuoteDetail() {
   useEffect(() => {
     const loadLatestVersion = async () => {
       if (!resolvedId) return;
+      
+      console.log('[QuoteDetail] Loading latest version for quote:', resolvedId);
+      
       try {
         const { data, error } = await supabase
           .from('quotation_versions')
@@ -50,31 +53,82 @@ export default function QuoteDetail() {
           .eq('quote_id', resolvedId)
           .order('version_number', { ascending: false })
           .limit(1);
-        if (error) return;
-        if (Array.isArray(data) && data.length && data[0]?.id) {
-          setVersionId(String(data[0].id));
-        } else {
-          // Create initial version if none exists (align with typed schema)
-          if (!tenantId) {
-            // Fallback: fetch tenant from quote if not already set
-            const { data: qRow } = await supabase
-              .from('quotes')
-              .select('tenant_id')
-              .eq('id', resolvedId)
-              .single();
-            setTenantId((qRow as any)?.tenant_id ?? null);
-          }
-          if (!tenantId && !(await supabase.auth.getUser()).data?.user) return;
-          const finalTenantId = tenantId ?? ((await supabase.auth.getUser()).data?.user as any)?.user_metadata?.tenant_id;
-          const { data: v } = await supabase
-            .from('quotation_versions')
-            .insert({ quote_id: resolvedId, tenant_id: finalTenantId, version_number: 1 })
-            .select('id')
-            .single();
-          if (v?.id) setVersionId(String(v.id));
+        
+        if (error) {
+          console.error('[QuoteDetail] Error querying versions:', error);
+          return;
         }
-      } catch {}
+        
+        if (Array.isArray(data) && data.length && data[0]?.id) {
+          console.log('[QuoteDetail] Found existing version:', data[0].id);
+          setVersionId(String(data[0].id));
+          return;
+        }
+        
+        // Create initial version only if none exists
+        console.log('[QuoteDetail] No version found, creating version 1');
+        
+        let finalTenantId = tenantId;
+        if (!finalTenantId) {
+          // Fallback: fetch tenant from quote if not already set
+          const { data: qRow, error: qError } = await supabase
+            .from('quotes')
+            .select('tenant_id')
+            .eq('id', resolvedId)
+            .maybeSingle();
+          
+          if (qError) {
+            console.error('[QuoteDetail] Error fetching quote tenant:', qError);
+          }
+          
+          finalTenantId = (qRow as any)?.tenant_id ?? null;
+          if (finalTenantId) {
+            setTenantId(finalTenantId);
+          }
+        }
+        
+        if (!finalTenantId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          finalTenantId = user?.user_metadata?.tenant_id;
+        }
+        
+        if (!finalTenantId) {
+          console.error('[QuoteDetail] Cannot create version: no tenant_id available');
+          return;
+        }
+        
+        const { data: v, error: insertError } = await supabase
+          .from('quotation_versions')
+          .insert({ quote_id: resolvedId, tenant_id: finalTenantId, version_number: 1 })
+          .select('id')
+          .maybeSingle();
+        
+        if (insertError) {
+          console.error('[QuoteDetail] Error creating version:', insertError);
+          // Check if version was created by another process
+          const { data: retry } = await supabase
+            .from('quotation_versions')
+            .select('id')
+            .eq('quote_id', resolvedId)
+            .limit(1)
+            .maybeSingle();
+          
+          if (retry?.id) {
+            console.log('[QuoteDetail] Version found on retry:', retry.id);
+            setVersionId(String(retry.id));
+          }
+          return;
+        }
+        
+        if (v?.id) {
+          console.log('[QuoteDetail] Created version:', v.id);
+          setVersionId(String(v.id));
+        }
+      } catch (error) {
+        console.error('[QuoteDetail] Unexpected error in loadLatestVersion:', error);
+      }
     };
+    
     loadLatestVersion();
   }, [resolvedId]);
 
