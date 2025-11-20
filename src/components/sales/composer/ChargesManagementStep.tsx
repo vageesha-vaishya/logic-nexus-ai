@@ -128,7 +128,12 @@ export function ChargesManagementStep({
         <Tabs defaultValue={legs[0]?.id}>
           <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${legs.length}, 1fr)` }}>
             {legs.map((leg, idx) => {
-              const serviceType = serviceTypes.find(st => st.id === leg.serviceTypeId);
+              const serviceType = serviceTypes.find((st) =>
+                st.id === leg.serviceTypeId ||
+                st.id === leg.mode ||
+                st.code === leg.mode ||
+                st.name === leg.mode
+              );
               const legName = serviceType?.name || leg.mode.toUpperCase();
               
               return (
@@ -143,7 +148,12 @@ export function ChargesManagementStep({
             const totals = calculateTotals(leg.charges);
             const margin = totals.sell - totals.buy;
             const marginPercent = totals.buy > 0 ? ((margin / totals.buy) * 100).toFixed(2) : '0.00';
-            const serviceType = serviceTypes.find(st => st.id === leg.serviceTypeId);
+            const serviceType = serviceTypes.find((st) =>
+              st.id === leg.serviceTypeId ||
+              st.id === leg.mode ||
+              st.code === leg.mode ||
+              st.name === leg.mode
+            );
 
             return (
               <TabsContent key={leg.id} value={leg.id} className="space-y-4">
