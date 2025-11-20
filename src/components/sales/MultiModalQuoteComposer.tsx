@@ -359,26 +359,29 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }
   };
 
-  const addLeg = (mode: string) => {
-    const lowerMode = mode.toLowerCase();
+  const addLeg = (modeId: string) => {
+    // Resolve the selected transport mode so we can use its code for lookups and labels
+    const selectedMode = transportModes.find((tm) => tm.id === modeId);
+    const modeCode = selectedMode?.code || modeId;
+    const lowerModeCode = modeCode.toLowerCase();
     
     // Find matching service types by looking at their transport_modes relationship
     const matchingServiceTypes = serviceTypes.filter((st) => {
       if (!st.is_active) return false;
-      // Check if the service type has a transport_modes relationship with matching code
       const transportMode = (st as any).transport_modes;
-      return transportMode && transportMode.code?.toLowerCase() === lowerMode;
+      return transportMode && transportMode.code?.toLowerCase() === lowerModeCode;
     });
     
     const defaultServiceType = matchingServiceTypes[0];
 
     const newLeg: Leg = {
       id: `leg-${Date.now()}`,
-      mode,
+      mode: modeCode,
       serviceTypeId: defaultServiceType?.id || '',
       origin: '',
       destination: '',
-      charges: []
+      charges: [],
+      legType: 'transport',
     };
     setLegs([...legs, newLeg]);
     
@@ -386,7 +389,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     if (defaultServiceType) {
       toast({
         title: 'Service Type Auto-Selected',
-        description: `${defaultServiceType.name} has been automatically selected for ${mode} transport.`,
+        description: `${defaultServiceType.name} has been automatically selected for ${selectedMode?.name || modeCode} transport.`,
       });
     }
   };
