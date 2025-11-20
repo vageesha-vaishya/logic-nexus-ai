@@ -2559,7 +2559,25 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       if (Array.isArray(existing) && existing.length && existing[0]?.id) {
                         setComposerVersionId(String(existing[0].id));
                       } else {
-                        const finalTenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
+                        let finalTenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id || null;
+                        // Fallback: resolve tenant from the quote row when context is missing
+                        if (!finalTenantId) {
+                          try {
+                            const { data: qRow } = await supabase
+                              .from('quotes')
+                              .select('tenant_id')
+                              .eq('id', quoteId)
+                              .maybeSingle();
+                            finalTenantId = (qRow as any)?.tenant_id ?? null;
+                          } catch {}
+                        }
+                        // Last fallback: use authenticated user's tenant_id from metadata
+                        if (!finalTenantId) {
+                          try {
+                            const { data: { user } } = await supabase.auth.getUser();
+                            finalTenantId = (user as any)?.user_metadata?.tenant_id ?? null;
+                          } catch {}
+                        }
                         if (!finalTenantId) {
                           toast.error('Missing tenant context');
                           return;
