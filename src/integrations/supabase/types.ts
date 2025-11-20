@@ -797,6 +797,135 @@ export type Database = {
         }
         Relationships: []
       }
+      charge_tier_config: {
+        Row: {
+          basis_id: string | null
+          carrier_id: string | null
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          service_type_id: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          basis_id?: string | null
+          carrier_id?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          service_type_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          basis_id?: string | null
+          carrier_id?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          service_type_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charge_tier_config_basis_id_fkey"
+            columns: ["basis_id"]
+            isOneToOne: false
+            referencedRelation: "charge_bases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_tier_config_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_tier_config_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "charge_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_tier_config_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_tier_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      charge_tier_ranges: {
+        Row: {
+          created_at: string | null
+          currency_id: string | null
+          id: string
+          max_value: number | null
+          min_value: number
+          rate: number
+          sort_order: number | null
+          tier_config_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency_id?: string | null
+          id?: string
+          max_value?: number | null
+          min_value: number
+          rate: number
+          sort_order?: number | null
+          tier_config_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency_id?: string | null
+          id?: string
+          max_value?: number | null
+          min_value?: number
+          rate?: number
+          sort_order?: number | null
+          tier_config_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charge_tier_ranges_currency_id_fkey"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charge_tier_ranges_tier_config_id_fkey"
+            columns: ["tier_config_id"]
+            isOneToOne: false
+            referencedRelation: "charge_tier_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           code_national: string | null
@@ -5696,6 +5825,16 @@ export type Database = {
       get_tenant_plan_tier: {
         Args: { _tenant_id: string }
         Returns: Database["public"]["Enums"]["subscription_tier"]
+      }
+      get_tier_rate: {
+        Args: { p_tier_config_id: string; p_value: number }
+        Returns: {
+          currency_id: string
+          max_value: number
+          min_value: number
+          range_id: string
+          rate: number
+        }[]
       }
       get_user_custom_permissions: {
         Args: { check_user_id: string }
