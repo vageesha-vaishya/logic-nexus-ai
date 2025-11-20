@@ -147,7 +147,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .from('quotes')
             .select('tenant_id, franchise_id')
             .eq('id', quoteId)
-            .single();
+            .maybeSingle();
           resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
           if ((quoteRow as any)?.franchise_id) {
             setFranchiseId((quoteRow as any).franchise_id);
@@ -162,7 +162,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .from('quotation_versions')
             .select('tenant_id')
             .eq('id', versionId)
-            .single();
+            .maybeSingle();
           resolvedTenantId = (versionRow as any)?.tenant_id ?? null;
         } catch {}
       }
@@ -174,7 +174,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .from('quotation_version_options')
             .select('tenant_id')
             .eq('id', optionId)
-            .single();
+            .maybeSingle();
           resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
         } catch {}
       }
@@ -226,7 +226,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .from('quotes')
           .select('tenant_id')
           .eq('id', quoteId)
-          .single();
+          .maybeSingle();
         resolved = (q as any)?.tenant_id ?? null;
       }
       if (!resolved && versionId) {
@@ -234,7 +234,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .from('quotation_versions')
           .select('tenant_id')
           .eq('id', versionId)
-          .single();
+          .maybeSingle();
         resolved = (v as any)?.tenant_id ?? null;
       }
       if (!resolved && optionId) {
@@ -242,7 +242,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .from('quotation_version_options')
           .select('tenant_id')
           .eq('id', optionId)
-          .single();
+          .maybeSingle();
         resolved = (o as any)?.tenant_id ?? null;
       }
       if (resolved) setTenantId(resolved);
