@@ -3039,6 +3039,447 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_api_configs: {
+        Row: {
+          api_provider: string
+          api_version: string | null
+          auth_config: Json
+          auth_type: string
+          base_url: string
+          carrier_id: string
+          created_at: string | null
+          custom_headers: Json | null
+          health_status: string | null
+          id: string
+          is_active: boolean | null
+          label_endpoint: string | null
+          last_health_check: string | null
+          rate_endpoint: string | null
+          rate_limit_per_day: number | null
+          rate_limit_per_minute: number | null
+          retry_attempts: number | null
+          supports_document_upload: boolean | null
+          supports_label_generation: boolean | null
+          supports_rate_shopping: boolean | null
+          supports_tracking: boolean | null
+          tenant_id: string
+          timeout_seconds: number | null
+          tracking_endpoint: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_provider: string
+          api_version?: string | null
+          auth_config?: Json
+          auth_type: string
+          base_url: string
+          carrier_id: string
+          created_at?: string | null
+          custom_headers?: Json | null
+          health_status?: string | null
+          id?: string
+          is_active?: boolean | null
+          label_endpoint?: string | null
+          last_health_check?: string | null
+          rate_endpoint?: string | null
+          rate_limit_per_day?: number | null
+          rate_limit_per_minute?: number | null
+          retry_attempts?: number | null
+          supports_document_upload?: boolean | null
+          supports_label_generation?: boolean | null
+          supports_rate_shopping?: boolean | null
+          supports_tracking?: boolean | null
+          tenant_id: string
+          timeout_seconds?: number | null
+          tracking_endpoint?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_provider?: string
+          api_version?: string | null
+          auth_config?: Json
+          auth_type?: string
+          base_url?: string
+          carrier_id?: string
+          created_at?: string | null
+          custom_headers?: Json | null
+          health_status?: string | null
+          id?: string
+          is_active?: boolean | null
+          label_endpoint?: string | null
+          last_health_check?: string | null
+          rate_endpoint?: string | null
+          rate_limit_per_day?: number | null
+          rate_limit_per_minute?: number | null
+          retry_attempts?: number | null
+          supports_document_upload?: boolean | null
+          supports_label_generation?: boolean | null
+          supports_rate_shopping?: boolean | null
+          supports_tracking?: boolean | null
+          tenant_id?: string
+          timeout_seconds?: number | null
+          tracking_endpoint?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_api_configs_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_api_configs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_charge_mappings: {
+        Row: {
+          applies_to_service_types: string[] | null
+          calculation_method: string | null
+          carrier_id: string
+          charge_basis_id: string | null
+          charge_category_id: string | null
+          created_at: string | null
+          currency_id: string | null
+          default_rate: number | null
+          id: string
+          is_active: boolean | null
+          max_shipment_value: number | null
+          min_shipment_value: number | null
+          provider_charge_code: string
+          provider_charge_description: string | null
+          provider_charge_name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_service_types?: string[] | null
+          calculation_method?: string | null
+          carrier_id: string
+          charge_basis_id?: string | null
+          charge_category_id?: string | null
+          created_at?: string | null
+          currency_id?: string | null
+          default_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          max_shipment_value?: number | null
+          min_shipment_value?: number | null
+          provider_charge_code: string
+          provider_charge_description?: string | null
+          provider_charge_name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_service_types?: string[] | null
+          calculation_method?: string | null
+          carrier_id?: string
+          charge_basis_id?: string | null
+          charge_category_id?: string | null
+          created_at?: string | null
+          currency_id?: string | null
+          default_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          max_shipment_value?: number | null
+          min_shipment_value?: number | null
+          provider_charge_code?: string
+          provider_charge_description?: string | null
+          provider_charge_name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_charge_mappings_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_charge_mappings_charge_basis_id_fkey"
+            columns: ["charge_basis_id"]
+            isOneToOne: false
+            referencedRelation: "charge_bases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_charge_mappings_charge_category_id_fkey"
+            columns: ["charge_category_id"]
+            isOneToOne: false
+            referencedRelation: "charge_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_charge_mappings_currency_id_fkey"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_charge_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_rate_rules: {
+        Row: {
+          actions: Json
+          carrier_id: string
+          conditions: Json
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_blocking: boolean | null
+          priority: number | null
+          rule_name: string
+          rule_type: string
+          service_type_id: string | null
+          tenant_id: string
+          updated_at: string | null
+          validation_message: string | null
+        }
+        Insert: {
+          actions?: Json
+          carrier_id: string
+          conditions?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_blocking?: boolean | null
+          priority?: number | null
+          rule_name: string
+          rule_type: string
+          service_type_id?: string | null
+          tenant_id: string
+          updated_at?: string | null
+          validation_message?: string | null
+        }
+        Update: {
+          actions?: Json
+          carrier_id?: string
+          conditions?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_blocking?: boolean | null
+          priority?: number | null
+          rule_name?: string
+          rule_type?: string
+          service_type_id?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+          validation_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_rate_rules_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_rate_rules_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_rate_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_rate_templates: {
+        Row: {
+          carrier_id: string
+          created_at: string | null
+          effective_from: string
+          effective_until: string | null
+          id: string
+          is_active: boolean | null
+          max_chargeable_weight: number | null
+          min_chargeable_weight: number | null
+          rate_structure: Json
+          requires_dimensional_weight: boolean | null
+          requires_origin_destination: boolean | null
+          service_type_id: string | null
+          template_name: string
+          template_type: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          carrier_id: string
+          created_at?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_chargeable_weight?: number | null
+          min_chargeable_weight?: number | null
+          rate_structure?: Json
+          requires_dimensional_weight?: boolean | null
+          requires_origin_destination?: boolean | null
+          service_type_id?: string | null
+          template_name: string
+          template_type: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          carrier_id?: string
+          created_at?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_chargeable_weight?: number | null
+          min_chargeable_weight?: number | null
+          rate_structure?: Json
+          requires_dimensional_weight?: boolean | null
+          requires_origin_destination?: boolean | null
+          service_type_id?: string | null
+          template_name?: string
+          template_type?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_rate_templates_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_rate_templates_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_rate_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_surcharges: {
+        Row: {
+          applies_to_countries: string[] | null
+          applies_to_service_types: string[] | null
+          applies_to_weight_range: Json | null
+          applies_to_zones: string[] | null
+          calculation_type: string
+          carrier_id: string
+          created_at: string | null
+          currency_id: string | null
+          effective_from: string
+          effective_until: string | null
+          id: string
+          is_active: boolean | null
+          rate: number | null
+          requires_hazmat: boolean | null
+          requires_special_handling: boolean | null
+          requires_temperature_control: boolean | null
+          surcharge_code: string
+          surcharge_description: string | null
+          surcharge_name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_countries?: string[] | null
+          applies_to_service_types?: string[] | null
+          applies_to_weight_range?: Json | null
+          applies_to_zones?: string[] | null
+          calculation_type: string
+          carrier_id: string
+          created_at?: string | null
+          currency_id?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          rate?: number | null
+          requires_hazmat?: boolean | null
+          requires_special_handling?: boolean | null
+          requires_temperature_control?: boolean | null
+          surcharge_code: string
+          surcharge_description?: string | null
+          surcharge_name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_countries?: string[] | null
+          applies_to_service_types?: string[] | null
+          applies_to_weight_range?: Json | null
+          applies_to_zones?: string[] | null
+          calculation_type?: string
+          carrier_id?: string
+          created_at?: string | null
+          currency_id?: string | null
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_active?: boolean | null
+          rate?: number | null
+          requires_hazmat?: boolean | null
+          requires_special_handling?: boolean | null
+          requires_temperature_control?: boolean | null
+          surcharge_code?: string
+          surcharge_description?: string | null
+          surcharge_name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_surcharges_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_surcharges_currency_id_fkey"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_surcharges_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_types: {
         Row: {
           code: string
@@ -5888,6 +6329,20 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
+      evaluate_provider_rate_rules: {
+        Args: {
+          p_carrier_id: string
+          p_quote_data: Json
+          p_service_type_id: string
+        }
+        Returns: {
+          actions: Json
+          rule_id: string
+          rule_name: string
+          rule_type: string
+          validation_message: string
+        }[]
+      }
       execute_sql_query: { Args: { query_text: string }; Returns: Json }
       generate_next_option_name: {
         Args: { p_version_id: string }
@@ -5896,6 +6351,24 @@ export type Database = {
       generate_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
+      }
+      get_applicable_provider_surcharges: {
+        Args: {
+          p_carrier_id: string
+          p_country_code?: string
+          p_is_hazmat?: boolean
+          p_is_temperature_controlled?: boolean
+          p_service_type: string
+          p_weight_kg: number
+        }
+        Returns: {
+          calculation_type: string
+          currency_code: string
+          rate: number
+          surcharge_code: string
+          surcharge_id: string
+          surcharge_name: string
+        }[]
       }
       get_chargeable_weight: {
         Args: { p_actual_weight_kg: number; p_volumetric_weight_kg: number }
