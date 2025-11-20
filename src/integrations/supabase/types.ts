@@ -3955,6 +3955,48 @@ export type Database = {
           },
         ]
       }
+      quote_access_logs: {
+        Row: {
+          accessed_at: string | null
+          action_type: string | null
+          id: string
+          quote_id: string
+          quote_share_id: string | null
+          visitor_email: string | null
+        }
+        Insert: {
+          accessed_at?: string | null
+          action_type?: string | null
+          id?: string
+          quote_id: string
+          quote_share_id?: string | null
+          visitor_email?: string | null
+        }
+        Update: {
+          accessed_at?: string | null
+          action_type?: string | null
+          id?: string
+          quote_id?: string
+          quote_share_id?: string | null
+          visitor_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_access_logs_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_access_logs_quote_share_id_fkey"
+            columns: ["quote_share_id"]
+            isOneToOne: false
+            referencedRelation: "quote_shares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_charges: {
         Row: {
           amount: number | null
@@ -4037,33 +4079,94 @@ export type Database = {
           },
         ]
       }
-      quote_documents: {
+      quote_comments: {
         Row: {
-          document_data: Json | null
-          document_type: string
-          document_url: string | null
-          generated_at: string | null
-          generated_by: string | null
+          author_type: string
+          author_user_id: string | null
+          comment_text: string
+          created_at: string | null
           id: string
+          is_internal: boolean | null
           quote_id: string
+          tenant_id: string
+          updated_at: string | null
         }
         Insert: {
-          document_data?: Json | null
-          document_type: string
-          document_url?: string | null
-          generated_at?: string | null
-          generated_by?: string | null
+          author_type: string
+          author_user_id?: string | null
+          comment_text: string
+          created_at?: string | null
           id?: string
+          is_internal?: boolean | null
           quote_id: string
+          tenant_id: string
+          updated_at?: string | null
         }
         Update: {
-          document_data?: Json | null
-          document_type?: string
-          document_url?: string | null
-          generated_at?: string | null
-          generated_by?: string | null
+          author_type?: string
+          author_user_id?: string | null
+          comment_text?: string
+          created_at?: string | null
           id?: string
+          is_internal?: boolean | null
           quote_id?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_comments_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_comments_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_comments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_documents: {
+        Row: {
+          document_name: string
+          document_type: string
+          file_url: string | null
+          generated_at: string | null
+          id: string
+          is_public: boolean | null
+          quote_id: string
+          tenant_id: string
+        }
+        Insert: {
+          document_name: string
+          document_type: string
+          file_url?: string | null
+          generated_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          quote_id: string
+          tenant_id: string
+        }
+        Update: {
+          document_name?: string
+          document_type?: string
+          file_url?: string | null
+          generated_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          quote_id?: string
+          tenant_id?: string
         }
         Relationships: [
           {
@@ -4071,6 +4174,61 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_email_history: {
+        Row: {
+          delivery_status: string | null
+          email_type: string
+          id: string
+          quote_id: string
+          sent_at: string | null
+          subject: string
+          tenant_id: string
+          to_emails: string[]
+        }
+        Insert: {
+          delivery_status?: string | null
+          email_type: string
+          id?: string
+          quote_id: string
+          sent_at?: string | null
+          subject: string
+          tenant_id: string
+          to_emails: string[]
+        }
+        Update: {
+          delivery_status?: string | null
+          email_type?: string
+          id?: string
+          quote_id?: string
+          sent_at?: string | null
+          subject?: string
+          tenant_id?: string
+          to_emails?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_email_history_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_email_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -4352,6 +4510,157 @@ export type Database = {
           },
           {
             foreignKeyName: "quote_number_sequences_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_presentation_templates: {
+        Row: {
+          created_at: string | null
+          font_family: string | null
+          footer_template: string | null
+          franchise_id: string | null
+          header_template: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          layout_config: Json | null
+          logo_url: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          show_buy_prices: boolean | null
+          show_carrier_details: boolean | null
+          show_transit_times: boolean | null
+          template_name: string
+          template_type: string
+          tenant_id: string
+          terms_conditions_template: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          font_family?: string | null
+          footer_template?: string | null
+          franchise_id?: string | null
+          header_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          layout_config?: Json | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_buy_prices?: boolean | null
+          show_carrier_details?: boolean | null
+          show_transit_times?: boolean | null
+          template_name: string
+          template_type: string
+          tenant_id: string
+          terms_conditions_template?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          font_family?: string | null
+          footer_template?: string | null
+          franchise_id?: string | null
+          header_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          layout_config?: Json | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_buy_prices?: boolean | null
+          show_carrier_details?: boolean | null
+          show_transit_times?: boolean | null
+          template_name?: string
+          template_type?: string
+          tenant_id?: string
+          terms_conditions_template?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_presentation_templates_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_presentation_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_shares: {
+        Row: {
+          access_type: string | null
+          created_at: string | null
+          created_by: string | null
+          current_views: number | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          max_views: number | null
+          quote_id: string
+          share_token: string
+          tenant_id: string
+        }
+        Insert: {
+          access_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_views?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          max_views?: number | null
+          quote_id: string
+          share_token: string
+          tenant_id: string
+        }
+        Update: {
+          access_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_views?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          max_views?: number | null
+          quote_id?: string
+          share_token?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_shares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_shares_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_shares_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -6325,6 +6634,14 @@ export type Database = {
         Args: { p_version_id_1: string; p_version_id_2: string }
         Returns: Json
       }
+      create_quote_share: {
+        Args: {
+          p_expires_in_days?: number
+          p_quote_id: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       decrement_user_lead_count: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
@@ -6352,6 +6669,7 @@ export type Database = {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
       }
+      generate_share_token: { Args: never; Returns: string }
       get_applicable_provider_surcharges: {
         Args: {
           p_carrier_id: string
