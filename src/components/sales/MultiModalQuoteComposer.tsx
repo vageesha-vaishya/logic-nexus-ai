@@ -95,6 +95,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   });
   const [basisTarget, setBasisTarget] = useState<{ type: 'leg' | 'combined'; legId?: string; chargeIdx: number } | null>(null);
 
+  // Transport modes for mode-to-service-type mapping
+  const [transportModes, setTransportModes] = useState<any[]>([]);
+
   useEffect(() => {
     loadInitialData();
     
@@ -178,8 +181,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       setTenantId(resolvedTenantId);
 
-      const [st, cc, cb, cu, td, ct, cs] = await Promise.all([
-        supabase.from('service_types').select('*').eq('is_active', true),
+      const [st, tm, cc, cb, cu, td, ct, cs] = await Promise.all([
+        supabase
+          .from('service_types')
+          .select('*, transport_modes(code, name)')
+          .eq('is_active', true),
+        supabase.from('transport_modes').select('*').eq('is_active', true),
         supabase.from('charge_categories').select('*').eq('is_active', true),
         supabase.from('charge_bases').select('*').eq('is_active', true),
         supabase.from('currencies').select('*').eq('is_active', true),
@@ -189,6 +196,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       ]);
 
       setServiceTypes(st.data || []);
+      setTransportModes(tm.data || []);
       setChargeCategories(cc.data || []);
       setChargeBases(cb.data || []);
       setCurrencies(cu.data || []);
@@ -353,10 +361,15 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const addLeg = (mode: string) => {
     const lowerMode = mode.toLowerCase();
-    // Filter service types by mode and select the first active one
-    const matchingServiceTypes = serviceTypes.filter(
-      (st) => st.is_active && st.mode?.toLowerCase() === lowerMode
-    );
+    
+    // Find matching service types by looking at their transport_modes relationship
+    const matchingServiceTypes = serviceTypes.filter((st) => {
+      if (!st.is_active) return false;
+      // Check if the service type has a transport_modes relationship with matching code
+      const transportMode = (st as any).transport_modes;
+      return transportMode && transportMode.code?.toLowerCase() === lowerMode;
+    });
+    
     const defaultServiceType = matchingServiceTypes[0];
 
     const newLeg: Leg = {
