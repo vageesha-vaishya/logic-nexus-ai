@@ -119,11 +119,13 @@ export default function QuoteNew() {
           </div>
         </div>
         <QuoteForm onSuccess={handleSuccess} />
-        {/* Quotation Composer is now only available via the Capture Carrier Rates popup in QuoteForm */}
+        
+        {createdQuoteId && versionId && (
+          <div className="mt-6">
+            <MultiModalQuoteComposer quoteId={createdQuoteId} versionId={versionId} />
+          </div>
+        )}
       </div>
-      {createdQuoteId && versionId && (
-        <MultiModalQuoteComposer quoteId={createdQuoteId} versionId={versionId} />
-      )}
     </DashboardLayout>
   );
 }

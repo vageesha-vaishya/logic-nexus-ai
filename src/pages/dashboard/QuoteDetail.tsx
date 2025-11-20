@@ -167,10 +167,13 @@ export default function QuoteDetail() {
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
         <QuotationVersionHistory quoteId={resolvedId ?? id as string} />
+        
+        {resolvedId && versionId && (
+          <div className="mt-6">
+            <MultiModalQuoteComposer quoteId={resolvedId} versionId={versionId} />
+          </div>
+        )}
       </div>
-      {resolvedId && versionId && (
-        <MultiModalQuoteComposer quoteId={resolvedId} versionId={versionId} />
-      )}
     </DashboardLayout>
   );
 }
