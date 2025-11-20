@@ -3081,6 +3081,7 @@ export type Database = {
           destination_location: string | null
           franchise_id: string | null
           id: string
+          leg_type: string | null
           mode: string | null
           mode_id: string | null
           origin_location: string | null
@@ -3089,6 +3090,7 @@ export type Database = {
           provider_id: string | null
           quotation_version_option_id: string
           service_id: string | null
+          service_only_category: string | null
           service_type_id: string | null
           sort_order: number
           tenant_id: string
@@ -3099,6 +3101,7 @@ export type Database = {
           destination_location?: string | null
           franchise_id?: string | null
           id?: string
+          leg_type?: string | null
           mode?: string | null
           mode_id?: string | null
           origin_location?: string | null
@@ -3107,6 +3110,7 @@ export type Database = {
           provider_id?: string | null
           quotation_version_option_id: string
           service_id?: string | null
+          service_only_category?: string | null
           service_type_id?: string | null
           sort_order?: number
           tenant_id: string
@@ -3117,6 +3121,7 @@ export type Database = {
           destination_location?: string | null
           franchise_id?: string | null
           id?: string
+          leg_type?: string | null
           mode?: string | null
           mode_id?: string | null
           origin_location?: string | null
@@ -3125,6 +3130,7 @@ export type Database = {
           provider_id?: string | null
           quotation_version_option_id?: string
           service_id?: string | null
+          service_only_category?: string | null
           service_type_id?: string | null
           sort_order?: number
           tenant_id?: string
@@ -4159,6 +4165,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_leg_categories: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          icon_name: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       service_modes: {
         Row: {

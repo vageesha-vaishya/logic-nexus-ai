@@ -22,6 +22,8 @@ interface Leg {
   origin: string;
   destination: string;
   charges: any[];
+  legType?: 'transport' | 'service';
+  serviceOnlyCategory?: string;
 }
 
 interface MultiModalQuoteComposerProps {
@@ -301,6 +303,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             serviceTypeId: leg.service_type_id || '',
             origin: leg.origin_location || '',
             destination: leg.destination_location || '',
+            legType: leg.leg_type || 'transport',
+            serviceOnlyCategory: leg.service_only_category || '',
             charges: Array.from(chargesMap.values())
           };
         });
@@ -830,6 +834,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
+              leg_type: leg.legType || 'transport',
+              service_only_category: leg.serviceOnlyCategory || null,
               tenant_id: finalTenantId,
               franchise_id: franchiseId,
               sort_order: i
@@ -849,6 +855,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
+              leg_type: leg.legType || 'transport',
+              service_only_category: leg.serviceOnlyCategory || null,
               sort_order: i
             })
             .eq('id', legId);
