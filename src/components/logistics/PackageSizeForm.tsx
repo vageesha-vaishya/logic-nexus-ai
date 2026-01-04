@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 
 const formSchema = z.object({
   size_name: z.string().min(1, "Size name is required"),
@@ -38,18 +39,27 @@ export function PackageSizeForm({ onSuccess }: PackageSizeFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const { error } = await supabase.from("package_sizes").insert({
-        ...values,
+      const payload: Database["public"]["Tables"]["package_sizes"]["Insert"] = {
+        size_name: values.size_name,
         tenant_id: context.tenantId!,
-      } as any);
+        size_code: values.size_code,
+        length_ft: values.length_ft,
+        width_ft: values.width_ft,
+        height_ft: values.height_ft,
+        max_weight_kg: values.max_weight_kg,
+        description: values.description,
+        is_active: values.is_active,
+      };
+      const { error } = await supabase.from("package_sizes").insert(payload);
 
       if (error) throw error;
 
       toast.success("Package size created successfully");
       form.reset();
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create package size");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(message || "Failed to create package size");
     }
   }
 

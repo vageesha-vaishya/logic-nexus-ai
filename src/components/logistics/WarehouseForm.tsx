@@ -20,6 +20,7 @@ const warehouseSchema = z.object({
 });
 
 type WarehouseFormData = z.infer<typeof warehouseSchema>;
+export type { WarehouseFormData };
 
 interface WarehouseFormProps {
   initialData?: Partial<WarehouseFormData> & { id?: string };

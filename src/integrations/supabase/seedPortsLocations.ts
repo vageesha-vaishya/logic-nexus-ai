@@ -1,4 +1,6 @@
 import { toast } from 'sonner';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './types';
 
 type PortSeed = {
   tenant_id: string;
@@ -11,7 +13,7 @@ type PortSeed = {
   is_active: boolean;
 };
 
-export async function seedPortsForTenant(supabase: any, tenantId: string): Promise<number> {
+export async function seedPortsForTenant(supabase: SupabaseClient<Database>, tenantId: string): Promise<number> {
   if (!tenantId) return 0;
 
   const seeds: PortSeed[] = [
@@ -37,16 +39,18 @@ export async function seedPortsForTenant(supabase: any, tenantId: string): Promi
       .select('location_code')
       .eq('tenant_id', tenantId);
     if (exErr) throw exErr;
-    const existingCodes = new Set((existing ?? []).map((r: any) => String(r.location_code)));
+    const rows = (existing ?? []) as { location_code: string | null }[];
+    const existingCodes = new Set(rows.map((r) => String(r.location_code)));
     const toInsert = seeds.filter((s) => !existingCodes.has(s.location_code));
     if (toInsert.length === 0) return 0;
     const { error } = await supabase.from('ports_locations').insert(toInsert);
     if (error) throw error;
     toast.success(`Seeded ${toInsert.length} ports/locations`);
     return toInsert.length;
-  } catch (e: any) {
-    console.warn('Seed ports/locations failed:', e?.message || e);
-    toast.error('Failed to seed ports/locations', { description: e?.message || String(e) });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn('Seed ports/locations failed:', message);
+    toast.error('Failed to seed ports/locations', { description: message });
     return 0;
   }
 }

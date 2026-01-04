@@ -19,48 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
-
-type Stage = 'prospecting' | 'qualification' | 'needs_analysis' | 'value_proposition' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost';
-
-interface Opportunity {
-  id: string;
-  name: string;
-  stage: Stage;
-  amount: number | null;
-  probability: number | null;
-  close_date: string | null;
-  expected_revenue: number | null;
-  created_at: string;
-  account_id: string | null;
-  owner_id: string | null;
-  franchise_id: string | null;
-  accounts?: { name: string } | null;
-  contacts?: { first_name: string; last_name: string } | null;
-}
-
-const stageColors: Record<Stage, string> = {
-  prospecting: 'bg-slate-500/10 text-slate-700 dark:text-slate-300',
-  qualification: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  needs_analysis: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
-  value_proposition: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-  proposal: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
-  negotiation: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  closed_won: 'bg-green-500/10 text-green-700 dark:text-green-300',
-  closed_lost: 'bg-red-500/10 text-red-700 dark:text-red-300',
-};
-
-const stageLabels: Record<Stage, string> = {
-  prospecting: '🆕 New Opportunity',
-  qualification: '💰 Quote Requested',
-  needs_analysis: '📋 Requirements Gathering',
-  proposal: '📄 Quote Submitted',
-  negotiation: '🤝 Negotiation',
-  value_proposition: '📝 Contract Review',
-  closed_won: '✅ Won',
-  closed_lost: '❌ Lost',
-};
-
-const stages: Stage[] = ['prospecting', 'qualification', 'proposal', 'negotiation', 'value_proposition', 'needs_analysis', 'closed_won', 'closed_lost'];
+import { Opportunity, OpportunityStage, stageColors, stageLabels, stages } from "./opportunities-data";
 
 export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
@@ -85,7 +44,7 @@ export default function OpportunitiesPipeline() {
   const [dateTo, setDateTo] = useState<string>("");
 
   // WIP limits
-  const [wipLimits, setWipLimits] = useState<Record<Stage, number>>({
+  const [wipLimits, setWipLimits] = useState<Record<OpportunityStage, number>>({
     prospecting: 30,
     qualification: 20,
     needs_analysis: 15,

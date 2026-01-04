@@ -8,32 +8,17 @@ import { Plus, Pencil, Trash2, PackageCheck } from "lucide-react";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import { CargoDetailsForm } from "@/components/logistics/CargoDetailsForm";
+import type { Database } from "@/integrations/supabase/types";
 
-type CargoDetail = {
-  id: string;
-  tenant_id?: string;
-  service_type?: string;
-  service_id?: string;
-  cargo_type_id?: string | null;
-  commodity_description?: string | null;
-  hs_code?: string | null;
-  package_count?: number | null;
-  total_weight_kg?: number | null;
-  total_volume_cbm?: number | null;
-  hazmat?: boolean | null;
-  hazmat_class?: string | null;
-  temperature_controlled?: boolean | null;
-  requires_special_handling?: boolean | null;
-  notes?: string | null;
-  is_active?: boolean | null;
-  [key: string]: any; // Allow additional fields from database
-};
+type CargoDetail = Database["public"]["Tables"]["cargo_details"]["Row"];
 
 export default function CargoDetails() {
   const { supabase, context } = useCRM();
   const [details, setDetails] = useState<CargoDetail[]>([]);
-  const [services, setServices] = useState<any[]>([]);
-  const [cargoTypes, setCargoTypes] = useState<any[]>([]);
+  type ServiceRow = Pick<Database["public"]["Tables"]["services"]["Row"], "id" | "service_name" | "service_type" | "service_code">;
+  type CargoTypeRow = Pick<Database["public"]["Tables"]["cargo_types"]["Row"], "id" | "name">;
+  const [services, setServices] = useState<ServiceRow[]>([]);
+  const [cargoTypes, setCargoTypes] = useState<CargoTypeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -46,13 +31,14 @@ export default function CargoDetails() {
       const [{ data: cd }, { data: svc }, { data: ct }] = await Promise.all([
         supabase.from("cargo_details").select("*").eq("tenant_id", context.tenantId),
         supabase.from("services").select("id, service_name, service_type, service_code").eq("tenant_id", context.tenantId),
-        supabase.from("cargo_types").select("id, cargo_type_name").eq("tenant_id", context.tenantId),
+        supabase.from("cargo_types").select("id, name").eq("tenant_id", context.tenantId),
       ]);
       setDetails((cd || []) as CargoDetail[]);
       setServices(svc || []);
       setCargoTypes(ct || []);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load cargo details");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error(message || "Failed to load cargo details");
     } finally {
       setLoading(false);
     }
@@ -74,7 +60,7 @@ export default function CargoDetails() {
   const cargoTypeMap = useMemo(() => {
     const m: Record<string, string> = {};
     cargoTypes.forEach((c) => {
-      m[String(c.id)] = c.cargo_type_name;
+      m[String(c.id)] = c.name;
     });
     return m;
   }, [cargoTypes]);
@@ -85,8 +71,9 @@ export default function CargoDetails() {
       if (error) throw error;
       toast.success("Cargo details deleted");
       fetchData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error(message || "Failed to delete");
     }
   }
 
@@ -130,7 +117,6 @@ export default function CargoDetails() {
                     <TableHead>Service Type</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Cargo Type</TableHead>
-                    <TableHead>Packages</TableHead>
                     <TableHead>Weight (kg)</TableHead>
                     <TableHead>Volume (cbm)</TableHead>
                     <TableHead>Hazmat</TableHead>
@@ -144,10 +130,9 @@ export default function CargoDetails() {
                       <TableCell className="capitalize">{d.service_type?.replace(/_/g, " ")}</TableCell>
                       <TableCell>{serviceMap[String(d.service_id)] || d.service_id}</TableCell>
                       <TableCell>{d.cargo_type_id ? cargoTypeMap[String(d.cargo_type_id)] : '-'}</TableCell>
-                      <TableCell>{d.package_count ?? '-'}</TableCell>
-                      <TableCell>{d.total_weight_kg ?? '-'}</TableCell>
-                      <TableCell>{d.total_volume_cbm ?? '-'}</TableCell>
-                      <TableCell>{d.hazmat ? 'Yes' : 'No'}</TableCell>
+                      <TableCell>{d.weight_kg ?? '-'}</TableCell>
+                      <TableCell>{d.volume_cbm ?? '-'}</TableCell>
+                      <TableCell>{d.is_hazardous ? 'Yes' : 'No'}</TableCell>
                       <TableCell>{d.is_active ? 'Active' : 'Inactive'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -173,7 +158,25 @@ export default function CargoDetails() {
               <DialogTitle>Edit Cargo Details</DialogTitle>
             </DialogHeader>
             {editItem && (
-              <CargoDetailsForm initialData={editItem} onSuccess={() => { setEditOpen(false); setEditItem(null); fetchData(); }} />
+              <CargoDetailsForm
+                initialData={{
+                  id: editItem.id,
+                  service_type: editItem.service_type || "",
+                  service_id: editItem.service_id || "",
+                  cargo_type_id: editItem.cargo_type_id || "",
+                  commodity_description: editItem.commodity_description || "",
+                  hs_code: editItem.hs_code || "",
+                  total_weight_kg: editItem.weight_kg ?? undefined,
+                  total_volume_cbm: editItem.volume_cbm ?? undefined,
+                  is_hazardous: !!editItem.is_hazardous,
+                  hazmat_class: editItem.hazmat_class || "",
+                  temperature_controlled: !!editItem.temperature_controlled,
+                  notes: editItem.notes || "",
+                  is_active: editItem.is_active ?? true,
+                  dimensions: (editItem as any).dimensions_cm ?? {},
+                }}
+                onSuccess={() => { setEditOpen(false); setEditItem(null); fetchData(); }}
+              />
             )}
           </DialogContent>
         </Dialog>

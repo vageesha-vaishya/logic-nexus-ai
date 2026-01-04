@@ -15,21 +15,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
 
-interface Lead {
-  id: string;
-  first_name: string;
-  last_name: string;
-  company: string | null;
-  email: string | null;
-  phone: string | null;
-  status: string;
-  source: string;
-  estimated_value: number | null;
-  created_at: string;
-  lead_score: number | null;
-  qualification_status: string | null;
-  owner_id?: string | null;
-}
+import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 
 export default function Leads() {
   const navigate = useNavigate();
@@ -73,11 +59,17 @@ export default function Leads() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setLeads(data || []);
-    } catch (error: any) {
+      // Validate and cast data
+      const safeLeads = (data || []).map(d => ({
+        ...d,
+        status: stages.includes(d.status as LeadStatus) ? (d.status as LeadStatus) : 'new'
+      })) as Lead[];
+
+      setLeads(safeLeads);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load leads');
-      console.error('Error:', error);
+      console.error('Error:', message);
     } finally {
       setLoading(false);
     }
@@ -260,7 +252,7 @@ export default function Leads() {
           </SelectContent>
         </Select>
 
-        <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as any)}>
+        <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as 'any' | 'unassigned' | 'me')}>
           <SelectTrigger className="w-[180px]">
             <UsersIcon className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Owner" />

@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
+import type { Database, Json } from "@/integrations/supabase/types";
 
 const cargoDetailsSchema = z.object({
   service_type: z.string().min(1, "Service type is required"),
@@ -17,14 +18,12 @@ const cargoDetailsSchema = z.object({
   cargo_type_id: z.string().optional(),
   commodity_description: z.string().optional(),
   hs_code: z.string().optional(),
-  package_count: z.coerce.number().int().nonnegative().default(0),
   total_weight_kg: z.coerce.number().optional(),
   total_volume_cbm: z.coerce.number().optional(),
   dimensions: z.any().optional(),
-  hazmat: z.boolean().default(false),
+  is_hazardous: z.boolean().default(false),
   hazmat_class: z.string().optional(),
   temperature_controlled: z.boolean().default(false),
-  requires_special_handling: z.boolean().default(false),
   notes: z.string().optional(),
   is_active: z.boolean().default(true),
 });
@@ -33,9 +32,12 @@ export type CargoDetailsFormData = z.infer<typeof cargoDetailsSchema> & { id?: s
 
 export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Partial<CargoDetailsFormData>; onSuccess?: () => void }) {
   const { supabase, context } = useCRM();
-  const [serviceTypes, setServiceTypes] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
-  const [cargoTypes, setCargoTypes] = useState<any[]>([]);
+  type ServiceTypeOption = Pick<Database["public"]["Tables"]["service_types"]["Row"], "name" | "description" | "is_active">;
+  type ServiceOption = Pick<Database["public"]["Tables"]["services"]["Row"], "id" | "service_name" | "service_type" | "service_code" | "is_active">;
+  type CargoTypeOption = Pick<Database["public"]["Tables"]["cargo_types"]["Row"], "id" | "name" | "is_active">;
+  const [serviceTypes, setServiceTypes] = useState<ServiceTypeOption[]>([]);
+  const [services, setServices] = useState<ServiceOption[]>([]);
+  const [cargoTypes, setCargoTypes] = useState<CargoTypeOption[]>([]);
 
   const form = useForm<CargoDetailsFormData>({
     resolver: zodResolver(cargoDetailsSchema),
@@ -45,14 +47,12 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
       cargo_type_id: initialData?.cargo_type_id || "",
       commodity_description: initialData?.commodity_description || "",
       hs_code: initialData?.hs_code || "",
-      package_count: (initialData?.package_count as any) ?? 0,
-      total_weight_kg: (initialData?.total_weight_kg as any) ?? undefined,
-      total_volume_cbm: (initialData?.total_volume_cbm as any) ?? undefined,
-      dimensions: initialData?.dimensions || {},
-      hazmat: !!initialData?.hazmat,
+      total_weight_kg: initialData?.total_weight_kg ?? undefined,
+      total_volume_cbm: initialData?.total_volume_cbm ?? undefined,
+      dimensions: (initialData?.dimensions as Json) || {},
+      is_hazardous: !!initialData?.is_hazardous,
       hazmat_class: initialData?.hazmat_class || "",
       temperature_controlled: !!initialData?.temperature_controlled,
-      requires_special_handling: !!initialData?.requires_special_handling,
       notes: initialData?.notes || "",
       is_active: initialData?.is_active ?? true,
     },
@@ -64,11 +64,20 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
     // Load service types (publicly viewable per migration)
     (async () => {
       const { data } = await supabase.from("service_types").select("name, description, is_active");
-      const values = (data || []).filter((t: any) => t.is_active !== false);
+      const values = (data || []).filter((t) => (t as ServiceTypeOption).is_active !== false) as ServiceTypeOption[];
       // Fallback to known values if empty
-      setServiceTypes(values.length > 0 ? values : [
-        { name: "ocean" }, { name: "air" }, { name: "trucking" }, { name: "courier" }, { name: "moving" }, { name: "railway_transport" },
-      ]);
+      setServiceTypes(
+        values.length > 0
+          ? values
+          : [
+              { name: "ocean", description: null, is_active: true },
+              { name: "air", description: null, is_active: true },
+              { name: "trucking", description: null, is_active: true },
+              { name: "courier", description: null, is_active: true },
+              { name: "moving", description: null, is_active: true },
+              { name: "railway_transport", description: null, is_active: true },
+            ]
+      );
     })();
   }, [supabase]);
 
@@ -77,9 +86,12 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
     (async () => {
       const { data, error } = await supabase
         .from("cargo_types")
-        .select("id, cargo_type_name, is_active")
+        .select("id, name, is_active")
         .eq("tenant_id", context.tenantId);
-      if (!error) setCargoTypes((data || []).filter((c: any) => c.is_active));
+      if (!error) {
+        const rows = (data || []) as CargoTypeOption[];
+        setCargoTypes(rows.filter((c) => c.is_active !== false));
+      }
     })();
   }, [supabase, context.tenantId]);
 
@@ -95,33 +107,65 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
         query = query.eq("service_type", selectedType);
       }
       const { data, error } = await query;
-      if (!error) setServices((data || []).filter((s: any) => s.is_active));
+      if (!error) {
+        const rows = (data || []) as ServiceOption[];
+        setServices(rows.filter((s) => s.is_active !== false));
+      }
     })();
   }, [supabase, context.tenantId, selectedType]);
 
   async function handleSubmit(values: CargoDetailsFormData) {
     try {
-      const payload: any = {
-        ...values,
-        tenant_id: context.tenantId!,
-      };
       if (initialData?.id) {
-        const { error } = await supabase.from("cargo_details").update(payload as any).eq("id", initialData.id);
+        const updatePayload: Database["public"]["Tables"]["cargo_details"]["Update"] = {
+          tenant_id: context.tenantId!,
+          service_type: values.service_type,
+          service_id: values.service_id,
+          cargo_type_id: values.cargo_type_id,
+          commodity_description: values.commodity_description,
+          hs_code: values.hs_code,
+          dimensions_cm: values.dimensions as Json,
+          is_hazardous: values.is_hazardous,
+          hazmat_class: values.hazmat_class,
+          temperature_controlled: values.temperature_controlled,
+          notes: values.notes,
+          weight_kg: values.total_weight_kg,
+          volume_cbm: values.total_volume_cbm,
+          is_active: values.is_active,
+        };
+        const { error } = await supabase.from("cargo_details").update(updatePayload).eq("id", initialData.id);
         if (error) throw error;
         toast.success("Cargo details updated");
       } else {
-        const { error } = await supabase.from("cargo_details").insert(payload as any);
+        const insertPayload: Database["public"]["Tables"]["cargo_details"]["Insert"] = {
+          tenant_id: context.tenantId!,
+          service_type: values.service_type,
+          service_id: values.service_id,
+          cargo_type_id: values.cargo_type_id,
+          commodity_description: values.commodity_description,
+          hs_code: values.hs_code,
+          dimensions_cm: values.dimensions as Json,
+          is_hazardous: values.is_hazardous,
+          hazmat_class: values.hazmat_class,
+          temperature_controlled: values.temperature_controlled,
+          notes: values.notes,
+          weight_kg: values.total_weight_kg,
+          volume_cbm: values.total_volume_cbm,
+          is_active: values.is_active,
+        };
+        const { error } = await supabase.from("cargo_details").insert(insertPayload);
         if (error) throw error;
         toast.success("Cargo details created");
         form.reset();
       }
       onSuccess?.();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save cargo details");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error(message || "Failed to save cargo details");
     }
   }
 
-  const serviceOptions = useMemo(() => services, [services]);
+  const serviceOptions = useMemo<ServiceOption[]>(() => services, [services]);
 
   return (
     <Form {...form}>
@@ -140,7 +184,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {serviceTypes.map((t: any) => (
+                    {serviceTypes.map((t) => (
                       <SelectItem key={t.name} value={t.name}>{t.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -163,7 +207,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {serviceOptions.map((svc: any) => (
+                    {serviceOptions.map((svc) => (
                       <SelectItem key={svc.id} value={String(svc.id)}>
                         {svc.service_name} {svc.service_code ? `(${svc.service_code})` : ''}
                       </SelectItem>
@@ -190,8 +234,8 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {cargoTypes.map((ct: any) => (
-                      <SelectItem key={ct.id} value={String(ct.id)}>{ct.cargo_type_name}</SelectItem>
+                    {cargoTypes.map((ct) => (
+                      <SelectItem key={ct.id} value={String(ct.id)}>{ct.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -296,18 +340,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="requires_special_handling"
-            render={({ field }) => (
-              <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                <FormLabel>Special Handling</FormLabel>
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-              </FormItem>
-            )}
-          />
+          
         </div>
 
         {form.watch("hazmat") && (

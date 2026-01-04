@@ -3,7 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from '../_shared/cors.ts';
 import { Logger } from '../_shared/logger.ts';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
 
 Deno.serve(async (req: Request) => {

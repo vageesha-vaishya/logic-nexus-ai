@@ -18,10 +18,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
+import { Quote, QuoteStatus, statusConfig } from './quotes-data';
+
 export default function Quotes() {
   const navigate = useNavigate();
   const { supabase } = useCRM();
-  const [quotes, setQuotes] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
@@ -85,9 +87,10 @@ export default function Quotes() {
       })
     );
 
-        setQuotes(quotesWithRelations);
-      } catch (err: any) {
-        toast.error('Failed to load quotes', { description: err.message });
+        setQuotes(quotesWithRelations as unknown as Quote[]);
+      } catch (err: unknown) {
+        const description = err instanceof Error ? err.message : String(err);
+        toast.error('Failed to load quotes', { description });
       } finally {
         setLoading(false);
       }
@@ -175,21 +178,21 @@ export default function Quotes() {
     );
   });
 
-  const { sorted: sortedQuotes, sortField, sortDirection, onSort } = useSort<any>(
+  const { sorted: sortedQuotes, sortField, sortDirection, onSort } = useSort<Quote>(
     filteredQuotes,
     {
       initialField: 'created_at',
       initialDirection: 'desc',
       accessors: {
-        quote_number: (q: any) => q.quote_number || (q.id ? String(q.id).slice(0, 8) : ''),
-        customer: (q: any) => q.accounts?.name || '',
-        contact: (q: any) => (q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : ''),
-        opportunity: (q: any) => q.opportunities?.name || '',
-        carrier: (q: any) => q.carriers?.carrier_name || '',
-        status: (q: any) => q.status || '',
-        sell_price: (q: any) => Number(q.sell_price ?? 0),
-        margin: (q: any) => (q.sell_price != null && q.cost_price != null ? Number(q.sell_price) - Number(q.cost_price) : 0),
-        created_at: (q: any) => (q.created_at ? new Date(q.created_at).getTime() : 0),
+        quote_number: (q: Quote) => q.quote_number || (q.id ? String(q.id).slice(0, 8) : ''),
+        customer: (q: Quote) => q.accounts?.name || '',
+        contact: (q: Quote) => (q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : ''),
+        opportunity: (q: Quote) => q.opportunities?.name || '',
+        carrier: (q: Quote) => q.carriers?.carrier_name || '',
+        status: (q: Quote) => q.status || '',
+        sell_price: (q: Quote) => Number(q.sell_price ?? 0),
+        margin: (q: Quote) => (q.sell_price != null && q.cost_price != null ? Number(q.sell_price) - Number(q.cost_price) : 0),
+        created_at: (q: Quote) => (q.created_at ? new Date(q.created_at).getTime() : 0),
       },
     }
   );

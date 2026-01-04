@@ -9,13 +9,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRM } from '@/hooks/useCRM';
+import { stageProbabilityMap, OpportunityStage } from '@/pages/dashboard/opportunities-data';
 
 const opportunitySchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
   stage: z.enum(['prospecting', 'qualification', 'needs_analysis', 'value_proposition', 'proposal', 'negotiation', 'closed_won', 'closed_lost']),
   amount: z.string().optional(),
-  probability: z.string().optional(),
+  probability: z.string().optional().refine(val => {
+    if (!val) return true;
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0 && num <= 100;
+  }, "Probability must be between 0 and 100"),
   close_date: z.string().optional(),
   account_id: z.string().optional(),
   contact_id: z.string().optional(),
@@ -172,7 +177,15 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Stage</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select 
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    if (stageProbabilityMap[val as OpportunityStage] !== undefined) {
+                       form.setValue('probability', stageProbabilityMap[val as OpportunityStage].toString());
+                    }
+                  }} 
+                  defaultValue={field.value}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select stage" />

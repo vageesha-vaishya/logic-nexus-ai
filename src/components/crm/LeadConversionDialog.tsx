@@ -8,11 +8,25 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { OpportunityStage, buildOpportunityFromLead } from '@/pages/dashboard/opportunities-data';
 
 interface LeadConversionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  lead: any;
+  lead: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    company?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    title?: string | null;
+    tenant_id?: string | null;
+    franchise_id?: string | null;
+    estimated_value?: number | null;
+    expected_close_date?: string | null;
+    source?: string | null;
+  };
   onConversionComplete: () => void;
 }
 
@@ -104,20 +118,17 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
       // Create Opportunity if requested
       if (createOpportunity) {
+        const oppInsert = buildOpportunityFromLead({
+          lead,
+          name: opportunityName,
+          tenant_id: effectiveTenantId,
+          franchise_id: effectiveFranchiseId,
+          account_id: accountId,
+          contact_id: contactId,
+        });
         const { data: oppData, error: oppError } = await supabase
           .from('opportunities')
-          .insert({
-            name: opportunityName || `${lead.first_name} ${lead.last_name} Opportunity`,
-            account_id: accountId,
-            contact_id: contactId,
-            stage: 'prospecting',
-            amount: lead.estimated_value != null ? Number(lead.estimated_value) : null,
-            close_date: lead.expected_close_date,
-            tenant_id: effectiveTenantId,
-            franchise_id: effectiveFranchiseId,
-            lead_source: lead.source,
-            lead_id: lead.id,
-          })
+          .insert(oppInsert)
           .select()
           .single();
 
@@ -129,7 +140,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
       const { error: leadError } = await supabase
         .from('leads')
         .update({
-          status: 'won',
+          status: 'converted',
           converted_at: new Date().toISOString(),
           converted_account_id: accountId,
           converted_contact_id: contactId,
@@ -146,8 +157,11 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
       if (opportunityId) {
         navigate(`/dashboard/opportunities/${opportunityId}`);
       }
-    } catch (error: any) {
-      const message = error?.message || 'Failed to convert lead';
+    } catch (error: unknown) {
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : 'Failed to convert lead';
       toast.error(message);
       console.error('Convert lead error:', error);
     } finally {

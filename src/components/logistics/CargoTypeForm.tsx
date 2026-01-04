@@ -8,13 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 
 const formSchema = z.object({
-  cargo_type_name: z.string().min(1, "Cargo type name is required"),
-  cargo_code: z.string().optional(),
-  requires_special_handling: z.boolean().default(false),
-  hazmat_class: z.string().optional(),
-  temperature_controlled: z.boolean().default(false),
+  name: z.string().min(1, "Cargo type name is required"),
+  code: z.string().optional(),
+  is_hazardous: z.boolean().default(false),
+  requires_temperature_control: z.boolean().default(false),
   description: z.string().optional(),
   is_active: z.boolean().default(true),
 });
@@ -29,11 +29,10 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      cargo_type_name: "",
-      cargo_code: "",
-      requires_special_handling: false,
-      hazmat_class: "",
-      temperature_controlled: false,
+      name: "",
+      code: "",
+      is_hazardous: false,
+      requires_temperature_control: false,
       description: "",
       is_active: true,
     },
@@ -41,18 +40,25 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const { error } = await supabase.from("cargo_types").insert({
-        ...values,
+      const payload: Database["public"]["Tables"]["cargo_types"]["Insert"] = {
+        name: values.name,
         tenant_id: context.tenantId!,
-      } as any);
+        code: values.code || null,
+        is_hazardous: values.is_hazardous,
+        requires_temperature_control: values.requires_temperature_control,
+        description: values.description || null,
+        is_active: values.is_active,
+      };
+      const { error } = await supabase.from("cargo_types").insert(payload);
 
       if (error) throw error;
 
       toast.success("Cargo type created successfully");
       form.reset();
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create cargo type");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(message || "Failed to create cargo type");
     }
   }
 
@@ -62,7 +68,7 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="cargo_type_name"
+            name="name"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Cargo Type Name</FormLabel>
@@ -76,7 +82,7 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
 
           <FormField
             control={form.control}
-            name="cargo_code"
+            name="code"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Cargo Code</FormLabel>
@@ -88,20 +94,6 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="hazmat_class"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Hazmat Class (if applicable)</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Class 3 - Flammable Liquids" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <FormField
           control={form.control}
@@ -120,11 +112,11 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="requires_special_handling"
+            name="is_hazardous"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3">
                 <div>
-                  <FormLabel>Special Handling</FormLabel>
+                  <FormLabel>Hazardous</FormLabel>
                 </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -135,11 +127,11 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
 
           <FormField
             control={form.control}
-            name="temperature_controlled"
+            name="requires_temperature_control"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3">
                 <div>
-                  <FormLabel>Temperature Controlled</FormLabel>
+                  <FormLabel>Requires Temperature Control</FormLabel>
                 </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />

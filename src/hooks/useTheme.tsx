@@ -174,7 +174,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (darkStored) {
         toggleDark(darkStored === 'true');
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Choose default scope based on current context
@@ -280,7 +282,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (scope === 'franchise') payload.franchise_id = context?.franchiseId;
       if (scope === 'tenant') payload.tenant_id = context?.tenantId;
       await (supabase as any).from('ui_themes').upsert(payload);
-    } catch {}
+    } catch {
+      // ignore
+    }
   };
 
   const deleteTheme = async (name: string) => {
@@ -294,7 +298,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (scope === 'franchise') q = q.eq('franchise_id', context?.franchiseId);
       if (scope === 'tenant') q = q.eq('tenant_id', context?.tenantId);
       await q;
-    } catch {}
+    } catch {
+      // ignore
+    }
   };
 
   const setActive = (name: string) => {
@@ -316,7 +322,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (scope === 'franchise') set = set.eq('franchise_id', context?.franchiseId);
         if (scope === 'tenant') set = set.eq('tenant_id', context?.tenantId);
         await set;
-      } catch {}
+      } catch {
+        // ignore
+      }
     })();
   };
 

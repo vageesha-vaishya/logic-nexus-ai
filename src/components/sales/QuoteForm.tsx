@@ -229,7 +229,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       const mappingRows = Array.isArray(mappingsData) ? mappingsData : [];
       const serviceIds = [...new Set(mappingRows.map((m: any) => m.service_id).filter(Boolean))];
 
-      let servicesById: Record<string, any> = {};
+      const servicesById: Record<string, any> = {};
       if (serviceIds.length > 0) {
         const { data: svcData, error: svcErr } = await supabase
           .from('services')
@@ -298,7 +298,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
 
           // Fetch services scoped to tenant when available; otherwise global active
-          let svcQuery = supabase
+          const svcQuery = supabase
             .from('services')
             .select('id, service_name, service_type, tenant_id, is_active')
             .eq('is_active', true)
@@ -379,7 +379,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     };
 
     fetchLastUsedValues();
-  }, [quoteId, user?.id, context.tenantId, roles, opportunities, accounts, contacts]);
+  }, [quoteId, user?.id, context.tenantId, roles, opportunities, accounts, contacts, form, supabase]);
 
   // Load existing quote for edit mode independent of tenant context
   useEffect(() => {
@@ -405,7 +405,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           if (qTenantId) {
             setResolvedTenantId(String(qTenantId));
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
 
         // CRITICAL: Hydrate dropdown lists BEFORE setting form values
         // This ensures Select components recognize the values as valid options
@@ -497,7 +499,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (accData) {
               accountToAdd = { id: accData.id, name: accData.name || 'Selected Account' };
             }
-          } catch {}
+          } catch {
+            // ignore
+          }
         }
 
         // Fetch contact if not already prepared from opportunity
@@ -574,7 +578,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           if (qServiceTypeText && !selectedServiceType) {
             setSelectedServiceType(canonicalType(qServiceTypeText));
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
         // Defer syncing of selectedServiceType (code) to effect that watches service_type_id
         setQuoteNumberPreview((quote as any).quote_number || '');
         if (debugHydration) {
@@ -584,7 +590,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               service_id: form.getValues('service_id'),
               selectedServiceType,
             });
-          } catch {}
+          } catch {
+            // ignore
+          }
         }
 
         // Load items; tolerate RLS issues by falling back to empty
@@ -637,12 +645,16 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (debugHydration) {
               try {
                 console.debug('[hydrate:rates] quoteId', String(quoteId), 'rows', rows.length, 'mapped', mapped.length);
-              } catch {}
+              } catch {
+                // ignore
+              }
             }
             setCarrierQuotes(mapped);
             setExistingRateIds(rows.map((r: any) => String(r.id)));
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
 
         // Ensure selected lookup values appear in dropdowns even if tenant filters exclude them
         try {
@@ -668,7 +680,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     svcType: String(data.service_type || ''),
                     formServiceId: form.getValues('service_id'),
                   });
-                } catch {}
+                } catch {
+                  // ignore
+                }
               }
               // If edit mode has no selectedServiceType yet, derive from saved service
               try {
@@ -676,14 +690,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 if (svcTypeCode && !selectedServiceType) {
                   setSelectedServiceType(svcTypeCode);
                 }
-              } catch {}
+              } catch {
+                // ignore
+              }
               // Ensure the form's service_id reflects the injected value
               try {
                 const curFormServiceId = form.getValues('service_id');
                 if (String(curFormServiceId) !== String(selServiceId)) {
                   form.setValue('service_id', String(selServiceId), { shouldDirty: false });
                 }
-              } catch {}
+              } catch {
+                // ignore
+              }
             } else {
               // Fallback: if direct fetch is blocked (e.g., RLS), resolve label via Edge Function and inject minimal entry
               try {
@@ -702,7 +720,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       svcType: String((quote as any).service_type || selectedServiceType || ''),
                       formServiceId: form.getValues('service_id'),
                     });
-                  } catch {}
+                  } catch {
+                    // ignore
+                  }
                 }
                 // Ensure the form reflects the saved selection even without full dataset
                 try {
@@ -710,7 +730,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   if (String(curFormServiceId) !== String(selServiceId)) {
                     form.setValue('service_id', String(selServiceId), { shouldDirty: false });
                   }
-                } catch {}
+                } catch {
+                  // ignore
+                }
               } catch (_) {
                 const fallbackLabel = 'Selected Service';
                 setServices((prev) => [{ id: String(selServiceId), service_name: fallbackLabel, service_type: String((quote as any).service_type || selectedServiceType || '') }, ...prev]);
@@ -726,7 +748,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       svcType: String((quote as any).service_type || selectedServiceType || ''),
                       formServiceId: form.getValues('service_id'),
                     });
-                  } catch {}
+                  } catch {
+                    // ignore
+                  }
                 }
                 // Ensure the form reflects the saved selection even without full dataset
                 try {
@@ -734,7 +758,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   if (String(curFormServiceId) !== String(selServiceId)) {
                     form.setValue('service_id', String(selServiceId), { shouldDirty: false });
                   }
-                } catch {}
+                } catch {
+                  // ignore
+                }
               }
             }
           }
@@ -796,7 +822,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   if (String(curFormTypeId) !== String(selServiceTypeId)) {
                     form.setValue('service_type_id', String(selServiceTypeId), { shouldDirty: false });
                   }
-                } catch {}
+                } catch {
+                  // ignore
+                }
                 // Also seed selectedServiceType code if not yet set
                 if (!selectedServiceType && injected.code) {
                   setSelectedServiceType(injected.code);
@@ -808,7 +836,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       code: String(injected.code || ''),
                       formTypeId: form.getValues('service_type_id'),
                     });
-                  } catch {}
+                  } catch {
+                    // ignore
+                  }
                 }
               } else {
                 // Fallback: inject minimal service type from textual service_type on quote if available
@@ -828,7 +858,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   if (String(curFormTypeId) !== String(selServiceTypeId)) {
                     form.setValue('service_type_id', String(selServiceTypeId), { shouldDirty: false });
                   }
-                } catch {}
+                } catch {
+                  // ignore
+                }
                 if (!selectedServiceType && derivedCode) {
                   setSelectedServiceType(derivedCode);
                 }
@@ -839,10 +871,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       code: String(derivedCode || ''),
                       formTypeId: form.getValues('service_type_id'),
                     });
-                  } catch {}
+                  } catch {
+                    // ignore
+                  }
                 }
               }
-            } catch {}
+            } catch {
+              // ignore
+            }
           }
 
           // Note: opportunity, account, contact already fetched above
@@ -873,7 +909,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           setSelectedServiceType(String(defaultServiceType.code));
         }
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceTypes, isEditMode]);
 
@@ -893,14 +931,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (!debugHydration) return;
     try {
       console.debug('[render] selectedServiceType code', selectedServiceType);
-    } catch {}
-  }, [selectedServiceType]);
+    } catch {
+      // ignore
+    }
+  }, [selectedServiceType, debugHydration]);
   useEffect(() => {
     if (!debugHydration) return;
     try {
       console.debug('[render] filteredServices length', filteredServices.length);
-    } catch {}
-  }, [filteredServices]);
+    } catch {
+      // ignore
+    }
+  }, [filteredServices, debugHydration]);
 
   // In edit mode, if selectedServiceType is still empty, derive it from saved service or fetch by type id
   useEffect(() => {
@@ -934,11 +976,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 });
                 setSelectedServiceType(String(stData.code));
               }
-            } catch {}
+            } catch {
+              // ignore
+            }
           })();
         }
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, selectedServiceType, services, serviceTypes]);
 
@@ -1026,7 +1072,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               .eq('is_active', true);
             setPackageCategories(globalCats || []);
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
         try {
           if (!pkgSizesRes.data || pkgSizesRes.data.length === 0) {
             const { data: globalSizes } = await supabase
@@ -1035,7 +1083,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               .eq('is_active', true);
             setPackageSizes(globalSizes || []);
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
 
         // Fetch carriers filtered by selected service type via mapping table
         const currentServiceTypeId = selectedServiceType || form.getValues('service_type_id');
@@ -1185,7 +1235,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
           }
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
 
       // Ensure currently selected CRM IDs appear in dropdowns even if tenant lists exclude them
       try {
@@ -1215,7 +1267,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     resource_id: curAccountId as any,
                     details: { method: 'edge_function', reason: 'rls_blocked' },
                   }]);
-                } catch {}
+                } catch {
+                  // ignore
+                }
               }
             } catch (fnErr) {
               console.warn('Account label resolution failed:', fnErr);
@@ -1269,7 +1323,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     resource_id: curContactId as any,
                     details: { method: 'edge_function', reason: 'rls_blocked' },
                   }]);
-                } catch {}
+                } catch {
+                  // ignore
+                }
               }
             } catch (fnErr) {
               console.warn('Contact label resolution failed:', fnErr);
@@ -1306,7 +1362,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                     resource_id: curOppId as any,
                     details: { method: 'edge_function', reason: 'rls_blocked' },
                   }]);
-                } catch {}
+                } catch {
+                  // ignore
+                }
               }
             } catch (fnErr) {
               console.warn('Opportunity label resolution failed:', fnErr);
@@ -1453,7 +1511,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
     };
     preview();
-  }, [context.tenantId, context.franchiseId]);
+  }, [context.tenantId, context.franchiseId, roles, quoteId, supabase]);
 
   // When account changes, clear contact if it no longer belongs to the selected account
   useEffect(() => {
@@ -1466,7 +1524,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (selected && String(selected.account_id) !== String(accountId)) {
       form.setValue('contact_id', undefined, { shouldDirty: true });
     }
-  }, [accountId, contacts]);
+  }, [accountId, contacts, form]);
 
   // Resolve tenant from selected account or context
   useEffect(() => {
@@ -1483,7 +1541,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (!resolvedTenantId) { setResolvedTenantName(null); return; }
         const { data, error } = await supabase.from('tenants').select('name').eq('id', resolvedTenantId).maybeSingle();
         if (!error) setResolvedTenantName((data as any)?.name ?? null);
-      } catch {}
+      } catch {
+        // ignore
+      }
     })();
   }, [resolvedTenantId, supabase]);
 
@@ -1561,7 +1621,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             // Non-fatal if RLS blocks direct resolution
           }
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
     resolveMissingLabels();
   }, [items, packageCategories, packageSizes, supabase]);
@@ -1841,7 +1903,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         const exists = prev.some((a: any) => String(a.id) === String(normalized.id));
         return exists ? prev : [normalized, ...prev];
       });
-    } catch {}
+    } catch {
+      // ignore
+    }
   };
 
   const handleSelectContact = (contact: any) => {
@@ -1852,7 +1916,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         const exists = prev.some((c: any) => String(c.id) === String(contact.id));
         return exists ? prev : [contact, ...prev];
       });
-    } catch {}
+    } catch {
+      // ignore
+    }
   };
 
   const updateCharge = (
@@ -1907,7 +1973,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           .eq('id', values.account_id)
           .maybeSingle();
         tenantId = acc?.tenant_id || tenantId;
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
     // As an additional fallback, infer from opportunity if provided
     if (!tenantId && values.opportunity_id) {
@@ -1922,7 +1990,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (!values.account_id && (opp as any)?.account_id) {
           form.setValue('account_id', String((opp as any).account_id), { shouldDirty: true });
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
     const franchiseId = context.franchiseId || roles?.[0]?.franchise_id || null;
 
@@ -2010,6 +2080,27 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         quote = created;
       }
 
+      // Update opportunity stage based on quote status when linked
+      try {
+        const oppId = quote?.opportunity_id || values.opportunity_id;
+        const qStatus = String(values.status || '').toLowerCase();
+        if (oppId) {
+          let nextStage: string | null = null;
+          if (qStatus === 'draft' || qStatus === 'sent') nextStage = 'proposal';
+          else if (qStatus === 'accepted') nextStage = 'closed_won';
+          else if (qStatus === 'rejected') nextStage = 'closed_lost';
+          if (nextStage) {
+            const updatePayload: Record<string, unknown> = { stage: nextStage };
+            if (nextStage === 'closed_won') {
+              updatePayload.closed_at = new Date().toISOString();
+            }
+            await supabase.from('opportunities').update(updatePayload).eq('id', oppId);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to update opportunity stage from quote status', e);
+      }
+
       const itemsData = items.map((item) => ({
         quote_id: quote.id,
         line_number: Number(item.line_number) || 1,
@@ -2057,7 +2148,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             }))
           );
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
 
       // Persist carrier rates and charges, then generate quotation version/options
       try {
@@ -2569,14 +2662,18 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                               .eq('id', quoteId)
                               .maybeSingle();
                             finalTenantId = (qRow as any)?.tenant_id ?? null;
-                          } catch {}
+                          } catch {
+                            // ignore
+                          }
                         }
                         // Last fallback: use authenticated user's tenant_id from metadata
                         if (!finalTenantId) {
                           try {
                             const { data: { user } } = await supabase.auth.getUser();
                             finalTenantId = (user as any)?.user_metadata?.tenant_id ?? null;
-                          } catch {}
+                          } catch {
+                            // ignore
+                          }
                         }
                         if (!finalTenantId) {
                           toast.error('Missing tenant context');
@@ -2616,7 +2713,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         if (debugHydration) {
                           try {
                             console.debug('[modal:rates] auto-hydrate on open', { quoteId, rows: (rows || []).length, mapped: mapped.length });
-                          } catch {}
+                          } catch {
+                            // ignore
+                          }
                         }
                         setCarrierQuotes(mapped);
                         setExistingRateIds((rows || []).map((r: any) => String(r.id)));

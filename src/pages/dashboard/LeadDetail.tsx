@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { LeadForm } from '@/components/crm/LeadForm';
+import type { LeadFormData } from '@/components/crm/LeadForm';
+import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
 import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
@@ -15,23 +17,20 @@ import { ArrowLeft, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, B
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Lead, statusConfig } from './leads-data';
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { supabase } = useCRM();
-  const [lead, setLead] = useState<any>(null);
+  const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showConversionDialog, setShowConversionDialog] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
 
-  useEffect(() => {
-    if (id) fetchLead();
-  }, [id]);
-
-  const fetchLead = async () => {
+  const fetchLead = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('leads')
@@ -40,25 +39,36 @@ export default function LeadDetail() {
         .single();
 
       if (error) throw error;
-      setLead(data);
-    } catch (error: any) {
-      toast.error('Failed to load lead');
+      setLead(data as unknown as Lead);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to load lead', { description: message });
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, supabase]);
 
-  const handleUpdate = async (formData: any) => {
+  useEffect(() => {
+    if (id) fetchLead();
+  }, [id, fetchLead]);
+
+  const handleUpdate = async (formData: LeadFormData) => {
     try {
       // Extract extras and merge into custom_fields
-      const { service_id, attachments, custom_fields: existingCustom = {}, ...rest } = formData || {};
-      const attachmentNames = Array.isArray(attachments)
-        ? attachments.map((f: File) => f.name)
-        : [];
-      const mergedCustomFields: Record<string, any> = {
+      const { service_id, attachments, ...rest } = formData || ({} as LeadFormData);
+      const attachmentList = Array.isArray(attachments) ? attachments : [];
+      const attachmentNames = attachmentList
+        .map((f) => {
+          if (f && typeof f === 'object' && 'name' in f) {
+            const name = (f as { name?: unknown }).name;
+            if (typeof name === 'string') return name;
+          }
+          return undefined;
+        })
+        .filter((n): n is string => !!n);
+      const mergedCustomFields: Json = {
         ...(lead?.custom_fields || {}),
-        ...(existingCustom || {}),
         ...(service_id ? { service_id } : {}),
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
       };
@@ -68,7 +78,7 @@ export default function LeadDetail() {
         .update({
           ...rest,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
-          custom_fields: Object.keys(mergedCustomFields).length ? mergedCustomFields : null,
+          custom_fields: Object.keys(mergedCustomFields as Record<string, unknown>).length ? mergedCustomFields : null,
         })
         .eq('id', id);
 
@@ -77,8 +87,9 @@ export default function LeadDetail() {
       toast.success('Lead updated successfully');
       setIsEditing(false);
       fetchLead();
-    } catch (error: any) {
-      toast.error('Failed to update lead');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to update lead', { description: message });
       console.error('Error:', error);
     }
   };
@@ -94,8 +105,9 @@ export default function LeadDetail() {
 
       toast.success('Lead deleted successfully');
       navigate('/dashboard/leads');
-    } catch (error: any) {
-      toast.error('Failed to delete lead');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to delete lead', { description: message });
       console.error('Error:', error);
     }
   };
@@ -203,7 +215,23 @@ export default function LeadDetail() {
             </CardHeader>
             <CardContent>
               <LeadForm
-                initialData={lead}
+                initialData={{
+                  id: lead.id,
+                  first_name: lead.first_name,
+                  last_name: lead.last_name,
+                  company: lead.company ?? '',
+                  title: lead.title ?? '',
+                  email: lead.email ?? '',
+                  phone: lead.phone ?? '',
+                  status: (lead.status === 'converted' ? 'new' : lead.status) as LeadFormData['status'],
+                  source: (['website','referral','email','phone','social','event','other'].includes(lead.source)
+                    ? (lead.source as LeadFormData['source'])
+                    : 'other'),
+                  estimated_value: lead.estimated_value != null ? String(lead.estimated_value) : '',
+                  expected_close_date: lead.expected_close_date ?? '',
+                  description: lead.description ?? '',
+                  notes: lead.notes ?? '',
+                }}
                 onSubmit={handleUpdate}
                 onCancel={() => setIsEditing(false)}
               />
@@ -288,7 +316,7 @@ export default function LeadDetail() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Estimated Value</p>
                       <p className="text-sm font-semibold text-green-600">
-                        ${parseFloat(lead.estimated_value).toLocaleString()}
+                        {lead.estimated_value?.toLocaleString()}
                       </p>
                     </div>
                   </div>

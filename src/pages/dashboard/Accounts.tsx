@@ -45,9 +45,10 @@ export default function Accounts() {
 
       if (error) throw error;
       setAccounts(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load accounts');
-      console.error('Error:', error);
+      console.error('Error:', message);
     } finally {
       setLoading(false);
     }
@@ -58,14 +59,14 @@ export default function Accounts() {
     account.industry?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const { sorted: sortedAccounts, sortField, sortDirection, onSort } = useSort<any>(filteredAccounts, {
+  const { sorted: sortedAccounts, sortField, sortDirection, onSort } = useSort<Account>(filteredAccounts, {
     accessors: {
-      name: (a) => a.name,
-      type: (a) => a.account_type ?? '',
-      status: (a) => a.status ?? '',
-      industry: (a) => a.industry ?? '',
-      phone: (a) => a.phone ?? '',
-      email: (a) => a.email ?? '',
+      name: (a: Account) => a.name,
+      type: (a: Account) => a.account_type ?? '',
+      status: (a: Account) => a.status ?? '',
+      industry: (a: Account) => a.industry ?? '',
+      phone: (a: Account) => a.phone ?? '',
+      email: (a: Account) => a.email ?? '',
     },
   });
 

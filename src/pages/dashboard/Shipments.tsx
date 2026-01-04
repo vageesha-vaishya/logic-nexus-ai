@@ -17,22 +17,7 @@ import { ShipmentStats } from '@/components/logistics/ShipmentStats';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
-
-interface Shipment {
-  id: string;
-  shipment_number: string;
-  shipment_type: string;
-  status: string;
-  origin_address: unknown;
-  destination_address: unknown;
-  pickup_date: string | null;
-  estimated_delivery_date: string | null;
-  total_packages: number | null;
-  priority_level: string;
-  created_at: string;
-  account_id: string | null;
-  accounts?: { name: string } | null;
-}
+import { Shipment, ShipmentStatus, statusConfig, normalizeShipmentType, formatShipmentType } from './shipments-data';
 
 export default function Shipments() {
   const navigate = useNavigate();
@@ -68,44 +53,13 @@ export default function Shipments() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setShipments(data || []);
-    } catch (error: any) {
+      setShipments(data as unknown as Shipment[]);
+    } catch (error: unknown) {
       toast.error('Failed to load shipments');
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const toCanonicalShipmentType = (name: string): string => {
-    const n = String(name || '').trim().toLowerCase();
-    const map: Record<string, string> = {
-      ocean: 'ocean',
-      'ocean_freight': 'ocean',
-      sea: 'ocean',
-      'sea_freight': 'ocean',
-      'sea_cargo': 'ocean',
-      air: 'air',
-      'air_freight': 'air',
-      'air_cargo': 'air',
-      trucking: 'inland_trucking',
-      'inland_trucking': 'inland_trucking',
-      road: 'inland_trucking',
-      'road_transport': 'inland_trucking',
-      ground: 'inland_trucking',
-      courier: 'courier',
-      express: 'courier',
-      'express_delivery': 'courier',
-      parcel: 'courier',
-      moving: 'movers_packers',
-      'movers_packers': 'movers_packers',
-      'packers_and_movers': 'movers_packers',
-      rail: 'rail',
-      railway: 'rail',
-      'railway_transport': 'rail',
-      'rail_transport': 'rail',
-    };
-    return map[n] || String(name);
   };
 
   const filteredShipments = shipments.filter(shipment => {
@@ -119,7 +73,7 @@ export default function Shipments() {
     ].some(v => (v || '').toLowerCase().includes(globalQuery));
 
     const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
-    const matchesType = typeFilter === 'all' || toCanonicalShipmentType(shipment.shipment_type) === toCanonicalShipmentType(typeFilter);
+    const matchesType = typeFilter === 'all' || normalizeShipmentType(shipment.shipment_type) === normalizeShipmentType(typeFilter);
 
     const matchesShipmentNo = matchText(shipment.shipment_number, filterShipmentNo, filterShipmentNoOp);
     const matchesCustomer = matchText(shipment.accounts?.name ?? '', filterCustomer, filterCustomerOp);
@@ -146,7 +100,7 @@ export default function Shipments() {
       matchesPackages && matchesETA;
   });
 
-  const { sorted: sortedShipments, sortField, sortDirection, onSort } = useSort<any>(filteredShipments, {
+  const { sorted: sortedShipments, sortField, sortDirection, onSort } = useSort<Shipment>(filteredShipments, {
     accessors: {
       shipment_number: (s) => s.shipment_number,
       type: (s) => s.shipment_type,
@@ -178,32 +132,8 @@ export default function Shipments() {
   const delivered = shipments.filter(s => s.status === 'delivered').length;
   const pending = shipments.filter(s => ['draft', 'confirmed'].includes(s.status)).length;
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: 'bg-gray-500/10 text-gray-500',
-      confirmed: 'bg-blue-500/10 text-blue-500',
-      in_transit: 'bg-purple-500/10 text-purple-500',
-      customs: 'bg-yellow-500/10 text-yellow-500',
-      out_for_delivery: 'bg-orange-500/10 text-orange-500',
-      delivered: 'bg-green-500/10 text-green-500',
-      cancelled: 'bg-red-500/10 text-red-500',
-      on_hold: 'bg-gray-600/10 text-gray-600',
-      returned: 'bg-red-400/10 text-red-400',
-    };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
-  };
-
-  const formatShipmentType = (type: string) => {
-    const t = toCanonicalShipmentType(type);
-    const labels: Record<string, string> = {
-      ocean: 'Ocean',
-      air: 'Air',
-      inland_trucking: 'Inland Trucking',
-      rail: 'Rail',
-      courier: 'Courier',
-      movers_packers: 'Movers & Packers',
-    };
-    return labels[t] || type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  const getStatusColor = (status: ShipmentStatus) => {
+    return statusConfig[status]?.color || 'bg-gray-500/10 text-gray-500';
   };
 
   return (

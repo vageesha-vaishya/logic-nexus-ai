@@ -12,7 +12,16 @@ import { useToast } from '@/hooks/use-toast';
 export default function Tenants() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [tenants, setTenants] = useState<any[]>([]);
+  interface Tenant {
+    id: string;
+    name: string;
+    slug: string;
+    domain: string | null;
+    subscription_tier: string | null;
+    is_active: boolean;
+    created_at: string;
+  }
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,12 +37,9 @@ export default function Tenants() {
 
       if (error) throw error;
       setTenants(data || []);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }

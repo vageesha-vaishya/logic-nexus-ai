@@ -41,6 +41,7 @@ const leadSchema = z.object({
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
+export type { LeadFormData };
 
 interface LeadFormProps {
   initialData?: Partial<LeadFormData> & { id?: string };

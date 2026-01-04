@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -9,19 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 
 export default function CargoTypes() {
   const { supabase, context } = useCRM();
-  const [cargoTypes, setCargoTypes] = useState<any[]>([]);
+  type CargoTypeRow = Database["public"]["Tables"]["cargo_types"]["Row"];
+  const [cargoTypes, setCargoTypes] = useState<CargoTypeRow[]>([]);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (context.isPlatformAdmin || context.tenantId) {
-      fetchCargoTypes();
-    }
-  }, [context.isPlatformAdmin, context.tenantId]);
-
-  const fetchCargoTypes = async () => {
+  const fetchCargoTypes = useCallback(async () => {
     const isPlatform = context.isPlatformAdmin;
     const tenantId = context.tenantId;
     if (!isPlatform && !tenantId) return;
@@ -32,49 +28,48 @@ export default function CargoTypes() {
     if (!isPlatform) {
       query = query.eq("tenant_id", tenantId as string);
     }
-    const { data, error } = await query.order("cargo_type_name");
+    const { data, error } = await query.order("name");
 
     if (error) {
       console.error("Error fetching cargo types:", error);
       return;
     }
 
-    const rows = data || [];
+    const rows = (data || []) as CargoTypeRow[];
     // Dev-only: auto-seed demo cargo types if none exist (only when tenant scoped)
     if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
       try {
         await supabase.from("cargo_types").insert([
           {
             tenant_id: tenantId,
-            cargo_type_name: "General Cargo",
-            cargo_code: "GEN",
-            requires_special_handling: false,
-            temperature_controlled: false,
+            name: "General Cargo",
+            code: "GEN",
+            is_hazardous: false,
+            requires_temperature_control: false,
             is_active: true,
           },
           {
             tenant_id: tenantId,
-            cargo_type_name: "Perishable Goods",
-            cargo_code: "PER",
-            requires_special_handling: true,
-            temperature_controlled: true,
+            name: "Perishable Goods",
+            code: "PER",
+            is_hazardous: false,
+            requires_temperature_control: true,
             is_active: true,
           },
           {
             tenant_id: tenantId,
-            cargo_type_name: "Hazardous Materials",
-            cargo_code: "HAZ",
-            requires_special_handling: true,
-            temperature_controlled: false,
-            hazmat_class: "Class 3",
+            name: "Hazardous Materials",
+            code: "HAZ",
+            is_hazardous: true,
+            requires_temperature_control: false,
             is_active: true,
           },
           {
             tenant_id: tenantId,
-            cargo_type_name: "Oversized Machinery",
-            cargo_code: "OVS",
-            requires_special_handling: true,
-            temperature_controlled: false,
+            name: "Oversized Machinery",
+            code: "OVS",
+            is_hazardous: false,
+            requires_temperature_control: false,
             is_active: false,
           },
         ]);
@@ -83,16 +78,24 @@ export default function CargoTypes() {
           .from("cargo_types")
           .select("*")
           .eq("tenant_id", tenantId as string)
-          .order("cargo_type_name");
-        setCargoTypes(seeded || []);
-      } catch (seedErr: any) {
-        console.warn("Cargo types seed failed:", seedErr?.message || seedErr);
+          .order("name");
+        setCargoTypes((seeded || []) as CargoTypeRow[]);
+      } catch (seedErr: unknown) {
+        const message = seedErr instanceof Error ? seedErr.message : String(seedErr);
+        console.warn("Cargo types seed failed:", message);
         setCargoTypes([]);
       }
     } else {
       setCargoTypes(rows);
     }
-  };
+  }, [context.isPlatformAdmin, context.tenantId, supabase]);
+
+  useEffect(() => {
+    if (context.isPlatformAdmin || context.tenantId) {
+      fetchCargoTypes();
+    }
+  }, [context.isPlatformAdmin, context.tenantId, fetchCargoTypes]);
+
 
   return (
     <DashboardLayout>
@@ -129,32 +132,30 @@ export default function CargoTypes() {
             <TableRow>
               <TableHead>Cargo Type</TableHead>
               <TableHead>Code</TableHead>
-              <TableHead>Special Handling</TableHead>
+              <TableHead>Hazardous</TableHead>
               <TableHead>Temperature Control</TableHead>
-              <TableHead>Hazmat Class</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {cargoTypes.map((cargo) => (
               <TableRow key={cargo.id}>
-                <TableCell className="font-medium">{cargo.cargo_type_name}</TableCell>
-                <TableCell>{cargo.cargo_code}</TableCell>
+                <TableCell className="font-medium">{cargo.name}</TableCell>
+                <TableCell>{cargo.code || "-"}</TableCell>
                 <TableCell>
-                  {cargo.requires_special_handling ? (
+                  {cargo.is_hazardous ? (
                     <CheckCircle className="h-4 w-4 text-green-600" />
                   ) : (
                     <XCircle className="h-4 w-4 text-muted-foreground" />
                   )}
                 </TableCell>
                 <TableCell>
-                  {cargo.temperature_controlled ? (
+                  {cargo.requires_temperature_control ? (
                     <CheckCircle className="h-4 w-4 text-blue-600" />
                   ) : (
                     <XCircle className="h-4 w-4 text-muted-foreground" />
                   )}
                 </TableCell>
-                <TableCell>{cargo.hazmat_class || "-"}</TableCell>
                 <TableCell>
                   <Badge variant={cargo.is_active ? "default" : "secondary"}>
                     {cargo.is_active ? "Active" : "Inactive"}

@@ -82,8 +82,8 @@ export function CurrencyField<TFieldValues extends FieldValues, TName extends Fi
   placeholder = "0.00",
   disabled,
   className,
+  currencyCode = "USD",
 }: BaseFieldProps<TFieldValues, TName> & { currencyCode?: string }) {
-  const currencyCode = (arguments[0] as any)?.currencyCode ?? "USD";
   return (
     <FormField
       control={control}
@@ -127,8 +127,8 @@ export function ComboboxField<TFieldValues extends FieldValues, TName extends Fi
   placeholder = "Select option",
   disabled,
   className,
+  options,
 }: BaseFieldProps<TFieldValues, TName> & { options: ComboOption[] }) {
-  const options = (arguments[0] as any)?.options as ComboOption[];
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
@@ -206,8 +206,8 @@ export function FileUploadField<TFieldValues extends FieldValues, TName extends 
   placeholder,
   disabled,
   className,
+  multiple = true,
 }: BaseFieldProps<TFieldValues, TName> & { multiple?: boolean }) {
-  const multiple = (arguments[0] as any)?.multiple ?? true;
   return (
     <FormField
       control={control}
@@ -257,6 +257,7 @@ export function AsyncComboboxField<
   placeholder = "Search services...",
   disabled,
   className,
+  loader,
 }: BaseFieldProps<TFieldValues, TName> & { loader?: AsyncComboLoader }) {
   const defaultLoader: AsyncComboLoader = React.useCallback(async (search: string) => {
     let query = supabase
@@ -271,7 +272,7 @@ export function AsyncComboboxField<
     return (data || []).map((r: any) => ({ label: r.name, value: r.id }));
   }, []);
 
-  const loader = (arguments[0] as any)?.loader ?? defaultLoader;
+  const actualLoader = loader ?? defaultLoader;
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [options, setOptions] = React.useState<ComboOption[]>([]);
@@ -282,7 +283,7 @@ export function AsyncComboboxField<
     (async () => {
       setLoading(true);
       try {
-        const opts = await loader(search);
+        const opts = await actualLoader(search);
         if (!cancelled) setOptions(opts);
       } finally {
         if (!cancelled) setLoading(false);
@@ -291,7 +292,7 @@ export function AsyncComboboxField<
     return () => {
       cancelled = true;
     };
-  }, [loader, search]);
+  }, [actualLoader, search]);
 
   // Virtualizer setup
   const parentRef = React.useRef<HTMLDivElement | null>(null);

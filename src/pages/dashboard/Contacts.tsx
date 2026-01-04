@@ -45,9 +45,10 @@ export default function Contacts() {
 
       if (error) throw error;
       setContacts(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load contacts');
-      console.error('Error:', error);
+      console.error('Error:', message);
     } finally {
       setLoading(false);
     }
@@ -58,13 +59,13 @@ export default function Contacts() {
     contact.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const { sorted: sortedContacts, sortField, sortDirection, onSort } = useSort<any>(filteredContacts, {
+  const { sorted: sortedContacts, sortField, sortDirection, onSort } = useSort<Contact>(filteredContacts, {
     accessors: {
-      name: (c) => `${c.first_name} ${c.last_name}`,
-      title: (c) => c.title ?? '',
-      account: (c) => c.accounts?.name ?? '',
-      email: (c) => c.email ?? '',
-      phone: (c) => c.phone ?? '',
+      name: (c: Contact) => `${c.first_name} ${c.last_name}`,
+      title: (c: Contact) => c.title ?? '',
+      account: (c: Contact) => c.accounts?.name ?? '',
+      email: (c: Contact) => c.email ?? '',
+      phone: (c: Contact) => c.phone ?? '',
     },
   });
 

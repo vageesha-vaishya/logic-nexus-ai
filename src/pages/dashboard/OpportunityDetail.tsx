@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,41 +23,26 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { OpportunityItemsEditor } from '@/components/crm/OpportunityItemsEditor';
-
-const stageColors: Record<string, string> = {
-  prospecting: 'bg-slate-500',
-  qualification: 'bg-blue-500',
-  needs_analysis: 'bg-cyan-500',
-  value_proposition: 'bg-indigo-500',
-  proposal: 'bg-purple-500',
-  negotiation: 'bg-orange-500',
-  closed_won: 'bg-green-500',
-  closed_lost: 'bg-red-500',
-};
-
-const stageLabels: Record<string, string> = {
-  prospecting: 'Prospecting',
-  qualification: 'Qualification',
-  needs_analysis: 'Needs Analysis',
-  value_proposition: 'Value Proposition',
-  proposal: 'Proposal',
-  negotiation: 'Negotiation',
-  closed_won: 'Closed Won',
-  closed_lost: 'Closed Lost',
-};
+import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
+import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
+import type { Database } from '@/integrations/supabase/types';
 
 export default function OpportunityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { supabase } = useCRM();
-  const [opportunity, setOpportunity] = useState<any>(null);
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState<OpportunityHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [sfIdInput, setSfIdInput] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [quotes, setQuotes] = useState<any[]>([]);
+  type QuoteRow = Database['public']['Tables']['quotes']['Row'];
+  const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [quotesLoading, setQuotesLoading] = useState(true);
 
   // Advanced quote filters
@@ -69,11 +54,7 @@ export default function OpportunityDetail() {
   const [quoteStartDate, setQuoteStartDate] = useState<string>('');
   const [quoteEndDate, setQuoteEndDate] = useState<string>('');
 
-  useEffect(() => {
-    fetchOpportunity();
-  }, [id]);
-
-  const fetchOpportunity = async () => {
+  const fetchOpportunity = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('opportunities')
@@ -87,20 +68,64 @@ export default function OpportunityDetail() {
         .single();
 
       if (error) throw error;
-      setOpportunity(data);
-      // Cast to any for newly added fields not yet in generated Supabase types
-      setSfIdInput((data as any)?.salesforce_opportunity_id || '');
-    } catch (error: any) {
+      setOpportunity(data as unknown as Opportunity);
+      const extra = data as unknown as { salesforce_opportunity_id?: string | null };
+      setSfIdInput(extra?.salesforce_opportunity_id || '');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load opportunity', {
-        description: error.message,
+        description: message,
       });
       navigate('/dashboard/opportunities');
     } finally {
       setLoading(false);
     }
+  }, [id, supabase, navigate, toast]);
+
+  useEffect(() => {
+    fetchOpportunity();
+  }, [fetchOpportunity]);
+
+  const fetchHistory = async () => {
+    if (!id) return;
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('opportunity_probability_history' as never)
+        .select(`
+          *,
+          changer:changed_by(first_name, last_name, email)
+        `)
+        .eq('opportunity_id', id)
+        .order('changed_at', { ascending: false });
+
+      if (error) throw error;
+      setHistory((data || []) as OpportunityHistory[]);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
-  const handleUpdate = async (formData: any) => {
+  const handleUpdate = async (formData: {
+    name: string;
+    description?: string;
+    stage: OpportunityStage;
+    amount?: string;
+    probability?: string;
+    close_date?: string;
+    account_id?: string;
+    contact_id?: string;
+    lead_id?: string;
+    lead_source?: Database['public']['Enums']['lead_source'];
+    next_step?: string;
+    competitors?: string;
+    type?: string;
+    forecast_category?: string;
+    tenant_id?: string;
+    franchise_id?: string;
+  }) => {
     try {
       const updateData = {
         name: formData.name,
@@ -130,9 +155,10 @@ export default function OpportunityDetail() {
       toast.success('Opportunity updated successfully');
       setIsEditing(false);
       fetchOpportunity();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to update opportunity', {
-        description: error.message,
+        description: message,
       });
     }
   };
@@ -141,15 +167,15 @@ export default function OpportunityDetail() {
     try {
       const { error } = await supabase
         .from('opportunities')
-        // Cast payload to any since generated types may not include new column yet
-        .update({ salesforce_opportunity_id: sfIdInput || null } as any)
+        .update({ salesforce_opportunity_id: sfIdInput || null } as unknown as Database['public']['Tables']['opportunities']['Update'])
         .eq('id', id);
 
       if (error) throw error;
       toast.success('SOS Opportunity ID saved');
       fetchOpportunity();
-    } catch (error: any) {
-      toast.error('Failed to save SOS ID', { description: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to save SOS ID', { description: message });
     }
   };
 
@@ -162,8 +188,9 @@ export default function OpportunityDetail() {
       if (error) throw error;
       toast.success('SOS sync completed');
       fetchOpportunity();
-    } catch (error: any) {
-      toast.error('SOS sync failed', { description: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('SOS sync failed', { description: message });
     } finally {
       setSyncing(false);
     }
@@ -180,9 +207,10 @@ export default function OpportunityDetail() {
 
       toast.success('Opportunity deleted successfully');
       navigate('/dashboard/opportunities');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to delete opportunity', {
-        description: error.message,
+        description: message,
       });
     }
   };
@@ -197,21 +225,22 @@ export default function OpportunityDetail() {
           .eq('opportunity_id', id)
           .order('created_at', { ascending: false });
         if (error) throw error;
-        setQuotes(data || []);
-      } catch (err: any) {
-        console.error('Failed to load related quotes:', err.message);
+        setQuotes((data || []) as QuoteRow[]);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('Failed to load related quotes:', message);
       } finally {
         setQuotesLoading(false);
       }
     };
     fetchQuotes();
-  }, [id]);
+  }, [id, supabase]);
 
   const makePrimary = async (quoteId: string) => {
     try {
       const { error } = await supabase
         .from('quotes')
-        .update({ is_primary: true, opportunity_id: id } as any)
+        .update({ is_primary: true, opportunity_id: id } as unknown as Database['public']['Tables']['quotes']['Update'])
         .eq('id', quoteId);
       if (error) throw error;
       toast.success('Primary quote updated');
@@ -221,9 +250,10 @@ export default function OpportunityDetail() {
         .select('*')
         .eq('opportunity_id', id)
         .order('created_at', { ascending: false });
-      setQuotes(data || []);
-    } catch (err: any) {
-      toast.error('Failed to set primary quote', { description: err.message });
+      setQuotes((data || []) as QuoteRow[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error('Failed to set primary quote', { description: message });
     }
   };
 
@@ -251,7 +281,7 @@ export default function OpportunityDetail() {
     const statusVal = (q.status || '').toLowerCase();
     const matchesStatus = quoteStatus && quoteStatus !== 'any' ? statusVal === quoteStatus : true;
 
-    const totalNum = Number(q.total ?? q.total_amount ?? 0);
+    const totalNum = Number(q.total_amount ?? 0);
     const matchesMin = quoteMinTotal ? totalNum >= Number(quoteMinTotal) : true;
     const matchesMax = quoteMaxTotal ? totalNum <= Number(quoteMaxTotal) : true;
 
@@ -356,11 +386,19 @@ export default function OpportunityDetail() {
           </Card>
           </>
         ) : (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>Opportunity Information</CardTitle>
-              </CardHeader>
+          <Tabs defaultValue="details" onValueChange={(val) => {
+            if (val === 'history') fetchHistory();
+          }}>
+            <TabsList>
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="history">Stage & Probability History</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Opportunity Information</CardTitle>
+                </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -497,22 +535,22 @@ export default function OpportunityDetail() {
                       <div className="text-sm text-muted-foreground">No matching quotes.</div>
                     ) : (
                       <div className="space-y-3">
-                        {filteredQuotesAdvanced.map((q) => (
-                          <div key={q.id} className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
-                              <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total ?? q.total_amount ?? 0)}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {q.is_primary ? (
-                                <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
-                              ) : (
-                                <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
-                              )}
-                              <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
-                            </div>
-                          </div>
-                        ))}
+                    {filteredQuotesAdvanced.map((q) => (
+                      <div key={q.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
+                          <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total_amount ?? 0)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(q as unknown as { is_primary?: boolean }).is_primary ? (
+                            <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
+                          )}
+                          <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
+                        </div>
+                      </div>
+                    ))}
                       </div>
                     )}
                   </div>
@@ -544,7 +582,12 @@ export default function OpportunityDetail() {
                 )}
               </CardContent>
             </Card>
-          </>
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-6">
+              <OpportunityHistoryTab history={history} onRefresh={fetchHistory} />
+            </TabsContent>
+          </Tabs>
         )}
       </div>
 

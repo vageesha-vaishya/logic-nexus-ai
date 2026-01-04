@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,47 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
-
-type ShipmentStatus = 'draft' | 'confirmed' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'customs' | 'cancelled' | 'on_hold' | 'returned';
-
-interface Shipment {
-  id: string;
-  shipment_number: string;
-  status: ShipmentStatus;
-  origin_address: any;
-  destination_address: any;
-  pickup_date: string | null;
-  estimated_delivery_date: string | null;
-  actual_delivery_date: string | null;
-  total_weight_kg: number | null;
-  total_packages: number | null;
-  total_charges: number | null;
-  currency: string | null;
-  current_location: any;
-  priority_level: string | null;
-  created_at: string;
-  pod_received?: boolean;
-  pod_received_at?: string | null;
-}
-
-interface Carrier {
-  id: string;
-  carrier_name: string;
-}
-
-const statusConfig: Record<ShipmentStatus, { label: string; color: string }> = {
-  draft: { label: "Draft", color: "bg-gray-500/10 text-gray-700 dark:text-gray-300" },
-  confirmed: { label: "Confirmed", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300" },
-  in_transit: { label: "In Transit", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300" },
-  out_for_delivery: { label: "Out for Delivery", color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300" },
-  delivered: { label: "Delivered", color: "bg-green-500/10 text-green-700 dark:text-green-300" },
-  customs: { label: "Customs", color: "bg-orange-500/10 text-orange-700 dark:text-orange-300" },
-  cancelled: { label: "Cancelled", color: "bg-red-500/10 text-red-700 dark:text-red-300" },
-  on_hold: { label: "On Hold", color: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
-  returned: { label: "Returned", color: "bg-pink-500/10 text-pink-700 dark:text-pink-300" },
-};
-
-const stages: ShipmentStatus[] = ['draft', 'confirmed', 'in_transit', 'out_for_delivery', 'delivered', 'customs', 'cancelled', 'on_hold', 'returned'];
+import { Carrier, Shipment, ShipmentStatus, statusConfig, stages, Address } from "./shipments-data";
 
 export default function ShipmentsPipeline() {
   const navigate = useNavigate();
@@ -117,9 +77,40 @@ export default function ShipmentsPipeline() {
     })
   );
 
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const { data: shipmentsData, error: shipmentsError } = await supabase
+        .from("shipments")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (shipmentsError) throw shipmentsError;
+      (setShipments as any)(shipmentsData || []);
+
+      const { data: carriersData, error: carriersError } = await supabase
+        .from("carriers")
+        .select("id, carrier_name")
+        .eq("is_active", true);
+
+      if (carriersError) throw carriersError;
+      setCarriers(carriersData || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch shipments",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, toast]);
+
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Initialize selected stages from URL
   useEffect(() => {
@@ -143,38 +134,6 @@ export default function ShipmentsPipeline() {
     }
   }, [selectedStages, setSearchParams]);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch shipments
-      const { data: shipmentsData, error: shipmentsError } = await supabase
-        .from("shipments")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (shipmentsError) throw shipmentsError;
-      setShipments(shipmentsData || []);
-
-      // Fetch carriers
-      const { data: carriersData, error: carriersError } = await supabase
-        .from("carriers")
-        .select("id, carrier_name")
-        .eq("is_active", true);
-
-      if (carriersError) throw carriersError;
-      setCarriers(carriersData || []);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch shipments",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleStatusChange = async (shipmentId: string, newStatus: ShipmentStatus) => {
     try {
@@ -224,7 +183,7 @@ export default function ShipmentsPipeline() {
     handleStatusChange(shipmentId, newStatus);
   };
 
-  const getLocationString = (address: any): string => {
+  const getLocationString = (address: Address | null): string => {
     if (!address) return "—";
     const city = address.city || "";
     const country = address.country || "";
@@ -337,9 +296,9 @@ export default function ShipmentsPipeline() {
     if (selectedShipments.size === 0) return;
     try {
       const now = new Date().toISOString();
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("shipments")
-        .update({ pod_received: true, pod_received_at: now } as any)
+        .update({ pod_received: true, pod_received_at: now })
         .in("id", Array.from(selectedShipments));
       if (error) throw error;
       setShipments(prev => prev.map(s =>
@@ -356,9 +315,9 @@ export default function ShipmentsPipeline() {
   const handleMarkPodReceived = async (shipmentId: string) => {
     try {
       const now = new Date().toISOString();
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("shipments")
-        .update({ pod_received: true, pod_received_at: now } as any)
+        .update({ pod_received: true, pod_received_at: now })
         .eq("id", shipmentId);
       if (error) throw error;
       setShipments(prev => prev.map(s => s.id === shipmentId ? { ...s, pod_received: true, pod_received_at: now } : s));
@@ -390,8 +349,10 @@ export default function ShipmentsPipeline() {
     ])
   ) as Record<ShipmentStatus, number>;
 
+  type SortMode = 'default' | 'created_at' | 'pickup_date' | 'charges';
+
   // Per-stage sorting configuration
-  const [stageSort, setStageSort] = useState<Record<ShipmentStatus, 'default' | 'created_at' | 'pickup_date' | 'charges'>>({
+  const [stageSort, setStageSort] = useState<Record<ShipmentStatus, SortMode>>({
     draft: 'default',
     confirmed: 'default',
     in_transit: 'default',
@@ -542,7 +503,7 @@ export default function ShipmentsPipeline() {
                     <SelectItem value="low">Low</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as 'none' | 'priority' | 'carrier')}>
                   <SelectTrigger>
                     <Layers className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Group By" />
@@ -735,7 +696,7 @@ export default function ShipmentsPipeline() {
                                   >
                                     {laneGroupedShipments[stage].length}
                                   </Badge>
-                                  <Select value={stageSort[stage]} onValueChange={(v) => setStageSort(prev => ({ ...prev, [stage]: v as any }))}>
+                                  <Select value={stageSort[stage]} onValueChange={(v) => setStageSort(prev => ({ ...prev, [stage]: v as SortMode }))}>
                                     <SelectTrigger className="h-7 w-[120px] text-xs">
                                       <SelectValue placeholder="Sort" />
                                     </SelectTrigger>

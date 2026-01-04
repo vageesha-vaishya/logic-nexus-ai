@@ -8,7 +8,8 @@ describe('utils', () => {
     });
 
     it('should handle conditional classes', () => {
-      expect(cn('bg-red-500', false && 'text-white', 'p-4')).toBe('bg-red-500 p-4');
+      const condition = false;
+      expect(cn('bg-red-500', condition && 'text-white', 'p-4')).toBe('bg-red-500 p-4');
     });
 
     it('should resolve tailwind conflicts', () => {

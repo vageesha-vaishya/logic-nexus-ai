@@ -55,11 +55,11 @@ export default function UIDemoForms() {
     }
   };
 
-  const basicInfoSnippet = `// Basic Information section\n<FormGrid>\n  <TextField name=\"companyName\" label=\"Company Name\" />\n  <TextField name=\"email\" label=\"Email\" />\n  <TextField name=\"phone\" label=\"Phone\" />\n  <SelectField name=\"serviceType\" label=\"Service Type\" />\n  <SelectField name=\"shipmentType\" label=\"Shipment Type\" />\n</FormGrid>`;
+  const basicInfoSnippet = `// Basic Information section\n<FormGrid>\n  <TextField name="companyName" label="Company Name" />\n  <TextField name="email" label="Email" />\n  <TextField name="phone" label="Phone" />\n  <SelectField name="serviceType" label="Service Type" />\n  <SelectField name="shipmentType" label="Shipment Type" />\n</FormGrid>`;
 
-  const pricingSnippet = `// Pricing & Options section\n<FormGrid>\n  <NumberField name=\"basePrice\" label=\"Base Price\" />\n  <SelectField name=\"pricingUnit\" label=\"Pricing Unit\" />\n  <SwitchField name=\"isFragile\" label=\"Fragile Handling\" />\n  <CheckboxField name=\"insuranceRequired\" label=\"Insurance Required\" />\n</FormGrid>`;
+  const pricingSnippet = `// Pricing & Options section\n<FormGrid>\n  <NumberField name="basePrice" label="Base Price" />\n  <SelectField name="pricingUnit" label="Pricing Unit" />\n  <SwitchField name="isFragile" label="Fragile Handling" />\n  <CheckboxField name="insuranceRequired" label="Insurance Required" />\n</FormGrid>`;
 
-  const notesSnippet = `// Notes section\n<TextareaField name=\"notes\" label=\"Internal Notes\" />`;
+  const notesSnippet = `// Notes section\n<TextareaField name="notes" label="Internal Notes" />`;
 
   const onSubmit = (values: Schema) => {
     toast.success("Form submitted", { description: JSON.stringify(values, null, 2) });

@@ -183,7 +183,9 @@ export async function upsertRatesAndChargesForQuote(
             rate_reference_id: quoteId,
           })
           .eq('id', rateId);
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
 
     // Replace charges for this rate to avoid duplication
@@ -249,7 +251,9 @@ export async function listCarrierRatesForQuote(
           .eq('rate_reference_id', qn);
         rows = byNumber || rows;
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
   // Fallback 2: if still empty, resolve via quotation versions/options
@@ -276,7 +280,9 @@ export async function listCarrierRatesForQuote(
           rows = byIds || rows;
         }
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
   const out = (rows || []).map((r: any) => ({
@@ -288,7 +294,9 @@ export async function listCarrierRatesForQuote(
   if (import.meta.env.DEV) {
     try {
       console.debug('[hydrate:rates]', { quoteId, rows: (rows || []).length, mapped: out.length });
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
   return out;
 }

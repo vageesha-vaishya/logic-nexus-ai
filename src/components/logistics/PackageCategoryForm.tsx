@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 
 const formSchema = z.object({
   category_name: z.string().min(1, "Category name is required"),
@@ -35,18 +36,23 @@ export function PackageCategoryForm({ onSuccess }: PackageCategoryFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const { error } = await supabase.from("package_categories").insert({
-        ...values,
+      const payload: Database["public"]["Tables"]["package_categories"]["Insert"] = {
+        category_name: values.category_name,
         tenant_id: context.tenantId!,
-      } as any);
+        category_code: values.category_code,
+        description: values.description,
+        is_active: values.is_active,
+      };
+      const { error } = await supabase.from("package_categories").insert(payload);
 
       if (error) throw error;
 
       toast.success("Package category created successfully");
       form.reset();
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create package category");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(message || "Failed to create package category");
     }
   }
 

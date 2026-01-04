@@ -11,9 +11,11 @@ import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { DateField, CurrencyField, ComboboxField, FileUploadField } from '@/components/forms/AdvancedFields';
 
+import { normalizeShipmentType } from '@/pages/dashboard/shipments-data';
+
 const shipmentSchema = z.object({
   shipment_number: z.string().min(1, 'Shipment number is required'),
-  shipment_type: z.enum(['ocean_freight', 'air_freight', 'inland_trucking', 'railway_transport', 'courier', 'movers_packers']),
+  shipment_type: z.enum(['ocean', 'air', 'inland_trucking', 'rail', 'courier', 'movers_packers']),
   status: z.enum(['draft', 'confirmed', 'in_transit', 'customs', 'out_for_delivery', 'delivered', 'cancelled', 'on_hold', 'returned']),
   origin_address: z.string().min(1, 'Origin address is required'),
   destination_address: z.string().min(1, 'Destination address is required'),
@@ -47,23 +49,34 @@ interface ShipmentFormProps {
 
 export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormProps) {
   const { supabase, context } = useCRM();
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   
   const form = useForm<ShipmentFormData>({
     resolver: zodResolver(shipmentSchema),
     defaultValues: {
       shipment_number: initialData?.shipment_number || '',
-      shipment_type: initialData?.shipment_type || 'courier',
+      shipment_type: initialData?.shipment_type ? normalizeShipmentType(initialData.shipment_type) : 'courier',
       status: initialData?.status || 'draft',
       origin_address: initialData?.origin_address || '',
       destination_address: initialData?.destination_address || '',
-      pickup_date: initialData?.pickup_date ? new Date(initialData.pickup_date as any) : undefined,
-      estimated_delivery_date: initialData?.estimated_delivery_date ? new Date(initialData.estimated_delivery_date as any) : undefined,
+      pickup_date:
+        typeof initialData?.pickup_date === 'string'
+          ? new Date(initialData.pickup_date)
+          : (initialData?.pickup_date as Date | undefined),
+      estimated_delivery_date:
+        typeof initialData?.estimated_delivery_date === 'string'
+          ? new Date(initialData.estimated_delivery_date)
+          : (initialData?.estimated_delivery_date as Date | undefined),
       total_weight_kg: initialData?.total_weight_kg || '',
       total_volume_cbm: initialData?.total_volume_cbm || '',
       total_packages: initialData?.total_packages || '',
       container_number: initialData?.container_number || '',
-      declared_value: initialData?.declared_value ? Number(initialData.declared_value as any) : undefined,
+      declared_value:
+        typeof initialData?.declared_value === 'number'
+          ? initialData.declared_value
+          : (typeof initialData?.declared_value === 'string'
+              ? Number(initialData.declared_value)
+              : undefined),
       service_level: initialData?.service_level || '',
       priority_level: initialData?.priority_level || 'normal',
       special_instructions: initialData?.special_instructions || '',
@@ -78,13 +91,11 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
   });
 
   useEffect(() => {
-    fetchAccounts();
-  }, []);
-
-  const fetchAccounts = async () => {
-    const { data } = await supabase.from('accounts').select('id, name').order('name');
-    if (data) setAccounts(data);
-  };
+    (async () => {
+      const { data } = await supabase.from('accounts').select('id, name').order('name');
+      if (data) setAccounts(data as { id: string; name: string }[]);
+    })();
+  }, [supabase]);
 
   const { isSubmitting } = form.formState;
 
@@ -119,10 +130,10 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="ocean_freight">Ocean Freight</SelectItem>
-                    <SelectItem value="air_freight">Air Freight</SelectItem>
+                    <SelectItem value="ocean">Ocean Freight</SelectItem>
+                    <SelectItem value="air">Air Freight</SelectItem>
                     <SelectItem value="inland_trucking">Inland Trucking</SelectItem>
-                    <SelectItem value="railway_transport">Railway Transport</SelectItem>
+                    <SelectItem value="rail">Railway Transport</SelectItem>
                     <SelectItem value="courier">Courier</SelectItem>
                     <SelectItem value="movers_packers">Movers & Packers</SelectItem>
                   </SelectContent>

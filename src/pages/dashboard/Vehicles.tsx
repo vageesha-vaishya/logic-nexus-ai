@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Truck } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -36,11 +36,7 @@ export default function Vehicles() {
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase } = useCRM();
 
-  useEffect(() => {
-    fetchVehicles();
-  }, []);
-
-  const fetchVehicles = async () => {
+  const fetchVehicles = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('vehicles')
@@ -49,13 +45,18 @@ export default function Vehicles() {
 
       if (error) throw error;
       setVehicles(data || []);
-    } catch (error: any) {
-      toast.error('Failed to load vehicles');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to load vehicles', { description: message });
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchVehicles();
+  }, [fetchVehicles]);
 
   const filteredVehicles = vehicles.filter(vehicle =>
     vehicle.vehicle_number.toLowerCase().includes(searchQuery.toLowerCase()) ||

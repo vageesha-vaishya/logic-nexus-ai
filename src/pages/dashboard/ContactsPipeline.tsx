@@ -168,7 +168,7 @@ export default function ContactsPipeline() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Search contacts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
-                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as 'none' | 'account')}>
                   <SelectTrigger className="w-full md:w-[200px]">
                     <Layers className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Group By" />

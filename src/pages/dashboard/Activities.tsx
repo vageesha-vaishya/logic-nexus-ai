@@ -57,7 +57,7 @@ export default function Activities() {
   const [subjectOp, setSubjectOp] = useState<TextOp>('contains');
   const [descriptionQuery, setDescriptionQuery] = useState('');
   const [descriptionOp, setDescriptionOp] = useState<TextOp>('contains');
-  const [statusAdv, setStatusAdv] = useState<'any' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending'>('any');
+  const [statusAdv, setStatusAdv] = useState<'any' | 'planned' | 'in_progress' | 'completed' | 'cancelled'>('any');
   const [priorityAdv, setPriorityAdv] = useState<'any' | 'low' | 'medium' | 'high' | 'urgent'>('any');
   const [dueStart, setDueStart] = useState<string>('');
   const [dueEnd, setDueEnd] = useState<string>('');
@@ -97,9 +97,9 @@ export default function Activities() {
       // Fetch lead names referenced by activities for grouping headers
       const leadIds = Array.from(
         new Set(
-          (data || [])
-            .map((a: any) => a.lead_id)
-            .filter((id: any): id is string => !!id)
+          ((data || []) as Array<{ lead_id: string | null }>)
+            .map((a) => a.lead_id)
+            .filter((id): id is string => !!id)
         )
       );
       if (leadIds.length > 0) {
@@ -118,8 +118,9 @@ export default function Activities() {
       } else {
         setLeadNamesById({});
       }
-    } catch (error: any) {
-      toast.error('Failed to load activities');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to load activities', { description: message });
       console.error('Error:', error);
     } finally {
       setLoading(false);
@@ -140,8 +141,9 @@ export default function Activities() {
 
       toast.success('Activity marked as completed');
       fetchActivities();
-    } catch (error: any) {
-      toast.error('Failed to update activity');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to update activity', { description: message });
       console.error('Error:', error);
     }
   };
@@ -160,9 +162,10 @@ export default function Activities() {
       // Optimistically update local list
       setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, assigned_to } : a)));
       toast.success('Assignment updated');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(err);
-      toast.error(err?.message || 'Failed to update assignment');
+      toast.error(message || 'Failed to update assignment');
     }
   };
 
@@ -308,7 +311,8 @@ export default function Activities() {
   const counts = getTabCounts();
 
   const getActivityIcon = (type: string) => {
-    const icons: Record<string, any> = {
+    type IconComponent = typeof Phone;
+    const icons: Record<string, IconComponent> = {
       call: Phone,
       email: Mail,
       meeting: Calendar,
@@ -403,7 +407,7 @@ export default function Activities() {
             <div className="flex items-center gap-3">
               <div className="w-40">
                 <div className="text-xs text-muted-foreground mb-1">Type</div>
-                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as 'any' | 'email' | 'call' | 'task' | 'meeting' | 'note')}>
                   <SelectTrigger>
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
@@ -419,7 +423,7 @@ export default function Activities() {
               </div>
               <div className="w-56">
                 <div className="text-xs text-muted-foreground mb-1">Owner</div>
-                <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as any)}>
+                <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as 'any' | 'unassigned' | 'me' | string)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Owner" />
                   </SelectTrigger>
@@ -532,7 +536,7 @@ export default function Activities() {
 
         <div className="w-[180px]">
           <div className="text-xs text-muted-foreground mb-1">Status</div>
-          <Select value={statusAdv} onValueChange={(v) => setStatusAdv(v as any)}>
+          <Select value={statusAdv} onValueChange={(v) => setStatusAdv(v as 'any' | 'planned' | 'in_progress' | 'completed' | 'cancelled')}>
             <SelectTrigger>
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -548,7 +552,7 @@ export default function Activities() {
 
         <div className="w-[180px]">
           <div className="text-xs text-muted-foreground mb-1">Priority</div>
-          <Select value={priorityAdv} onValueChange={(v) => setPriorityAdv(v as any)}>
+          <Select value={priorityAdv} onValueChange={(v) => setPriorityAdv(v as 'any' | 'low' | 'medium' | 'high' | 'urgent')}>
             <SelectTrigger>
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
@@ -839,7 +843,7 @@ export default function Activities() {
                               </Badge>
                               <div onClick={(e) => e.stopPropagation()}>
                                 <Select
-                                  onValueChange={(v) => assignActivityOwner(activity.id, v as any)}
+                                  onValueChange={(v) => assignActivityOwner(activity.id, v as string | 'none')}
                                   defaultValue={activity.assigned_to ?? 'none'}
                                 >
                                   <SelectTrigger className="w-[200px]">

@@ -85,7 +85,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
           setEditorHtml(editorRef.current.innerHTML);
         }
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [selectedAccount, accounts]);
 
   const fetchAccounts = async () => {
@@ -146,7 +148,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
           try {
             const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
             description = parsed?.error || parsed?.message || description;
-          } catch {}
+          } catch {
+            // ignore
+          }
         }
         throw new Error(description);
       }
@@ -180,7 +184,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
   const exec = (cmd: string, val?: string) => {
     try {
       document.execCommand(cmd, false, val);
-    } catch {}
+    } catch {
+      // ignore
+    }
   };
 
   const applyLink = () => {

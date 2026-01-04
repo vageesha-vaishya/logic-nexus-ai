@@ -377,25 +377,33 @@ export default function SecurityOverview() {
       if (savedTable) setSelectedTableForSearch(savedTable);
       const savedShow = localStorage.getItem('schema_show_filters');
       if (savedShow) setShowFilters(savedShow === 'true');
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem('schema_table_filters', JSON.stringify(tableFilters));
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [tableFilters]);
 
   useEffect(() => {
     try {
       localStorage.setItem('schema_selected_table', selectedTableForSearch || '');
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [selectedTableForSearch]);
 
   useEffect(() => {
     try {
       localStorage.setItem('schema_show_filters', showFilters ? 'true' : 'false');
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [showFilters]);
  
    const runDataSearch = async (pageOverride?: number) => {

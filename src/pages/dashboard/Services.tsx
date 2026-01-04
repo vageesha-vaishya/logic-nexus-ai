@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,42 +71,38 @@ export default function Services() {
   const isAdmin = isTenantAdmin || isPlatform;
   const tenantId = context.tenantId || null;
 
-  useEffect(() => {
-    fetchTypes();
-    fetchServices();
-    if (isPlatform) fetchTenants();
-  }, [tenantId, isPlatform]);
-
-  const fetchTypes = async () => {
+  const fetchTypes = useCallback(async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('service_types')
         .select('name, is_active')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;
-      setTypes((data || []) as any);
-    } catch (err: any) {
-      console.error('Failed to fetch service types:', err?.message || err);
+      setTypes((data || []) as { name: string; is_active: boolean }[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch service types:', message);
     }
-  };
+  }, [supabase]);
 
-  const fetchTenants = async () => {
+  const fetchTenants = useCallback(async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('tenants')
         .select('id, name')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;
-      setTenants((data || []) as any);
-    } catch (err: any) {
-      console.error('Failed to fetch tenants:', err?.message || err);
-      toast.error('Failed to fetch tenants', { description: err?.message });
+      setTenants((data || []) as { id: string; name: string }[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch tenants:', message);
+      toast.error('Failed to fetch tenants', { description: message });
     }
-  };
+  }, [supabase, toast]);
 
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     try {
       // Platform admins can view all services across tenants; others are tenant-scoped
       let query = supabase
@@ -121,12 +117,19 @@ export default function Services() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setServices((data || []) as any);
-    } catch (err: any) {
-      console.error('Failed to fetch services:', err?.message || err);
-      toast.error('Failed to fetch services', { description: err?.message });
+      setServices((data || []) as ServiceRow[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch services:', message);
+      toast.error('Failed to fetch services', { description: message });
     }
-  };
+  }, [supabase, isPlatform, tenantId, toast]);
+
+  useEffect(() => {
+    fetchTypes();
+    fetchServices();
+    if (isPlatform) fetchTenants();
+  }, [tenantId, isPlatform, fetchTypes, fetchServices, fetchTenants]);
 
   const resetForm = () => {
     setServiceName('');
@@ -173,7 +176,17 @@ export default function Services() {
         toast.error('No active service types available', { description: 'Activate at least one type under Service Types.' });
         return;
       }
-      const payload: any = {
+      const payload: {
+        tenant_id: string;
+        service_name: string;
+        service_type: string;
+        service_code: string | null;
+        description: string | null;
+        pricing_unit: string | null;
+        base_price: number | null;
+        transit_time_days: number | null;
+        is_active: boolean;
+      } = {
         tenant_id: targetTenantId,
         service_name: serviceName.trim(),
         service_type: chosenType,
@@ -184,14 +197,15 @@ export default function Services() {
         transit_time_days: transitDays === '' ? null : Number(transitDays),
         is_active: isActive,
       };
-      const { error } = await supabase.from('services').insert([payload]);
+      const { error } = await supabase.from('services').insert(payload);
       if (error) throw error;
       toast.success('Service created');
       setOpen(false);
       resetForm();
       fetchServices();
-    } catch (err: any) {
-      toast.error('Failed to create service', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to create service', { description: message });
     }
   };
 
@@ -207,8 +221,9 @@ export default function Services() {
         .eq('id', row.id);
       if (error) throw error;
       fetchServices();
-    } catch (err: any) {
-      toast.error('Failed to update service', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to update service', { description: message });
     }
   };
 
@@ -225,8 +240,9 @@ export default function Services() {
       if (error) throw error;
       toast.success('Service deleted');
       fetchServices();
-    } catch (err: any) {
-      toast.error('Failed to delete service', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to delete service', { description: message });
     }
   };
 
@@ -248,7 +264,16 @@ export default function Services() {
   const doSaveWithMigrationIfNeeded = async () => {
     try {
       if (!isAdmin || !editingRow) return;
-      const payload: any = {
+      const payload: {
+        service_name: string;
+        service_code: string | null;
+        description: string | null;
+        pricing_unit: string | null;
+        base_price: number | null;
+        transit_time_days: number | null;
+        is_active: boolean;
+        tenant_id?: string;
+      } = {
         service_name: editServiceName.trim(),
         service_code: editServiceCode || null,
         description: editDescription || null,
@@ -260,7 +285,7 @@ export default function Services() {
       if (isPlatform && editTenantId) {
         // If tenant changed and migration toggled, update mappings first
         if (editTenantId !== editingRow.tenant_id && editMigrateMappings && mappingsCount > 0) {
-          const { error: migError } = await (supabase as any)
+          const { error: migError } = await supabase
             .from('service_type_mappings')
             .update({ tenant_id: editTenantId })
             .eq('service_id', editingRow.id)
@@ -279,8 +304,9 @@ export default function Services() {
       setConfirmOpen(false);
       resetEditForm();
       fetchServices();
-    } catch (err: any) {
-      toast.error('Failed to update service', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to update service', { description: message });
     } finally {
       setConfirmBusy(false);
     }
@@ -304,7 +330,7 @@ export default function Services() {
 
       // If platform admin is changing tenant, check mappings and ask confirmation
       if (isPlatform && editTenantId && editTenantId !== editingRow.tenant_id) {
-        const { count, error: countError } = await (supabase as any)
+        const { count, error: countError } = await supabase
           .from('service_type_mappings')
           .select('id', { count: 'exact', head: true })
           .eq('service_id', editingRow.id)
@@ -322,8 +348,9 @@ export default function Services() {
         }
       }
       await doSaveWithMigrationIfNeeded();
-    } catch (err: any) {
-      toast.error('Failed to update service', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to update service', { description: message });
     }
   };
 
@@ -388,7 +415,7 @@ export default function Services() {
       return matchesSearch && matchesStatus && matchesType && matchesTenant;
     });
     const cmp = (a: ServiceRow, b: ServiceRow) => {
-      let av: any; let bv: any;
+      let av: string | number; let bv: string | number;
       if (sortKey === 'name') { av = a.service_name.toLowerCase(); bv = b.service_name.toLowerCase(); }
       else if (sortKey === 'type') { av = String(a.service_type).toLowerCase(); bv = String(b.service_type).toLowerCase(); }
       else if (sortKey === 'tenant') { av = String(tenantNameById[a.tenant_id] || a.tenant_id).toLowerCase(); bv = String(tenantNameById[b.tenant_id] || b.tenant_id).toLowerCase(); }
@@ -515,7 +542,7 @@ export default function Services() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all'|'active'|'inactive')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -549,7 +576,7 @@ export default function Services() {
                   </SelectContent>
                 </Select>
               )}
-              <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as 'name'|'type'|'tenant'|'price'|'time'|'status')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -562,7 +589,7 @@ export default function Services() {
                   <SelectItem value="status">Status</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+              <Select value={sortDir} onValueChange={(v) => setSortDir(v as 'asc'|'desc')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Order" />
                 </SelectTrigger>

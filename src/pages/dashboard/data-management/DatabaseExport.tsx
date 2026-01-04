@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +55,9 @@ export default function DatabaseExport() {
   const clearPendingDownloads = () => {
     try {
       pendingDownloads.forEach((d) => URL.revokeObjectURL(d.url));
-    } catch {}
+    } catch {
+      // ignore
+    }
     setPendingDownloads([]);
   };
   useEffect(() => {
@@ -210,17 +211,19 @@ export default function DatabaseExport() {
                 const dot = name.lastIndexOf('.');
                 const base = dot > -1 ? name.slice(0, dot) : name;
                 const ext = dot > -1 ? name.slice(dot) : '';
-                let i = 1;
+                const i = 1;
                 name = `${base} (${i})${ext}`;
               }
             } else {
               const dot = name.lastIndexOf('.');
               const base = dot > -1 ? name.slice(0, dot) : name;
               const ext = dot > -1 ? name.slice(dot) : '';
-              let i = 1;
+              const i = 1;
               name = `${base} (${i})${ext}`;
             }
-          } catch {}
+          } catch {
+            // ignore
+          }
           const fileHandle = await dirHandle.getFileHandle(name, { create: true });
           const writable = await fileHandle.createWritable();
           await writable.write(f.content);

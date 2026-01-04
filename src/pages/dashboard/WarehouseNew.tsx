@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { WarehouseForm } from '@/components/logistics/WarehouseForm';
+import type { WarehouseFormData } from '@/components/logistics/WarehouseForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
@@ -11,7 +12,7 @@ export default function WarehouseNew() {
   const navigate = useNavigate();
   const { supabase, context } = useCRM();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: WarehouseFormData) => {
     try {
       const warehouseData = {
         ...data,
@@ -21,15 +22,16 @@ export default function WarehouseNew() {
         capacity_sqft: data.capacity_sqft ? parseFloat(data.capacity_sqft) : null,
       };
 
-      const { error } = await supabase.from('warehouses').insert([warehouseData]);
+      const { error } = await supabase.from('warehouses').insert(warehouseData);
 
       if (error) throw error;
 
       toast.success('Warehouse created successfully');
       navigate('/dashboard/warehouses');
-    } catch (error: any) {
-      toast.error('Failed to create warehouse: ' + error.message);
-      console.error('Error:', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to create warehouse: ' + message);
+      console.error('Error:', message);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,25 +9,29 @@ import { TrackingTimeline } from '@/components/logistics/TrackingTimeline';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
 
 export default function ShipmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [shipment, setShipment] = useState<any>(null);
+  const [shipment, setShipment] = useState<Shipment | null>(null);
   const [loading, setLoading] = useState(true);
-  const [attachments, setAttachments] = useState<any[]>([]);
+  type ShipmentAttachment = {
+    path: string;
+    name: string;
+    size?: number;
+    uploaded_at?: string;
+    public_url?: string | null;
+    resolved_url?: string | null;
+    content_type?: string | null;
+    document_type?: string | null;
+  };
+  const [attachments, setAttachments] = useState<ShipmentAttachment[]>([]);
   const [podUploading, setPodUploading] = useState(false);
   const { supabase, context } = useCRM();
   const [podFile, setPodFile] = useState<File | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchShipment();
-      fetchAttachments();
-    }
-  }, [id]);
-
-  const fetchShipment = async () => {
+  const fetchShipment = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('shipments')
@@ -36,34 +40,41 @@ export default function ShipmentDetail() {
         .single();
 
       if (error) throw error;
-      setShipment(data);
-    } catch (error: any) {
+      setShipment(data as Shipment);
+    } catch (error: unknown) {
       toast.error('Failed to load shipment');
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, id, toast]);
 
-  const fetchAttachments = async () => {
+  const fetchAttachments = useCallback(async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('shipment_attachments')
         .select('*')
         .eq('shipment_id', id)
         .order('uploaded_at', { ascending: false });
       if (error) throw error;
-      const rows = data || [];
-      const withUrls = rows.map((att: any) => {
-        const urlRes = (supabase as any).storage.from('shipments').getPublicUrl(att.path);
+      const rows = (data || []) as ShipmentAttachment[];
+      const withUrls = rows.map((att) => {
+        const urlRes = supabase.storage.from('shipments').getPublicUrl(att.path);
         const resolved = att.public_url || urlRes?.data?.publicUrl || null;
         return { ...att, resolved_url: resolved };
       });
       setAttachments(withUrls);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.warn('Failed to load attachments', error);
     }
-  };
+  }, [supabase, id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchShipment();
+      fetchAttachments();
+    }
+  }, [id, fetchShipment, fetchAttachments]);
 
   const handleUploadPOD = async () => {
     try {
@@ -74,17 +85,17 @@ export default function ShipmentDetail() {
       setPodUploading(true);
       const safeName = podFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `${id}/pod_${Date.now()}_${safeName}`;
-      const { error: uploadError } = await (supabase as any).storage
+      const { error: uploadError } = await supabase.storage
         .from('shipments')
         .upload(path, podFile, { contentType: podFile.type || 'application/octet-stream', upsert: false });
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = (supabase as any).storage
+      const { data: urlData } = supabase.storage
         .from('shipments')
         .getPublicUrl(path);
       const publicUrl = urlData?.publicUrl ?? null;
 
-      const { error: metaErr } = await (supabase as any)
+      const { error: metaErr } = await supabase
         .from('shipment_attachments')
         .insert([{
           shipment_id: id,
@@ -100,7 +111,7 @@ export default function ShipmentDetail() {
         }]);
       if (metaErr) throw metaErr;
 
-      const { error: updErr } = await (supabase as any)
+      const { error: updErr } = await supabase
         .from('shipments')
         .update({ pod_received: true, pod_received_at: new Date().toISOString() })
         .eq('id', id);
@@ -109,27 +120,20 @@ export default function ShipmentDetail() {
       toast.success('POD uploaded and marked as received');
       setPodFile(null);
       await Promise.all([fetchAttachments(), fetchShipment()]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('POD upload failed:', error);
-      toast.error('Failed to upload POD: ' + (error?.message || 'Unknown error'));
+      const msg =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : 'Unknown error';
+      toast.error('Failed to upload POD: ' + msg);
     } finally {
       setPodUploading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: 'bg-gray-500/10 text-gray-500',
-      confirmed: 'bg-blue-500/10 text-blue-500',
-      in_transit: 'bg-purple-500/10 text-purple-500',
-      customs: 'bg-yellow-500/10 text-yellow-500',
-      out_for_delivery: 'bg-orange-500/10 text-orange-500',
-      delivered: 'bg-green-500/10 text-green-500',
-      cancelled: 'bg-red-500/10 text-red-500',
-      on_hold: 'bg-gray-600/10 text-gray-600',
-      returned: 'bg-red-400/10 text-red-400',
-    };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
+  const getStatusColor = (status: ShipmentStatus) => {
+    return statusConfig[status]?.color || 'bg-gray-500/10 text-gray-500';
   };
 
   if (loading) {
@@ -163,7 +167,7 @@ export default function ShipmentDetail() {
             <div>
               <h1 className="text-3xl font-bold">{shipment.shipment_number}</h1>
               <p className="text-muted-foreground">
-                {shipment.shipment_type.replace('_', ' ')}
+                {formatShipmentType(shipment.shipment_type)}
               </p>
             </div>
             <Badge className={getStatusColor(shipment.status)}>

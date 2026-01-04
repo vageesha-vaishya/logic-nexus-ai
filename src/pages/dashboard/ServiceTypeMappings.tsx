@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Pencil } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 
 type MappingRow = {
   id: string;
@@ -19,7 +20,7 @@ type MappingRow = {
   service_id: string;
   is_default: boolean;
   priority: number;
-  conditions: Record<string, any> | null;
+  conditions: Json | null;
   is_active: boolean;
 };
 
@@ -28,7 +29,14 @@ const FALLBACK_SERVICE_TYPES = ['ocean', 'air', 'trucking', 'courier', 'moving',
 export default function ServiceTypeMappings() {
   const { supabase, context } = useCRM();
   const [mappings, setMappings] = useState<MappingRow[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  type ServiceRow = {
+    id: string;
+    service_name: string;
+    service_type: string;
+    tenant_id: string;
+    is_active: boolean;
+  };
+  const [services, setServices] = useState<ServiceRow[]>([]);
   const [typeOptions, setTypeOptions] = useState<{ name: string; is_active: boolean }[]>([]);
   const [open, setOpen] = useState(false);
   const [tenants, setTenants] = useState<{ id: string; name?: string }[]>([]);
@@ -132,10 +140,11 @@ export default function ServiceTypeMappings() {
       }
       const { data, error } = await query.order('service_name');
       if (error) throw error;
-      setServices(data || []);
-    } catch (err: any) {
-      console.error('Failed to fetch services:', err?.message || err);
-      toast.error('Failed to fetch services', { description: err?.message });
+      setServices((data || []) as ServiceRow[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch services:', message);
+      toast.error('Failed to fetch services', { description: message });
     }
   };
 
@@ -149,51 +158,54 @@ export default function ServiceTypeMappings() {
 
   const fetchMappings = async () => {
     try {
-      let query = (supabase as any)
+      let query = supabase
         .from('service_type_mappings')
         .select('*');
       if (!isPlatform) query = query.eq('tenant_id', tenantId as string);
       const { data, error } = await query.order('service_type').order('priority', { ascending: false });
       if (error) throw error;
-      const rows = Array.isArray(data) ? (data as any) : [];
-      setMappings(rows as unknown as MappingRow[]);
-    } catch (err: any) {
-      console.error('Failed to fetch mappings:', err?.message || err);
-      toast.error('Failed to fetch mappings', { description: err?.message });
+      const rows = Array.isArray(data) ? (data as MappingRow[]) : [];
+      setMappings(rows);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch mappings:', message);
+      toast.error('Failed to fetch mappings', { description: message });
     }
   };
 
   const fetchTypes = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('service_types')
         .select('name, is_active')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;
-      setTypeOptions((data || []) as any);
-    } catch (err: any) {
-      console.error('Failed to fetch service types:', err?.message || err);
+      setTypeOptions((data || []) as { name: string; is_active: boolean }[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch service types:', message);
     }
   };
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('tenants')
         .select('id, name')
         .order('name');
       if (error) throw error;
-      setTenants((data || []) as any);
-    } catch (err: any) {
-      console.error('Failed to fetch tenants:', err?.message || err);
-      toast.error('Failed to fetch tenants', { description: err?.message });
+      setTenants((data || []) as { id: string; name?: string }[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch tenants:', message);
+      toast.error('Failed to fetch tenants', { description: message });
     }
   };
 
   const serviceById = useMemo(() => {
-    const map: Record<string, any> = {};
-    services.forEach((s: any) => { map[String(s.id)] = s; });
+    const map: Record<string, ServiceRow> = {};
+    services.forEach((s) => { map[String(s.id)] = s; });
     return map;
   }, [services]);
   const tenantNameById = useMemo(() => {
@@ -215,8 +227,8 @@ export default function ServiceTypeMappings() {
       const matchesTenant = !isPlatform ? true : (listTenantFilter === 'all' ? true : m.tenant_id === listTenantFilter);
       return matchesSearch && matchesStatus && matchesType && matchesTenant;
     });
-    const cmp = (a: any, b: any) => {
-      let av: any; let bv: any;
+    const cmp = (a: MappingRow, b: MappingRow) => {
+      let av: string | number; let bv: string | number;
       if (sortKey === 'priority') { av = a.priority; bv = b.priority; }
       else if (sortKey === 'type') { av = String(a.service_type).toLowerCase(); bv = String(b.service_type).toLowerCase(); }
       else if (sortKey === 'service') {
@@ -260,10 +272,10 @@ export default function ServiceTypeMappings() {
   const filteredServicesForType = useMemo(() => {
     if (!newType) return [];
     const candidates = resolveCandidateTypes(newType);
-    const byType = services.filter((s: any) => candidates.includes(String(s.service_type)));
+    const byType = services.filter((s) => candidates.includes(String(s.service_type)));
     if (isPlatform) {
       // When platform admin, scope by selected tenant if provided
-      if (selectedTenantId) return byType.filter((s: any) => String(s.tenant_id) === String(selectedTenantId));
+      if (selectedTenantId) return byType.filter((s) => String(s.tenant_id) === String(selectedTenantId));
       // No tenant selected: do not show services to force tenant scoping
       return [];
     }
@@ -273,9 +285,9 @@ export default function ServiceTypeMappings() {
   const filteredEditServicesForType = useMemo(() => {
     if (!editType) return [];
     const candidates = resolveCandidateTypes(editType);
-    const byType = services.filter((s: any) => candidates.includes(String(s.service_type)));
+    const byType = services.filter((s) => candidates.includes(String(s.service_type)));
     if (isPlatform) {
-      if (editTenantId) return byType.filter((s: any) => String(s.tenant_id) === String(editTenantId));
+      if (editTenantId) return byType.filter((s) => String(s.tenant_id) === String(editTenantId));
       return [];
     }
     return byType;
@@ -313,9 +325,10 @@ export default function ServiceTypeMappings() {
         toast.error('Please select type and service');
         return;
       }
-      let conditionsObj: any = {};
+      let conditionsObj: Json = {};
       try {
-        conditionsObj = JSON.parse(newConditions || '{}');
+        const parsed = JSON.parse(newConditions || '{}');
+        conditionsObj = typeof parsed === 'object' && parsed !== null ? parsed : {};
       } catch (jsonErr) {
         toast.error('Conditions must be valid JSON');
         return;
@@ -328,29 +341,30 @@ export default function ServiceTypeMappings() {
         priority: newPriority,
         conditions: conditionsObj,
         is_active: newIsActive,
-      } as any;
-      const { error } = await (supabase as any).from('service_type_mappings').insert([payload]);
+      } as const;
+      const { error } = await supabase.from('service_type_mappings').insert(payload);
       if (error) throw error;
       toast.success('Mapping created');
       setOpen(false);
       resetForm();
       fetchMappings();
-    } catch (err: any) {
-      console.error('Failed to create mapping:', err?.message || err);
-      toast.error('Failed to create mapping', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to create mapping:', message);
+      toast.error('Failed to create mapping', { description: message });
     }
   };
 
   const handleToggleDefault = async (row: MappingRow, next: boolean) => {
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('service_type_mappings')
         .update({ is_default: next })
         .eq('id', row.id);
       if (error) throw error;
       fetchMappings();
-    } catch (err: any) {
-      const msg = err?.message || String(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       toast.error('Failed to update default', { description: msg });
       // Unique default constraint may fail; refresh to reflect current state
       fetchMappings();
@@ -359,28 +373,30 @@ export default function ServiceTypeMappings() {
 
   const handleToggleActive = async (row: MappingRow, next: boolean) => {
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('service_type_mappings')
         .update({ is_active: next })
         .eq('id', row.id);
       if (error) throw error;
       fetchMappings();
-    } catch (err: any) {
-      toast.error('Failed to update status', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to update status', { description: message });
     }
   };
 
   const handleDelete = async (row: MappingRow) => {
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('service_type_mappings')
         .delete()
         .eq('id', row.id);
       if (error) throw error;
       toast.success('Mapping deleted');
       fetchMappings();
-    } catch (err: any) {
-      toast.error('Failed to delete mapping', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to delete mapping', { description: message });
     }
   };
 
@@ -403,9 +419,10 @@ export default function ServiceTypeMappings() {
         toast.error('Please select type and service');
         return;
       }
-      let conditionsObj: any = {};
+      let conditionsObj: Json = {};
       try {
-        conditionsObj = JSON.parse(editConditions || '{}');
+        const parsed = JSON.parse(editConditions || '{}');
+        conditionsObj = typeof parsed === 'object' && parsed !== null ? parsed : {};
       } catch (jsonErr) {
         toast.error('Conditions must be valid JSON');
         return;
@@ -417,8 +434,8 @@ export default function ServiceTypeMappings() {
         priority: editPriority,
         conditions: conditionsObj,
         is_active: editIsActive,
-      } as any;
-      const { error } = await (supabase as any)
+      } as const;
+      const { error } = await supabase
         .from('service_type_mappings')
         .update(payload)
         .eq('id', editingRow.id);
@@ -427,8 +444,8 @@ export default function ServiceTypeMappings() {
       setEditOpen(false);
       resetEditForm();
       fetchMappings();
-    } catch (err: any) {
-      const msg = err?.message || String(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       toast.error('Failed to update mapping', { description: msg });
       fetchMappings();
     }
@@ -507,7 +524,7 @@ export default function ServiceTypeMappings() {
                           {filteredServicesForType.length === 0 ? (
                             <div className="px-3 py-2 text-sm text-muted-foreground">No services for selected type</div>
                           ) : (
-                            filteredServicesForType.map((s: any) => (
+                            filteredServicesForType.map((s: ServiceRow) => (
                               <SelectItem key={String(s.id)} value={String(s.id)}>
                                 {s.service_name}
                               </SelectItem>
@@ -556,7 +573,7 @@ export default function ServiceTypeMappings() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all'|'active'|'inactive')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -590,7 +607,7 @@ export default function ServiceTypeMappings() {
                   </SelectContent>
                 </Select>
               )}
-              <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as 'priority'|'type'|'service'|'status'|'default')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -602,7 +619,7 @@ export default function ServiceTypeMappings() {
                   <SelectItem value="default">Default</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+              <Select value={sortDir} onValueChange={(v) => setSortDir(v as 'asc'|'desc')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Order" />
                 </SelectTrigger>
@@ -710,7 +727,7 @@ export default function ServiceTypeMappings() {
                       {filteredEditServicesForType.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-muted-foreground">No services for selected type</div>
                       ) : (
-                        filteredEditServicesForType.map((s: any) => (
+                        filteredEditServicesForType.map((s: ServiceRow) => (
                           <SelectItem key={String(s.id)} value={String(s.id)}>
                             {s.service_name}
                           </SelectItem>

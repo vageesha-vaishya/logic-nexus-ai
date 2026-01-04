@@ -1,5 +1,4 @@
 // Ambient Deno typing for editors without Deno type support
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
 // @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';

@@ -65,7 +65,7 @@ export default function Dashboards() {
         const { data: users } = await fetchAssignableUsers({ search: '', limit: 50 });
         setAssignableUsers((users ?? []) as AssignableUser[]);
         // My Leads: assigned to me
-        let leadQuery = supabase
+        const leadQuery = supabase
           .from('leads')
           .select('id, first_name, last_name, company, status, owner_id')
           .eq('owner_id', context.userId)
@@ -79,7 +79,7 @@ export default function Dashboards() {
         setMyLeads(leads || []);
 
         // My Activities: assigned to me and not completed
-        let actQuery = supabase
+        const actQuery = supabase
           .from('activities')
           .select('id, activity_type, subject, due_date, status, assigned_to, lead_id')
           .eq('assigned_to', context.userId)

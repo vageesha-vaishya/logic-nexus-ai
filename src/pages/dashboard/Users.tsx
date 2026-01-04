@@ -14,7 +14,24 @@ export default function Users() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context } = useCRM();
-  const [users, setUsers] = useState<any[]>([]);
+  type UserRole = {
+    role: string;
+    tenant_id: string | null;
+    franchise_id: string | null;
+    tenant_name?: string | null;
+    franchise_name?: string | null;
+  };
+  type UserRow = {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string | null;
+    is_active: boolean;
+    created_at: string;
+    user_roles?: UserRole[];
+  };
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,20 +88,17 @@ export default function Users() {
       // Enrich user data with tenant and franchise names
       const enrichedUsers = profilesData?.map(user => ({
         ...user,
-        user_roles: user.user_roles?.map((role: any) => ({
+        user_roles: user.user_roles?.map((role: { role: string; tenant_id: string | null; franchise_id: string | null }) => ({
           ...role,
           tenant_name: role.tenant_id ? tenantsMap.get(role.tenant_id) : null,
           franchise_name: role.franchise_id ? franchisesMap.get(role.franchise_id) : null,
         }))
       })) || [];
 
-      setUsers(enrichedUsers);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      setUsers(enrichedUsers as UserRow[]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -146,7 +160,7 @@ export default function Users() {
                       <TableCell>{user.phone || '-'}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
-                          {user.user_roles?.map((role: any, idx: number) => (
+                          {user.user_roles?.map((role: UserRole, idx: number) => (
                             <Badge key={idx} variant="outline" className="text-xs">
                               {role.role.replace('_', ' ')}
                             </Badge>

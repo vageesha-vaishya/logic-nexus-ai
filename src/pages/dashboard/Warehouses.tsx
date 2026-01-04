@@ -15,13 +15,14 @@ import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
+import type { Json } from '@/integrations/supabase/types';
 
 interface Warehouse {
   id: string;
   name: string;
   code: string;
   warehouse_type: string | null;
-  address: any;
+  address: Json | null;
   contact_person: string | null;
   contact_phone: string | null;
   capacity_sqft: number | null;
@@ -65,9 +66,10 @@ export default function Warehouses() {
 
       if (error) throw error;
       setWarehouses(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load warehouses');
-      console.error('Error:', error);
+      console.error('Error:', message);
     } finally {
       setLoading(false);
     }

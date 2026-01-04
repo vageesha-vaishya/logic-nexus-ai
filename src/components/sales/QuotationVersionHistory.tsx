@@ -90,7 +90,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
           .in('quotation_version_id', versionIds);
         if (oErr) throw oErr;
         const carrierRateIds = (opts ?? []).map((o: any) => o.carrier_rate_id).filter(Boolean);
-        let rateMap: Record<string, any> = {};
+        const rateMap: Record<string, any> = {};
         if (carrierRateIds.length > 0) {
           const { data: rates, error: rErr } = await supabase
             .from('carrier_rates')
@@ -143,7 +143,9 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
         if (q?.franchise_id) setFranchiseId(String(q.franchise_id));
         const { data: auth } = await supabase.auth.getUser();
         setUserId(auth?.user?.id ?? null);
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
     init();
     load();

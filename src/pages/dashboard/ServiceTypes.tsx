@@ -49,15 +49,16 @@ export default function ServiceTypes() {
 
   const fetchTypes = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('service_types')
         .select('*')
         .order('name');
       if (error) throw error;
-      setTypes((data || []) as any);
-    } catch (err: any) {
-      console.error('Failed to fetch service types:', err?.message || err);
-      toast.error('Failed to fetch service types', { description: err?.message });
+      setTypes((data || []) as ServiceTypeRow[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch service types:', message);
+      toast.error('Failed to fetch service types', { description: message });
     }
   };
 
@@ -95,15 +96,16 @@ export default function ServiceTypes() {
         code: code.trim().toLowerCase(),
         description: description || null, 
         is_active: isActive 
-      } as any;
-      const { error } = await (supabase as any).from('service_types').insert([payload]);
+      } as const;
+      const { error } = await supabase.from('service_types').insert(payload);
       if (error) throw error;
       toast.success('Service type created');
       setOpen(false);
       resetForm();
       fetchTypes();
-    } catch (err: any) {
-      toast.error('Failed to create type', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to create type', { description: message });
     }
   };
 
@@ -113,14 +115,15 @@ export default function ServiceTypes() {
         toast.error('Only platform admins can update service types');
         return;
       }
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('service_types')
         .update({ is_active: next })
         .eq('id', row.id);
       if (error) throw error;
       fetchTypes();
-    } catch (err: any) {
-      toast.error('Failed to update type', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to update type', { description: message });
     }
   };
 
@@ -130,15 +133,16 @@ export default function ServiceTypes() {
         toast.error('Only platform admins can delete service types');
         return;
       }
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('service_types')
         .delete()
         .eq('id', row.id);
       if (error) throw error;
       toast.success('Service type deleted');
       fetchTypes();
-    } catch (err: any) {
-      toast.error('Failed to delete type', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to delete type', { description: message });
     }
   };
 
@@ -171,8 +175,8 @@ export default function ServiceTypes() {
         code: editCode.trim().toLowerCase(),
         description: editDescription || null,
         is_active: editIsActive,
-      } as any;
-      const { error } = await (supabase as any)
+      } as const;
+      const { error } = await supabase
         .from('service_types')
         .update(payload)
         .eq('id', editingRow.id);
@@ -181,8 +185,9 @@ export default function ServiceTypes() {
       setEditOpen(false);
       resetEditForm();
       fetchTypes();
-    } catch (err: any) {
-      toast.error('Failed to update type', { description: err?.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to update type', { description: message });
     }
   };
 
@@ -200,7 +205,7 @@ export default function ServiceTypes() {
       return matchesSearch && matchesStatus;
     });
     const cmp = (a: ServiceTypeRow, b: ServiceTypeRow) => {
-      let av: any; let bv: any;
+      let av: string | number; let bv: string | number;
       if (sortKey === 'name') { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
       else if (sortKey === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
       else { av = a.is_active ? 1 : 0; bv = b.is_active ? 1 : 0; }
@@ -269,7 +274,7 @@ export default function ServiceTypes() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all'|'active'|'inactive')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -279,7 +284,7 @@ export default function ServiceTypes() {
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as 'name'|'description'|'status')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -289,7 +294,7 @@ export default function ServiceTypes() {
                   <SelectItem value="status">Status</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={sortDir} onValueChange={(v) => setSortDir(v as any)}>
+              <Select value={sortDir} onValueChange={(v) => setSortDir(v as 'asc'|'desc')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Order" />
                 </SelectTrigger>

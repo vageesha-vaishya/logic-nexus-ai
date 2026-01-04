@@ -15,33 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { matchText, TextOp } from '@/lib/utils';
-
-const stageColors: Record<string, string> = {
-  prospecting: 'bg-slate-500',
-  qualification: 'bg-blue-500',
-  needs_analysis: 'bg-cyan-500',
-  value_proposition: 'bg-indigo-500',
-  proposal: 'bg-purple-500',
-  negotiation: 'bg-orange-500',
-  closed_won: 'bg-green-500',
-  closed_lost: 'bg-red-500',
-};
-
-  const stageLabels: Record<string, string> = {
-  prospecting: 'Prospecting',
-  qualification: 'Qualification',
-  needs_analysis: 'Needs Analysis',
-  value_proposition: 'Value Proposition',
-  proposal: 'Proposal',
-  negotiation: 'Negotiation',
-  closed_won: 'Closed Won',
-  closed_lost: 'Closed Lost',
-};
+import { Opportunity, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 
 export default function Opportunities() {
   const navigate = useNavigate();
   const { supabase, context } = useCRM();
-  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
@@ -74,10 +53,11 @@ export default function Opportunities() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOpportunities(data || []);
-    } catch (error: any) {
+      setOpportunities(data as unknown as Opportunity[]);
+    } catch (error: unknown) {
+      const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to load opportunities', {
-        description: error.message,
+        description,
       });
     } finally {
       setLoading(false);
@@ -123,14 +103,14 @@ export default function Opportunities() {
     return true;
   });
 
-  const { sorted: sortedOpportunities, sortField, sortDirection, onSort } = useSort<any>(filteredOpportunitiesAdvanced, {
+  const { sorted: sortedOpportunities, sortField, sortDirection, onSort } = useSort<Opportunity>(filteredOpportunitiesAdvanced, {
     accessors: {
-      name: (o) => o.name,
-      account: (o) => o.accounts?.name ?? '',
-      stage: (o) => o.stage,
-      amount: (o) => o.amount ?? 0,
-      close_date: (o) => o.close_date ?? '',
-      probability: (o) => o.probability ?? 0,
+      name: (o: Opportunity) => o.name,
+      account: (o: Opportunity) => o.accounts?.name ?? '',
+      stage: (o: Opportunity) => o.stage,
+      amount: (o: Opportunity) => o.amount ?? 0,
+      close_date: (o: Opportunity) => o.close_date ?? '',
+      probability: (o: Opportunity) => o.probability ?? 0,
     },
   });
 

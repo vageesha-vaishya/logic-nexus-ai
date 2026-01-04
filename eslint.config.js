@@ -19,6 +19,33 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      "react-hooks/exhaustive-deps": "warn",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": ["warn", { ignoreRestArgs: true }],
+      "@typescript-eslint/ban-ts-comment": ["error", { "ts-ignore": "allow-with-description" }],
+    },
+    settings: {},
+  },
+  {
+    files: ["supabase/functions/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+    },
+  },
+  {
+    files: [
+      "src/components/aes-hts-code-manager.tsx",
+      "src/components/sales/composer/**/*.{ts,tsx}",
+      "src/pages/dashboard/ShipmentsPipeline.tsx",
+      "src/components/sales/QuoteForm.tsx",
+      "src/pages/dashboard/UIDemoForms.tsx",
+      "src/pages/dashboard/UIDemoAdvanced.tsx",
+      "src/pages/dashboard/data-management/DatabaseExport.tsx"
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  }
 );
