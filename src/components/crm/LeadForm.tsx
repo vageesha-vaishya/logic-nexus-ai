@@ -121,7 +121,26 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+        <Card className="bg-slate-50 border-slate-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="space-y-1">
+                <h3 className="font-semibold text-lg">Lead Qualification Score</h3>
+                <p className="text-sm text-muted-foreground">AI-driven score based on completeness and engagement</p>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className={`text-3xl font-bold ${color}`}>{score}</span>
+                  <span className="text-muted-foreground">/ 100</span>
+                </div>
+                <Badge variant="outline" className={`${color} border-current`}>{label} (Grade {grade})</Badge>
+              </div>
+            </div>
+            <Progress value={score} className="h-2" />
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-2 gap-4">
           {context.isPlatformAdmin && (
             <FormField

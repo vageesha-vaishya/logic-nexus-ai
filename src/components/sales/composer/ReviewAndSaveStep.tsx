@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { DocumentPreview } from './DocumentPreview';
 
 interface Leg {
   id: string;
@@ -50,9 +51,12 @@ export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Review Quotation</CardTitle>
-        <CardDescription>Review all details before saving</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+            <CardTitle>Review Quotation</CardTitle>
+            <CardDescription>Review all details before saving</CardDescription>
+        </div>
+        <DocumentPreview quoteData={quoteData} legs={legs} combinedCharges={combinedCharges} />
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Quote Summary */}
@@ -70,6 +74,20 @@ export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges
             <div>
               <p className="text-muted-foreground">Currency</p>
               <p className="font-medium">{currency?.code || 'Not selected'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Incoterms</p>
+              <p className="font-medium">{quoteData.incoterms || 'Not specified'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Commodity</p>
+              <p className="font-medium">{quoteData.commodity || 'Not specified'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Weight / Volume</p>
+              <p className="font-medium">
+                {quoteData.total_weight ? `${quoteData.total_weight} kg` : '-'} / {quoteData.total_volume ? `${quoteData.total_volume} cbm` : '-'}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Total Legs</p>

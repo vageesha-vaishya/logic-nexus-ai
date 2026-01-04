@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
+import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationWorkflowStepper } from './composer/QuotationWorkflowStepper';
@@ -694,7 +695,38 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const updateLeg = (legId: string, updates: Partial<Leg>) => {
-    setLegs(legs.map(leg => leg.id === legId ? { ...leg, ...updates } : leg));
+    setLegs(legs.map(leg => {
+      if (leg.id === legId) {
+        const updatedLeg = { ...leg, ...updates };
+        
+        // If mode changed, recalculate chargeable weight for weight-based charges
+        if (updates.mode && updates.mode !== leg.mode) {
+          const weight = Number(quoteData.total_weight) || 0;
+          const volume = Number(quoteData.total_volume) || 0;
+          const newChargeableWeight = calculateChargeableWeight(weight, volume, updates.mode as TransportMode);
+          const quantity = newChargeableWeight > 0 ? newChargeableWeight : 1;
+          
+          updatedLeg.charges = leg.charges.map(charge => {
+            // Check if charge is weight-based
+            const basis = chargeBases.find(b => b.id === charge.basis_id);
+            const code = basis?.code?.toLowerCase() || '';
+            const isWeightBased = !charge.basis_id || ['kg', 'lb', 'cbm', 'wm', 'chg_wt', 'ton', 'w/m'].some(c => code.includes(c));
+            
+            if (isWeightBased) {
+              return {
+                ...charge,
+                buy: { ...charge.buy, quantity },
+                sell: { ...charge.sell, quantity }
+              };
+            }
+            return charge;
+          });
+        }
+        
+        return updatedLeg;
+      }
+      return leg;
+    }));
   };
 
   const confirmRemoveLeg = (legId: string) => {
@@ -733,6 +765,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const addCharge = (legId: string) => {
     setLegs(legs.map(leg => {
       if (leg.id === legId) {
+        // Calculate chargeable weight based on leg mode and quote details
+        const weight = Number(quoteData.total_weight) || 0;
+        const volume = Number(quoteData.total_volume) || 0;
+        const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
+        
+        // Default quantity to chargeable weight if available, otherwise 1
+        const defaultQuantity = chargeableWeight > 0 ? chargeableWeight : 1;
+
         return {
           ...leg,
           charges: [
@@ -743,8 +783,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               basis_id: '',
               unit: '',
               currency_id: currencies[0]?.id || '',
-              buy: { quantity: 1, rate: 0, dbChargeId: null },
-              sell: { quantity: 1, rate: 0, dbChargeId: null },
+              buy: { quantity: defaultQuantity, rate: 0, dbChargeId: null },
+              sell: { quantity: defaultQuantity, rate: 0, dbChargeId: null },
               note: ''
             }
           ]
@@ -1386,6 +1426,86 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }
   };
 
+  const handleFetchRates = async (legId: string) => {
+    setLoading(true);
+    try {
+      const leg = legs.find(l => l.id === legId);
+      if (!leg) return;
+
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const mode = leg.mode.toLowerCase();
+      const mockRates = [];
+
+      // Generate mock rates based on mode
+      if (mode.includes('air')) {
+        mockRates.push({ category: 'Freight', basis: 'kg', buy: 2.5 + Math.random(), sell: 3.5 + Math.random(), unit: 'kg' });
+        mockRates.push({ category: 'Fuel', basis: 'kg', buy: 0.5, sell: 0.55, unit: 'kg' });
+        mockRates.push({ category: 'Security', basis: 'kg', buy: 0.15, sell: 0.20, unit: 'kg' });
+      } else if (mode.includes('sea') || mode.includes('ocean')) {
+        mockRates.push({ category: 'Freight', basis: 'container', buy: 1200 + (Math.random() * 200), sell: 1500 + (Math.random() * 300), unit: '20ft' });
+        mockRates.push({ category: 'Bunker', basis: 'container', buy: 150, sell: 150, unit: '20ft' });
+        mockRates.push({ category: 'Doc', basis: 'shipment', buy: 50, sell: 75, unit: 'doc' });
+      } else if (mode.includes('road') || mode.includes('truck')) {
+        mockRates.push({ category: 'Freight', basis: 'trip', buy: 400 + (Math.random() * 50), sell: 550 + (Math.random() * 50), unit: 'trip' });
+        mockRates.push({ category: 'Fuel', basis: 'trip', buy: 40, sell: 45, unit: 'trip' });
+      } else {
+        mockRates.push({ category: 'Freight', basis: 'unit', buy: 100, sell: 150, unit: 'unit' });
+      }
+
+      const weight = Number(quoteData.total_weight) || 0;
+      const volume = Number(quoteData.total_volume) || 0;
+      const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
+      
+      const newCharges = mockRates.map(rate => {
+        // Match category
+        const cat = chargeCategories.find(c => c.name.toLowerCase().includes(rate.category.toLowerCase())) || chargeCategories[0];
+        // Match basis
+        const basis = chargeBases.find(b => b.code.toLowerCase().includes(rate.basis.toLowerCase())) || chargeBases[0];
+        
+        // Determine quantity
+        let quantity = 1;
+        if (basis?.code?.toLowerCase().includes('kg') || basis?.code?.toLowerCase().includes('cbm')) {
+             quantity = chargeableWeight > 0 ? chargeableWeight : 1;
+        }
+
+        return {
+          id: `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          category_id: cat?.id || '',
+          basis_id: basis?.id || '',
+          unit: rate.unit,
+          currency_id: currencies[0]?.id || '',
+          buy: { quantity, rate: Number(rate.buy.toFixed(2)), dbChargeId: null },
+          sell: { quantity, rate: Number(rate.sell.toFixed(2)), dbChargeId: null },
+          note: `Market Rate: ${rate.category}`
+        };
+      });
+
+      setLegs(prev => prev.map(l => {
+        if (l.id === legId) {
+          return { ...l, charges: [...l.charges, ...newCharges] };
+        }
+        return l;
+      }));
+
+      toast({
+        title: 'Rates Fetched',
+        description: `Retrieved ${mockRates.length} market rates for ${leg.mode}.`,
+      });
+
+    } catch (error) {
+      console.error('Error fetching rates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch carrier rates.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNext = () => {
     // Clear validation on navigation
     setValidationErrors([]);
@@ -1456,7 +1576,36 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         <QuoteDetailsStep
           quoteData={quoteData}
           currencies={currencies}
-          onChange={(field, value) => setQuoteData({ ...quoteData, [field]: value })}
+          onChange={(field, value) => {
+            setQuoteData((prev: any) => ({ ...prev, [field]: value }));
+            
+            // Recalculate charges if weight/volume changes
+            if (field === 'total_weight' || field === 'total_volume') {
+              const weight = field === 'total_weight' ? Number(value) : Number(quoteData.total_weight) || 0;
+              const volume = field === 'total_volume' ? Number(value) : Number(quoteData.total_volume) || 0;
+              
+              setLegs(currentLegs => currentLegs.map(leg => {
+                const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
+                const quantity = chargeableWeight > 0 ? chargeableWeight : 1;
+                
+                const updatedCharges = leg.charges.map(charge => {
+                  const basis = chargeBases.find(b => b.id === charge.basis_id);
+                  const code = basis?.code?.toLowerCase() || '';
+                  const isWeightBased = !charge.basis_id || ['kg', 'lb', 'cbm', 'wm', 'chg_wt', 'ton', 'w/m'].some(c => code.includes(c));
+                  
+                  if (isWeightBased) {
+                    return {
+                      ...charge,
+                      buy: { ...charge.buy, quantity },
+                      sell: { ...charge.sell, quantity }
+                    };
+                  }
+                  return charge;
+                });
+                return { ...leg, charges: updatedCharges };
+              }));
+            }
+          }}
         />
       )}
 
@@ -1493,6 +1642,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onUpdateCombinedCharge={updateCombinedCharge}
           onRemoveCombinedCharge={confirmRemoveCombinedCharge}
           onConfigureCombinedBasis={openCombinedBasisModal}
+          onFetchRates={handleFetchRates}
         />
       )}
 

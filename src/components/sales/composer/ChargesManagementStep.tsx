@@ -166,10 +166,18 @@ export function ChargesManagementStep({
                       {leg.origin || 'Origin'} → {leg.destination || 'Destination'}
                     </p>
                   </div>
-                  <Button onClick={() => onAddCharge(leg.id)} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Charge
-                  </Button>
+                  <div className="flex gap-2">
+                    {onFetchRates && (
+                      <Button onClick={() => onFetchRates(leg.id)} size="sm" variant="outline">
+                        <Globe className="mr-2 h-4 w-4" />
+                        Fetch Rates
+                      </Button>
+                    )}
+                    <Button onClick={() => onAddCharge(leg.id)} size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Charge
+                    </Button>
+                  </div>
                 </div>
 
                 {leg.charges.length > 0 ? (
