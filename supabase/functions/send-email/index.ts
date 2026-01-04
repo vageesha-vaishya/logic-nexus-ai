@@ -3,6 +3,7 @@ declare const Deno: {
   serve(handler: (req: Request) => Promise<Response> | Response): void;
 };
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Logger } from '../_shared/logger.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

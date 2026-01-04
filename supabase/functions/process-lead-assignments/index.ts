@@ -3,6 +3,7 @@
 declare const Deno: any;
 // @ts-ignore Supabase Edge (Deno) resolves URL imports at runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Logger } from '../_shared/logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

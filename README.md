@@ -1,73 +1,69 @@
-# Welcome to your Lovable project
+# Logic Nexus AI
 
-## Project info
+Logic Nexus AI is a comprehensive logistics and CRM platform built with modern web technologies.
 
-**URL**: https://lovable.dev/projects/3573c51a-42f4-4367-af3e-effd1073c883
+## 🚀 Technologies
 
-## How can I edit this code?
+*   **Frontend:** React, TypeScript, Vite, Tailwind CSS, shadcn-ui
+*   **Backend:** Supabase (PostgreSQL, Auth, Edge Functions, Realtime, Storage)
+*   **Testing:** Vitest, Playwright (E2E), k6, Lighthouse CI
+*   **Monitoring:** Sentry, PostHog
 
-There are several ways of editing your application.
+## 🛠️ Setup & Development
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3573c51a-42f4-4367-af3e-effd1073c883) and start prompting.
+*   Node.js (v20+)
+*   npm
+*   Supabase CLI (optional, for local backend dev)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Installation
 
-**Use your preferred IDE**
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd logic-nexus-ai
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+# Install dependencies
+npm install
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Development Server
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Testing
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Unit Tests:**
+```bash
+npm test
+```
 
-**Use GitHub Codespaces**
+**Performance Tests:**
+See [tests/performance/README.md](tests/performance/README.md) for details on running k6 load tests.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Build
 
-## What technologies are used for this project?
+```bash
+npm run build
+```
 
-This project is built with:
+## 🔒 Security & Compliance
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+*   **Authentication:** Supabase Auth with RLS (Row Level Security).
+*   **Logging:** Centralized structured logging via `src/lib/logger.ts`.
+*   **Data Retention:** See [DATA_RETENTION_POLICY.md](DATA_RETENTION_POLICY.md).
+*   **Disaster Recovery:** See [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md).
 
-## How can I deploy this project?
+## 📊 Monitoring
 
-Simply open [Lovable](https://lovable.dev/projects/3573c51a-42f4-4367-af3e-effd1073c883) and click on Share -> Publish.
+This project uses:
+*   **Sentry** for error tracking.
+*   **PostHog** for product analytics.
+*   **Lighthouse CI** for performance regression testing.
 
-## Can I connect a custom domain to my Lovable project?
+## 📝 License
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Proprietary - SOS Logistics Pro

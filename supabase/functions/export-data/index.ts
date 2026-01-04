@@ -6,6 +6,8 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  const logger = new Logger({ function: 'export-data' });
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -65,38 +67,38 @@ Deno.serve(async (req) => {
 
     const exportData: Record<string, any> = {};
     
-    console.log('Starting data export...');
+    logger.info('Starting data export...');
     
     for (const table of tables) {
       try {
-        console.log(`Exporting table: ${table}`);
+        logger.info(`Exporting table: ${table}`);
         const { data, error } = await supabase
           .from(table)
           .select('*')
           .limit(10000);
         
         if (error) {
-          console.error(`Error exporting ${table}:`, error);
+          logger.error(`Error exporting ${table}`, { error });
           exportData[table] = { error: error.message };
         } else {
           exportData[table] = data || [];
-          console.log(`Exported ${data?.length || 0} rows from ${table}`);
+          logger.info(`Exported ${data?.length || 0} rows from ${table}`);
         }
       } catch (err) {
-        console.error(`Exception exporting ${table}:`, err);
+        logger.error(`Exception exporting ${table}`, { error: err });
         exportData[table] = { error: String(err) };
       }
     }
 
     // Export auth users
     try {
-      console.log('Exporting auth users...');
+      logger.info('Exporting auth users...');
       const { data: users, error } = await supabase.auth.admin.listUsers({
         perPage: 1000
       });
       
       if (error) {
-        console.error('Error exporting auth users:', error);
+        logger.error('Error exporting auth users', { error });
         exportData['auth_users'] = { error: error.message };
       } else {
         exportData['auth_users'] = users.users.map(u => ({

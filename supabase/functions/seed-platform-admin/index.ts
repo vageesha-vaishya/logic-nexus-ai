@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Logger } from '../_shared/logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +7,8 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req: Request) => {
+  const logger = new Logger({ function: 'seed-platform-admin' });
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -62,10 +65,10 @@ Deno.serve(async (req: Request) => {
       userId = existing.id;
       // Optionally update password to provided one and confirm email
       await supabaseAdmin.auth.admin.updateUserById(userId, { password, email_confirm: true });
-      console.log('User exists; updated password and confirmed email:', userId);
+      logger.info('User exists; updated password and confirmed email', { userId });
     } else {
       userId = createdUser?.user?.id ?? null;
-      console.log('User created:', userId);
+      logger.info('User created', { userId });
     }
 
     if (!userId) {
@@ -82,7 +85,7 @@ Deno.serve(async (req: Request) => {
       .limit(1);
 
     if (roleSelectError) {
-      console.error('Role select error:', roleSelectError);
+      logger.error('Role select error', { error: roleSelectError });
     }
 
     if (!roleExisting || roleExisting.length === 0) {
@@ -95,38 +98,21 @@ Deno.serve(async (req: Request) => {
           franchise_id: null
         });
       if (roleError) {
-        console.error('Role assignment error:', roleError);
+        logger.error('Role assignment error', { error: roleError });
         throw roleError;
       }
     }
-
-    // Set must_change_password flag
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({ must_change_password: true })
-      .eq('id', userId);
-
-    if (profileError) {
-      console.error('Profile update error:', profileError);
-    }
-
-    console.log('Platform admin created successfully');
-
+    
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        message: 'Platform admin ensured successfully',
-        user_id: userId 
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ message: 'Platform admin seeded successfully', userId }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
   } catch (error) {
-    console.error('Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    logger.error('Error seeding platform admin', { error });
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
