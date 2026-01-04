@@ -15,8 +15,8 @@ const activitySchema = z.object({
   activity_type: z.enum(['call', 'email', 'meeting', 'task', 'note']),
   status: z.enum(['planned', 'in_progress', 'completed', 'cancelled']),
   priority: z.enum(['low', 'medium', 'high', 'urgent']),
-  subject: z.string().min(1, 'Subject is required').max(200),
-  description: z.string().optional(),
+  subject: z.string().trim().min(1, 'Subject is required').max(200),
+  description: z.string().trim().optional(),
   due_date: z.string().optional(),
   account_id: z.string().optional(),
   contact_id: z.string().optional(),
@@ -70,9 +70,29 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
     if (leadsRes.data) setLeads(leadsRes.data);
   };
 
-  const { isSubmitting } = form.formState;
+  const { isSubmitting, isDirty } = form.formState;
+
+  const getChangedFields = (data: ActivityFormData) => {
+    if (!initialData) return [];
+    
+    const changed: string[] = [];
+    (Object.keys(data) as Array<keyof ActivityFormData>).forEach((key) => {
+      // loosely compare to handle null/undefined vs empty string differences
+      const initialValue = initialData[key] ?? '';
+      const currentValue = data[key] ?? '';
+      
+      if (initialValue != currentValue) {
+        changed.push(key);
+      }
+    });
+    return changed;
+  };
 
   const handleFormSubmit = (data: ActivityFormData) => {
+    if (initialData?.id && !isDirty) {
+      onCancel();
+      return;
+    }
     setPendingData(data);
     setShowConfirmDialog(true);
   };
@@ -84,6 +104,8 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
       setPendingData(null);
     }
   };
+
+  const changedFields = pendingData ? getChangedFields(pendingData) : [];
 
   return (
     <>
@@ -305,7 +327,23 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm {initialData?.id ? 'Update' : 'Create'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to {initialData?.id ? 'update' : 'create'} this activity?
+              {initialData?.id ? (
+                <div className="space-y-2">
+                  <p>Are you sure you want to update this activity?</p>
+                  {changedFields.length > 0 && (
+                    <div className="text-sm bg-muted p-2 rounded">
+                      <p className="font-semibold mb-1">Changed fields:</p>
+                      <ul className="list-disc list-inside">
+                        {changedFields.map(field => (
+                          <li key={field} className="capitalize">{field.replace('_', ' ')}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                'Are you sure you want to create this activity?'
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

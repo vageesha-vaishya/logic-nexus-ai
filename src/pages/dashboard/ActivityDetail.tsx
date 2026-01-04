@@ -132,7 +132,7 @@ export default function ActivityDetail() {
     try {
       const { error } = await supabase
         .from('activities')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() } as any)
         .eq('id', id);
 
       if (error) throw error;

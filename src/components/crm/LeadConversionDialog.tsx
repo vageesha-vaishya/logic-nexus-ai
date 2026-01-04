@@ -149,6 +149,24 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
       if (leadError) throw leadError;
 
+      // Transfer activities to the new entities
+      const activityUpdatePayload: any = {};
+      if (accountId) activityUpdatePayload.account_id = accountId;
+      if (contactId) activityUpdatePayload.contact_id = contactId;
+      if (opportunityId) activityUpdatePayload.opportunity_id = opportunityId;
+
+      if (Object.keys(activityUpdatePayload).length > 0) {
+        const { error: activityError } = await supabase
+          .from('activities')
+          .update(activityUpdatePayload)
+          .eq('lead_id', lead.id);
+        
+        if (activityError) {
+          console.error('Failed to transfer activities:', activityError);
+          toast.warning('Lead converted, but activities could not be transferred.');
+        }
+      }
+
       toast.success('Lead converted successfully!');
       onOpenChange(false);
       onConversionComplete();

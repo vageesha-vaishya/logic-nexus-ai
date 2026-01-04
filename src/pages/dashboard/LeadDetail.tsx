@@ -50,8 +50,31 @@ export default function LeadDetail() {
   }, [id, supabase]);
 
   useEffect(() => {
-    if (id) fetchLead();
-  }, [id, fetchLead]);
+    if (id) {
+        fetchLead();
+        
+        // Real-time subscription for lead updates (e.g. score changes)
+        const channel = supabase
+            .channel(`lead-detail-${id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'leads',
+                    filter: `id=eq.${id}`
+                },
+                (payload) => {
+                    setLead(payload.new as unknown as Lead);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }
+  }, [id, fetchLead, supabase]);
 
   const handleUpdate = async (formData: LeadFormData) => {
     try {
@@ -240,12 +263,14 @@ export default function LeadDetail() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
             <LeadScoringCard
-              score={lead.lead_score || 0}
-              status={lead.status}
-              estimatedValue={lead.estimated_value}
-              lastActivityDate={lead.last_activity_date}
-              source={lead.source}
-            />
+                  leadId={lead.id}
+                  score={lead.lead_score || 0}
+                  status={lead.status}
+                  estimatedValue={lead.estimated_value}
+                  lastActivityDate={lead.last_activity_date}
+                  source={lead.source}
+                  title={lead.title}
+                />
             
             <Card>
               <CardHeader>
