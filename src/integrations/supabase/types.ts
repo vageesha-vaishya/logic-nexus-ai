@@ -6001,6 +6001,72 @@ export type Database = {
           },
         ]
       }
+      territory_geographies: {
+        Row: {
+          city_id: string | null
+          continent_id: string | null
+          country_id: string | null
+          created_at: string
+          id: string
+          state_id: string | null
+          territory_id: string
+        }
+        Insert: {
+          city_id?: string | null
+          continent_id?: string | null
+          country_id?: string | null
+          created_at?: string
+          id?: string
+          state_id?: string | null
+          territory_id: string
+        }
+        Update: {
+          city_id?: string | null
+          continent_id?: string | null
+          country_id?: string | null
+          created_at?: string
+          id?: string
+          state_id?: string | null
+          territory_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territory_geographies_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "territory_geographies_continent_id_fkey"
+            columns: ["continent_id"]
+            isOneToOne: false
+            referencedRelation: "continents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "territory_geographies_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "territory_geographies_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "territory_geographies_territory_id_fkey"
+            columns: ["territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       themes: {
         Row: {
           borders: Json | null
