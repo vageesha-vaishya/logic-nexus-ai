@@ -41,6 +41,7 @@ import OpportunityNew from "./pages/dashboard/OpportunityNew";
 import OpportunityDetail from "./pages/dashboard/OpportunityDetail";
 import OpportunitiesPipeline from "./pages/dashboard/OpportunitiesPipeline";
 import LeadRouting from "./pages/dashboard/LeadRouting";
+import QueueManagement from "./pages/dashboard/QueueManagement";
 import LeadAssignment from "./pages/dashboard/LeadAssignment";
 import EmailManagement from "./pages/dashboard/EmailManagement";
 import ThemeManagement from "./pages/dashboard/ThemeManagement";
@@ -432,6 +433,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>
                   <LeadRouting />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/queues" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>
+                  <QueueManagement />
                 </ProtectedRoute>
               } 
             />

@@ -6,6 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, Edit, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -39,20 +41,53 @@ export function AssignmentRules({ onUpdate }: Props) {
   const [selectedRule, setSelectedRule] = useState<AssignmentRule | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Platform admin support
+  const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(context.tenantId || null);
+
+  // Effective tenant ID (context or selected)
+  const effectiveTenantId = context.tenantId || selectedTenantId;
+
   useEffect(() => {
-    fetchRules();
-  }, []);
+    if (context.isPlatformAdmin) {
+      fetchTenants();
+    }
+  }, [context.isPlatformAdmin]);
+
+  useEffect(() => {
+    if (effectiveTenantId) {
+      fetchRules();
+    } else {
+      setRules([]);
+      setLoading(false);
+    }
+  }, [effectiveTenantId]);
+
+  const fetchTenants = async () => {
+    try {
+      const { data, error } = await supabase.from('tenants').select('id, name').order('name');
+      if (error) throw error;
+      setTenants(data || []);
+      
+      // Auto-select first tenant if none selected and tenants exist
+      if (data && data.length > 0 && !selectedTenantId) {
+        setSelectedTenantId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching tenants:', error);
+      toast.error('Failed to load tenants');
+    }
+  };
 
   const fetchRules = async () => {
+    if (!effectiveTenantId) return;
+
     try {
       let query = supabase
         .from('lead_assignment_rules')
         .select('*')
+        .eq('tenant_id', effectiveTenantId)
         .order('priority', { ascending: false });
-
-      if (context.tenantId) {
-        query = query.eq('tenant_id', context.tenantId);
-      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -145,6 +180,29 @@ export function AssignmentRules({ onUpdate }: Props) {
 
   return (
     <div className="space-y-4">
+      {context.isPlatformAdmin && (
+        <Card className="mb-4">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-4">
+              <Label>Select Tenant Context:</Label>
+              <Select
+                value={selectedTenantId || ''}
+                onValueChange={setSelectedTenantId}
+              >
+                <SelectTrigger className="w-[300px]">
+                  <SelectValue placeholder="Select a tenant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tenants.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-lg font-medium">Assignment Rules</h3>
@@ -184,7 +242,7 @@ export function AssignmentRules({ onUpdate }: Props) {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground mb-4">No assignment rules configured</p>
-            <Button onClick={() => setDialogOpen(true)}>
+            <Button onClick={() => setDialogOpen(true)} disabled={!effectiveTenantId}>
               <Plus className="mr-2 h-4 w-4" />
               Create First Rule
             </Button>

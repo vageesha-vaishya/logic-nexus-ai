@@ -24,15 +24,19 @@ type RuleFormData = z.infer<typeof ruleSchema>;
 
 interface Props {
   rule?: any;
+  tenantId?: string | null;
   onSave: () => void;
   onCancel: () => void;
 }
 
-export function AssignmentRuleForm({ rule, onSave, onCancel }: Props) {
+export function AssignmentRuleForm({ rule, tenantId, onSave, onCancel }: Props) {
   const { supabase, context } = useCRM();
   const [users, setUsers] = useState<any[]>([]);
   const [territories, setTerritories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Effective tenant ID (prop or context)
+  const effectiveTenantId = tenantId || context.tenantId;
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<RuleFormData>({
     resolver: zodResolver(ruleSchema),
@@ -58,7 +62,7 @@ export function AssignmentRuleForm({ rule, onSave, onCancel }: Props) {
 
   const fetchTerritories = async () => {
     let query = supabase.from('territories').select('*').eq('is_active', true);
-    if (context.tenantId) query = query.eq('tenant_id', context.tenantId);
+    if (effectiveTenantId) query = query.eq('tenant_id', effectiveTenantId);
     const { data } = await query;
     setTerritories(data || []);
   };
@@ -66,9 +70,13 @@ export function AssignmentRuleForm({ rule, onSave, onCancel }: Props) {
   const onSubmit = async (data: RuleFormData) => {
     setLoading(true);
     try {
+      if (!effectiveTenantId) {
+        throw new Error('Tenant context is missing');
+      }
+
       const payload: any = {
         ...data,
-        tenant_id: context.tenantId,
+        tenant_id: effectiveTenantId,
         is_active: true,
         criteria: data.criteria || {},
       };

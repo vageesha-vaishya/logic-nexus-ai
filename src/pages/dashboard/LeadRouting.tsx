@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Trash2, ArrowUpDown, Info } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Trash2, ArrowUpDown, Info, Users, List, PlayCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
@@ -18,6 +19,8 @@ interface AssignmentRule {
   priority: number;
   criteria: any;
   assigned_to: string | null;
+  assigned_queue_id: string | null;
+  assignment_type: 'user' | 'queue' | 'round_robin_group';
   is_active: boolean;
 }
 
@@ -26,6 +29,7 @@ export default function LeadRouting() {
   const { supabase, context } = useCRM();
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [queues, setQueues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRule, setNewRule] = useState({
     rule_name: '',
@@ -33,12 +37,15 @@ export default function LeadRouting() {
     criteria_type: 'source',
     criteria_value: '',
     assigned_to: '',
+    assigned_queue_id: '',
+    assignment_type: 'user' as 'user' | 'queue' | 'round_robin_group',
     is_active: true,
   });
 
   useEffect(() => {
     fetchRules();
     fetchUsers();
+    fetchQueues();
   }, []);
 
   const fetchRules = async () => {
@@ -72,10 +79,33 @@ export default function LeadRouting() {
     }
   };
 
+  const fetchQueues = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('queues')
+        .select('id, name, type');
+
+      if (error) throw error;
+      setQueues(data || []);
+    } catch (error: any) {
+      console.error('Error fetching queues:', error);
+    }
+  };
+
   const handleCreateRule = async () => {
-    if (!newRule.rule_name || !newRule.assigned_to) {
-      toast.error('Please fill in all required fields');
+    if (!newRule.rule_name) {
+      toast.error('Rule name is required');
       return;
+    }
+
+    if (newRule.assignment_type === 'user' && !newRule.assigned_to) {
+        toast.error('Please select a user');
+        return;
+    }
+
+    if ((newRule.assignment_type === 'queue' || newRule.assignment_type === 'round_robin_group') && !newRule.assigned_queue_id) {
+        toast.error('Please select a queue');
+        return;
     }
 
     try {
@@ -88,7 +118,9 @@ export default function LeadRouting() {
             type: newRule.criteria_type,
             value: newRule.criteria_value,
           },
-          assigned_to: newRule.assigned_to,
+          assigned_to: newRule.assignment_type === 'user' ? newRule.assigned_to : null,
+          assigned_queue_id: newRule.assignment_type !== 'user' ? newRule.assigned_queue_id : null,
+          assignment_type: newRule.assignment_type,
           is_active: newRule.is_active,
           tenant_id: context.tenantId,
         });
@@ -102,6 +134,8 @@ export default function LeadRouting() {
         criteria_type: 'source',
         criteria_value: '',
         assigned_to: '',
+        assigned_queue_id: '',
+        assignment_type: 'user',
         is_active: true,
       });
       fetchRules();
@@ -155,6 +189,14 @@ export default function LeadRouting() {
     );
   }
 
+  const getFilteredQueues = (type: 'holding' | 'round_robin') => {
+      // In the select, we might want to show all queues if using generic queue assignment,
+      // but ideally we filter by intended usage.
+      // For simplicity, let's allow assigning to any queue, but maybe highlight type.
+      // Actually, let's follow the requirement: 'holding' for queue assignment, 'round_robin' for group.
+      return queues.filter(q => q.type === type);
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -166,22 +208,22 @@ export default function LeadRouting() {
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Looking for advanced assignment features? Check out the new{' '}
+            You can manage Queues and Groups in the{' '}
             <Button
               variant="link"
               className="p-0 h-auto font-semibold"
-              onClick={() => navigate('/dashboard/lead-assignment')}
+              onClick={() => navigate('/dashboard/queues')}
             >
-              Lead Assignment
+              Queue Management
             </Button>
-            {' '}module with territories, capacity management, and automated workflows.
+            {' '}page.
           </AlertDescription>
         </Alert>
 
         <Card>
           <CardHeader>
             <CardTitle>Create Assignment Rule</CardTitle>
-            <CardDescription>Automatically route leads to team members based on criteria</CardDescription>
+            <CardDescription>Automatically route leads to team members, queues, or groups</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -189,7 +231,7 @@ export default function LeadRouting() {
                 <Label htmlFor="ruleName">Rule Name *</Label>
                 <Input
                   id="ruleName"
-                  placeholder="e.g., Route referrals to John"
+                  placeholder="e.g., Route referrals to Sales Queue"
                   value={newRule.rule_name}
                   onChange={(e) => setNewRule({ ...newRule, rule_name: e.target.value })}
                 />
@@ -234,23 +276,81 @@ export default function LeadRouting() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="assignedTo">Assign To *</Label>
-                <Select
-                  value={newRule.assigned_to}
-                  onValueChange={(value) => setNewRule({ ...newRule, assigned_to: value })}
+              <div className="col-span-2">
+                <Label className="mb-2 block">Assignment Target</Label>
+                <Tabs 
+                    value={newRule.assignment_type} 
+                    onValueChange={(v) => setNewRule({ ...newRule, assignment_type: v as any, assigned_to: '', assigned_queue_id: '' })}
                 >
-                  <SelectTrigger id="assignedTo">
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <TabsList>
+                        <TabsTrigger value="user">
+                            <Users className="w-4 h-4 mr-2"/> User
+                        </TabsTrigger>
+                        <TabsTrigger value="queue">
+                            <List className="w-4 h-4 mr-2"/> Queue
+                        </TabsTrigger>
+                        <TabsTrigger value="round_robin_group">
+                            <PlayCircle className="w-4 h-4 mr-2"/> Round Robin Group
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="user" className="mt-4">
+                        <Label htmlFor="assignedTo">Assign To User *</Label>
+                        <Select
+                            value={newRule.assigned_to}
+                            onValueChange={(value) => setNewRule({ ...newRule, assigned_to: value })}
+                        >
+                            <SelectTrigger id="assignedTo">
+                                <SelectValue placeholder="Select user" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {users.map((user) => (
+                                    <SelectItem key={user.id} value={user.id}>
+                                        {user.first_name} {user.last_name} ({user.email})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </TabsContent>
+
+                    <TabsContent value="queue" className="mt-4">
+                        <Label htmlFor="assignedQueue">Assign To Queue *</Label>
+                        <Select
+                            value={newRule.assigned_queue_id}
+                            onValueChange={(value) => setNewRule({ ...newRule, assigned_queue_id: value })}
+                        >
+                            <SelectTrigger id="assignedQueue">
+                                <SelectValue placeholder="Select holding queue" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {getFilteredQueues('holding').map((q) => (
+                                    <SelectItem key={q.id} value={q.id}>
+                                        {q.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </TabsContent>
+
+                    <TabsContent value="round_robin_group" className="mt-4">
+                        <Label htmlFor="assignedGroup">Assign To Round Robin Group *</Label>
+                        <Select
+                            value={newRule.assigned_queue_id}
+                            onValueChange={(value) => setNewRule({ ...newRule, assigned_queue_id: value })}
+                        >
+                            <SelectTrigger id="assignedGroup">
+                                <SelectValue placeholder="Select round robin group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {getFilteredQueues('round_robin').map((q) => (
+                                    <SelectItem key={q.id} value={q.id}>
+                                        {q.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </TabsContent>
+                </Tabs>
               </div>
 
               <div className="space-y-2 flex items-end">
@@ -290,7 +390,16 @@ export default function LeadRouting() {
             ) : (
               <div className="space-y-3">
                 {rules.map((rule) => {
-                  const assignedUser = users.find(u => u.id === rule.assigned_to);
+                  let assignmentText = 'Unknown';
+                  if (rule.assignment_type === 'user' && rule.assigned_to) {
+                      const u = users.find(u => u.id === rule.assigned_to);
+                      assignmentText = u ? `User: ${u.first_name} ${u.last_name}` : 'Unknown User';
+                  } else if (rule.assigned_queue_id) {
+                      const q = queues.find(q => q.id === rule.assigned_queue_id);
+                      const prefix = rule.assignment_type === 'round_robin_group' ? 'RR Group' : 'Queue';
+                      assignmentText = q ? `${prefix}: ${q.name}` : `Unknown ${prefix}`;
+                  }
+
                   return (
                     <div
                       key={rule.id}
@@ -307,10 +416,13 @@ export default function LeadRouting() {
                               Inactive
                             </span>
                           )}
+                          <span className="text-xs bg-blue-500/10 text-blue-600 px-2 py-1 rounded capitalize">
+                            {rule.assignment_type?.replace(/_/g, ' ')}
+                          </span>
                         </div>
                         <div className="text-sm text-muted-foreground">
                           When {rule.criteria?.type} = "{rule.criteria?.value}" → Assign to{' '}
-                          {assignedUser ? `${assignedUser.first_name} ${assignedUser.last_name}` : 'Unknown'}
+                          <span className="font-medium text-foreground">{assignmentText}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -353,15 +465,11 @@ export default function LeadRouting() {
             </div>
             <div>
               <p className="font-medium text-foreground mb-1">4. Lead Assignment</p>
-              <p>The first matching active rule assigns the lead to the specified team member</p>
+              <p>The first matching active rule assigns the lead to the specified Target (User, Queue, or Round Robin Group)</p>
             </div>
             <div>
-              <p className="font-medium text-foreground mb-1">5. Qualification & Nurturing</p>
-              <p>Assigned reps engage with leads, track activities, and move them through the pipeline</p>
-            </div>
-            <div>
-              <p className="font-medium text-foreground mb-1">6. Conversion</p>
-              <p>Qualified leads are converted to accounts, contacts, and opportunities</p>
+              <p className="font-medium text-foreground mb-1">5. Round Robin Distribution</p>
+              <p>If assigned to a Round Robin Group, the system automatically picks the best available agent based on capacity.</p>
             </div>
           </CardContent>
         </Card>
