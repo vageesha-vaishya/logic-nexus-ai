@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,9 @@ import { AssignmentAnalytics } from '@/components/assignment/AssignmentAnalytics
 
 export default function LeadAssignment() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'rules';
+
   const { supabase, context } = useCRM();
   const [stats, setStats] = useState({
     pendingQueue: 0,
@@ -27,10 +30,45 @@ export default function LeadAssignment() {
     activeRules: 0,
     territories: 0,
   });
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStats();
+
+    // Subscribe to changes
+    const channel = supabase
+      .channel('lead-assignment-stats')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_assignment_queue'
+        },
+        () => {
+          fetchStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_assignment_history'
+        },
+        () => {
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchStats = async () => {
@@ -163,7 +201,7 @@ export default function LeadAssignment() {
         </div>
 
         {/* Tabs for different sections */}
-        <Tabs defaultValue="rules" className="space-y-4">
+        <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList>
             <TabsTrigger value="rules">
               <Settings className="mr-2 h-4 w-4" />

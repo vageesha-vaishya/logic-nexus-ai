@@ -60,7 +60,6 @@ export default function QueueManagement() {
       const { data, error } = await supabase
         .from('queues')
         .select('*, queue_members(count)')
-        .eq('tenant_id', context.tenantId)
         .order('name');
 
       if (error) throw error;
@@ -72,7 +71,12 @@ export default function QueueManagement() {
       
       setQueues(formattedQueues);
     } catch (error: any) {
-      toast.error('Failed to load queues');
+      // Check for missing table error (PGRST205)
+      if (error?.code === 'PGRST205' || error?.message?.includes('relation "public.queues" does not exist')) {
+        toast.error('System Update Required: Queues table not found. Please run database migrations.');
+      } else {
+        toast.error('Failed to load queues');
+      }
       console.error('Error:', error);
     } finally {
       setLoading(false);

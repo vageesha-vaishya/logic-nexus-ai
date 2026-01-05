@@ -13,6 +13,9 @@ import { useCRM } from '@/hooks/useCRM';
 import { FormSection, FormGrid } from '@/components/forms/FormLayout';
 import { AsyncComboboxField, FileUploadField } from '@/components/forms/AdvancedFields';
 import { Switch } from '@/components/ui/switch';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -104,6 +107,22 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   const { isSubmitting } = form.formState;
   const attachments = form.watch('attachments');
   const [signedUrlEnabled, setSignedUrlEnabled] = useState(false);
+  const values = form.getValues();
+  const fields = [
+    values.first_name,
+    values.last_name,
+    values.email,
+    values.phone,
+    values.company,
+    values.title,
+    values.description,
+    values.notes,
+  ];
+  const filledCount = fields.filter((v) => typeof v === 'string' ? v.trim().length > 0 : !!v).length;
+  const score = Math.round((filledCount / fields.length) * 100);
+  const label = score >= 80 ? 'Strong' : score >= 50 ? 'Moderate' : 'Weak';
+  const grade = score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D';
+  const color = score >= 80 ? 'text-green-600 dark:text-green-300' : score >= 50 ? 'text-yellow-600 dark:text-yellow-300' : 'text-red-600 dark:text-red-300';
 
   const handleFormSubmit = (data: LeadFormData) => {
     setPendingData(data);

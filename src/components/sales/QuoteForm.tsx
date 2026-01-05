@@ -197,19 +197,19 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     },
   });
 
-  // Filter services by the currently selected service_type_id (FK-only)
-  const filteredServices = useMemo(() => {
-    const currentTypeId = form.getValues('service_type_id');
-    if (!currentTypeId) return [] as any[];
-    return services.filter((service: any) => String(service.service_type_id || '') === String(currentTypeId));
-  }, [form, services]);
-
   // Watch selected account to enable contact filtering
   const accountId = form.watch('account_id');
   // Watch selected carrier to ensure its label is available immediately
   const carrierId = form.watch('carrier_id');
   // Watch service type id (UUID) to sync code for filtering/mappings
   const serviceTypeId = form.watch('service_type_id');
+
+  // Filter services by the currently selected service_type_id (FK-only)
+  const filteredServices = useMemo(() => {
+    const currentTypeId = serviceTypeId;
+    if (!currentTypeId) return [] as any[];
+    return services.filter((service: any) => String(service.service_type_id || '') === String(currentTypeId));
+  }, [serviceTypeId, services]);
 
   const fetchServiceData = async () => {
     try {
@@ -244,7 +244,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
 
       // Extract unique service type ids for dropdown (FKs)
-      const uniqueTypeIds = [...new Set(mappingRows.map((m: any) => String(m.service_type_id)).filter(Boolean))];
+      const uniqueTypeIds = [...new Set(mappingRows
+        .map((m: any) => m.service_type_id)
+        .filter((id: any) => id !== null && id !== undefined)
+        .map(String)
+      )];
 
       // Resolve service_type_id to canonical service_types (UUID id + name + code)
       let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
@@ -1090,120 +1094,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           // ignore
         }
 
-        // Fetch carriers filtered by selected service type via mapping table
-        const currentServiceTypeId = selectedServiceType || form.getValues('service_type_id');
-        if (currentServiceTypeId) {
-          // Get service type code to use for carrier filtering
-          const serviceType = serviceTypes.find((st: any) => String(st.id) === String(currentServiceTypeId));
-          const serviceTypeCode = serviceType?.code;
-          
-          if (serviceTypeCode) {
-            // Normalize to carrier_service_types.service_type values
-            const normCode = (() => {
-              const raw = String(serviceTypeCode).toLowerCase();
-              switch (raw) {
-                case 'ocean':
-                case 'ocean_freight':
-                  return 'ocean';
-                case 'air':
-                case 'air_freight':
-                  return 'air';
-                case 'inland_trucking':
-                case 'trucking':
-                case 'road':
-                  return 'trucking';
-                case 'courier':
-                  return 'courier';
-                case 'railway_transport':
-                case 'rail':
-                  return 'railway_transport';
-                default:
-                  return raw.split('_')[0];
-              }
-            })();
-            const carriersRes = await (supabase as any)
-              .from('carrier_service_types')
-              .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
-              .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
-              .eq('service_type', normCode)
-              .eq('is_active', true);
-            if (carriersRes.error) throw carriersRes.error;
-            // Map carriers from join and de-duplicate by id to avoid double labels
-            const mappedRaw = (carriersRes.data || [])
-              .map((row: any) => row.carriers)
-              .filter((c: any) => !!c && c.is_active);
-            const mappedById: Record<string, any> = {};
-            for (const c of mappedRaw) {
-              mappedById[String(c.id)] = c;
-            }
-            let mapped = Object.values(mappedById);
-
-            // Fallback: if no mappings present, use carriers table by mode/carrier_type
-            if (mapped.length === 0) {
-              const { data: allCarriers } = await (supabase as any)
-                .from('carriers')
-                .select('id, carrier_name, is_active, carrier_type, mode, tenant_id')
-                .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
-                .order('carrier_name');
-              const normalizeCarrierType = (mode?: string, type?: string) => {
-                const m = String(mode || '').toLowerCase();
-                const t = String(type || '').toLowerCase();
-                const key = m || t;
-                switch (key) {
-                  case 'ocean':
-                    return 'ocean';
-                  case 'air':
-                  case 'air_cargo':
-                    return 'air';
-                  case 'inland_trucking':
-                  case 'trucking':
-                  case 'road':
-                    return 'trucking';
-                  case 'courier':
-                    return 'courier';
-                  case 'movers_packers':
-                  case 'movers_and_packers':
-                  case 'moving':
-                    return 'moving';
-                  case 'railway_transport':
-                  case 'rail':
-                    return 'railway_transport';
-                  default:
-                    return key.split('_')[0];
-                }
-              };
-              const fallbacks = (allCarriers || [])
-                .filter((c: any) => c && c.is_active)
-                .filter((c: any) => normalizeCarrierType(c.mode, c.carrier_type) === normCode);
-              const fbById: Record<string, any> = {};
-              for (const c of fallbacks) fbById[String(c.id)] = c;
-              mapped = Object.values(fbById);
-            }
-            // Ensure saved carrier (in edit mode) appears in the list even if not mapped
-            const selectedCarrierId = form.getValues('carrier_id');
-            if (selectedCarrierId && !mapped.some((c: any) => String(c.id) === String(selectedCarrierId))) {
-              const { data: selCarrier } = await supabase
-                .from('carriers')
-                .select('id, carrier_name, is_active')
-                .eq('id', selectedCarrierId)
-                .maybeSingle();
-              if (selCarrier) {
-                mappedById[String(selCarrier.id)] = selCarrier;
-                mapped = Object.values(mappedById);
-              }
-            }
-            // Dedupe by name to avoid global + tenant duplicates; prefer tenant entry
-            setCarriers(uniqueByCarrierName(mapped, tenantId));
-          } else {
-            // No service type code found
-            setCarriers([]);
-          }
-        } else {
-          // No service type selected yet; do not show carriers
-          setCarriers([]);
-        }
-
-        // Seed resolved tenant from current context
+        // Fetch carriers logic moved to dedicated effect to support reactive updates
+        // See useEffect dependent on serviceTypeId below
         setResolvedTenantId(tenantId);
 
         // Capture local lists for use below

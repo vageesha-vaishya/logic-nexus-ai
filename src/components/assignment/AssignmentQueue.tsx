@@ -15,27 +15,47 @@ export function AssignmentQueue({ onUpdate }: Props) {
   const { supabase, context } = useCRM();
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'failed'>('all');
 
   useEffect(() => {
     fetchQueue();
+
+    const channel = supabase
+      .channel('assignment-queue-list')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_assignment_queue'
+        },
+        () => {
+          fetchQueue();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchQueue = async () => {
     try {
-      let query = supabase
+      // We rely on RLS for tenant isolation
+      const { data, error } = await supabase
         .from('lead_assignment_queue')
         .select('*, leads(first_name, last_name, company)')
         .order('priority', { ascending: false })
         .order('created_at', { ascending: true });
 
-      if (context.tenantId) query = query.eq('tenant_id', context.tenantId);
-
-      const { data, error } = await query;
       if (error) throw error;
+      
+      console.log('Queue fetched:', data?.length, 'items');
       setQueue(data || []);
     } catch (error: any) {
       toast.error('Failed to load queue');
-      console.error('Error:', error);
+      console.error('Error fetching queue:', error);
     } finally {
       setLoading(false);
     }
@@ -101,10 +121,19 @@ export function AssignmentQueue({ onUpdate }: Props) {
             View and manage pending lead assignments
           </p>
         </div>
-        <Button onClick={fetchQueue} variant="outline" size="sm">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={filter === 'pending' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setFilter(filter === 'pending' ? 'all' : 'pending')}
+          >
+            Pending Only
+          </Button>
+          <Button onClick={fetchQueue} variant="outline" size="sm">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {queue.length === 0 ? (
@@ -115,7 +144,9 @@ export function AssignmentQueue({ onUpdate }: Props) {
         </Card>
       ) : (
         <div className="space-y-3">
-          {queue.map((item) => (
+          {queue
+            .filter(item => filter === 'all' || (item.status && item.status.toLowerCase() === filter))
+            .map((item) => (
             <Card key={item.id}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">

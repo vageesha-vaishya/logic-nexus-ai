@@ -29,8 +29,6 @@ export const APP_MENU: MenuModule[] = [
       // Place Home at the top
       { name: 'Home', path: '/dashboard', icon: Home, description: 'Overview homepage' },
       // Workflow sequence
-      { name: 'Accounts', path: '/dashboard/accounts/pipeline', icon: Building2, description: 'Organizations and customers' },
-      { name: 'Contacts', path: '/dashboard/contacts/pipeline', icon: Users, description: 'People tied to accounts' },
       {
         name: 'Leads',
         path: '/dashboard/leads/pipeline',
@@ -45,6 +43,8 @@ export const APP_MENU: MenuModule[] = [
       },
       { name: 'Tasks/Activities', path: '/dashboard/activities', icon: CheckSquare, description: 'Activity management' },
       { name: 'Opportunities', path: '/dashboard/opportunities/pipeline', icon: TrendingUp, description: 'Deals and pipeline' },
+      { name: 'Accounts', path: '/dashboard/accounts/pipeline', icon: Building2, description: 'Organizations and customers' },
+      { name: 'Contacts', path: '/dashboard/contacts/pipeline', icon: Users, description: 'People tied to accounts' },
       { name: 'Quotes', path: '/dashboard/quotes/pipeline', icon: FileCheck, description: 'Sales quotes and proposals' },
 
       // Remaining items

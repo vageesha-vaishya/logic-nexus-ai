@@ -232,157 +232,36 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           containerSizes: [] as any[]
         };
 
-        // Load service types
-        try {
-          const { data, error } = await supabase
-            .from('service_types')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading service_types:', error);
-            errors.push('Failed to load service types');
-          } else {
-            results.serviceTypes = data || [];
-            console.log('[Composer] Loaded service types:', results.serviceTypes.length);
+        const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string) => {
+          try {
+            const { data, error } = await supabase
+              .from(table)
+              .select('*')
+              .eq('is_active', true);
+            
+            if (error) {
+              console.error(`[Composer] Error loading ${table}:`, error);
+              errors.push(errorMsg);
+            } else {
+              (results as any)[resultKey] = data || [];
+              console.log(`[Composer] Loaded ${table}:`, (results as any)[resultKey].length);
+            }
+          } catch (error) {
+            console.error(`[Composer] Exception loading ${table}:`, error);
+            errors.push(errorMsg);
           }
-        } catch (error) {
-          console.error('[Composer] Exception loading service_types:', error);
-          errors.push('Failed to load service types');
-        }
+        };
 
-        // Load transport modes
-        try {
-          const { data, error } = await supabase
-            .from('transport_modes')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading transport_modes:', error);
-            errors.push('Failed to load transport modes');
-          } else {
-            results.transportModes = data || [];
-            console.log('[Composer] Loaded transport modes:', results.transportModes.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading transport_modes:', error);
-          errors.push('Failed to load transport modes');
-        }
-
-        // Load charge categories
-        try {
-          const { data, error } = await supabase
-            .from('charge_categories')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading charge_categories:', error);
-            errors.push('Failed to load charge categories');
-          } else {
-            results.chargeCategories = data || [];
-            console.log('[Composer] Loaded charge categories:', results.chargeCategories.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading charge_categories:', error);
-          errors.push('Failed to load charge categories');
-        }
-
-        // Load charge bases
-        try {
-          const { data, error } = await supabase
-            .from('charge_bases')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading charge_bases:', error);
-            errors.push('Failed to load charge bases');
-          } else {
-            results.chargeBases = data || [];
-            console.log('[Composer] Loaded charge bases:', results.chargeBases.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading charge_bases:', error);
-          errors.push('Failed to load charge bases');
-        }
-
-        // Load currencies
-        try {
-          const { data, error } = await supabase
-            .from('currencies')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading currencies:', error);
-            errors.push('Failed to load currencies');
-          } else {
-            results.currencies = data || [];
-            console.log('[Composer] Loaded currencies:', results.currencies.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading currencies:', error);
-          errors.push('Failed to load currencies');
-        }
-
-        // Load trade directions
-        try {
-          const { data, error } = await supabase
-            .from('trade_directions')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading trade_directions:', error);
-            errors.push('Failed to load trade directions');
-          } else {
-            results.tradeDirections = data || [];
-            console.log('[Composer] Loaded trade directions:', results.tradeDirections.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading trade_directions:', error);
-          errors.push('Failed to load trade directions');
-        }
-
-        // Load container types
-        try {
-          const { data, error } = await supabase
-            .from('container_types')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading container_types:', error);
-            errors.push('Failed to load container types');
-          } else {
-            results.containerTypes = data || [];
-            console.log('[Composer] Loaded container types:', results.containerTypes.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading container_types:', error);
-          errors.push('Failed to load container types');
-        }
-
-        // Load container sizes
-        try {
-          const { data, error } = await supabase
-            .from('container_sizes')
-            .select('*')
-            .eq('is_active', true);
-          
-          if (error) {
-            console.error('[Composer] Error loading container_sizes:', error);
-            errors.push('Failed to load container sizes');
-          } else {
-            results.containerSizes = data || [];
-            console.log('[Composer] Loaded container sizes:', results.containerSizes.length);
-          }
-        } catch (error) {
-          console.error('[Composer] Exception loading container_sizes:', error);
-          errors.push('Failed to load container sizes');
-        }
+        await Promise.all([
+          fetchRef('service_types', 'serviceTypes', 'Failed to load service types'),
+          fetchRef('transport_modes', 'transportModes', 'Failed to load transport modes'),
+          fetchRef('charge_categories', 'chargeCategories', 'Failed to load charge categories'),
+          fetchRef('charge_bases', 'chargeBases', 'Failed to load charge bases'),
+          fetchRef('currencies', 'currencies', 'Failed to load currencies'),
+          fetchRef('trade_directions', 'tradeDirections', 'Failed to load trade directions'),
+          fetchRef('container_types', 'containerTypes', 'Failed to load container types'),
+          fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes')
+        ]);
 
         return results;
       };

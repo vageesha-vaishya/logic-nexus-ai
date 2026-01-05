@@ -44,6 +44,21 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange }: QuoteDetai
   const seaChgWeight = calculateChargeableWeight(weight, volume, 'sea');
   const roadChgWeight = calculateChargeableWeight(weight, volume, 'road');
 
+  const calculateDaysRemaining = (dateStr: string | undefined) => {
+    if (!dateStr) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Parse input as local date to ensure accurate day difference
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const targetDate = new Date(y, m - 1, d);
+    
+    const diffTime = targetDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const daysRemaining = calculateDaysRemaining(quoteData.validUntil);
+
   return (
     <Card>
       <CardHeader>

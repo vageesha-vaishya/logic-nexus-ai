@@ -50,21 +50,27 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const load = async () => {
     setLoading(true);
     try {
-      // Get current version ID from quote
-      const { data: quoteData } = await supabase
-        .from('quotes')
-        .select('current_version_id')
-        .eq('id', quoteId)
-        .maybeSingle();
+      // Parallel fetch: current version ID and all versions
+      const [quoteRes, versionsRes] = await Promise.all([
+        supabase
+          .from('quotes')
+          .select('current_version_id')
+          .eq('id', quoteId)
+          .maybeSingle(),
+        supabase
+          .from('quotation_versions')
+          .select('*')
+          .eq('quote_id', quoteId)
+          .order('version_number', { ascending: false })
+      ]);
+
+      const quoteData = quoteRes.data;
+      const vs = versionsRes.data;
+      const vErr = versionsRes.error;
+
+      if (vErr) throw vErr;
 
       const currentVersionId = quoteData?.current_version_id;
-
-      const { data: vs, error: vErr } = await supabase
-        .from('quotation_versions')
-        .select('*')
-        .eq('quote_id', quoteId)
-        .order('version_number', { ascending: false });
-      if (vErr) throw vErr;
 
       // Mark current version
       const versionsWithCurrent = (vs ?? []).map(v => ({

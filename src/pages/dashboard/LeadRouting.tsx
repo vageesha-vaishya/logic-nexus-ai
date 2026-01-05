@@ -46,10 +46,15 @@ export default function LeadRouting() {
     fetchRules();
     fetchUsers();
     fetchQueues();
-  }, []);
+  }, [context.tenantId]);
 
   const fetchRules = async () => {
     try {
+      if (!context.tenantId) {
+        setRules([]);
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase
         .from('lead_assignment_rules')
         .select('*')
@@ -85,7 +90,16 @@ export default function LeadRouting() {
         .from('queues')
         .select('id, name, type');
 
-      if (error) throw error;
+      if (error) {
+        setQueues([]);
+        const msg = typeof error?.message === 'string' ? error.message : '';
+        const code = typeof error?.code === 'string' ? error.code : '';
+        if (code === 'PGRST205' || msg.includes('Could not find the table')) {
+          toast.info('Queues are not available in this environment');
+          return;
+        }
+        throw error;
+      }
       setQueues(data || []);
     } catch (error: any) {
       console.error('Error fetching queues:', error);
@@ -109,6 +123,10 @@ export default function LeadRouting() {
     }
 
     try {
+      if (!context.tenantId) {
+        toast.error('No tenant selected');
+        return;
+      }
       const { error } = await supabase
         .from('lead_assignment_rules')
         .insert({
