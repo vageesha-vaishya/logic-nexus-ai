@@ -117,6 +117,11 @@ export default function QueueManagement() {
       return;
     }
 
+    if (!context.tenantId) {
+      toast.error('No tenant context available. Please ensure you have the correct role assigned.');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('queues')
