@@ -1,43 +1,37 @@
-# Lead Management Module: Technical Documentation & Implementation Guide
+# Lead Management Module: Implementation Wizard & Technical Guide
 
-**Version**: 1.0.0
+**Version**: 2.0.0
 **Date**: 2026-01-06
-**Status**: Approved for Implementation
+**Status**: Implementation Ready
+**Guide Format**: Sequential Implementation Wizard
 
 ---
 
 ## Executive Summary
-This document serves as the authoritative technical reference for the Lead Management Module within the SOS Logistics Pro platform. It details the architecture, configuration, and operational workflows required to implement a robust lead-to-cash lifecycle.
+This document is structured as a **Step-by-Step Implementation Wizard**. Follow the steps sequentially to configure, implement, and verify the Lead Management Module. Each step represents a logical phase in the deployment lifecycle.
 
 ---
 
-## 1. System Pre-requisites & Configuration
+## 🧙‍♂️ Implementation Wizard
 
-### 1.1 Hardware & Software Requirements
-The Lead Management Module is a cloud-native application component hosted on the Supabase platform.
+### Step 1: System Pre-requisites & Configuration
+*Objective: Prepare the environment and core security layer.*
 
-*   **Server-Side**:
-    *   **Runtime**: Supabase (PostgreSQL 15+, Edge Functions via Deno).
-    *   **Storage**: Supabase Storage for attachment handling.
-    *   **Infrastructure**: Hosted on AWS (via Supabase Managed Service).
-*   **Client-Side**:
+#### 1.1 Hardware & Software Requirements
+Ensure the following baseline configuration for end-to-end implementation:
+*   **Server Runtime**: Supabase (PostgreSQL 15+, Edge Functions via Deno).
+*   **Client Environment**:
     *   **Browser**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+.
-    *   **Device**: Responsive design supports Desktop (1920x1080 optimized), Tablet, and Mobile.
-    *   **Network**: Minimum 5 Mbps broadband connection recommended.
+    *   **Display**: Optimized for 1920x1080 (Desktop) down to 375x667 (Mobile).
+    *   **Network**: Low-latency broadband (>5 Mbps) recommended for real-time updates.
+*   **Mobile Access**:
+    *   Fully responsive web interface (PWA-ready).
+    *   Touch-optimized input fields for field sales.
 
-### 1.2 Database Schema Integration
-The module integrates directly with the core CRM schema. Key integration points include:
+#### 1.2 Database Schema & Integration
+The module requires the following core tables. Run the migration scripts to establish the schema.
 
-| Table | Relationship | Description |
-| :--- | :--- | :--- |
-| `leads` | Primary | Core record storage for potential customers. |
-| `activities` | 1:N | Human interactions (calls, emails, meetings) linked to a lead. |
-| `lead_activities` | 1:N | Automated system events (email opens, link clicks) for scoring. |
-| `queues` | Reference | Holding buckets or round-robin groups for assignment. |
-| `queue_members` | Join | Users assigned to specific queues. |
-| `tenants` | Scope | Root isolation layer for multi-tenancy. |
-
-**Schema Snippet (`leads`):**
+**Core Table: `leads`**
 ```sql
 CREATE TABLE public.leads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,334 +43,199 @@ CREATE TABLE public.leads (
   title TEXT,
   email TEXT,
   phone TEXT,
-  status public.lead_status DEFAULT 'new', -- Enum: new, contacted, qualified, etc.
-  source public.lead_source DEFAULT 'other', -- Enum: website, referral, etc.
+  status public.lead_status DEFAULT 'new',
+  source public.lead_source DEFAULT 'other',
   estimated_value DECIMAL(15,2),
   expected_close_date DATE,
   description TEXT,
   notes TEXT,
   owner_id UUID REFERENCES public.profiles(id),
-  owner_queue_id UUID REFERENCES public.queues(id), -- Polymorphic assignment
-  converted_account_id UUID REFERENCES public.accounts(id),
-  converted_contact_id UUID REFERENCES public.contacts(id),
-  converted_at TIMESTAMP WITH TIME ZONE,
-  created_by UUID REFERENCES public.profiles(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+  owner_queue_id UUID REFERENCES public.queues(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-**Schema Snippet (`queues`):**
-```sql
-CREATE TABLE public.queues (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    franchise_id UUID REFERENCES public.franchises(id) ON DELETE SET NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    email TEXT,
-    is_active BOOLEAN DEFAULT true,
-    type TEXT CHECK (type IN ('holding', 'round_robin')) DEFAULT 'holding',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+**Integration Points**:
+*   **`tenants`**: Strict foreign key enforcement for multi-tenancy.
+*   **`profiles`**: Links to `owner_id` for user assignment.
+*   **`queues`**: Links to `owner_queue_id` for pool-based assignment.
 
-### 1.3 User Permission Matrix
-Access is controlled via Row Level Security (RLS) and Application-Level Permissions defined in `src/config/permissions.ts`.
+#### 1.3 User Permission Matrix & Security
+Configure Role-Based Access Control (RBAC) in `src/config/permissions.ts`.
 
-| Permission Slug | Platform Admin | Tenant Admin | Franchise Admin | Sales User | Description |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| `leads.view` | ✅ All | ✅ Tenant | ✅ Franchise | ✅ Owned | View lead records. |
-| `leads.create` | ✅ | ✅ | ✅ | ✅ | Create new leads. |
-| `leads.edit` | ✅ | ✅ | ✅ | ✅ | Edit existing leads. |
-| `leads.delete` | ✅ | ✅ | ✅ | ❌ | Delete leads. |
-| `leads.convert` | ✅ | ✅ | ✅ | ✅ | Convert lead to Account/Opp. |
-| `leads.assign` | ✅ | ✅ | ✅ | ❌ | Manually reassign lead owner. |
-| `admin.lead_routing`| ✅ | ✅ | ❌ | ❌ | Configure routing rules/queues. |
+| Permission | Platform Admin | Tenant Admin | Franchise Admin | Sales User |
+| :--- | :---: | :---: | :---: | :---: |
+| `leads.view` | ✅ All | ✅ Tenant | ✅ Franchise | ✅ Owned |
+| `leads.create` | ✅ | ✅ | ✅ | ✅ |
+| `leads.edit` | ✅ | ✅ | ✅ | ✅ |
+| `leads.delete` | ✅ | ✅ | ✅ | ❌ |
+| `leads.convert`| ✅ | ✅ | ✅ | ✅ |
+| `leads.assign` | ✅ | ✅ | ✅ | ❌ |
 
-### 1.4 API Access Configuration
-*   **Authentication**: Bearer Token (JWT) via Supabase Auth.
-*   **Base URL**: `https://<project-ref>.supabase.co/rest/v1`
-*   **Headers**:
-    *   `apikey`: Public Anon Key (for client) or Service Role (for backend).
-    *   `Authorization`: `Bearer <token>`
-    *   `Prefer`: `return=representation` (to receive created/updated data).
+#### 1.4 API Access Configuration
+*   **Endpoint**: `https://<project>.supabase.co/rest/v1/leads`
+*   **Auth**: Bearer Token (JWT).
+*   **Headers**: `apikey`, `Authorization`, `Content-Type: application/json`.
 
 ---
 
-## 2. Lead Creation Process
+### Step 2: Implementing Lead Creation Process
+*Objective: Deploy the lead capture interface and validation logic.*
 
-### 2.1 Data Entry & Validation
-The creation interface enforces data quality through strict validation rules defined in the Zod schema (`leadSchema`).
+#### 2.1 Required Fields & Validation Rules
+Implement the following Zod schema (`leadSchema`) to enforce data integrity:
 
-**Validation Rules (Zod):**
-```typescript
-const leadSchema = z.object({
-  first_name: z.string().min(1, 'First name is required').max(100),
-  last_name: z.string().min(1, 'Last name is required').max(100),
-  company: z.string().optional(),
-  title: z.string().optional(),
-  // Email or Phone must be provided (refinement rule)
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  status: z.enum(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']),
-  source: z.enum(['website', 'referral', 'email', 'phone', 'social', 'event', 'other']),
-  estimated_value: z.string().optional(), // Parsed to decimal on submit
-  expected_close_date: z.string().optional(),
-  description: z.string().optional(),
-  notes: z.string().optional(),
-  tenant_id: z.string().optional(),
-  franchise_id: z.string().optional()
-}).refine((data) => {
-  const hasEmail = !!(data.email && data.email.trim());
-  const hasPhone = !!(data.phone && data.phone.trim());
-  return hasEmail || hasPhone;
-}, {
-  path: ['email'],
-  message: 'Provide at least one contact: email or phone',
-});
+| Field | Requirement | Validation Rule |
+| :--- | :--- | :--- |
+| `first_name` | **Required** | Min 1 char, Max 100 chars. |
+| `last_name` | **Required** | Min 1 char, Max 100 chars. |
+| `company` | Optional | String. |
+| `email` | **Conditional** | Valid Email format. *Must provide Email OR Phone.* |
+| `phone` | **Conditional** | String. *Must provide Email OR Phone.* |
+| `status` | Default | Enum: `new`, `contacted`, `qualified`, etc. |
+| `source` | Default | Enum: `website`, `referral`, `other`, etc. |
+
+#### 2.2 Data Entry Guidelines & Input Masks
+*   **Phone Numbers**: Use international format (e.g., `+1-555-0123`). UI should strip non-numeric characters before saving.
+*   **Email**: Auto-trim whitespace; lowercase normalization.
+*   **Currency**: `estimated_value` inputs should allow commas but save as raw decimal (e.g., input "1,500.00" -> save `1500.00`).
+
+#### 2.3 Interface Preview & Annotations
+The Lead Creation UI (`LeadNew.tsx`) is designed as a focused data entry form.
+
+```
+[UI Mockup Placeholder]
++-------------------------------------------------------+
+|  New Lead                                    [Save]   |
+|                                                       |
+|  1. Contact Information ----------------------------  |
+|  [ First Name * ]  [ Last Name * ]                    |
+|  [ Email        ]  [ Phone       ] <--(At least one)  |
+|                                                       |
+|  2. Business Details -------------------------------  |
+|  [ Company Name ]  [ Job Title   ]                    |
+|                                                       |
+|  3. Opportunity Data -------------------------------  |
+|  [ Est. Value ($) ]  [ Close Date (DD/MM/YYYY) ]      |
+|                                                       |
+|  4. Status & Source --------------------------------  |
+|  [ Status (New) v]  [ Source (Website) v]             |
++-------------------------------------------------------+
 ```
 
-### 2.2 Sample Lead Dataset
+#### 2.4 Sample Lead Dataset (Validation Scenarios)
+Use these records to test your implementation:
+
+**Scenario A: Standard Web Lead**
 ```json
-[
-  {
-    "first_name": "John",
-    "last_name": "Doe",
-    "company": "Acme Logistics",
-    "email": "j.doe@acme.example.com",
-    "phone": "+1-555-0199",
-    "source": "website",
-    "status": "new",
-    "estimated_value": 15000,
-    "description": "Inquiry about cold chain storage."
-  },
-  {
-    "first_name": "Jane",
-    "last_name": "Smith",
-    "company": null,
-    "email": "jane.s@gmail.com",
-    "source": "referral",
-    "status": "new",
-    "notes": "Referred by existing client Bob Wilson."
-  }
-]
+{
+  "first_name": "Sarah",
+  "last_name": "Connor",
+  "company": "Cyberdyne Systems",
+  "email": "sarah@cyberdyne.net",
+  "source": "website",
+  "status": "new",
+  "estimated_value": 50000
+}
 ```
 
-### 2.3 Interface Reference
-The Lead Form UI is divided into logical sections:
-1.  **Contact Information**: First Name, Last Name, Title, Email, Phone (2-column grid).
-2.  **Company Details**: Company Name, Website (if added), Address.
-3.  **Lead Status & Source**: Dropdowns for Status (New, Contacted, etc.) and Source.
-4.  **Opportunity Details**: Estimated Value, Expected Close Date.
-5.  **Additional Info**: Description (Textarea), Notes (Textarea).
-6.  **Attachments**: File upload area for supporting docs.
-
-*Note: The form supports dynamic loading of Tenants/Franchises based on the logged-in user's role.*
-
----
-
-## 3. Lead Activities Management
-
-### 3.1 Activity Types & Fields
-Activities represent human interactions. They are stored in the `activities` table.
-
-| Activity Type | Mandatory Fields | Optional Fields | Icon |
-| :--- | :--- | :--- | :--- |
-| **Call** | Subject, Duration | Outcome, Recording URL | 📞 |
-| **Email** | Subject, Body | Attachments, Message ID | ✉️ |
-| **Meeting** | Subject, Start/End Time | Location, Attendees | 📅 |
-| **Task** | Subject, Due Date | Priority, Description | ☑️ |
-| **Note** | Content | - | 📝 |
-
-### 3.2 Automated Events (`lead_activities`)
-Separate from human activities, the system tracks automated engagement signals for scoring:
-*   `email_opened`
-*   `link_clicked`
-*   `page_view`
-*   `form_submission`
-
-### 3.3 Activity Workflow
-```mermaid
-graph LR
-    A[User Logs Activity] --> B{Type?}
-    B -- Task --> C[Set Due Date]
-    B -- Meeting --> D[Sync to Calendar]
-    B -- Email --> E[Send via SMTP]
-    C --> F[Activity Feed Update]
-    D --> F
-    E --> F
-    F --> G[Update Lead 'Last Activity' Timestamp]
+**Scenario B: Referral (Phone Only)**
+```json
+{
+  "first_name": "James",
+  "last_name": "Howlett",
+  "phone": "+1-555-0199",
+  "source": "referral",
+  "notes": "Referred by Professor X."
+}
 ```
 
 ---
 
-## 4. Lead Routing Mechanism
+### Step 3: Implementing Lead Activities Management
+*Objective: Enable tracking of interactions (Calls, Emails, Meetings).*
 
-### 4.1 Routing Logic
-The routing engine evaluates rules in priority order (1 = Highest). It supports both **User Assignment** and **Queue Assignment**.
+#### 3.1 Activity Types & Field Matrix
+Configure the `activities` table to support these polymorphic types.
 
-**Decision Factors:**
-1.  **Geography**: Country, State/Province (e.g., "US West Coast").
-2.  **Lead Score**: High value (> $50k) vs Standard.
-3.  **Source**: Website vs Partner Referral.
+| Activity Type | Mandatory Fields | Optional Fields |
+| :--- | :--- | :--- |
+| **Call** 📞 | `subject`, `duration_minutes` | `outcome` (connected/voicemail), `recording_url` |
+| **Email** ✉️ | `subject`, `body` | `message_id`, `attachments` |
+| **Meeting** 📅 | `subject`, `start_time`, `end_time` | `location`, `attendees_list` |
+| **Task** ☑️ | `subject`, `due_date` | `priority`, `status` |
 
-### 4.2 Workflow Diagram
-```mermaid
-flowchart TD
-    Start[New Lead Arrives] --> Score[Calculate Lead Score]
-    Score --> Rule1{Is High Priority?}
-    Rule1 -- Yes --> VIP[Assign to VIP Queue]
-    Rule1 -- No --> Rule2{Region = NA?}
-    Rule2 -- Yes --> NA_Team[Assign to NA Sales Group]
-    Rule2 -- No --> General[Assign to General Pool]
-    
-    VIP --> Notify[Alert Managers]
-    NA_Team --> RR[Round Robin Distribution]
-    General --> Holding[Holding Queue]
-```
+#### 3.2 Activity Tracking Workflow
+The system automatically updates the parent Lead's "Last Activity" timestamp whenever a new activity is logged.
 
-### 4.3 Performance Metrics
-*   **Routing Latency**: Target < 500ms.
-*   **Rule Match Rate**: % of leads matching a specific rule vs default catch-all.
-
----
-
-## 5. Lead Assignment Framework
-
-### 5.1 Assignment Configurations
-1.  **Direct User**: Assigns to a specific `user_id`.
-2.  **Queue (Holding)**: Assigns to `owner_queue_id` (User ID remains null).
-3.  **Round Robin**:
-    *   Selects Group Members from `queue_members`.
-    *   Filters by availability (future feature).
-    *   Distributes sequentially to ensure even load.
-
-### 5.2 Assignment Success Tracking
-We track assignment history (future implementation) or rely on `updated_at` timestamps.
-*   **Success Rate**: (Successful Assignments / Total Routing Attempts) * 100.
-*   **Failure Modes**: "No Available Agents", "Queue Full", "System Error".
-
----
-
-## 6. Queue Management System
-
-### 6.1 Queue Configuration
-*   **Type**:
-    *   `holding`: Passive. Leads wait to be picked.
-    *   `round_robin`: Active. System distributes leads.
-*   **Scope**: Tenant-wide or Franchise-specific.
-*   **Security**: `queue_members` table controls who can access leads in a queue.
-
-### 6.2 Monitoring KPIs
-*   **Queue Depth**: Current number of unassigned leads (`owner_id` IS NULL AND `owner_queue_id` IS NOT NULL).
-*   **Avg Wait Time**: Time from Queue Entry to User Assignment.
-*   **Abandonment Rate**: Leads closed/lost while in queue.
-
----
-
-## 7. Integration with Related Objects
-
-### 7.1 Conversion Workflow
-When a lead is converted via `LeadConversionDialog`:
-1.  **Account**: Checks for duplicates or creates new `accounts` record.
-2.  **Contact**: Creates `contacts` record linked to Account.
-3.  **Opportunity**: Creates `opportunities` record with stage "Prospecting" (if requested).
-4.  **Lead**:
-    *   Status updates to `converted`.
-    *   `converted_at`, `converted_account_id`, `converted_contact_id` are set.
-5.  **Activities**: All linked activities are re-parented to the new Account/Contact/Opportunity.
-
-### 7.2 Data Consistency
-*   **Transactional Integrity**: Conversion is wrapped in a database transaction to ensure atomicity.
-*   **Field Mapping**:
-    *   Lead `company` -> Account `name`
-    *   Lead `estimated_value` -> Opportunity `amount`
-    *   Lead `expected_close_date` -> Opportunity `close_date`
-
----
-
-## 8. End-to-End Process Flow
-
-### 8.1 Sequence Diagram
 ```mermaid
 sequenceDiagram
-    participant Web as Web Form
-    participant API as System API
+    participant User
+    participant UI as Activity Form
     participant DB as Database
-    participant Eng as Routing Engine
-    participant Ag as Sales Agent
+    participant Lead as Lead Record
 
-    Web->>API: POST /leads
-    API->>DB: Insert Lead (Status=New)
-    DB-->>Eng: Trigger Assignment
-    Eng->>DB: Fetch Rules
-    Eng->>Eng: Evaluate Logic
-    Eng->>DB: Update Lead (Owner=Agent)
-    DB-->>Ag: Notification (New Lead)
-    Ag->>DB: Update Status (Contacted)
-    Ag->>DB: Log Call Activity
-    Ag->>DB: Convert Lead
-    DB->>DB: Create Account/Opp
+    User->>UI: Select "Log Call"
+    UI->>UI: Validate Subject & Duration
+    UI->>DB: INSERT into activities
+    DB->>Lead: UPDATE updated_at = NOW()
+    DB-->>UI: Success Response
+    UI-->>User: Show in Timeline
 ```
 
-### 8.2 Swimlane Diagram (Process Flow)
-```mermaid
-flowchart TD
-    subgraph System
-    A[Lead Captured] --> B[Lead Scored]
-    B --> C{Route?}
-    C -- Queue --> D[Add to Queue]
-    C -- User --> E[Assign to User]
-    end
-
-    subgraph Manager
-    M1[Define Rules] -.-> C
-    M2[Monitor Queues] -.-> D
-    end
-
-    subgraph Sales Rep
-    E --> F[Receive Notification]
-    D --> G[Pick from Queue]
-    F --> H[Qualify Lead]
-    G --> H
-    H --> I{Qualified?}
-    I -- Yes --> J[Convert to Opportunity]
-    I -- No --> K[Mark as Lost]
-    end
+#### 3.3 Sample Activity Record
+```json
+{
+  "type": "call",
+  "subject": "Introductory Discovery Call",
+  "duration_minutes": 15,
+  "outcome": "qualified",
+  "lead_id": "uuid-of-lead",
+  "created_by": "uuid-of-agent",
+  "created_at": "2026-01-06T10:00:00Z"
+}
 ```
+
+---
+
+### Step 4: Configuring Lead Routing & Assignment
+*Objective: Automate lead distribution to the right agents.*
+
+#### 4.1 Routing Logic Flow
+1.  **Capture**: Lead enters system (Status = `new`).
+2.  **Score**: System calculates priority (e.g., Value > $10k = High).
+3.  **Route**:
+    *   **Direct**: Assign to specific user if logic matches.
+    *   **Queue**: Place in `holding` or `round_robin` queue.
+    *   **Fallback**: Assign to "General Pool" if no rules match.
+
+#### 4.2 Queue Management
+*   **Round Robin Queues**: Automatically cycle through available members.
+*   **Holding Queues**: "First-come, first-served" pull model.
+
+---
+
+### Step 5: Integration & Conversion
+*Objective: Move the lead to the next stage of the lifecycle.*
+
+#### 5.1 Conversion Workflow
+When a lead is marked `converted`:
+1.  **Create Account**: `Acme Logistics` (from Lead Company).
+2.  **Create Contact**: `Sarah Connor` (from Lead Name).
+3.  **Create Opportunity**: `Acme Logistics Deal` (from Lead Value).
+4.  **Archive Lead**: Status -> `converted`; link to new objects.
 
 ---
 
 ## Appendices
 
-### A. Troubleshooting Guide
-| Issue | Probable Cause | Solution |
-| :--- | :--- | :--- |
-| **Lead stuck in 'New'** | No matching rules; Default rule missing. | Check `LeadRouting` config; ensure a "Catch-all" rule exists. |
-| **Round Robin failing** | All agents at capacity or unavailable. | Check `user_capacity` table; increase limits or mark agents available. |
-| **Permissions Error** | User lacks `leads.view` permission. | Verify User Role assignments in `PermissionsMatrix` and `queue_members`. |
+### A. Troubleshooting
+*   **Validation Errors**: Check Zod schema in `LeadForm.tsx`.
+*   **Missing Activities**: Ensure `lead_id` foreign key is correctly set on activity insert.
+*   **Routing Failures**: Verify `queues` table has active members.
 
-### B. Security Matrix
-*   **Encryption**: TLS 1.2+ for transit; AES-256 for data at rest.
-*   **RLS**: Strict Row Level Security policies ensure tenants cannot see each other's data.
-*   **Audit**: All status changes logged in `lead_assignment_history` (planned) or `activities`.
-
-### C. API Integration Specs
-**Endpoint**: `POST /rest/v1/leads`
-**Payload**:
-```json
-{
-  "first_name": "String",
-  "last_name": "String",
-  "email": "String",
-  "tenant_id": "UUID",
-  "source": "website"
-}
-```
-
-### D. Change Log
-| Version | Date | Author | Changes |
-| :--- | :--- | :--- | :--- |
-| 1.0.0 | 2026-01-06 | System Architect | Initial comprehensive release. |
+### B. Glossary
+*   **Lead**: Unqualified prospect.
+*   **Activity**: Interaction event.
+*   **Queue**: Container for unassigned leads.

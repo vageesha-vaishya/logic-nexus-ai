@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ArrowLeft, Filter, RefreshCw, Calendar, Tag } from 'lucide-react';
+import { Search, ArrowLeft, Filter, RefreshCw, Calendar, Tag, Plus } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
@@ -284,6 +284,12 @@ export default function LeadsPipeline() {
               <Button variant="secondary" size="sm" onClick={() => navigate("/dashboard/leads")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 List View
+              </Button>
+              <Button asChild size="sm">
+                <Link to="/dashboard/leads/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Lead
+                </Link>
               </Button>
             </div>
           </div>
