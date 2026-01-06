@@ -34,6 +34,8 @@ export default function QueueManagement() {
   const [queues, setQueues] = useState<Queue[]>([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
+  const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   
   // Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -52,7 +54,26 @@ export default function QueueManagement() {
   useEffect(() => {
     fetchQueues();
     fetchUsers();
+    if (context.isPlatformAdmin) {
+      fetchTenants();
+    }
   }, []);
+
+  const fetchTenants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      setTenants((data || []) as { id: string; name: string }[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch tenants:', message);
+      toast.error('Failed to fetch tenants', { description: message });
+    }
+  };
 
   const fetchQueues = async () => {
     try {
@@ -118,8 +139,9 @@ export default function QueueManagement() {
       return;
     }
 
-    if (!context.tenantId) {
-      toast.error('No tenant context available. Please ensure you have the correct role assigned.');
+    const tenantId = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
+    if (!tenantId) {
+      toast.error(context.isPlatformAdmin ? 'Please select a tenant' : 'No tenant context available. Please ensure you have the correct role assigned.');
       return;
     }
 
@@ -128,7 +150,7 @@ export default function QueueManagement() {
         .from('queues')
         .insert({
           ...newQueue,
-          tenant_id: context.tenantId,
+          tenant_id: tenantId,
         });
 
       if (error) throw error;
@@ -142,6 +164,7 @@ export default function QueueManagement() {
         type: 'holding',
         is_active: true,
       });
+      setSelectedTenantId(null);
       fetchQueues();
     } catch (error: any) {
       toast.error('Failed to create queue');
@@ -286,6 +309,24 @@ export default function QueueManagement() {
               <DialogDescription>Add a new queue for lead assignment</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {context.isPlatformAdmin && (
+                <div className="space-y-2">
+                  <Label htmlFor="tenant">Tenant *</Label>
+                  <Select
+                    value={selectedTenantId || ''}
+                    onValueChange={(value: string) => setSelectedTenantId(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select tenant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenants.map(t => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="name">Queue Name *</Label>
                 <Input
