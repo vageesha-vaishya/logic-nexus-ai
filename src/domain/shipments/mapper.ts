@@ -66,24 +66,24 @@ export const dbRowToAppShipment = (row: DbShipmentRow): AppShipment => {
     id: String(row.id),
     shipment_number: String(row.shipment_number || row.id),
     shipment_type: normalizeShipmentType(String(row.shipment_type || "ocean")),
-    reference_number: row.quote_id || null, // Mapping quote_id to reference_number as primary ref
-    special_instructions: row.notes || null, // Mapping notes to special_instructions
+    reference_number: row.reference_number || null,
+    special_instructions: row.special_instructions || null,
     status: normalizeStatus(row.status || null),
-    origin_address: toAddress(row.origin_location || null),
-    destination_address: toAddress(row.destination_location || null),
+    origin_address: toAddress(row.origin_address || null),
+    destination_address: toAddress(row.destination_address || null),
     pickup_date: row.pickup_date || null,
-    estimated_delivery_date: row.estimated_delivery || null, // mapped from estimated_delivery
-    actual_delivery_date: row.actual_delivery || null,
+    estimated_delivery_date: row.estimated_delivery_date || null,
+    actual_delivery_date: row.actual_delivery_date || null,
     total_weight_kg: row.total_weight_kg ?? null,
-    total_packages: null, // Not present in DB row based on types
-    total_charges: row.total_cost ?? null, // Mapping total_cost to total_charges
+    total_packages: row.total_packages ?? null,
+    total_charges: row.total_charges ?? null,
     currency: row.currency || null,
     current_location: null, // Not present in DB row
-    priority_level: null, // Not present in DB row
+    priority_level: row.priority_level || null,
     created_at: String(row.created_at || new Date().toISOString()),
     pod_received: false, // Not in DB schema
     pod_received_at: null, // Not in DB schema
-    account_id: row.owner_id || null, // Mapping owner_id to account_id
+    account_id: row.account_id || null,
     accounts: null, // Join field, handled separately if needed
   };
 };
@@ -92,30 +92,30 @@ export const appShipmentToDbInsert = (app: Partial<AppShipment>): Partial<DbShip
   const db: Partial<DbShipmentRow> = {};
   
   if (app.shipment_number) db.shipment_number = app.shipment_number;
-  if (app.shipment_type) db.shipment_type = app.shipment_type as any; // Cast as any to satisfy exact enum match if needed, though values align
-  if (app.reference_number) db.quote_id = app.reference_number;
-  if (app.special_instructions) db.notes = app.special_instructions;
+  if (app.shipment_type) db.shipment_type = app.shipment_type as any;
+  if (app.reference_number) db.reference_number = app.reference_number;
+  if (app.special_instructions) db.special_instructions = app.special_instructions;
   if (app.status) db.status = app.status;
   
   if (app.origin_address) {
-    db.origin_location = app.origin_address as unknown as any; // Json type
+    db.origin_address = app.origin_address as unknown as any;
   }
   
   if (app.destination_address) {
-    db.destination_location = app.destination_address as unknown as any; // Json type
+    db.destination_address = app.destination_address as unknown as any;
   }
   
   if (app.pickup_date) db.pickup_date = app.pickup_date;
-  if (app.estimated_delivery_date) db.estimated_delivery = app.estimated_delivery_date;
-  if (app.actual_delivery_date) db.actual_delivery = app.actual_delivery_date;
+  if (app.estimated_delivery_date) db.estimated_delivery_date = app.estimated_delivery_date;
+  if (app.actual_delivery_date) db.actual_delivery_date = app.actual_delivery_date;
   
   if (app.total_weight_kg !== undefined) db.total_weight_kg = app.total_weight_kg;
-  if (app.total_charges !== undefined) db.total_cost = app.total_charges;
+  if (app.total_packages !== undefined) db.total_packages = app.total_packages;
+  if (app.total_charges !== undefined) db.total_charges = app.total_charges;
   if (app.currency) db.currency = app.currency;
+  if (app.priority_level) db.priority_level = app.priority_level;
   
-  if (app.account_id) db.owner_id = app.account_id;
-  
-  // vehicle_id, carrier_id, tenant_id etc. would need to be passed if available in AppShipment or separate context
+  if (app.account_id) db.account_id = app.account_id;
   
   return db;
 };
@@ -124,5 +124,3 @@ export const appShipmentToDbInsert = (app: Partial<AppShipment>): Partial<DbShip
 export const dbRowsToAppShipments = (rows: DbShipmentRow[]): AppShipment[] => {
   return (rows || []).map(dbRowToAppShipment);
 };
-
-

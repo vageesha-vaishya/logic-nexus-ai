@@ -25,6 +25,7 @@ interface Activity {
   id: string;
   activity_type: string;
   subject: string | null;
+  description?: string | null;
   status: string | null;
   priority: string | null;
   due_date: string | null;
@@ -73,7 +74,6 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
         .from('activities')
         .select('*')
         .eq('lead_id', leadId)
-        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -168,10 +168,10 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
     if (!activityToDelete) return;
 
     try {
-      // Soft delete
+      // Hard delete since deleted_at column doesn't exist
       const { error } = await supabase
         .from('activities')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', activityToDelete);
 
       if (error) throw error;

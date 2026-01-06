@@ -11,10 +11,11 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 const formSchema = z.object({
-  name: z.string().min(1, "Cargo type name is required"),
-  code: z.string().optional(),
-  is_hazardous: z.boolean().default(false),
-  requires_temperature_control: z.boolean().default(false),
+  cargo_type_name: z.string().min(1, "Cargo type name is required"),
+  cargo_code: z.string().optional(),
+  hazmat_class: z.string().optional(),
+  temperature_controlled: z.boolean().default(false),
+  requires_special_handling: z.boolean().default(false),
   description: z.string().optional(),
   is_active: z.boolean().default(true),
 });
@@ -29,10 +30,11 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      code: "",
-      is_hazardous: false,
-      requires_temperature_control: false,
+      cargo_type_name: "",
+      cargo_code: "",
+      hazmat_class: "",
+      temperature_controlled: false,
+      requires_special_handling: false,
       description: "",
       is_active: true,
     },
@@ -41,11 +43,12 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const payload: Database["public"]["Tables"]["cargo_types"]["Insert"] = {
-        name: values.name,
+        cargo_type_name: values.cargo_type_name,
         tenant_id: context.tenantId!,
-        code: values.code || null,
-        is_hazardous: values.is_hazardous,
-        requires_temperature_control: values.requires_temperature_control,
+        cargo_code: values.cargo_code || null,
+        hazmat_class: values.hazmat_class || null,
+        temperature_controlled: values.temperature_controlled,
+        requires_special_handling: values.requires_special_handling,
         description: values.description || null,
         is_active: values.is_active,
       };
@@ -68,7 +71,7 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="name"
+            name="cargo_type_name"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Cargo Type Name</FormLabel>
@@ -82,7 +85,7 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
 
           <FormField
             control={form.control}
-            name="code"
+            name="cargo_code"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Cargo Code</FormLabel>
@@ -112,11 +115,11 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="is_hazardous"
+            name="requires_special_handling"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3">
                 <div>
-                  <FormLabel>Hazardous</FormLabel>
+                  <FormLabel>Requires Special Handling</FormLabel>
                 </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -127,11 +130,11 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
 
           <FormField
             control={form.control}
-            name="requires_temperature_control"
+            name="temperature_controlled"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3">
                 <div>
-                  <FormLabel>Requires Temperature Control</FormLabel>
+                  <FormLabel>Temperature Controlled</FormLabel>
                 </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />

@@ -28,7 +28,7 @@ export default function CargoTypes() {
     if (!isPlatform) {
       query = query.eq("tenant_id", tenantId as string);
     }
-    const { data, error } = await query.order("name");
+    const { data, error } = await query.order("cargo_type_name");
 
     if (error) {
       console.error("Error fetching cargo types:", error);
@@ -42,34 +42,38 @@ export default function CargoTypes() {
         await supabase.from("cargo_types").insert([
           {
             tenant_id: tenantId,
-            name: "General Cargo",
-            code: "GEN",
-            is_hazardous: false,
-            requires_temperature_control: false,
+            cargo_type_name: "General Cargo",
+            cargo_code: "GEN",
+            hazmat_class: null,
+            temperature_controlled: false,
+            requires_special_handling: false,
             is_active: true,
           },
           {
             tenant_id: tenantId,
-            name: "Perishable Goods",
-            code: "PER",
-            is_hazardous: false,
-            requires_temperature_control: true,
+            cargo_type_name: "Perishable Goods",
+            cargo_code: "PER",
+            hazmat_class: null,
+            temperature_controlled: true,
+            requires_special_handling: false,
             is_active: true,
           },
           {
             tenant_id: tenantId,
-            name: "Hazardous Materials",
-            code: "HAZ",
-            is_hazardous: true,
-            requires_temperature_control: false,
+            cargo_type_name: "Hazardous Materials",
+            cargo_code: "HAZ",
+            hazmat_class: "Class 3",
+            temperature_controlled: false,
+            requires_special_handling: true,
             is_active: true,
           },
           {
             tenant_id: tenantId,
-            name: "Oversized Machinery",
-            code: "OVS",
-            is_hazardous: false,
-            requires_temperature_control: false,
+            cargo_type_name: "Oversized Machinery",
+            cargo_code: "OVS",
+            hazmat_class: null,
+            temperature_controlled: false,
+            requires_special_handling: true,
             is_active: false,
           },
         ]);
@@ -78,7 +82,7 @@ export default function CargoTypes() {
           .from("cargo_types")
           .select("*")
           .eq("tenant_id", tenantId as string)
-          .order("name");
+          .order("cargo_type_name");
         setCargoTypes((seeded || []) as CargoTypeRow[]);
       } catch (seedErr: unknown) {
         const message = seedErr instanceof Error ? seedErr.message : String(seedErr);
@@ -140,17 +144,17 @@ export default function CargoTypes() {
           <TableBody>
             {cargoTypes.map((cargo) => (
               <TableRow key={cargo.id}>
-                <TableCell className="font-medium">{cargo.name}</TableCell>
-                <TableCell>{cargo.code || "-"}</TableCell>
+                <TableCell className="font-medium">{cargo.cargo_type_name}</TableCell>
+                <TableCell>{cargo.cargo_code || "-"}</TableCell>
                 <TableCell>
-                  {cargo.is_hazardous ? (
+                  {cargo.hazmat_class ? (
                     <CheckCircle className="h-4 w-4 text-green-600" />
                   ) : (
                     <XCircle className="h-4 w-4 text-muted-foreground" />
                   )}
                 </TableCell>
                 <TableCell>
-                  {cargo.requires_temperature_control ? (
+                  {cargo.temperature_controlled ? (
                     <CheckCircle className="h-4 w-4 text-blue-600" />
                   ) : (
                     <XCircle className="h-4 w-4 text-muted-foreground" />

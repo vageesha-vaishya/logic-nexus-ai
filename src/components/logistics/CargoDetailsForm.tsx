@@ -25,7 +25,6 @@ const cargoDetailsSchema = z.object({
   hazmat_class: z.string().optional(),
   temperature_controlled: z.boolean().default(false),
   notes: z.string().optional(),
-  is_active: z.boolean().default(true),
 });
 
 export type CargoDetailsFormData = z.infer<typeof cargoDetailsSchema> & { id?: string };
@@ -34,7 +33,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   const { supabase, context } = useCRM();
   type ServiceTypeOption = Pick<Database["public"]["Tables"]["service_types"]["Row"], "name" | "description" | "is_active">;
   type ServiceOption = Pick<Database["public"]["Tables"]["services"]["Row"], "id" | "service_name" | "service_type" | "service_code" | "is_active">;
-  type CargoTypeOption = Pick<Database["public"]["Tables"]["cargo_types"]["Row"], "id" | "name" | "is_active">;
+  type CargoTypeOption = { id: string; cargo_type_name: string; is_active: boolean | null };
   const [serviceTypes, setServiceTypes] = useState<ServiceTypeOption[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [cargoTypes, setCargoTypes] = useState<CargoTypeOption[]>([]);
@@ -54,7 +53,6 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
       hazmat_class: initialData?.hazmat_class || "",
       temperature_controlled: !!initialData?.temperature_controlled,
       notes: initialData?.notes || "",
-      is_active: initialData?.is_active ?? true,
     },
   });
 
@@ -86,11 +84,15 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
     (async () => {
       const { data, error } = await supabase
         .from("cargo_types")
-        .select("id, name, is_active")
+        .select("id, cargo_type_name, is_active")
         .eq("tenant_id", context.tenantId);
-      if (!error) {
-        const rows = (data || []) as CargoTypeOption[];
-        setCargoTypes(rows.filter((c) => c.is_active !== false));
+      if (!error && data) {
+        const rows = data.filter((c) => c.is_active !== false).map(c => ({
+          id: c.id,
+          cargo_type_name: c.cargo_type_name,
+          is_active: c.is_active
+        }));
+        setCargoTypes(rows);
       }
     })();
   }, [supabase, context.tenantId]);
@@ -131,7 +133,6 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           notes: values.notes,
           weight_kg: values.total_weight_kg,
           volume_cbm: values.total_volume_cbm,
-          is_active: values.is_active,
         };
         const { error } = await supabase.from("cargo_details").update(updatePayload).eq("id", initialData.id);
         if (error) throw error;
@@ -151,7 +152,6 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           notes: values.notes,
           weight_kg: values.total_weight_kg,
           volume_cbm: values.total_volume_cbm,
-          is_active: values.is_active,
         };
         const { error } = await supabase.from("cargo_details").insert(insertPayload);
         if (error) throw error;
@@ -235,7 +235,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                   </FormControl>
                   <SelectContent>
                     {cargoTypes.map((ct) => (
-                      <SelectItem key={ct.id} value={String(ct.id)}>{ct.name}</SelectItem>
+                      <SelectItem key={ct.id} value={String(ct.id)}>{ct.cargo_type_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -273,20 +273,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="package_count"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Package Count</FormLabel>
-                <FormControl>
-                  <Input type="number" min={0} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="total_weight_kg"
@@ -315,13 +302,13 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="hazmat"
+            name="is_hazardous"
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                <FormLabel>Hazmat</FormLabel>
+                <FormLabel>Hazardous</FormLabel>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
@@ -340,10 +327,9 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
               </FormItem>
             )}
           />
-          
         </div>
 
-        {form.watch("hazmat") && (
+        {form.watch("is_hazardous") && (
           <FormField
             control={form.control}
             name="hazmat_class"
@@ -369,19 +355,6 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                 <Textarea placeholder="Internal notes..." {...field} />
               </FormControl>
               <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="is_active"
-          render={({ field }) => (
-            <FormItem className="flex items-center justify-between rounded-lg border p-3">
-              <FormLabel>Active</FormLabel>
-              <FormControl>
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              </FormControl>
             </FormItem>
           )}
         />

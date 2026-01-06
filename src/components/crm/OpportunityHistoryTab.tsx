@@ -51,94 +51,31 @@ export function OpportunityHistoryTab({ history, onRefresh }: Props) {
   }, [history, filters]);
 
   const loadPresets = async () => {
-    try {
-      if (!context.userId) return;
-      const { data, error } = await supabase
-        .from('history_filter_presets')
-        .select('*')
-        .eq('user_id', context.userId)
-        .order('name', { ascending: true });
-      if (error) throw error;
-      const list: HistoryFilterPreset[] = (data || []).map((p) => ({
-        id: (p as { id: string }).id,
-        name: (p as { name: string }).name,
-        filters: ((p as { filters?: HistoryFilters }).filters) || {},
-      }));
-      setPresets(list);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error('Failed to load presets', { description: message });
-    }
+    // history_filter_presets table doesn't exist - use empty list
+    setPresets([]);
   };
 
   const savePreset = async () => {
-    try {
-      if (!newPresetName.trim()) {
-        toast.error('Preset name is required');
-        return;
-      }
-      if (!context.userId) {
-        toast.error('User not available');
-        return;
-      }
-      const payload = {
-        user_id: context.userId,
-        tenant_id: context.tenantId || null,
-        name: newPresetName.trim(),
-        filters,
-      };
-      const { error } = await supabase.from('history_filter_presets').insert(payload);
-      if (error) throw error;
-      toast.success('Preset saved');
-      posthog.capture('crm.opportunity_history.preset_save', { name: payload.name });
-      setNewPresetName('');
-      await loadPresets();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error('Failed to save preset', { description: message });
-    }
+    // history_filter_presets table doesn't exist - feature disabled
+    toast.info('Presets feature is not available');
   };
 
   const applyPreset = async (id: string) => {
-    try {
-      const preset = presets.find((p) => p.id === id);
-      if (!preset) return;
-      setFilters(preset.filters || { type: 'any' });
-      setSelectedPresetId(id);
-      posthog.capture('crm.opportunity_history.preset_apply', { name: preset.name });
-    } catch {
-      // ignore
-    }
+    const preset = presets.find((p) => p.id === id);
+    if (!preset) return;
+    setFilters(preset.filters || { type: 'any' });
+    setSelectedPresetId(id);
+    posthog.capture('crm.opportunity_history.preset_apply', { name: preset.name });
   };
 
   const deletePreset = async (id: string) => {
-    try {
-      const { error } = await supabase.from('history_filter_presets').delete().eq('id', id);
-      if (error) throw error;
-      toast.success('Preset deleted');
-      posthog.capture('crm.opportunity_history.preset_delete');
-      if (selectedPresetId === id) setSelectedPresetId('');
-      await loadPresets();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error('Failed to delete preset', { description: message });
-    }
+    // history_filter_presets table doesn't exist - feature disabled
+    toast.info('Presets feature is not available');
   };
 
   const renamePreset = async (id: string, name: string) => {
-    try {
-      if (!name.trim()) {
-        toast.error('Name is required');
-        return;
-      }
-      const { error } = await supabase.from('history_filter_presets').update({ name: name.trim() }).eq('id', id);
-      if (error) throw error;
-      toast.success('Preset renamed');
-      await loadPresets();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error('Failed to rename preset', { description: message });
-    }
+    // history_filter_presets table doesn't exist - feature disabled
+    toast.info('Presets feature is not available');
   };
 
   const applyFilters = (next: Partial<HistoryFilters>) => {
