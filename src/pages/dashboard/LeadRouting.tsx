@@ -19,8 +19,8 @@ interface AssignmentRule {
   priority: number;
   criteria: any;
   assigned_to: string | null;
-  assigned_queue_id: string | null;
-  assignment_type: 'user' | 'queue' | 'round_robin_group';
+  assigned_queue_id?: string | null;
+  assignment_type: string;
   is_active: boolean;
 }
 

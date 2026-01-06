@@ -19,7 +19,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
-import { Opportunity, OpportunityStage, stageColors, stageLabels, stages } from "./opportunities-data";
+import { Opportunity, OpportunityStage as Stage, stageColors, stageLabels, stages } from "./opportunities-data";
+type OpportunityStage = Stage;
 
 export default function OpportunitiesPipeline() {
   const navigate = useNavigate();

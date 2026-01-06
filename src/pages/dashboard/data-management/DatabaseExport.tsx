@@ -253,7 +253,7 @@ export default function DatabaseExport() {
     try {
       const files: Array<{ name: string; content: string; type: string }> = [];
       for (const t of chosen) {
-        const { data, error } = await supabase.from(t.table_name).select("*");
+        const { data, error } = await (supabase.from(t.table_name as any).select("*") as any);
         if (error) {
           toast.error(`Failed exporting ${t.table_name}`, { description: error.message });
           continue;
@@ -299,27 +299,27 @@ export default function DatabaseExport() {
       const keys: string[] = [];
 
       if (exportOptions.schema) {
-        promises.push(supabase.rpc("get_database_schema"));
+        promises.push((supabase.rpc as any)("get_database_schema"));
         keys.push("schema");
       }
       if (exportOptions.constraints) {
-        promises.push(supabase.rpc("get_table_constraints"));
+        promises.push((supabase.rpc as any)("get_table_constraints"));
         keys.push("constraints");
       }
       if (exportOptions.indexes) {
-        promises.push(supabase.rpc("get_table_indexes"));
+        promises.push((supabase.rpc as any)("get_table_indexes"));
         keys.push("indexes");
       }
       if (exportOptions.dbFunctions) {
-        promises.push(supabase.rpc("get_database_functions"));
+        promises.push((supabase.rpc as any)("get_database_functions"));
         keys.push("database_functions");
       }
       if (exportOptions.rlsPolicies) {
-        promises.push(supabase.rpc("get_rls_policies"));
+        promises.push((supabase.rpc as any)("get_rls_policies"));
         keys.push("rls_policies");
       }
       if (exportOptions.enums) {
-        promises.push(supabase.rpc("get_database_enums"));
+        promises.push((supabase.rpc as any)("get_database_enums"));
         keys.push("enums");
       }
       if (exportOptions.edgeFunctions || exportOptions.secrets) {
@@ -360,7 +360,7 @@ export default function DatabaseExport() {
         const chosen = tables.filter(t => selected[t.table_name]);
         if (chosen.length > 0) {
           const tableDataPromises = chosen.map(async (t) => {
-            const { data, error } = await supabase.from(t.table_name).select("*");
+            const { data, error } = await (supabase.from(t.table_name as any).select("*") as any);
             if (error) {
               console.error(`Failed exporting ${t.table_name}:`, error.message);
               return { table_name: t.table_name, data: [], error: error.message };
@@ -494,13 +494,13 @@ export default function DatabaseExport() {
         // Prefer RPC with full bodies; gracefully fall back to metadata-only
         let functionsData: any[] | null = null;
         try {
-          const { data: functionsWithBody } = await supabase.rpc("get_database_functions_with_body");
+          const { data: functionsWithBody } = await (supabase.rpc as any)("get_database_functions_with_body");
           functionsData = functionsWithBody || null;
         } catch (e) {
           functionsData = null;
         }
         if (!functionsData) {
-          const { data: metaData, error } = await supabase.rpc("get_database_functions");
+          const { data: metaData, error } = await (supabase.rpc as any)("get_database_functions");
           if (error) throw error;
           functionsData = metaData || [];
         }
@@ -697,7 +697,7 @@ export default function DatabaseExport() {
           };
 
           for (const table of chosen) {
-            const { data, error } = await supabase.from(table.table_name).select("*");
+            const { data, error } = await (supabase.from(table.table_name as any).select("*") as any);
             if (error) {
               console.error(`Failed exporting ${table.table_name}:`, error.message);
               continue;
@@ -771,7 +771,7 @@ export default function DatabaseExport() {
 
       // Export all table data
       for (const table of tables) {
-        const { data, error } = await supabase.from(table.table_name).select("*");
+        const { data, error } = await (supabase.from(table.table_name as any).select("*") as any);
         if (error) {
           console.error(`Failed to backup ${table.table_name}:`, error.message);
           continue;
@@ -817,10 +817,10 @@ export default function DatabaseExport() {
 
       // Export only changed records since last backup
       for (const table of tables) {
-        const { data, error } = await supabase
-          .from(table.table_name)
+        const { data, error } = await (supabase
+          .from(table.table_name as any)
           .select("*")
-          .or(`created_at.gte.${lastBackupTime},updated_at.gte.${lastBackupTime}`);
+          .or(`created_at.gte.${lastBackupTime},updated_at.gte.${lastBackupTime}`) as any);
         
         if (error) {
           console.error(`Failed to backup ${table.table_name}:`, error.message);
@@ -880,9 +880,9 @@ export default function DatabaseExport() {
         
         for (const record of recordsArray) {
           if (restoreMode === 'upsert') {
-            const { error } = await supabase
-              .from(tableName)
-              .upsert(record, { onConflict: 'id' });
+            const { error } = await (supabase
+              .from(tableName as any)
+              .upsert(record, { onConflict: 'id' }) as any);
             
             if (error) {
               console.error(`Error upserting to ${tableName}:`, error.message);
@@ -891,9 +891,9 @@ export default function DatabaseExport() {
               totalRestored++;
             }
           } else {
-            const { error } = await supabase
-              .from(tableName)
-              .insert(record);
+            const { error } = await (supabase
+              .from(tableName as any)
+              .insert(record) as any);
             
             if (error) {
               console.error(`Error inserting to ${tableName}:`, error.message);

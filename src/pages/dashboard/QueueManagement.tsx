@@ -66,10 +66,11 @@ export default function QueueManagement() {
       
       const formattedQueues = data?.map(q => ({
         ...q,
+        type: q.type as 'holding' | 'round_robin',
         member_count: q.queue_members?.[0]?.count || 0
       })) || [];
       
-      setQueues(formattedQueues);
+      setQueues(formattedQueues as Queue[]);
     } catch (error: any) {
       // Check for missing table error (PGRST205)
       if (error?.code === 'PGRST205' || error?.message?.includes('relation "public.queues" does not exist')) {
