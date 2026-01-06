@@ -66,21 +66,21 @@ The system operates on a serverless architecture leveraging Supabase for backend
 ### High-Level Architecture
 ```mermaid
 graph TD
-    subgraph Client_Layer [Frontend (React/Vite)]
+    subgraph Client_Layer ["Frontend (React/Vite)"]
         UI[MultiModalQuoteComposer]
-        Form[QuoteForm.tsx (Monolith)]
+        Form["QuoteForm.tsx (Monolith)"]
         State[React Query Cache]
         Auth[Supabase Auth Client]
     end
 
-    subgraph API_Layer [Edge Network]
+    subgraph API_Layer ["Edge Network"]
         Edge[Supabase Edge Functions]
         Rest[PostgREST API]
         Realtime[Realtime Subscriptions]
     end
 
-    subgraph Data_Layer [Database]
-        DB[(PostgreSQL 15)]
+    subgraph Data_Layer ["Database"]
+        DB[("PostgreSQL 15")]
         RLS[Row Level Security Policies]
         Triggers[PL/pgSQL Triggers]
     end
