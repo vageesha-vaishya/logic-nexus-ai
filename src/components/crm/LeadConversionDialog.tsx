@@ -118,17 +118,20 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
       // Create Opportunity if requested
       if (createOpportunity) {
-        const oppInsert = buildOpportunityFromLead({
-          lead,
-          name: opportunityName,
+        const oppInsert = {
+          name: opportunityName || `${lead.first_name} ${lead.last_name} Opportunity`,
           tenant_id: effectiveTenantId,
           franchise_id: effectiveFranchiseId,
           account_id: accountId,
           contact_id: contactId,
-        });
+          stage: 'prospecting' as const,
+          amount: lead.estimated_value || 0,
+          close_date: lead.expected_close_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          lead_id: lead.id,
+        };
         const { data: oppData, error: oppError } = await supabase
           .from('opportunities')
-          .insert(oppInsert)
+          .insert([oppInsert])
           .select()
           .single();
 

@@ -47,23 +47,18 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
 
   const calculateBreakdown = async () => {
     try {
-      // Fetch Config
-      const { data: configData } = await supabase
-        .from('lead_score_config')
-        .select('weights_json')
-        .single();
-      
-      const weights = configData?.weights_json || {
+      // Use default weights since lead_score_config table doesn't exist
+      const weights = {
         demographic: { title_cxo: 20, title_vp: 15, title_manager: 10 },
         behavioral: { email_opened: 5, link_clicked: 10, page_view: 2, form_submission: 20 },
         logistics: { high_value_cargo: 20, urgent_shipment: 15 },
         decay: { weekly_percentage: 10 }
       };
 
-      // Fetch Activities
+      // Fetch Activities from activities table
       const { data: activities } = await supabase
-        .from('lead_activities')
-        .select('type')
+        .from('activities')
+        .select('activity_type')
         .eq('lead_id', leadId);
 
       // 1. Demographic Score
@@ -83,8 +78,9 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
       let behScore = 0;
       if (activities) {
         activities.forEach((a: any) => {
-          if (weights.behavioral[a.type]) {
-            behScore += weights.behavioral[a.type];
+          const actType = a.activity_type as keyof typeof weights.behavioral;
+          if (weights.behavioral[actType]) {
+            behScore += weights.behavioral[actType];
           }
         });
       }

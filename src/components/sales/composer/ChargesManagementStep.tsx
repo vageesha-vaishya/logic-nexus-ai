@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus } from 'lucide-react';
+import { Plus, Globe } from 'lucide-react';
 import { ChargeRow } from './ChargeRow';
 import { HelpTooltip } from './HelpTooltip';
 
@@ -40,6 +40,7 @@ interface ChargesManagementStepProps {
   onUpdateCombinedCharge?: (chargeIdx: number, field: string, value: any) => void;
   onRemoveCombinedCharge?: (chargeIdx: number) => void;
   onConfigureCombinedBasis?: (chargeIdx: number) => void;
+  onFetchRates?: (legId: string) => void;
 }
 
 export function ChargesManagementStep({
@@ -63,7 +64,8 @@ export function ChargesManagementStep({
   onAddCombinedCharge,
   onUpdateCombinedCharge,
   onRemoveCombinedCharge,
-  onConfigureCombinedBasis
+  onConfigureCombinedBasis,
+  onFetchRates
 }: ChargesManagementStepProps) {
   const calculateTotals = (charges: any[]) => {
     return charges.reduce((acc, charge) => ({

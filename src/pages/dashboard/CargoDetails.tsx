@@ -16,7 +16,7 @@ export default function CargoDetails() {
   const { supabase, context } = useCRM();
   const [details, setDetails] = useState<CargoDetail[]>([]);
   type ServiceRow = Pick<Database["public"]["Tables"]["services"]["Row"], "id" | "service_name" | "service_type" | "service_code">;
-  type CargoTypeRow = Pick<Database["public"]["Tables"]["cargo_types"]["Row"], "id" | "name">;
+  type CargoTypeRow = { id: string; cargo_type_name: string };
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [cargoTypes, setCargoTypes] = useState<CargoTypeRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,11 +31,11 @@ export default function CargoDetails() {
       const [{ data: cd }, { data: svc }, { data: ct }] = await Promise.all([
         supabase.from("cargo_details").select("*").eq("tenant_id", context.tenantId),
         supabase.from("services").select("id, service_name, service_type, service_code").eq("tenant_id", context.tenantId),
-        supabase.from("cargo_types").select("id, name").eq("tenant_id", context.tenantId),
+        supabase.from("cargo_types").select("id, cargo_type_name").eq("tenant_id", context.tenantId),
       ]);
       setDetails((cd || []) as CargoDetail[]);
       setServices(svc || []);
-      setCargoTypes(ct || []);
+      setCargoTypes((ct || []).map(c => ({ id: c.id, cargo_type_name: c.cargo_type_name })));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       toast.error(message || "Failed to load cargo details");
@@ -60,7 +60,7 @@ export default function CargoDetails() {
   const cargoTypeMap = useMemo(() => {
     const m: Record<string, string> = {};
     cargoTypes.forEach((c) => {
-      m[String(c.id)] = c.name;
+      m[String(c.id)] = c.cargo_type_name;
     });
     return m;
   }, [cargoTypes]);
@@ -133,7 +133,7 @@ export default function CargoDetails() {
                       <TableCell>{d.weight_kg ?? '-'}</TableCell>
                       <TableCell>{d.volume_cbm ?? '-'}</TableCell>
                       <TableCell>{d.is_hazardous ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>{d.is_active ? 'Active' : 'Inactive'}</TableCell>
+                      <TableCell>Active</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" onClick={() => { setEditItem(d); setEditOpen(true); }}>
@@ -172,7 +172,6 @@ export default function CargoDetails() {
                   hazmat_class: editItem.hazmat_class || "",
                   temperature_controlled: !!editItem.temperature_controlled,
                   notes: editItem.notes || "",
-                  is_active: editItem.is_active ?? true,
                   dimensions: (editItem as any).dimensions_cm ?? {},
                 }}
                 onSuccess={() => { setEditOpen(false); setEditItem(null); fetchData(); }}
