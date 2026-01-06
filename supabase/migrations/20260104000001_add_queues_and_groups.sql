@@ -18,6 +18,7 @@ ALTER TABLE public.queues ENABLE ROW LEVEL SECURITY;
 
 -- 2. Drop existing policies to avoid conflicts
 DROP POLICY IF EXISTS "Tenant admins can manage queues" ON public.queues;
+DROP POLICY IF EXISTS "Admins can manage queues" ON public.queues;
 DROP POLICY IF EXISTS "Users can view queues in their tenant" ON public.queues;
 
 -- 3. Re-create Policies
@@ -27,7 +28,17 @@ FOR ALL
 USING (
   has_role(auth.uid(), 'tenant_admin') 
   AND tenant_id = get_user_tenant_id(auth.uid())
+)
+WITH CHECK (
+  has_role(auth.uid(), 'tenant_admin') 
+  AND tenant_id = get_user_tenant_id(auth.uid())
 );
+
+CREATE POLICY "Admins can manage queues"
+ON public.queues
+FOR ALL
+USING (has_role(auth.uid(), 'platform_admin'))
+WITH CHECK (has_role(auth.uid(), 'platform_admin'));
 
 CREATE POLICY "Users can view queues in their tenant"
 ON public.queues
@@ -48,6 +59,7 @@ ALTER TABLE public.queue_members ENABLE ROW LEVEL SECURITY;
 
 -- Drop policies for queue_members
 DROP POLICY IF EXISTS "Tenant admins can manage queue members" ON public.queue_members;
+DROP POLICY IF EXISTS "Admins can manage queue members" ON public.queue_members;
 DROP POLICY IF EXISTS "Users can view queue members in their tenant" ON public.queue_members;
 
 -- Re-create policies
@@ -61,7 +73,21 @@ USING (
     AND q.tenant_id = get_user_tenant_id(auth.uid())
     AND has_role(auth.uid(), 'tenant_admin')
   )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.queues q
+    WHERE q.id = queue_members.queue_id
+    AND q.tenant_id = get_user_tenant_id(auth.uid())
+    AND has_role(auth.uid(), 'tenant_admin')
+  )
 );
+
+CREATE POLICY "Admins can manage queue members"
+ON public.queue_members
+FOR ALL
+USING (has_role(auth.uid(), 'platform_admin'))
+WITH CHECK (has_role(auth.uid(), 'platform_admin'));
 
 CREATE POLICY "Users can view queue members in their tenant"
 ON public.queue_members

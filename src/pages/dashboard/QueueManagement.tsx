@@ -36,6 +36,9 @@ export default function QueueManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [franchises, setFranchises] = useState<{ id: string; name: string }[]>([]);
+  const [selectedFranchiseId, setSelectedFranchiseId] = useState<string | null>(null);
+  const [franchiseSupported, setFranchiseSupported] = useState(true);
   
   // Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -57,7 +60,19 @@ export default function QueueManagement() {
     if (context.isPlatformAdmin) {
       fetchTenants();
     }
+    if (!context.isPlatformAdmin && context.isTenantAdmin && context.tenantId) {
+      fetchFranchises(context.tenantId);
+    }
   }, []);
+
+  useEffect(() => {
+    if (selectedTenantId) {
+      fetchFranchises(selectedTenantId);
+    } else {
+      setFranchises([]);
+      setSelectedFranchiseId(null);
+    }
+  }, [selectedTenantId]);
 
   const fetchTenants = async () => {
     try {
@@ -75,24 +90,83 @@ export default function QueueManagement() {
     }
   };
 
+  const fetchFranchises = async (tenantId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('franchises')
+        .select('id, name')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      setFranchises((data || []) as { id: string; name: string }[]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to fetch franchises:', message);
+      toast.error('Failed to fetch franchises', { description: message });
+    }
+  };
+
   const fetchQueues = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query: any = supabase
         .from('queues')
-        .select('*, queue_members(count)')
-        .order('name');
+        .select('id, name, description, email, type, is_active, tenant_id, franchise_id, created_at, updated_at, queue_members(count)');
+
+      if (context.isPlatformAdmin && franchiseSupported) {
+        if (selectedTenantId) query = query.eq('tenant_id', selectedTenantId);
+        if (selectedFranchiseId) query = query.eq('franchise_id', selectedFranchiseId);
+      } else if (context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+        if (context.franchiseId && franchiseSupported) query = query.eq('franchise_id', context.franchiseId);
+      }
+
+      const { data, error } = await query.order('name');
 
       if (error) throw error;
-      
-      const formattedQueues = data?.map(q => ({
-        ...q,
-        type: q.type as 'holding' | 'round_robin',
-        member_count: q.queue_members?.[0]?.count || 0
-      })) || [];
-      
-      setQueues(formattedQueues as Queue[]);
+      const formattedQueues: Queue[] = (data || []).map((q: any) => ({
+        id: q.id,
+        name: q.name,
+        description: q.description || '',
+        email: q.email || '',
+        type: (q.type as 'holding' | 'round_robin'),
+        is_active: !!q.is_active,
+        member_count: q.queue_members?.[0]?.count || 0,
+      }));
+      setQueues(formattedQueues);
     } catch (error: any) {
+      if (error?.code === '42703' && error?.message?.includes('franchise_id')) {
+        try {
+          setFranchiseSupported(false);
+          let fallback: any = supabase
+            .from('queues')
+            .select('id, name, description, email, type, is_active, tenant_id, created_at, updated_at, queue_members(count)');
+          if (context.isPlatformAdmin) {
+            if (selectedTenantId) fallback = fallback.eq('tenant_id', selectedTenantId);
+          } else if (context.tenantId) {
+            fallback = fallback.eq('tenant_id', context.tenantId);
+          }
+          const { data } = await fallback.order('name');
+          const formattedQueues: Queue[] = (data || []).map((q: any) => ({
+            id: q.id,
+            name: q.name,
+            description: q.description || '',
+            email: q.email || '',
+            type: (q.type as 'holding' | 'round_robin'),
+            is_active: !!q.is_active,
+            member_count: q.queue_members?.[0]?.count || 0,
+          }));
+          setQueues(formattedQueues);
+          return;
+        } catch (e: any) {
+          toast.error('Failed to load queues');
+          console.error('Error:', e);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
       // Check for missing table error (PGRST205)
       if (error?.code === 'PGRST205' || error?.message?.includes('relation "public.queues" does not exist')) {
         toast.error('System Update Required: Queues table not found. Please run database migrations.');
@@ -107,10 +181,31 @@ export default function QueueManagement() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      const scopeTenant = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
+      const scopeFranchise = context.isPlatformAdmin ? selectedFranchiseId : context.franchiseId;
+
+      let userIds: string[] | null = null;
+      if (scopeFranchise) {
+        const { data: roleRows } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('franchise_id', scopeFranchise);
+        userIds = (roleRows || []).map(r => r.user_id);
+      } else if (scopeTenant) {
+        const { data: roleRows } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('tenant_id', scopeTenant);
+        userIds = (roleRows || []).map(r => r.user_id);
+      }
+
+      let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
-        .order('first_name');
+        .select('id, first_name, last_name, email');
+      if (userIds && userIds.length > 0) {
+        query = query.in('id', userIds);
+      }
+      const { data, error } = await query.order('first_name');
 
       if (error) throw error;
       setUsers(data || []);
@@ -151,9 +246,23 @@ export default function QueueManagement() {
         .insert({
           ...newQueue,
           tenant_id: tenantId,
+          ...(franchiseSupported ? { franchise_id: selectedFranchiseId || null } : {}),
         });
 
-      if (error) throw error;
+      if (error) {
+        if (error?.code === '42703' && error?.message?.includes('franchise_id')) {
+          setFranchiseSupported(false);
+          const { error: retryError } = await supabase
+            .from('queues')
+            .insert({
+              ...newQueue,
+              tenant_id: tenantId,
+            });
+          if (retryError) throw retryError;
+        } else {
+          throw error;
+        }
+      }
 
       toast.success('Queue created successfully');
       setIsCreateOpen(false);
@@ -165,6 +274,7 @@ export default function QueueManagement() {
         is_active: true,
       });
       setSelectedTenantId(null);
+      setSelectedFranchiseId(null);
       fetchQueues();
     } catch (error: any) {
       toast.error('Failed to create queue');
@@ -323,6 +433,28 @@ export default function QueueManagement() {
                       {tenants.map(t => (
                         <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {(franchiseSupported && (context.isPlatformAdmin || context.isTenantAdmin)) && (
+                <div className="space-y-2">
+                  <Label htmlFor="franchise">Franchise (Optional)</Label>
+                  <Select
+                    value={selectedFranchiseId || ''}
+                    onValueChange={(value: string) => setSelectedFranchiseId(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={franchises.length ? 'Select franchise' : 'No franchises available'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {franchises.length > 0 ? (
+                        franchises.map(f => (
+                          <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>No franchises</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
