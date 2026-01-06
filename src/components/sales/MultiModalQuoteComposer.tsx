@@ -234,10 +234,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string) => {
           try {
-            const { data, error } = await supabase
-              .from(table)
+            const { data, error } = await (supabase
+              .from(table as any)
               .select('*')
-              .eq('is_active', true);
+              .eq('is_active', true) as any);
             
             if (error) {
               console.error(`[Composer] Error loading ${table}:`, error);

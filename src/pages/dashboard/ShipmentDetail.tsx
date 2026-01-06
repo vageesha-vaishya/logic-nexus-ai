@@ -17,6 +17,7 @@ export default function ShipmentDetail() {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [loading, setLoading] = useState(true);
   type ShipmentAttachment = {
+    id?: string;
     path: string;
     name: string;
     size?: number;
@@ -51,11 +52,11 @@ export default function ShipmentDetail() {
 
   const fetchAttachments = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('shipment_attachments')
+      const { data, error } = await (supabase
+        .from('shipment_attachments' as any)
         .select('*')
         .eq('shipment_id', id)
-        .order('uploaded_at', { ascending: false });
+        .order('uploaded_at', { ascending: false }) as any);
       if (error) throw error;
       const rows = (data || []) as ShipmentAttachment[];
       const withUrls = rows.map((att) => {
@@ -95,8 +96,8 @@ export default function ShipmentDetail() {
         .getPublicUrl(path);
       const publicUrl = urlData?.publicUrl ?? null;
 
-      const { error: metaErr } = await supabase
-        .from('shipment_attachments')
+      const { error: metaErr } = await (supabase
+        .from('shipment_attachments' as any)
         .insert([{
           shipment_id: id,
           tenant_id: context?.tenantId,
@@ -108,7 +109,7 @@ export default function ShipmentDetail() {
           content_type: podFile.type || null,
           public_url: publicUrl,
           document_type: 'proof_of_delivery',
-        }]);
+        }]) as any);
       if (metaErr) throw metaErr;
 
       const { error: updErr } = await supabase
@@ -279,7 +280,7 @@ export default function ShipmentDetail() {
               </div>
             </CardHeader>
             <CardContent>
-              <p>{shipment.origin_address?.address || JSON.stringify(shipment.origin_address)}</p>
+              <p>{(shipment.origin_address as any)?.address || JSON.stringify(shipment.origin_address)}</p>
             </CardContent>
           </Card>
 
@@ -291,7 +292,7 @@ export default function ShipmentDetail() {
               </div>
             </CardHeader>
             <CardContent>
-              <p>{shipment.destination_address?.address || JSON.stringify(shipment.destination_address)}</p>
+              <p>{(shipment.destination_address as any)?.address || JSON.stringify(shipment.destination_address)}</p>
             </CardContent>
           </Card>
         </div>
@@ -334,7 +335,7 @@ export default function ShipmentDetail() {
                   .map((att) => {
                     const url = att.resolved_url;
                     return (
-                      <li key={`pod-${att.id}`} className="flex items-center justify-between">
+                      <li key={`pod-${att.id || att.path}`} className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                           <div>
@@ -364,7 +365,7 @@ export default function ShipmentDetail() {
                   .map((att) => {
                   const url = att.resolved_url;
                   return (
-                    <li key={att.id} className="flex items-center justify-between">
+                    <li key={att.id || att.path} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Package className="h-4 w-4 text-muted-foreground" />
                         <div>

@@ -146,7 +146,7 @@ export function useRelatedData<T extends { id: string }>(
 
       if (supabaseError) throw supabaseError;
 
-      const newData = result as T[];
+      const newData = (result as unknown) as T[];
       
       if (isLoadMore) {
         setData(prev => {

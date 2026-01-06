@@ -15,14 +15,20 @@ export default function WarehouseNew() {
   const handleSubmit = async (data: WarehouseFormData) => {
     try {
       const warehouseData = {
-        ...data,
+        name: data.name || 'Unnamed Warehouse',
+        code: data.code || `WH-${Date.now()}`,
+        warehouse_type: data.warehouse_type,
+        contact_person: data.contact_person,
+        contact_phone: data.contact_phone,
+        contact_email: data.contact_email,
+        is_active: data.is_active ?? true,
         tenant_id: context.tenantId,
         franchise_id: context.franchiseId,
         address: { address: data.address },
         capacity_sqft: data.capacity_sqft ? parseFloat(data.capacity_sqft) : null,
       };
 
-      const { error } = await supabase.from('warehouses').insert(warehouseData);
+      const { error } = await supabase.from('warehouses').insert([warehouseData] as any);
 
       if (error) throw error;
 

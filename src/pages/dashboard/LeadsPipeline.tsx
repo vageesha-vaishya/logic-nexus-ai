@@ -182,7 +182,7 @@ export default function LeadsPipeline() {
     try {
         const { error } = await supabase
             .from('leads')
-            .update(leadUpdates)
+            .update(leadUpdates as any)
             .eq('id', id);
 
         if (error) throw error;
