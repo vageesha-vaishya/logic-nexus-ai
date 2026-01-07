@@ -161,6 +161,28 @@
 - User read/write policies with proper tenant/franchise filtering
 - Security definer functions used to avoid infinite recursion
 
+### Index Standardization Verification
+```sql
+SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='quotes' AND indexname IN ('idx_quotes_tenant_id','idx_quotes_franchise_id');
+SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='shipments' AND indexname IN ('idx_shipments_tenant_id','idx_shipments_franchise_id');
+SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='activities' AND indexname IN ('idx_activities_tenant_id','idx_activities_franchise_id');
+```
+
+### RLS Policy Verification (Quotes, Shipments, Activities)
+```sql
+SELECT polname, schemaname, tablename, cmd FROM pg_policies WHERE schemaname='public' AND tablename IN ('quotes','shipments','activities') ORDER BY tablename, polname;
+```
+
+### Query Performance Baseline (Franchise‑Scoped)
+```sql
+EXPLAIN ANALYZE SELECT id FROM public.quotes WHERE tenant_id = get_user_tenant_id(auth.uid()) AND franchise_id = get_user_franchise_id(auth.uid()) ORDER BY created_at DESC LIMIT 50;
+EXPLAIN ANALYZE SELECT id FROM public.shipments WHERE tenant_id = get_user_tenant_id(auth.uid()) AND franchise_id = get_user_franchise_id(auth.uid()) ORDER BY created_at DESC LIMIT 50;
+EXPLAIN ANALYZE SELECT id FROM public.activities WHERE tenant_id = get_user_tenant_id(auth.uid()) AND franchise_id = get_user_franchise_id(auth.uid()) ORDER BY created_at DESC LIMIT 50;
+```
+
+### Deployment Scheduling
+- [x] Schedule execution of index renames and policy updates during low‑traffic windows
+
 ### Phase 8: Data Export (08-data-export.sql)
 - [x] All tables listed in correct foreign key dependency order
 - [x] Export commands for all tables
@@ -240,6 +262,16 @@
 - [ ] Test authentication
 - [ ] Test CRUD operations
 - [ ] Verify RLS policies work
+ - [ ] Verify Phase 2 objects and functions
+
+### Phase 2 Verification
+```sql
+SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('user_preferences','admin_override_audit');
+SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='user_preferences' AND indexname IN ('idx_user_preferences_tenant_id','idx_user_preferences_franchise_id');
+SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='admin_override_audit' AND indexname IN ('idx_admin_override_audit_tenant_id','idx_admin_override_audit_franchise_id','idx_admin_override_audit_user_id');
+SELECT proname FROM pg_proc JOIN pg_namespace n ON n.oid=pg_proc.pronamespace WHERE n.nspname='public' AND proname IN ('set_user_franchise_preference','audit_admin_override','set_admin_override');
+SELECT polname, tablename FROM pg_policies WHERE schemaname='public' AND tablename IN ('user_preferences','admin_override_audit');
+```
 
 ## 🧪 Verification Queries
 

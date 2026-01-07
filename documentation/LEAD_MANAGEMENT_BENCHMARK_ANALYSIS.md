@@ -992,7 +992,42 @@ CREATE TABLE email_sequence_enrollments (
 
 ### 4.5 Phase 4: Advanced Features
 
-Detailed specifications to be developed based on Phase 1-3 learnings.
+The following multi‑phase implementation plan expands the specifications and connects Phase 4 outcomes back to Phase 1–3 learnings for a cohesive rollout across the platform:
+
+**Phase 1: Policies and Schema Standardization**
+- Implement standardized Row‑Level Security (RLS) policies across all core tables (quotes, shipments, activities, reporting)
+- Add franchise_id indexes to optimize query performance for franchise‑specific operations
+- Validate all security functions and permission grants to ensure proper access control
+- Document all RLS policies and schema changes in the system architecture documentation
+
+**Phase 2: UI Defaults and Controls Implementation**
+- Develop a global franchise selector component with persistent session storage
+- Implement admin override functionality with proper authentication and logging
+- Update all data pipelines to enforce franchise‑first data retrieval patterns
+- Modify list views and search functionality to respect franchise boundaries
+- Add visual indicators for franchise context throughout the UI
+
+**Phase 3: RPCs and Edge Functions Enhancement**
+- Modify all RPC endpoints to require franchise parameters in requests
+- Implement comprehensive audit trails for all write operations
+- Apply rate limiting and cooldown mechanisms for sensitive operations
+- Minimize anonymous grants by implementing proper authentication requirements
+- Add input validation for all franchise‑related parameters
+
+**Phase 4: Reporting and Analytics Upgrade**
+- Develop franchise‑specific filters for all reports and dashboards
+- Implement comparison functionality between franchise performance metrics
+- Create tenant overview dashboards for admin users
+- Conduct performance benchmarking under high‑volume conditions
+- Update all dashboards to reflect franchise‑specific data segmentation
+
+**Phase 5: System Hardening and Testing**
+- Develop comprehensive isolation tests for all franchise boundaries
+- Implement end‑to‑end test suite covering full business flows (lead→quote→portal→shipment)
+- Add compliance checks for data access and retention policies
+- Implement audit log immutability protections
+- Perform security penetration testing focused on franchise isolation
+- Document all test cases and results in the quality assurance repository
 
 ---
 

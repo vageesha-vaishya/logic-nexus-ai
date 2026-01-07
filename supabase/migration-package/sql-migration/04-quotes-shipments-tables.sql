@@ -305,15 +305,20 @@ CREATE TABLE IF NOT EXISTS tracking_events (
 
 -- Indexes
 CREATE INDEX idx_carrier_rates_carrier ON carrier_rates(carrier_id);
-CREATE INDEX idx_quotes_tenant ON quotes(tenant_id);
-CREATE INDEX idx_quotes_franchise ON quotes(franchise_id);
+CREATE INDEX idx_quotes_tenant_id ON quotes(tenant_id);
+CREATE INDEX idx_quotes_franchise_id ON quotes(franchise_id);
 CREATE INDEX idx_quotes_opportunity ON quotes(opportunity_id);
 CREATE INDEX idx_quotation_versions_quote ON quotation_versions(quote_id);
-CREATE INDEX idx_shipments_tenant ON shipments(tenant_id);
-CREATE INDEX idx_shipments_franchise ON shipments(franchise_id);
+CREATE INDEX idx_shipments_tenant_id ON shipments(tenant_id);
+CREATE INDEX idx_shipments_franchise_id ON shipments(franchise_id);
 CREATE INDEX idx_shipments_quote ON shipments(quote_id);
 CREATE INDEX idx_tracking_events_shipment ON tracking_events(shipment_id);
 
 -- Triggers
 CREATE TRIGGER update_quotes_updated_at BEFORE UPDATE ON quotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_shipments_updated_at BEFORE UPDATE ON shipments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER INDEX IF EXISTS idx_quotes_tenant RENAME TO idx_quotes_tenant_id;
+ALTER INDEX IF EXISTS idx_quotes_franchise RENAME TO idx_quotes_franchise_id;
+ALTER INDEX IF EXISTS idx_shipments_tenant RENAME TO idx_shipments_tenant_id;
+ALTER INDEX IF EXISTS idx_shipments_franchise RENAME TO idx_shipments_franchise_id;

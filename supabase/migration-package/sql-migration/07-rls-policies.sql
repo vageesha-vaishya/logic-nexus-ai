@@ -62,6 +62,32 @@ ALTER TABLE public.quote_number_config_franchise ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_sequences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT policyname, tablename
+    FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename IN (
+        'tenants','franchises','profiles','user_roles','user_capacity',
+        'custom_roles','custom_role_permissions','user_custom_roles',
+        'subscription_plans','tenant_subscriptions','usage_records',
+        'accounts','contacts','leads','opportunities','opportunity_line_items',
+        'activities','campaigns','quotes','quotation_versions','quotation_version_options',
+        'customer_selections','shipments','tracking_events','carriers','carrier_rates',
+        'services','service_types','service_type_mappings','ports_locations','incoterms',
+        'cargo_types','package_categories','package_sizes','container_types','container_sizes',
+        'cargo_details','consignees','warehouses','vehicles','currencies','charge_categories',
+        'charge_sides','charge_bases','assignment_rules','lead_assignment_history',
+        'lead_assignment_queue','territory_assignments','email_accounts','emails','email_templates',
+        'quote_number_config_tenant','quote_number_config_franchise','quote_number_sequences','audit_logs'
+      )
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
+END $$;
+
 -- =====================================================
 -- TENANTS POLICIES
 -- =====================================================
@@ -335,7 +361,7 @@ CREATE POLICY "Users can update their activities"
   ON public.activities FOR UPDATE
   USING (
     tenant_id = public.get_user_tenant_id(auth.uid()) AND
-    (assigned_to = auth.uid() OR created_by = auth.uid() OR public.has_role(auth.uid(), 'tenant_admin'))
+    (assigned_to = auth.uid() OR created_by = auth.uid() OR public.has_role(auth.uid(), 'tenant_admin') OR public.has_role(auth.uid(), 'franchise_admin'))
   );
 
 -- CAMPAIGNS

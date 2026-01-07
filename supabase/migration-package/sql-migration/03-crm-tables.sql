@@ -253,14 +253,15 @@ CREATE INDEX idx_accounts_tenant ON accounts(tenant_id);
 CREATE INDEX idx_accounts_franchise ON accounts(franchise_id);
 CREATE INDEX idx_contacts_account ON contacts(account_id);
 CREATE INDEX idx_contacts_tenant ON contacts(tenant_id);
-CREATE INDEX idx_leads_tenant ON leads(tenant_id);
-CREATE INDEX idx_leads_franchise ON leads(franchise_id);
+CREATE INDEX idx_leads_tenant_id ON leads(tenant_id);
+CREATE INDEX idx_leads_franchise_id ON leads(franchise_id);
 CREATE INDEX idx_leads_owner ON leads(owner_id);
 CREATE INDEX idx_opportunities_account ON opportunities(account_id);
-CREATE INDEX idx_opportunities_tenant ON opportunities(tenant_id);
-CREATE INDEX idx_activities_tenant ON activities(tenant_id);
+CREATE INDEX idx_opportunities_tenant_id ON opportunities(tenant_id);
+CREATE INDEX idx_activities_tenant_id ON activities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_activities_franchise_id ON activities(franchise_id);
 CREATE INDEX idx_activities_assigned ON activities(assigned_to);
-CREATE INDEX idx_campaigns_tenant ON campaigns(tenant_id);
+CREATE INDEX idx_campaigns_tenant_id ON campaigns(tenant_id);
 CREATE INDEX idx_emails_account ON emails(account_id);
 
 -- Triggers
@@ -270,3 +271,9 @@ CREATE TRIGGER update_leads_updated_at BEFORE UPDATE ON leads FOR EACH ROW EXECU
 CREATE TRIGGER update_opportunities_updated_at BEFORE UPDATE ON opportunities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_opportunity_line_items_updated_at BEFORE UPDATE ON opportunity_line_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON activities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER INDEX IF EXISTS idx_leads_tenant RENAME TO idx_leads_tenant_id;
+ALTER INDEX IF EXISTS idx_leads_franchise RENAME TO idx_leads_franchise_id;
+ALTER INDEX IF EXISTS idx_opportunities_tenant RENAME TO idx_opportunities_tenant_id;
+ALTER INDEX IF EXISTS idx_activities_tenant RENAME TO idx_activities_tenant_id;
+ALTER INDEX IF EXISTS idx_campaigns_tenant RENAME TO idx_campaigns_tenant_id;

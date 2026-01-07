@@ -114,6 +114,7 @@ apply_schema() {
         "sql-migration/05-audit-system-tables.sql"
         "sql-migration/06-database-functions.sql"
         "sql-migration/07-rls-policies.sql"
+        "sql-migration/08-ui-controls.sql"
     )
 
     for script in "${scripts[@]}"; do
