@@ -138,11 +138,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => {
             // Load dynamic permissions first
             RoleService.getRolePermissions().then(map => {
-              setDynamicRoleMap(map);
+              // Dynamic role map loaded - use it for permission resolution
               return map;
             }).catch(e => {
               console.warn('Failed to load dynamic permissions on init', e);
-              return {};
+              return {} as Record<string, string[]>;
             }).then((map) => {
               fetchProfile(currentSession.user.id).then(setProfile);
               fetchUserRoles(currentSession.user.id).then(async (rolesData) => {

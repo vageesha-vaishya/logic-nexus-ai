@@ -25,6 +25,8 @@ describe('buildOpportunityFromLead', () => {
     converted_at: null,
     custom_fields: null,
     owner_id: null,
+    tenant_id: 'tenant_1',
+    franchise_id: 'franchise_1',
   };
 
   it('maps core fields correctly with default name', () => {

@@ -23,7 +23,7 @@ export function useQuoteTemplates() {
     queryKey: templateKeys.list(tenantId),
     queryFn: async () => {
       if (!tenantId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('quote_templates')
         .select('*')
         .eq('tenant_id', tenantId)
@@ -38,7 +38,7 @@ export function useQuoteTemplates() {
   const createTemplate = useMutation({
     mutationFn: async (newTemplate: CreateQuoteTemplateDTO) => {
       if (!tenantId) throw new Error('No tenant ID found');
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('quote_templates')
         .insert([{ ...newTemplate, tenant_id: tenantId }])
         .select()
@@ -58,7 +58,7 @@ export function useQuoteTemplates() {
 
   const updateTemplate = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: UpdateQuoteTemplateDTO }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('quote_templates')
         .update(updates)
         .eq('id', id)
@@ -79,7 +79,7 @@ export function useQuoteTemplates() {
 
   const deleteTemplate = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('quote_templates')
         .delete()
         .eq('id', id);

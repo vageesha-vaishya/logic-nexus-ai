@@ -318,6 +318,96 @@ export type Database = {
           },
         ]
       }
+      auth_permissions: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      auth_role_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          permission_id: string
+          role_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          permission_id: string
+          role_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          permission_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auth_role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "auth_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auth_role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "auth_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auth_roles: {
+        Row: {
+          can_manage_scopes: string[] | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_system: boolean | null
+          label: string
+          level: number
+          updated_at: string | null
+        }
+        Insert: {
+          can_manage_scopes?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          id: string
+          is_system?: boolean | null
+          label: string
+          level?: number
+          updated_at?: string | null
+        }
+        Update: {
+          can_manage_scopes?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          label?: string
+          level?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       cargo_details: {
         Row: {
           actual_weight_kg: number | null
@@ -2315,6 +2405,38 @@ export type Database = {
           },
         ]
       }
+      lead_activities: {
+        Row: {
+          created_at: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_assignment_history: {
         Row: {
           assigned_at: string | null
@@ -2468,6 +2590,76 @@ export type Database = {
             columns: ["territory_id"]
             isOneToOne: false
             referencedRelation: "territories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_score_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          tenant_id: string
+          updated_at: string | null
+          weights_json: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+          weights_json?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+          weights_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_score_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_score_logs: {
+        Row: {
+          change_reason: string | null
+          created_at: string | null
+          id: string
+          lead_id: string
+          new_score: number | null
+          old_score: number | null
+        }
+        Insert: {
+          change_reason?: string | null
+          created_at?: string | null
+          id?: string
+          lead_id: string
+          new_score?: number | null
+          old_score?: number | null
+        }
+        Update: {
+          change_reason?: string | null
+          created_at?: string | null
+          id?: string
+          lead_id?: string
+          new_score?: number | null
+          old_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_score_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
@@ -2939,6 +3131,51 @@ export type Database = {
           width_ft?: number | null
         }
         Relationships: []
+      }
+      portal_tokens: {
+        Row: {
+          accessed_at: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          quote_id: string
+          tenant_id: string | null
+          token: string
+        }
+        Insert: {
+          accessed_at?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          quote_id: string
+          tenant_id?: string | null
+          token: string
+        }
+        Update: {
+          accessed_at?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          quote_id?: string
+          tenant_id?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_tokens_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_tokens_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ports_locations: {
         Row: {
@@ -4748,6 +4985,53 @@ export type Database = {
           },
         ]
       }
+      quote_templates: {
+        Row: {
+          category: string | null
+          content: Json | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          content?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          content?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quotes: {
         Row: {
           accepted_at: string | null
@@ -5338,6 +5622,47 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipment_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          shipment_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          shipment_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          shipment_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_attachments_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
             referencedColumns: ["id"]
           },
         ]

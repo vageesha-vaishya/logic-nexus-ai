@@ -62,7 +62,7 @@ export default function Leads() {
         .order('created_at', { ascending: false });
 
       // Validate and cast data
-      const safeLeads = (data || []).map(d => ({
+      const safeLeads = (data || []).map((d: any) => ({
         ...d,
         status: stages.includes(d.status as LeadStatus) ? (d.status as LeadStatus) : 'new'
       })) as Lead[];

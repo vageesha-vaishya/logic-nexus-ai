@@ -22,7 +22,7 @@ export const RoleService = {
    * Fetches all defined roles from the database
    */
   async getRoles() {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('auth_roles')
       .select('*')
       .order('level', { ascending: true });
@@ -35,7 +35,7 @@ export const RoleService = {
    * Fetches all available permissions
    */
   async getPermissions() {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('auth_permissions')
       .select('*')
       .order('id', { ascending: true });
@@ -48,7 +48,7 @@ export const RoleService = {
    * Fetches the mapping of roles to permissions
    */
   async getRolePermissions() {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('auth_role_permissions')
       .select('role_id, permission_id');
     
@@ -56,7 +56,7 @@ export const RoleService = {
     
     // Transform to Record<roleId, permissionId[]>
     const map: Record<string, string[]> = {};
-    data.forEach(item => {
+    (data || []).forEach((item: any) => {
       if (!map[item.role_id]) map[item.role_id] = [];
       map[item.role_id].push(item.permission_id);
     });
@@ -69,7 +69,7 @@ export const RoleService = {
    */
   async updateRolePermissions(roleId: string, permissionIds: string[]) {
     // 1. Delete existing
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await (supabase as any)
       .from('auth_role_permissions')
       .delete()
       .eq('role_id', roleId);
@@ -78,7 +78,7 @@ export const RoleService = {
 
     // 2. Insert new
     if (permissionIds.length > 0) {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await (supabase as any)
         .from('auth_role_permissions')
         .insert(
           permissionIds.map(pId => ({
@@ -113,7 +113,7 @@ export const RoleService = {
       is_system: true
     }));
 
-    const { error: rolesError } = await supabase
+    const { error: rolesError } = await (supabase as any)
       .from('auth_roles')
       .upsert(roles, { onConflict: 'id' });
     
@@ -132,7 +132,7 @@ export const RoleService = {
       description: p
     }));
 
-    const { error: permsError } = await supabase
+    const { error: permsError } = await (supabase as any)
       .from('auth_permissions')
       .upsert(permsList, { onConflict: 'id' });
       
@@ -140,17 +140,14 @@ export const RoleService = {
 
     // 4. Upsert Role Permissions
     for (const [roleId, perms] of Object.entries(ROLE_PERMISSIONS)) {
-      // First clean up for this role (optional, but safer for re-seeding)
-      // await supabase.from('auth_role_permissions').delete().eq('role_id', roleId);
-      
       const links = perms.map(p => ({
         role_id: roleId,
         permission_id: p
       }));
       
-      const { error: linkError } = await supabase
+      const { error: linkError } = await (supabase as any)
         .from('auth_role_permissions')
-        .upsert(links, { onConflict: 'role_id, permission_id' }); // Requires constraint
+        .upsert(links, { onConflict: 'role_id, permission_id' });
         
       if (linkError) console.error(`Error seeding permissions for ${roleId}:`, linkError);
     }

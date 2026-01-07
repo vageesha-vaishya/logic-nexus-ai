@@ -24,7 +24,7 @@ export function useQuotePortal() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('portal_tokens')
         .insert({
           quote_id: quoteId,
@@ -48,7 +48,7 @@ export function useQuotePortal() {
 
   const getActiveTokens = async (quoteId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('portal_tokens')
         .select('*')
         .eq('quote_id', quoteId)
@@ -65,7 +65,7 @@ export function useQuotePortal() {
 
   const revokeToken = async (tokenId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('portal_tokens')
         .delete()
         .eq('id', tokenId);

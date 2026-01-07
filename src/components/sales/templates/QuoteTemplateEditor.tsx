@@ -74,7 +74,9 @@ export function QuoteTemplateEditor({ template, open, onOpenChange }: QuoteTempl
         });
       } else {
         await createTemplate.mutateAsync({
-          ...values,
+          name: values.name,
+          description: values.description,
+          category: values.category,
           content,
         });
       }

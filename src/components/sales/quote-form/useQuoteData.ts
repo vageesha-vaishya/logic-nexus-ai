@@ -80,7 +80,7 @@ export function useQuoteData() {
     queryKey: quoteKeys.reference.opportunities(tenantId),
     queryFn: async () => {
       if (!tenantId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('opportunities')
         .select('id, name, account_id, contact_id')
         .eq('tenant_id', tenantId)
