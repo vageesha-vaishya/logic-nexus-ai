@@ -13,7 +13,13 @@ export function useQuoteHydration(
   const { 
     setResolvedTenantId, 
     setServices, 
-    setResolvedServiceLabels 
+    setResolvedServiceLabels,
+    setAccounts,
+    setContacts,
+    setOpportunities,
+    accounts,
+    contacts,
+    opportunities
   } = useQuoteContext();
   const [isHydrating, setIsHydrating] = useState(false);
 
@@ -72,6 +78,63 @@ export function useQuoteHydration(
                      return [...prev, { ...svc, id: String(svc.id) }];
                  });
              }
+        }
+
+        // Inject selected CRM entities into dropdowns if missing
+        const accId = quote.account_id ? String(quote.account_id) : '';
+        const conId = quote.contact_id ? String(quote.contact_id) : '';
+        const oppId = quote.opportunity_id ? String(quote.opportunity_id) : '';
+
+        if (accId && !accounts.some((a: any) => String(a.id) === accId)) {
+          const { data: acc } = await supabase
+            .from('accounts')
+            .select('id, name')
+            .eq('id', accId)
+            .maybeSingle();
+          if (acc) {
+            setAccounts((prev) => {
+              const exists = prev.some((a: any) => String(a.id) === String(acc.id));
+              return exists ? prev : [{ id: String(acc.id), name: acc.name || 'Account' }, ...prev];
+            });
+          }
+        }
+
+        if (conId && !contacts.some((c: any) => String(c.id) === conId)) {
+          const { data: con } = await supabase
+            .from('contacts')
+            .select('id, first_name, last_name, account_id')
+            .eq('id', conId)
+            .maybeSingle();
+          if (con) {
+            setContacts((prev) => {
+              const exists = prev.some((c: any) => String(c.id) === String(con.id));
+              return exists ? prev : [{
+                id: String(con.id),
+                first_name: con.first_name || '',
+                last_name: con.last_name || '',
+                account_id: con.account_id ? String(con.account_id) : null
+              }, ...prev];
+            });
+          }
+        }
+
+        if (oppId && !opportunities.some((o: any) => String(o.id) === oppId)) {
+          const { data: opp } = await supabase
+            .from('opportunities')
+            .select('id, name, account_id, contact_id')
+            .eq('id', oppId)
+            .maybeSingle();
+          if (opp) {
+            setOpportunities((prev) => {
+              const exists = prev.some((o: any) => String(o.id) === String(opp.id));
+              return exists ? prev : [{
+                id: String(opp.id),
+                name: opp.name || 'Opportunity',
+                account_id: opp.account_id ? String(opp.account_id) : null,
+                contact_id: opp.contact_id ? String(opp.contact_id) : null
+              }, ...prev];
+            });
+          }
         }
 
       } catch (error) {

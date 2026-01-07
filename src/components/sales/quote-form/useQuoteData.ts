@@ -17,6 +17,10 @@ export function useQuoteData() {
   const [resolvedCarrierLabels, setResolvedCarrierLabels] = useState<Record<string, string>>({});
   const [resolvedPackageCategoryLabels, setResolvedPackageCategoryLabels] = useState<Record<string, string>>({});
   const [resolvedPackageSizeLabels, setResolvedPackageSizeLabels] = useState<Record<string, string>>({});
+  const [injectedAccounts, setInjectedAccounts] = useState<any[]>([]);
+  const [injectedContacts, setInjectedContacts] = useState<any[]>([]);
+  const [injectedOpportunities, setInjectedOpportunities] = useState<any[]>([]);
+  const [injectedServices, setInjectedServices] = useState<any[]>([]);
 
   const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
 
@@ -25,12 +29,17 @@ export function useQuoteData() {
     queryKey: quoteKeys.reference.ports(),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('ports')
-        .select('id, name, code, country_code')
-        .order('name')
+        .from('ports_locations')
+        .select('id, location_name, location_code, country')
+        .order('location_name')
         .limit(100);
       if (error) throw error;
-      return data || [];
+      return (data || []).map((p: any) => ({
+        id: p.id,
+        name: p.location_name,
+        code: p.location_code,
+        country_code: p.country
+      }));
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   });
@@ -84,11 +93,11 @@ export function useQuoteData() {
   });
 
   // 5. Fetch Services & Types (Complex Logic Refactored)
-  const { data: serviceData = { services: [], serviceTypes: [] } } = useQuery({
+  const serviceQuery: any = useQuery({
     queryKey: quoteKeys.reference.services(tenantId),
     queryFn: async () => {
       // Logic from original fetchServiceData
-      let query = supabase
+      let query = (supabase as any)
         .from('service_type_mappings')
         .select('service_type_id, service_id, is_default, priority')
         .eq('is_active', true)
@@ -106,7 +115,7 @@ export function useQuoteData() {
 
       const servicesById: Record<string, any> = {};
       if (serviceIds.length > 0) {
-        const { data: svcData, error: svcErr } = await supabase
+        const { data: svcData, error: svcErr } = await (supabase as any)
           .from('services')
           .select('id, service_name, is_active')
           .in('id', serviceIds)
@@ -163,6 +172,7 @@ export function useQuoteData() {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+  const serviceData = serviceQuery.data ?? { services: [], serviceTypes: [] };
 
   // 6. Fetch Contacts
   const { data: contacts = [] } = useQuery({
@@ -182,18 +192,26 @@ export function useQuoteData() {
 
   return {
     serviceTypes: serviceData.serviceTypes,
-    services: serviceData.services,
+    services: [...injectedServices, ...serviceData.services].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
     carriers,
     ports,
-    accounts,
-    contacts,
-    opportunities,
+    accounts: [...injectedAccounts, ...accounts].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
+    contacts: [...injectedContacts, ...contacts].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
+    opportunities: [...injectedOpportunities, ...opportunities].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
     setResolvedTenantId,
     resolvedTenantId,
-    setAccounts: () => {}, // No-op, managed by query
-    setOpportunities: () => {}, // No-op, managed by query
-    setServices: () => {}, // No-op, managed by query
-    setContacts: () => {}, // No-op, managed by query
+    setAccounts: (updater?: (prev: any[]) => any[]) => {
+      setInjectedAccounts((prev) => (updater ? updater(prev) : prev));
+    },
+    setOpportunities: (updater?: (prev: any[]) => any[]) => {
+      setInjectedOpportunities((prev) => (updater ? updater(prev) : prev));
+    },
+    setServices: (updater?: (prev: any[]) => any[]) => {
+      setInjectedServices((prev) => (updater ? updater(prev) : prev));
+    },
+    setContacts: (updater?: (prev: any[]) => any[]) => {
+      setInjectedContacts((prev) => (updater ? updater(prev) : prev));
+    },
     setResolvedServiceLabels
   };
 }

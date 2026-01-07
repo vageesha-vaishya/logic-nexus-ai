@@ -8,6 +8,152 @@
 
 ---
 
+## 7. Tenant→Franchisee Audit Report
+
+### 7.1 Scope and Method
+- Reviewed codebase modules and migrations for tenant_id and franchise_id handling
+- Verified RLS policies, hooks, UI scoping, and RPC functions
+- Cross-referenced workflows from Lead to Shipment including public portal access
+
+### 7.2 Modules and Implementation
+- Leads
+  - DB: leads table with tenant/franchise scoping in policies
+  - UI: [LeadForm.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/components/crm/LeadForm.tsx), [LeadsPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/LeadsPipeline.tsx)
+  - Services: Assignment rules/queues; see [QueueManagement.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/QueueManagement.tsx) and migration [add_queues_and_groups.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20260104000001_add_queues_and_groups.sql)
+  - Access: RLS in [07-rls-policies.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migration-package/sql-migration/07-rls-policies.sql)
+- Contacts
+  - DB: franchise-scoped policies and indexes
+  - Evidence: [20251001012101_e33f1e24.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251001012101_e33f1e24-d74b-4b19-9430-148a0ac99d5b.sql#L280-L324)
+- Opportunities
+  - DB: RLS with franchise and tenant indexes
+  - Evidence: [20251001050412_2d9e5998.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251001050412_2d9e5998-e0ed-4389-a890-ac0dc42e5d49.sql#L57-L100)
+  - UI: [OpportunitiesPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/OpportunitiesPipeline.tsx), [OpportunityDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/OpportunityDetail.tsx#L451-L504)
+- Quotes
+  - DB: quotes table gains franchise-linked references (carrier, ports); see [20251006023245_fdc44a0d.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251006023245_fdc44a0d-d441-46d0-92d9-da818cfd01a1.sql#L49-L88)
+  - UI: [Quotes.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/Quotes.tsx), [QuotesPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/QuotesPipeline.tsx#L374-L416), [QuoteDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/QuoteDetail.tsx)
+  - Portal: [get_quote_by_token](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20260107000001_create_portal_tokens.sql#L22-L70), [accept_quote_by_token](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20260107000001_create_portal_tokens.sql#L96-L166), [QuotePortal.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/portal/QuotePortal.tsx)
+- Shipments
+  - UI: [ShipmentsPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/ShipmentsPipeline.tsx), [ShipmentDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/ShipmentDetail.tsx)
+  - DB: ports/carriers/consignees RLS aligned to tenant; see [20251006023245_fdc44a0d.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251006023245_fdc44a0d-d441-46d0-92d9-da818cfd01a1.sql)
+- Activities
+  - UI: [ActivityComposer.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/components/crm/ActivityComposer.tsx), [ActivityDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/ActivityDetail.tsx)
+  - DB: RLS policies in [07-rls-policies.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migration-package/sql-migration/07-rls-policies.sql)
+- Files, Campaigns, Calendar, Groups
+  - UI routes exist; scoping partially tenant-level; franchise segmentation to be standardized
+  - Evidence: [navigation.ts](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/config/navigation.ts)
+- Reporting
+  - UI: lists and dashboards; franchise filtering not consistently default
+  - Recommendation: enforce franchise-first scope with admin override
+- Theme/Config
+  - Hook enforces scope by context: [useTheme.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/hooks/useTheme.tsx#L188-L210)
+- Context and Permissions
+  - Context derivation: [useCRM.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/hooks/useCRM.tsx)
+  - Role/permissions: [useAuth.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/hooks/useAuth.tsx#L55-L127)
+
+### 7.3 Implementation Status
+
+| Module | Status | Evidence |
+|--------|--------|----------|
+| Leads | Complete | RLS + queues, UI forms/pipeline present |
+| Contacts | Complete | RLS policies ([link](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251001012101_e33f1e24-d74b-4b19-9430-148a0ac99d5b.sql#L280-L324)) |
+| Opportunities | Complete | RLS + indexes, pipelines/details |
+| Quotes | Partial | Franchise default scope not enforced everywhere; portal added |
+| Shipments | Partial | RLS aligned; UI present; ensure franchise filters |
+| Activities | Partial | RLS exists; verify UI scoping consistency |
+| Files/Campaigns | Not started (franchise) | Tenant-level UI; need franchise CRUD |
+| Calendar/Groups | Partial | UI exists; franchise membership needed |
+| Reporting | Partial | Add franchise filters and comparisons |
+| Portal | Complete | Token RPCs + acceptance audit and UI |
+
+### 7.4 Technical Details
+- Database
+  - tenant_id, franchise_id fields on core tables; indexes on franchise_id recommended for high-volume tables (quotes, shipments, activities)
+  - Policies enforce franchise access; SECURITY DEFINER RPCs handle anon portal actions
+- API and Service
+  - Supabase queries via UI components/hooks; RPCs for token verify/accept flows
+  - Edge functions operate under service role; should include franchise parameters
+- Business Logic
+  - UI components leverage context for scoped queries; quote portal implements acceptance with audit logs
+- Permissions
+  - Roles mapped to union permissions; custom permissions via RPC; tenant/franchise context applied in hooks
+- Synchronization
+  - Email sync edge function; ensure franchise scoping in data writes and audits
+
+### 7.5 Gaps and Risks
+- Inconsistent franchise-first default filtering in Quotes/Reporting UI
+- Edge functions lacking explicit franchise audit parameters on all writes
+- Shared caches not keyed by franchise leading to potential leakage
+- Performance under franchise-scale lists requires dedicated indexes and pagination tuning
+
+### 7.6 Visuals
+
+Module Status Matrix (Mermaid)
+```mermaid
+flowchart TB
+  subgraph Modules
+    Leads[Leads ✓]
+    Contacts[Contacts ✓]
+    Opps[Opportunities ✓]
+    Quotes[Quotes ~]
+    Shipments[Shipments ~]
+    Activities[Activities ~]
+    Files[Files ✗]
+    Campaigns[Campaigns ✗]
+    Calendar[Calendar ~]
+    Groups[Groups ~]
+    Reporting[Reporting ~]
+    Portal[Customer Portal ✓]
+  end
+```
+
+Architecture (Current State)
+```mermaid
+flowchart LR
+  Auth[Auth Roles] --> Ctx[useAuth/useCRM Context]
+  Ctx --> UI[Scoped UI/Edge]
+  UI --> RLS[RLS Policies/Functions]
+  RLS --> Data[Tables with tenant_id+franchise_id]
+  UI --> Portal[Portal RPCs]
+  Portal --> RLS
+```
+
+Lead→Shipment Flow
+```mermaid
+flowchart TD
+  Lead[Lead Created] --> Score[AI/Rule Scoring]
+  Score --> Assign[Assignment/Queues (franchise lanes)]
+  Assign --> Opp[Opportunity]
+  Opp --> Quote[Quote]
+  Quote --> PortalView[Portal View]
+  PortalView --> Accept[Acceptance Audit]
+  Accept --> Shipment[Shipment Execution]
+  Shipment --> Report[Reporting (franchise filters)]
+```
+
+PNG Export
+- Source blocks above are editable; PNG export can be generated via Mermaid CLI or IDE extensions
+
+### 7.7 Recommendations and Priority
+- Enforce franchise-first default scoping in Quotes/Reporting UI (Critical)
+- Add franchise_id parameter auditing in all edge functions (High)
+- Key caches by franchise and tenant (High)
+- Add franchise_id indexes and verify pagination performance (Medium)
+- Standardize RPC contracts to include franchise context where applicable (Medium)
+
+### 7.8 Effort Estimates
+- UI scoping standardization: 24–40 hours
+- Edge function parameterization + audits: 32–48 hours
+- Indexing and performance tuning: 16–24 hours
+- Cache keying and validation: 12–20 hours
+- RPC contract review and updates: 20–30 hours
+
+### 7.9 Verification Steps
+- Run e2e tests with franchise users to validate isolation
+- Execute RPC cooldown tests and SECURITY DEFINER permission audits
+- Benchmark lists (Quotes/Opportunities) at franchise data volumes
+- Confirm audit records for portal acceptance include IP/UA and franchise
+
+---
 ## Executive Summary
 
 This document provides a comprehensive analysis comparing the lead management workflows of the top 5 global CRM platforms with the SOS Logistics Enterprise Platform. The analysis covers lead capture, qualification, assignment, routing, scoring, and automation capabilities, with specific focus on logistics industry requirements.
