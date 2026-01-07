@@ -89,6 +89,7 @@ export const APP_MENU: MenuModule[] = [
     label: 'Settings',
     items: [
       { name: 'System Settings', path: '/dashboard/settings', icon: Cog, description: 'Account and app settings' },
+      { name: 'Roles & Permissions', path: '/dashboard/settings/permissions', icon: Cog, description: 'Configure access control', permissions: ['admin.settings.manage'] },
       { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme' },
       { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage' },
       { name: 'Data Management', path: '/dashboard/settings/data-management', icon: Cog, description: 'Database options and quote numbering' },

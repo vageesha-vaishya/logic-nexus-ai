@@ -10,6 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { PermissionGuard } from '@/lib/auth/PermissionGuard';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RoleService } from '@/lib/api/roles';
 
 export default function Users() {
   const navigate = useNavigate();
@@ -34,9 +38,18 @@ export default function Users() {
   };
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [bulkRole, setBulkRole] = useState<string>('user');
+  const [bulkTenant, setBulkTenant] = useState<string>('');
+  const [bulkFranchise, setBulkFranchise] = useState<string>('');
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
 
   useEffect(() => {
     fetchUsers();
+    supabase.from('tenants').select('id,name').then(({ data }) => setTenants(data || []));
+    supabase.from('franchises').select('id,name').then(({ data }) => setFranchises(data || []));
   }, []);
 
   const fetchUsers = async () => {
@@ -119,6 +132,11 @@ export default function Users() {
               New User
             </Button>
           </PermissionGuard>
+          <PermissionGuard requiredPermission="admin.users.manage">
+            <Button variant="outline" onClick={() => setShowBulkDialog(true)} disabled={selectedIds.length === 0}>
+              Bulk Assign Roles
+            </Button>
+          </PermissionGuard>
         </div>
 
         <Card>
@@ -139,6 +157,14 @@ export default function Users() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedIds.length > 0 && selectedIds.length === users.length}
+                        onCheckedChange={(val) => {
+                          setSelectedIds(val ? users.map(u => u.id) : []);
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
@@ -156,6 +182,17 @@ export default function Users() {
                       className="cursor-pointer"
                       onClick={() => navigate(`/dashboard/users/${user.id}`)}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.includes(user.id)}
+                          onCheckedChange={(val) => {
+                            setSelectedIds(prev => {
+                              if (val) return [...prev, user.id];
+                              return prev.filter(id => id !== user.id);
+                            });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         {user.first_name} {user.last_name}
                       </TableCell>
@@ -191,6 +228,69 @@ export default function Users() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Bulk Assign Roles</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-sm font-medium">Role</label>
+                <Select defaultValue={bulkRole} onValueChange={setBulkRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['platform_admin','tenant_admin','franchise_admin','user'].map(r => (
+                      <SelectItem key={r} value={r}>{r.replace('_',' ')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Tenant</label>
+                <Select defaultValue={bulkTenant} onValueChange={setBulkTenant}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Franchise</label>
+                <Select defaultValue={bulkFranchise} onValueChange={setBulkFranchise}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select franchise" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {franchises.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                try {
+                  await RoleService.bulkAssignRoles(selectedIds, { role: bulkRole, tenant_id: bulkTenant || null, franchise_id: bulkFranchise || null });
+                  toast({ title: 'Success', description: 'Roles assigned' });
+                  setShowBulkDialog(false);
+                  setSelectedIds([]);
+                  fetchUsers();
+                } catch (e) {
+                  toast({ title: 'Error', description: 'Failed to assign roles', variant: 'destructive' });
+                }
+              }}>Assign</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

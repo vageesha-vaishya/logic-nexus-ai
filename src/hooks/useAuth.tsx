@@ -111,9 +111,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const rolesData = await fetchUserRoles(user.id);
       setRoles(rolesData);
       
-      // Combine standard role permissions with custom role permissions
+      // Resolve permissions using dynamic role map and hierarchy (inheritance)
+      let dynamicMap: Record<string, string[]> = {};
+      try {
+        dynamicMap = await RoleService.getRolePermissions();
+      } catch (e) {
+        dynamicMap = {};
+      }
+      let hierarchyParents: Record<string, string[]> = {};
+      try {
+        const { childrenToParents } = await RoleService.getRoleHierarchy();
+        hierarchyParents = childrenToParents;
+      } catch (e) {}
       const standardPerms = unionPermissions(
-        ...rolesData.map(r => ROLE_PERMISSIONS[r.role])
+        ...rolesData.map(r => {
+          const base = (dynamicMap[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
+          const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
+            if (visited.has(roleId)) return [];
+            visited.add(roleId);
+            const direct = hierarchyParents[roleId] || [];
+            const all = [...direct];
+            direct.forEach(pr => {
+              all.push(...collectAncestors(pr, visited));
+            });
+            return Array.from(new Set(all));
+          };
+          const parents = collectAncestors(r.role);
+          const inherited = parents.flatMap(p => ((dynamicMap[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
+          return unionPermissions(base, inherited);
+        })
       );
       const { granted, denied } = await fetchCustomPermissions(user.id);
       
@@ -143,15 +169,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }).catch(e => {
               console.warn('Failed to load dynamic permissions on init', e);
               return {} as Record<string, string[]>;
-            }).then((map) => {
+            }).then(async (map) => {
               fetchProfile(currentSession.user.id).then(setProfile);
               fetchUserRoles(currentSession.user.id).then(async (rolesData) => {
                 setRoles(rolesData);
                 
+                // Resolve inheritance
+                let hierarchyParents: Record<string, string[]> = {};
+                try {
+                  const { childrenToParents } = await RoleService.getRoleHierarchy();
+                  hierarchyParents = childrenToParents;
+                } catch (e) {}
                 const standardPerms = unionPermissions(
                   ...rolesData.map((r) => {
-                    const dynamicPerms = map[r.role];
-                    return (dynamicPerms as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
+                    const base = (map[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
+                    const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
+                      if (visited.has(roleId)) return [];
+                      visited.add(roleId);
+                      const direct = hierarchyParents[roleId] || [];
+                      const all = [...direct];
+                      direct.forEach(pr => {
+                        all.push(...collectAncestors(pr, visited));
+                      });
+                      return Array.from(new Set(all));
+                    };
+                    const parents = collectAncestors(r.role);
+                    const inherited = parents.flatMap(p => ((map[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
+                    return unionPermissions(base, inherited);
                   })
                 );
                 

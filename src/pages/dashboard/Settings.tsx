@@ -103,7 +103,7 @@ export default function Settings() {
               </div>
               <CardDescription>Your access levels</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-4">
               {roles.map((role) => (
                 <div key={role.role} className="text-sm">
                   <span className="font-medium capitalize">{role.role.replace('_', ' ')}</span>
@@ -111,6 +111,15 @@ export default function Settings() {
                   {role.franchise_id && <span className="text-muted-foreground"> • Franchise scoped</span>}
                 </div>
               ))}
+              <div className="mt-2 flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Permissions Management</p>
+                  <p className="text-xs text-muted-foreground">Configure modules and granular permissions for all roles.</p>
+                </div>
+                <Button variant="default" onClick={() => navigate('/dashboard/settings/permissions')}>
+                  Open
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

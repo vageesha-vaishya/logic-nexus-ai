@@ -65,9 +65,37 @@ export const RoleService = {
   },
 
   /**
+   * Fetch role inheritance (hierarchy) mapping: parent -> children and child -> parents
+   */
+  async getRoleHierarchy() {
+    const { data, error } = await (supabase as any)
+      .from('auth_role_hierarchy')
+      .select('manager_role_id, target_role_id');
+    if (error) {
+      const code = (error as any)?.code;
+      const message = (error as any)?.message || '';
+      if (code === 'PGRST205' || message.includes('auth_role_hierarchy')) {
+        return { parentsToChildren: {}, childrenToParents: {}, available: false };
+      }
+      throw error;
+    }
+    const parentsToChildren: Record<string, string[]> = {};
+    const childrenToParents: Record<string, string[]> = {};
+    (data || []).forEach((row: any) => {
+      const parent = row.manager_role_id as string;
+      const child = row.target_role_id as string;
+      if (!parentsToChildren[parent]) parentsToChildren[parent] = [];
+      if (!childrenToParents[child]) childrenToParents[child] = [];
+      parentsToChildren[parent].push(child);
+      childrenToParents[child].push(parent);
+    });
+    return { parentsToChildren, childrenToParents, available: true };
+  },
+
+  /**
    * Updates the permissions for a specific role
    */
-  async updateRolePermissions(roleId: string, permissionIds: string[]) {
+  async updateRolePermissions(roleId: string, permissionIds: string[], justification?: string) {
     // 1. Delete existing
     const { error: deleteError } = await (supabase as any)
       .from('auth_role_permissions')
@@ -94,7 +122,142 @@ export const RoleService = {
     await supabase.from('audit_logs').insert({
       action: 'role.permissions.update',
       resource_type: 'auth_role',
-      details: { roleId, permissionCount: permissionIds.length }
+      details: { roleId, permissionCount: permissionIds.length, justification: justification || null }
+    });
+  },
+
+  /**
+   * Create a new custom role
+   */
+  async createRole(role: Omit<DbRole, 'is_system'> & { is_system?: boolean }) {
+    const payload = { ...role, is_system: role.is_system ?? false };
+    const { data, error } = await (supabase as any).from('auth_roles').insert(payload).select().single();
+    if (error) throw error;
+    await supabase.from('audit_logs').insert({
+      action: 'role.create',
+      resource_type: 'auth_role',
+      details: { id: data.id }
+    });
+    return data as DbRole;
+  },
+
+  /**
+   * Update an existing role
+   */
+  async updateRole(roleId: string, updates: Partial<DbRole>) {
+    const { data, error } = await (supabase as any)
+      .from('auth_roles')
+      .update(updates)
+      .eq('id', roleId)
+      .select()
+      .single();
+    if (error) throw error;
+    await supabase.from('audit_logs').insert({
+      action: 'role.update',
+      resource_type: 'auth_role',
+      details: { id: roleId, updates }
+    });
+    return data as DbRole;
+  },
+
+  /**
+   * Delete a role (cannot delete system roles)
+   */
+  async deleteRole(roleId: string) {
+    const { data: role } = await (supabase as any).from('auth_roles').select('is_system').eq('id', roleId).single();
+    if (role?.is_system) {
+      throw new Error('Cannot delete a system role');
+    }
+    const { error } = await (supabase as any).from('auth_roles').delete().eq('id', roleId);
+    if (error) throw error;
+    await supabase.from('audit_logs').insert({
+      action: 'role.delete',
+      resource_type: 'auth_role',
+      details: { id: roleId }
+    });
+  },
+
+  /**
+   * Set role inheritance: selectedRole inherits from parentRoles
+   */
+  async setRoleInheritance(selectedRoleId: string, parentRoleIds: string[]) {
+    // Remove existing parent links for this child
+    const { error: delError } = await (supabase as any)
+      .from('auth_role_hierarchy')
+      .delete()
+      .eq('target_role_id', selectedRoleId);
+    if (delError) {
+      const code = (delError as any)?.code;
+      const message = (delError as any)?.message || '';
+      if (code === 'PGRST205' || message.includes('auth_role_hierarchy')) {
+        throw new Error('Role inheritance table is missing. Please run the migration to create auth_role_hierarchy.');
+      }
+      throw delError;
+    }
+    // Insert new links
+    if (parentRoleIds.length > 0) {
+      const rows = parentRoleIds.map(pid => ({
+        manager_role_id: pid,
+        target_role_id: selectedRoleId
+      }));
+      const { error: insError } = await (supabase as any).from('auth_role_hierarchy').insert(rows);
+      if (insError) {
+        const code = (insError as any)?.code;
+        const message = (insError as any)?.message || '';
+        if (code === 'PGRST205' || message.includes('auth_role_hierarchy')) {
+          throw new Error('Role inheritance table is missing. Please run the migration to create auth_role_hierarchy.');
+        }
+        throw insError;
+      }
+    }
+    await supabase.from('audit_logs').insert({
+      action: 'role.inheritance.update',
+      resource_type: 'auth_role',
+      details: { roleId: selectedRoleId, parents: parentRoleIds }
+    });
+  },
+
+  /**
+   * Assign roles to a single user
+   */
+  async assignRolesToUser(userId: string, assignments: { role: string; tenant_id?: string | null; franchise_id?: string | null }[], replace = false) {
+    if (replace) {
+      await (supabase as any).from('user_roles').delete().eq('user_id', userId);
+    }
+    if (assignments.length > 0) {
+      const rows = assignments.map(a => ({
+        user_id: userId,
+        role: a.role,
+        tenant_id: a.tenant_id ?? null,
+        franchise_id: a.franchise_id ?? null
+      }));
+      const { error } = await (supabase as any).from('user_roles').insert(rows);
+      if (error) throw error;
+    }
+    await supabase.from('audit_logs').insert({
+      action: 'user.roles.assign',
+      resource_type: 'user',
+      details: { userId, count: assignments.length, replace }
+    });
+  },
+
+  /**
+   * Bulk assign a role to many users
+   */
+  async bulkAssignRoles(userIds: string[], assignment: { role: string; tenant_id?: string | null; franchise_id?: string | null }) {
+    if (userIds.length === 0) return;
+    const rows = userIds.map(uid => ({
+      user_id: uid,
+      role: assignment.role,
+      tenant_id: assignment.tenant_id ?? null,
+      franchise_id: assignment.franchise_id ?? null
+    }));
+    const { error } = await (supabase as any).from('user_roles').insert(rows);
+    if (error) throw error;
+    await supabase.from('audit_logs').insert({
+      action: 'user.roles.bulk_assign',
+      resource_type: 'user',
+      details: { userIdsCount: userIds.length, role: assignment.role }
     });
   },
 

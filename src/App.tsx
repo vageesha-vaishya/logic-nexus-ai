@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import Landing from "./pages/Landing";
@@ -265,6 +265,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/settings/permissions" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <RolesPermissions />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/security-overview" 
               element={
                 <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
@@ -275,8 +283,8 @@ const App = () => (
             <Route 
               path="/dashboard/permissions" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.users.manage"]}>
-                  <PermissionsMatrix />
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <Navigate to="/dashboard/settings/permissions" replace />
                 </ProtectedRoute>
               }
             />

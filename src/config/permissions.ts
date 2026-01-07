@@ -49,7 +49,21 @@ export type Permission =
   | 'admin.users.manage'
   | 'admin.lead_routing.manage'
   | 'admin.lead_assignment.manage'
-  | 'admin.settings.manage';
+  | 'admin.settings.manage'
+  | 'shipments.view' | 'shipments.create' | 'shipments.edit' | 'shipments.delete'
+  | 'shipments.approvals.view' | 'shipments.approvals.manage'
+  | 'shipments.reports.view' | 'shipments.reports.manage'
+  | 'shipments.config.manage'
+  | 'shipments.audit.view' | 'shipments.audit.manage'
+  | 'warehouses.view' | 'warehouses.create' | 'warehouses.edit' | 'warehouses.delete'
+  | 'vehicles.view' | 'vehicles.create' | 'vehicles.edit' | 'vehicles.delete'
+  | 'carriers.view' | 'carriers.create' | 'carriers.edit' | 'carriers.delete'
+  | 'service_types.view' | 'service_types.create' | 'service_types.edit' | 'service_types.delete'
+  | 'services.view' | 'services.create' | 'services.edit' | 'services.delete'
+  | 'service_type_mappings.view' | 'service_type_mappings.create' | 'service_type_mappings.edit' | 'service_type_mappings.delete'
+  | 'ports_locations.view' | 'ports_locations.create' | 'ports_locations.edit' | 'ports_locations.delete'
+  | 'consignees.view' | 'consignees.create' | 'consignees.edit' | 'consignees.delete';
+
 
 export const ROLE_PERMISSIONS: Record<
   'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user',
@@ -71,6 +85,11 @@ export const ROLE_PERMISSIONS: Record<
     'groups.view','groups.manage',
     'calendar.view','calendar.manage',
     'admin.tenants.manage','admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
+    'shipments.view','shipments.create','shipments.edit','shipments.delete',
+    'shipments.approvals.view','shipments.approvals.manage',
+    'shipments.reports.view','shipments.reports.manage',
+    'shipments.config.manage',
+    'shipments.audit.view','shipments.audit.manage',
   ],
   tenant_admin: [
     // Admin within tenant
@@ -88,6 +107,11 @@ export const ROLE_PERMISSIONS: Record<
     'groups.view','groups.manage',
     'calendar.view','calendar.manage',
     'admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
+    'shipments.view','shipments.create','shipments.edit','shipments.delete',
+    'shipments.approvals.view','shipments.approvals.manage',
+    'shipments.reports.view','shipments.reports.manage',
+    'shipments.config.manage',
+    'shipments.audit.view',
   ],
   franchise_admin: [
     // Admin within franchise
@@ -105,6 +129,9 @@ export const ROLE_PERMISSIONS: Record<
     'groups.view',
     'calendar.view',
     'admin.lead_assignment.manage',
+    'shipments.view','shipments.create','shipments.edit',
+    'shipments.approvals.view',
+    'shipments.reports.view',
   ],
   user: [
     // Typical sales user
@@ -121,6 +148,7 @@ export const ROLE_PERMISSIONS: Record<
     'chatter.view','chatter.post',
     'groups.view',
     'calendar.view',
+    'shipments.view',
   ],
 };
 

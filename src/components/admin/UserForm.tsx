@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { ROLE_MATRIX, UserRole, canManageRole, validateHierarchy } from '@/lib/auth/RoleMatrix';
+import { RoleService } from '@/lib/api/roles';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -46,6 +47,9 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   const [franchises, setFranchises] = useState<any[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>(user?.user_roles?.[0]?.role || '');
   const [selectedTenantId, setSelectedTenantId] = useState<string>(user?.user_roles?.[0]?.tenant_id || '');
+  const [assignedRoles, setAssignedRoles] = useState<Array<{ role: UserRole; tenant_id?: string | null; franchise_id?: string | null }>>(
+    (user?.user_roles || []).map((r: any) => ({ role: r.role, tenant_id: r.tenant_id || null, franchise_id: r.franchise_id || null })) || []
+  );
 
   // Determine current user's role for permission checks
   const currentUserRole: UserRole = context.isPlatformAdmin ? 'platform_admin' 
@@ -179,17 +183,11 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
         if (profileError) throw profileError;
 
-        // Update role if changed
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .update({
-            role: values.role,
-            tenant_id: values.tenant_id || null,
-            franchise_id: values.franchise_id || null,
-          })
-          .eq('user_id', user.id);
-
-        if (roleError) throw roleError;
+        // Replace roles with assignedRoles (include primary role from form if not present)
+        const primaryAssignment = { role: values.role as UserRole, tenant_id: values.tenant_id || null, franchise_id: values.franchise_id || null };
+        const hasPrimary = assignedRoles.some(r => r.role === primaryAssignment.role && r.tenant_id === primaryAssignment.tenant_id && r.franchise_id === primaryAssignment.franchise_id);
+        const finalAssignments = hasPrimary ? assignedRoles : [primaryAssignment, ...assignedRoles];
+        await RoleService.assignRolesToUser(user.id, finalAssignments, true);
 
         toast({
           title: 'Success',
@@ -237,6 +235,15 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
           description: `User created successfully. ${messages.join(' ')}`,
         });
         
+        try {
+          // Assign additional roles after creation
+          const { data: created } = await supabase.from('profiles').select('id').eq('email', values.email).single();
+          if (created?.id && assignedRoles.length > 0) {
+            await RoleService.assignRolesToUser(created.id, assignedRoles, false);
+          }
+        } catch (e) {
+          console.warn('Failed to assign additional roles on creation', e);
+        }
         navigate('/dashboard/users');
       }
     } catch (error: any) {
@@ -503,6 +510,104 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             )}
           />
         )}
+
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="flex items-center justify-between">
+            <FormLabel>Additional Roles</FormLabel>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAssignedRoles(prev => [...prev, { role: 'user', tenant_id: context.tenantId || null, franchise_id: context.franchiseId || null }])}
+            >
+              Add Role
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {assignedRoles.map((r, idx) => (
+              <div key={idx} className="grid grid-cols-3 gap-3 items-end">
+                <div>
+                  <FormLabel>Role</FormLabel>
+                  <Select 
+                    onValueChange={(value) => {
+                      setAssignedRoles(prev => prev.map((item, i) => i === idx ? { ...item, role: value as UserRole } : item));
+                    }} 
+                    defaultValue={r.role}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Object.values(ROLE_MATRIX)
+                        .filter(role => canManageRole(currentUserRole, role.id))
+                        .map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <FormLabel>Tenant</FormLabel>
+                  <Select 
+                    onValueChange={(value) => {
+                      setAssignedRoles(prev => prev.map((item, i) => i === idx ? { ...item, tenant_id: value } : item));
+                    }} 
+                    defaultValue={r.tenant_id || ''}
+                    disabled={!context.isPlatformAdmin}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a tenant" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {tenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <FormLabel>Franchise</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        setAssignedRoles(prev => prev.map((item, i) => i === idx ? { ...item, franchise_id: value } : item));
+                      }} 
+                      defaultValue={r.franchise_id || ''}
+                      disabled={!context.isPlatformAdmin && !context.isTenantAdmin}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a franchise" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {franchises.map((franchise) => (
+                          <SelectItem key={franchise.id} value={franchise.id}>
+                            {franchise.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setAssignedRoles(prev => prev.filter((_, i) => i !== idx))}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="flex gap-4">
           <Button type="submit" className="flex-1">

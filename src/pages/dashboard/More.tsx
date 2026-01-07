@@ -20,9 +20,9 @@ export default function More() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <CardDescription>View the read-only matrix of role capabilities.</CardDescription>
+              <CardDescription>Open Permissions Management to configure access controls.</CardDescription>
               <Button asChild className="w-full">
-                <Link to="/dashboard/permissions">View Matrix</Link>
+                <Link to="/dashboard/settings/permissions">Open Permissions</Link>
               </Button>
             </CardContent>
           </Card>
