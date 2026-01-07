@@ -46,6 +46,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Accounts', path: '/dashboard/accounts/pipeline', icon: Building2, description: 'Organizations and customers' },
       { name: 'Contacts', path: '/dashboard/contacts/pipeline', icon: Users, description: 'People tied to accounts' },
       { name: 'Quotes', path: '/dashboard/quotes/pipeline', icon: FileCheck, description: 'Sales quotes and proposals' },
+      { name: 'Quote Templates', path: '/dashboard/quotes/templates', icon: FileText, description: 'Manage quote templates', permissions: ['quotes.templates.manage'] },
 
       // Remaining items
       { name: 'Files', path: '/dashboard/files', icon: FileText, description: 'Documents and attachments' },

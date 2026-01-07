@@ -17,6 +17,20 @@ This document provides a comprehensive analysis comparing the lead management wo
 - **Critical Gaps**: AI-powered predictive scoring, advanced round-robin algorithms, mobile-first design
 - **Recommended Priority**: Enhanced automation engine with territory-based routing
 
+Compact Architecture View:
+```
+USER ROLES ──► useAuth/useCRM (tenant_id + franchise_id + perms)
+      │
+      ▼
+ UI/Edge ──► Scoped queries/mutations (franchise-first default)
+      │
+      ▼
+   RLS ──► Enforce tenant+franchise at DB (policies/functions)
+      │
+      ▼
+  DATA ──► leads/opportunities/quotes/shipments/activities (segregated)
+```
+
 ---
 
 ## 1. Detailed Feature Analysis: Top 5 CRM Platforms
@@ -1233,3 +1247,241 @@ interface AssignLeadResponse {
 | Product Owner | | | |
 | Tech Lead | | | |
 | Engineering Manager | | | |
+
+---
+
+## 5. Multi‑Tenant + Multi‑Franchisee Architecture Update
+
+### 5.1 Current System Analysis
+- Architecture
+  - Multi‑tenant identity and role model implemented using Supabase Auth and role tables; context helper exposes tenant and franchise for the signed‑in user. See hook [useCRM.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/hooks/useCRM.tsx) and auth role derivation in [useAuth.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/hooks/useAuth.tsx#L55-L90).
+  - Row‑Level Security policies exist for key CRM entities with franchise scoping, for example contacts and opportunities:
+    - Contacts RLS policies: [20251001012101_e33f1e24.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251001012101_e33f1e24-d74b-4b19-9430-148a0ac99d5b.sql#L280-L324)
+    - Opportunities RLS policies and indexes: [20251001050412_2d9e5998.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20251001050412_2d9e5998-e0ed-4389-a890-ac0dc42e5d49.sql#L57-L100)
+- Modules missing or partial franchisee functionality (UI/process)
+  - Reporting dashboards: global aggregates without franchise filters
+  - Files and Campaigns: view and actions not consistently scoped by franchise
+  - Groups/Chatter and Calendar: membership and visibility not segmented by franchise
+  - Quotes list: front‑end filters present, but default scope can be tenant‑wide; ensure franchise default scope aligns with user context. See [QuotesPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/QuotesPipeline.tsx#L374-L416)
+- End‑to‑end workflow mapping (Lead → Shipment)
+  - Lead capture and assignment: Lead creation in Leads pages and edge functions; assignment via queues/rules. See [QueueManagement.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/QueueManagement.tsx) and policies in [add_queues_and_groups.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migrations/20260104000001_add_queues_and_groups.sql)
+  - Lead conversion: Opportunity creation and pipeline, then quotes generation (QuoteNew/QuoteDetail), followed by shipment creation from accepted quotes. References:
+    - Opportunity flow: [OpportunitiesPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/OpportunitiesPipeline.tsx), [OpportunityDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/OpportunityDetail.tsx#L451-L504)
+    - Quote creation and management: [Quotes.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/Quotes.tsx), [QuoteDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/QuoteDetail.tsx)
+    - Shipment lifecycle: [ShipmentsPipeline.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/ShipmentsPipeline.tsx), [ShipmentDetail.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/dashboard/ShipmentDetail.tsx)
+
+### 5.2 Vision & Architecture Enhancement
+- Target architecture: Multi‑tenant platform with explicit multi‑franchise layer
+  - Data segregation: Every core entity carries tenant_id and (where applicable) franchise_id; queries enforce both via RLS and default scopes
+  - Process isolation: Assignment queues, workload capacity, and workflow engines are franchise‑scoped by default with optional tenant overrides for admins
+  - Access control: Role‑based permissions with franchise inheritance; functions like get_user_franchise_id and get_user_tenant_id gate access at the DB layer
+  - Public portal: Token‑scoped anonymous access inherits tenant linkage and usage thresholds; quote acceptance writes audit entries without bypassing RLS
+- Required segregation guarantees
+  - Read paths: Always filter by franchise_id for non‑admin roles
+  - Write paths: Enforce franchise_id on inserts/updates based on user context
+  - Background tasks: Edge functions operate under a service role with explicit franchise scoping parameters and audit logs
+
+### 5.3 GAP Analysis Matrix
+
+| Area | Current | Desired | Gap |
+|------|---------|---------|-----|
+| Reporting | Tenant‑level | Franchise‑segmented dashboards | Medium |
+| Files | Tenant‑scoped | Franchise‑scoped CRUD + sharing | Medium |
+| Campaigns | Tenant‑level | Franchise‑level targeting | Medium |
+| Calendar/Groups | Global/team | Franchise membership/visibility | Medium |
+| Quotes default scope | Mixed | Franchise‑first default scope | Low |
+| Workflow engine | Code‑driven | Visual designer with franchise lanes | High |
+
+Architectural violations to address
+- UI components issuing unscoped queries without franchise filters
+- Edge functions missing franchise parameters on writes
+- Shared caches not keyed by franchise
+
+### 5.4 Implementation Plan
+- Technical specification
+  - Introduce a franchise_required default scope in React hooks/components; derive from [useCRM.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/hooks/useCRM.tsx)
+  - Enforce franchise checks in DB functions and policies; extend RLS where missing
+  - Add indexes on franchise_id for high‑volume tables (quotes, shipments, activities)
+- Module modifications
+  - Reporting: add franchise filter, tenant/admin override, and comparison views
+  - Files/Campaigns: CRUD screens and queries to require franchise_id by default
+  - Calendar/Groups: franchise membership for visibility and notifications
+  - Quotes: default franchise scope in lists and pipelines, preserving admin overrides
+- Data model changes
+  - Ensure franchise_id exists and is indexed on all relevant tables; backfill where null with tenant default mapping
+- API/service layer
+  - Supabase RPCs to accept franchise_id as required input; service role functions validate cross‑franchise interactions and write audit logs
+
+### 5.5 Workflow Integration
+- Lead Management: assignment engines and queues operate per franchise; capacity and fairness measured per franchise
+- Order Processing: opportunities and quotes linked to franchise; number sequences optionally franchise‑specific
+- Shipment Tracking: milestones and documents segregated; carrier allocations audited per franchise
+- Reporting: scorecards and funnels filtered; admins can view cross‑franchise comparisons
+- Franchise business rules examples
+  - Territory exclusions per franchise
+  - Priority lanes for premium franchises
+  - SLA thresholds adjusted per franchise contracts
+- Cross‑franchise scenarios
+  - Admin‑mediated transfers with full audit
+  - Shared resources with explicit consent and time‑boxed visibility
+
+### 5.6 Quality Standards
+- Data isolation tests
+  - Unit and integration tests validating RLS and query scoping for franchise users
+- Performance benchmarks
+  - Pagination and pipeline rendering under 200ms at P95 for 50k+ franchise records
+- Security audits
+  - Review SECURITY DEFINER RPCs and grants; verify least privilege and logging
+- Compliance checklist
+  - Tenant/franchise isolation, auditability, data minimization, retention policies
+
+### 5.7 Deliverables
+- Updated architecture diagrams with franchise layer, context derivation, and RLS boundaries
+- Technical specifications detailing missing components and required changes
+- Implementation roadmap with milestones and ownership
+- Testing strategy (unit, integration, e2e) for franchise functionality
+- Workflow change log documenting updates across modules
+
+## 6. Test Strategy for Franchisee Functionality
+- Scope
+  - Validate franchise isolation across read/write paths
+  - Verify performance targets at franchise scale
+  - Audit SECURITY DEFINER RPCs and grants
+  - Confirm compliance for retention and auditability
+- Methodology
+  - Unit tests: hooks, utilities, RPC parameter validation
+  - Integration tests: Supabase RLS, edge functions under service role
+  - End-to-end tests: user flows for lead→quote→portal→acceptance→shipment
+- Test Checklist (condensed)
+  - Data Isolation: Franchise users cannot read/write outside their franchise
+  - Admin Overrides: Tenant admins see cross-franchise; regular users do not
+  - Performance: Quotes/Opportunities P95 <200ms with 50k franchise rows
+  - RPC Cooldowns: View/accept RPCs enforce cooldown windows
+  - Security: Minimal anon grants; SECURITY DEFINER functions reviewed
+  - Token Audit: IP/UserAgent captured; flagged at threshold
+  - Compliance: Retention policy applied to acceptances/audits; transfers audited
+- Tooling & Environments
+  - Supabase SQL tests, Playwright e2e, Vitest unit/integration
+  - Seeded tenants/franchises with synthetic data volume
+- Metrics & Reporting
+  - P95/avg latency, error rates, isolation violations, coverage
+  - Weekly dashboards for progress and regression tracking
+- Exit Criteria
+  - Zero isolation violations, performance meets targets, security audits pass,
+    compliance checklist complete, and green e2e suite
+
+---
+
+## Appendix A: ASCII Architecture Diagrams
+
+### A.1 Multi‑Tenant + Multi‑Franchisee Layering
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         USER + ROLE CONTEXT (Auth)                           │
+│  ┌───────────────┐   ┌───────────────┐   ┌───────────────┐   ┌────────────┐ │
+│  │ platform_admin│   │ tenant_admin  │   │ franchise_admin│   │ user       │ │
+│  └───────┬───────┘   └───────┬───────┘   └───────┬───────┘   └──────┬─────┘ │
+│          │                   │                   │                    │       │
+│          ▼                   ▼                   ▼                    ▼       │
+│                 ┌──────────────────────────────────────────────┐              │
+│                 │        APP CONTEXT (useCRM/useAuth)          │              │
+│                 │ tenant_id    franchise_id     permissions    │              │
+│                 └──────────────────────────────────────────────┘              │
+│                               │                                              │
+├───────────────────────────────┼──────────────────────────────────────────────┤
+│                               ▼                                              │
+│                      APPLICATION LAYER (UI / Edge)                            │
+│     ┌───────────────┐  ┌────────────────┐  ┌────────────────┐                │
+│     │ UI Components │  │ React Hooks    │  │ Edge Functions │                │
+│     └───────┬───────┘  └────────┬───────┘  └────────┬───────┘                │
+│             │                   │                   │                         │
+│             ▼                   ▼                   ▼                         │
+│        Scoped Queries     Scoped Mutations   Service Role Actions             │
+│        (tenant+franchise) (tenant+franchise) (validating franchise)          │
+├───────────────────────────────┼──────────────────────────────────────────────┤
+│                               ▼                                              │
+│                         SUPABASE RLS BOUNDARY                                 │
+│      ┌─────────────────────────────────────────────────────────────────┐      │
+│      │  Policies enforce tenant_id + franchise_id on SELECT/INSERT/UPD │      │
+│      │  Functions with SECURITY DEFINER mediate anon/service actions   │      │
+│      └─────────────────────────────────────────────────────────────────┘      │
+│                               │                                              │
+│                               ▼                                              │
+│                    DATA TABLES (tenant_id, franchise_id)                      │
+│   leads, opportunities, quotes, shipments, activities, files, campaigns      │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### A.2 Lead → Shipment Workflow (Franchise‑Scoped)
+```
+┌──────────────────────────┐
+│        Lead Created      │
+└─────────────┬────────────┘
+              │
+      ┌───────▼────────┐
+      │   AI Scoring   │ (context: tenant+franchise)
+      └───────┬────────┘
+              │
+      ┌───────▼────────┐
+      │ Assignment/    │  Rules + Queues (franchise lanes)
+      │ Territory Check│
+      └───────┬────────┘
+              │
+      ┌───────▼────────┐
+      │ Opportunity     │
+      │ Created         │
+      └───────┬────────┘
+              │
+      ┌───────▼────────┐
+      │ Quote Created   │  Franchise‑scoped numbering (optional)
+      └───────┬────────┘
+              │
+      ┌───────▼────────┐
+      │ Customer Portal │  Token → Verify (RLS/SECURITY DEFINER)
+      │ View & Accept   │  Acceptance → Audit Write
+      └───────┬────────┘
+              │
+      ┌───────▼────────┐
+      │ Shipment        │
+      │ Execution       │  Milestones + Documents (franchise segregated)
+      └───────┬────────┘
+              │
+      ┌───────▼────────┐
+      │ Reporting       │  Franchise filters + Tenant admin overrides
+      └─────────────────┘
+```
+
+### A.3 RLS Boundaries and Anon Token Flow
+```
+Client (Anon) ──► RPC: get_quote_by_token ──► RLS bypass via SECURITY DEFINER
+                                  │
+                                  ▼
+                         Token validity + cooldown
+                                  │
+                                  ▼
+                         SELECT quotes (scoped by token link)
+
+Client (Anon) ──► RPC: accept_quote_by_token ──► RLS bypass via SECURITY DEFINER
+                                  │
+                                  ▼
+                         Insert audit (quote_acceptances)
+                                  │
+                                  ▼
+                         Update quote status (accepted) with safeguards
+```
+
+---
+
+## Appendix B: Franchisee Test Checklist
+
+| Area | Test | Description | Method | Pass Criteria |
+|------|------|-------------|--------|---------------|
+| Data Isolation | Franchise SELECT | Franchise user cannot see other franchise data | Unit + e2e (Supabase RLS, UI filters) | No cross‑franchise rows returned |
+| Data Isolation | Franchise INSERT | Writes automatically set franchise_id from context | Unit (hooks), DB constraints | Row franchise_id matches user franchise |
+| Data Isolation | Admin Override | Tenant admin can view cross‑franchise | e2e with role change, UI filters | Admin sees all; regular users do not |
+| Performance | Pipeline Render | Quotes/Opportunities lists under load | Benchmark tooling, P95 latency | <200ms P95 for 50k rows per franchise |
+| Performance | RPC Cooldown | Token verify and accept enforce cooldown | Unit on SQL functions | Repeated calls blocked within window |
+| Security | SECURITY DEFINER Review | Only necessary RPCs have anon grants | Manual audit, permissions check | Minimal grants, functions validated |
+| Security | Token Audit Trail | IP/UserAgent logged; flagged on thresholds | Unit on SQL writes | IP/UA persisted, flagged when count > limit |
+| Compliance | Retention Policy | Quote acceptance and audit retention | Policy docs + e2e deletion task | Retention aligned to compliance checklist |
+| Compliance | Access Logs | Admin actions and transfers are auditable | e2e transfer flow | Audit entries exist and immutable |

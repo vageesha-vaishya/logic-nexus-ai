@@ -67,6 +67,7 @@ import VehicleNew from "./pages/dashboard/VehicleNew";
 import SubscriptionManagement from "./pages/dashboard/SubscriptionManagement";
 import TenantSubscription from "./pages/dashboard/TenantSubscription";
 import Quotes from "./pages/dashboard/Quotes";
+import QuoteTemplates from "./pages/dashboard/QuoteTemplates";
 import QuoteNew from "./pages/dashboard/QuoteNew";
 import QuoteDetail from "./pages/dashboard/QuoteDetail";
 import QuotesPipeline from "./pages/dashboard/QuotesPipeline";
@@ -100,6 +101,7 @@ import DatabaseExport from "./pages/dashboard/data-management/DatabaseExport";
 import AccountsPipeline from "./pages/dashboard/AccountsPipeline";
 import ContactsPipeline from "./pages/dashboard/ContactsPipeline";
 import QuotationTests from "./pages/testing/QuotationTests";
+import QuotePortal from "./pages/portal/QuotePortal";
     
 const queryClient = new QueryClient();
 
@@ -397,6 +399,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/quotes/templates" 
+              element={
+                <ProtectedRoute requiredPermissions={["quotes.templates.manage"]}>
+                  <QuoteTemplates />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/quotes/new" 
               element={
                 <ProtectedRoute>
@@ -513,10 +523,11 @@ const App = () => (
               path="/dashboard/settings/master-data" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataGeography /></ProtectedRoute>} 
             />
-            <Route 
-              path="/dashboard/settings/master-data-hts" 
+            <Route path="/dashboard/settings/master-data-hts" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataHTS /></ProtectedRoute>} 
             />
+            {/* Public customer portal */}
+            <Route path="/portal/quote/:token" element={<QuotePortal />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* Salesforce-style navigation placeholder routes */}
             <Route path="/dashboard/files" element={<ProtectedRoute requiredPermissions={["files.view"]}><Files /></ProtectedRoute>} />

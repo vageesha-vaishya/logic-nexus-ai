@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { QuoteForm } from '@/components/sales/QuoteForm';
+import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { useCRM } from '@/hooks/useCRM';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { QuoteTemplateList } from '@/components/sales/templates/QuoteTemplateList';
+import { QuoteTemplate } from '@/components/sales/templates/types';
+import { FileText } from 'lucide-react';
+import { QuoteFormValues } from '@/components/sales/quote-form/types';
+import { toast } from 'sonner';
 
 export default function QuoteNew() {
   const navigate = useNavigate();
@@ -12,6 +19,28 @@ export default function QuoteNew() {
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateData, setTemplateData] = useState<Partial<QuoteFormValues> | undefined>(undefined);
+
+  const handleTemplateSelect = (template: QuoteTemplate) => {
+    try {
+      // Parse content if string, or use as is if object
+      const content = typeof template.content === 'string' 
+        ? JSON.parse(template.content) 
+        : template.content;
+      
+      // Map template content to form values
+      // We explicitly exclude system fields
+      const { id, created_at, updated_at, tenant_id, quote_number, ...rest } = content as any;
+      
+      setTemplateData(rest);
+      setTemplateDialogOpen(false);
+      toast.success(`Template "${template.name}" applied`);
+    } catch (e) {
+      console.error('Error applying template', e);
+      toast.error('Failed to apply template');
+    }
+  };
 
   const handleSuccess = (quoteId: string) => {
     // Instead of navigating immediately, create initial version and show composer inline
@@ -116,9 +145,22 @@ export default function QuoteNew() {
           </Breadcrumb>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">New Quote</h1>
+            <Button variant="outline" onClick={() => setTemplateDialogOpen(true)}>
+              <FileText className="mr-2 h-4 w-4" />
+              Use Template
+            </Button>
           </div>
         </div>
-        <QuoteForm onSuccess={handleSuccess} />
+        <QuoteForm onSuccess={handleSuccess} initialData={templateData} />
+        
+        <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Select a Quote Template</DialogTitle>
+            </DialogHeader>
+            <QuoteTemplateList onSelect={handleTemplateSelect} />
+          </DialogContent>
+        </Dialog>
         
         {createdQuoteId && versionId && (
           <div className="mt-6">

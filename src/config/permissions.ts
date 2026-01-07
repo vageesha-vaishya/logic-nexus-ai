@@ -19,6 +19,11 @@ export type Permission =
   | 'opportunities.create'
   | 'opportunities.edit'
   | 'opportunities.delete'
+  | 'quotes.view'
+  | 'quotes.create'
+  | 'quotes.edit'
+  | 'quotes.delete'
+  | 'quotes.templates.manage'
   | 'activities.view'
   | 'activities.create'
   | 'activities.edit'
@@ -56,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create','accounts.edit','accounts.delete',
     'contacts.view','contacts.create','contacts.edit','contacts.delete',
     'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
+    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.templates.manage',
     'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',
@@ -72,6 +78,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create','accounts.edit','accounts.delete',
     'contacts.view','contacts.create','contacts.edit','contacts.delete',
     'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
+    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.templates.manage',
     'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',
@@ -88,6 +95,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create','accounts.edit',
     'contacts.view','contacts.create','contacts.edit',
     'opportunities.view','opportunities.create','opportunities.edit',
+    'quotes.view','quotes.create','quotes.edit',
     'activities.view','activities.create','activities.edit','activities.complete',
     'campaigns.view',
     'files.view',
@@ -104,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create',
     'contacts.view','contacts.create',
     'opportunities.view','opportunities.create',
+    'quotes.view','quotes.create',
     'activities.view','activities.create','activities.complete',
     'campaigns.view',
     'files.view',

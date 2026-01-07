@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { QuoteForm } from '@/components/sales/QuoteForm';
+import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
+import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
 
 export default function QuoteDetail() {
   const { id } = useParams();
@@ -16,6 +17,7 @@ export default function QuoteDetail() {
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
 
   useEffect(() => {
     const checkQuote = async () => {
@@ -24,13 +26,14 @@ export default function QuoteDetail() {
         // Allow navigating by either UUID id or quote_number (e.g., QT-2025-002)
         const { data, error } = await supabase
           .from('quotes')
-          .select('id, tenant_id')
+          .select('id, tenant_id, quote_number')
           .or(`id.eq.${id},quote_number.eq.${id}`)
           .limit(1)
           .single();
         if (error) throw error;
         setResolvedId((data as any)?.id ?? null);
         setTenantId((data as any)?.tenant_id ?? null);
+        setQuoteNumber((data as any)?.quote_number ?? null);
         setLoading(false);
       } catch (err: any) {
         toast.error('Failed to load quote', { description: err.message });
@@ -163,6 +166,9 @@ export default function QuoteDetail() {
           </Breadcrumb>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">Edit Quote</h1>
+            {resolvedId && (
+              <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
+            )}
           </div>
         </div>
         <QuoteForm quoteId={resolvedId ?? id} onSuccess={handleSuccess} />
