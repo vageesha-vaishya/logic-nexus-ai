@@ -14,6 +14,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 
@@ -54,7 +55,8 @@ export default function Leads() {
 
   const fetchLeads = async () => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context);
+      const { data, error } = await dao
         .from('leads')
         .select('*')
         .order('created_at', { ascending: false });

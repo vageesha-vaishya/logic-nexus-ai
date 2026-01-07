@@ -39,6 +39,7 @@ export const OBJECT_GROUPS: ObjectGroup[] = [
       { name: 'Tenants', to: '/dashboard/tenants', icon: FileText, description: 'Multi-tenant administration' },
       { name: 'Franchises', to: '/dashboard/franchises', icon: Package, description: 'Franchise entities' },
       { name: 'Users', to: '/dashboard/users', icon: Users, description: 'Manage users and roles' },
+      { name: 'Roles & Permissions', to: '/dashboard/permissions', icon: Shield, description: 'Configure access control' },
       { name: 'Security Overview', to: '/dashboard/security-overview', icon: Shield, description: 'RLS policies and security' },
       { name: 'Settings', to: '/dashboard/settings', icon: Settings, description: 'Global and app settings' },
     ],

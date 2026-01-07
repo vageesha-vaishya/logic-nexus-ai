@@ -20,7 +20,13 @@ const franchiseSchema = z.object({
   tenant_id: z.string().min(1, 'Tenant is required'),
   manager_id: z.string().optional(),
   is_active: z.boolean().default(true),
-  address: z.string().optional(),
+  address: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zip: z.string().optional(),
+    country: z.string().optional(),
+  }).optional(),
 });
 
 type FranchiseFormValues = z.infer<typeof franchiseSchema>;
@@ -47,23 +53,56 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       tenant_id: franchise?.tenant_id || context.tenantId || '',
       manager_id: franchise?.manager_id || '',
       is_active: franchise?.is_active ?? true,
-      address: franchise?.address ? JSON.stringify(franchise.address, null, 2) : '',
+      address: typeof franchise?.address === 'string' 
+        ? JSON.parse(franchise.address) 
+        : franchise?.address || { street: '', city: '', state: '', zip: '', country: '' },
     },
   });
 
+  // Watch tenant_id to refetch managers
+  const selectedTenantId = form.watch('tenant_id');
+
   useEffect(() => {
     fetchTenants();
-    fetchManagers();
   }, []);
 
+  useEffect(() => {
+    if (selectedTenantId) {
+      fetchManagers(selectedTenantId);
+    } else {
+      setManagers([]);
+    }
+  }, [selectedTenantId]);
+
   const fetchTenants = async () => {
+    // If not platform admin, we don't need to fetch tenants as we use the context one
+    if (!context.isPlatformAdmin) return;
+    
     const { data } = await supabase.from('tenants').select('id, name').eq('is_active', true);
     setTenants(data || []);
   };
 
-  const fetchManagers = async () => {
-    const { data } = await supabase.from('profiles').select('id, first_name, last_name, email');
-    setManagers(data || []);
+  const fetchManagers = async (tenantId: string) => {
+    // Get users associated with this tenant
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('tenant_id', tenantId);
+      
+    if (userRoles && userRoles.length > 0) {
+      const userIds = userRoles.map(ur => ur.user_id);
+      // Remove duplicates
+      const uniqueUserIds = Array.from(new Set(userIds));
+      
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', uniqueUserIds);
+        
+      setManagers(profiles || []);
+    } else {
+      setManagers([]);
+    }
   };
 
   const handleFormSubmit = (values: FranchiseFormValues) => {
@@ -87,7 +126,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
         tenant_id: values.tenant_id,
         manager_id: values.manager_id || null,
         is_active: values.is_active,
-        address: values.address ? JSON.parse(values.address) : null,
+        address: values.address,
       };
 
       if (franchise) {
@@ -157,30 +196,32 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="tenant_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tenant *</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select tenant" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {tenants.map((tenant) => (
-                    <SelectItem key={tenant.id} value={tenant.id}>
-                      {tenant.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {context.isPlatformAdmin && (
+          <FormField
+            control={form.control}
+            name="tenant_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tenant *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select tenant" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {tenants.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <FormField
           control={form.control}
@@ -207,24 +248,76 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address (JSON)</FormLabel>
-              <FormControl>
-                <Textarea 
-                  placeholder='{"street": "123 Main St", "city": "New York", "state": "NY", "zip": "10001"}' 
-                  className="font-mono"
-                  rows={4}
-                  {...field} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="space-y-4 rounded-lg border p-4">
+          <FormLabel>Address</FormLabel>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="address.street"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Street</FormLabel>
+                  <FormControl>
+                    <Input placeholder="123 Main St" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input placeholder="New York" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.state"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>State</FormLabel>
+                  <FormControl>
+                    <Input placeholder="NY" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.zip"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Zip Code</FormLabel>
+                  <FormControl>
+                    <Input placeholder="10001" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.country"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Country</FormLabel>
+                  <FormControl>
+                    <Input placeholder="USA" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
         <FormField
           control={form.control}

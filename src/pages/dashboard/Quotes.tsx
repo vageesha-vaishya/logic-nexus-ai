@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Quote, QuoteStatus, statusConfig } from './quotes-data';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
@@ -24,7 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 export default function Quotes() {
   const navigate = useNavigate();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -71,9 +72,9 @@ export default function Quotes() {
     const quotesWithRelations = await Promise.all(
       (data || []).map(async (quote) => {
         const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
-          quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,
-          quote.contact_id ? supabase.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
-          quote.opportunity_id ? supabase.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
+          quote.account_id ? dao.from('accounts').select('name').eq('id', quote.account_id).single() : null,
+          quote.contact_id ? dao.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
+          quote.opportunity_id ? dao.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
           quote.carrier_id ? supabase.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
           quote.service_type_id ? supabase.from('service_types').select('name').eq('id', quote.service_type_id).single() : null,
         ]);

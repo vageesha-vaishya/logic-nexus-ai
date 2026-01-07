@@ -103,6 +103,8 @@ import ContactsPipeline from "./pages/dashboard/ContactsPipeline";
 import QuotationTests from "./pages/testing/QuotationTests";
 import QuotePortal from "./pages/portal/QuotePortal";
     
+import RolesPermissions from "./pages/dashboard/RolesPermissions";
+
 const queryClient = new QueryClient();
 
 const App = () => (

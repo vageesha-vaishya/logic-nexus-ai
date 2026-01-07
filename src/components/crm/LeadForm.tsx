@@ -58,6 +58,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   const { supabase, context } = useCRM();
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
+  const [currentFranchise, setCurrentFranchise] = useState<{ id: string; name: string } | null>(null);
   
   const form = useForm<LeadFormData>({
     resolver: zodResolver(leadSchema),
@@ -75,7 +76,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       description: initialData?.description || '',
       notes: initialData?.notes || '',
       tenant_id: initialData?.tenant_id || '',
-      franchise_id: initialData?.franchise_id || '',
+      franchise_id: initialData?.franchise_id || context.franchiseId || '',
       service_id: (initialData as any)?.custom_fields?.service_id || '',
       attachments: [],
     },
@@ -86,8 +87,10 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       fetchTenants();
     } else if (context.isTenantAdmin) {
       fetchFranchises();
+    } else if (context.franchiseId) {
+      fetchCurrentFranchise();
     }
-  }, [context.isPlatformAdmin, context.isTenantAdmin]);
+  }, [context.isPlatformAdmin, context.isTenantAdmin, context.franchiseId]);
 
   const fetchTenants = async () => {
     const { data } = await supabase.from('tenants').select('id, name').order('name');
@@ -102,6 +105,16 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       .eq('tenant_id', context.tenantId)
       .order('name');
     if (data) setFranchises(data);
+  };
+
+  const fetchCurrentFranchise = async () => {
+    if (!context.franchiseId) return;
+    const { data } = await supabase
+      .from('franchises')
+      .select('id, name')
+      .eq('id', context.franchiseId)
+      .single();
+    if (data) setCurrentFranchise(data);
   };
 
   const { isSubmitting } = form.formState;
@@ -213,6 +226,13 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
                 </FormItem>
               )}
             />
+          )}
+
+          {!context.isTenantAdmin && !context.isPlatformAdmin && currentFranchise && (
+            <div className="col-span-2 space-y-2">
+              <FormLabel>Franchise</FormLabel>
+              <Input value={currentFranchise.name} disabled readOnly className="bg-muted" />
+            </div>
           )}
 
           <FormField

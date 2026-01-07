@@ -9,6 +9,7 @@ import { Plus, Users2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
+import { PermissionGuard } from '@/lib/auth/PermissionGuard';
 
 export default function Users() {
   const navigate = useNavigate();
@@ -112,10 +113,12 @@ export default function Users() {
             <h1 className="text-3xl font-bold">Users</h1>
             <p className="text-muted-foreground">Manage system users and permissions</p>
           </div>
-          <Button onClick={() => navigate('/dashboard/users/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New User
-          </Button>
+          <PermissionGuard requiredPermission="user.create">
+            <Button onClick={() => navigate('/dashboard/users/new')}>
+              <Plus className="mr-2 h-4 w-4" />
+              New User
+            </Button>
+          </PermissionGuard>
         </div>
 
         <Card>

@@ -254,6 +254,8 @@ export default function LeadDetail() {
                   expected_close_date: lead.expected_close_date ?? '',
                   description: lead.description ?? '',
                   notes: lead.notes ?? '',
+                  tenant_id: lead.tenant_id,
+                  franchise_id: lead.franchise_id ?? '',
                 }}
                 onSubmit={handleUpdate}
                 onCancel={() => setIsEditing(false)}

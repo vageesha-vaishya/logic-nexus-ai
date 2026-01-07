@@ -30,6 +30,8 @@ export interface Lead {
   last_activity_date: string | null;
   converted_at: string | null;
   custom_fields: Record<string, unknown> | null;
+  tenant_id: string;
+  franchise_id: string | null;
 }
 
 export const stages: LeadStatus[] = [

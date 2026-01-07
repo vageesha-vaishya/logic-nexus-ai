@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
+import { ROLE_MATRIX, UserRole, canManageRole, validateHierarchy } from '@/lib/auth/RoleMatrix';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -46,6 +47,12 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   const [selectedRole, setSelectedRole] = useState<string>(user?.user_roles?.[0]?.role || '');
   const [selectedTenantId, setSelectedTenantId] = useState<string>(user?.user_roles?.[0]?.tenant_id || '');
 
+  // Determine current user's role for permission checks
+  const currentUserRole: UserRole = context.isPlatformAdmin ? 'platform_admin' 
+    : context.isTenantAdmin ? 'tenant_admin'
+    : context.isFranchiseAdmin ? 'franchise_admin'
+    : 'user';
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -58,15 +65,30 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       is_active: user?.is_active ?? true,
       must_change_password: user?.must_change_password ?? false,
       email_verified: true,
-      role: user?.user_roles?.[0]?.role || 'user',
-      tenant_id: user?.user_roles?.[0]?.tenant_id || '',
-      franchise_id: user?.user_roles?.[0]?.franchise_id || '',
+      role: user?.user_roles?.[0]?.role || (currentUserRole === 'franchise_admin' ? 'user' : 'user'),
+      tenant_id: user?.user_roles?.[0]?.tenant_id || context.tenantId || '',
+      franchise_id: user?.user_roles?.[0]?.franchise_id || context.franchiseId || '',
     },
   });
 
   useEffect(() => {
     fetchTenants();
   }, []);
+
+  useEffect(() => {
+    // If tenant admin, force tenant selection
+    if (context.isTenantAdmin && context.tenantId) {
+      setSelectedTenantId(context.tenantId);
+      form.setValue('tenant_id', context.tenantId);
+    }
+    
+    // If franchise admin, force tenant and franchise
+    if (context.isFranchiseAdmin && context.tenantId && context.franchiseId) {
+      setSelectedTenantId(context.tenantId);
+      form.setValue('tenant_id', context.tenantId);
+      form.setValue('franchise_id', context.franchiseId);
+    }
+  }, [context.isTenantAdmin, context.tenantId, context.isFranchiseAdmin, context.franchiseId, form]);
 
   useEffect(() => {
     if (selectedTenantId) {
@@ -124,6 +146,22 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   };
 
   const onSubmit = async (values: UserFormValues) => {
+    // Validate hierarchy security
+    if (!validateHierarchy(
+      currentUserRole,
+      context.tenantId || null,
+      context.franchiseId || null,
+      values.tenant_id || null,
+      values.franchise_id || null
+    )) {
+      toast({
+        title: 'Security Violation',
+        description: 'You are not authorized to assign users to this scope.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       if (user) {
         // Update profile
@@ -379,7 +417,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
                   setSelectedRole(value);
                 }} 
                 defaultValue={field.value}
-                disabled={!context.isPlatformAdmin && field.value === 'platform_admin'}
+                disabled={!!user && !canManageRole(currentUserRole, field.value as UserRole)}
               >
                 <FormControl>
                   <SelectTrigger>
@@ -387,12 +425,13 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {context.isPlatformAdmin && (
-                    <SelectItem value="platform_admin">Platform Admin</SelectItem>
-                  )}
-                  <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
-                  <SelectItem value="franchise_admin">Franchise Admin</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
+                  {Object.values(ROLE_MATRIX)
+                    .filter(role => canManageRole(currentUserRole, role.id))
+                    .map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -413,6 +452,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
                     setSelectedTenantId(value);
                   }} 
                   defaultValue={field.value}
+                  disabled={!context.isPlatformAdmin}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -440,7 +480,11 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Franchise *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select 
+                  onValueChange={field.onChange} 
+                  defaultValue={field.value}
+                  disabled={!context.isPlatformAdmin && !context.isTenantAdmin}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a franchise" />

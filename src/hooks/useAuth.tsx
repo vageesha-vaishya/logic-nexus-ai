@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ROLE_PERMISSIONS, unionPermissions, type Permission } from '@/config/permissions';
+import { RoleService } from '@/lib/api/roles';
 
 type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
@@ -135,17 +136,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (currentSession?.user) {
           setTimeout(() => {
-            fetchProfile(currentSession.user.id).then(setProfile);
-            fetchUserRoles(currentSession.user.id).then(async (rolesData) => {
-              setRoles(rolesData);
-              const standardPerms = unionPermissions(
-                ...rolesData.map((r) => ROLE_PERMISSIONS[r.role])
-              );
-              const { granted, denied } = await fetchCustomPermissions(currentSession.user.id);
-              const mergedPerms = unionPermissions(standardPerms, granted);
-              const finalPerms = mergedPerms.filter(p => !denied.includes(p));
-              setPermissions(finalPerms);
-              setLoading(false);
+            // Load dynamic permissions first
+            RoleService.getRolePermissions().then(map => {
+              setDynamicRoleMap(map);
+              return map;
+            }).catch(e => {
+              console.warn('Failed to load dynamic permissions on init', e);
+              return {};
+            }).then((map) => {
+              fetchProfile(currentSession.user.id).then(setProfile);
+              fetchUserRoles(currentSession.user.id).then(async (rolesData) => {
+                setRoles(rolesData);
+                
+                const standardPerms = unionPermissions(
+                  ...rolesData.map((r) => {
+                    const dynamicPerms = map[r.role];
+                    return (dynamicPerms as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
+                  })
+                );
+                
+                const { granted, denied } = await fetchCustomPermissions(currentSession.user.id);
+                const mergedPerms = unionPermissions(standardPerms, granted);
+                const finalPerms = mergedPerms.filter(p => !denied.includes(p));
+                setPermissions(finalPerms);
+                setLoading(false);
+              });
             });
           }, 0);
         } else {
