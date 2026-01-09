@@ -27,6 +27,7 @@ const defaultExportTemplate: ExportTemplate = {
   id: 'default',
   name: 'Standard Export',
   fields: ['name', 'industry', 'phone', 'email', 'status', 'account_type'],
+  includeCustomFields: false,
   format: 'csv'
 };
 
