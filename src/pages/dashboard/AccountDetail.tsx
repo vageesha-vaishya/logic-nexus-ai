@@ -92,7 +92,7 @@ export default function AccountDetail() {
   const fetchRelationships = async (accountId: string) => {
     try {
       // Check if table exists by trying to select 1
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('account_relationships')
         .select(`
           id, relationship_type, notes,
@@ -108,7 +108,7 @@ export default function AccountDetail() {
 
   const fetchSegments = async (accountId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('segment_members')
         .select(`
           segment:segment_id(id, name, description)

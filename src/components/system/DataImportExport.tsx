@@ -44,14 +44,19 @@ export interface DataField {
   label: string;
   required?: boolean;
   aliases?: string[]; // For auto-mapping
+  type?: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  options?: string[];
+  validationPattern?: RegExp;
 }
 
 export interface ExportTemplate {
+  id?: string;
   name: string;
   fields: string[]; // keys
-  includeCustomFields: boolean;
+  includeCustomFields?: boolean;
   filters?: Record<string, any>;
   allowedRoles?: string[]; // If set, only users with these roles can see/use this template
+  format?: 'csv' | 'xlsx' | 'json';
 }
 
 interface DataImportExportProps {

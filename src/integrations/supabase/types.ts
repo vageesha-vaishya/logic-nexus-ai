@@ -2311,6 +2311,111 @@ export type Database = {
           },
         ]
       }
+      import_history: {
+        Row: {
+          created_at: string
+          entity_name: string
+          file_name: string
+          id: string
+          imported_at: string
+          imported_by: string | null
+          reverted_at: string | null
+          reverted_by: string | null
+          status: string
+          summary: Json | null
+          table_name: string
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_name: string
+          file_name: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          reverted_at?: string | null
+          reverted_by?: string | null
+          status?: string
+          summary?: Json | null
+          table_name: string
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_name?: string
+          file_name?: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          reverted_at?: string | null
+          reverted_by?: string | null
+          status?: string
+          summary?: Json | null
+          table_name?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_history_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_history_reverted_by_fkey"
+            columns: ["reverted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_history_details: {
+        Row: {
+          created_at: string
+          id: string
+          import_id: string
+          new_data: Json | null
+          operation_type: string
+          previous_data: Json | null
+          record_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_id: string
+          new_data?: Json | null
+          operation_type: string
+          previous_data?: Json | null
+          record_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_id?: string
+          new_data?: Json | null
+          operation_type?: string
+          previous_data?: Json | null
+          record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_history_details_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "import_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incoterms: {
         Row: {
           created_at: string | null

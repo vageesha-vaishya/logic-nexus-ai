@@ -136,7 +136,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
         }
       } catch (e) {
         console.error("Invalid JSON for custom_fields");
-        finalData.custom_fields = {};
+        finalData.custom_fields = null;
       }
 
       await onSubmit(finalData as any);
