@@ -20,15 +20,26 @@ export default function ContactDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const [activeSegments, setActiveSegments] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+
   useEffect(() => {
-    if (id) fetchContact();
+    if (id) {
+      fetchContact();
+      fetchSegments(id);
+      fetchActivities(id);
+    }
   }, [id]);
 
   const fetchContact = async () => {
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('*, accounts(name)')
+        .select(`
+          *,
+          accounts (name),
+          reports_to_contact:reports_to (first_name, last_name)
+        `)
         .eq('id', id)
         .single();
 
@@ -42,13 +53,46 @@ export default function ContactDetail() {
     }
   };
 
+  const fetchActivities = async (contactId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      setActivities(data || []);
+    } catch (err) {
+      console.error('Failed to load activities', err);
+    }
+  };
+
+  const fetchSegments = async (contactId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('segment_members')
+        .select(`
+          segment:segment_id(id, name, description)
+        `)
+        .eq('entity_id', contactId);
+
+      if (!error && data) {
+        setActiveSegments(data.map((d: any) => d.segment));
+      }
+    } catch (e) {
+      console.log('Segments module not active');
+    }
+  };
+
   const handleUpdate = async (formData: any) => {
     try {
       const { error } = await supabase
         .from('contacts')
         .update({
           ...formData,
-          account_id: formData.account_id || null,
+          account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
+          reports_to: formData.reports_to === 'none' || formData.reports_to === '' ? null : formData.reports_to,
         })
         .eq('id', id);
 
@@ -159,6 +203,12 @@ export default function ContactDetail() {
                     <p className="text-sm">{contact.title}</p>
                   </div>
                 )}
+                {contact.department && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Department</p>
+                    <p className="text-sm">{contact.department}</p>
+                  </div>
+                )}
                 {contact.accounts && (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Account</p>
@@ -168,9 +218,29 @@ export default function ContactDetail() {
                     </div>
                   </div>
                 )}
-                {contact.is_primary && (
-                  <Badge variant="outline">Primary Contact</Badge>
+                {contact.reports_to_contact && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Reports To</p>
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-primary"
+                      onClick={() => navigate(`/dashboard/contacts/${contact.reports_to}`)}
+                    >
+                      {contact.reports_to_contact.first_name} {contact.reports_to_contact.last_name}
+                    </Button>
+                  </div>
                 )}
+                <div className="flex gap-2 flex-wrap">
+                  {contact.is_primary && (
+                    <Badge variant="outline">Primary Contact</Badge>
+                  )}
+                  {contact.lifecycle_stage && (
+                    <Badge variant="secondary" className="capitalize">{contact.lifecycle_stage}</Badge>
+                  )}
+                  {contact.lead_source && (
+                    <Badge variant="outline" className="capitalize">Source: {contact.lead_source}</Badge>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -207,6 +277,56 @@ export default function ContactDetail() {
                     </a>
                   </div>
                 )}
+                {contact.social_profiles && Object.keys(contact.social_profiles).length > 0 && (
+                  <div className="space-y-1 mt-2 pt-2 border-t">
+                     <p className="text-sm font-medium text-muted-foreground">Social Profiles</p>
+                     {Object.entries(contact.social_profiles).map(([network, url]) => (
+                       <div key={network} className="flex items-center gap-2">
+                         <span className="text-xs text-muted-foreground capitalize w-16">{network}:</span>
+                         <a href={String(url)} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate">
+                           {String(url)}
+                         </a>
+                       </div>
+                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Segments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {activeSegments.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {activeSegments.map((seg: any) => (
+                      <Badge key={seg.id} variant="secondary">{seg.name}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No active segments.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom Fields</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {contact.custom_fields && Object.keys(contact.custom_fields).length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(contact.custom_fields).map(([key, value]) => (
+                      <div key={key}>
+                        <p className="text-sm font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
+                        <p className="text-sm">{String(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No custom fields defined.</p>
+                )}
               </CardContent>
             </Card>
 
@@ -220,6 +340,36 @@ export default function ContactDetail() {
                 </CardContent>
               </Card>
             )}
+
+            <Card className="md:col-span-2">
+              <CardHeader className="flex items-center justify-between">
+                <CardTitle>Activities</CardTitle>
+                <Button size="sm" onClick={() => navigate(`/dashboard/activities/new?contactId=${id}`)}>New Activity</Button>
+              </CardHeader>
+              <CardContent>
+                {activities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No activities recorded yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {activities.map((activity) => (
+                      <div key={activity.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/activities/${activity.id}`)}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{activity.subject}</p>
+                            <Badge variant="outline" className="text-xs capitalize">{activity.activity_type}</Badge>
+                            <Badge variant="secondary" className="text-xs capitalize">{activity.status.replace(/_/g, ' ')}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{activity.description || 'No description'}</p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Due: {activity.due_date ? format(new Date(activity.due_date), 'PPP') : 'No due date'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <Card className="md:col-span-2">
               <CardHeader>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, UserPlus, DollarSign, Filter, TrendingUp, Users as UsersIcon, Trash2, Palette, ArrowLeft } from 'lucide-react';
+import { Plus, Search, UserPlus, DollarSign, Filter, TrendingUp, Users as UsersIcon, Trash2, Palette, ArrowLeft, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -403,6 +403,25 @@ export default function Leads() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  params.set('from', 'workspace');
+                  params.set('view', viewMode);
+                  if (searchQuery) params.set('q', searchQuery);
+                  if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+                  if (scoreMin) params.set('scoreMin', scoreMin);
+                  if (scoreMax) params.set('scoreMax', scoreMax);
+                  if (createdStart) params.set('createdFrom', createdStart);
+                  if (createdEnd) params.set('createdTo', createdEnd);
+                  navigate(`/dashboard/leads/import-export?${params.toString()}`);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('leads.actions.importExport', 'Import/Export')}
+              </Button>
               <ViewToggle 
                 value={viewMode} 
                 modes={['pipeline', 'card', 'grid', 'list']}

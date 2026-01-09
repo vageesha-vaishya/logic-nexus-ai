@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Building2, Phone, Mail, Globe } from 'lucide-react';
+import { Plus, Search, Building2, Phone, Mail, Globe, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,9 +102,17 @@ export default function Accounts() {
         onViewModeChange={setViewMode}
         onCreate={() => (window.location.href = '/dashboard/accounts/new')}
         actionsRight={
-          <Button variant="outline" asChild>
-            <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
-          </Button>
+          <>
+            <Button variant="outline" asChild className="mr-2">
+              <Link to="/dashboard/accounts/import-export">
+                <Download className="mr-2 h-4 w-4" />
+                Import/Export
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
+            </Button>
+          </>
         }
       >
         <div className="flex items-center gap-4">

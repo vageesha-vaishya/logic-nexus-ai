@@ -20,6 +20,12 @@ const contactSchema = z.object({
   phone: z.string().optional(),
   mobile: z.string().optional(),
   linkedin_url: z.string().url('Invalid URL').optional().or(z.literal('')),
+  department: z.string().optional(),
+  reports_to: z.string().optional(),
+  lifecycle_stage: z.enum(['subscriber', 'lead', 'mql', 'sql', 'customer', 'evangelist', 'other']).optional(),
+  lead_source: z.string().optional(),
+  social_profiles: z.string().optional(),
+  custom_fields: z.string().optional(),
   account_id: z.string().optional(),
   is_primary: z.boolean().default(false),
   notes: z.string().optional(),
@@ -30,7 +36,7 @@ const contactSchema = z.object({
 type ContactFormData = z.infer<typeof contactSchema>;
 
 interface ContactFormProps {
-  initialData?: Partial<ContactFormData> & { id?: string };
+  initialData?: any;
   onSubmit: (data: ContactFormData) => Promise<void>;
   onCancel: () => void;
 }
@@ -38,6 +44,7 @@ interface ContactFormProps {
 export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProps) {
   const { supabase, context } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -53,6 +60,12 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
       phone: initialData?.phone || '',
       mobile: initialData?.mobile || '',
       linkedin_url: initialData?.linkedin_url || '',
+      department: initialData?.department || '',
+      reports_to: initialData?.reports_to || 'none',
+      lifecycle_stage: initialData?.lifecycle_stage || 'lead',
+      lead_source: initialData?.lead_source || '',
+      social_profiles: initialData?.social_profiles ? JSON.stringify(initialData.social_profiles, null, 2) : '',
+      custom_fields: initialData?.custom_fields ? JSON.stringify(initialData.custom_fields, null, 2) : '',
       account_id: initialData?.account_id || '',
       is_primary: initialData?.is_primary || false,
       notes: initialData?.notes || '',
@@ -61,16 +74,6 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
     },
   });
 
-  useEffect(() => {
-    fetchAccounts();
-    if (context.isPlatformAdmin) {
-      fetchTenants();
-    }
-    if (context.isPlatformAdmin || context.isTenantAdmin) {
-      fetchFranchises();
-    }
-  }, [context]);
-
   const fetchAccounts = async () => {
     const { data } = await supabase
       .from('accounts')
@@ -78,6 +81,31 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
       .order('name');
     if (data) setAccounts(data);
   };
+
+  const fetchContacts = async () => {
+    let query = supabase
+      .from('contacts')
+      .select('id, first_name, last_name')
+      .order('last_name');
+
+    if (initialData?.id) {
+      query = query.neq('id', initialData.id);
+    }
+
+    const { data } = await query;
+    if (data) setContacts(data);
+  };
+
+  useEffect(() => {
+    fetchAccounts();
+    fetchContacts();
+    if (context.isPlatformAdmin) {
+      fetchTenants();
+    }
+    if (context.isPlatformAdmin || context.isTenantAdmin) {
+      fetchFranchises();
+    }
+  }, [context]);
 
   const fetchTenants = async () => {
     const { data } = await supabase
@@ -166,6 +194,20 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
 
           <FormField
             control={form.control}
+            name="department"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Department</FormLabel>
+                <FormControl>
+                  <Input placeholder="Sales" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="account_id"
             render={({ field }) => (
               <FormItem>
@@ -185,6 +227,73 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="reports_to"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Reports To</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select manager" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {contacts.map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.first_name} {contact.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="lifecycle_stage"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Lifecycle Stage</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="subscriber">Subscriber</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                    <SelectItem value="mql">MQL</SelectItem>
+                    <SelectItem value="sql">SQL</SelectItem>
+                    <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="evangelist">Evangelist</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="lead_source"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Lead Source</FormLabel>
+                <FormControl>
+                  <Input placeholder="Referral, Website, etc." {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -278,6 +387,42 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
                     placeholder="Additional notes..."
                     className="min-h-[100px]"
                     {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="social_profiles"
+            render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>Social Profiles (JSON)</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder='{"twitter": "https://twitter.com/jdoe", "facebook": "..."}' 
+                    className="font-mono text-xs"
+                    {...field} 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="custom_fields"
+            render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>Custom Fields (JSON)</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder='{"hobby": "fishing", "vip_status": true}' 
+                    className="font-mono text-xs"
+                    {...field} 
                   />
                 </FormControl>
                 <FormMessage />

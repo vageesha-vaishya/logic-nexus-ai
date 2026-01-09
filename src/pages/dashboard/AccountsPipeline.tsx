@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useCRM } from "@/hooks/useCRM";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, AlertCircle, LayoutGrid } from "lucide-react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, AlertCircle, LayoutGrid, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
@@ -253,6 +253,12 @@ export default function AccountsPipeline() {
               })()}
             </p>
           </div>
+          <Button variant="ghost" size="sm" asChild className="mr-2">
+            <Link to="/dashboard/accounts/import-export">
+              <Download className="h-4 w-4 mr-2" />
+              Import/Export
+            </Link>
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/accounts")}> 
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to List

@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_relationships: {
+        Row: {
+          id: string
+          tenant_id: string
+          from_account_id: string
+          to_account_id: string
+          relationship_type: string
+          notes: string | null
+          created_at: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          from_account_id: string
+          to_account_id: string
+          relationship_type: string
+          notes?: string | null
+          created_at?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          from_account_id?: string
+          to_account_id?: string
+          relationship_type?: string
+          notes?: string | null
+          created_at?: string | null
+          created_by?: string | null
+        }
+        Relationships: [
+           {
+            foreignKeyName: "account_relationships_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_relationships_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       accounts: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"] | null
@@ -36,6 +84,9 @@ export type Database = {
           tenant_id: string
           updated_at: string | null
           website: string | null
+          custom_fields: Json | null
+          last_activity_at: string | null
+          social_profiles: Json | null
         }
         Insert: {
           account_type?: Database["public"]["Enums"]["account_type"] | null
@@ -58,6 +109,9 @@ export type Database = {
           tenant_id: string
           updated_at?: string | null
           website?: string | null
+          custom_fields?: Json | null
+          last_activity_at?: string | null
+          social_profiles?: Json | null
         }
         Update: {
           account_type?: Database["public"]["Enums"]["account_type"] | null
@@ -80,6 +134,9 @@ export type Database = {
           tenant_id?: string
           updated_at?: string | null
           website?: string | null
+          custom_fields?: Json | null
+          last_activity_at?: string | null
+          social_profiles?: Json | null
         }
         Relationships: [
           {
@@ -1325,6 +1382,13 @@ export type Database = {
           tenant_id: string
           title: string | null
           updated_at: string | null
+          department: string | null
+          reports_to: string | null
+          lifecycle_stage: string | null
+          lead_source: string | null
+          custom_fields: Json | null
+          last_activity_at: string | null
+          social_profiles: Json | null
         }
         Insert: {
           account_id?: string | null
@@ -1345,6 +1409,13 @@ export type Database = {
           tenant_id: string
           title?: string | null
           updated_at?: string | null
+          department?: string | null
+          reports_to?: string | null
+          lifecycle_stage?: string | null
+          lead_source?: string | null
+          custom_fields?: Json | null
+          last_activity_at?: string | null
+          social_profiles?: Json | null
         }
         Update: {
           account_id?: string | null
@@ -1365,6 +1436,13 @@ export type Database = {
           tenant_id?: string
           title?: string | null
           updated_at?: string | null
+          department?: string | null
+          reports_to?: string | null
+          lifecycle_stage?: string | null
+          lead_source?: string | null
+          custom_fields?: Json | null
+          last_activity_at?: string | null
+          social_profiles?: Json | null
         }
         Relationships: [
           {
@@ -4052,6 +4130,89 @@ export type Database = {
           },
         ]
       }
+      segments: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          description: string | null
+          entity_type: string
+          criteria: Json
+          is_dynamic: boolean | null
+          created_at: string | null
+          updated_at: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          description?: string | null
+          entity_type: string
+          criteria?: Json
+          is_dynamic?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          description?: string | null
+          entity_type?: string
+          criteria?: Json
+          is_dynamic?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "segments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "segments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      segment_members: {
+        Row: {
+          id: string
+          segment_id: string
+          entity_id: string
+          added_at: string | null
+        }
+        Insert: {
+          id?: string
+          segment_id: string
+          entity_id: string
+          added_at?: string | null
+        }
+        Update: {
+          id?: string
+          segment_id?: string
+          entity_id?: string
+          added_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "segment_members_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "segments"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       quotation_version_options: {
         Row: {
           auto_margin_enabled: boolean

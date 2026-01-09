@@ -26,7 +26,8 @@ export default function ContactNew() {
           ...formData,
           tenant_id,
           franchise_id: formData.franchise_id || context.franchiseId,
-          account_id: formData.account_id === 'none' ? null : (formData.account_id || null),
+          account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
+          reports_to: formData.reports_to === 'none' || formData.reports_to === '' ? null : formData.reports_to,
         })
         .select()
         .single();

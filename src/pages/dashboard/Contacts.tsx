@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, User, Mail, Phone, Building2 } from 'lucide-react';
+import { Plus, Search, User, Mail, Phone, Building2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +80,12 @@ export default function Contacts() {
         </div>
         <div className="flex items-center gap-2">
           <ViewToggle value={viewMode} onChange={setViewMode} />
+          <Button asChild variant="outline">
+            <Link to="/dashboard/contacts/import-export">
+              <Download className="mr-2 h-4 w-4" />
+              Import/Export
+            </Link>
+          </Button>
           <Button asChild variant="outline">
             <Link to="/dashboard/contacts/pipeline">Pipeline View</Link>
           </Button>

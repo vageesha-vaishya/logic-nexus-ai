@@ -25,12 +25,13 @@ const accountSchema = z.object({
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
   parent_account_id: z.string().optional(),
+  custom_fields: z.string().optional(),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
 
 interface AccountFormProps {
-  initialData?: Partial<AccountFormData> & { id?: string };
+  initialData?: any;
   onSubmit: (data: AccountFormData) => Promise<void>;
   onCancel: () => void;
 }
@@ -127,7 +128,18 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   const handleConfirm = async () => {
     if (pendingData) {
       setShowConfirmDialog(false);
-      await onSubmit(pendingData);
+      
+      const finalData = { ...pendingData };
+      try {
+        if (typeof finalData.custom_fields === 'string' && finalData.custom_fields) {
+          finalData.custom_fields = JSON.parse(finalData.custom_fields);
+        }
+      } catch (e) {
+        console.error("Invalid JSON for custom_fields");
+        finalData.custom_fields = {};
+      }
+
+      await onSubmit(finalData as any);
       setPendingData(null);
     }
   };
@@ -300,6 +312,24 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
                 <FormLabel>Website</FormLabel>
                 <FormControl>
                   <Input placeholder="https://example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="custom_fields"
+            render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>Custom Fields (JSON)</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder='{"priority": "high", "segment": "enterprise"}' 
+                    className="font-mono text-xs"
+                    {...field} 
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

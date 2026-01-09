@@ -25,7 +25,10 @@ export default function AccountDetail() {
   const [relatedOpps, setRelatedOpps] = useState<any[]>([]);
   const [parentAccount, setParentAccount] = useState<any>(null);
   const [childAccounts, setChildAccounts] = useState<any[]>([]);
-  const [tab, setTab] = useState<'details' | 'related' | 'news'>('details');
+  const [relationships, setRelationships] = useState<any[]>([]);
+  const [activeSegments, setActiveSegments] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [tab, setTab] = useState<'details' | 'related' | 'activities'>('details');
 
   useEffect(() => {
     // Reset UI state when navigating between accounts
@@ -59,6 +62,9 @@ export default function AccountDetail() {
         fetchRelatedContacts(id as string),
         fetchRelatedOpportunities(id as string),
         fetchChildAccounts(id as string),
+        fetchRelationships(id as string),
+        fetchSegments(id as string),
+        fetchActivities(id as string),
       ]);
     } catch (error: any) {
       toast.error('Failed to load account');
@@ -67,6 +73,56 @@ export default function AccountDetail() {
       setLoading(false);
     }
   };
+
+  const fetchActivities = async (accountId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      setActivities(data || []);
+    } catch (err) {
+      console.error('Failed to load activities', err);
+    }
+  };
+
+  const fetchRelationships = async (accountId: string) => {
+    try {
+      // Check if table exists by trying to select 1
+      const { data, error } = await supabase
+        .from('account_relationships')
+        .select(`
+          id, relationship_type, notes,
+          to_account:to_account_id(id, name)
+        `)
+        .eq('from_account_id', accountId);
+
+      if (!error) setRelationships(data || []);
+    } catch (e) {
+      console.log('Relationships module not active');
+    }
+  };
+
+  const fetchSegments = async (accountId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('segment_members')
+        .select(`
+          segment:segment_id(id, name, description)
+        `)
+        .eq('entity_id', accountId);
+
+      if (!error && data) {
+        setActiveSegments(data.map((d: any) => d.segment));
+      }
+    } catch (e) {
+      console.log('Segments module not active');
+    }
+  };
+
 
   const fetchRelatedContacts = async (accountId: string) => {
     try {
@@ -225,11 +281,11 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'details' | 'related' | 'news')} key={id}>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as 'details' | 'related' | 'activities')} key={id}>
             <TabsList>
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="related">Related</TabsTrigger>
-              <TabsTrigger value="news">News</TabsTrigger>
+              <TabsTrigger value="activities">Activities</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details">
@@ -325,8 +381,25 @@ export default function AccountDetail() {
                   </CardContent>
                 </Card>
 
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Segments</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {activeSegments.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {activeSegments.map((seg: any) => (
+                          <Badge key={seg.id} variant="secondary">{seg.name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No active segments.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {account.description && (
-                  <Card>
+                  <Card className="md:col-span-2">
                     <CardHeader>
                       <CardTitle>Description</CardTitle>
                     </CardHeader>
@@ -335,6 +408,26 @@ export default function AccountDetail() {
                     </CardContent>
                   </Card>
                 )}
+
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Custom Fields</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {account.custom_fields && Object.keys(account.custom_fields).length > 0 ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        {Object.entries(account.custom_fields).map(([key, value]) => (
+                          <div key={key}>
+                            <p className="text-sm font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
+                            <p className="text-sm">{String(value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No custom fields defined.</p>
+                    )}
+                  </CardContent>
+                </Card>
 
                 <Card className="md:col-span-2">
                   <CardHeader>
@@ -388,6 +481,38 @@ export default function AccountDetail() {
                   </CardContent>
                 </Card>
 
+                <Card className="md:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Relationships</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {relationships.length > 0 ? (
+                      <div className="space-y-4">
+                        {relationships.map((rel: any) => (
+                          <div key={rel.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium">{rel.to_account?.name}</p>
+                              <Badge variant="outline" className="mt-1 capitalize">
+                                {rel.relationship_type.replace(/_/g, ' ')}
+                              </Badge>
+                              {rel.notes && <p className="text-sm text-muted-foreground mt-1">{rel.notes}</p>}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/dashboard/accounts/${rel.to_account?.id}`)}
+                            >
+                              View
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No defined relationships.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader className="flex items-center justify-between">
                     <CardTitle>Contacts</CardTitle>
@@ -438,13 +563,34 @@ export default function AccountDetail() {
               </div>
             </TabsContent>
 
-            <TabsContent value="news">
+            <TabsContent value="activities">
               <Card>
-                <CardHeader>
-                  <CardTitle>News</CardTitle>
+                <CardHeader className="flex items-center justify-between">
+                  <CardTitle>Activities</CardTitle>
+                  <Button size="sm" onClick={() => navigate(`/dashboard/activities/new?accountId=${id}`)}>New Activity</Button>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">Company/industry news will appear here.</p>
+                  {activities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No activities recorded yet.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {activities.map((activity) => (
+                        <div key={activity.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/activities/${activity.id}`)}>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{activity.subject}</p>
+                              <Badge variant="outline" className="text-xs capitalize">{activity.activity_type}</Badge>
+                              <Badge variant="secondary" className="text-xs capitalize">{activity.status.replace(/_/g, ' ')}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{activity.description || 'No description'}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Due: {activity.due_date ? format(new Date(activity.due_date), 'PPP') : 'No due date'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

@@ -12,9 +12,11 @@ import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import Accounts from "./pages/dashboard/Accounts";
+import AccountsImportExport from "./pages/dashboard/AccountsImportExport";
 import AccountNew from "./pages/dashboard/AccountNew";
 import AccountDetail from "./pages/dashboard/AccountDetail";
 import Contacts from "./pages/dashboard/Contacts";
+import ContactsImportExport from "./pages/dashboard/ContactsImportExport";
 import ContactNew from "./pages/dashboard/ContactNew";
 import ContactDetail from "./pages/dashboard/ContactDetail";
 import Leads from "./pages/dashboard/Leads";
@@ -147,6 +149,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/accounts/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["accounts.create"]}>
+                  <AccountsImportExport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/accounts/:id" 
               element={
                 <ProtectedRoute requiredPermissions={["accounts.view"]}>
@@ -175,6 +185,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["contacts.create"]}>
                   <ContactNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/contacts/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["contacts.create"]}>
+                  <ContactsImportExport />
                 </ProtectedRoute>
               } 
             />

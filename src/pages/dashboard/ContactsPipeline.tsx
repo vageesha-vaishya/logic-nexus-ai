@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, AlertCircle } from "lucide-react";
+import { ArrowLeft, Search, Filter, Layers, Settings, AlertCircle, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
@@ -154,10 +154,16 @@ export default function ContactsPipeline() {
             <h1 className="text-3xl font-bold">Contacts Pipeline</h1>
             <p className="text-muted-foreground">Engagement lifecycle for contacts</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/contacts')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to List
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/contacts/import-export')}>
+              <Download className="h-4 w-4 mr-2" />
+              Import/Export
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/contacts')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to List
+            </Button>
+          </div>
         </div>
 
         <Card>

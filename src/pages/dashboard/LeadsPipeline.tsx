@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Filter, RefreshCw, Plus } from 'lucide-react';
+import { ArrowLeft, Filter, RefreshCw, Plus, Download } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
@@ -546,6 +546,20 @@ export default function LeadsPipeline() {
               <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 {t('leads.actions.refresh', 'Refresh')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (searchQuery) params.set('q', searchQuery);
+                  if (selectedStages.length > 0) params.set('status', selectedStages.join(','));
+                  params.set('from', 'pipeline');
+                  navigate(`/dashboard/leads/import-export?${params.toString()}`);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {t('leads.actions.importExport', 'Import/Export')}
               </Button>
               <ViewToggle
                 value="pipeline"
