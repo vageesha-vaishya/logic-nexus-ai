@@ -18,5 +18,6 @@
 
 ## Security Policies
 - RLS enforcement; field-level restrictions
+- Privilege Escalation: Super admins (Platform Admins) retain full operational control over import/audit logs
 - Webhook authentication; replay protection
 - Incident response: detection, triage, communication SLAs

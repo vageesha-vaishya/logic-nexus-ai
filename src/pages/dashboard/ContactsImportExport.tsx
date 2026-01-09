@@ -1,5 +1,4 @@
 import DataImportExport, { DataField, ExportTemplate } from '@/components/system/DataImportExport';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { z } from 'zod';
 
 const contactFields: DataField[] = [
@@ -31,14 +30,13 @@ const defaultExportTemplate: ExportTemplate = {
 };
 
 const validationSchema = z.object({
-  first_name: z.string().min(1, 'First Name is required'),
-  last_name: z.string().min(1, 'Last Name is required'),
-  email: z.string().email().optional().or(z.literal('')),
+  first_name: z.string().trim().min(1, 'First Name is required'),
+  last_name: z.string().trim().min(1, 'Last Name is required'),
+  email: z.string().email().nullish().or(z.literal('')),
 });
 
 export default function ContactsImportExport() {
   return (
-    <DashboardLayout>
       <DataImportExport
         entityName="Contacts"
         tableName="contacts"
@@ -48,6 +46,5 @@ export default function ContactsImportExport() {
         defaultExportTemplate={defaultExportTemplate}
         listPath="/dashboard/contacts"
       />
-    </DashboardLayout>
   );
 }

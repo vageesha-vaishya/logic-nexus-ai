@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Download, Upload, FileText, AlertCircle, CheckCircle2, Pause, Play, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Upload, FileText, AlertCircle, CheckCircle2, Pause, Play, XCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import * as z from 'zod';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { processImportRow, ImportLog } from '@/lib/import-processor';
 import { ImportHistoryService, ImportDetail, ImportSession } from '@/lib/import-history-service';
+import { ImportReportDialog } from './ImportReportDialog';
 
 // --- Types ---
 
@@ -88,7 +89,7 @@ type ImportPreviewRow = {
 };
 
 const DEFAULT_MAX_IMPORT_FILE_BYTES = 50 * 1024 * 1024;
-const IMPORT_BATCH_SIZE = 1000;
+const IMPORT_BATCH_SIZE = 100;
 const DUPLICATE_QUERY_BATCH_SIZE = 200;
 
 // --- Helpers ---
@@ -210,6 +211,46 @@ export default function DataImportExport({
   const [xlsxSheetNames, setXlsxSheetNames] = useState<string[]>([]);
   const [selectedXlsxSheet, setSelectedXlsxSheet] = useState<string>('');
   const [importAllXlsxSheets, setImportAllXlsxSheets] = useState(false);
+
+  // Tenant/Franchise Selection State (Platform Admin)
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
+  const [selectedFranchiseId, setSelectedFranchiseId] = useState<string>('');
+
+  // Fetch tenants for platform admin
+  useEffect(() => {
+    if (context.isPlatformAdmin) {
+      const fetchTenants = async () => {
+        const { data } = await supabase
+          .from('tenants')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        if (data) setTenants(data);
+      };
+      fetchTenants();
+    }
+  }, [context.isPlatformAdmin, supabase]);
+
+  // Fetch franchises when tenant is selected
+  useEffect(() => {
+    if (selectedTenantId) {
+      const fetchFranchises = async () => {
+        const { data } = await supabase
+          .from('franchises')
+          .select('id, name')
+          .eq('tenant_id', selectedTenantId)
+          .eq('is_active', true)
+          .order('name');
+        if (data) setFranchises(data);
+      };
+      fetchFranchises();
+    } else {
+      setFranchises([]);
+      setSelectedFranchiseId('');
+    }
+  }, [selectedTenantId, supabase]);
 
   // Refs
   const csvParserRef = useRef<Papa.Parser | null>(null);
@@ -411,6 +452,15 @@ export default function DataImportExport({
 
   const handleImport = async () => {
     if (!selectedFile) return;
+
+    const effectiveTenantId = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
+    const effectiveFranchiseId = context.isPlatformAdmin ? selectedFranchiseId : context.franchiseId;
+
+    if (!effectiveTenantId) {
+      toast.error("Please select a tenant for this import.");
+      return;
+    }
+
     setProcessingAction('import');
     setImporting(true);
     setImportStep(4);
@@ -424,12 +474,11 @@ export default function DataImportExport({
 
     let importSessionId: string | undefined;
     try {
-        const { data: { user } } = await supabase.auth.getUser();
         const session = await ImportHistoryService.createSession(supabase, {
             entity_name: entityName,
             table_name: tableName,
             file_name: selectedFile.name,
-            imported_by: user?.id
+            imported_by: context.userId
         });
         importSessionId = session.id;
     } catch (e) {
@@ -444,11 +493,14 @@ export default function DataImportExport({
         success: 0, failed: 0, errors: [], logs: [], insertedIds: [] 
     };
     const batch: any[] = [];
+    const batchErrors: { rowNumber: number; field: string; errorMessage: string; rawData: any }[] = [];
     
     let rowIndex = 0;
+    const totalSize = selectedFile.size;
+    let processedSize = 0;
 
     const processBatch = async () => {
-      if (batch.length === 0) return;
+      if (batch.length === 0 && batchErrors.length === 0) return;
       
       try {
         setImportingStage('uploading');
@@ -456,8 +508,8 @@ export default function DataImportExport({
         // Prepare data
         const records = batch.map(item => ({
           ...item.record,
-          tenant_id: context.tenantId,
-          franchise_id: context.franchiseId,
+          tenant_id: effectiveTenantId,
+          franchise_id: effectiveFranchiseId,
         }));
 
         const importDetails: ImportDetail[] = [];
@@ -547,8 +599,25 @@ export default function DataImportExport({
         }
 
         // Log History
-        if (importSessionId && importDetails.length > 0) {
-             await ImportHistoryService.logDetails(supabase, importSessionId, importDetails);
+        if (importSessionId) {
+             if (importDetails.length > 0) {
+                 await ImportHistoryService.logDetails(supabase, importSessionId, importDetails);
+             }
+
+             if (batchErrors.length > 0) {
+                 await ImportHistoryService.logErrors(supabase, importSessionId, batchErrors);
+             }
+             
+             // Update session summary periodically (commit point)
+             await ImportHistoryService.updateSession(supabase, importSessionId, {
+                 status: 'partial',
+                 summary: {
+                     success: result.success,
+                     failed: result.failed,
+                     inserted: result.insertedIds.length,
+                     updated: result.success - result.insertedIds.length
+                 }
+             });
         }
 
       } catch (e: any) {
@@ -556,12 +625,21 @@ export default function DataImportExport({
         result.errors.push(`Batch exception: ${e.message}`);
       } finally {
         batch.length = 0; // Clear batch
+        batchErrors.length = 0;
         setImportProcessedRows(prev => prev + batch.length);
         
         // Calculate ETA
         if (importStartedAtRef.current && result.success + result.failed > 0) {
            const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
-           // const rate = (result.success + result.failed) / elapsed;
+           // const processed = result.success + result.failed;
+           // const rate = processed / elapsed; // rows per second
+           // Estimate remaining
+           // We need total rows. We don't have total rows easily for CSV stream unless we count first?
+           // PapaParse doesn't give total count in stream mode.
+           // But for Step 2 we analyzed the file, maybe we have a count?
+           // Actually analyzing only reads first 25 rows.
+           // So for CSV stream, ETA is hard without total.
+           // For XLSX/JSON we have total.
         }
       }
     };
@@ -587,19 +665,77 @@ export default function DataImportExport({
                 const { record, customFields, logs, isValid } = buildMappedRecord(results.data as ParsedRow, rowIndex);
                 if (logs.length > 0) result.logs.push(...logs);
                 
+                // Capture errors for batch logging
+                logs.forEach(log => {
+                    if (log.type === 'error') {
+                        batchErrors.push({
+                            rowNumber: log.rowNumber,
+                            field: log.field,
+                            errorMessage: log.message,
+                            rawData: record
+                        });
+                    }
+                });
+                
+                // Calculate Progress & ETA
+                if (results.meta && results.meta.cursor) {
+                    processedSize = results.meta.cursor;
+                }
+                const currentProgress = Math.min(100, Math.round((processedSize / totalSize) * 100));
+                setProgress(currentProgress);
+
+                // Calculate ETA every 100 rows or so
+                if (rowIndex % 100 === 0 && importStartedAtRef.current) {
+                    const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
+                    if (elapsed > 1 && processedSize > 0) {
+                        const rate = processedSize / elapsed; // bytes per second
+                        const remainingBytes = totalSize - processedSize;
+                        const eta = remainingBytes / rate;
+                        setImportEtaSeconds(Math.ceil(eta));
+                    }
+                }
+                
                 // Validate
-                if (validationSchema) {
+                let shouldImport = isValid;
+                
+                if (validationSchema && shouldImport) {
                   const validation = validationSchema.safeParse(record);
                   if (!validation.success) {
+                    shouldImport = false;
                     result.failed++;
-                    result.errors.push(`Row validation failed: ${validation.error.errors.map(e => e.message).join(', ')}`);
-                    return;
+                    result.errors.push(`Row ${rowIndex} validation failed: ${validation.error.errors.map(e => e.message).join(', ')}`);
+                    const errorMsg = `Schema validation failed: ${validation.error.errors.map(e => e.message).join(', ')}`;
+                    result.logs.push({
+                         rowNumber: rowIndex,
+                         field: 'all',
+                         original: JSON.stringify(record),
+                         newValue: null,
+                         message: errorMsg,
+                         type: 'error'
+                    });
+                    batchErrors.push({
+                         rowNumber: rowIndex,
+                         field: 'all',
+                         errorMessage: errorMsg,
+                         rawData: record
+                    });
+                  } else {
+                    // Update record with transformed data (e.g. trimmed strings)
+                    Object.assign(record, validation.data);
                   }
+                }
+                
+                if (!shouldImport) {
+                     // Even if failed, we might want to log it in history details if we want "Original Values" audit?
+                     // Current requirement: "Maintain original data in a separate 'Original Values' audit table"
+                     // We can do this by inserting into import_history_details with operation_type='failed'?
+                     // The schema has 'insert' | 'update'. We might need to expand it or just log it in summary.
+                     return;
                 }
 
                 batch.push({ record, customFields });
 
-                if (batch.length >= importBatchSize) {
+                if (batch.length + batchErrors.length >= importBatchSize) {
                    parser.pause();
                    await processBatch();
                    parser.resume();
@@ -610,15 +746,11 @@ export default function DataImportExport({
                await processBatch();
                resolve();
              },
-             error: (err) => reject(err)
+             error: (err: Error) => reject(err)
            });
         });
       } else {
         // XLSX or JSON (Already parsed into sampleRows/memory usually, but for large files we should re-read)
-        // For simplicity reusing the memory read if small enough, but let's re-read to be safe or just iterate
-        // If file was analyzed, we have rows in memory if it was small? 
-        // Actually analyzeFile only stores sampleRows.
-        // We need to re-parse fully.
         
         let allRows: ParsedRow[] = [];
         if (fileFormat === 'json') {
@@ -632,6 +764,8 @@ export default function DataImportExport({
           allRows = XLSX.utils.sheet_to_json(ws) as ParsedRow[];
         }
 
+        const totalRows = allRows.length;
+
         for (const row of allRows) {
            if (cancelRequestedRef.current) break;
            while (pauseRequestedRef.current) {
@@ -641,23 +775,71 @@ export default function DataImportExport({
            setImportPaused(false);
 
            rowIndex++;
+
+           // Progress & ETA
+           const currentProgress = Math.min(100, Math.round((rowIndex / totalRows) * 100));
+           setProgress(currentProgress);
+           
+           if (rowIndex % 100 === 0 && importStartedAtRef.current) {
+               const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
+               if (elapsed > 1) {
+                   const rate = rowIndex / elapsed; // rows per second
+                   const remainingRows = totalRows - rowIndex;
+                   const eta = remainingRows / rate;
+                   setImportEtaSeconds(Math.ceil(eta));
+               }
+           }
            const { record, customFields, logs, isValid } = buildMappedRecord(row, rowIndex);
            if (logs.length > 0) result.logs.push(...logs);
            
-           if (validationSchema) {
+           // Capture errors for batch logging
+           logs.forEach(log => {
+               if (log.type === 'error') {
+                   batchErrors.push({
+                       rowNumber: log.rowNumber,
+                       field: log.field,
+                       errorMessage: log.message,
+                       rawData: record
+                   });
+               }
+           });
+           
+           let shouldImport = isValid;
+
+           if (validationSchema && shouldImport) {
               const validation = validationSchema.safeParse(record);
               if (!validation.success) {
-                result.failed++;
-                result.errors.push(`Row validation failed: ${validation.error.errors.map(e => e.message).join(', ')}`);
-                continue;
+                  shouldImport = false;
+                  result.failed++;
+                  result.errors.push(`Row ${rowIndex} validation failed: ${validation.error.errors.map(e => e.message).join(', ')}`);
+                  const errorMsg = `Schema validation failed: ${validation.error.errors.map(e => e.message).join(', ')}`;
+                  result.logs.push({
+                         rowNumber: rowIndex,
+                         field: 'all',
+                         original: JSON.stringify(record),
+                         newValue: null,
+                         message: errorMsg,
+                         type: 'error'
+                  });
+                  batchErrors.push({
+                         rowNumber: rowIndex,
+                         field: 'all',
+                         errorMessage: errorMsg,
+                         rawData: record
+                  });
+              } else {
+                  // Update record with transformed data (e.g. trimmed strings)
+                  Object.assign(record, validation.data);
               }
            }
+
+           if (shouldImport) {
+             batch.push({ record, customFields });
+           }
            
-           batch.push({ record, customFields });
-           
-           if (batch.length >= importBatchSize) {
-             await processBatch();
-             await yieldToBrowser();
+           if (batch.length + batchErrors.length >= importBatchSize) {
+               await processBatch();
+               await yieldToBrowser();
            }
         }
         await processBatch();
@@ -775,6 +957,8 @@ export default function DataImportExport({
 
   const [historyData, setHistoryData] = useState<ImportSession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [reportSession, setReportSession] = useState<ImportSession | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -886,6 +1070,53 @@ export default function DataImportExport({
               {/* Step 1: Upload */}
               {importStep === 1 && (
                 <div className="space-y-4">
+                  {context.isPlatformAdmin && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/20">
+                      <div className="space-y-2">
+                        <Label htmlFor="tenant-select">Target Tenant (Required)</Label>
+                        <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                          <SelectTrigger id="tenant-select">
+                            <SelectValue placeholder="Select Tenant" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tenants.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                <div className="flex items-center justify-between w-full gap-2">
+                                  <span>{t.name}</span>
+                                  <Badge variant="outline" className="text-[10px] font-mono">{t.id.slice(0, 8)}</Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="franchise-select">Target Franchise (Optional)</Label>
+                        <Select 
+                          value={selectedFranchiseId} 
+                          onValueChange={setSelectedFranchiseId}
+                          disabled={!selectedTenantId || franchises.length === 0}
+                        >
+                          <SelectTrigger id="franchise-select">
+                            <SelectValue placeholder={!selectedTenantId ? "Select Tenant First" : "Select Franchise (Optional)"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                             <SelectItem value="none">-- None (Tenant Level) --</SelectItem>
+                            {franchises.map((f) => (
+                              <SelectItem key={f.id} value={f.id}>
+                                <div className="flex items-center justify-between w-full gap-2">
+                                  <span>{f.name}</span>
+                                  <Badge variant="outline" className="text-[10px] font-mono">{f.id.slice(0, 8)}</Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
                   <div
                     className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
                       isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
@@ -1055,9 +1286,14 @@ export default function DataImportExport({
                        <h3 className="text-lg font-medium">{processingAction === 'revert' ? 'Reverting Import...' : 'Importing...'}</h3>
                        {processingAction === 'import' && (
                            <>
-                               <p className="text-muted-foreground text-sm">
-                                 Processed {importProcessedRows} records...
-                               </p>
+                               <Progress value={progress} className="w-full max-w-md mx-auto" />
+                               <div className="flex justify-between w-full max-w-md mx-auto text-sm text-muted-foreground">
+                                   <span>Processed {importProcessedRows} records</span>
+                                   {importEtaSeconds !== null && (
+                                       <span>ETA: {importEtaSeconds < 60 ? `${importEtaSeconds}s` : `${Math.ceil(importEtaSeconds / 60)}m`}</span>
+                                   )}
+                               </div>
+                               
                                <div className="flex justify-center gap-2 mt-4">
                                  <Button variant="outline" size="sm" onClick={() => pauseRequestedRef.current = !importPaused}>
                                     {importPaused ? <Play className="h-4 w-4 mr-2"/> : <Pause className="h-4 w-4 mr-2"/>}
@@ -1262,11 +1498,24 @@ export default function DataImportExport({
                              ) : '-'}
                            </TableCell>
                            <TableCell>
-                             {session.status !== 'reverted' && (
-                               <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleHistoryRevert(session.id)}>
-                                 <XCircle className="h-4 w-4 mr-2" /> Revert
-                               </Button>
-                             )}
+                             <div className="flex items-center gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setReportSession(session);
+                                    setIsReportOpen(true);
+                                  }}
+                                  title="View Report"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" /> View
+                                </Button>
+                                {session.status !== 'reverted' && (
+                                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleHistoryRevert(session.id)}>
+                                    <XCircle className="h-4 w-4 mr-2" /> Revert
+                                  </Button>
+                                )}
+                             </div>
                            </TableCell>
                          </TableRow>
                        ))
@@ -1277,6 +1526,14 @@ export default function DataImportExport({
             </Card>
           </TabsContent>
         </Tabs>
+
+        {reportSession && (
+          <ImportReportDialog 
+            session={reportSession} 
+            open={isReportOpen} 
+            onOpenChange={setIsReportOpen} 
+          />
+        )}
       </div>
     </DashboardLayout>
   );

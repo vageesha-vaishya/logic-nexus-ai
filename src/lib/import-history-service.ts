@@ -68,6 +68,35 @@ export const ImportHistoryService = {
   },
 
   /**
+   * Logs validation or processing errors for a batch
+   */
+  async logErrors(
+    supabase: SupabaseClient,
+    importId: string,
+    errors: { rowNumber: number; field: string; errorMessage: string; rawData: any }[]
+  ) {
+    if (!errors.length) return;
+    
+    try {
+      const { error } = await supabase
+        .from('import_errors')
+        .insert(
+          errors.map(e => ({
+            import_id: importId,
+            row_number: e.rowNumber,
+            field: e.field,
+            error_message: e.errorMessage,
+            raw_data: e.rawData
+          }))
+        );
+        
+      if (error) throw error;
+    } catch (err) {
+      console.warn('Failed to log import errors (import_errors table might be missing):', err);
+    }
+  },
+
+  /**
    * Updates the session status and summary
    */
   async updateSession(

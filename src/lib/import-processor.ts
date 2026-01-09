@@ -64,21 +64,35 @@ export const processImportRow = (
     }
 
     if (!result.isValid) {
-        // Depending on strictness, we might flag the row as invalid
-        // But for "robust" import, maybe we just log it as an error but keep the value?
-        // Requirement: "Preserves original data when automatic correction isn't possible"
+        // Requirement: "skip only invalid fields while preserving valid data"
+        // So we keep the row valid but log the error?
+        // But if a required field is invalid, the row might be invalid.
+        // We don't know required fields here easily without schema.
+        // Let's assume validationSchema in parent handles "required".
+        // Here we just mark the field as null/invalid but don't fail the whole row unless critical?
+        // Actually, if we set isValid = false, the row is skipped.
+        // If we want partial import, we should set isValid = true but the specific field to null.
+        
+        // However, the requirement says "skip only invalid fields".
+        // So we log the error, set value to null (or keep original?), and keep isValid = true.
+        // Let's set value to null to avoid inserting bad data.
+        
+        processedData[dbField] = null; // Clear invalid data
+        
         logs.push({
             rowNumber,
             field: dbField,
             original: result.original,
-            newValue: result.value,
+            newValue: null,
             message: result.log || 'Validation failed',
             type: 'error'
         });
-        isValid = false; // Mark row as invalid if validation fails
+        
+        // We do NOT set isValid = false here, allowing partial import.
+        // The parent component's validationSchema will catch missing required fields.
+    } else {
+        processedData[dbField] = result.value;
     }
-
-    processedData[dbField] = result.value;
   }
 
   // Handle unmapped fields if needed? 

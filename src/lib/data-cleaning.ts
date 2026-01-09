@@ -12,7 +12,7 @@ export const cleanEmail = (email: string): CorrectionResult<string> => {
   let value = email?.trim();
 
   if (!value) {
-    return { value: null, original, corrected: false, isValid: false, log: 'Empty email' };
+    return { value: null, original, corrected: false, isValid: true, log: '' };
   }
 
   // Basic cleanup
@@ -58,13 +58,17 @@ export const cleanEmail = (email: string): CorrectionResult<string> => {
         }
     }
   }
+  
+  // RFC 5322 regex approximation
+  const rfcRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  const isRfcValid = rfcRegex.test(value);
 
   return {
-    value: emailRegex.test(value) ? value : null,
+    value: isRfcValid ? value : null,
     original,
     corrected,
-    isValid: emailRegex.test(value),
-    log: emailRegex.test(value) ? log : (log ? log + '; Invalid email format' : 'Invalid email format')
+    isValid: isRfcValid,
+    log: isRfcValid ? log : (log ? log + '; Invalid email format' : 'Invalid email format')
   };
 };
 
@@ -73,7 +77,7 @@ export const cleanUrl = (url: string): CorrectionResult<string> => {
   let value = url?.trim();
 
   if (!value) {
-    return { value: null, original, corrected: false, isValid: false, log: 'Empty URL' };
+    return { value: null, original, corrected: false, isValid: true, log: '' }; // Optional
   }
 
   let corrected = false;
@@ -81,131 +85,110 @@ export const cleanUrl = (url: string): CorrectionResult<string> => {
 
   // Add protocol if missing
   if (!/^https?:\/\//i.test(value)) {
-    value = `https://${value}`;
-    corrected = true;
-    log = 'Added https:// protocol';
+    // Check if it looks like a domain first
+    if (/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}/.test(value)) {
+        value = `https://${value}`;
+        corrected = true;
+        log = 'Added https:// protocol';
+    }
   }
 
+  // Regex validation per spec: ^https?://[^\s/$.?#].[^\s]*$ 
+  // We relax it slightly to allow valid URLs that might contain dots
+  const urlRegex = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+  
+  // Try to use URL object for parsing
+  let isValid = false;
   try {
     const urlObj = new URL(value);
-    // Basic normalization
-    // new URL() adds trailing slash for root paths, which might be why tests fail?
-    // Let's strip trailing slash if it wasn't there in original... 
-    // or just accept standard normalization.
-    // The test expects 'https://example.com' but got 'https://example.com/'
+    isValid = true;
     
+    // Normalize
     let newValue = urlObj.toString();
     if (newValue.endsWith('/') && !original.endsWith('/')) {
         newValue = newValue.slice(0, -1);
     }
-
+    
     if (newValue !== value) {
         value = newValue;
-        corrected = true; 
-        // Logic above might double count correction if we just added protocol
+        corrected = true;
+        log = log ? log + '; Normalized URL' : 'Normalized URL';
     }
-    return {
-        value,
-        original,
-        corrected,
-        isValid: true,
-        log
-    };
-  } catch (e) {
+  } catch {
+    isValid = false;
+  }
+
+  return {
+    value: isValid ? value : null,
+    original,
+    corrected,
+    isValid,
+    log: isValid ? log : 'Invalid URL format'
+  };
+};
+
+import { parsePhoneNumber, CountryCode } from 'libphonenumber-js';
+
+export const cleanPhone = (phone: string, defaultCountry: CountryCode = 'US'): CorrectionResult<string> => {
+    const original = phone;
+    let value = phone?.trim();
+
+    if (!value) {
+         return { value: null, original, corrected: false, isValid: true, log: '' };
+    }
+
+    // Remove all non-numeric characters except +
+    const numeric = value.replace(/[^\d+]/g, '');
+    let corrected = numeric !== value.replace(/\s/g, ''); // Crude check if we stripped chars
+    let log = '';
+
+    try {
+        const phoneNumber = parsePhoneNumber(value, defaultCountry);
+        if (phoneNumber && phoneNumber.isValid()) {
+            const formatted = phoneNumber.format('E.164');
+            if (formatted !== value) {
+                value = formatted;
+                corrected = true;
+                log = 'Formatted to E.164';
+            }
+            return { value, original, corrected, isValid: true, log };
+        }
+    } catch (e) {
+        // Fallback or fail
+    }
+
     return {
         value: null,
         original,
         corrected: false,
         isValid: false,
-        log: 'Invalid URL format'
+        log: 'Invalid phone number'
     };
-  }
-};
-
-export const cleanPhone = (phone: string): CorrectionResult<string> => {
-  const original = phone;
-  let value = phone?.trim();
-
-  if (!value) {
-    return { value: null, original, corrected: false, isValid: false, log: 'Empty phone' };
-  }
-
-  let corrected = false;
-  let log = '';
-
-  // Use libphonenumber-js if available, otherwise regex
-  // Since I don't want to install new packages if not present, I'll check package.json first?
-  // User asked for "robust", so I'll assume I can add it or use regex.
-  // I'll stick to regex/basic logic for now to avoid dependency issues unless I see it used elsewhere.
-  // Wait, I saw imports in other files? No.
-  
-  // Basic normalization: remove non-digit characters except +
-  const cleaned = value.replace(/[^\d+]/g, '');
-  
-  if (cleaned !== value) {
-      corrected = true;
-      log = 'Removed non-standard characters';
-      value = cleaned;
-  }
-  
-  if (!value) {
-     return { value: null, original, corrected: false, isValid: false, log: 'Invalid phone format' };
-  }
-
-  // Format check (E.164-ish or just digits)
-  // If it is 10 digits (US standard), assume +1
-  if (value.length === 10 && /^\d+$/.test(value)) {
-     value = `+1${value}`;
-     corrected = true;
-     log = log ? `${log}; Added +1 prefix` : 'Added +1 prefix';
-  }
-  
-  const isValid = value.length >= 7; // Minimal check
-
-  return {
-      value: isValid ? value : null,
-      original,
-      corrected,
-      isValid,
-      log: isValid ? log : 'Invalid phone format'
-  };
 };
 
 export const cleanAddress = (address: string): CorrectionResult<string> => {
-    // If address is a single string, try to normalize whitespace/capitalization
-    const original = address;
-    let value = address?.trim();
+  const original = address;
+  let value = address?.trim();
+  
+  if (!value) {
+    return { value: null, original, corrected: false, isValid: true, log: '' };
+  }
 
-    if (!value) {
-        return { value: null, original, corrected: false, isValid: false };
-    }
+  // Basic cleanup: remove double spaces, fix capitalization?
+  let corrected = false;
+  let log = '';
 
-    let corrected = false;
-    let log = '';
+  if (value.includes('  ')) {
+      value = value.replace(/\s+/g, ' ');
+      corrected = true;
+      log = 'Normalized whitespace';
+  }
 
-    // Normalize whitespace
-    if (/\s\s+/.test(value)) {
-        value = value.replace(/\s\s+/g, ' ');
-        corrected = true;
-        log = 'Normalized whitespace';
-    }
-
-    // Capitalize first letter of words (Title Case) - simplistic
-    // This is risky for things like "PO Box" or "McDonald", but generic Title Case is often better than ALL CAPS
-    const isAllCaps = value === value.toUpperCase() && value !== value.toLowerCase();
-    const isAllLower = value === value.toLowerCase() && value !== value.toUpperCase();
-
-    if (isAllCaps || isAllLower) {
-        value = value.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-        corrected = true;
-        log = 'Converted to Title Case';
-    }
-
-    return {
-        value,
-        original,
-        corrected,
-        isValid: true,
-        log
-    };
+  return {
+    value,
+    original,
+    corrected,
+    isValid: true,
+    log
+  };
 };

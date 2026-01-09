@@ -2,6 +2,7 @@
 
 ## Authentication
 - JWT with tenant/franchise claims
+- Platform Admins possess global access scopes, bypassing tenant isolation for system-wide operations (e.g. data imports)
 - HMAC signatures for webhooks; timestamp and nonce headers
 
 ## Ports & Locations

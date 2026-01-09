@@ -21,6 +21,7 @@
 
 ## Security
 - RLS; franchise scoping; field-level restrictions
+- Platform Admin Bypass: Full access granted for critical operations (e.g., Import/Export management)
 - Secrets vault; HMAC webhooks; audit logs
 
 ## Integrations

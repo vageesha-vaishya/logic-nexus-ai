@@ -32,16 +32,15 @@ const defaultExportTemplate: ExportTemplate = {
 };
 
 const validationSchema = z.object({
-  name: z.string().min(1, 'Account Name is required'),
-  email: z.string().email().optional().or(z.literal('')),
-  website: z.string().url().optional().or(z.literal('')),
-  annual_revenue: z.number().optional(),
-  employee_count: z.number().int().optional(),
+  name: z.string().trim().min(1, 'Account Name is required'),
+  email: z.string().email().nullish().or(z.literal('')),
+  website: z.string().url().nullish().or(z.literal('')),
+  annual_revenue: z.number().nullish(),
+  employee_count: z.number().int().nullish(),
 });
 
 export default function AccountsImportExport() {
   return (
-    <DashboardLayout>
       <DataImportExport
         entityName="Accounts"
         tableName="accounts"
@@ -51,6 +50,5 @@ export default function AccountsImportExport() {
         defaultExportTemplate={defaultExportTemplate}
         listPath="/dashboard/accounts"
       />
-    </DashboardLayout>
   );
 }
