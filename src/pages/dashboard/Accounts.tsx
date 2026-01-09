@@ -3,7 +3,6 @@ import { Plus, Search, Building2, Phone, Mail, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import TitleStrip from '@/components/ui/title-strip';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
 import { useSort } from '@/hooks/useSort';
@@ -12,6 +11,9 @@ import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
+import { EntityCard } from '@/components/system/EntityCard';
+import { EmptyState } from '@/components/system/EmptyState';
 
 interface Account {
   id: string;
@@ -91,84 +93,82 @@ export default function Accounts() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground">Manage your company accounts</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ViewToggle value={viewMode} onChange={setViewMode} />
-          <Button asChild variant="outline">
+      <FirstScreenTemplate
+        title="Accounts"
+        description="Manage your company accounts"
+        breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Accounts' }]}
+        viewMode={viewMode}
+        availableModes={['card', 'grid', 'list']}
+        onViewModeChange={setViewMode}
+        onCreate={() => (window.location.href = '/dashboard/accounts/new')}
+        actionsRight={
+          <Button variant="outline" asChild>
             <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
           </Button>
-          <Button asChild>
-            <Link to="/dashboard/accounts/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Account
-            </Link>
-          </Button>
+        }
+      >
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search accounts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search accounts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading accounts...</p>
+          </div>
+        ) : filteredAccounts.length === 0 ? (
+          <EmptyState
+            icon={<Building2 className="h-10 w-10" />}
+            title="No accounts found"
+            description={searchQuery ? 'Try adjusting your search' : 'Get started by creating your first account'}
+            actionLabel={!searchQuery ? 'Create Account' : undefined}
+            onAction={!searchQuery ? () => (window.location.href = '/dashboard/accounts/new') : undefined}
           />
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading accounts...</p>
-        </div>
-      ) : filteredAccounts.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No accounts found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery ? 'Try adjusting your search' : 'Get started by creating your first account'}
-            </p>
-            {!searchQuery && (
-              <Button asChild>
-                <Link to="/dashboard/accounts/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Account
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        viewMode === 'list' ? (
+        ) : viewMode === 'list' ? (
           <Card>
             <CardHeader className="pb-2">
-              <TitleStrip label="All Accounts" />
+              <CardTitle>All Accounts</CardTitle>
+              <CardDescription>Sorted and filterable list</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
-              <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
-                <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
-                  <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>Name</SortableHead>
-                  <SortableHead field="type" activeField={sortField} direction={sortDirection} onSort={onSort}>Type</SortableHead>
-                  <SortableHead field="status" activeField={sortField} direction={sortDirection} onSort={onSort}>Status</SortableHead>
-                  <SortableHead field="industry" activeField={sortField} direction={sortDirection} onSort={onSort}>Industry</SortableHead>
-                  <SortableHead field="phone" activeField={sortField} direction={sortDirection} onSort={onSort}>Phone</SortableHead>
-                  <SortableHead field="email" activeField={sortField} direction={sortDirection} onSort={onSort}>Email</SortableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedAccounts.map((account) => (
-                    <TableRow key={account.id} className="cursor-pointer" onClick={() => {}}>
-                      <TableCell>
-                        <Link className="font-medium hover:underline" to={`/dashboard/accounts/${account.id}`}>{account.name}</Link>
-                      </TableCell>
+                <TableHeader>
+                  <TableRow>
+                    <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>
+                      Name
+                    </SortableHead>
+                    <SortableHead field="type" activeField={sortField} direction={sortDirection} onSort={onSort}>
+                      Type
+                    </SortableHead>
+                    <SortableHead field="status" activeField={sortField} direction={sortDirection} onSort={onSort}>
+                      Status
+                    </SortableHead>
+                    <SortableHead field="industry" activeField={sortField} direction={sortDirection} onSort={onSort}>
+                      Industry
+                    </SortableHead>
+                    <SortableHead field="phone" activeField={sortField} direction={sortDirection} onSort={onSort}>
+                      Phone
+                    </SortableHead>
+                    <SortableHead field="email" activeField={sortField} direction={sortDirection} onSort={onSort}>
+                      Email
+                    </SortableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedAccounts.map((account) => (
+                    <TableRow
+                      key={account.id}
+                      className="cursor-pointer"
+                      onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
+                    >
+                      <TableCell className="font-medium">{account.name}</TableCell>
                       <TableCell>{account.account_type}</TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(account.status)}>{account.status}</Badge>
@@ -183,76 +183,33 @@ export default function Accounts() {
             </CardContent>
           </Card>
         ) : viewMode === 'grid' ? (
-          <div className="space-y-2">
-            <TitleStrip label="All Accounts" />
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {filteredAccounts.map((account) => (
-                <Link key={account.id} to={`/dashboard/accounts/${account.id}`}>
-                  <Card className="hover:shadow transition-shadow cursor-pointer">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base truncate">{account.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                      <Badge className={getTypeColor(account.account_type)}>{account.account_type}</Badge>
-                      <Badge className={getStatusColor(account.status)}>{account.status}</Badge>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {filteredAccounts.map((account) => (
+              <EntityCard
+                key={account.id}
+                title={account.name}
+                subtitle={account.industry || undefined}
+                meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
+                tags={[account.status, account.account_type].filter(Boolean)}
+                onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
+              />
+            ))}
           </div>
         ) : (
-          <div className="space-y-2">
-            <TitleStrip label="All Accounts" />
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredAccounts.map((account) => (
-                <Link key={account.id} to={`/dashboard/accounts/${account.id}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <Building2 className="h-10 w-10 text-primary" />
-                        <div className="flex gap-2">
-                          <Badge className={getStatusColor(account.status)}>
-                            {account.status}
-                          </Badge>
-                          <Badge className={getTypeColor(account.account_type)}>
-                            {account.account_type}
-                          </Badge>
-                        </div>
-                      </div>
-                      <CardTitle className="mt-4">{account.name}</CardTitle>
-                      {account.industry && (
-                        <CardDescription>{account.industry}</CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {account.phone && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{account.phone}</span>
-                        </div>
-                      )}
-                      {account.email && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="h-4 w-4" />
-                          <span className="truncate">{account.email}</span>
-                        </div>
-                      )}
-                      {account.website && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Globe className="h-4 w-4" />
-                          <span className="truncate">{account.website}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+          <div className="flex flex-col gap-3">
+            {filteredAccounts.map((account) => (
+              <EntityCard
+                key={account.id}
+                title={account.name}
+                subtitle={account.industry || undefined}
+                meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
+                tags={[account.status, account.account_type].filter(Boolean)}
+                onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
+              />
+            ))}
           </div>
-        )
-      )}
-    </div>
+        )}
+      </FirstScreenTemplate>
     </DashboardLayout>
   );
 }

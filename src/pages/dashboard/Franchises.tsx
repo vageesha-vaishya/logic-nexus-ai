@@ -5,10 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Store } from 'lucide-react';
+import { Plus, Store, FileDown, FileUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
+import { ImportFranchiseModal } from '@/components/admin/ImportFranchiseModal';
+import Papa from 'papaparse';
+import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
+import { EmptyState } from '@/components/system/EmptyState';
+import { ViewMode } from '@/components/ui/view-toggle';
+import { EntityCard } from '@/components/system/EntityCard';
 
 export default function Franchises() {
   const navigate = useNavigate();
@@ -16,6 +22,8 @@ export default function Franchises() {
   const { context } = useCRM();
   const [franchises, setFranchises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
     fetchFranchises();
@@ -49,19 +57,72 @@ export default function Franchises() {
     }
   };
 
+  const handleExport = () => {
+    try {
+      const exportData = franchises.map(f => ({
+        name: f.name,
+        code: f.code,
+        tenant: f.tenants?.name,
+        status: f.is_active ? 'Active' : 'Inactive',
+        created_at: new Date(f.created_at).toLocaleDateString(),
+        street: f.address?.street || '',
+        city: f.address?.city || '',
+        state: f.address?.state || '',
+        zip: f.address?.zip || '',
+        country: f.address?.country || '',
+        phone: f.address?.contact?.phone || '',
+        email: f.address?.contact?.email || '',
+      }));
+
+      const csv = Papa.unparse(exportData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `franchises_export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Franchises exported successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to export franchises',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Franchises</h1>
-            <p className="text-muted-foreground">Manage franchise locations</p>
-          </div>
-          <Button onClick={() => navigate('/dashboard/franchises/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Franchise
-          </Button>
-        </div>
+      <FirstScreenTemplate
+        title="Franchises"
+        description="Manage franchise locations"
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Franchises' },
+        ]}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        availableModes={['card', 'grid', 'list']}
+        onImport={() => setIsImportModalOpen(true)}
+        onExport={handleExport}
+        onCreate={() => navigate('/dashboard/franchises/new')}
+      >
+
+        <ImportFranchiseModal 
+          open={isImportModalOpen} 
+          onOpenChange={setIsImportModalOpen}
+          onImportComplete={fetchFranchises}
+        />
 
         <Card>
           <CardHeader>
@@ -74,10 +135,13 @@ export default function Franchises() {
             {loading ? (
               <div className="text-center py-8">Loading...</div>
             ) : franchises.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No franchises found. Create your first franchise to get started.
-              </div>
-            ) : (
+              <EmptyState
+                title="No franchises found"
+                description="Create your first franchise to get started."
+                actionLabel="New Franchise"
+                onAction={() => navigate('/dashboard/franchises/new')}
+              />
+            ) : viewMode === 'list' ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -110,10 +174,36 @@ export default function Franchises() {
                   ))}
                 </TableBody>
               </Table>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {franchises.map((f) => (
+                  <EntityCard
+                    key={f.id}
+                    title={f.name}
+                    subtitle={`${f.code} • ${f.tenants?.name || '—'}`}
+                    meta={`Created ${new Date(f.created_at).toLocaleDateString()}`}
+                    tags={[f.is_active ? 'Active' : 'Inactive']}
+                    onClick={() => navigate(`/dashboard/franchises/${f.id}`)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {franchises.map((f) => (
+                  <EntityCard
+                    key={f.id}
+                    title={f.name}
+                    subtitle={`${f.code} • ${f.tenants?.name || '—'}`}
+                    meta={`Created ${new Date(f.created_at).toLocaleDateString()}`}
+                    tags={[f.is_active ? 'Active' : 'Inactive']}
+                    onClick={() => navigate(`/dashboard/franchises/${f.id}`)}
+                  />
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      </FirstScreenTemplate>
     </DashboardLayout>
   );
 }

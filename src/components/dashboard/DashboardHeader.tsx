@@ -1,12 +1,60 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bell, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import { useCRM } from "@/hooks/useCRM";
 
 export const DashboardHeader = () => {
+  const { context, setFranchisePreference, setAdminOverride } = useCRM();
+  const { toast } = useToast();
+  const [franchises, setFranchises] = useState<any[]>([]);
+  const [selectedFranchise, setSelectedFranchise] = useState<string | undefined>(undefined);
+  const [adminOverride, setAdminOverride] = useState<boolean>(false);
+
+  useEffect(() => {
+    setSelectedFranchise(context.franchiseId || undefined);
+    setAdminOverride(!!context.adminOverrideEnabled);
+  }, [context.franchiseId, context.adminOverrideEnabled]);
+
+  useEffect(() => {
+    async function loadFranchises() {
+      if (!context.tenantId) return;
+      const { data, error } = await supabase
+        .from("franchises")
+        .select("id,name,code")
+        .eq("tenant_id", context.tenantId)
+        .order("name", { ascending: true });
+      if (!error && data) setFranchises(data);
+    }
+    loadFranchises();
+  }, [context.tenantId]);
+
+  const handleFranchiseChange = async (value: string) => {
+    setSelectedFranchise(value);
+    try {
+      await setFranchisePreference(value || null, adminOverride);
+      toast({ title: "Franchise updated" });
+    } catch (e: any) {
+      toast({ title: "Failed to update franchise", description: e?.message || String(e), variant: "destructive" });
+    }
+  };
+
+  const handleAdminOverrideToggle = async (checked: boolean) => {
+    setAdminOverride(checked);
+    try {
+      await setAdminOverride(checked, selectedFranchise || null);
+      toast({ title: checked ? "Admin override enabled" : "Admin override disabled" });
+    } catch (e: any) {
+      toast({ title: "Failed to set admin override", description: e?.message || String(e), variant: "destructive" });
+    }
+  };
+
   return (
     <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
-      {/* Search */}
       <div className="flex-1 max-w-md">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -17,8 +65,23 @@ export const DashboardHeader = () => {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Select value={selectedFranchise || ""} onValueChange={handleFranchiseChange}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="Select franchise" />
+            </SelectTrigger>
+            <SelectContent>
+              {franchises.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Admin Override</span>
+            <Switch checked={adminOverride} onCheckedChange={handleAdminOverrideToggle} />
+          </div>
+        </div>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5" />
           <Badge 

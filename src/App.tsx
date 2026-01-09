@@ -22,6 +22,7 @@ import LeadNew from "./pages/dashboard/LeadNew";
 import LeadDetail from "./pages/dashboard/LeadDetail";
 import LeadsImportExport from "./pages/dashboard/LeadsImportExport";
 import LeadsPipeline from "./pages/dashboard/LeadsPipeline";
+import { LeadsViewStateProvider } from "./hooks/useLeadsViewState";
 import Activities from "./pages/dashboard/Activities";
 import ActivityNew from "./pages/dashboard/ActivityNew";
 import ActivityDetail from "./pages/dashboard/ActivityDetail";
@@ -53,6 +54,7 @@ import Chatter from "./pages/dashboard/Chatter";
 import Groups from "./pages/dashboard/Groups";
 import Calendar from "./pages/dashboard/Calendar";
 import Dashboards from "./pages/dashboard/Dashboards";
+import CRMWorkspace from "./pages/dashboard/CRMWorkspace";
 import More from "./pages/dashboard/More";
 import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
 import CustomRoles from "./pages/dashboard/CustomRoles";
@@ -196,7 +198,9 @@ const App = () => (
               path="/dashboard/leads" 
               element={
                 <ProtectedRoute requiredPermissions={["leads.view"]}>
-                  <Leads />
+                  <LeadsViewStateProvider>
+                    <Leads />
+                  </LeadsViewStateProvider>
                 </ProtectedRoute>
               } 
             />
@@ -220,7 +224,9 @@ const App = () => (
               path="/dashboard/leads/pipeline" 
               element={
                 <ProtectedRoute requiredPermissions={["leads.view"]}>
-                  <LeadsPipeline />
+                  <LeadsViewStateProvider>
+                    <LeadsPipeline />
+                  </LeadsViewStateProvider>
                 </ProtectedRoute>
               } 
             />
@@ -547,6 +553,8 @@ const App = () => (
             <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
             <Route path="/dashboard/calendar" element={<ProtectedRoute requiredPermissions={["calendar.view"]}><Calendar /></ProtectedRoute>} />
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
+            <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><CRMWorkspace /></ProtectedRoute>} />
+            <Route path="/dashboard/leads-workspace" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />

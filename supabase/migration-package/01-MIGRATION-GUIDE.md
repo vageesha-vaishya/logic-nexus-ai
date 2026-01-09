@@ -6,7 +6,7 @@ This package contains all scripts needed for a complete, error-free migration.
 ## 🎯 Quick Start (Easiest Method)
 
 ### Prerequisites
-- [ ] Supabase account created at https://supabase.com
+ - [ ] Supabase account created at <https://supabase.com>
 - [ ] New Supabase project created
 - [ ] Database password saved
 - [ ] Node.js and npm installed
@@ -38,7 +38,7 @@ pg_dump "postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres" \
 
 ### Step 2: Prepare New Supabase Project (5 minutes)
 
-1. Create new project at https://supabase.com
+1. Create new project at <https://supabase.com>
 2. Wait for project provisioning (2-3 minutes)
 3. Get credentials from **Project Settings → API**:
    - Project URL

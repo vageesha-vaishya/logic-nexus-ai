@@ -1,0 +1,106 @@
+{
+  "leads": {
+    "title": "Espacio de trabajo de Clientes Potenciales",
+    "subtitle": "Enfoque en pipeline y contactos activos",
+    "kpi": {
+      "totalLeads": "Total de Leads",
+      "wonDeals": "Tratos Ganados",
+      "contacted": "Contactados",
+      "highScore": "Puntuación Alta"
+    },
+    "actions": {
+      "newLead": "Nuevo Lead",
+      "refresh": "Actualizar",
+      "listView": "Vista de Lista",
+      "pipelineView": "Vista de Pipeline",
+      "setDefault": "Establecer por defecto",
+      "cancel": "Cancelar",
+      "delete": "Eliminar",
+      "addLead": "Añadir Lead"
+    },
+    "filters": {
+      "search": "Buscar leads...",
+      "status": "Estado",
+      "score": "Puntuación",
+      "owner": "Propietario",
+      "allStatuses": "Todos los Estados",
+      "allScores": "Todas las Puntuaciones",
+      "anyOwner": "Cualquier Propietario",
+      "nameOp": "Op Nombre",
+      "name": "Nombre",
+      "scoreMin": "Punt. min",
+      "scoreMax": "Punt. max",
+      "valueMin": "Valor min",
+      "valueMax": "Valor max",
+      "companyOp": "Op Empresa",
+      "company": "Empresa",
+      "emailOp": "Op Email",
+      "email": "Email",
+      "ops": {
+        "contains": "Contiene",
+        "equals": "Igual a",
+        "startsWith": "Empieza con",
+        "endsWith": "Termina con"
+      },
+      "statusOptions": {
+        "new": "Nuevo",
+        "contacted": "Contactado",
+        "qualified": "Calificado",
+        "proposal": "Propuesta",
+        "negotiation": "Negociación",
+        "won": "Ganado",
+        "lost": "Perdido",
+        "converted": "Convertido"
+      },
+      "scoreOptions": {
+        "high": "Alta (70+)",
+        "medium": "Media (40-69)",
+        "low": "Baja (<40)"
+      },
+      "ownerOptions": {
+        "me": "Asignado a mí",
+        "unassigned": "Sin asignar"
+      }
+    },
+    "columns": {
+      "name": "Nombre",
+      "company": "Empresa",
+      "email": "Correo",
+      "phone": "Teléfono",
+      "status": "Estado",
+      "source": "Fuente",
+      "score": "Puntuación",
+      "value": "Valor"
+    },
+    "allLeads": "Todos los Leads",
+    "messages": {
+      "loading": "Cargando leads...",
+      "noLeads": "No se encontraron leads",
+      "noLeadsDescSearch": "Intenta ajustar tu búsqueda",
+      "noLeadsDescNew": "Comienza a construir tu pipeline de ventas",
+      "loadError": "Error al cargar leads",
+      "defaultViewSet": "Vista por defecto establecida a {{view}}",
+      "defaultViewError": "Error al actualizar la vista por defecto",
+      "deleteConfirm": "¿Estás seguro de que quieres eliminar {{count}} leads?",
+      "deleteSuccess": "{{count}} leads eliminados",
+      "deleteError": "Error al eliminar leads",
+      "newLead": "Nuevo lead: {{name}}",
+      "statusUpdate": "Lead movido a {{status}}",
+      "leadUpdate": "Lead actualizado",
+      "updateError": "Error al actualizar lead",
+      "statusError": "Error al actualizar estado"
+    },
+    "tabs": {
+      "board": "Tablero Kanban",
+      "analytics": "Analítica"
+    },
+    "pipeline": {
+      "loading": "Cargando pipeline...",
+      "found": "{{count}} leads encontrados",
+      "user": "Usuario"
+    },
+    "bulk": {
+      "selected": "{{count}} seleccionados"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+import { Meta, Story, Canvas } from '@storybook/blocks';
+import * as Segmentation from './CustomerSegmentation.stories';
+
+<Meta title="CRM/CustomerSegmentation/Docs" of={Segmentation} />
+
+# Customer Segmentation
+
+This component provides visual insights into customer segments using multiple criteria:
+- Demographic (industry, title, company size)
+- Behavioral (email opens, site visits, recency)
+- Geographic (region, country)
+
+## Performance
+
+- Charts use Recharts with responsive containers
+- Minimal render work via useMemo for transformed datasets
+- Avoids heavy DOM updates by limiting legend and tooltip complexity
+
+## Accessibility
+
+- Charts include legends and tooltips for interpretability
+- Tab interface supports keyboard navigation
+- Buttons and actions include descriptive labels
+
+## Usage
+
+<Canvas>
+  <Story of={Segmentation.Default} />
+</Canvas>

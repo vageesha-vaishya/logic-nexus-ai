@@ -13,6 +13,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
+import { CrudFormLayout } from '@/components/system/CrudFormLayout';
+import { FormSection } from '@/components/system/FormSection';
+import { FormStepper } from '@/components/system/FormStepper';
 
 const franchiseSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -26,6 +29,20 @@ const franchiseSchema = z.object({
     state: z.string().optional(),
     zip: z.string().optional(),
     country: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    website: z.string().optional(),
+    communication: z.object({
+      whatsapp: z.string().optional(),
+      telegram: z.string().optional(),
+      preferred: z.string().optional(),
+    }).optional(),
+    demographics: z.object({
+      founded_year: z.string().optional(),
+      employee_count: z.string().optional(),
+      languages: z.string().optional(),
+      revenue_range: z.string().optional(),
+    }).optional(),
   }).optional(),
 });
 
@@ -55,7 +72,18 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       is_active: franchise?.is_active ?? true,
       address: typeof franchise?.address === 'string' 
         ? JSON.parse(franchise.address) 
-        : franchise?.address || { street: '', city: '', state: '', zip: '', country: '' },
+        : franchise?.address || { 
+          street: '', 
+          city: '', 
+          state: '', 
+          zip: '', 
+          country: '',
+          phone: '',
+          email: '',
+          website: '',
+          communication: { whatsapp: '', telegram: '', preferred: '' },
+          demographics: { founded_year: '', employee_count: '', languages: '', revenue_range: '' },
+        },
     },
   });
 
@@ -167,8 +195,25 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-        <FormField
+        <CrudFormLayout
+          title={franchise ? 'Edit Franchise' : 'New Franchise'}
+          description="Branch information, contacts, channels, and demographics"
+          onCancel={() => navigate('/dashboard/franchises')}
+          onSave={() => form.handleSubmit(handleFormSubmit)()}
+        >
+          <FormStepper
+            steps={[
+              { id: 'details', label: 'Details' },
+              { id: 'profile', label: 'Profile & Contacts' },
+              { id: 'communication', label: 'Communication' },
+              { id: 'demographics', label: 'Demographics' },
+              { id: 'status', label: 'Status' },
+            ]}
+            activeId="details"
+          />
+
+          <div className="space-y-6">
+            <FormField
           control={form.control}
           name="name"
           render={({ field }) => (
@@ -248,14 +293,13 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
           )}
         />
 
-        <div className="space-y-4 rounded-lg border p-4">
-          <FormLabel>Address</FormLabel>
+        <FormSection title="Address">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
               name="address.street"
               render={({ field }) => (
-                <FormItem className="col-span-2">
+                <FormItem className="md:col-span-2">
                   <FormLabel>Street</FormLabel>
                   <FormControl>
                     <Input placeholder="123 Main St" {...field} />
@@ -317,9 +361,165 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
               )}
             />
           </div>
-        </div>
+        </FormSection>
 
-        <FormField
+        <FormSection title="Profile & Contacts">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="address.phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+1 555-123-4567" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="branch@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.website"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Website</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Communication Channels">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="address.communication.whatsapp"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WhatsApp</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+1 555-123-4567" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.communication.telegram"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telegram</FormLabel>
+                  <FormControl>
+                    <Input placeholder="@handle" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.communication.preferred"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preferred Contact Method</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select method" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="phone">Phone</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="telegram">Telegram</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Demographics">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="address.demographics.founded_year"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Founded Year</FormLabel>
+                  <FormControl>
+                    <Input placeholder="1998" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.demographics.employee_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Employee Count</FormLabel>
+                  <FormControl>
+                    <Input placeholder="50" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.demographics.languages"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Languages</FormLabel>
+                  <FormControl>
+                    <Input placeholder="English, Spanish" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address.demographics.revenue_range"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Revenue Range</FormLabel>
+                  <FormControl>
+                    <Input placeholder="$1M–$5M" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title="Status">
+          <FormField
           control={form.control}
           name="is_active"
           render={({ field }) => (
@@ -339,20 +539,9 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
             </FormItem>
           )}
         />
-
-        <div className="flex gap-4">
-          <Button type="submit" className="flex-1">
-            {franchise ? 'Update' : 'Create'} Franchise
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate('/dashboard/franchises')}
-          >
-            Cancel
-          </Button>
-        </div>
-        </form>
+        </FormSection>
+          </div>
+        </CrudFormLayout>
       </Form>
 
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

@@ -80,7 +80,7 @@ Execute scripts in this exact order:
 ## Step-by-Step Instructions
 
 ### Prerequisites
-1. Create a new Supabase project at https://supabase.com
+1. Create a new Supabase project at <https://supabase.com>
 2. Navigate to SQL Editor in your project
 3. Have your project credentials ready
 

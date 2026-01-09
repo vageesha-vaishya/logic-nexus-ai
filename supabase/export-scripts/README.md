@@ -196,5 +196,5 @@ This preserves all data types, sequences, and relationships perfectly.
 ## Need Help?
 
 - Check the main migration guide for context
-- Review Supabase documentation: https://supabase.com/docs
+- Review Supabase documentation: <https://supabase.com/docs>
 - Test on a small subset first before full migration

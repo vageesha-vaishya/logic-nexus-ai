@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { motion, useMotionValue } from "framer-motion";
 import { memo } from "react";
 import { EditableText } from "@/components/ui/editable-text";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, GripVertical } from "lucide-react";
 
 export interface KanbanItem {
   id: string;
@@ -80,7 +80,7 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
       <div
         ref={setNodeRef}
         style={style}
-        className="opacity-40 bg-muted/50 h-[140px] rounded-lg border-2 border-dashed border-primary/20"
+        className="opacity-40 bg-muted/50 h-[120px] rounded-lg border-2 border-dashed border-primary/20"
       />
     );
   }
@@ -94,28 +94,28 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
   };
 
   return (
-    <motion.div
-      layoutId={isOverlay ? undefined : item.id}
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.2 }}
-      className="relative touch-none"
-      style={{ willChange: "transform" }}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "touch-none group relative",
+        isOverlay ? "cursor-grabbing rotate-2 scale-105 z-50" : "cursor-grab",
+        "focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-lg"
+      )}
     >
-      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-        <Card
-          className={cn(
-            "group relative transition-all duration-200 cursor-grab active:cursor-grabbing border-l-[3px]",
-            "hover:shadow-lg hover:-translate-y-0.5",
-            isOverlay ? "shadow-2xl scale-105 rotate-2 cursor-grabbing z-50" : "shadow-sm",
-            priorityBorderColors[item.priority || "low"]
-          )}
-        >
-          <CardHeader className="p-3 space-y-2">
+      <Card 
+        className={cn(
+          "relative overflow-hidden transition-all duration-200 border-l-4 hover:shadow-md",
+          priorityBorderColors[item.priority || "low"],
+          isOverlay ? "shadow-xl ring-2 ring-primary/20" : "shadow-sm"
+        )}
+      >
+        <CardHeader className="p-2.5 space-y-1.5">
             {/* Header: Badges & Title */}
             <div className="flex justify-between items-start gap-2">
-              <div className="space-y-1.5 flex-1">
+              <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2">
                    <Badge 
                     variant="outline" 
@@ -166,29 +166,29 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
             )}
 
             {/* Footer: Value & Assignees */}
-            <div className="flex items-center justify-between pt-2 mt-1 border-t border-border/40">
-              <div className="font-medium text-sm tabular-nums" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-border/40">
+              <div className="font-medium text-xs tabular-nums" onPointerDown={(e) => e.stopPropagation()}>
                  <EditableText 
                     value={item.value || 0} 
                     type="currency"
                     currencySymbol={item.currency}
                     onSave={(val) => handleUpdate('value', val)}
-                    className="text-sm"
+                    className="text-xs"
                   />
               </div>
 
               {/* Avatar Group */}
-              <div className="flex items-center -space-x-2">
+              <div className="flex items-center -space-x-1.5">
                 {assignees.slice(0, 3).map((u, i) => (
-                  <Avatar key={i} className="h-6 w-6 border-2 border-background ring-1 ring-border/10">
+                  <Avatar key={i} className="h-5 w-5 border-2 border-background ring-1 ring-border/10">
                     <AvatarImage src={u.avatarUrl} />
-                    <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                    <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
                       {u.name.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 ))}
                 {assignees.length > 3 && (
-                  <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] font-medium text-muted-foreground ring-1 ring-border/10">
+                  <div className="h-5 w-5 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[8px] font-medium text-muted-foreground ring-1 ring-border/10">
                     +{assignees.length - 3}
                   </div>
                 )}
@@ -196,7 +196,6 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
             </div>
           </CardHeader>
         </Card>
-      </div>
-    </motion.div>
+    </div>
   );
 });

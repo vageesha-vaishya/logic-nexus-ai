@@ -206,7 +206,7 @@ supabase secrets list --project-ref pqulscbawoqzhqobwupu
 
 ### Get Keys from Dashboard
 
-1. Go to https://supabase.com/dashboard/project/pqulscbawoqzhqobwupu
+1. Go to <https://supabase.com/dashboard/project/pqulscbawoqzhqobwupu>
 2. Navigate to **Settings** → **API**
 3. Copy:
    - **Project URL** → SUPABASE_URL
@@ -372,7 +372,7 @@ supabase functions deploy <function-name> --project-ref pqulscbawoqzhqobwupu
 
 Your database and edge functions should now be fully migrated to the new Supabase Cloud project. 
 
-### Final Checklist:
+### Final Checklist
 - ✅ All tables created with schema
 - ✅ All RLS policies applied
 - ✅ All data imported
@@ -384,7 +384,7 @@ Your database and edge functions should now be fully migrated to the new Supabas
 - ✅ Team members invited
 - ✅ Monitoring configured
 
-### Next Steps:
+### Next Steps
 1. Monitor application for any issues
 2. Update documentation with new project details
 3. Decommission old project after verification period

@@ -1,55 +1,37 @@
-# End-to-End Testing Framework
+# Testing (Removed)
 
-This project uses [Playwright](https://playwright.dev/) for end-to-end (E2E) testing. The framework is designed to cover critical user journeys, automate UI/API validations, and generate detailed reports.
+Automated testing has been removed from this codebase (unit/integration/E2E, related configs, and CI workflows). This file preserves what existed previously so it can be restored later.
 
-## Features
+## Previously Present (Removed)
 
-- **Critical Flow Coverage**: Tests for Lead Management, including Dashboard and Detail views.
-- **Mocking**: Supabase API responses are mocked to ensure consistent and isolated testing without hitting the real database.
-- **Visual Evidence**: Screenshots and videos are automatically captured for failed tests.
-- **CI/CD Integration**: Automated testing workflow via GitHub Actions.
-- **Cross-Browser Testing**: Configured for Chromium, Firefox, and WebKit.
+- Unit/integration tests (Vitest + Testing Library) under `src/**/*.test.{ts,tsx}` and `src/**/__tests__/*`
+- E2E tests (Playwright) under `tests/e2e/*.spec.ts`
+- Playwright configuration: `playwright.config.ts`
+- Vitest configuration: `vite.config.ts` `test` block and `/// <reference types="vitest" />`
+- Vitest setup: `test/setup.ts`
+- CI workflows: `.github/workflows/playwright.yml`
+- Lighthouse CI workflow/config: `.github/workflows/lighthouse.yml`, `.lighthouserc.json`, `lighthouse-*.json`
+- Local test env file: `.env.local_test`
+- Playwright output: `playwright-report/`
 
-## Running Tests
+## Where Testing Was Previously Configured
 
-### Run all E2E tests
-```bash
-npm run test:e2e
-```
+- `package.json` scripts: `test`, `test:*`, `ci:test`, `test:e2e*`, `test:storybook`
+- `package.json` devDependencies: `vitest`, `@playwright/test`, `@testing-library/*`, `jsdom`, `@lhci/cli`, `@storybook/test*`
+- `vite.config.ts` had a `test` section configuring jsdom + setup file + include globs
+- `.storybook/main.ts` previously enabled `@storybook/addon-interactions`
+- `src/components/system/FormStepper.stories.tsx` previously used `@storybook/test` `play` function
 
-### Run tests with UI Mode (Recommended for debugging)
-```bash
-npx playwright test --ui
-```
+## Restoration Notes (Manual)
 
-### Run specific test file
-```bash
-npx playwright test tests/e2e/leads.spec.ts
-```
+To restore automated testing, re-add the tooling and configs that were removed:
 
-### View Report
-```bash
-npx playwright show-report
-```
+1. Re-add scripts and devDependencies in `package.json` (Vitest/Playwright/Testing Library/etc.)
+2. Restore `vite.config.ts` `test` config and `/// <reference types="vitest" />`
+3. Restore `playwright.config.ts` and `tests/e2e/`
+4. Restore `test/setup.ts` (and any helpers/fixtures)
+5. Restore `.github/workflows/playwright.yml` (and optionally Lighthouse CI configs)
 
-## Test Structure
+## Status
 
-- `tests/e2e/`: Contains test specification files.
-  - `leads.spec.ts`: Validates Lead Management workflows (Dashboard, Detail, Scoring).
-- `playwright.config.ts`: Global configuration for Playwright.
-- `.github/workflows/playwright.yml`: CI/CD pipeline configuration.
-
-## Writing New Tests
-
-1. Create a new `.spec.ts` file in `tests/e2e/`.
-2. Use the `test` and `expect` fixtures from `@playwright/test`.
-3. Mock necessary API calls using `page.route` to simulate backend responses.
-4. Use `getByText`, `getByRole`, etc., to interact with the UI.
-
-## CI/CD Pipeline
-
-The project includes a GitHub Actions workflow (`playwright.yml`) that:
-1. Triggers on push/pull_request to `main` or `develop` branches.
-2. Installs dependencies and Playwright browsers.
-3. Runs the test suite.
-4. Uploads the test report (including screenshots/videos of failures) as an artifact.
+This project currently has no automated tests configured or runnable via `npm run test`.

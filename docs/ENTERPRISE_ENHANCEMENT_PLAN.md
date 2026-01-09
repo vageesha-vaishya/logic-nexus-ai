@@ -1,4 +1,4 @@
-# Enterprise Enhancement Implementation Plan: SOS Logistics Pro
+# Enterprise Enhancement Plan
 
 ## 1. Executive Summary
 This document outlines a strategic roadmap to transform **SOS Logistics Pro** from a functional MVP into a world-class, enterprise-grade Logistics CRM platform. The plan leverages the current modern tech stack (React, Supabase, TypeScript) while addressing critical gaps in automation, AI integration, and logistics-specific depth to compete with industry giants like Salesforce Logistics Cloud and CargoWise.
@@ -105,6 +105,9 @@ To reach "World-Class" status, the platform must achieve:
 ### Phase 3: AI & Advanced Analytics (6-12 Months)
 *   **Objective**: Introduce intelligence and predictive capabilities.
 *   **Key Deliverables**:
+    *   [x] **Franchise-First Architecture**: Enforced data isolation by franchise with Admin Override capability. (Completed)
+        *   **Implementation**: `useCRM` hook enhancement, RLS-like filtering in `Quotes`, `Shipments`, `Contacts`, `Activities`.
+        *   **Security**: Admin Override toggle for super-admins to view global data vs specific franchise data.
     *   **AI Pricing Assistant**: Suggest optimal margins based on historical win rates.
     *   **Route Optimizer**: Recommend best route (Time vs. Cost) using historical data.
     *   **Dynamic Dashboards**: PowerBI-style embedded analytics (Supabase -> Cube.js -> Frontend).

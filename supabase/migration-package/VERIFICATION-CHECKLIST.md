@@ -74,7 +74,7 @@
 - Updated DROP statements to include both names for backward compatibility
 - Added trigger for `opportunity_line_items`
 
-### Phase 4: Quotes & Shipments Tables (04-quotes-shipments-tables.sql)
+### Phase 4: Quotes & Shipments (04-quotes-shipments-tables.sql)
 - [x] Services table
 - [x] Carrier rates table
 - [x] Carrier rate charges table
@@ -192,7 +192,7 @@ EXPLAIN ANALYZE SELECT id FROM public.activities WHERE tenant_id = get_user_tena
 
 ## 🔍 Table Dependencies Verified
 
-### Dependency Chain:
+### Dependency Chain
 1. **Independent:** subscription_plans, service_types, ports_locations, incoterms, cargo_types, package_categories, package_sizes, container_types, container_sizes, currencies, charge_categories, charge_sides, charge_bases, hts_codes, service_type_mappings
 2. **Level 1:** tenants → subscription data, franchises, profiles
 3. **Level 2:** user_roles, carriers, services, custom_roles, oauth_configurations

@@ -1,0 +1,28 @@
+import { Meta, Story, Canvas } from '@storybook/blocks';
+import * as NC from './NotificationCenter.stories';
+
+<Meta title="CRM/NotificationCenter/Docs" of={NC} />
+
+# Notification Center
+
+Real-time notification list with filtering tabs, mark-as-read, and dismiss actions.
+
+## Optimization
+
+- Virtualized scroll area keeps rendering efficient
+- Controlled button interactions to prevent reflows
+- Memoized filtered sets by tab
+
+## Accessibility
+
+- Action buttons have ARIA labels
+- Tab navigation is keyboard accessible
+- Color use keeps contrast above recommended thresholds
+
+## Examples
+
+<Canvas>
+  <Story of={NC.Default} />
+  <Story of={NC.Empty} />
+</Canvas>
+

@@ -9,7 +9,7 @@ Use this template to give Trae AI clear, actionable instructions for complex dev
 - Prefer minimal, surgical changes and show diffs/patches.
 
 ## Template
-```
+```text
 Title: <Clear, specific goal>
 
 Goal

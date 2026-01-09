@@ -1,4 +1,3 @@
-/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -33,11 +32,5 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["react", "react-dom", "@tanstack/react-query"],
   },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['tests/e2e/**'],
-  },
+  // Automated testing configuration was removed; see TESTING.md for restoration notes.
 }));

@@ -5,12 +5,67 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+
+const memoryStore = new Map<string, string>();
+
+const safeStorage: Storage = {
+  get length() {
+    try {
+      return localStorage.length;
+    } catch {
+      return memoryStore.size;
+    }
+  },
+  clear() {
+    try {
+      localStorage.clear();
+      return;
+    } catch {
+      memoryStore.clear();
+    }
+  },
+  getItem(key: string) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return memoryStore.get(key) ?? null;
+    }
+  },
+  key(index: number) {
+    try {
+      return localStorage.key(index);
+    } catch {
+      return Array.from(memoryStore.keys())[index] ?? null;
+    }
+  },
+  removeItem(key: string) {
+    try {
+      localStorage.removeItem(key);
+      return;
+    } catch {
+      memoryStore.delete(key);
+    }
+  },
+  setItem(key: string, value: string) {
+    try {
+      localStorage.setItem(key, value);
+      return;
+    } catch {
+      memoryStore.set(key, value);
+    }
+  },
+};
+
+const effectiveSupabaseUrl = SUPABASE_URL || 'http://localhost:54321';
+const effectiveSupabaseKey = SUPABASE_PUBLISHABLE_KEY || 'missing-supabase-publishable-key';
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(effectiveSupabaseUrl, effectiveSupabaseKey, {
   auth: {
-    storage: localStorage,
+    storage: safeStorage,
     persistSession: true,
     autoRefreshToken: true,
   }

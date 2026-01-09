@@ -60,16 +60,16 @@ export default function Quotes() {
   useEffect(() => {
     const fetchQuotes = async () => {
       try {
-        const { data, error } = await supabase
-          .from('quotes')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100); // Increased limit for better stats
-    
-    if (error) throw error;
+        let query = supabase.from('quotes').select('*').order('created_at', { ascending: false }).limit(100);
+        if (!context.adminOverrideEnabled && context.franchiseId) {
+          query = query.eq('franchise_id', context.franchiseId);
+        }
+        const { data, error } = await query;
+        
+        if (error) throw error;
 
-    // Fetch related data separately
-    const quotesWithRelations = await Promise.all(
+        // Fetch related data separately
+        const quotesWithRelations = await Promise.all(
       (data || []).map(async (quote) => {
         const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
           quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,

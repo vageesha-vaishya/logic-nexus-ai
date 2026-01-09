@@ -28,9 +28,9 @@ node helpers/test-connection.js
 - `@supabase/supabase-js` package (auto-installed by Lovable)
 
 ### Output
-
+ 
 Success output:
-```
+```text
 ✓ Configuration loaded
 ✓ Supabase client created
 ✓ Database connection successful

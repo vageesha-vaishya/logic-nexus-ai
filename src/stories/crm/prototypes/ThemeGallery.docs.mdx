@@ -1,0 +1,394 @@
+import React from 'react';
+import { Meta, Canvas } from '@storybook/blocks';
+import { THEME_PRESETS } from '@/theme/themes';
+import { themeStyleFromPreset } from './Layout';
+
+<Meta title="CRM/Prototypes/Theme Gallery" />
+
+# Theme Preset Gallery
+
+Browse all presets from the theme system with previews of key tokens. Use the controls to switch size and filter by dark/light accessibility.
+
+export const parseHsl = (val) => {
+  if (!val || typeof val !== 'string') return null;
+  const alphaSplit = val.split('/')[0].trim();
+  const parts = alphaSplit.split(' ').map(s => s.trim());
+  if (parts.length < 3) return null;
+  const h = Number(parts[0]);
+  const s = Number(parts[1].replace('%', ''));
+  const l = Number(parts[2].replace('%', ''));
+  if (Number.isNaN(h) || Number.isNaN(s) || Number.isNaN(l)) return null;
+  return { h, s, l };
+};
+
+export const hslToRgb = ({ h, s, l }) => {
+  const S = s / 100;
+  const L = l / 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = S * Math.min(L, 1 - L);
+  const f = (n) => L - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return { r: Math.round(255 * f(0)), g: Math.round(255 * f(8)), b: Math.round(255 * f(4)) };
+};
+
+export const luminance = ({ r, g, b }) => {
+  const srgb = [r, g, b].map(v => v / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+};
+
+export const contrast = (fg, bg) => {
+  const pf = parseHsl(fg);
+  const pb = parseHsl(bg);
+  if (!pf || !pb) return null;
+  const L1 = luminance(hslToRgb(pf));
+  const L2 = luminance(hslToRgb(pb));
+  const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+  return Number(ratio.toFixed(2));
+};
+
+export const classify = (ratio) => {
+  if (ratio == null) return { label: 'n/a', cls: 'bg-muted text-muted-foreground' };
+  if (ratio >= 7) return { label: 'AAA', cls: 'bg-emerald-100 text-emerald-700' };
+  if (ratio >= 4.5) return { label: 'AA', cls: 'bg-amber-100 text-amber-700' };
+  return { label: 'Fail', cls: 'bg-red-100 text-red-700' };
+};
+
+export const classifyWithSize = (ratio, size) => {
+  if (ratio == null) return { label: 'n/a', cls: 'bg-muted text-muted-foreground' };
+  if (size === 'large') {
+    if (ratio >= 4.5) return { label: 'AAA', cls: 'bg-emerald-100 text-emerald-700' };
+    if (ratio >= 3.0) return { label: 'AA', cls: 'bg-amber-100 text-amber-700' };
+    return { label: 'Fail', cls: 'bg-red-100 text-red-700' };
+  }
+  return classify(ratio);
+};
+
+export const PreviewBox = ({ name, size, showContrast, textSize, customPair }) => {
+  const style = themeStyleFromPreset(name);
+  const preset = THEME_PRESETS.find(p => p.name === name);
+  const gradient = `linear-gradient(${preset?.angle ?? 135}deg, hsl(${preset?.start}) 0%, hsl(${preset?.end}) 100%)`;
+  const headerClass = size === 'large' ? 'p-4' : 'p-3';
+  const gridClass = size === 'large' ? 'p-4 grid grid-cols-2 gap-3 text-sm' : 'p-3 grid grid-cols-2 gap-2 text-xs';
+  const fg = style?.['--foreground'];
+  const bg = style?.['--background'] ?? (preset?.dark ? '222 47% 11%' : '0 0% 100%');
+  const cardFg = style?.['--card-foreground'];
+  const cardBg = style?.['--card'];
+  const popFg = style?.['--popover-foreground'];
+  const popBg = style?.['--popover'];
+  const thText = style?.['--table-header-text'];
+  const thBg = style?.['--table-header-background'];
+  const ratios = showContrast ? {
+    root: contrast(fg, bg),
+    card: contrast(cardFg, cardBg),
+    popover: contrast(popFg, popBg),
+    table: contrast(thText, thBg),
+  } : null;
+  const statuses = showContrast ? {
+    root: classifyWithSize(ratios?.root, textSize),
+    card: classifyWithSize(ratios?.card, textSize),
+    popover: classifyWithSize(ratios?.popover, textSize),
+    table: classifyWithSize(ratios?.table, textSize),
+  } : null;
+  const anyFail = showContrast ? ['root','card','popover','table'].some(k => statuses?.[k]?.label === 'Fail') : false;
+  const tokenDefaults = {
+    foreground: preset?.dark ? '210 40% 98%' : '222 47% 11%',
+    background: preset?.dark ? '222 47% 11%' : '0 0% 100%',
+    'muted-foreground': '215 16% 47%',
+    card: preset?.dark ? '222 47% 11%' : '0 0% 100%',
+    'card-foreground': preset?.dark ? '210 40% 98%' : '222 47% 11%',
+    accent: '197 71% 52%',
+    'accent-foreground': '0 0% 100%',
+    'sidebar-foreground': '210 40% 98%',
+    'sidebar-background': style?.['--sidebar-background'] ?? (preset?.dark ? '222 47% 11%' : '0 0% 100%'),
+  };
+  const tokens = {
+    foreground: style?.['--foreground'] ?? tokenDefaults.foreground,
+    background: style?.['--background'] ?? tokenDefaults.background,
+    'muted-foreground': tokenDefaults['muted-foreground'],
+    card: style?.['--card'] ?? tokenDefaults.card,
+    'card-foreground': style?.['--card-foreground'] ?? tokenDefaults['card-foreground'],
+    accent: style?.['--accent'] ?? tokenDefaults.accent,
+    'accent-foreground': tokenDefaults['accent-foreground'],
+    'sidebar-foreground': tokenDefaults['sidebar-foreground'],
+    'sidebar-background': tokenDefaults['sidebar-background'],
+  };
+  const pairMap = {
+    'fg-bg': ['foreground', 'background'],
+    'muted-card': ['muted-foreground', 'card'],
+    'accent-accent': ['accent-foreground', 'accent'],
+    'sidebar': ['sidebar-foreground', 'sidebar-background'],
+  };
+  const pair = pairMap[customPair] ?? pairMap['fg-bg'];
+  const customRatio = showContrast ? contrast(tokens[pair[0]], tokens[pair[1]]) : null;
+  const customStatus = showContrast ? classifyWithSize(customRatio, textSize) : null;
+  return (
+    <div style={style} className={`rounded-lg border overflow-hidden ${showContrast && anyFail ? 'border-red-400' : ''}`}>
+      <div className={`${headerClass} flex items-center justify-between`}>
+        <div className="font-medium">{name}</div>
+        <div className="h-5 w-28 rounded" style={{ backgroundImage: gradient }} />
+      </div>
+      <div className={gridClass}>
+        <div className="rounded-md bg-card text-card-foreground p-2">Card</div>
+        <div className="rounded-md bg-popover text-popover-foreground p-2">Popover</div>
+        <div className="rounded-md border p-2">Border/Input</div>
+        <div className="rounded-md p-2" style={{ color: 'hsl(var(--table-header-text))', backgroundColor: 'hsl(var(--table-header-background))' }}>
+          Table Header
+        </div>
+      </div>
+      {showContrast && (
+        <div className="px-3 pb-3 text-xs grid grid-cols-2 gap-2">
+          <div className="rounded-md p-2 bg-muted flex items-center justify-between">
+            <span>Fg/Bg: {ratios?.root ? `${ratios.root}:1` : 'n/a'}</span>
+            <span className={`ml-2 inline-block px-2 py-1 rounded ${statuses?.root?.cls}`}>{statuses?.root?.label}</span>
+          </div>
+          <div className="rounded-md p-2 bg-muted flex items-center justify-between">
+            <span>Card: {ratios?.card ? `${ratios.card}:1` : 'n/a'}</span>
+            <span className={`ml-2 inline-block px-2 py-1 rounded ${statuses?.card?.cls}`}>{statuses?.card?.label}</span>
+          </div>
+          <div className="rounded-md p-2 bg-muted flex items-center justify-between">
+            <span>Popover: {ratios?.popover ? `${ratios.popover}:1` : 'n/a'}</span>
+            <span className={`ml-2 inline-block px-2 py-1 rounded ${statuses?.popover?.cls}`}>{statuses?.popover?.label}</span>
+          </div>
+          <div className="rounded-md p-2 bg-muted flex items-center justify-between">
+            <span>Table: {ratios?.table ? `${ratios.table}:1` : 'n/a'}</span>
+            <span className={`ml-2 inline-block px-2 py-1 rounded ${statuses?.table?.cls}`}>{statuses?.table?.label}</span>
+          </div>
+        </div>
+      )}
+      {showContrast && (
+        <div className="px-3 pb-3 text-xs">
+          <div className="rounded-md p-2 bg-muted flex items-center justify-between">
+            <span>Custom: {pair[0]} vs {pair[1]} {customRatio ? `(${customRatio}:1)` : '(n/a)'}</span>
+            <span className={`ml-2 inline-block px-2 py-1 rounded ${customStatus?.cls}`}>{customStatus?.label}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const ThemeGalleryInteractive = () => {
+  const [mode, setMode] = React.useState('all');
+  const [category, setCategory] = React.useState('all');
+  const [size, setSize] = React.useState('compact');
+  const [sort, setSort] = React.useState('asc');
+  const [textSize, setTextSize] = React.useState('normal');
+  const [customPair, setCustomPair] = React.useState('fg-bg');
+  const [exportCurrentOnly, setExportCurrentOnly] = React.useState(false);
+  const [selectedPairs, setSelectedPairs] = React.useState(['fg-bg']);
+  const categorize = (name) => {
+    const n = name.toLowerCase();
+    if (n.includes('accessible') || n.includes('high contrast')) return 'accessibility';
+    if (n.includes('brand')) return 'brand';
+    return 'curated';
+  };
+  const filtered = THEME_PRESETS.filter((p) => {
+    if (mode === 'dark') return !!(p).dark;
+    if (mode === 'light') return !(p).dark;
+    return true;
+  }).filter((p) => {
+    if (category === 'all') return true;
+    return categorize(p.name) === category;
+  }).sort((a, b) => {
+    const cmp = a.name.localeCompare(b.name);
+    return sort === 'asc' ? cmp : -cmp;
+  });
+  const exportCsv = () => {
+    const pairs = exportCurrentOnly ? (selectedPairs.length ? selectedPairs : ['fg-bg','muted-card','accent-accent','sidebar']) : ['fg-bg', 'muted-card', 'accent-accent', 'sidebar'];
+    const sizes = exportCurrentOnly ? [textSize] : ['normal', 'large'];
+    const pairMap = {
+      'fg-bg': ['foreground', 'background'],
+      'muted-card': ['muted-foreground', 'card'],
+      'accent-accent': ['accent-foreground', 'accent'],
+      'sidebar': ['sidebar-foreground', 'sidebar-background'],
+    };
+    const header = ['preset', 'dark', 'gradient_start', 'gradient_end', 'gradient_angle', 'pair', 'fg_token', 'fg_value', 'bg_token', 'bg_value', 'luminance_fg', 'luminance_bg', 'text_size', 'ratio', 'badge'];
+    const rows = [header.join(',')];
+    const source = exportCurrentOnly ? filtered : THEME_PRESETS;
+    for (const p of source) {
+      const style = themeStyleFromPreset(p.name);
+      const tokenDefaults = {
+        foreground: p.dark ? '210 40% 98%' : '222 47% 11%',
+        background: p.dark ? '222 47% 11%' : '0 0% 100%',
+        'muted-foreground': '215 16% 47%',
+        card: p.dark ? '222 47% 11%' : '0 0% 100%',
+        'card-foreground': p.dark ? '210 40% 98%' : '222 47% 11%',
+        accent: style?.['--accent'] ?? '197 71% 52%',
+        'accent-foreground': '0 0% 100%',
+        'sidebar-foreground': '210 40% 98%',
+        'sidebar-background': style?.['--sidebar-background'] ?? (p.dark ? '222 47% 11%' : '0 0% 100%'),
+      };
+      const tokens = {
+        foreground: style?.['--foreground'] ?? tokenDefaults.foreground,
+        background: style?.['--background'] ?? tokenDefaults.background,
+        'muted-foreground': tokenDefaults['muted-foreground'],
+        card: style?.['--card'] ?? tokenDefaults.card,
+        'card-foreground': style?.['--card-foreground'] ?? tokenDefaults['card-foreground'],
+        accent: style?.['--accent'] ?? tokenDefaults.accent,
+        'accent-foreground': tokenDefaults['accent-foreground'],
+        'sidebar-foreground': tokenDefaults['sidebar-foreground'],
+        'sidebar-background': tokenDefaults['sidebar-background'],
+      };
+      for (const pair of pairs) {
+        const [fgKey, bgKey] = pairMap[pair];
+        const fgVal = tokens[fgKey];
+        const bgVal = tokens[bgKey];
+        const r = contrast(fgVal, bgVal);
+        const lf = (() => { const ph = parseHsl(fgVal); return ph ? luminance(hslToRgb(ph)).toFixed(4) : ''; })();
+        const lb = (() => { const ph = parseHsl(bgVal); return ph ? luminance(hslToRgb(ph)).toFixed(4) : ''; })();
+        for (const sz of sizes) {
+          const badge = classifyWithSize(r, sz).label;
+          rows.push([p.name, String(!!p.dark), p.start ?? '', p.end ?? '', String(p.angle ?? ''), pair, fgKey, fgVal ?? '', bgKey, bgVal ?? '', lf, lb, sz, r == null ? '' : `${r}`, badge].join(','));
+        }
+      }
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = exportCurrentOnly ? 'theme-contrast-selection.csv' : 'theme-contrast-audit.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const exportJson = () => {
+    const pairs = exportCurrentOnly ? (selectedPairs.length ? selectedPairs : ['fg-bg','muted-card','accent-accent','sidebar']) : ['fg-bg', 'muted-card', 'accent-accent', 'sidebar'];
+    const sizes = exportCurrentOnly ? [textSize] : ['normal', 'large'];
+    const pairMap = {
+      'fg-bg': ['foreground', 'background'],
+      'muted-card': ['muted-foreground', 'card'],
+      'accent-accent': ['accent-foreground', 'accent'],
+      'sidebar': ['sidebar-foreground', 'sidebar-background'],
+    };
+    const source = exportCurrentOnly ? filtered : THEME_PRESETS;
+    const data = [];
+    for (const p of source) {
+      const style = themeStyleFromPreset(p.name);
+      const tokenDefaults = {
+        foreground: p.dark ? '210 40% 98%' : '222 47% 11%',
+        background: p.dark ? '222 47% 11%' : '0 0% 100%',
+        'muted-foreground': '215 16% 47%',
+        card: p.dark ? '222 47% 11%' : '0 0% 100%',
+        'card-foreground': p.dark ? '210 40% 98%' : '222 47% 11%',
+        accent: style?.['--accent'] ?? '197 71% 52%',
+        'accent-foreground': '0 0% 100%',
+        'sidebar-foreground': '210 40% 98%',
+        'sidebar-background': style?.['--sidebar-background'] ?? (p.dark ? '222 47% 11%' : '0 0% 100%'),
+      };
+      const tokens = {
+        foreground: style?.['--foreground'] ?? tokenDefaults.foreground,
+        background: style?.['--background'] ?? tokenDefaults.background,
+        'muted-foreground': tokenDefaults['muted-foreground'],
+        card: style?.['--card'] ?? tokenDefaults.card,
+        'card-foreground': style?.['--card-foreground'] ?? tokenDefaults['card-foreground'],
+        accent: style?.['--accent'] ?? tokenDefaults.accent,
+        'accent-foreground': tokenDefaults['accent-foreground'],
+        'sidebar-foreground': tokenDefaults['sidebar-foreground'],
+        'sidebar-background': tokenDefaults['sidebar-background'],
+      };
+      for (const pair of pairs) {
+        const [fgKey, bgKey] = pairMap[pair];
+        const fgVal = tokens[fgKey];
+        const bgVal = tokens[bgKey];
+        const r = contrast(fgVal, bgVal);
+        const lf = (() => { const ph = parseHsl(fgVal); return ph ? luminance(hslToRgb(ph)) : null; })();
+        const lb = (() => { const ph = parseHsl(bgVal); return ph ? luminance(hslToRgb(ph)) : null; })();
+        for (const sz of sizes) {
+          const badge = classifyWithSize(r, sz).label;
+          data.push({
+            preset: p.name,
+            dark: !!p.dark,
+            gradient_start: p.start ?? null,
+            gradient_end: p.end ?? null,
+            gradient_angle: p.angle ?? null,
+            pair,
+            fg_token: fgKey,
+            fg_value: fgVal ?? null,
+            bg_token: bgKey,
+            bg_value: bgVal ?? null,
+            luminance_fg: lf,
+            luminance_bg: lb,
+            text_size: sz,
+            ratio: r,
+            badge,
+          });
+        }
+      }
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = exportCurrentOnly ? 'theme-contrast-selection.json' : 'theme-contrast-audit.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const gridCols = size === 'large' ? 'sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="inline-flex rounded-md border overflow-hidden">
+          <button onClick={() => setSize('compact')} className={`px-3 py-2 text-sm ${size === 'compact' ? 'bg-muted' : ''}`}>Compact</button>
+          <button onClick={() => setSize('large')} className={`px-3 py-2 text-sm border-l ${size === 'large' ? 'bg-muted' : ''}`}>Large</button>
+        </div>
+        <div className="inline-flex rounded-md border overflow-hidden ml-2">
+          <button onClick={() => setMode('all')} className={`px-3 py-2 text-sm ${mode === 'all' ? 'bg-muted' : ''}`}>All</button>
+          <button onClick={() => setMode('dark')} className={`px-3 py-2 text-sm border-l ${mode === 'dark' ? 'bg-muted' : ''}`}>Dark</button>
+          <button onClick={() => setMode('light')} className={`px-3 py-2 text-sm border-l ${mode === 'light' ? 'bg-muted' : ''}`}>Light</button>
+        </div>
+        <div className="inline-flex rounded-md border overflow-hidden ml-2">
+          <button onClick={() => setCategory('all')} className={`px-3 py-2 text-sm ${category === 'all' ? 'bg-muted' : ''}`}>All</button>
+          <button onClick={() => setCategory('accessibility')} className={`px-3 py-2 text-sm border-l ${category === 'accessibility' ? 'bg-muted' : ''}`}>Accessibility</button>
+          <button onClick={() => setCategory('brand')} className={`px-3 py-2 text-sm border-l ${category === 'brand' ? 'bg-muted' : ''}`}>Brand</button>
+          <button onClick={() => setCategory('curated')} className={`px-3 py-2 text-sm border-l ${category === 'curated' ? 'bg-muted' : ''}`}>Curated</button>
+        </div>
+        <div className="inline-flex rounded-md border overflow-hidden ml-2">
+          <button onClick={() => setSort('asc')} className={`px-3 py-2 text-sm ${sort === 'asc' ? 'bg-muted' : ''}`}>Name A–Z</button>
+          <button onClick={() => setSort('desc')} className={`px-3 py-2 text-sm border-l ${sort === 'desc' ? 'bg-muted' : ''}`}>Name Z–A</button>
+        </div>
+        {category === 'accessibility' && (
+          <>
+            <div className="inline-flex rounded-md border overflow-hidden ml-2">
+              <button onClick={() => setTextSize('normal')} className={`px-3 py-2 text-sm ${textSize === 'normal' ? 'bg-muted' : ''}`}>Normal Text</button>
+              <button onClick={() => setTextSize('large')} className={`px-3 py-2 text-sm border-l ${textSize === 'large' ? 'bg-muted' : ''}`}>Large Text</button>
+            </div>
+            <div className="inline-flex rounded-md border overflow-hidden ml-2">
+              <button onClick={() => setCustomPair('fg-bg')} className={`px-3 py-2 text-sm ${customPair === 'fg-bg' ? 'bg-muted' : ''}`}>Foreground vs Background</button>
+              <button onClick={() => setCustomPair('muted-card')} className={`px-3 py-2 text-sm border-l ${customPair === 'muted-card' ? 'bg-muted' : ''}`}>Muted vs Card</button>
+              <button onClick={() => setCustomPair('accent-accent')} className={`px-3 py-2 text-sm border-l ${customPair === 'accent-accent' ? 'bg-muted' : ''}`}>Accent vs Accent</button>
+              <button onClick={() => setCustomPair('sidebar')} className={`px-3 py-2 text-sm border-l ${customPair === 'sidebar' ? 'bg-muted' : ''}`}>Sidebar</button>
+            </div>
+            <button onClick={exportCsv} className="ml-2 px-3 py-2 text-sm rounded-md border">Export CSV</button>
+            <button onClick={exportJson} className="ml-2 px-3 py-2 text-sm rounded-md border">Export JSON</button>
+            <div className="inline-flex rounded-md border overflow-hidden ml-2">
+              <button onClick={() => setSelectedPairs((prev) => prev.includes('fg-bg') ? prev.filter(x => x !== 'fg-bg') : [...prev, 'fg-bg'])} className={`px-3 py-2 text-sm ${selectedPairs.includes('fg-bg') ? 'bg-muted' : ''}`}>Pair: Fg/Bg</button>
+              <button onClick={() => setSelectedPairs((prev) => prev.includes('muted-card') ? prev.filter(x => x !== 'muted-card') : [...prev, 'muted-card'])} className={`px-3 py-2 text-sm border-l ${selectedPairs.includes('muted-card') ? 'bg-muted' : ''}`}>Pair: Muted/Card</button>
+              <button onClick={() => setSelectedPairs((prev) => prev.includes('accent-accent') ? prev.filter(x => x !== 'accent-accent') : [...prev, 'accent-accent'])} className={`px-3 py-2 text-sm border-l ${selectedPairs.includes('accent-accent') ? 'bg-muted' : ''}`}>Pair: Accent</button>
+              <button onClick={() => setSelectedPairs((prev) => prev.includes('sidebar') ? prev.filter(x => x !== 'sidebar') : [...prev, 'sidebar'])} className={`px-3 py-2 text-sm border-l ${selectedPairs.includes('sidebar') ? 'bg-muted' : ''}`}>Pair: Sidebar</button>
+              <button onClick={() => setSelectedPairs(['fg-bg','muted-card','accent-accent','sidebar'])} className="px-3 py-2 text-sm border-l">All Pairs</button>
+              <button onClick={() => setSelectedPairs([])} className="px-3 py-2 text-sm border-l">Clear</button>
+            </div>
+          </>
+        )}
+      </div>
+      <div className={`grid gap-4 ${gridCols}`}>
+        {filtered.map((p) => (
+          <PreviewBox key={p.name} name={p.name} size={size} showContrast={category === 'accessibility'} textSize={textSize} customPair={customPair} />
+        ))}
+      </div>
+      {category === 'accessibility' && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm">Current selection only</label>
+          <input type="checkbox" checked={exportCurrentOnly} onChange={(e) => setExportCurrentOnly(e.target.checked)} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+<Canvas>
+  <ThemeGalleryInteractive />
+  <style>{`
+    .sbdocs-wrapper .grid > div {
+      contain: content;
+    }
+  `}</style>
+</Canvas>

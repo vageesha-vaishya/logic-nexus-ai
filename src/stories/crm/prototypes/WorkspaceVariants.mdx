@@ -1,0 +1,56 @@
+import { Meta, Canvas, Source } from '@storybook/blocks';
+import { PrototypeLayout, LeadsLayout } from './Layout';
+
+<Meta title="CRM/Prototypes/Workspace Variants" />
+
+# Workspace Variants
+
+The CRM prototype system supports multiple workspace layouts tailored to different user roles or focuses. 
+These layouts can be composed using the shared sections (`DashboardOverview`, `PipelineSection`, etc.) and support theme presets.
+
+## Available Variants
+
+### 1. Default CRM Workspace (`PrototypeLayout`)
+The default layout provides a comprehensive overview of all CRM activities, including pipeline, analytics, contacts, and tasks.
+
+**Best for:** Sales Managers, General CRM Users.
+
+<Canvas>
+  <PrototypeLayout themePreset="Azure Minimal" />
+</Canvas>
+
+### 2. Leads Workspace (`LeadsLayout`)
+A focused layout emphasizing the sales pipeline (Kanban) and active contacts. It removes the analytics deep dive to reduce distraction for sales representatives focused on moving leads through stages.
+
+**Best for:** Sales Representatives (SDRs/BDRs).
+
+<Canvas>
+  <LeadsLayout themePreset="Emerald Slate" />
+</Canvas>
+
+## Token Mapping Guide
+
+To create new variants, map your component tokens to the semantic variables exposed by `themeStyleFromPreset`.
+
+| Semantic Token | Tailwind Utility | CSS Variable |
+|:---|:---|:---|
+| Primary Action | `bg-primary` | `--primary` |
+| Secondary/Accent | `bg-accent` | `--accent` |
+| Card Background | `bg-card` | `--card` |
+| Border | `border-border` | `--border` |
+| Text Color | `text-foreground` | `--foreground` |
+
+### Example Composition
+
+```tsx
+import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
+import { PipelineSection } from './Layout';
+
+export function CustomLayout() {
+  return (
+    <FirstScreenTemplate title="My Custom Workspace">
+       <PipelineSection className="h-[500px]" />
+    </FirstScreenTemplate>
+  );
+}
+```

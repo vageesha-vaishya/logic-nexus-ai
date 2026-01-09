@@ -5,7 +5,7 @@
 ### 1. Environment Configuration
 - [ ] Verified `new-supabase-config.env` has correct values:
   - `NEW_DB_URL` - Database connection string
-  - `NEW_SUPABASE_URL` - https://pqulscbawoqzhqobwupu.supabase.co
+  - `NEW_SUPABASE_URL` - <https://pqulscbawoqzhqobwupu.supabase.co>
   - `NEW_SUPABASE_ANON_KEY` - Anon key
   - `NEW_SUPABASE_SERVICE_ROLE_KEY` - Service role key
   - `NEW_PROJECT_ID` - pqulscbawoqzhqobwupu

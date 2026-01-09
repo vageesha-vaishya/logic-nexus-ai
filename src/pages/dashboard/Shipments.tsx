@@ -47,10 +47,11 @@ export default function Shipments() {
 
   const fetchShipments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('*, accounts(name)')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('shipments').select('*, accounts(name)').order('created_at', { ascending: false });
+      if (!context.adminOverrideEnabled && context.franchiseId) {
+        query = query.eq('franchise_id', context.franchiseId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       setShipments(data as unknown as Shipment[]);

@@ -1404,11 +1404,11 @@ interface AssignLeadResponse {
 
 ### Appendix D: References
 
-1. Salesforce Documentation: https://help.salesforce.com/s/articleView?id=sf.leads_home.htm
-2. HubSpot Knowledge Base: https://knowledge.hubspot.com/scoring/build-lead-scores
-3. Zoho CRM Help: https://help.zoho.com/portal/en/kb/crm
-4. Microsoft Dynamics 365 Docs: https://learn.microsoft.com/en-us/dynamics365/sales/
-5. Pipedrive Resources: https://www.pipedrive.com/en/products/sales/lead-routing-software
+1. Salesforce Documentation: <https://help.salesforce.com/s/articleView?id=sf.leads_home.htm>
+2. HubSpot Knowledge Base: <https://knowledge.hubspot.com/scoring/build-lead-scores>
+3. Zoho CRM Help: <https://help.zoho.com/portal/en/kb/crm>
+4. Microsoft Dynamics 365 Docs: <https://learn.microsoft.com/en-us/dynamics365/sales/>
+5. Pipedrive Resources: <https://www.pipedrive.com/en/products/sales/lead-routing-software>
 6. Gartner CRM Magic Quadrant 2024
 7. Forrester Wave: CRM Suites 2024
 

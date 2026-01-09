@@ -83,7 +83,7 @@ export function AssignmentRules({ onUpdate }: Props) {
     if (!effectiveTenantId) return;
 
     try {
-      let query = supabase
+      const query = supabase
         .from('lead_assignment_rules')
         .select('*')
         .eq('tenant_id', effectiveTenantId)

@@ -1,0 +1,3 @@
+SELECT extname FROM pg_extension WHERE extname = 'pgcrypto';
+SELECT proname FROM pg_proc JOIN pg_namespace n ON n.oid = pg_proc.pronamespace WHERE n.nspname = 'public' AND proname IN ('require_encryption_key','encrypt_text','decrypt_text','audit_row_change') ORDER BY proname;
+SELECT tgname, c.relname AS table_name FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND tgname IN ('audit_accounts','audit_contacts','audit_leads','audit_opportunities','audit_activities','audit_campaigns','audit_quotes','audit_shipments','audit_emails') ORDER BY tgname;

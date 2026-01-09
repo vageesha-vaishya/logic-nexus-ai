@@ -2,7 +2,7 @@
 
 Use this when React warns about duplicate keys in list rendering.
 
-```
+```text
 Title: Fix duplicate key warnings in Select components
 
 Goal

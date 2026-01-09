@@ -8,6 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Building2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
+import { EmptyState } from '@/components/system/EmptyState';
+import { ViewMode } from '@/components/ui/view-toggle';
+import { EntityCard } from '@/components/system/EntityCard';
 
 export default function Tenants() {
   const navigate = useNavigate();
@@ -23,6 +27,7 @@ export default function Tenants() {
   }
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
     fetchTenants();
@@ -47,17 +52,15 @@ export default function Tenants() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Tenants</h1>
-            <p className="text-muted-foreground">Manage organization tenants</p>
-          </div>
-          <Button onClick={() => navigate('/dashboard/tenants/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Tenant
-          </Button>
-        </div>
+      <FirstScreenTemplate
+        title="Tenants"
+        description="Manage organization tenants"
+        breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Tenants' }]}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        availableModes={['card', 'grid', 'list']}
+        onCreate={() => navigate('/dashboard/tenants/new')}
+      >
 
         <Card>
           <CardHeader>
@@ -70,10 +73,13 @@ export default function Tenants() {
             {loading ? (
               <div className="text-center py-8">Loading...</div>
             ) : tenants.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No tenants found. Create your first tenant to get started.
-              </div>
-            ) : (
+              <EmptyState
+                title="No tenants found"
+                description="Create your first tenant to get started."
+                actionLabel="New Tenant"
+                onAction={() => navigate('/dashboard/tenants/new')}
+              />
+            ) : viewMode === 'list' ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -101,17 +107,41 @@ export default function Tenants() {
                           {tenant.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        {new Date(tenant.created_at).toLocaleDateString()}
-                      </TableCell>
+                      <TableCell>{new Date(tenant.created_at).toLocaleDateString()}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tenants.map((t) => (
+                  <EntityCard
+                    key={t.id}
+                    title={t.name}
+                    subtitle={`${t.slug} • ${t.subscription_tier || 'Free'}`}
+                    meta={`Created ${new Date(t.created_at).toLocaleDateString()}`}
+                    tags={[t.is_active ? 'Active' : 'Inactive']}
+                    onClick={() => navigate(`/dashboard/tenants/${t.id}`)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {tenants.map((t) => (
+                  <EntityCard
+                    key={t.id}
+                    title={t.name}
+                    subtitle={`${t.slug} • ${t.subscription_tier || 'Free'}`}
+                    meta={`Created ${new Date(t.created_at).toLocaleDateString()}`}
+                    tags={[t.is_active ? 'Active' : 'Inactive']}
+                    onClick={() => navigate(`/dashboard/tenants/${t.id}`)}
+                  />
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      </FirstScreenTemplate>
     </DashboardLayout>
   );
 }

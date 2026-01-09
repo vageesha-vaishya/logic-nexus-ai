@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ROLE_PERMISSIONS, unionPermissions, type Permission } from '@/config/permissions';
@@ -117,12 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dynamicMap = await RoleService.getRolePermissions();
       } catch (e) {
         dynamicMap = {};
+        void 0;
       }
       let hierarchyParents: Record<string, string[]> = {};
       try {
         const { childrenToParents } = await RoleService.getRoleHierarchy();
         hierarchyParents = childrenToParents;
-      } catch (e) {}
+      } catch (e) { void 0; }
       const standardPerms = unionPermissions(
         ...rolesData.map(r => {
           const base = (dynamicMap[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
@@ -154,6 +155,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      toast.error('Supabase is not configured');
+      setLoading(false);
+      return;
+    }
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
@@ -176,10 +183,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 // Resolve inheritance
                 let hierarchyParents: Record<string, string[]> = {};
-                try {
-                  const { childrenToParents } = await RoleService.getRoleHierarchy();
-                  hierarchyParents = childrenToParents;
-                } catch (e) {}
+              try {
+                const { childrenToParents } = await RoleService.getRoleHierarchy();
+                hierarchyParents = childrenToParents;
+              } catch (e) { void 0; }
                 const standardPerms = unionPermissions(
                   ...rolesData.map((r) => {
                     const base = (map[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];

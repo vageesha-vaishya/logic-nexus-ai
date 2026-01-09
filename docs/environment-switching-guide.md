@@ -13,7 +13,7 @@ This guide explains how to switch between Lovable Cloud (production) and your lo
 
 **IMPORTANT**: Add the following to your `.gitignore` file:
 
-```
+```gitignore
 .env.local
 .env.local.backup
 ```
@@ -43,7 +43,7 @@ npx supabase start
 
 This command will output your local credentials:
 
-```
+```text
 API URL: http://127.0.0.1:54321
 anon key: eyJhbGci...
 service_role key: eyJhbGci...

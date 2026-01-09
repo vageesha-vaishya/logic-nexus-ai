@@ -5,14 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import type { ChargeSide } from '@/domain/common/types';
 
 export default function ChargeSides() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ChargeSide[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('charge_sides').select('*').order('name');
-    setItems(data ?? []);
+    const { data } = await supabase
+      .from('charge_sides')
+      .select('id, name, code, is_active')
+      .order('name');
+    setItems((data ?? []) as ChargeSide[]);
   };
 
   useEffect(() => { load(); }, []);
@@ -24,7 +28,7 @@ export default function ChargeSides() {
     load();
   };
 
-  const update = async (id: string, patch: any) => {
+  const update = async (id: string, patch: Partial<ChargeSide>) => {
     await supabase.from('charge_sides').update(patch).eq('id', id);
     load();
   };

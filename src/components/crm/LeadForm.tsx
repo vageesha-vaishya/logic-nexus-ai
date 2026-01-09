@@ -82,27 +82,33 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
     },
   });
 
+  const watchedTenantId = form.watch('tenant_id');
+
   useEffect(() => {
     if (context.isPlatformAdmin) {
       fetchTenants();
+      if (watchedTenantId) {
+        fetchFranchises(watchedTenantId);
+      } else {
+        setFranchises([]);
+      }
     } else if (context.isTenantAdmin) {
-      fetchFranchises();
+      if (context.tenantId) fetchFranchises(context.tenantId);
     } else if (context.franchiseId) {
       fetchCurrentFranchise();
     }
-  }, [context.isPlatformAdmin, context.isTenantAdmin, context.franchiseId]);
+  }, [context.isPlatformAdmin, context.isTenantAdmin, context.franchiseId, watchedTenantId]);
 
   const fetchTenants = async () => {
     const { data } = await supabase.from('tenants').select('id, name').order('name');
     if (data) setTenants(data);
   };
 
-  const fetchFranchises = async () => {
-    if (!context.tenantId) return;
+  const fetchFranchises = async (tenantId: string) => {
     const { data } = await supabase
       .from('franchises')
       .select('id, name')
-      .eq('tenant_id', context.tenantId)
+      .eq('tenant_id', tenantId)
       .order('name');
     if (data) setFranchises(data);
   };
@@ -201,7 +207,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             />
           )}
 
-          {context.isTenantAdmin && franchises.length > 0 && (
+          {(context.isTenantAdmin || context.isPlatformAdmin) && franchises.length > 0 && (
             <FormField
               control={form.control}
               name="franchise_id"

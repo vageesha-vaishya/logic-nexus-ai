@@ -203,6 +203,7 @@ export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemCli
       animate={{ opacity: 1 }} 
       transition={{ duration: 0.5 }}
       className="h-full"
+      data-testid="kanban-board"
     >
       <DndContext
         sensors={sensors}
@@ -211,7 +212,7 @@ export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemCli
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex h-full gap-4 pb-4 overflow-x-auto snap-x snap-mandatory">
+        <div className="flex h-full gap-3 pb-4 overflow-x-auto snap-x snap-mandatory">
            {columns.map((col) => (
              <KanbanColumn
                key={col.id}
@@ -231,7 +232,7 @@ export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemCli
               <KanbanCard item={activeItem} isOverlay />
             )}
             {activeColumn && (
-               <div className="w-[300px] h-[500px] bg-muted/50 rounded-xl border-2 border-primary" />
+               <div className="w-[85vw] sm:w-[300px] h-[500px] bg-muted/50 rounded-xl border-2 border-primary" />
             )}
           </DragOverlay>,
           document.body

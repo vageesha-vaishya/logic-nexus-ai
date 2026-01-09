@@ -5,14 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import type { ContainerSize } from '@/domain/common/types';
 
 export default function ContainerSizes() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ContainerSize[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('container_sizes').select('*').order('name');
-    setItems(data ?? []);
+    const { data } = await supabase
+      .from('container_sizes')
+      .select('id, name, code, description, is_active, tenant_id')
+      .order('name');
+    setItems((data ?? []) as ContainerSize[]);
   };
 
   useEffect(() => { load(); }, []);
@@ -20,13 +24,18 @@ export default function ContainerSizes() {
   const add = async () => {
     if (!newItem.name) return;
     const { data: userData } = await supabase.auth.getUser();
-    const tenantId = (userData?.user as any)?.user_metadata?.tenant_id ?? null;
+    let tenantId: string | null = null;
+    const meta = userData?.user?.user_metadata;
+    if (meta && typeof meta === 'object' && 'tenant_id' in meta) {
+      const v = (meta as Record<string, unknown>)['tenant_id'];
+      tenantId = typeof v === 'string' ? v : null;
+    }
     await supabase.from('container_sizes').insert({ ...newItem, tenant_id: tenantId });
     setNewItem({ name: '', code: '', description: '' });
     load();
   };
 
-  const update = async (id: string, patch: any) => {
+  const update = async (id: string, patch: Partial<ContainerSize>) => {
     await supabase.from('container_sizes').update(patch).eq('id', id);
     load();
   };

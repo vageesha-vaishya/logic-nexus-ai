@@ -52,6 +52,8 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Files', path: '/dashboard/files', icon: FileText, description: 'Documents and attachments' },
       { name: 'Campaigns', path: '/dashboard/campaigns', icon: Megaphone, description: 'Marketing campaigns' },
       { name: 'Dashboards', path: '/dashboard/dashboards', icon: BarChart3, description: 'Visual dashboards' },
+      { name: 'CRM Workspace', path: '/dashboard/crm-workspace', icon: BarChart3, description: 'Integrated CRM prototype workspace' },
+      { name: 'Leads Workspace', path: '/dashboard/leads/pipeline', icon: Users, description: 'Leads-focused workspace variant' },
       { name: 'Reports', path: '/dashboard/reports', icon: PieChart, description: 'Analytics and reports' },
       { name: 'Chatter', path: '/dashboard/chatter', icon: MessageSquare, description: 'Collaboration feed' },
       { name: 'Groups', path: '/dashboard/groups', icon: UsersRound, description: 'Team groups' },

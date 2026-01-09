@@ -4,7 +4,7 @@ Complete automation scripts for migrating from Lovable Cloud to Supabase Cloud.
 
 ## 📦 Package Contents
 
-```
+```text
 migration-package/
 ├── 00-pre-migration-test.sh      # Pre-migration environment tests ⭐ NEW
 ├── 01-MIGRATION-GUIDE.md          # Complete step-by-step guide
@@ -62,7 +62,7 @@ chmod +x *.sh
 
 ## 📋 Prerequisites
 
-1. **New Supabase project created** at https://supabase.com
+1. **New Supabase project created** at <https://supabase.com>
 2. **PostgreSQL client** (`psql`) installed
 3. **Node.js** installed
 4. **Data exported** from Lovable Cloud to `migration-data/` folder
@@ -229,7 +229,7 @@ This restores your Lovable Cloud connection immediately.
 ## 📝 Logs & Reports
 
 All operations logged to:
-```
+```text
 migration-logs/
 ├── migration-YYYYMMDD_HHMMSS.log      # Full migration log
 ├── verification-report.txt            # Basic verification
@@ -319,7 +319,7 @@ The scripts now support clean re-runs:
 ## 📞 Support Resources
 
 - Migration guide: `01-MIGRATION-GUIDE.md`
-- Supabase docs: https://supabase.com/docs
+ - Supabase docs: <https://supabase.com/docs>
 - Export scripts: `../export-scripts/README.md`
 
 ## ✅ Success Checklist

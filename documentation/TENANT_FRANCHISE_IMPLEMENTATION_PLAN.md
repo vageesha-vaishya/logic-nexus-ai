@@ -113,9 +113,28 @@ graph LR
     -   `user_preferences` table and API.
     -   `admin_override_audit` table.
     -   Global "Franchise Selector" UI Component.
-    -   "Admin Mode" Toggle Component.
+    -   Verification scripts.
 
-#### Phase 3: "Franchise-First" UI Refactor
+#### Phase 2: Foundation & Security (Completed)
+-   **Goal**: Establish core security controls and operational readiness.
+-   **Deliverables**:
+    -   Authentication and Authorization: Supabase Auth configured; RLS policies active across core tables.
+    -   Data Encryption: pgcrypto-enabled with session-based key usage via functions encrypt_text/decrypt_text.
+    -   Secure Channels: HTTPS/TLS enforced by platform; application uses secure endpoints.
+    -   Monitoring & Logging: Audit triggers on core tables (accounts, contacts, leads, opportunities, activities, campaigns, quotes, shipments, emails).
+    -   Backup & DR: Export and import scripts validated for schema/data recovery.
+-   **Verification**:
+    -   Run [11-verify-phase-1.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migration-package/sql-migration/11-verify-phase-1.sql) for RLS/index coverage.
+    -   Run [12-verify-security.sql](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/supabase/migration-package/sql-migration/12-verify-security.sql) to confirm pgcrypto, functions, and audit triggers.
+-   **Status**: Completed ✓
+-   **Notes**: Encryption functions use a session key (app.encryption_key) and do not store secrets in the database.
+-   **Verification Results Summary**:
+    -   pgcrypto extension: Present ✓
+    -   Encryption functions: Present and compiled ✓
+    -   Audit triggers: Installed on core tables ✓
+    -   RLS enabled on core tables: Verified via script ✓
+
+#### Phase 3: UI Controls & Persistence (Current)
 -   **Goal**: Update all application views to respect the selected context.
 -   **Deliverables**:
     -   Update `useCRM` hook to consume `user_preferences`.
@@ -199,4 +218,3 @@ We adhere to a strict branching policy to manage the migration:
     -   **On PR**: Run `npm run typecheck`, `npm run lint`.
     -   **On Merge to Main**: Auto-tag version, trigger deployment pipeline.
     -   **Audit Trail**: Git history + PR comments serve as the audit trail for architectural decisions.
-

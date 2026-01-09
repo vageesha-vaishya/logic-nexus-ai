@@ -283,3 +283,145 @@ CREATE TRIGGER auto_generate_quote_number_trigger
   BEFORE INSERT ON quotes
   FOR EACH ROW
   EXECUTE FUNCTION auto_generate_quote_number();
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION require_encryption_key()
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  k TEXT;
+BEGIN
+  k := current_setting('app.encryption_key', true);
+  IF k IS NULL OR k = '' THEN
+    RAISE EXCEPTION 'encryption key not set';
+  END IF;
+  RETURN k;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION encrypt_text(plaintext TEXT)
+RETURNS BYTEA
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  k TEXT;
+BEGIN
+  IF plaintext IS NULL THEN
+    RETURN NULL;
+  END IF;
+  k := require_encryption_key();
+  RETURN pgp_sym_encrypt(plaintext, k, 'cipher-algo=aes256, compress-algo=1');
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION decrypt_text(cipher BYTEA)
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  k TEXT;
+BEGIN
+  IF cipher IS NULL THEN
+    RETURN NULL;
+  END IF;
+  k := require_encryption_key();
+  RETURN pgp_sym_decrypt(cipher, k);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION audit_row_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_action TEXT;
+  v_resource_type TEXT;
+  v_resource_id UUID;
+  v_ip TEXT;
+  v_tenant UUID;
+  v_franchise UUID;
+BEGIN
+  v_action := TG_OP;
+  v_resource_type := TG_TABLE_NAME;
+  v_resource_id := COALESCE(NEW.id, OLD.id);
+  v_ip := COALESCE(inet_client_addr()::TEXT, 'unknown');
+  v_tenant := public.get_user_tenant_id(auth.uid());
+  v_franchise := public.get_user_franchise_id(auth.uid());
+  INSERT INTO audit_logs(user_id, action, resource_type, resource_id, ip_address, details, created_at)
+  VALUES (
+    auth.uid(),
+    v_action,
+    v_resource_type,
+    v_resource_id,
+    v_ip,
+    jsonb_build_object(
+      'tenant_id', v_tenant,
+      'franchise_id', v_franchise
+    ),
+    NOW()
+  );
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS audit_accounts ON accounts;
+CREATE TRIGGER audit_accounts
+AFTER INSERT OR UPDATE OR DELETE ON accounts
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_contacts ON contacts;
+CREATE TRIGGER audit_contacts
+AFTER INSERT OR UPDATE OR DELETE ON contacts
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_leads ON leads;
+CREATE TRIGGER audit_leads
+AFTER INSERT OR UPDATE OR DELETE ON leads
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_opportunities ON opportunities;
+CREATE TRIGGER audit_opportunities
+AFTER INSERT OR UPDATE OR DELETE ON opportunities
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_activities ON activities;
+CREATE TRIGGER audit_activities
+AFTER INSERT OR UPDATE OR DELETE ON activities
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_campaigns ON campaigns;
+CREATE TRIGGER audit_campaigns
+AFTER INSERT OR UPDATE OR DELETE ON campaigns
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_quotes ON quotes;
+CREATE TRIGGER audit_quotes
+AFTER INSERT OR UPDATE OR DELETE ON quotes
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_shipments ON shipments;
+CREATE TRIGGER audit_shipments
+AFTER INSERT OR UPDATE OR DELETE ON shipments
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();
+
+DROP TRIGGER IF EXISTS audit_emails ON emails;
+CREATE TRIGGER audit_emails
+AFTER INSERT OR UPDATE OR DELETE ON emails
+FOR EACH ROW EXECUTE FUNCTION audit_row_change();

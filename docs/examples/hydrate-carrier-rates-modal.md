@@ -2,7 +2,7 @@
 
 Use this when adding a modal that loads carrier rates on demand.
 
-```
+```text
 Title: Hydrate carrier rates in modal on demand
 
 Goal

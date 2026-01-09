@@ -5,14 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import type { ChargeCategory } from '@/domain/common/types';
 
 export default function ChargeCategories() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ChargeCategory[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('charge_categories').select('*').order('name');
-    setItems(data ?? []);
+    const { data } = await supabase
+      .from('charge_categories')
+      .select('id, name, code, description, is_active')
+      .order('name');
+    setItems((data ?? []) as ChargeCategory[]);
   };
 
   useEffect(() => { load(); }, []);
@@ -24,7 +28,7 @@ export default function ChargeCategories() {
     load();
   };
 
-  const update = async (id: string, patch: any) => {
+  const update = async (id: string, patch: Partial<ChargeCategory>) => {
     await supabase.from('charge_categories').update(patch).eq('id', id);
     load();
   };

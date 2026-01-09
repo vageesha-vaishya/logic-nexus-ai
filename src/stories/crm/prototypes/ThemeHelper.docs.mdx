@@ -1,0 +1,39 @@
+import { Meta, Canvas, ArgsTable } from '@storybook/blocks';
+import { PrototypeLayout } from './Layout';
+
+<Meta of={PrototypeLayout} title="CRM/Prototypes/Theme Helper" />
+
+# Theme Helper Overview
+
+This page explains how the CRM prototypes apply scoped theme tokens via the helper and layout. Use the PrototypeLayout with a themePreset to preview any preset defined in the theme system.
+
+## Usage
+
+```tsx
+import { PrototypeLayout } from './Layout';
+
+export function Example() {
+  return <PrototypeLayout themePreset="Azure Minimal" />;
+}
+```
+
+<Canvas>
+  <PrototypeLayout themePreset="Azure Minimal" />
+</Canvas>
+
+## Tokens Applied
+
+- Core: --primary, --accent, --radius, --gradient-primary, --foreground
+- Sidebar: --sidebar-background, --sidebar-accent
+- Table: --table-header-text, --table-header-separator, --table-header-background, --table-background, --table-foreground
+- Card: --card, --card-foreground
+- Popover: --popover, --popover-foreground
+- Form: --border, --input
+- Effects: --ring
+
+These names align with the design system variables in index.css and are applied to the wrapper to avoid global style leaks.
+
+## Props
+
+<ArgsTable of={PrototypeLayout} />
+

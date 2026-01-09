@@ -145,7 +145,7 @@ export function useQuoteData() {
         }
       }
       
-      let servicesForDropdown = mappingRows
+      const servicesForDropdown = mappingRows
         .map((m: any) => {
           const svc = servicesById[String(m.service_id)];
           if (!svc) return null;

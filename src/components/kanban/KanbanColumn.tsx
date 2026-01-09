@@ -50,7 +50,7 @@ export function KanbanColumn({ column, onItemUpdate, onItemView }: KanbanColumnP
       <div
         ref={setNodeRef}
         style={style}
-        className="w-[300px] h-[500px] max-h-[calc(100vh-200px)] rounded-xl bg-muted/50 border-2 border-dashed border-primary/20 opacity-50"
+        className="w-[85vw] sm:w-[300px] md:min-w-[300px] md:flex-1 md:max-w-[400px] h-[500px] max-h-[calc(100vh-200px)] rounded-xl bg-muted/50 border-2 border-dashed border-primary/20 opacity-50 flex-shrink-0 snap-center"
       />
     );
   }
@@ -59,20 +59,20 @@ export function KanbanColumn({ column, onItemUpdate, onItemView }: KanbanColumnP
     <div
       ref={setNodeRef}
       style={style}
-      className="w-[300px] flex flex-col gap-2 h-full max-h-[calc(100vh-180px)]"
+      className="w-[85vw] sm:w-[300px] md:min-w-[300px] md:flex-1 md:max-w-[400px] flex flex-col gap-2 h-full max-h-[calc(100vh-180px)] flex-shrink-0 snap-center"
     >
       {/* Column Header */}
       <div 
         {...attributes} 
         {...listeners}
         className={cn(
-          "flex items-center justify-between p-3 rounded-lg bg-card border shadow-sm cursor-grab active:cursor-grabbing relative group",
+          "flex items-center justify-between p-2 rounded-lg bg-card border shadow-sm cursor-grab active:cursor-grabbing relative group",
           column.color ? `border-l-4 ${column.color.replace('bg-', 'border-l-')}` : "border-l-4 border-l-transparent"
         )}
       >
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-sm">{column.title}</h3>
-          <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">
+          <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
             {column.items.length}
           </Badge>
         </div>
@@ -95,10 +95,10 @@ export function KanbanColumn({ column, onItemUpdate, onItemView }: KanbanColumnP
       )}
 
       {/* Sortable Area */}
-      <div className="flex-1 bg-muted/30 rounded-xl p-2 border border-transparent hover:border-muted-foreground/10 transition-colors overflow-hidden">
-        <ScrollArea className="h-full pr-3 -mr-3">
+      <div className="flex-1 bg-muted/30 rounded-xl p-1.5 border border-transparent hover:border-muted-foreground/10 transition-colors overflow-hidden">
+        <ScrollArea className="h-full pr-2 -mr-2">
           <SortableContext items={itemsIds}>
-            <div className="flex flex-col gap-3 min-h-[100px] pb-4 pr-3">
+            <div className="flex flex-col gap-2 min-h-[100px] pb-4 pr-2">
               <AnimatePresence mode="popLayout" initial={false}>
                 {column.items.map((item) => (
                   <KanbanCard 

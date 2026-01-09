@@ -1,0 +1,59 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="CRM/Introduction" />
+
+# CRM Component Library
+
+This module contains a comprehensive suite of enterprise-grade React components designed for Customer Relationship Management (CRM) applications. These components are built with **Shadcn UI**, **Tailwind CSS**, and **TypeScript**, ensuring accessibility, responsiveness, and type safety.
+
+## Core Components
+
+The library is organized into functional groups covering the entire CRM lifecycle:
+
+### 1. Lead & Pipeline Management
+- **[ProfileHeader](?path=/docs/crm-profileheader--docs)**: Rich header for Lead/Contact profiles with quick actions and stats.
+- **[PipelineBoard](?path=/docs/crm-pipelineboard--docs)**: Kanban-style board for managing deal stages with drag-and-drop support.
+- **[DealWizard](?path=/docs/crm-dealwizard--docs)**: Multi-step wizard for creating complex opportunities.
+
+### 2. Data & Analytics
+- **[DataTable](?path=/docs/crm-datatable--docs)**: High-density data grid with sorting, filtering, and view modes (List/Board).
+- **[AnalyticsDashboard](?path=/docs/crm-analyticsdashboard--docs)**: Visual dashboard for pipeline health, conversion rates, and revenue forecasting.
+- **[AdvancedFilter](?path=/docs/crm-advancedfilter--docs)**: Complex filtering engine with support for multiple conditions and saved presets.
+
+### 3. Activity & Collaboration
+- **[InteractionTimeline](?path=/docs/crm-interactiontimeline--docs)**: Chronological view of all customer interactions (calls, emails, meetings).
+- **[TaskScheduler](?path=/docs/crm-taskscheduler--docs)**: Task management system with "Upcoming", "Overdue", and "Completed" views.
+- **[TeamAssignment](?path=/docs/crm-teamassignment--docs)**: Role-based access control and team member management for deals.
+- **[DocumentRepository](?path=/docs/crm-documentrepository--docs)**: File management system with preview, search, and categorization.
+
+## Design Principles
+
+- **Accessibility**: All components follow WAI-ARIA patterns and are keyboard navigable.
+- **Responsiveness**: Mobile-first design ensures usability on tablets and phones.
+- **Consistency**: Unified design tokens for colors, spacing, and typography.
+- **Performance**: Optimized for large datasets using virtualization and efficient rendering.
+
+## Usage
+
+Components are designed to be composed together. For example, a Lead Detail page might combine `ProfileHeader`, `InteractionTimeline`, and `DocumentRepository`.
+
+```tsx
+import { ProfileHeader } from '@/components/crm/ProfileHeader';
+import { InteractionTimeline } from '@/components/crm/InteractionTimeline';
+
+function LeadPage({ lead, activities }) {
+  return (
+    <div className="space-y-6">
+      <ProfileHeader lead={lead} />
+      <div className="grid grid-cols-3 gap-6">
+        <div className="col-span-2">
+          {/* Main content */}
+        </div>
+        <div className="col-span-1">
+          <InteractionTimeline activities={activities} />
+        </div>
+      </div>
+    </div>
+  );
+}
+```

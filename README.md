@@ -36,13 +36,7 @@ npm run dev
 
 ### Testing
 
-**Unit Tests:**
-```bash
-npm test
-```
-
-**Performance Tests:**
-See [tests/performance/README.md](tests/performance/README.md) for details on running k6 load tests.
+Automated testing is currently not configured in this repository. See [TESTING.md](TESTING.md) for what was removed and how to restore Vitest/Playwright/Lighthouse/k6.
 
 ### Build
 
@@ -63,6 +57,19 @@ This project uses:
 *   **Sentry** for error tracking.
 *   **PostHog** for product analytics.
 *   **Lighthouse CI** for performance regression testing.
+
+## CRM: Leads Module Notes
+
+### View State Persistence
+
+The Leads module uses a single persisted state for view mode + theme + filters via [useLeadsViewState.tsx](src/hooks/useLeadsViewState.tsx).
+
+If view toggles appear “non-functional”, check for conflicting sources of truth:
+*   `leads.viewState.v1` (current persisted state)
+*   legacy keys: `leadsViewMode`, `leadsTheme`
+*   backend defaults: `user:{userId}:leads.default_view` / `user:{userId}:leads.default_theme`
+
+Backend defaults should only apply on a “fresh” session (no local overrides).
 
 ## 📝 License
 

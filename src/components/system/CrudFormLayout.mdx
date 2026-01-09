@@ -1,0 +1,45 @@
+import { Canvas, Meta, Story, Controls } from '@storybook/blocks';
+import * as CrudFormLayoutStories from './CrudFormLayout.stories';
+import { CrudFormLayout } from './CrudFormLayout';
+
+<Meta of={CrudFormLayoutStories} />
+
+# CrudFormLayout
+
+A standardized layout for Create/Update forms. It wraps the form content in a Card and provides a consistent header and footer with Save/Cancel buttons.
+
+## Usage
+
+Use this component to wrap your form fields.
+
+```tsx
+<CrudFormLayout
+  title="Create Franchise"
+  onSave={handleSave}
+  onCancel={handleCancel}
+>
+  <FormFields />
+</CrudFormLayout>
+```
+
+## Props
+
+<Controls />
+
+## Stories
+
+### Default
+
+<Canvas of={CrudFormLayoutStories.Default} />
+
+### With Description
+
+<Canvas of={CrudFormLayoutStories.WithDescription} />
+
+### Saving State
+
+<Canvas of={CrudFormLayoutStories.Saving} />
+
+### With Footer Extra
+
+<Canvas of={CrudFormLayoutStories.WithFooterExtra} />

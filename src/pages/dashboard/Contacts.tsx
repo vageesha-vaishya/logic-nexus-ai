@@ -30,7 +30,7 @@ export default function Contacts() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
 
   useEffect(() => {
     fetchContacts();
@@ -38,10 +38,11 @@ export default function Contacts() {
 
   const fetchContacts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*, accounts(name)')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('contacts').select('*, accounts(name)').order('created_at', { ascending: false });
+      if (!context.adminOverrideEnabled && context.franchiseId) {
+        query = query.eq('franchise_id', context.franchiseId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       setContacts(data || []);

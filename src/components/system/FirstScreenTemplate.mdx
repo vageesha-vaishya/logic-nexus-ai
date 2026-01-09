@@ -1,0 +1,47 @@
+import { Canvas, Meta, Story, Controls } from '@storybook/blocks';
+import * as FirstScreenTemplateStories from './FirstScreenTemplate.stories';
+import { FirstScreenTemplate } from './FirstScreenTemplate';
+
+<Meta of={FirstScreenTemplateStories} />
+
+# FirstScreenTemplate
+
+Standardized template for the first screen (index/list view) of any module. It includes a title, description, breadcrumbs, view toggle, and standard action buttons (Import, Export, New).
+
+## Usage
+
+Use this component as the top-level wrapper for your list pages.
+
+```tsx
+<FirstScreenTemplate
+  title="Franchises"
+  description="Manage franchise locations"
+  onCreate={() => handleCreate()}
+  viewMode="list"
+  onViewModeChange={setViewMode}
+>
+  <YourListContent />
+</FirstScreenTemplate>
+```
+
+## Props
+
+<Controls />
+
+## Stories
+
+### Default (List View)
+
+<Canvas of={FirstScreenTemplateStories.Default} />
+
+### With All Actions
+
+<Canvas of={FirstScreenTemplateStories.WithAllActions} />
+
+### Card View
+
+<Canvas of={FirstScreenTemplateStories.CardView} />
+
+### Pipeline View
+
+<Canvas of={FirstScreenTemplateStories.PipelineView} />

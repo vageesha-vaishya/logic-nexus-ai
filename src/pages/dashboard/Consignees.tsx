@@ -21,11 +21,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import type { Consignee } from '@/domain/common/types';
+
 export default function Consignees() {
   const navigate = useNavigate();
   const { supabase, context } = useCRM();
   const { roles } = useAuth();
-  const [consignees, setConsignees] = useState<any[]>([]);
+  const [consignees, setConsignees] = useState<Consignee[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -55,14 +57,14 @@ export default function Consignees() {
     try {
       let query = supabase
         .from('consignees')
-        .select('*');
+        .select('id, tenant_id, company_name, contact_person, contact_email, tax_id, customs_id, is_active');
       if (!isPlatform) {
         query = query.eq('tenant_id', tenantId as string);
       }
       const { data, error } = await query.order('company_name');
 
       if (error) throw error;
-      const rows = data || [];
+      const rows = (data || []) as Consignee[];
       // Dev-only: auto-seed demo consignees if none exist (only when tenant scoped)
       if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
         try {
@@ -102,16 +104,18 @@ export default function Consignees() {
             .eq('tenant_id', tenantId as string)
             .order('company_name');
           setConsignees(seeded || []);
-        } catch (seedErr: any) {
-          console.warn('Consignee seed failed:', seedErr?.message || seedErr);
+        } catch (seedErr: unknown) {
+          const msg = seedErr instanceof Error ? seedErr.message : String(seedErr);
+          console.warn('Consignee seed failed:', msg);
           setConsignees([]);
         }
       } else {
         setConsignees(rows);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       toast.error('Failed to load consignees', {
-        description: error.message,
+        description: msg,
       });
     } finally {
       setLoading(false);
@@ -140,8 +144,9 @@ export default function Consignees() {
       if (error) throw error;
       toast.success('Consignee deleted');
       fetchConsignees();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete consignee');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg || 'Failed to delete consignee');
     }
   };
 
@@ -202,7 +207,7 @@ export default function Consignees() {
               </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Status</label>
-                <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+                <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | 'active' | 'inactive')}>
                   <SelectTrigger>
                     <SelectValue placeholder="All" />
                   </SelectTrigger>

@@ -5,14 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import type { Currency } from '@/domain/common/types';
 
 export default function Currencies() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<Currency[]>([]);
   const [newItem, setNewItem] = useState({ code: '', name: '', symbol: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('currencies').select('*').order('code');
-    setItems(data ?? []);
+    const { data } = await supabase
+      .from('currencies')
+      .select('id, code, name, symbol, is_active')
+      .order('code');
+    setItems((data ?? []) as Currency[]);
   };
 
   useEffect(() => { load(); }, []);
@@ -24,7 +28,7 @@ export default function Currencies() {
     load();
   };
 
-  const update = async (id: string, patch: any) => {
+  const update = async (id: string, patch: Partial<Currency>) => {
     await supabase.from('currencies').update(patch).eq('id', id);
     load();
   };

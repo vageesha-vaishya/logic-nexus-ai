@@ -16,6 +16,7 @@ import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
+import ActivityBoard from '@/components/crm/ActivityBoard';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
@@ -35,6 +36,23 @@ interface Activity {
   contact_id: string | null;
   lead_id: string | null;
   assigned_to: string | null;
+  leads?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    company: string | null;
+    status: string;
+  } | null;
+  accounts?: {
+    id: string;
+    name: string;
+    account_type: string;
+  } | null;
+  contacts?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
 export default function Activities() {
@@ -58,6 +76,7 @@ export default function Activities() {
   const [descriptionQuery, setDescriptionQuery] = useState('');
   const [descriptionOp, setDescriptionOp] = useState<TextOp>('contains');
   const [statusAdv, setStatusAdv] = useState<'any' | 'planned' | 'in_progress' | 'completed' | 'cancelled'>('any');
+  const [leadStatusFilter, setLeadStatusFilter] = useState<string>('any');
   const [priorityAdv, setPriorityAdv] = useState<'any' | 'low' | 'medium' | 'high' | 'urgent'>('any');
   const [dueStart, setDueStart] = useState<string>('');
   const [dueEnd, setDueEnd] = useState<string>('');
@@ -86,10 +105,34 @@ export default function Activities() {
 
   const fetchActivities = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('activities')
-        .select('*')
+        .select(`
+          *,
+          leads (
+            id,
+            first_name,
+            last_name,
+            company,
+            status
+          ),
+          accounts (
+            id,
+            name,
+            account_type
+          ),
+          contacts (
+            id,
+            first_name,
+            last_name
+          )
+        `)
         .order('due_date', { ascending: true, nullsFirst: false });
+
+      if (!context.adminOverrideEnabled && context.franchiseId) {
+        query = query.eq('franchise_id', context.franchiseId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       setActivities(data || []);
@@ -169,6 +212,26 @@ export default function Activities() {
     }
   };
 
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    // Optimistic update
+    const oldActivities = [...activities];
+    setActivities(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
+
+    try {
+      const { error } = await supabase
+        .from('activities')
+        .update({ status: newStatus })
+        .eq('id', id);
+      
+      if (error) throw error;
+      toast.success('Activity status updated');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
+      setActivities(oldActivities); // Revert on error
+    }
+  };
+
   const filterActivitiesByTab = (activities: Activity[]) => {
     const now = startOfDay(new Date());
     
@@ -209,6 +272,7 @@ export default function Activities() {
     .filter((activity) => matchText(activity.subject ?? '', subjectQuery, subjectOp))
     .filter((activity) => matchText(activity.description ?? '', descriptionQuery, descriptionOp))
     .filter((activity) => (statusAdv === 'any' ? true : activity.status === statusAdv))
+    .filter((activity) => (leadStatusFilter === 'any' ? true : activity.leads?.status === leadStatusFilter))
     .filter((activity) => (priorityAdv === 'any' ? true : activity.priority === priorityAdv))
     .filter((activity) => {
       if (!dueStart && !dueEnd) return true;
@@ -352,7 +416,7 @@ export default function Activities() {
           <p className="text-muted-foreground">Manage your tasks and activities</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          <ViewToggle value={viewMode} onChange={setViewMode} />
+          <ViewToggle value={viewMode} onChange={setViewMode} modes={['list', 'card', 'grid', 'board']} />
           <Button asChild variant="outline" size="sm">
             <Link to="/dashboard/activities/new?type=email">
               <Mail className="mr-2 h-4 w-4" />
@@ -566,6 +630,24 @@ export default function Activities() {
           </Select>
         </div>
 
+        <div className="w-[180px]">
+          <div className="text-xs text-muted-foreground mb-1">Lead Status</div>
+          <Select value={leadStatusFilter} onValueChange={setLeadStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Lead Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              <SelectItem value="new">New</SelectItem>
+              <SelectItem value="contacted">Contacted</SelectItem>
+              <SelectItem value="qualified">Qualified</SelectItem>
+              <SelectItem value="proposal">Proposal</SelectItem>
+              <SelectItem value="negotiation">Negotiation</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex items-center gap-2">
           <Input
             type="date"
@@ -665,6 +747,7 @@ export default function Activities() {
                 <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
                   <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
                     <SortableHead label="Subject" field="subject" activeField={sortField} direction={sortDirection} onSort={onSort} />
+                    <SortableHead label="Related To" field="lead_id" activeField={sortField} direction={sortDirection} onSort={onSort} />
                     <SortableHead label="Type" field="activity_type" activeField={sortField} direction={sortDirection} onSort={onSort} />
                     <SortableHead label="Status" field="status" activeField={sortField} direction={sortDirection} onSort={onSort} />
                     <SortableHead label="Priority" field="priority" activeField={sortField} direction={sortDirection} onSort={onSort} />
@@ -679,6 +762,20 @@ export default function Activities() {
                     onClick={() => navigate(`/dashboard/activities/${activity.id}`)}
                   >
                     <TableCell className="font-medium">{activity.subject}</TableCell>
+                    <TableCell>
+                      {activity.leads ? (
+                        <div className="flex flex-col">
+                          <span className="font-medium">{activity.leads.first_name} {activity.leads.last_name}</span>
+                          {activity.leads.company && <span className="text-xs text-muted-foreground">{activity.leads.company}</span>}
+                        </div>
+                      ) : activity.accounts ? (
+                        <span className="font-medium">{activity.accounts.name}</span>
+                      ) : activity.contacts ? (
+                        <span className="font-medium">{activity.contacts.first_name} {activity.contacts.last_name}</span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
                     <TableCell className="capitalize">{activity.activity_type}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(activity.status)}>
@@ -737,6 +834,8 @@ export default function Activities() {
             </div>
           </CardContent>
         </Card>
+      ) : viewMode === 'board' ? (
+        <ActivityBoard activities={filteredActivitiesAdvanced} onStatusChange={handleStatusChange} />
       ) : viewMode === 'grid' ? (
         <div className="space-y-2">
           <TitleStrip label="All Activities" />

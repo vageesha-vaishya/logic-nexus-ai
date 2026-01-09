@@ -6,6 +6,8 @@ import { LeadForm } from '@/components/crm/LeadForm';
 import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/react';
 
 export default function LeadNew() {
   const navigate = useNavigate();
@@ -52,7 +54,10 @@ export default function LeadNew() {
       navigate(`/dashboard/leads/${data.id}`);
     } catch (error: any) {
       toast.error('Failed to create lead');
-      console.error('Error:', error);
+      logger.error('Failed to create lead', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      Sentry.captureException(error);
     }
   };
 

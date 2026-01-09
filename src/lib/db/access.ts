@@ -114,4 +114,41 @@ export class ScopedDataAccess {
     }
     return newValue;
   }
+
+  /**
+   * Public method to log view preference changes.
+   * This allows UI components to log user preferences without exposing the generic logAudit.
+   */
+  public logViewPreference(resourceType: string, viewMode: string) {
+    this.logAudit('VIEW_CHANGE', resourceType, { viewMode });
+  }
+
+  /**
+   * Retrieves a system setting by key.
+   */
+  public async getSystemSetting(key: string) {
+    return this.from('system_settings' as any)
+      .select('setting_value')
+      .eq('setting_key', key)
+      .maybeSingle() as Promise<{ data: { setting_value: any } | null, error: any }>;
+  }
+
+  /**
+   * Sets or updates a system setting.
+   */
+  public async setSystemSetting(key: string, value: any) {
+    const payload = {
+      setting_key: key,
+      setting_value: value,
+    };
+    
+    const injectedPayload = this.injectScope(payload);
+    
+    const result = await this.supabase.from('system_settings' as any).upsert(injectedPayload, {
+      onConflict: 'tenant_id, setting_key'
+    });
+    
+    this.logAudit('UPSERT', 'system_settings', { key, value });
+    return result;
+  }
 }

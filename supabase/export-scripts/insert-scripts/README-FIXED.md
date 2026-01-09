@@ -3,7 +3,7 @@
 ## Problem Solved
 
 The previous insert scripts had **hardcoded column names** that didn't match the actual database schema, causing errors like:
-```
+```text
 ERROR: 42703: column "tenant_id" does not exist
 ```
 
@@ -31,7 +31,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 #### Recommended Execution Order
 
 **Phase 1: Core Configuration (No Dependencies)**
-```
+```text
 - tenants
 - profiles  
 - subscription_plans
@@ -40,7 +40,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 ```
 
 **Phase 2: User & Geography (Depends on Phase 1)**
-```
+```text
 - user_roles
 - franchises
 - countries
@@ -49,7 +49,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 ```
 
 **Phase 3: Master Data (Depends on Phase 1-2)**
-```
+```text
 - currencies
 - service_types
 - cargo_types
@@ -69,7 +69,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 ```
 
 **Phase 4: Configuration (Depends on Phase 1-3)**
-```
+```text
 - tenant_subscriptions
 - usage_records
 - subscription_invoices
@@ -91,7 +91,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 ```
 
 **Phase 5: CRM Data (Depends on Phase 1-4)**
-```
+```text
 - accounts
 - contacts
 - leads
@@ -106,7 +106,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 ```
 
 **Phase 6: Quotes & Shipments (Depends on Phase 1-5)**
-```
+```text
 - carrier_rates
 - carrier_rate_charges
 - shipping_rates
@@ -124,7 +124,7 @@ The output will be organized by table. Copy the INSERT statements you need based
 ```
 
 **Phase 7: Audit & System (Execute Last)**
-```
+```text
 - audit_logs
 - notifications
 - system_settings
@@ -171,14 +171,14 @@ CROSS JOIN tenants;
 
 ## Troubleshooting
 
-### If no output appears:
+### If no output appears
 - Check that tables exist: `SELECT * FROM pg_tables WHERE schemaname = 'public';`
 - Check that tables have data: `SELECT count(*) FROM your_table;`
 
-### If you get permission errors:
+### If you get permission errors
 - Ensure you're running as a user with SELECT permissions on all tables
 
-### For large datasets:
+### For large datasets
 - Add `LIMIT` to queries: `WHERE EXISTS (SELECT 1 FROM table LIMIT 1000)`
 - Split into batches by date or ID ranges
 

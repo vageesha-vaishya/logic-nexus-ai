@@ -1,0 +1,75 @@
+import { Canvas, Meta, Story, Controls } from '@storybook/blocks';
+import * as FormGridStories from './FormGrid.stories';
+import * as FormSectionStories from './FormSection.stories';
+import { FormGrid, FormItem, FormSection } from './FormLayout';
+
+<Meta of={FormGridStories} />
+
+# Form Layout System
+
+The Form Layout system provides a structured, responsive grid for building complex forms. It consists of three main components:
+
+1. **FormSection**: A container with an optional title, description, and header actions.
+2. **FormGrid**: A grid container that defines the number of columns (1-4).
+3. **FormItem**: A wrapper for individual fields that controls column spanning.
+
+## Usage
+
+```tsx
+import { FormSection, FormGrid, FormItem } from '@/components/forms/FormLayout';
+
+<FormSection title="Organization Details">
+  <FormGrid columns={4}>
+    {/* Spans 2 columns */}
+    <FormItem span={2}>
+      <Label>Name</Label>
+      <Input />
+    </FormItem>
+    
+    {/* Default span 1 */}
+    <FormItem>
+      <Label>Type</Label>
+      <Select />
+    </FormItem>
+    
+    {/* Spans full width */}
+    <FormItem span="full">
+      <Label>Description</Label>
+      <Textarea />
+    </FormItem>
+  </FormGrid>
+</FormSection>
+```
+
+## Responsive Behavior
+
+- **Mobile (< 768px)**: All grids collapse to a single column.
+- **Tablet (768px - 1024px)**: 
+  - 4-column grids become 2 columns.
+  - 3-column grids become 3 columns (crowded) or wrap.
+  - 2-column grids remain 2 columns.
+- **Desktop (>= 1024px)**: Full column layout is applied.
+
+## FormGrid Props
+
+<Controls of={FormGridStories.FourColumnLayout} />
+
+## Examples
+
+### 4-Column Complex Layout
+
+Ideal for dense forms with many fields like Enterprise Resource Planning (ERP) data entry.
+
+<Canvas of={FormGridStories.FourColumnLayout} />
+
+### 3-Column Standard Layout
+
+Good for contact forms or user profiles.
+
+<Canvas of={FormGridStories.ThreeColumnLayout} />
+
+### 2-Column Compact Layout
+
+Best for settings, login forms, or simple data entry.
+
+<Canvas of={FormGridStories.TwoColumnLayout} />

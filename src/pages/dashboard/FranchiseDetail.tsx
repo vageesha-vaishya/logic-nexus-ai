@@ -4,9 +4,10 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { FranchiseForm } from '@/components/admin/FranchiseForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Store, Trash2, ArrowLeft } from 'lucide-react';
+import { Store, Trash2, ArrowLeft, FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import Papa from 'papaparse';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 
 export default function FranchiseDetail() {
   const { id } = useParams();
@@ -74,6 +76,50 @@ export default function FranchiseDetail() {
     }
   };
 
+  const handleExport = () => {
+    try {
+      const exportData = [{
+        name: franchise.name,
+        code: franchise.code,
+        tenant_id: franchise.tenant_id,
+        status: franchise.is_active ? 'Active' : 'Inactive',
+        created_at: new Date(franchise.created_at).toLocaleDateString(),
+        street: franchise.address?.street || '',
+        city: franchise.address?.city || '',
+        state: franchise.address?.state || '',
+        zip: franchise.address?.zip || '',
+        country: franchise.address?.country || '',
+        phone: franchise.address?.contact?.phone || '',
+        email: franchise.address?.contact?.email || '',
+      }];
+
+      const csv = Papa.unparse(exportData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${franchise.name.replace(/\s+/g, '_')}_export.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Franchise exported successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to export franchise',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -93,6 +139,21 @@ export default function FranchiseDetail() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto space-y-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+              <BreadcrumbSeparator />
+            </BreadcrumbItem>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard/franchises">Franchises</BreadcrumbLink>
+              <BreadcrumbSeparator />
+            </BreadcrumbItem>
+            <BreadcrumbItem>
+              <BreadcrumbPage>Detail</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/franchises')}>
@@ -103,13 +164,17 @@ export default function FranchiseDetail() {
               <p className="text-muted-foreground">Edit franchise details</p>
             </div>
           </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handleExport} title="Export">
+              <FileDown className="h-4 w-4" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="icon">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Franchise</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -123,6 +188,7 @@ export default function FranchiseDetail() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+      </div>
 
         <Card>
           <CardHeader>

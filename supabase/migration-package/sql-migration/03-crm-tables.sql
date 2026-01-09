@@ -249,20 +249,24 @@ CREATE TABLE IF NOT EXISTS emails (
 );
 
 -- Indexes
-CREATE INDEX idx_accounts_tenant ON accounts(tenant_id);
-CREATE INDEX idx_accounts_franchise ON accounts(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_tenant_id ON accounts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_franchise_id ON accounts(franchise_id);
 CREATE INDEX idx_contacts_account ON contacts(account_id);
-CREATE INDEX idx_contacts_tenant ON contacts(tenant_id);
-CREATE INDEX idx_leads_tenant_id ON leads(tenant_id);
-CREATE INDEX idx_leads_franchise_id ON leads(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_tenant_id ON contacts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_franchise_id ON contacts(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_leads_tenant_id ON leads(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_leads_franchise_id ON leads(franchise_id);
 CREATE INDEX idx_leads_owner ON leads(owner_id);
 CREATE INDEX idx_opportunities_account ON opportunities(account_id);
-CREATE INDEX idx_opportunities_tenant_id ON opportunities(tenant_id);
-CREATE INDEX idx_activities_tenant_id ON activities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_opportunities_tenant_id ON opportunities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_opportunities_franchise_id ON opportunities(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_activities_tenant_id ON activities(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_activities_franchise_id ON activities(franchise_id);
 CREATE INDEX idx_activities_assigned ON activities(assigned_to);
-CREATE INDEX idx_campaigns_tenant_id ON campaigns(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_campaigns_tenant_id ON campaigns(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_campaigns_franchise_id ON campaigns(franchise_id);
 CREATE INDEX idx_emails_account ON emails(account_id);
+CREATE INDEX IF NOT EXISTS idx_emails_franchise_id ON emails(franchise_id);
 
 -- Triggers
 CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -277,3 +281,6 @@ ALTER INDEX IF EXISTS idx_leads_franchise RENAME TO idx_leads_franchise_id;
 ALTER INDEX IF EXISTS idx_opportunities_tenant RENAME TO idx_opportunities_tenant_id;
 ALTER INDEX IF EXISTS idx_activities_tenant RENAME TO idx_activities_tenant_id;
 ALTER INDEX IF EXISTS idx_campaigns_tenant RENAME TO idx_campaigns_tenant_id;
+ALTER INDEX IF EXISTS idx_accounts_tenant RENAME TO idx_accounts_tenant_id;
+ALTER INDEX IF EXISTS idx_accounts_franchise RENAME TO idx_accounts_franchise_id;
+ALTER INDEX IF EXISTS idx_contacts_tenant RENAME TO idx_contacts_tenant_id;
