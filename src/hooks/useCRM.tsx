@@ -1,6 +1,6 @@
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 
 export function useCRM() {
   const { user, roles } = useAuth();
@@ -34,10 +34,14 @@ export function useCRM() {
     async function loadPref() {
       if (!user) return;
       setLoadingPref(true);
-      const { data } = await supabase.from('user_preferences').select('franchise_id, admin_override_enabled').eq('user_id', user.id).limit(1).maybeSingle();
-      if (data) {
-        setPref({ franchise_id: data.franchise_id ?? null, admin_override_enabled: !!data.admin_override_enabled });
-      } else {
+      try {
+        const { data } = await (supabase as any).from('user_preferences').select('franchise_id, admin_override_enabled').eq('user_id', user.id).limit(1).maybeSingle();
+        if (data) {
+          setPref({ franchise_id: data.franchise_id ?? null, admin_override_enabled: !!data.admin_override_enabled });
+        } else {
+          setPref(null);
+        }
+      } catch {
         setPref(null);
       }
       setLoadingPref(false);
@@ -45,13 +49,13 @@ export function useCRM() {
     loadPref();
   }, [user?.id]);
 
-  const setFranchisePreference = async (franchiseId: string | null, adminOverride?: boolean) => {
+  const setFranchisePreference = useCallback(async (franchiseId: string | null, adminOverride?: boolean) => {
     if (!user) return;
     await (supabase as any).rpc('set_user_franchise_preference', {
       p_franchise_id: franchiseId,
       p_admin_override: adminOverride ?? pref?.admin_override_enabled ?? false,
     });
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('user_preferences')
       .select('franchise_id, admin_override_enabled')
       .eq('user_id', user.id)
@@ -60,15 +64,15 @@ export function useCRM() {
     if (data) {
       setPref({ franchise_id: data.franchise_id ?? null, admin_override_enabled: !!data.admin_override_enabled });
     }
-  };
+  }, [user, pref?.admin_override_enabled]);
 
-  const setAdminOverride = async (enabled: boolean, franchiseIdOverride?: string | null) => {
+  const setAdminOverride = useCallback(async (enabled: boolean, franchiseIdOverride?: string | null) => {
     if (!user) return;
     await (supabase as any).rpc('set_admin_override', {
       p_enabled: enabled,
       p_franchise_id: franchiseIdOverride ?? pref?.franchise_id ?? null,
     });
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('user_preferences')
       .select('franchise_id, admin_override_enabled')
       .eq('user_id', user.id)
@@ -77,7 +81,7 @@ export function useCRM() {
     if (data) {
       setPref({ franchise_id: data.franchise_id ?? null, admin_override_enabled: !!data.admin_override_enabled });
     }
-  };
+  }, [user, pref?.franchise_id]);
 
   return {
     user,

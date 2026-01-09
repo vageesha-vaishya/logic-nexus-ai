@@ -218,7 +218,7 @@ export default function Activities() {
     setActivities(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('activities')
         .update({ status: newStatus })
         .eq('id', id);

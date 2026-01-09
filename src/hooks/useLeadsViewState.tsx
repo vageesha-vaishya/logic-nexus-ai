@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useCallback } from 'react';
 
 export type LeadsPrimaryView = 'pipeline' | 'card' | 'grid' | 'list';
 export type LeadsPipelineTab = 'board' | 'analytics';
@@ -237,18 +237,27 @@ export function LeadsViewStateProvider({ children }: { children: React.ReactNode
     }
   }, [state]);
 
+  // Memoize dispatchers separately to prevent re-renders
+  const setView = useCallback((v: LeadsPrimaryView) => dispatch({ type: 'setView', payload: v }), []);
+  const setThemeAction = useCallback((t: string) => dispatch({ type: 'setTheme', payload: t }), []);
+  const setWorkspace = useCallback((patch: Partial<LeadsWorkspaceFilters>) => dispatch({ type: 'setWorkspace', payload: patch }), []);
+  const setPipeline = useCallback((patch: Partial<LeadsPipelineState>) => dispatch({ type: 'setPipeline', payload: patch }), []);
+  const setSelectedIds = useCallback((ids: string[]) => dispatch({ type: 'setSelectedIds', payload: ids }), []);
+  const setWorkspaceScrollY = useCallback((y: number) => dispatch({ type: 'setWorkspaceScrollY', payload: y }), []);
+  const setPipelineScrollY = useCallback((y: number) => dispatch({ type: 'setPipelineScrollY', payload: y }), []);
+
   const value = useMemo<LeadsViewStateContextValue>(
     () => ({
       state,
-      setView: (v) => dispatch({ type: 'setView', payload: v }),
-      setTheme: (t) => dispatch({ type: 'setTheme', payload: t }),
-      setWorkspace: (patch) => dispatch({ type: 'setWorkspace', payload: patch }),
-      setPipeline: (patch) => dispatch({ type: 'setPipeline', payload: patch }),
-      setSelectedIds: (ids) => dispatch({ type: 'setSelectedIds', payload: ids }),
-      setWorkspaceScrollY: (y) => dispatch({ type: 'setWorkspaceScrollY', payload: y }),
-      setPipelineScrollY: (y) => dispatch({ type: 'setPipelineScrollY', payload: y }),
+      setView,
+      setTheme: setThemeAction,
+      setWorkspace,
+      setPipeline,
+      setSelectedIds,
+      setWorkspaceScrollY,
+      setPipelineScrollY,
     }),
-    [state],
+    [state, setView, setThemeAction, setWorkspace, setPipeline, setSelectedIds, setWorkspaceScrollY, setPipelineScrollY],
   );
 
   return <LeadsViewStateContext.Provider value={value}>{children}</LeadsViewStateContext.Provider>;

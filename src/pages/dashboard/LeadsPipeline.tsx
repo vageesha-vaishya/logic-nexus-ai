@@ -4,15 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ArrowLeft, Filter, RefreshCw, Calendar, Tag, Plus } from 'lucide-react';
+import { ArrowLeft, Filter, RefreshCw, Plus } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 import { KanbanFunnel } from '@/components/kanban/KanbanFunnel';
-import { KanbanFilters, FilterOption } from '@/components/kanban/KanbanFilters';
+import { KanbanFilters } from '@/components/kanban/KanbanFilters';
 import { PipelineAnalytics } from '@/components/analytics/PipelineAnalytics';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,6 +27,25 @@ import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Loading skeleton for the pipeline
+function PipelineSkeleton() {
+  return (
+    <div className="flex h-full gap-3 pb-4 overflow-x-auto">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="w-[300px] flex-shrink-0 flex flex-col gap-2">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <div className="flex-1 space-y-2">
+            {[1, 2, 3].map((j) => (
+              <Skeleton key={j} className="h-28 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function LeadsPipeline() {
   usePerformanceMonitor('Leads Pipeline');
@@ -39,23 +56,29 @@ export default function LeadsPipeline() {
   const { state: viewState, setTheme, setView, setPipeline, setWorkspace } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const isNavigatingAwayFromPipeline = useRef(false);
+  const hasFetchedRef = useRef(false);
   
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
 
-  // URL State
+  // URL State - memoized to prevent recalculation
   const searchQuery = searchParams.get('q') || '';
   const selectedStages = useMemo(() => {
     const s = searchParams.get('status');
     return s ? (s.split(',') as LeadStatus[]).filter(x => stages.includes(x)) : [];
   }, [searchParams]);
-  const currentView = searchParams.get('view') || 'board'; // 'board' | 'analytics'
+  const currentView = searchParams.get('view') || 'board';
 
-  const handleSetDefaultView = async () => {
+  // Stable context check
+  const isContextReady = Boolean(context?.tenantId || context?.isPlatformAdmin);
+
+  const handleSetDefaultView = useCallback(async () => {
+    if (!context) return;
     try {
       setIsSavingDefault(true);
       const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
@@ -65,7 +88,7 @@ export default function LeadsPipeline() {
       } catch {
         void 0;
       }
-      if (context?.userId) {
+      if (context.userId) {
         const userViewKey = `user:${context.userId}:leads.default_view`;
         const userThemeKey = `user:${context.userId}:leads.default_theme`;
         const [{ error: vErr }, { error: tErr }] = await Promise.all([
@@ -86,76 +109,83 @@ export default function LeadsPipeline() {
     } finally {
       setIsSavingDefault(false);
     }
-  };
+  }, [context, supabase, viewState.theme, t]);
 
+  // Load theme default - only once after hydration
   useEffect(() => {
+    if (!viewState.hydrated || !context?.userId) return;
+    if (viewState.hydrationSource !== 'default') return;
+    
     const loadThemeDefault = async () => {
-        if (!viewState.hydrated || !context?.userId) return;
-        if (viewState.hydrationSource !== 'default') return;
-        try {
-            const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-            const userThemeKey = `user:${context.userId}:leads.default_theme`;
-            const { data: themeData } = await dao.getSystemSetting(userThemeKey);
-            const defaultTheme = themeData?.setting_value;
-            
-            if (defaultTheme && typeof defaultTheme === 'string' && defaultTheme !== viewState.theme) {
-                setTheme(defaultTheme);
-            }
-        } catch {
-            return;
+      try {
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const userThemeKey = `user:${context.userId}:leads.default_theme`;
+        const { data: themeData } = await dao.getSystemSetting(userThemeKey);
+        const defaultTheme = themeData?.setting_value;
+        
+        if (defaultTheme && typeof defaultTheme === 'string' && defaultTheme !== viewState.theme) {
+          setTheme(defaultTheme);
         }
+      } catch {
+        return;
+      }
     };
     loadThemeDefault();
-  }, [context?.userId, viewState.hydrated, viewState.theme, setTheme, supabase, context]);
+  }, [context?.userId, viewState.hydrated, viewState.hydrationSource]);
 
-  const handleThemeChange = (val: string) => {
+  const handleThemeChange = useCallback((val: string) => {
     setTheme(val);
     try {
       localStorage.setItem('leadsTheme', val);
     } catch {
       return;
     }
-  };
+  }, [setTheme]);
 
+  // Set view state only once on mount
   useEffect(() => {
     if (!viewState.hydrated) return;
     if (isNavigatingAwayFromPipeline.current) return;
     if (viewState.view !== 'pipeline') setView('pipeline');
-  }, [setView, viewState.hydrated, viewState.view]);
+  }, [viewState.hydrated]);
 
+  // Sync URL to view state - debounced
   useEffect(() => {
     if (!viewState.hydrated) return;
     const tab = currentView === 'analytics' ? 'analytics' : 'board';
     setPipeline({ q: searchQuery, status: selectedStages, tab });
-  }, [currentView, searchQuery, selectedStages, setPipeline, viewState.hydrated]);
+  }, [currentView, searchQuery, selectedStages.join(','), viewState.hydrated]);
 
-  const handleSearchChange = (val: string) => {
+  const handleSearchChange = useCallback((val: string) => {
     setSearchParams(prev => {
-        const newParams = new URLSearchParams(prev);
-        if (val) newParams.set('q', val);
-        else newParams.delete('q');
-        return newParams;
+      const newParams = new URLSearchParams(prev);
+      if (val) newParams.set('q', val);
+      else newParams.delete('q');
+      return newParams;
     }, { replace: true });
-  };
+  }, [setSearchParams]);
 
-  const handleViewChange = (view: string) => {
+  const handleViewChange = useCallback((view: string) => {
     setSearchParams(prev => {
-        const newParams = new URLSearchParams(prev);
-        newParams.set('view', view);
-        return newParams;
+      const newParams = new URLSearchParams(prev);
+      newParams.set('view', view);
+      return newParams;
     });
-  };
+  }, [setSearchParams]);
 
-  const handleStageFilterChange = (values: string[]) => {
-      setSearchParams(prev => {
-        const newParams = new URLSearchParams(prev);
-        if (values.length > 0) newParams.set('status', values.join(','));
-        else newParams.delete('status');
-        return newParams;
-      });
-  };
+  const handleStageFilterChange = useCallback((values: string[]) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (values.length > 0) newParams.set('status', values.join(','));
+      else newParams.delete('status');
+      return newParams;
+    });
+  }, [setSearchParams]);
 
+  // Stable fetch function - no dependencies on filter state
   const fetchLeads = useCallback(async () => {
+    if (!isContextReady) return;
+    
     setLoading(true);
     try {
       const dataAccess = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
@@ -166,7 +196,6 @@ export default function LeadsPipeline() {
 
       if (error) throw error;
       
-      // Validate and cast data
       const safeLeads = ((data as any[]) || []).map(d => ({
         ...d,
         status: stages.includes(d.status as LeadStatus) ? (d.status as LeadStatus) : 'new'
@@ -175,19 +204,18 @@ export default function LeadsPipeline() {
       setLeads(safeLeads);
     } catch (error) {
       logger.error('Failed to fetch leads (pipeline)', {
-        q: searchQuery,
-        status: selectedStages,
         error: error instanceof Error ? error.message : String(error),
       });
       Sentry.captureException(error);
       toast.error('Failed to load leads');
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
     }
-  }, [supabase, context, searchQuery, selectedStages]);
+  }, [supabase, context, isContextReady]);
 
   const fetchTasks = useCallback(async () => {
-    if (!context) return;
+    if (!isContextReady) return;
     try {
       const dataAccess = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       const { data, error } = await (dataAccess.from('activities') as any)
@@ -198,25 +226,33 @@ export default function LeadsPipeline() {
       if (error) throw error;
       
       const mappedTasks: Task[] = (data || []).map((d: any) => ({
-         id: d.id,
-         title: d.title || 'Untitled Task',
-         due_date: d.due_date,
-         status: d.status === 'completed' ? 'completed' : 'pending',
-         priority: d.priority || 'medium',
-         assigned_to: { name: 'User' }, // Placeholder as we'd need a join to get real name
-         related_to: d.related_to ? { type: 'lead', id: d.related_to, name: 'Lead' } : undefined
+        id: d.id,
+        title: d.title || d.subject || 'Untitled Task',
+        due_date: d.due_date,
+        status: d.status === 'completed' ? 'completed' : 'pending',
+        priority: d.priority || 'medium',
+        assigned_to: { name: 'User' },
+        related_to: d.related_to ? { type: 'lead', id: d.related_to, name: 'Lead' } : undefined
       }));
       setTasks(mappedTasks);
     } catch (e) {
       console.error('Error fetching tasks', e);
     }
-  }, [supabase, context]);
+  }, [supabase, context, isContextReady]);
 
+  // Initial data fetch - only when context is ready
   useEffect(() => {
+    if (!isContextReady || hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    
     fetchLeads();
     fetchTasks();
+  }, [isContextReady, fetchLeads, fetchTasks]);
 
-    // Real-time subscription
+  // Real-time subscription - separate from fetch
+  useEffect(() => {
+    if (!isContextReady) return;
+
     const channel = supabase
       .channel('leads-pipeline-changes')
       .on(
@@ -229,28 +265,25 @@ export default function LeadsPipeline() {
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const newLead = payload.new as Lead;
-            // Validate status
             const safeLead: Lead = {
-               ...newLead,
-               status: stages.includes(newLead.status) ? newLead.status : 'new'
+              ...newLead,
+              status: stages.includes(newLead.status) ? newLead.status : 'new'
             };
             setLeads((prev) => [safeLead, ...prev]);
             toast.info(`New lead: ${newLead.first_name} ${newLead.last_name}`);
           } 
           else if (payload.eventType === 'UPDATE') {
             const updatedLead = payload.new as Lead;
-            // Validate status
             const safeLead: Lead = {
-               ...updatedLead,
-               status: stages.includes(updatedLead.status) ? updatedLead.status : 'new'
+              ...updatedLead,
+              status: stages.includes(updatedLead.status) ? updatedLead.status : 'new'
             };
-            
             setLeads((prev) => prev.map((l) => 
-                l.id === safeLead.id ? safeLead : l
+              l.id === safeLead.id ? safeLead : l
             ));
           } 
           else if (payload.eventType === 'DELETE') {
-             setLeads((prev) => prev.filter((l) => l.id !== payload.old.id));
+            setLeads((prev) => prev.filter((l) => l.id !== payload.old.id));
           }
         }
       )
@@ -259,17 +292,14 @@ export default function LeadsPipeline() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, context, fetchLeads, fetchTasks]);
+  }, [supabase, isContextReady]);
 
-  const handleTaskComplete = async (taskId: string) => {
-    // Optimistic update
+  const handleTaskComplete = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
+    if (!task || !isContextReady) return;
     const newStatus = task.status === 'completed' ? 'pending' : 'completed';
 
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-
-    if (!context) return;
 
     try {
       const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
@@ -282,28 +312,27 @@ export default function LeadsPipeline() {
     } catch (error) {
       console.error('Failed to update task', error);
       toast.error('Failed to update task status');
-      // Revert
       setTasks(prev => prev.map(t => t.id === taskId ? task : t));
     }
-  };
+  }, [tasks, supabase, context, isContextReady]);
 
-  const handleAddTask = () => {
+  const handleAddTask = useCallback(() => {
     setIsCreateTaskOpen(true);
-  };
+  }, []);
 
-  const handleSaveTask = async (taskData: { title: string; due_date: string; priority: 'low' | 'medium' | 'high' }) => {
-    if (!context) return;
+  const handleSaveTask = useCallback(async (taskData: { title: string; due_date: string; priority: 'low' | 'medium' | 'high' }) => {
+    if (!isContextReady) return;
     setIsSavingTask(true);
     try {
       const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
       const { data, error } = await (dataAccess.from('activities') as any).insert({
-          title: taskData.title,
-          due_date: taskData.due_date,
-          priority: taskData.priority,
-          activity_type: 'task',
-          status: 'pending',
-          tenant_id: context.tenantId
-        })
+        subject: taskData.title,
+        due_date: taskData.due_date,
+        priority: taskData.priority,
+        activity_type: 'task',
+        status: 'pending',
+        tenant_id: context?.tenantId
+      })
         .select()
         .single();
 
@@ -311,7 +340,7 @@ export default function LeadsPipeline() {
 
       const newTask: Task = {
         id: (data as any).id,
-        title: (data as any).title,
+        title: (data as any).subject,
         due_date: (data as any).due_date,
         status: 'pending',
         priority: (data as any).priority,
@@ -327,8 +356,9 @@ export default function LeadsPipeline() {
     } finally {
       setIsSavingTask(false);
     }
-  };
+  }, [supabase, context, isContextReady]);
 
+  // Memoized stats
   const stats: DashboardStats = useMemo(() => ({
     totalLeads: leads.length,
     wonDeals: leads.filter(l => l.status === 'won').length,
@@ -336,11 +366,10 @@ export default function LeadsPipeline() {
     highScore: Math.max(...leads.map(l => l.lead_score || 0), 0)
   }), [leads]);
 
-  const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
-    // Optimistic update
+  const handleStatusChange = useCallback(async (leadId: string, newStatus: LeadStatus) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
 
-    if (!context) return;
+    if (!isContextReady) return;
 
     try {
       const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
@@ -351,59 +380,49 @@ export default function LeadsPipeline() {
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
-      fetchLeads(); // Revert on error
+      fetchLeads();
     }
-  };
+  }, [supabase, context, isContextReady, fetchLeads]);
 
-  const handleItemUpdate = async (id: string, updates: Partial<KanbanItem>) => {
-    // Map KanbanItem fields back to Lead fields
+  const handleItemUpdate = useCallback(async (id: string, updates: Partial<KanbanItem>) => {
     const leadUpdates: Partial<Lead> = {};
     
     if (updates.title) {
-        // Assume title is "First Last", try to split
-        const parts = updates.title.split(' ');
-        if (parts.length > 0) {
-            leadUpdates.first_name = parts[0];
-            leadUpdates.last_name = parts.slice(1).join(' ') || '';
-        }
+      const parts = updates.title.split(' ');
+      if (parts.length > 0) {
+        leadUpdates.first_name = parts[0];
+        leadUpdates.last_name = parts.slice(1).join(' ') || '';
+      }
     }
 
     if (updates.value !== undefined) {
-        leadUpdates.estimated_value = updates.value;
+      leadUpdates.estimated_value = updates.value;
     }
 
-    // Optimistic Update
-    setLeads(prev => prev.map(l => {
-        if (l.id === id) {
-            return { ...l, ...leadUpdates };
-        }
-        return l;
-    }));
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...leadUpdates } : l));
 
     try {
-        const { error } = await supabase
-            .from('leads')
-            .update(leadUpdates as any)
-            .eq('id', id);
+      const { error } = await supabase
+        .from('leads')
+        .update(leadUpdates as any)
+        .eq('id', id);
 
-        if (error) throw error;
-        toast.success("Lead updated");
+      if (error) throw error;
+      toast.success("Lead updated");
     } catch (error) {
-        console.error('Error updating lead:', error);
-        toast.error('Failed to update lead');
-        fetchLeads(); // Revert
+      console.error('Error updating lead:', error);
+      toast.error('Failed to update lead');
+      fetchLeads();
     }
-  };
+  }, [supabase, fetchLeads]);
 
-  const onDragEnd = (activeId: string, overId: string, newStatus: string) => {
-    // The KanbanBoard passes the column ID as newStatus.
-    // We check if it's a valid LeadStatus before updating.
+  const onDragEnd = useCallback((activeId: string, overId: string, newStatus: string) => {
     if (stages.includes(newStatus as LeadStatus)) {
       handleStatusChange(activeId, newStatus as LeadStatus);
     }
-  };
+  }, [handleStatusChange]);
 
-  // Filter logic
+  // Filter logic - memoized
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       const matchesSearch = 
@@ -417,7 +436,7 @@ export default function LeadsPipeline() {
     });
   }, [leads, searchQuery, selectedStages]);
 
-  // Funnel Data Preparation
+  // Funnel Data - memoized
   const funnelData = useMemo(() => {
     const labelMap: Record<LeadStatus, string> = Object.fromEntries(
       stages.map((s) => [s, statusConfig[s].label])
@@ -435,7 +454,7 @@ export default function LeadsPipeline() {
     return { labelMap, colorMap, counts };
   }, [leads]);
 
-  // Kanban Data Preparation
+  // Kanban columns - memoized
   const columns: ColumnType[] = useMemo(() => {
     const visibleStages = selectedStages.length > 0 ? selectedStages : stages;
     return visibleStages.map(stage => ({
@@ -445,6 +464,7 @@ export default function LeadsPipeline() {
     }));
   }, [selectedStages]);
 
+  // Kanban items - memoized
   const items: KanbanItem[] = useMemo(() => {
     return filteredLeads.map(lead => ({
       id: lead.id,
@@ -459,6 +479,45 @@ export default function LeadsPipeline() {
     }));
   }, [filteredLeads]);
 
+  const handleNavigateAway = useCallback((mode: string) => {
+    if (mode !== 'pipeline') {
+      isNavigatingAwayFromPipeline.current = true;
+      try {
+        localStorage.setItem('leadsViewMode', mode);
+      } catch {
+        void 0;
+      }
+      setView(mode as any);
+      setWorkspace({
+        searchQuery,
+        statusFilter: selectedStages.length === 1 ? selectedStages[0] : 'all',
+      });
+      navigate('/dashboard/leads');
+    }
+  }, [setView, setWorkspace, searchQuery, selectedStages, navigate]);
+
+  // Show skeleton while waiting for context or initial load
+  if (!isContextReady || !initialLoadComplete) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col h-[calc(100vh-140px)] gap-6 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </div>
+          <Skeleton className="h-16 w-full" />
+          <PipelineSkeleton />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div style={themeStyleFromPreset(currentTheme)} className="flex flex-col h-[calc(100vh-140px)] gap-6 transition-colors duration-300">
@@ -471,7 +530,7 @@ export default function LeadsPipeline() {
               <p className="text-muted-foreground">{t('leads.subtitle', 'Manage and track your lead progression')}</p>
             </div>
             <div className="flex items-center gap-2">
-               <Select value={currentTheme} onValueChange={handleThemeChange}>
+              <Select value={currentTheme} onValueChange={handleThemeChange}>
                 <SelectTrigger className="w-[140px] h-8 text-xs">
                   <Palette className="mr-2 h-3 w-3" />
                   <SelectValue placeholder="Theme" />
@@ -484,33 +543,18 @@ export default function LeadsPipeline() {
                   ))}
                 </SelectContent>
               </Select>
-               <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
+              <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 {t('leads.actions.refresh', 'Refresh')}
               </Button>
               <ViewToggle
                 value="pipeline"
                 modes={['pipeline', 'card', 'grid', 'list']}
-                onChange={(mode) => {
-                  if (mode !== 'pipeline') {
-                    isNavigatingAwayFromPipeline.current = true;
-                    try {
-                      localStorage.setItem('leadsViewMode', mode);
-                    } catch {
-                      void 0;
-                    }
-                    setView(mode as any);
-                    setWorkspace({
-                      searchQuery,
-                      statusFilter: selectedStages.length === 1 ? selectedStages[0] : 'all',
-                    });
-                    navigate('/dashboard/leads');
-                  }
-                }}
+                onChange={handleNavigateAway}
               />
               {context?.isPlatformAdmin && (
                 <Button variant="outline" size="sm" onClick={handleSetDefaultView} disabled={isSavingDefault}>
-                    {t('leads.actions.setDefault', 'Set as Default')}
+                  {t('leads.actions.setDefault', 'Set as Default')}
                 </Button>
               )}
               <Button asChild size="sm">
@@ -550,53 +594,53 @@ export default function LeadsPipeline() {
               <TabsList>
                 <TabsTrigger value="board" className="flex items-center gap-2">
                   <LayoutGrid className="h-4 w-4" />
-                  {t('leads.tabs.board')}
+                  {t('leads.tabs.board', 'Board')}
                 </TabsTrigger>
                 <TabsTrigger value="analytics" className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
-                  {t('leads.tabs.analytics')}
+                  {t('leads.tabs.analytics', 'Analytics')}
                 </TabsTrigger>
               </TabsList>
             </div>
             
             {/* Analytics Content */}
             <TabsContent value="analytics" className="mt-0">
-               <PipelineAnalytics leads={filteredLeads} />
+              <PipelineAnalytics leads={filteredLeads} />
             </TabsContent>
 
             {/* Board Content */}
             <TabsContent value="board" className="mt-0 flex flex-col gap-6 h-full">
-               <div className="flex-none">
-                  <DashboardOverview stats={stats} />
-               </div>
+              <div className="flex-none">
+                <DashboardOverview stats={stats} />
+              </div>
 
-               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-                 <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
-                   {/* Filters */}
-                   <div className="flex-none">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
+                <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
+                  {/* Filters */}
+                  <div className="flex-none">
                     <Card className="rounded-md border-muted">
                       <CardContent className="p-2">
                         <KanbanFilters
-                            searchQuery={searchQuery}
-                            onSearchChange={handleSearchChange}
-                            filters={{ status: selectedStages }}
-                            onFilterChange={(key, values) => {
-                              if (key === 'status') handleStageFilterChange(values);
-                            }}
-                            availableFilters={[
-                              {
-                                id: 'status',
-                                label: t('leads.filters.status'),
-                                options: stages.map(s => ({
-                                  label: t(`leads.filters.statusOptions.${s}`),
-                                  value: s,
-                                }))
-                              }
-                            ]}
+                          searchQuery={searchQuery}
+                          onSearchChange={handleSearchChange}
+                          filters={{ status: selectedStages }}
+                          onFilterChange={(key, values) => {
+                            if (key === 'status') handleStageFilterChange(values);
+                          }}
+                          availableFilters={[
+                            {
+                              id: 'status',
+                              label: t('leads.filters.status', 'Status'),
+                              options: stages.map(s => ({
+                                label: t(`leads.filters.statusOptions.${s}`, statusConfig[s].label),
+                                value: s,
+                              }))
+                            }
+                          ]}
                         />
                         <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 pb-1">
-                            <Filter className="h-3 w-3" />
-                            <span>{t('leads.pipeline.found', { count: filteredLeads.length })}</span>
+                          <Filter className="h-3 w-3" />
+                          <span>{filteredLeads.length} {t('leads.pipeline.leadsFound', 'leads found')}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -605,9 +649,7 @@ export default function LeadsPipeline() {
                   {/* Kanban Board */}
                   <div className="flex-1 min-h-[500px] overflow-hidden bg-muted/20 rounded-lg border">
                     {loading && items.length === 0 ? (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        {t('leads.pipeline.loading')}
-                      </div>
+                      <PipelineSkeleton />
                     ) : (
                       <KanbanBoard 
                         columns={columns} 
@@ -618,17 +660,17 @@ export default function LeadsPipeline() {
                       />
                     )}
                   </div>
-                 </div>
+                </div>
 
-                 <div className="space-y-6 overflow-y-auto pr-2">
-                    <ContactsSection leads={filteredLeads} />
-                    <TasksSection 
-                        tasks={tasks} 
-                        onCompleteTask={handleTaskComplete} 
-                        onAddTask={handleAddTask}
-                    />
-                 </div>
-               </div>
+                <div className="space-y-6 overflow-y-auto pr-2">
+                  <ContactsSection leads={filteredLeads} />
+                  <TasksSection 
+                    tasks={tasks} 
+                    onCompleteTask={handleTaskComplete} 
+                    onAddTask={handleAddTask}
+                  />
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

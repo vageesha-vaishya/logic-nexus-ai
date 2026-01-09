@@ -126,11 +126,13 @@ export class ScopedDataAccess {
   /**
    * Retrieves a system setting by key.
    */
-  public async getSystemSetting(key: string) {
-    return this.from('system_settings' as any)
+  public async getSystemSetting(key: string): Promise<{ data: { setting_value: any } | null, error: any }> {
+    const result = await (this.supabase as any)
+      .from('system_settings')
       .select('setting_value')
       .eq('setting_key', key)
-      .maybeSingle() as Promise<{ data: { setting_value: any } | null, error: any }>;
+      .maybeSingle();
+    return result;
   }
 
   /**

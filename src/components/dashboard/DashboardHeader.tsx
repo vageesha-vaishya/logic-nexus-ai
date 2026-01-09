@@ -9,15 +9,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 
 export const DashboardHeader = () => {
-  const { context, setFranchisePreference, setAdminOverride } = useCRM();
+  const { context, setFranchisePreference, setAdminOverride, supabase } = useCRM();
   const { toast } = useToast();
   const [franchises, setFranchises] = useState<any[]>([]);
   const [selectedFranchise, setSelectedFranchise] = useState<string | undefined>(undefined);
-  const [adminOverride, setAdminOverride] = useState<boolean>(false);
+  const [adminOverrideEnabled, setAdminOverrideEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     setSelectedFranchise(context.franchiseId || undefined);
-    setAdminOverride(!!context.adminOverrideEnabled);
+    setAdminOverrideEnabled(!!context.adminOverrideEnabled);
   }, [context.franchiseId, context.adminOverrideEnabled]);
 
   useEffect(() => {
@@ -31,12 +31,12 @@ export const DashboardHeader = () => {
       if (!error && data) setFranchises(data);
     }
     loadFranchises();
-  }, [context.tenantId]);
+  }, [context.tenantId, supabase]);
 
   const handleFranchiseChange = async (value: string) => {
     setSelectedFranchise(value);
     try {
-      await setFranchisePreference(value || null, adminOverride);
+      await setFranchisePreference(value || null, adminOverrideEnabled);
       toast({ title: "Franchise updated" });
     } catch (e: any) {
       toast({ title: "Failed to update franchise", description: e?.message || String(e), variant: "destructive" });
@@ -44,7 +44,7 @@ export const DashboardHeader = () => {
   };
 
   const handleAdminOverrideToggle = async (checked: boolean) => {
-    setAdminOverride(checked);
+    setAdminOverrideEnabled(checked);
     try {
       await setAdminOverride(checked, selectedFranchise || null);
       toast({ title: checked ? "Admin override enabled" : "Admin override disabled" });
@@ -79,7 +79,7 @@ export const DashboardHeader = () => {
           </Select>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Admin Override</span>
-            <Switch checked={adminOverride} onCheckedChange={handleAdminOverrideToggle} />
+            <Switch checked={adminOverrideEnabled} onCheckedChange={handleAdminOverrideToggle} />
           </div>
         </div>
         <Button variant="ghost" size="icon" className="relative">
