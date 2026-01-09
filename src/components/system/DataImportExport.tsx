@@ -785,7 +785,11 @@ export default function DataImportExport({
       setHistoryData(data as ImportSession[]);
     } catch (err: any) {
       console.error(err);
-      toast.error("Failed to load history");
+      if (err?.code === 'PGRST205') {
+        toast.error("Import history tables missing. Please run the migration.");
+      } else {
+        toast.error("Failed to load history");
+      }
     } finally {
       setHistoryLoading(false);
     }
