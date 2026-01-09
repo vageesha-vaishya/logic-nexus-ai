@@ -15,16 +15,22 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import * as z from 'zod';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { processImportRow, ImportLog } from '@/lib/import-processor';
+import { ImportHistoryService, ImportDetail, ImportSession } from '@/lib/import-history-service';
 
 // --- Types ---
 
 export interface ImportResult {
+  importId?: string;
   success: number;
   failed: number;
   errors: string[];
+  logs: ImportLog[];
+  insertedIds: string[];
 }
 
 export type FileFormat = 'csv' | 'xlsx' | 'json';
@@ -48,7 +54,7 @@ export interface ExportTemplate {
   allowedRoles?: string[]; // If set, only users with these roles can see/use this template
 }
 
-export interface DataImportExportProps {
+interface DataImportExportProps {
   entityName: string; // e.g., "Leads", "Accounts"
   tableName: string; // e.g., "leads", "accounts"
   fields: DataField[];
@@ -63,6 +69,7 @@ export interface DataImportExportProps {
   onExportFilterApply?: (query: any, filters: any) => any;
   // Navigation
   listPath: string; // e.g., "/dashboard/leads"
+  enableAutoCorrection?: boolean;
 }
 
 type ParsedRow = Record<string, unknown>;
@@ -164,6 +171,8 @@ export default function DataImportExport({
   additionalExportTemplates = [],
   onTransformRecord,
   listPath,
+  enableAutoCorrection = true,
+  onExportFilterApply,
 }: DataImportExportProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -172,6 +181,7 @@ export default function DataImportExport({
   
   // State
   const [importing, setImporting] = useState(false);
+  const [processingAction, setProcessingAction] = useState<'import' | 'revert'>('import');
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -358,19 +368,28 @@ export default function DataImportExport({
     setImportEtaSeconds(null);
   };
 
-  const buildMappedRecord = (row: ParsedRow): { record: any; customFields: Record<string, unknown> } => {
-    const mapped: Record<string, unknown> = {};
-    const mappedSourceColumns = new Set<string>();
-    
-    for (const field of fields) {
-      const sourceCol = fieldMapping[field.key];
-      if (!sourceCol) continue;
-      mappedSourceColumns.add(sourceCol);
-      mapped[field.key] = row[sourceCol];
+  const buildMappedRecord = (row: ParsedRow, index: number): { record: any; customFields: Record<string, unknown>; logs: ImportLog[]; isValid: boolean } => {
+    let record: any = {};
+    const customFields: Record<string, unknown> = {};
+    let logs: ImportLog[] = [];
+    let isValid = true;
+
+    if (enableAutoCorrection) {
+      const processed = processImportRow(row, index + 1, fieldMapping);
+      record = processed.data;
+      logs = processed.logs;
+      isValid = processed.isValid;
+    } else {
+      for (const field of fields) {
+        const sourceCol = fieldMapping[field.key];
+        if (sourceCol) {
+          record[field.key] = row[sourceCol];
+        }
+      }
     }
 
-    const customFields: Record<string, unknown> = {};
     if (includeUnmappedAsCustom) {
+      const mappedSourceColumns = new Set(Object.values(fieldMapping));
       for (const key of Object.keys(row)) {
         if (!mappedSourceColumns.has(key)) {
           customFields[key] = row[key];
@@ -378,16 +397,16 @@ export default function DataImportExport({
       }
     }
 
-    let record = { ...mapped };
     if (onTransformRecord) {
       record = onTransformRecord(record);
     }
 
-    return { record, customFields };
+    return { record, customFields, logs, isValid };
   };
 
   const handleImport = async () => {
     if (!selectedFile) return;
+    setProcessingAction('import');
     setImporting(true);
     setImportStep(4);
     setImportingStage('parsing');
@@ -398,32 +417,133 @@ export default function DataImportExport({
     pauseRequestedRef.current = false;
     importStartedAtRef.current = Date.now();
 
-    const result: ImportResult = { success: 0, failed: 0, errors: [] };
+    let importSessionId: string | undefined;
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const session = await ImportHistoryService.createSession(supabase, {
+            entity_name: entityName,
+            table_name: tableName,
+            file_name: selectedFile.name,
+            imported_by: user?.id
+        });
+        importSessionId = session.id;
+    } catch (e) {
+        console.error("Failed to create import session", e);
+        toast.error("Failed to initialize import session");
+        setImporting(false);
+        return;
+    }
+
+    const result: ImportResult = { 
+        importId: importSessionId,
+        success: 0, failed: 0, errors: [], logs: [], insertedIds: [] 
+    };
     const batch: any[] = [];
     
+    let rowIndex = 0;
+
     const processBatch = async () => {
       if (batch.length === 0) return;
       
       try {
         setImportingStage('uploading');
-        // Check for duplicates if needed (simplified for now)
-        // ...
-
+        
         // Prepare data
         const records = batch.map(item => ({
           ...item.record,
           tenant_id: context.tenantId,
           franchise_id: context.franchiseId,
-          // custom_fields: item.customFields, // Assuming backend supports this or we ignore it
         }));
 
-        const { error } = await supabase.from(tableName).insert(records).select();
-        
-        if (error) {
-          result.failed += records.length;
-          result.errors.push(`Batch error: ${error.message}`);
+        const importDetails: ImportDetail[] = [];
+        const recordsToInsert: any[] = [];
+        const recordsToUpdate: any[] = [];
+
+        // Duplicate Check
+        if (duplicateMode === 'allow') {
+            recordsToInsert.push(...records);
         } else {
-          result.success += records.length;
+            // Fetch existing
+            const emails = records.map(r => r.email).filter(Boolean);
+            const phones = records.map(r => r.phone).filter(Boolean);
+            
+            let existingRecords: any[] = [];
+            if (emails.length > 0 || phones.length > 0) {
+                const orParts = [];
+                // Format array for Supabase .in() filter: "val1","val2"
+                if (emails.length) orParts.push(`email.in.(${JSON.stringify(emails).slice(1,-1)})`);
+                if (phones.length) orParts.push(`phone.in.(${JSON.stringify(phones).slice(1,-1)})`);
+                
+                if (orParts.length) {
+                   const { data } = await supabase.from(tableName as any).select('*').or(orParts.join(','));
+                   if (data) existingRecords = data;
+                }
+            }
+            
+            // Match records
+            for (const record of records) {
+                const match = existingRecords.find(e => 
+                   (record.email && e.email === record.email) || 
+                   (record.phone && e.phone === record.phone)
+                );
+                
+                if (match) {
+                    if (duplicateMode === 'skip') {
+                        result.logs.push({ 
+                            rowNumber: 0, field: 'all', original: '', newValue: '', 
+                            message: `Skipped duplicate (ID: ${match.id})`, type: 'info' 
+                        });
+                        // Don't count as failure, just don't add to success
+                    } else if (duplicateMode === 'update') {
+                        recordsToUpdate.push({ ...record, id: match.id });
+                        importDetails.push({
+                            record_id: match.id,
+                            operation_type: 'update',
+                            previous_data: match,
+                            new_data: record
+                        });
+                    }
+                } else {
+                    recordsToInsert.push(record);
+                }
+            }
+        }
+
+        // Execute Inserts
+        if (recordsToInsert.length > 0) {
+            const { data: inserted, error } = await supabase.from(tableName as any).insert(recordsToInsert).select();
+            if (error) {
+                result.failed += recordsToInsert.length;
+                result.errors.push(`Insert error: ${error.message}`);
+            } else if (inserted) {
+                const insertedRows = inserted as any[];
+                result.success += insertedRows.length;
+                result.insertedIds.push(...insertedRows.map(r => r.id));
+                insertedRows.forEach(r => {
+                    importDetails.push({
+                        record_id: r.id,
+                        operation_type: 'insert',
+                        new_data: r
+                    });
+                });
+            }
+        }
+
+        // Execute Updates
+        if (recordsToUpdate.length > 0) {
+             const { data: updated, error } = await supabase.from(tableName as any).upsert(recordsToUpdate).select();
+             if (error) {
+                 result.failed += recordsToUpdate.length;
+                 result.errors.push(`Update error: ${error.message}`);
+             } else if (updated) {
+                 result.success += updated.length;
+                 // Updates are tracked in importDetails for revert
+             }
+        }
+
+        // Log History
+        if (importSessionId && importDetails.length > 0) {
+             await ImportHistoryService.logDetails(supabase, importSessionId, importDetails);
         }
 
       } catch (e: any) {
@@ -436,8 +556,7 @@ export default function DataImportExport({
         // Calculate ETA
         if (importStartedAtRef.current && result.success + result.failed > 0) {
            const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
-           const rate = (result.success + result.failed) / elapsed;
-           // Estimate remaining rows if we knew total count... but we stream CSV
+           // const rate = (result.success + result.failed) / elapsed;
         }
       }
     };
@@ -459,7 +578,9 @@ export default function DataImportExport({
                 }
                 setImportPaused(false);
 
-                const { record, customFields } = buildMappedRecord(results.data as ParsedRow);
+                rowIndex++;
+                const { record, customFields, logs, isValid } = buildMappedRecord(results.data as ParsedRow, rowIndex);
+                if (logs.length > 0) result.logs.push(...logs);
                 
                 // Validate
                 if (validationSchema) {
@@ -514,7 +635,9 @@ export default function DataImportExport({
            }
            setImportPaused(false);
 
-           const { record, customFields } = buildMappedRecord(row);
+           rowIndex++;
+           const { record, customFields, logs, isValid } = buildMappedRecord(row, rowIndex);
+           if (logs.length > 0) result.logs.push(...logs);
            
            if (validationSchema) {
               const validation = validationSchema.safeParse(record);
@@ -551,10 +674,36 @@ export default function DataImportExport({
     }
   };
 
+  const handleRevert = async () => {
+    if (!importResult?.importId) return;
+
+    // Permission check
+    if (!context.isPlatformAdmin && !context.isTenantAdmin) {
+       toast.error("You do not have permission to revert imports.");
+       return;
+    }
+    
+    if (!confirm(`Are you sure you want to revert this import? This will undo inserts and restore updated records.`)) return;
+
+    setProcessingAction('revert');
+    setImporting(true);
+    try {
+      const result = await ImportHistoryService.revertImport(supabase, importResult.importId);
+      
+      toast.success(`Revert successful: ${result.revertedInserts} inserts deleted, ${result.revertedUpdates} updates restored.`);
+      setImportResult(prev => prev ? { ...prev, success: 0, insertedIds: [] } : null);
+      
+    } catch (e: any) {
+      toast.error(`Revert failed: ${e.message}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleExport = async (format: 'xlsx' | 'csv') => {
     setExportStage('counting');
     try {
-      let query = supabase.from(tableName).select('*');
+      let query = supabase.from(tableName as any).select('*');
       
       // Apply context filters
       if (!context.adminOverrideEnabled && context.franchiseId) {
@@ -580,7 +729,7 @@ export default function DataImportExport({
       setExportStage('building');
       
       // Map data to export fields
-      const exportData = data.map(row => {
+      const exportData = (data as any[]).map((row: any) => {
         const mapped: Record<string, any> = {};
         for (const fieldKey of currentExportFields) {
            const fieldDef = exportFields.find(f => f.key === fieldKey);
@@ -608,7 +757,7 @@ export default function DataImportExport({
       toast.success("Export completed successfully");
       
       // Audit Log (Mock)
-      console.log(`[AUDIT] User ${context.user?.id} exported ${data.length} ${entityName} records at ${new Date().toISOString()}`);
+      console.log(`[AUDIT] User ${context.userId} exported ${data.length} ${entityName} records at ${new Date().toISOString()}`);
       
     } catch (e: any) {
       toast.error(`Export failed: ${e.message}`);
@@ -616,6 +765,58 @@ export default function DataImportExport({
       setExportStage('idle');
     }
   };
+
+  // --- History Logic ---
+
+  const [historyData, setHistoryData] = useState<ImportSession[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('import_history')
+        .select('*')
+        .eq('entity_name', entityName)
+        .order('imported_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      setHistoryData(data as ImportSession[]);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to load history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [supabase, entityName]);
+
+  const handleHistoryRevert = async (importId: string) => {
+    // Permission check
+    if (!context.isPlatformAdmin && !context.isTenantAdmin) {
+       toast.error("You do not have permission to revert imports.");
+       return;
+    }
+    
+    if (!confirm(`Are you sure you want to revert this import? This will undo inserts and restore updated records.`)) return;
+
+    try {
+      const toastId = toast.loading("Reverting import...");
+      
+      const result = await ImportHistoryService.revertImport(supabase, importId);
+      
+      toast.dismiss(toastId);
+      toast.success(`Reverted successfully: ${result.revertedInserts} inserts removed, ${result.revertedUpdates} updates restored.`);
+      
+      fetchHistory(); // Refresh list
+    } catch (err: any) {
+      toast.error(`Revert failed: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   // --- Render ---
 
@@ -632,7 +833,14 @@ export default function DataImportExport({
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Tabs defaultValue="operations" className="w-full">
+          <TabsList>
+            <TabsTrigger value="operations">Import / Export</TabsTrigger>
+            <TabsTrigger value="history" onClick={fetchHistory}>History</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="operations" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Import Card */}
           <Card className="h-full flex flex-col">
             <CardHeader>
@@ -835,19 +1043,23 @@ export default function DataImportExport({
                           <div className="absolute inset-0 rounded-full border-4 border-muted"></div>
                           <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
                        </div>
-                       <h3 className="text-lg font-medium">Importing...</h3>
-                       <p className="text-muted-foreground text-sm">
-                         Processed {importProcessedRows} records...
-                       </p>
-                       <div className="flex justify-center gap-2 mt-4">
-                         <Button variant="outline" size="sm" onClick={() => pauseRequestedRef.current = !importPaused}>
-                            {importPaused ? <Play className="h-4 w-4 mr-2"/> : <Pause className="h-4 w-4 mr-2"/>}
-                            {importPaused ? 'Resume' : 'Pause'}
-                         </Button>
-                         <Button variant="destructive" size="sm" onClick={() => cancelRequestedRef.current = true}>
-                            <XCircle className="h-4 w-4 mr-2" /> Cancel
-                         </Button>
-                       </div>
+                       <h3 className="text-lg font-medium">{processingAction === 'revert' ? 'Reverting Import...' : 'Importing...'}</h3>
+                       {processingAction === 'import' && (
+                           <>
+                               <p className="text-muted-foreground text-sm">
+                                 Processed {importProcessedRows} records...
+                               </p>
+                               <div className="flex justify-center gap-2 mt-4">
+                                 <Button variant="outline" size="sm" onClick={() => pauseRequestedRef.current = !importPaused}>
+                                    {importPaused ? <Play className="h-4 w-4 mr-2"/> : <Pause className="h-4 w-4 mr-2"/>}
+                                    {importPaused ? 'Resume' : 'Pause'}
+                                 </Button>
+                                 <Button variant="destructive" size="sm" onClick={() => cancelRequestedRef.current = true}>
+                                    <XCircle className="h-4 w-4 mr-2" /> Cancel
+                                 </Button>
+                               </div>
+                           </>
+                       )}
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -879,8 +1091,47 @@ export default function DataImportExport({
                         </div>
                       )}
 
-                      <Button className="w-full" onClick={resetImport}>Import Another File</Button>
-                    </div>
+                      {importResult?.logs && importResult.logs.length > 0 && (
+                        <div className="border rounded-md mt-4">
+                          <div className="bg-muted px-4 py-2 border-b text-sm font-medium flex justify-between items-center">
+                            <span>Corrections Log</span>
+                            <Badge variant="secondary">{importResult.logs.length}</Badge>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto p-0">
+                             <table className="w-full text-xs text-left">
+                               <thead className="bg-muted/50 sticky top-0">
+                                 <tr>
+                                   <th className="p-2 font-medium">Row</th>
+                                   <th className="p-2 font-medium">Field</th>
+                                   <th className="p-2 font-medium">Original</th>
+                                   <th className="p-2 font-medium">New</th>
+                                   <th className="p-2 font-medium">Message</th>
+                                 </tr>
+                               </thead>
+                               <tbody className="divide-y">
+                                 {importResult.logs.map((log, i) => (
+                                   <tr key={i} className={log.type === 'error' ? 'bg-red-50/50' : ''}>
+                                     <td className="p-2 border-r">{log.rowNumber}</td>
+                                     <td className="p-2 border-r">{log.field}</td>
+                                     <td className="p-2 border-r max-w-[150px] truncate" title={String(log.original)}>{String(log.original)}</td>
+                                     <td className="p-2 border-r max-w-[150px] truncate" title={String(log.newValue)}>{String(log.newValue)}</td>
+                                     <td className="p-2">{log.message}</td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                             </table>
+                          </div>
+                        </div>
+                       )}
+ 
+                       {importResult?.importId && (
+                        <Button variant="destructive" className="w-full mt-4" onClick={handleRevert}>
+                           <XCircle className="h-4 w-4 mr-2" /> Revert Import
+                        </Button>
+                      )}
+
+                       <Button className="w-full mt-2" onClick={resetImport}>Import Another File</Button>
+                     </div>
                   )}
                 </div>
               )}
@@ -952,7 +1203,71 @@ export default function DataImportExport({
                </div>
             </CardContent>
           </Card>
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-6">
+            <Card>
+               <CardHeader>
+                 <CardTitle>Import History</CardTitle>
+                 <CardDescription>View past import sessions and revert them if necessary.</CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <Table>
+                   <TableHeader>
+                     <TableRow>
+                       <TableHead>Date</TableHead>
+                       <TableHead>File</TableHead>
+                       <TableHead>Status</TableHead>
+                       <TableHead>Summary</TableHead>
+                       <TableHead>Actions</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {historyLoading ? (
+                       <TableRow>
+                         <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
+                       </TableRow>
+                     ) : historyData.length === 0 ? (
+                       <TableRow>
+                         <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                           No import history found.
+                         </TableCell>
+                       </TableRow>
+                     ) : (
+                       historyData.map((session) => (
+                         <TableRow key={session.id}>
+                           <TableCell>{new Date(session.imported_at).toLocaleString()}</TableCell>
+                           <TableCell>{session.file_name}</TableCell>
+                           <TableCell>
+                              <Badge variant={session.status === 'success' ? 'default' : session.status === 'reverted' ? 'destructive' : 'secondary'}>
+                                {session.status}
+                              </Badge>
+                           </TableCell>
+                           <TableCell className="text-xs">
+                             {session.summary ? (
+                               <div className="flex gap-2">
+                                 <span className="text-green-600">Success: {session.summary.success}</span>
+                                 <span className="text-red-600">Failed: {session.summary.failed}</span>
+                               </div>
+                             ) : '-'}
+                           </TableCell>
+                           <TableCell>
+                             {session.status !== 'reverted' && (
+                               <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleHistoryRevert(session.id)}>
+                                 <XCircle className="h-4 w-4 mr-2" /> Revert
+                               </Button>
+                             )}
+                           </TableCell>
+                         </TableRow>
+                       ))
+                     )}
+                   </TableBody>
+                 </Table>
+               </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
