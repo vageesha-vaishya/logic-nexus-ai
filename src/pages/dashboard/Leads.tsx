@@ -71,7 +71,7 @@ export default function Leads() {
     createdEnd,
   } = viewState.workspace;
 
-  const viewMode = viewState.view as ViewMode;
+  const viewMode = (viewState.view === 'pipeline' ? 'card' : viewState.view) as ViewMode;
   const selectedIds = new Set(viewState.selection.selectedIds);
   const currentTheme = viewState.theme;
 
@@ -103,18 +103,6 @@ export default function Leads() {
       setWorkspaceScrollY(window.scrollY);
     };
   }, [viewState.hydrated, viewState.scroll.workspaceScrollY, setWorkspaceScrollY]);
-
-  useEffect(() => {
-    if (!viewState.hydrated) return;
-    if (viewState.view === 'pipeline') {
-      const params = new URLSearchParams();
-      if (viewState.pipeline.q) params.set('q', viewState.pipeline.q);
-      if (viewState.pipeline.status.length > 0) params.set('status', viewState.pipeline.status.join(','));
-      if (viewState.pipeline.tab) params.set('view', viewState.pipeline.tab);
-      const qs = params.toString();
-      navigate(qs ? `/dashboard/leads/pipeline?${qs}` : '/dashboard/leads/pipeline', { replace: true });
-    }
-  }, [navigate, viewState.hydrated, viewState.pipeline.q, viewState.pipeline.status, viewState.pipeline.tab, viewState.view]);
 
   useEffect(() => {
     const loadDefaults = async () => {
