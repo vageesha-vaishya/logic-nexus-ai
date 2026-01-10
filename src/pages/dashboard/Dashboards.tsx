@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Phone, Calendar, CheckSquare, Mail, StickyNote } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -59,39 +59,39 @@ export default function Dashboards() {
     );
   };
 
+  // Create scoped data access for proper filtering
+  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
+
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
         // Fetch assignable users for inline assignment control
         const { data: users } = await fetchAssignableUsers({ search: '', limit: 50 });
         setAssignableUsers((users ?? []) as AssignableUser[]);
-        // My Leads: assigned to me
-        const leadQuery = supabase
+        
+        // My Leads: Use ScopedDataAccess to apply tenant/franchise filters
+        const { data: leads, error: leadsErr } = await dao
           .from('leads')
           .select('id, first_name, last_name, company, status, owner_id')
           .eq('owner_id', context.userId)
           .order('created_at', { ascending: false })
           .limit(6);
 
-        // Rely on RLS for scoping; avoid extra filters that can exclude rows
-
-        const { data: leads, error: leadsErr } = await leadQuery;
         if (leadsErr) throw leadsErr;
-        setMyLeads(leads || []);
+        setMyLeads((leads as LeadItem[]) || []);
 
-        // My Activities: assigned to me and not completed
-        const actQuery = supabase
+        // My Activities: Use ScopedDataAccess to apply tenant/franchise filters
+        const { data: activities, error: actErr } = await dao
           .from('activities')
           .select('id, activity_type, subject, due_date, status, assigned_to, lead_id')
           .eq('assigned_to', context.userId)
           .or('status.is.null,status.neq.completed')
           .order('due_date', { ascending: true })
           .limit(6);
-        // Rely on RLS for scoping; avoid extra filters that can exclude rows
 
-        const { data: activities, error: actErr } = await actQuery;
         if (actErr) throw actErr;
-        const acts = (activities || []) as ActivityItem[];
+        const acts = (activities as ActivityItem[]) || [];
         setMyActivities(acts);
 
         // Fetch lead names for referenced activities to use as group headers
@@ -103,13 +103,14 @@ export default function Dashboards() {
           )
         );
         if (leadIds.length > 0) {
-          const { data: leadRefs, error: leadRefsErr } = await supabase
+          const { data: leadRefs, error: leadRefsErr } = await dao
             .from('leads')
             .select('id, first_name, last_name, company')
             .in('id', leadIds);
+
           if (!leadRefsErr && leadRefs) {
             const map: Record<string, string> = {};
-            for (const l of leadRefs) {
+            for (const l of leadRefs as any[]) {
               const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ').trim();
               map[l.id] = fullName || l.company || 'Lead';
             }
@@ -126,7 +127,8 @@ export default function Dashboards() {
     };
 
     fetchData();
-  }, [supabase, context.userId, context.tenantId, context.franchiseId, fetchAssignableUsers]);
+    // Include context._version to trigger re-fetch when scope changes
+  }, [dao, context.userId, context.tenantId, context.franchiseId, context._version, fetchAssignableUsers]);
 
   const assignActivityOwner = async (activityId: string, newOwnerId: string | 'none') => {
     try {

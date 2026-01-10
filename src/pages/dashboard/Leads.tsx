@@ -244,7 +244,7 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, context, ownerFilter, scoreFilter, searchQuery, statusFilter]);
+  }, [supabase, context, context._version, ownerFilter, scoreFilter, searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchLeads();

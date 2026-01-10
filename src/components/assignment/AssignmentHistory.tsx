@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { ArrowRight, Search } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export function AssignmentHistory() {
   const { supabase, context } = useCRM();
@@ -13,55 +14,60 @@ export function AssignmentHistory() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Create scoped data access for proper filtering
+  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
+
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        // Use ScopedDataAccess for proper tenant/franchise filtering
+        const { data: historyData, error } = await dao
+          .from('lead_assignment_history')
+          .select('*')
+          .order('assigned_at', { ascending: false })
+          .limit(100);
 
-  const fetchHistory = async () => {
-    try {
-      let query = supabase
-        .from('lead_assignment_history')
-        .select('*')
-        .order('assigned_at', { ascending: false })
-        .limit(100);
+        if (error) throw error;
 
-      if (context.tenantId) query = query.eq('tenant_id', context.tenantId);
+        // Fetch related data separately using dao for proper scoping
+        if (historyData && historyData.length > 0) {
+          const leadIds = (historyData as any[]).map(h => h.lead_id).filter(Boolean);
+          const userIds = [...new Set([
+            ...(historyData as any[]).map(h => h.assigned_to),
+            ...(historyData as any[]).map(h => h.assigned_from).filter(Boolean)
+          ])];
 
-      const { data: historyData, error } = await query;
-      if (error) throw error;
+          const [{ data: leadsData }, { data: profilesData }] = await Promise.all([
+            dao.from('leads').select('id, first_name, last_name, company').in('id', leadIds),
+            supabase.from('profiles').select('id, first_name, last_name').in('id', userIds)
+          ]);
 
-      // Fetch related data separately
-      if (historyData && historyData.length > 0) {
-        const leadIds = historyData.map(h => h.lead_id).filter(Boolean);
-        const userIds = [...new Set([
-          ...historyData.map(h => h.assigned_to),
-          ...historyData.map(h => h.assigned_from).filter(Boolean)
-        ])];
+          const leadsMap = new Map((leadsData as any[])?.map(l => [l.id, l]));
+          const profilesMap = new Map(profilesData?.map(p => [p.id, p]));
 
-        const [{ data: leadsData }, { data: profilesData }] = await Promise.all([
-          supabase.from('leads').select('id, first_name, last_name, company').in('id', leadIds),
-          supabase.from('profiles').select('id, first_name, last_name').in('id', userIds)
-        ]);
+          const enrichedData = (historyData as any[]).map(item => ({
+            ...item,
+            leads: leadsMap.get(item.lead_id),
+            assigned_to_profile: profilesMap.get(item.assigned_to),
+            assigned_from_profile: item.assigned_from ? profilesMap.get(item.assigned_from) : null
+          }));
 
-        const leadsMap = new Map(leadsData?.map(l => [l.id, l]));
-        const profilesMap = new Map(profilesData?.map(p => [p.id, p]));
-
-        const enrichedData = historyData.map(item => ({
-          ...item,
-          leads: leadsMap.get(item.lead_id),
-          assigned_to_profile: profilesMap.get(item.assigned_to),
-          assigned_from_profile: item.assigned_from ? profilesMap.get(item.assigned_from) : null
-        }));
-
-        setHistory(enrichedData);
+          setHistory(enrichedData);
+        } else {
+          setHistory([]);
+        }
+      } catch (error: any) {
+        toast.error('Failed to load history');
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      toast.error('Failed to load history');
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchHistory();
+    // Include context._version to trigger re-fetch when scope changes
+  }, [dao, context.tenantId, context.franchiseId, context._version, supabase]);
 
   const filteredHistory = history.filter((item) => {
     const searchLower = searchQuery.toLowerCase();
