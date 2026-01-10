@@ -566,7 +566,7 @@ const App = () => (
             <Route 
               path="/dashboard/transfers" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredPermissions={["transfers.view"]}>
                   <TransferCenter />
                 </ProtectedRoute>
               } 
