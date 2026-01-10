@@ -2,14 +2,34 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+type UnauthorizedState = {
+  reason?: string;
+  missingPermissions?: string[];
+  requiredRole?: string;
+  from?: string;
+} | null;
 
 export default function Unauthorized() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, roles, permissions, isPlatformAdmin } = useAuth();
-  const state = location.state as { reason?: string; missingPermissions?: string[]; requiredRole?: string } | null;
+  const state = (location.state as UnauthorizedState) || null;
   const [showDebug, setShowDebug] = useState(false);
+
+  const platformAdmin = isPlatformAdmin();
+  const redirectedRef = useRef(false);
+
+  useEffect(() => {
+    if (redirectedRef.current) return;
+    if (!platformAdmin) return;
+    if (!state?.from) return;
+    if (state.reason !== 'missing_permissions') return;
+
+    redirectedRef.current = true;
+    navigate(state.from, { replace: true });
+  }, [navigate, platformAdmin, state?.from, state?.reason]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
