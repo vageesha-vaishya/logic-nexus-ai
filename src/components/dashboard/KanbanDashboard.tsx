@@ -11,6 +11,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { FunnelChart, Funnel, LabelList } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
 import { useCRM } from "@/hooks/useCRM";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 import { Input } from "@/components/ui/input";
 
 interface KanbanStats {
@@ -59,7 +60,9 @@ export function KanbanDashboard() {
         return null;
       })();
 
-      let leadsQuery = supabase.from("leads").select("status, owner_id, created_at, franchise_id, tenant_id");
+      const db = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
+
+      let leadsQuery = (db.from("leads") as any).select("status, owner_id, created_at, franchise_id, tenant_id");
       if (from) leadsQuery = leadsQuery.gte("created_at", from.toISOString());
       if (dateFrom) leadsQuery = leadsQuery.gte("created_at", new Date(dateFrom).toISOString());
       if (dateTo) leadsQuery = leadsQuery.lte("created_at", new Date(dateTo).toISOString());
@@ -71,7 +74,7 @@ export function KanbanDashboard() {
         else if (context.tenantId) leadsQuery = leadsQuery.eq("tenant_id", context.tenantId as string);
       }
 
-      let oppsQuery = supabase.from("opportunities").select("stage, amount, owner_id, created_at, account_id, franchise_id, tenant_id");
+      let oppsQuery = (db.from("opportunities") as any).select("stage, amount, owner_id, created_at, account_id, franchise_id, tenant_id");
       if (from) oppsQuery = oppsQuery.gte("created_at", from.toISOString());
       if (dateFrom) oppsQuery = oppsQuery.gte("created_at", new Date(dateFrom).toISOString());
       if (dateTo) oppsQuery = oppsQuery.lte("created_at", new Date(dateTo).toISOString());
@@ -84,7 +87,7 @@ export function KanbanDashboard() {
         else if (context.tenantId) oppsQuery = oppsQuery.eq("tenant_id", context.tenantId as string);
       }
 
-      let quotesQuery = supabase.from("quotes").select("status, sell_price, created_at, account_id, franchise_id, tenant_id");
+      let quotesQuery = (db.from("quotes") as any).select("status, sell_price, created_at, account_id, franchise_id, tenant_id");
       if (from) quotesQuery = quotesQuery.gte("created_at", from.toISOString());
       if (dateFrom) quotesQuery = quotesQuery.gte("created_at", new Date(dateFrom).toISOString());
       if (dateTo) quotesQuery = quotesQuery.lte("created_at", new Date(dateTo).toISOString());
@@ -96,17 +99,8 @@ export function KanbanDashboard() {
         else if (context.tenantId) quotesQuery = quotesQuery.eq("tenant_id", context.tenantId as string);
       }
 
-      let shipmentsQuery = supabase.from("shipments").select("status, tenant_id, franchise_id");
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) shipmentsQuery = shipmentsQuery.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) shipmentsQuery = shipmentsQuery.eq("tenant_id", context.tenantId as string);
-      }
-
-      let activitiesQuery = supabase.from("activities").select("status, tenant_id, franchise_id");
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) activitiesQuery = activitiesQuery.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) activitiesQuery = activitiesQuery.eq("tenant_id", context.tenantId as string);
-      }
+      let shipmentsQuery = (db.from("shipments") as any).select("status, tenant_id, franchise_id");
+      let activitiesQuery = (db.from("activities") as any).select("status, tenant_id, franchise_id");
 
       const [leadsData, opportunitiesData, quotesData, shipmentsData, activitiesData] = await Promise.all([
         leadsQuery,
@@ -205,29 +199,23 @@ export function KanbanDashboard() {
 
   useEffect(() => {
     const loadAccounts = async () => {
-      let query = supabase.from("accounts").select("id, name").limit(200).order("name");
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
+      const db = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
+      let query = (db.from("accounts") as any).select("id, name").limit(200).order("name");
       const { data } = await query;
       setAccounts(data || []);
     };
     loadAccounts();
-  }, [context.franchiseId, context.tenantId, context.isPlatformAdmin]);
+  }, [context.franchiseId, context.tenantId, context.isPlatformAdmin, context.adminOverrideEnabled]);
 
   useEffect(() => {
     const loadFranchises = async () => {
-      let query = supabase.from("franchises").select("id, name").order("name");
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
+      const db = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
+      let query = (db.from("franchises") as any).select("id, name").order("name");
       const { data } = await query;
       setFranchises(data || []);
     };
     loadFranchises();
-  }, [context.franchiseId, context.tenantId, context.isPlatformAdmin]);
+  }, [context.franchiseId, context.tenantId, context.isPlatformAdmin, context.adminOverrideEnabled]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
