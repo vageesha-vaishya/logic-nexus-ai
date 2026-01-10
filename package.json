@@ -17,6 +17,7 @@
     "lint:markdown:fix": "eslint \"**/*.{md,mdx}\" --fix",
     "lint:remark": "remark . --frail",
     "lint:remark:fix": "remark . -o",
+    "test": "vitest run",
     "ci:lint": "eslint src --ext .ts,.tsx,.mdx",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",

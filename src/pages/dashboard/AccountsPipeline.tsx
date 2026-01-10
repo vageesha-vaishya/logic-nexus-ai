@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
 type AccountType = 'prospect' | 'customer' | 'partner' | 'vendor';
@@ -102,20 +103,14 @@ export default function AccountsPipeline() {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      let query = supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from("accounts")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
-      setAccounts((data || []) as Account[]);
+      setAccounts((data || []) as unknown as Account[]);
     } catch (error) {
       toast({ title: "Error", description: "Failed to fetch accounts", variant: "destructive" });
     } finally {
@@ -162,7 +157,8 @@ export default function AccountsPipeline() {
     else if (newStage === 'active' || newStage === 'vip') updates.status = 'active';
     else updates.status = 'pending';
     try {
-      const { error } = await supabase.from('accounts').update(updates).eq('id', accountId);
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao.from('accounts').update(updates).eq('id', accountId);
       if (error) throw error;
       setAccounts((prev) => prev.map((a) => a.id === accountId ? { ...a, ...updates } : a));
       toast({ title: 'Success', description: 'Account stage updated' });

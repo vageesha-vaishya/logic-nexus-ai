@@ -41,7 +41,8 @@ export default function PermissionsMatrix() {
   }, []);
 
   const hasRolePermission = (role: typeof ROLES[number], perm: string) => {
-    return ROLE_PERMISSIONS[role].includes(perm as Permission);
+    const permissions = ROLE_PERMISSIONS[role];
+    return permissions.includes('*') || permissions.includes(perm as Permission);
   };
 
   return (

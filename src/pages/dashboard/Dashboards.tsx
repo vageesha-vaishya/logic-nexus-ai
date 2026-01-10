@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { toast } from 'sonner';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 interface LeadItem {
   id: string;
@@ -130,7 +131,8 @@ export default function Dashboards() {
   const assignActivityOwner = async (activityId: string, newOwnerId: string | 'none') => {
     try {
       const assigned_to = newOwnerId === 'none' ? null : newOwnerId;
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('activities')
         .update({ assigned_to })
         .eq('id', activityId);
@@ -190,7 +192,7 @@ export default function Dashboards() {
 
           <Card>
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>My Activities</CardTitle>
+              <CardTitle>{context.isPlatformAdmin ? 'Recent Activities' : 'My Activities'}</CardTitle>
               <Button variant="link" className="p-0" asChild>
                 <Link to="/dashboard/activities">View all</Link>
               </Button>

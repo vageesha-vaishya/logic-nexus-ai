@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 import { Opportunity, OpportunityStage as Stage, stageColors, stageLabels, stages } from "./opportunities-data";
 type OpportunityStage = Stage;
 
@@ -85,7 +86,9 @@ export default function OpportunitiesPipeline() {
   const fetchOpportunities = async () => {
     try {
       setLoading(true);
-      let query = supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      
+      let query = dao
         .from("opportunities")
         .select(`
           *,
@@ -94,11 +97,8 @@ export default function OpportunitiesPipeline() {
         `)
         .order("created_at", { ascending: false });
 
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
-
+      // DAO handles scoping (including admin override)
+      
       const { data, error } = await query;
 
       if (error) throw error;
@@ -117,16 +117,12 @@ export default function OpportunitiesPipeline() {
 
   const fetchAccounts = async () => {
     try {
-      let query = supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from("accounts")
         .select("id, name")
         .limit(100)
         .order("name");
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
-      const { data, error } = await query;
 
       if (error) throw error;
       setAccounts(data || []);
@@ -137,7 +133,8 @@ export default function OpportunitiesPipeline() {
 
   const handleStageChange = async (opportunityId: string, newStage: Stage) => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("opportunities")
         .update({ stage: newStage })
         .eq("id", opportunityId);
@@ -233,7 +230,8 @@ export default function OpportunitiesPipeline() {
     if (selectedOpportunities.size === 0) return;
 
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("opportunities")
         .delete()
         .in("id", Array.from(selectedOpportunities));
@@ -261,7 +259,8 @@ export default function OpportunitiesPipeline() {
     if (selectedOpportunities.size === 0) return;
 
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("opportunities")
         .update({ stage: newStage })
         .in("id", Array.from(selectedOpportunities));

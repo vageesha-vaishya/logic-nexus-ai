@@ -402,9 +402,9 @@ export default function LeadsPipeline() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...leadUpdates } : l));
 
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update(leadUpdates as any)
+      const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
+      const { error } = await (dataAccess.from('leads') as any)
+        .update(leadUpdates)
         .eq('id', id);
 
       if (error) throw error;

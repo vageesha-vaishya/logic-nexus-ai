@@ -73,6 +73,7 @@ export const ROLE_PERMISSIONS: Record<
 > = {
   platform_admin: [
     // Full access
+    '*',
     'leads.view','leads.create','leads.edit','leads.delete','leads.convert','leads.assign','leads.import_export',
     'accounts.view','accounts.create','accounts.edit','accounts.delete',
     'contacts.view','contacts.create','contacts.edit','contacts.delete',

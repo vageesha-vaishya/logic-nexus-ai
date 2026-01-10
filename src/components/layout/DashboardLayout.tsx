@@ -6,6 +6,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StickyActionsProvider, useStickyActions } from '@/components/layout/StickyActionsContext';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
+import { AdminScopeSwitcher } from './AdminScopeSwitcher';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -34,6 +35,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
+              <div className="flex-1" />
+              <AdminScopeSwitcher />
               <ObjectMenu />
             </header>
             <main className="flex-1 p-4 bg-muted/30 pb-24" style={{ backgroundImage: 'var(--app-background, none)' }}>

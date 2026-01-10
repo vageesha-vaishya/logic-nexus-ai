@@ -9,6 +9,7 @@ export interface DataAccessContext {
   isTenantAdmin: boolean;
   isFranchiseAdmin: boolean;
   userId?: string;
+  adminOverrideEnabled?: boolean;
 }
 
 /**
@@ -18,12 +19,29 @@ export interface DataAccessContext {
  * @returns The scoped query
  */
 export function withScope<T>(query: T, context: DataAccessContext): T {
-  // Platform admins see everything
-  if (context.isPlatformAdmin) {
+  // Platform admins see everything UNLESS they have explicitly enabled override
+  if (context.isPlatformAdmin && !context.adminOverrideEnabled) {
     return query;
   }
 
   let scopedQuery = query as any;
+
+  // Admin Override Logic
+  if (context.isPlatformAdmin && context.adminOverrideEnabled) {
+    if (context.tenantId) {
+      scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    }
+    if (context.franchiseId) {
+      scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
+    }
+    // If override is enabled but no tenant/franchise selected, what happens?
+    // Usually it implies "Global" but if they wanted Global they would disable override.
+    // However, for safety, if they enable override and select nothing, maybe we should return nothing?
+    // Or maybe "All Tenants" is represented by null tenantId?
+    // If tenantId is null, we don't filter. So it behaves like Global.
+    // This seems acceptable.
+    return scopedQuery;
+  }
 
   // Tenant Admin: Must scope to their tenant
   if (context.isTenantAdmin && context.tenantId) {

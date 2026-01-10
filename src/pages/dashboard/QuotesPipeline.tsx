@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 import { Quote, QuoteStatus, statusConfig, stages } from "./quotes-data";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 export default function QuotesPipeline() {
   const navigate = useNavigate();
@@ -135,7 +136,8 @@ export default function QuotesPipeline() {
 
   const handleStatusChange = async (quoteId: string, newStatus: QuoteStatus) => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("quotes")
         .update({ status: newStatus })
         .eq("id", quoteId);
@@ -227,7 +229,8 @@ export default function QuotesPipeline() {
     if (selectedQuotes.size === 0) return;
 
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("quotes")
         .delete()
         .in("id", Array.from(selectedQuotes));
@@ -255,7 +258,8 @@ export default function QuotesPipeline() {
     if (selectedQuotes.size === 0) return;
 
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("quotes")
         .update({ status: newStatus })
         .in("id", Array.from(selectedQuotes));
