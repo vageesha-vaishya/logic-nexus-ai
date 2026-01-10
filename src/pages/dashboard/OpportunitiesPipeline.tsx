@@ -102,7 +102,7 @@ export default function OpportunitiesPipeline() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setOpportunities((data || []) as Opportunity[]);
+      setOpportunities((data as unknown as Opportunity[]) || []);
     } catch (error) {
       console.error("Error fetching opportunities:", error);
       toast({
@@ -125,7 +125,7 @@ export default function OpportunitiesPipeline() {
         .order("name");
 
       if (error) throw error;
-      setAccounts(data || []);
+      setAccounts((data as unknown as { id: string; name: string }[]) || []);
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }

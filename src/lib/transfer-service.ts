@@ -44,8 +44,8 @@ export const TransferService = {
   async createTransfer(payload: CreateTransferPayload) {
     const { items, ...transferData } = payload;
     
-    // Start transaction (manual via client)
-    const { data: transfer, error: transferError } = await supabase
+    // Cast until types regenerate
+    const { data: transfer, error: transferError } = await (supabase as any)
       .from('entity_transfers')
       .insert({
         ...transferData,
@@ -63,13 +63,13 @@ export const TransferService = {
       status: 'pending'
     }));
 
-    const { error: itemsError } = await supabase
+    const { error: itemsError } = await (supabase as any)
       .from('entity_transfer_items')
       .insert(itemsData);
 
     if (itemsError) {
       // Cleanup if items fail (optional but good)
-      await supabase.from('entity_transfers').delete().eq('id', transfer.id);
+      await (supabase as any).from('entity_transfers').delete().eq('id', transfer.id);
       throw itemsError;
     }
 
@@ -77,7 +77,7 @@ export const TransferService = {
   },
 
   async getTransfers() {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('entity_transfers')
       .select(`
         *,
@@ -94,7 +94,7 @@ export const TransferService = {
   },
 
   async getTransfer(id: string) {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('entity_transfers')
       .select(`
         *,
@@ -112,28 +112,29 @@ export const TransferService = {
     return data;
   },
 
-  async approveTransfer(id: string) {
+  async approveTransfer(id: string): Promise<{ success: boolean; processed?: number; message?: string }> {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await supabase.rpc('execute_transfer', {
+    // Cast until types regenerate
+    const { data, error } = await (supabase as any).rpc('execute_transfer', {
       p_transfer_id: id,
       p_approver_id: user.id
     });
 
     if (error) throw error;
-    return data;
+    return data as { success: boolean; processed?: number; message?: string };
   },
 
   async rejectTransfer(id: string, reason: string) {
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) throw new Error('Not authenticated');
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('entity_transfers')
       .update({
         status: 'rejected',
-        approved_by: user.id, // Act as rejector
+        approved_by: user.id,
         rejection_reason: reason,
         updated_at: new Date().toISOString()
       })

@@ -44,20 +44,20 @@ export function ImportReportDialog({ session, open, onOpenChange }: ImportReport
   const fetchErrors = async () => {
     setLoading(true);
     try {
-      // Fetch errors
-      const { data, error } = await supabase
+      // Fetch errors (cast until types regenerate)
+      const { data, error } = await (supabase as any)
         .from('import_errors')
         .select('*')
         .eq('import_id', session.id)
-        .limit(100); // Limit for now, maybe add pagination later
+        .limit(100);
 
       if (error) throw error;
       
-      setErrors(data || []);
+      setErrors((data || []) as ImportError[]);
 
       // Calculate stats (client side for now, or use separate query)
       const stats: Record<string, number> = {};
-      data?.forEach(err => {
+      (data || []).forEach((err: ImportError) => {
         stats[err.field] = (stats[err.field] || 0) + 1;
       });
       setErrorStats(stats);
