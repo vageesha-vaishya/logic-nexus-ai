@@ -335,16 +335,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const hasRole = (role: AppRole) => {
-    return roles.some(r => r.role === role);
+    const result = roles.some(r => r.role === role);
+    return result;
   };
 
-  const isPlatformAdmin = () => hasRole('platform_admin');
-  const isTenantAdmin = () => hasRole('tenant_admin');
-  const isFranchiseAdmin = () => hasRole('franchise_admin');
+  const isPlatformAdmin = () => {
+    // Check if any role is platform_admin - this bypasses all permission checks
+    const result = roles.some(r => r.role === 'platform_admin');
+    return result;
+  };
+  
+  const isTenantAdmin = () => roles.some(r => r.role === 'tenant_admin');
+  const isFranchiseAdmin = () => roles.some(r => r.role === 'franchise_admin');
 
   const hasPermission = (permission: Permission) => {
-    // Platform admin has implicit full access
-    if (isPlatformAdmin()) return true;
+    // Platform admin has implicit full access - check directly against roles array
+    const isAdmin = roles.some(r => r.role === 'platform_admin');
+    if (isAdmin) return true;
+    
+    // Check for wildcard permission or specific permission
     return permissions.includes('*') || permissions.includes(permission);
   };
 
