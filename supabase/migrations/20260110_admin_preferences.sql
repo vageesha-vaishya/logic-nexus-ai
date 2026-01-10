@@ -11,13 +11,16 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
 -- Enable RLS
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
 
--- Policies
+-- Policies (Drop first to avoid conflicts)
+DROP POLICY IF EXISTS "Users can view own preferences" ON public.user_preferences;
 CREATE POLICY "Users can view own preferences" ON public.user_preferences
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own preferences" ON public.user_preferences;
 CREATE POLICY "Users can update own preferences" ON public.user_preferences
     FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own preferences" ON public.user_preferences;
 CREATE POLICY "Users can insert own preferences" ON public.user_preferences
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 

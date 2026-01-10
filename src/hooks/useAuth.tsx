@@ -34,7 +34,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, metadata?: any) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: any }>;
   hasRole: (role: AppRole) => boolean;
   hasPermission: (permission: Permission) => boolean;
   isPlatformAdmin: () => boolean;
@@ -46,6 +46,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -63,7 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching roles:', error);
       return [];
     }
-    return data || [];
+    
+    // Map legacy or alternative role names to system roles
+    return (data || []).map((r: any) => ({
+      ...r,
+      role: r.role === 'super_admin' ? 'platform_admin' : r.role
+    }));
   };
 
   const fetchCustomPermissions = async (userId: string): Promise<{ granted: Permission[], denied: Permission[] }> => {
@@ -264,12 +270,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setProfile(null);
-    setRoles([]);
-    setPermissions([]);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+      }
+      return { error };
+    } catch (error) {
+      console.error('Unexpected error during sign out:', error);
+      return { error };
+    } finally {
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setRoles([]);
+      setPermissions([]);
+      navigate('/auth');
+    }
   };
 
   const hasRole = (role: AppRole) => {

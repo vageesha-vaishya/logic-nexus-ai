@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, DollarSign } from "lucide-react";
@@ -25,7 +24,7 @@ import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 export default function QuotesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, supabase } = useCRM();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,7 +83,9 @@ export default function QuotesPipeline() {
   const fetchQuotes = async () => {
     try {
       setLoading(true);
-      let query = supabase
+      
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from("quotes")
         .select(`
           *,
@@ -93,15 +94,8 @@ export default function QuotesPipeline() {
         `)
         .order("created_at", { ascending: false });
 
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
-      setQuotes((data || []) as Quote[]);
+      setQuotes((data || []) as unknown as Quote[]);
     } catch (error) {
       console.error("Error fetching quotes:", error);
       toast({
@@ -116,25 +110,34 @@ export default function QuotesPipeline() {
 
   const fetchAccounts = async () => {
     try {
-      let query = supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from("accounts")
         .select("id, name")
         .limit(100)
         .order("name");
-      if (!context.isPlatformAdmin) {
-        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
-        else if (context.tenantId) query = query.eq("tenant_id", context.tenantId as string);
-      }
-      const { data, error } = await query;
 
       if (error) throw error;
-      setAccounts(data || []);
+      setAccounts((data || []) as any);
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
   };
 
   const handleStatusChange = async (quoteId: string, newStatus: QuoteStatus) => {
+    // Check WIP limits
+    const limit = wipLimits[newStatus];
+    const currentCount = quotes.filter((q) => q.status === newStatus).length;
+
+    if (limit < 999 && currentCount >= limit) {
+      toast({
+        title: "WIP Limit Reached",
+        description: `Cannot move to ${statusConfig[newStatus].label} (Limit: ${limit})`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       const { error } = await dao

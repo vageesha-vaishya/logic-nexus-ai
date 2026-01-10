@@ -8,11 +8,12 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [loading, setLoading] = useState(true);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
@@ -24,7 +25,8 @@ export default function QuoteDetail() {
       try {
         if (!id) throw new Error('Missing quote identifier');
         // Allow navigating by either UUID id or quote_number (e.g., QT-2025-002)
-        const { data, error } = await supabase
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const { data, error } = await dao
           .from('quotes')
           .select('id, tenant_id, quote_number')
           .or(`id.eq.${id},quote_number.eq.${id}`)
@@ -50,9 +52,10 @@ export default function QuoteDetail() {
       console.log('[QuoteDetail] Loading latest version for quote:', resolvedId);
       
       try {
-        const { data, error } = await supabase
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const { data, error } = await (dao
           .from('quotation_versions')
-          .select('id, version_number')
+          .select('id, version_number') as any)
           .eq('quote_id', resolvedId)
           .order('version_number', { ascending: false })
           .limit(1);
@@ -62,9 +65,9 @@ export default function QuoteDetail() {
           return;
         }
         
-        if (Array.isArray(data) && data.length && data[0]?.id) {
-          console.log('[QuoteDetail] Found existing version:', data[0].id);
-          setVersionId(String(data[0].id));
+        if (Array.isArray(data) && data.length && (data[0] as any)?.id) {
+          console.log('[QuoteDetail] Found existing version:', (data[0] as any).id);
+          setVersionId(String((data[0] as any).id));
           return;
         }
         
@@ -74,7 +77,7 @@ export default function QuoteDetail() {
         let finalTenantId = tenantId;
         if (!finalTenantId) {
           // Fallback: fetch tenant from quote if not already set
-          const { data: qRow, error: qError } = await supabase
+          const { data: qRow, error: qError } = await dao
             .from('quotes')
             .select('tenant_id')
             .eq('id', resolvedId)
@@ -100,7 +103,7 @@ export default function QuoteDetail() {
           return;
         }
         
-        const { data: v, error: insertError } = await supabase
+        const { data: v, error: insertError } = await dao
           .from('quotation_versions')
           .insert({ quote_id: resolvedId, tenant_id: finalTenantId, version_number: 1 })
           .select('id')
@@ -109,23 +112,23 @@ export default function QuoteDetail() {
         if (insertError) {
           console.error('[QuoteDetail] Error creating version:', insertError);
           // Check if version was created by another process
-          const { data: retry } = await supabase
+          const { data: retry } = await dao
             .from('quotation_versions')
             .select('id')
             .eq('quote_id', resolvedId)
             .limit(1)
             .maybeSingle();
           
-          if (retry?.id) {
-            console.log('[QuoteDetail] Version found on retry:', retry.id);
-            setVersionId(String(retry.id));
+          if ((retry as any)?.id) {
+            console.log('[QuoteDetail] Version found on retry:', (retry as any).id);
+            setVersionId(String((retry as any).id));
           }
           return;
         }
         
-        if (v?.id) {
-          console.log('[QuoteDetail] Created version:', v.id);
-          setVersionId(String(v.id));
+        if ((v as any)?.id) {
+          console.log('[QuoteDetail] Created version:', (v as any).id);
+          setVersionId(String((v as any).id));
         }
       } catch (error) {
         console.error('[QuoteDetail] Unexpected error in loadLatestVersion:', error);

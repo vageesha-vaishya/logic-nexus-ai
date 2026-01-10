@@ -44,13 +44,14 @@ describe('Data Cleaning', () => {
 
   describe('cleanPhone', () => {
     it('should normalize phone numbers', () => {
-        const result = cleanPhone('+1 (555) 123-4567');
-        expect(result.value).toBe('+15551234567');
+        // Use a valid US number structure (e.g. Googleplex)
+        const result = cleanPhone('+1 (650) 253-0000');
+        expect(result.value).toBe('+16502530000');
     });
 
     it('should handle digits only', () => {
-        const result = cleanPhone('5551234567');
-        expect(result.value).toBe('+15551234567'); // Defaulting to US +1 in our logic
+        const result = cleanPhone('6502530000');
+        expect(result.value).toBe('+16502530000'); // Defaulting to US +1 in our logic
     });
     
     it('should return null for invalid phone', () => {

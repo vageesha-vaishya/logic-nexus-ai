@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
@@ -12,10 +11,10 @@ import { QuoteTemplate } from '@/components/sales/templates/types';
 import { FileText } from 'lucide-react';
 import { QuoteFormValues } from '@/components/sales/quote-form/types';
 import { toast } from 'sonner';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function QuoteNew() {
-  const navigate = useNavigate();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -47,7 +46,8 @@ export default function QuoteNew() {
     setCreatedQuoteId(quoteId);
     // Fetch tenant_id for the created quote to ensure version insert works
     (async () => {
-      const { data } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data } = await dao
         .from('quotes')
         .select('tenant_id')
         .eq('id', quoteId)
@@ -63,8 +63,9 @@ export default function QuoteNew() {
       console.log('[QuoteNew] Ensuring version exists for quote:', createdQuoteId);
       
       try {
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
         // Check if version already exists
-        const { data: existing, error: queryError } = await supabase
+        const { data: existing, error: queryError } = await dao
           .from('quotation_versions')
           .select('id, version_number')
           .eq('quote_id', createdQuoteId)
@@ -76,9 +77,9 @@ export default function QuoteNew() {
           return;
         }
         
-        if (Array.isArray(existing) && existing.length && existing[0]?.id) {
-          console.log('[QuoteNew] Found existing version:', existing[0].id);
-          setVersionId(String(existing[0].id));
+        if (Array.isArray(existing) && existing.length && (existing[0] as any)?.id) {
+          console.log('[QuoteNew] Found existing version:', (existing[0] as any).id);
+          setVersionId(String((existing[0] as any).id));
           return;
         }
         
@@ -91,7 +92,7 @@ export default function QuoteNew() {
           return;
         }
         
-        const { data: v, error: insertError } = await supabase
+        const { data: v, error: insertError } = await dao
           .from('quotation_versions')
           .insert({ quote_id: createdQuoteId, tenant_id: finalTenantId, version_number: 1 })
           .select('id')
@@ -100,23 +101,23 @@ export default function QuoteNew() {
         if (insertError) {
           console.error('[QuoteNew] Error creating version:', insertError);
           // Check if version was created by another process
-          const { data: retry } = await supabase
+          const { data: retry } = await dao
             .from('quotation_versions')
             .select('id')
             .eq('quote_id', createdQuoteId)
             .limit(1)
             .maybeSingle();
           
-          if (retry?.id) {
-            console.log('[QuoteNew] Version found on retry:', retry.id);
-            setVersionId(String(retry.id));
+          if ((retry as any)?.id) {
+            console.log('[QuoteNew] Version found on retry:', (retry as any).id);
+            setVersionId(String((retry as any).id));
           }
           return;
         }
         
-        if (v?.id) {
-          console.log('[QuoteNew] Created version:', v.id);
-          setVersionId(String(v.id));
+        if ((v as any)?.id) {
+          console.log('[QuoteNew] Created version:', (v as any).id);
+          setVersionId(String((v as any).id));
         }
       } catch (error) {
         console.error('[QuoteNew] Unexpected error in ensureVersion:', error);

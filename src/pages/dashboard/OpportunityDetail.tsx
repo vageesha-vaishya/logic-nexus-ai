@@ -29,10 +29,12 @@ import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
 import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import type { Database } from '@/integrations/supabase/types';
 
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+
 export default function OpportunityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

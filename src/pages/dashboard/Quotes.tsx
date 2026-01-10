@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Quote, QuoteStatus, statusConfig } from './quotes-data';
-import { ScopedDataAccess } from '@/lib/db/access';
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
@@ -60,24 +60,25 @@ export default function Quotes() {
   useEffect(() => {
     const fetchQuotes = async () => {
       try {
-        let query = supabase.from('quotes').select('*').order('created_at', { ascending: false }).limit(100);
-        if (!context.adminOverrideEnabled && context.franchiseId) {
-          query = query.eq('franchise_id', context.franchiseId);
-        }
-        const { data, error } = await query;
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const { data, error } = await dao
+          .from('quotes')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
         
         if (error) throw error;
 
         // Fetch related data separately
         const quotesWithRelations = await Promise.all(
-      (data || []).map(async (quote) => {
-        const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
-          quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,
-          quote.contact_id ? supabase.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
-          quote.opportunity_id ? supabase.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
-          quote.carrier_id ? supabase.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
-          quote.service_type_id ? supabase.from('service_types').select('name').eq('id', quote.service_type_id).single() : null,
-        ]);
+          ((data || []) as any[]).map(async (quote) => {
+            const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
+              quote.account_id ? supabase.from('accounts').select('name').eq('id', quote.account_id).single() : null,
+              quote.contact_id ? supabase.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
+              quote.opportunity_id ? supabase.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
+              quote.carrier_id ? supabase.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
+              quote.service_type_id ? supabase.from('service_types').select('name').eq('id', quote.service_type_id).single() : null,
+            ]);
 
         return {
           ...quote,

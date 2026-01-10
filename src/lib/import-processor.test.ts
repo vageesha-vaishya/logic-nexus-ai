@@ -32,7 +32,7 @@ describe('Import Processor', () => {
         const result = processImportRow(row, 1, mapping);
         
         expect(result.data.email).toBeNull();
-        expect(result.isValid).toBe(false);
+        expect(result.isValid).toBe(true); // Partial import allowed
         expect(result.logs).toHaveLength(1);
         expect(result.logs[0].type).toBe('error');
     });

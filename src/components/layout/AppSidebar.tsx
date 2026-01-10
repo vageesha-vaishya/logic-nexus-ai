@@ -1,7 +1,8 @@
-import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, Mail } from 'lucide-react';
+import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, Mail, Loader2 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 import Logo from '@/components/branding/Logo';
 import { APP_MENU } from '@/config/navigation';
 import {
@@ -25,6 +26,23 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      const { error } = await signOut();
+      if (error) {
+        toast.error("Sign out failed, but you have been logged out locally.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("An unexpected error occurred during sign out.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   // Restore saved scroll position on mount
   useEffect(() => {
@@ -217,10 +235,11 @@ export function AppSidebar() {
           variant="ghost"
           size={collapsed ? 'icon' : 'sm'}
           className="w-full justify-start"
-          onClick={signOut}
+          onClick={handleSignOut}
+          disabled={isSigningOut}
         >
-          <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-2">Sign Out</span>}
+          {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          {!collapsed && <span className="ml-2">{isSigningOut ? 'Signing Out...' : 'Sign Out'}</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>

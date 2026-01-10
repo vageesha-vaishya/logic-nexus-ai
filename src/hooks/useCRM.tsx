@@ -19,6 +19,9 @@ export function useCRM() {
     const effectiveFranchise = pref?.franchise_id ?? baseFranchise;
     const adminOverride = !!pref?.admin_override_enabled;
 
+    // Debug logging for role resolution
+    // console.debug('useCRM: Roles:', roles, 'PlatformAdmin:', !!platformAdmin);
+
     return {
       isPlatformAdmin: !!platformAdmin,
       isTenantAdmin: !!tenantAdmin,

@@ -23,8 +23,13 @@ export function AdminScopeSwitcher() {
   const [loadingData, setLoadingData] = useState(false);
 
   // If not platform admin, don't render anything
+  useEffect(() => {
+    if (!context.isPlatformAdmin) {
+      console.debug('AdminScopeSwitcher: User is not platform admin. Roles:', context);
+    }
+  }, [context.isPlatformAdmin]);
+
   if (!context.isPlatformAdmin) {
-    // console.log('AdminScopeSwitcher: User is not platform admin', context);
     return null;
   }
 
