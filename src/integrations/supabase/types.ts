@@ -2219,6 +2219,135 @@ export type Database = {
           },
         ]
       }
+      entity_transfer_items: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["transfer_entity_type"]
+          error_message: string | null
+          id: string
+          status: Database["public"]["Enums"]["transfer_status"]
+          transfer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["transfer_entity_type"]
+          error_message?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["transfer_status"]
+          transfer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["transfer_entity_type"]
+          error_message?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["transfer_status"]
+          transfer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "entity_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_transfers: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          id: string
+          rejection_reason: string | null
+          requested_by: string
+          source_franchise_id: string | null
+          source_tenant_id: string
+          status: Database["public"]["Enums"]["transfer_status"]
+          target_franchise_id: string | null
+          target_tenant_id: string
+          transfer_type: Database["public"]["Enums"]["transfer_type"]
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          rejection_reason?: string | null
+          requested_by: string
+          source_franchise_id?: string | null
+          source_tenant_id: string
+          status?: Database["public"]["Enums"]["transfer_status"]
+          target_franchise_id?: string | null
+          target_tenant_id: string
+          transfer_type: Database["public"]["Enums"]["transfer_type"]
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          rejection_reason?: string | null
+          requested_by?: string
+          source_franchise_id?: string | null
+          source_tenant_id?: string
+          status?: Database["public"]["Enums"]["transfer_status"]
+          target_franchise_id?: string | null
+          target_tenant_id?: string
+          transfer_type?: Database["public"]["Enums"]["transfer_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_transfers_approved_by_fkey_profiles"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_transfers_requested_by_fkey_profiles"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_transfers_source_franchise_id_fkey"
+            columns: ["source_franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_transfers_source_tenant_id_fkey"
+            columns: ["source_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_transfers_target_franchise_id_fkey"
+            columns: ["target_franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_transfers_target_tenant_id_fkey"
+            columns: ["target_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       franchises: {
         Row: {
           address: Json | null
@@ -2311,8 +2440,47 @@ export type Database = {
           },
         ]
       }
+      import_errors: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          field: string | null
+          id: string
+          import_id: string
+          raw_data: Json | null
+          row_number: number | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          field?: string | null
+          id?: string
+          import_id: string
+          raw_data?: Json | null
+          row_number?: number | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          field?: string | null
+          id?: string
+          import_id?: string
+          raw_data?: Json | null
+          row_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_errors_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "import_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_history: {
         Row: {
+          completed_at: string | null
           created_at: string
           entity_name: string
           file_name: string
@@ -2327,6 +2495,7 @@ export type Database = {
           tenant_id: string | null
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
           entity_name: string
           file_name: string
@@ -2341,6 +2510,7 @@ export type Database = {
           tenant_id?: string | null
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
           entity_name?: string
           file_name?: string
@@ -7169,6 +7339,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_franchisee_account_contact: {
+        Args: {
+          p_account_data: Json
+          p_contact_data: Json
+          p_franchise_id: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       calculate_dimensional_weight: {
         Args: {
           p_divisor?: number
@@ -7237,6 +7416,10 @@ export type Database = {
         }[]
       }
       execute_sql_query: { Args: { query_text: string }; Returns: Json }
+      execute_transfer: {
+        Args: { p_approver_id: string; p_transfer_id: string }
+        Returns: Json
+      }
       generate_next_option_name: {
         Args: { p_version_id: string }
         Returns: string
@@ -7528,6 +7711,24 @@ export type Database = {
         | "delayed"
         | "exception"
         | "returned"
+      transfer_entity_type:
+        | "lead"
+        | "opportunity"
+        | "quote"
+        | "shipment"
+        | "account"
+        | "contact"
+        | "activity"
+      transfer_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "completed"
+        | "failed"
+      transfer_type:
+        | "tenant_to_tenant"
+        | "tenant_to_franchise"
+        | "franchise_to_franchise"
       vehicle_status: "available" | "in_use" | "maintenance" | "out_of_service"
     }
     CompositeTypes: {
@@ -7744,6 +7945,27 @@ export const Constants = {
         "delayed",
         "exception",
         "returned",
+      ],
+      transfer_entity_type: [
+        "lead",
+        "opportunity",
+        "quote",
+        "shipment",
+        "account",
+        "contact",
+        "activity",
+      ],
+      transfer_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "completed",
+        "failed",
+      ],
+      transfer_type: [
+        "tenant_to_tenant",
+        "tenant_to_franchise",
+        "franchise_to_franchise",
       ],
       vehicle_status: ["available", "in_use", "maintenance", "out_of_service"],
     },

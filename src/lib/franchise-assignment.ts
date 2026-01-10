@@ -48,7 +48,8 @@ export async function assignAccountContactToFranchise(
   accountData: AccountData,
   contactData: ContactData
 ): Promise<AssignmentResult> {
-  const { data, error } = await supabase.rpc('assign_franchisee_account_contact', {
+  // Cast until types regenerate
+  const { data, error } = await (supabase as any).rpc('assign_franchisee_account_contact', {
     p_tenant_id: tenantId,
     p_franchise_id: franchiseId,
     p_account_data: accountData,
