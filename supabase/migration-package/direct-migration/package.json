@@ -1,0 +1,13 @@
+{
+  "name": "direct-migration-tool",
+  "version": "1.0.0",
+  "description": "Tools for direct database migration",
+  "main": "index.js",
+  "scripts": {
+    "migrate": "./migrate.sh"
+  },
+  "dependencies": {
+    "pg": "^8.11.3",
+    "dotenv": "^16.4.1"
+  }
+}

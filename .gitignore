@@ -26,3 +26,4 @@ dist-ssr
 .env.local
 .env.local.backup
 supabase/migration-package/new-supabase-config.env
+migration.env
