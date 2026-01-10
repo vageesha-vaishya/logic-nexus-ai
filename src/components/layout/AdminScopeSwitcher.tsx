@@ -37,42 +37,60 @@ export function AdminScopeSwitcher() {
   const currentTenantId = preferences?.tenant_id ?? null;
   const currentFranchiseId = preferences?.franchise_id ?? null;
 
+  // Load franchises when tenant changes or on initial load
+  const loadFranchises = async (tenantId: string | null) => {
+    try {
+      let q = (supabase as any).from('franchises').select('id, name, tenant_id').order('name');
+      if (tenantId) {
+        q = q.eq('tenant_id', tenantId);
+      }
+      const { data: fData } = await q;
+      setFranchises(fData || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadData = async (tenantIdOverride?: string | null) => {
+    setLoadingData(true);
+    try {
+      const { data: tData } = await (supabase as any).from('tenants').select('id, name').order('name');
+      setTenants(tData || []);
+      
+      // Use override if provided, otherwise use current preference
+      const effectiveTenantId = tenantIdOverride !== undefined ? tenantIdOverride : currentTenantId;
+      await loadFranchises(effectiveTenantId);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoadingData(false);
+  };
+
   useEffect(() => {
     if (adminOverride && open) {
       loadData();
     }
   }, [adminOverride, open]);
 
-  const loadData = async () => {
-    setLoadingData(true);
-    try {
-        const { data: tData } = await (supabase as any).from('tenants').select('id, name').order('name');
-        setTenants(tData || []);
-        
-        let q = (supabase as any).from('franchises').select('id, name, tenant_id').order('name');
-        if (currentTenantId) {
-            q = q.eq('tenant_id', currentTenantId);
-        }
-        const { data: fData } = await q;
-        setFranchises(fData || []);
-    } catch (e) {
-        console.error(e);
+  // Reload franchises when tenant preference changes
+  useEffect(() => {
+    if (adminOverride && open) {
+      loadFranchises(currentTenantId);
     }
-    setLoadingData(false);
-  };
+  }, [currentTenantId]);
 
   const handleToggleOverride = async (checked: boolean) => {
     await setAdminOverride(checked);
     if (checked) {
-        loadData();
+      loadData();
     }
   };
 
   const handleTenantChange = async (val: string) => {
     const newVal = val === 'all' ? null : val;
-    // Reset franchise when tenant changes
+    // Reset franchise when tenant changes and immediately load filtered franchises
     await setScopePreference(newVal, null);
-    loadData();
+    await loadFranchises(newVal);
   };
 
   const handleFranchiseChange = async (val: string) => {
