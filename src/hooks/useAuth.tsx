@@ -250,16 +250,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Safety timeout to prevent infinite loading state
+    // Safety timeout to prevent infinite loading state.
+    // IMPORTANT: do NOT force-complete loading while an authenticated user's
+    // roles/permissions are still being fetched, otherwise permission-gated
+    // routes can incorrectly redirect to /unauthorized.
     const safetyTimeout = setTimeout(() => {
       setLoading((prev) => {
-        if (prev) {
-          console.warn('Auth loading timed out, forcing completion');
-          return false;
+        if (!prev) return prev;
+
+        // If we already have an authenticated user in-flight, keep waiting.
+        if (lastLoadedUserId) {
+          console.warn('Auth loading is taking longer than expected; still waiting for user data...');
+          return true;
         }
-        return prev;
+
+        console.warn('Auth loading timed out (no authenticated user), forcing completion');
+        return false;
       });
-    }, 5000);
+    }, 15000);
 
     // Auth state listener MUST be synchronous; do not await or call Supabase inside callback.
     const {

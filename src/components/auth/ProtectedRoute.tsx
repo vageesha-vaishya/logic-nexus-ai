@@ -43,7 +43,17 @@ export function ProtectedRoute({
     const hasAny = requiredPermissions.some(p => hasPermission(p));
     if (!hasAny) {
       console.warn(`[ProtectedRoute] Access denied. User missing required permissions: ${requiredPermissions.join(', ')}`);
-      return <Navigate to="/unauthorized" state={{ reason: 'missing_permissions', missingPermissions: requiredPermissions }} replace />;
+      return (
+        <Navigate
+          to="/unauthorized"
+          state={{
+            reason: 'missing_permissions',
+            missingPermissions: requiredPermissions,
+            from: location.pathname + location.search,
+          }}
+          replace
+        />
+      );
     }
   }
 
