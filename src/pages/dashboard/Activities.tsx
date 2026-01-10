@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Search, Phone, Mail, Calendar, CheckSquare, FileText, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 interface Activity {
   id: string;
@@ -80,32 +81,14 @@ export default function Activities() {
   const [priorityAdv, setPriorityAdv] = useState<'any' | 'low' | 'medium' | 'high' | 'urgent'>('any');
   const [dueStart, setDueStart] = useState<string>('');
   const [dueEnd, setDueEnd] = useState<string>('');
-  useEffect(() => {
-    fetchActivities();
-  }, []);
+  // Create scoped data access for proper filtering
+  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const { data } = await fetchAssignableUsers({
-        search: '',
-        limit: 100,
-      });
-      setAssignableUsers(data || []);
-    };
-    fetchUsers();
-  }, [fetchAssignableUsers]);
-
-  useEffect(() => {
-    const firstTimeKey = 'activitiesHelpShown';
-    const hasSeen = localStorage.getItem(firstTimeKey);
-    if (!hasSeen) {
-      setShowHelp(true);
-    }
-  }, []);
-
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
     try {
-      let query = supabase
+      setLoading(true);
+      // Use ScopedDataAccess for proper tenant/franchise filtering
+      const { data, error } = await dao
         .from('activities')
         .select(`
           *,
@@ -129,13 +112,8 @@ export default function Activities() {
         `)
         .order('due_date', { ascending: true, nullsFirst: false });
 
-      if (!context.adminOverrideEnabled && context.franchiseId) {
-        query = query.eq('franchise_id', context.franchiseId);
-      }
-      const { data, error } = await query;
-
       if (error) throw error;
-      setActivities(data || []);
+      setActivities((data as Activity[]) || []);
 
       // Fetch lead names referenced by activities for grouping headers
       const leadIds = Array.from(
@@ -146,13 +124,13 @@ export default function Activities() {
         )
       );
       if (leadIds.length > 0) {
-        const { data: leadRefs, error: leadErr } = await supabase
+        const { data: leadRefs, error: leadErr } = await dao
           .from('leads')
           .select('id, first_name, last_name, company')
           .in('id', leadIds);
         if (!leadErr && leadRefs) {
           const map: Record<string, string> = {};
-          for (const l of leadRefs) {
+          for (const l of leadRefs as any[]) {
             const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ').trim();
             map[l.id] = fullName || l.company || 'Lead';
           }
@@ -168,7 +146,12 @@ export default function Activities() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dao]);
+
+  useEffect(() => {
+    fetchActivities();
+    // Include context._version to trigger re-fetch when scope changes
+  }, [fetchActivities, context.tenantId, context.franchiseId, context._version]);
 
   const handleMarkComplete = async (activityId: string) => {
     try {

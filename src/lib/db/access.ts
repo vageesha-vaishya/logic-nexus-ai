@@ -102,16 +102,22 @@ export class ScopedDataAccess {
    * Creates a query builder for the specified table with automatic scope filtering.
    * Returns methods that apply tenant/franchise filters based on user context.
    */
+  /**
+   * Creates a query builder for the specified table with automatic scope filtering.
+   * The select() method applies scope filters immediately and returns the full query builder.
+   */
   from(table: TableName) {
     const baseQuery = this.supabase.from(table);
     const ctx = this.context;
     const logAudit = this.logAudit.bind(this);
     const injectScope = this.injectScope.bind(this);
+    const applyScopeFilter = this.applyScopeFilter.bind(this);
 
     return {
       select: (columns = '*', options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
-        const selectQuery = baseQuery.select(columns, options as any) as any;
-        return this.applyScopeFilter(selectQuery);
+        let selectQuery = baseQuery.select(columns, options as any) as any;
+        // Apply scope filters and return the query builder for further chaining
+        return applyScopeFilter(selectQuery);
       },
       
       insert: (values: any) => {
@@ -125,9 +131,10 @@ export class ScopedDataAccess {
       },
 
       update: (values: any) => {
-        const updateQuery = baseQuery.update(values) as any;
+        let updateQuery = baseQuery.update(values) as any;
         logAudit('UPDATE', table as string, { values });
-        return this.applyScopeFilter(updateQuery);
+        // Apply scope filters and return the query builder for further chaining
+        return applyScopeFilter(updateQuery);
       },
 
       upsert: (values: any, options?: { onConflict?: string; ignoreDuplicates?: boolean; count?: 'exact' | 'planned' | 'estimated'; defaultToNull?: boolean }) => {
@@ -136,14 +143,16 @@ export class ScopedDataAccess {
           : injectScope(values);
 
         logAudit('UPSERT', table as string, { count: Array.isArray(values) ? values.length : 1 });
-        const upsertQuery = baseQuery.upsert(injectedValues, options) as any;
-        return this.applyScopeFilter(upsertQuery);
+        let upsertQuery = baseQuery.upsert(injectedValues, options) as any;
+        // Apply scope filters and return the query builder for further chaining
+        return applyScopeFilter(upsertQuery);
       },
 
       delete: () => {
-        const deleteQuery = baseQuery.delete() as any;
+        let deleteQuery = baseQuery.delete() as any;
         logAudit('DELETE', table as string, {});
-        return this.applyScopeFilter(deleteQuery);
+        // Apply scope filters and return the query builder for further chaining
+        return applyScopeFilter(deleteQuery);
       }
     };
   }

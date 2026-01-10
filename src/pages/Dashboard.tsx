@@ -1,11 +1,12 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, UserPlus, CheckSquare } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { KanbanDashboard } from '@/components/dashboard/KanbanDashboard';
+import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 interface DashboardStats {
   accounts: number;
@@ -16,6 +17,7 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { supabase, context } = useCRM();
   const [stats, setStats] = useState<DashboardStats>({
     accounts: 0,
     leads: 0,
@@ -25,37 +27,42 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Create scoped data access for proper filtering
+  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
+
   useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true);
+        
+        // Use ScopedDataAccess to apply tenant/franchise filters
+        const [accountsResult, leadsResult, contactsResult, activitiesResult] = await Promise.all([
+          dao.from('accounts').select('*', { count: 'exact', head: true }),
+          dao.from('leads').select('*', { count: 'exact', head: true }),
+          dao.from('contacts').select('*', { count: 'exact', head: true }),
+          dao.from('activities').select('*', { count: 'exact', head: true })
+        ]);
+
+        setStats({
+          accounts: (accountsResult as any).count || 0,
+          leads: (leadsResult as any).count || 0,
+          contacts: (contactsResult as any).count || 0,
+          activities: (activitiesResult as any).count || 0
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load dashboard statistics',
+          variant: 'destructive'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchDashboardStats();
-  }, []);
-
-  const fetchDashboardStats = async () => {
-    try {
-      setLoading(true);
-      
-      const [accountsResult, leadsResult, contactsResult, activitiesResult] = await Promise.all([
-        supabase.from('accounts').select('*', { count: 'exact', head: true }),
-        supabase.from('leads').select('*', { count: 'exact', head: true }),
-        supabase.from('contacts').select('*', { count: 'exact', head: true }),
-        supabase.from('activities').select('*', { count: 'exact', head: true })
-      ]);
-
-      setStats({
-        accounts: accountsResult.count || 0,
-        leads: leadsResult.count || 0,
-        contacts: contactsResult.count || 0,
-        activities: activitiesResult.count || 0
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load dashboard statistics',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Include context._version to trigger re-fetch when scope changes
+  }, [dao, context.tenantId, context.franchiseId, context._version, toast]);
 
   const statCards = [
     {
