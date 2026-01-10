@@ -30,17 +30,20 @@ export function ProtectedRoute({
   }
 
   if (requireAuth && !user) {
+    console.warn('[ProtectedRoute] Access denied. User not authenticated.');
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (requiredRole && !hasRole(requiredRole)) {
-    return <Navigate to="/unauthorized" replace />;
+    console.warn(`[ProtectedRoute] Access denied. User missing required role: ${requiredRole}`);
+    return <Navigate to="/unauthorized" state={{ reason: 'missing_role', requiredRole }} replace />;
   }
 
   if (requiredPermissions && requiredPermissions.length > 0) {
     const hasAny = requiredPermissions.some(p => hasPermission(p));
     if (!hasAny) {
-      return <Navigate to="/unauthorized" replace />;
+      console.warn(`[ProtectedRoute] Access denied. User missing required permissions: ${requiredPermissions.join(', ')}`);
+      return <Navigate to="/unauthorized" state={{ reason: 'missing_permissions', missingPermissions: requiredPermissions }} replace />;
     }
   }
 

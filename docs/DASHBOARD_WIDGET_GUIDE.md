@@ -47,6 +47,21 @@ src/
 | :--- | :--- | :--- |
 | `stats` | `StatItem[]` | Array of data objects for the cards. |
 | `loading` | `boolean` | If true, displays skeleton loading state. |
+| `className` | `string` | Optional CSS class for the grid container. |
+
+#### `StatItem` Interface
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `string` | Unique identifier. |
+| `title` | `string` | Metric title (localized). |
+| `value` | `string` | Display value (e.g., "$1.2M"). |
+| `change` | `string` | Trend value (e.g., "+8%"). |
+| `trend` | `"up" \| "down"` | Direction of trend. |
+| `icon` | `LucideIcon` | Icon component. |
+| `color` | `string` | Tailwind text color class. |
+| `data` | `{ value: number }[]` | Data points for sparkline. |
+| `description` | `string` | Optional tooltip text. |
+| `onClick` | `() => void` | Optional click handler. |
 
 ## 2. Core Functionality
 

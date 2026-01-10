@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
+  const isFetchingRef = useRef(false);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -217,30 +218,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     let lastLoadedUserId: string | null = null;
 
-    const scheduleUserDataLoad = (u: User) => {
-      if (lastLoadedUserId === u.id) return;
-      lastLoadedUserId = u.id;
-      setTimeout(() => {
-        if (cancelled) return;
-        void loadUserData(u);
-      }, 0);
-    };
-
     const applySession = (currentSession: Session | null, source: string) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
         console.log(`Auth session applied (${source})`, currentSession.user.id);
-        scheduleUserDataLoad(currentSession.user);
+        
+        // Only load data if it's a new user or not yet loaded
+        if (lastLoadedUserId !== currentSession.user.id) {
+          lastLoadedUserId = currentSession.user.id;
+          // Ensure loading is true while fetching user data
+          setLoading(true);
+          loadUserData(currentSession.user)
+            .catch(err => {
+              console.error('Failed to load user data:', err);
+            })
+            .finally(() => {
+              setLoading(false);
+            });
+        } else {
+          // Same user, data already loaded
+          setLoading(false);
+        }
       } else {
         lastLoadedUserId = null;
         setProfile(null);
         setRoles([]);
         setPermissions([]);
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     // Safety timeout to prevent infinite loading state
