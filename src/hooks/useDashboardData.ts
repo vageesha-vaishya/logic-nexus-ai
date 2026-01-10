@@ -37,6 +37,11 @@ export function useDashboardData() {
 
   useEffect(() => {
     const fetchData = async () => {
+      // If we don't have a user ID yet, we can't fetch personalized data
+      if (!context?.userId) {
+        return;
+      }
+
       setLoading(true);
       setError(null);
       
@@ -59,8 +64,14 @@ export function useDashboardData() {
             .limit(6)
         ]);
 
-        if (leadsResult.error) throw leadsResult.error;
-        if (activitiesResult.error) throw activitiesResult.error;
+        if (leadsResult.error) {
+          console.error('Leads fetch error:', leadsResult.error);
+          throw new Error(`Failed to fetch leads: ${leadsResult.error.message}`);
+        }
+        if (activitiesResult.error) {
+          console.error('Activities fetch error:', activitiesResult.error);
+          throw new Error(`Failed to fetch activities: ${activitiesResult.error.message}`);
+        }
 
         const leads = (leadsResult.data as LeadItem[]) || [];
         const activities = (activitiesResult.data as ActivityItem[]) || [];
@@ -79,14 +90,17 @@ export function useDashboardData() {
             .select('id, first_name, last_name, company')
             .in('id', leadIds);
 
-          if (leadRefsErr) throw leadRefsErr;
-
-          const map: Record<string, string> = {};
-          for (const l of (leadRefs as any[])) {
-            const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ').trim();
-            map[l.id] = fullName || l.company || 'Lead';
+          if (leadRefsErr) {
+             console.error('Lead refs fetch error:', leadRefsErr);
+             // Non-fatal error, just log it
+          } else {
+            const map: Record<string, string> = {};
+            for (const l of (leadRefs as any[])) {
+              const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ').trim();
+              map[l.id] = fullName || l.company || 'Lead';
+            }
+            setLeadNamesById(map);
           }
-          setLeadNamesById(map);
         } else {
           setLeadNamesById({});
         }
@@ -100,15 +114,16 @@ export function useDashboardData() {
     };
 
     fetchData();
-  }, [dao, context.userId, context.tenantId, context.franchiseId, context._version, fetchAssignableUsers]);
+  }, [context.userId, dao, fetchAssignableUsers]);
 
-  return {
-    loading,
-    error,
-    myLeads,
-    myActivities,
-    assignableUsers,
-    leadNamesById,
-    setMyActivities
+  return { 
+    loading, 
+    myLeads, 
+    myActivities, 
+    assignableUsers, 
+    leadNamesById, 
+    setMyActivities,
+    error 
   };
 }
+

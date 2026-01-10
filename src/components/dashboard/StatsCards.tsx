@@ -101,7 +101,7 @@ export const StatsCards = ({ stats = defaultStats, loading = false }: StatsCards
           </div>
           
           {/* Background Sparkline */}
-          <div className="absolute bottom-0 left-0 right-0 h-16 opacity-10 pointer-events-none">
+          <div className={`absolute bottom-0 left-0 right-0 h-16 opacity-10 pointer-events-none ${stat.color}`}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={stat.data}>
                 <Area 
@@ -109,7 +109,6 @@ export const StatsCards = ({ stats = defaultStats, loading = false }: StatsCards
                   dataKey="value" 
                   stroke="currentColor" 
                   fill="currentColor" 
-                  className={stat.color}
                 />
               </AreaChart>
             </ResponsiveContainer>

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Phone, Calendar, CheckSquare, Mail, StickyNote } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, Phone, Calendar, CheckSquare, Mail, StickyNote } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,8 +26,27 @@ export default function Dashboards() {
     myActivities, 
     assignableUsers, 
     leadNamesById, 
-    setMyActivities 
+    setMyActivities,
+    error
   } = useDashboardData();
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>{t('Error')}</AlertTitle>
+            <AlertDescription>
+              {t('Failed to load dashboard data. Please try refreshing the page.')}
+              <br />
+              <span className="text-xs opacity-70">{error.message}</span>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const renderTypeBadge = (t: string | null) => {
     const type = (t || '').toLowerCase();
