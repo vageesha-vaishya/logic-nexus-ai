@@ -56,8 +56,7 @@ export default function LeadsPipeline() {
   const { state: viewState, setTheme, setView, setPipeline, setWorkspace } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const isNavigatingAwayFromPipeline = useRef(false);
-  const hasFetchedRef = useRef(false);
-  
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -240,18 +239,26 @@ export default function LeadsPipeline() {
     }
   }, [supabase, context, isContextReady]);
 
-  // Initial data fetch - only when context is ready
+  // Fetch whenever scope changes (tenant / franchise / override)
   useEffect(() => {
-    if (!isContextReady || hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-    
+    if (!isContextReady) return;
     fetchLeads();
     fetchTasks();
-  }, [isContextReady, fetchLeads, fetchTasks]);
+  }, [isContextReady, (context as any)?._version, fetchLeads, fetchTasks]);
 
   // Real-time subscription - separate from fetch
   useEffect(() => {
     if (!isContextReady) return;
+
+    const matchesScope = (row: any) => {
+      if (!row) return false;
+      // Platform Admin in Global mode sees everything
+      if (context.isPlatformAdmin && !context.adminOverrideEnabled) return true;
+      // Scoped views must match the effective tenant/franchise
+      if (context.tenantId && row.tenant_id !== context.tenantId) return false;
+      if (context.franchiseId && row.franchise_id !== context.franchiseId) return false;
+      return true;
+    };
 
     const channel = supabase
       .channel('leads-pipeline-changes')
@@ -264,6 +271,7 @@ export default function LeadsPipeline() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if (!matchesScope(payload.new)) return;
             const newLead = payload.new as Lead;
             const safeLead: Lead = {
               ...newLead,
@@ -273,6 +281,7 @@ export default function LeadsPipeline() {
             toast.info(`New lead: ${newLead.first_name} ${newLead.last_name}`);
           } 
           else if (payload.eventType === 'UPDATE') {
+            if (!matchesScope(payload.new)) return;
             const updatedLead = payload.new as Lead;
             const safeLead: Lead = {
               ...updatedLead,
@@ -283,7 +292,8 @@ export default function LeadsPipeline() {
             ));
           } 
           else if (payload.eventType === 'DELETE') {
-            setLeads((prev) => prev.filter((l) => l.id !== payload.old.id));
+            if (!matchesScope(payload.old)) return;
+            setLeads((prev) => prev.filter((l) => l.id !== (payload.old as any).id));
           }
         }
       )
@@ -292,7 +302,14 @@ export default function LeadsPipeline() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, isContextReady]);
+  }, [
+    supabase,
+    isContextReady,
+    context.isPlatformAdmin,
+    context.adminOverrideEnabled,
+    context.tenantId,
+    context.franchiseId,
+  ]);
 
   const handleTaskComplete = useCallback(async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
