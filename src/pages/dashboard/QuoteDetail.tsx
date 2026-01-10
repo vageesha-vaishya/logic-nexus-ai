@@ -112,9 +112,9 @@ export default function QuoteDetail() {
         if (insertError) {
           console.error('[QuoteDetail] Error creating version:', insertError);
           // Check if version was created by another process
-          const { data: retry } = await dao
+          const { data: retry } = await (dao
             .from('quotation_versions')
-            .select('id')
+            .select('id') as any)
             .eq('quote_id', resolvedId)
             .limit(1)
             .maybeSingle();

@@ -7053,6 +7053,60 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          admin_override_enabled: boolean
+          created_at: string
+          franchise_id: string | null
+          id: string
+          language: string | null
+          notifications_enabled: boolean | null
+          tenant_id: string | null
+          theme: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_override_enabled?: boolean
+          created_at?: string
+          franchise_id?: string | null
+          id?: string
+          language?: string | null
+          notifications_enabled?: boolean | null
+          tenant_id?: string | null
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_override_enabled?: boolean
+          created_at?: string
+          franchise_id?: string | null
+          id?: string
+          language?: string | null
+          notifications_enabled?: boolean | null
+          tenant_id?: string | null
+          theme?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_preferences_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           assigned_at: string | null
@@ -7620,8 +7674,24 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_admin_override: {
+        Args: {
+          p_enabled: boolean
+          p_franchise_id?: string
+          p_tenant_id?: string
+        }
+        Returns: undefined
+      }
       set_current_version: {
         Args: { p_version_id: string }
+        Returns: undefined
+      }
+      set_user_scope_preference: {
+        Args: {
+          p_admin_override?: boolean
+          p_franchise_id?: string
+          p_tenant_id?: string
+        }
         Returns: undefined
       }
       tenant_has_feature: {
