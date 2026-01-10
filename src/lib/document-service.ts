@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { diffLines } from 'diff';
 
+// Use direct supabase calls with type assertions to avoid deep type instantiation errors
+
 export interface Document {
   id: string;
   path: string;
@@ -25,8 +27,8 @@ export interface DocumentVersion {
 }
 
 export const DocumentService = {
-  async getDocumentByPath(path: string) {
-    const { data, error } = await supabase
+  async getDocumentByPath(path: string): Promise<Document> {
+    const { data, error } = await (supabase as any)
       .from('documents')
       .select('*')
       .eq('path', path)
@@ -36,8 +38,8 @@ export const DocumentService = {
     return data as Document;
   },
 
-  async getVersions(documentId: string) {
-    const { data, error } = await supabase
+  async getVersions(documentId: string): Promise<DocumentVersion[]> {
+    const { data, error } = await (supabase as any)
       .from('document_versions')
       .select(`
         *,
@@ -49,11 +51,11 @@ export const DocumentService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data as DocumentVersion[];
+    return (data || []) as DocumentVersion[];
   },
 
-  async getVersion(documentId: string, version: string) {
-    const { data, error } = await supabase
+  async getVersion(documentId: string, version: string): Promise<DocumentVersion> {
+    const { data, error } = await (supabase as any)
       .from('document_versions')
       .select('*')
       .eq('document_id', documentId)
@@ -71,7 +73,7 @@ export const DocumentService = {
     notes: string
   ) {
     // Get latest version to calculate diff
-    const { data: latestVersion } = await supabase
+    const { data: latestVersion } = await (supabase as any)
       .from('document_versions')
       .select('*')
       .eq('document_id', documentId)
@@ -83,7 +85,7 @@ export const DocumentService = {
     let diffSummary = null;
 
     if (latestVersion) {
-      const parts = latestVersion.version.split('.').map(Number);
+      const parts = (latestVersion.version as string).split('.').map(Number);
       if (changeType === 'major') {
         parts[0]++;
         parts[1] = 0;
@@ -97,7 +99,7 @@ export const DocumentService = {
       newVersionNumber = parts.join('.');
 
       // Calculate diff
-      const diff = diffLines(latestVersion.content, content);
+      const diff = diffLines(latestVersion.content as string, content);
       diffSummary = {
         additions: diff.filter(p => p.added).length,
         deletions: diff.filter(p => p.removed).length,
@@ -105,7 +107,7 @@ export const DocumentService = {
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('document_versions')
       .insert({
         document_id: documentId,
@@ -122,7 +124,7 @@ export const DocumentService = {
     if (error) throw error;
 
     // Update document current_version
-    await supabase
+    await (supabase as any)
       .from('documents')
       .update({ 
         current_version: newVersionNumber,
