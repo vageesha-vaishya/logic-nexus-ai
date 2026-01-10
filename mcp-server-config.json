@@ -1,0 +1,6 @@
+{
+  "server": "@modelcontextprotocol/server-postgres",
+  "env": {
+    "connectionString": "postgres://postgres.pqulscbawoqzhqobwupu:%21%40%23SOS%40JANUARY%402026@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require"
+  }
+}

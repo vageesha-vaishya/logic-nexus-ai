@@ -7,7 +7,11 @@
     "migrate": "./migrate.sh"
   },
   "dependencies": {
+    "@types/diff": "^7.0.2",
+    "diff": "^8.0.2",
+    "dotenv": "^16.4.1",
     "pg": "^8.11.3",
-    "dotenv": "^16.4.1"
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

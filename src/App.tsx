@@ -109,6 +109,7 @@ import QuotePortal from "./pages/portal/QuotePortal";
     
 import RolesPermissions from "./pages/dashboard/RolesPermissions";
 import TransferCenter from "./pages/dashboard/TransferCenter";
+import DocumentManager from "./pages/dashboard/DocumentManager";
 
 const queryClient = new QueryClient();
 
@@ -568,6 +569,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["transfers.view"]}>
                   <TransferCenter />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/documents/roadmap" 
+              element={
+                <ProtectedRoute>
+                  <DocumentManager />
                 </ProtectedRoute>
               } 
             />

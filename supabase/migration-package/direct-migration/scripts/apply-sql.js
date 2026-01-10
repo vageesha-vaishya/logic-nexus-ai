@@ -32,10 +32,18 @@ async function applySql() {
         process.exit(1);
     }
 
-    const client = new Client({ 
+    const clientConfig = { 
         connectionString: targetUrl,
         connectionTimeoutMillis: 10000 // 10s timeout
-    });
+    };
+
+    if (targetUrl.includes('sslmode=require')) {
+        clientConfig.ssl = {
+            rejectUnauthorized: false
+        };
+    }
+
+    const client = new Client(clientConfig);
 
     try {
         log(`Connecting to database...`, 'info');
