@@ -1,11 +1,14 @@
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 
 export function useCRM() {
   const { user, roles } = useAuth();
   const [pref, setPref] = useState<{ tenant_id: string | null; franchise_id: string | null; admin_override_enabled: boolean } | null>(null);
   const [loadingPref, setLoadingPref] = useState(false);
+  
+  // Track context version to force re-fetches when scope changes
+  const [contextVersion, setContextVersion] = useState(0);
 
   const context = useMemo(() => {
     const platformAdmin = roles.find(r => r.role === 'platform_admin');
@@ -29,27 +32,18 @@ export function useCRM() {
     if (isPlatformAdmin) {
       // Platform Admin can override scope
       // If preference exists, use it. If not, default to Global (null)
-      // Note: If pref is null, it means "Global" for Platform Admin.
       effectiveTenant = pref?.tenant_id ?? null;
       effectiveFranchise = pref?.franchise_id ?? null;
       adminOverride = !!pref?.admin_override_enabled;
     } else if (isTenantAdmin) {
-      // Tenant Admin is bound to their tenant, but might switch franchises (if we allow it)
-      // For now, assume they are bound to their tenant.
+      // Tenant Admin is bound to their tenant
       effectiveTenant = baseTenant;
-      // They might have franchise preference if they manage multiple franchises? 
-      // Usually Tenant Admin sees all franchises. 
-      // If we want to allow Tenant Admin to scope to a franchise:
       if (pref?.franchise_id) {
-         // Verify this franchise belongs to their tenant? 
-         // We can't easily verify here without DB call. 
-         // But we can allow it and ScopedDataAccess will filter by both tenant_id AND franchise_id.
-         // If franchise doesn't belong to tenant, query returns empty. Safe.
          effectiveFranchise = pref.franchise_id;
       } else {
          effectiveFranchise = null; // "All Franchises" in this tenant
       }
-      adminOverride = false; // Cannot override admin mode
+      adminOverride = false;
     } else {
       // Regular users and Franchise Admins are strictly bound
       effectiveTenant = baseTenant;
@@ -66,8 +60,10 @@ export function useCRM() {
       franchiseId: effectiveFranchise,
       adminOverrideEnabled: adminOverride,
       userId: user?.id,
+      // Include version to track changes
+      _version: contextVersion,
     };
-  }, [roles, pref, user?.id]);
+  }, [roles, pref, user?.id, contextVersion]);
 
   useEffect(() => {
     async function loadPref() {
@@ -112,10 +108,11 @@ export function useCRM() {
           franchise_id: data.franchise_id ?? null, 
           admin_override_enabled: !!data.admin_override_enabled 
         });
+        // Increment version to trigger data re-fetches across all modules
+        setContextVersion(v => v + 1);
       }
     } catch (error) {
       console.error('Failed to set scope preference:', error);
-      // Fallback: Optimistically update state or show toast
     }
   }, [user, pref?.admin_override_enabled]);
 
@@ -139,6 +136,8 @@ export function useCRM() {
           franchise_id: data.franchise_id ?? null, 
           admin_override_enabled: !!data.admin_override_enabled 
         });
+        // Increment version to trigger data re-fetches across all modules
+        setContextVersion(v => v + 1);
       }
     } catch (error) {
       console.error('Failed to set admin override:', error);
