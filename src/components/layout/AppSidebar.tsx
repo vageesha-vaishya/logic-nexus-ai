@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, Mail, Loader2 } from 'lucide-react';
+import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, ArrowRightLeft, Mail, Loader2 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -108,6 +108,7 @@ export function AppSidebar() {
     { title: 'Tenants', url: '/dashboard/tenants', icon: FileText, roles: ['platform_admin'], permissions: ['admin.tenants.manage'] },
     { title: 'Franchises', url: '/dashboard/franchises', icon: Package, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.franchises.manage'] },
     { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['platform_admin', 'tenant_admin', 'franchise_admin'], permissions: ['admin.users.manage'] },
+    { title: 'Transfer Center', url: '/dashboard/transfers', icon: ArrowRightLeft, roles: ['platform_admin'], permissions: ['transfers.view'] },
   ];
 
   const getNavClass = ({ isActive }: { isActive: boolean }) =>

@@ -113,67 +113,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUserData = async (currentUser: User) => {
     try {
       console.log('Loading user data for:', currentUser.id);
-      
-      // Fetch all required data in parallel for performance
-      const [
-        profileResult, 
-        rolesResult, 
-        customPermsResult,
-        dynamicMapResult, 
-        hierarchyResult
-      ] = await Promise.all([
-        fetchProfile(currentUser.id),
-        fetchUserRoles(currentUser.id),
-        fetchCustomPermissions(currentUser.id),
-        RoleService.getRolePermissions().catch(e => {
+
+      // Load roles first so admin-gated UI (AdminScopeSwitcher, Transfer Center, etc.)
+      // can appear even if other (slower) lookups are still running.
+      const profilePromise = fetchProfile(currentUser.id);
+      const customPermsPromise = fetchCustomPermissions(currentUser.id);
+
+      const timeout = <T,>(ms: number, fallback: T) =>
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms));
+
+      const dynamicMapPromise = Promise.race([
+        RoleService.getRolePermissions().catch((e) => {
           console.warn('Failed to load dynamic permissions', e);
           return {} as Record<string, string[]>;
         }),
-        RoleService.getRoleHierarchy().catch(e => {
+        timeout(2500, {} as Record<string, string[]>),
+      ]);
+
+      const hierarchyPromise = Promise.race([
+        RoleService.getRoleHierarchy().catch((e) => {
           console.warn('Failed to load role hierarchy', e);
           return { parentsToChildren: {}, childrenToParents: {}, available: false };
-        })
+        }),
+        timeout(2500, { parentsToChildren: {}, childrenToParents: {}, available: false }),
+      ]);
+
+      const rolesResult = await fetchUserRoles(currentUser.id);
+      setRoles(rolesResult);
+
+      const [profileResult, customPermsResult, dynamicMapResult, hierarchyResult] = await Promise.all([
+        profilePromise,
+        customPermsPromise,
+        dynamicMapPromise,
+        hierarchyPromise,
       ]);
 
       setProfile(profileResult);
-      setRoles(rolesResult);
-      
-      const dynamicMap = dynamicMapResult;
-      const hierarchyParents = hierarchyResult.childrenToParents || {};
+
+      const dynamicMap = dynamicMapResult || {};
+      const hierarchyParents = (hierarchyResult as any)?.childrenToParents || {};
 
       const standardPerms = unionPermissions(
-        ...rolesResult.map(r => {
+        ...rolesResult.map((r) => {
           const base = (dynamicMap[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
           const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
             if (visited.has(roleId)) return [];
             visited.add(roleId);
             const direct = hierarchyParents[roleId] || [];
             const all = [...direct];
-            direct.forEach(pr => {
+            direct.forEach((pr: string) => {
               all.push(...collectAncestors(pr, visited));
             });
             return Array.from(new Set(all));
           };
           const parents = collectAncestors(r.role);
-          const inherited = parents.flatMap(p => ((dynamicMap[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
+          const inherited = parents.flatMap((p: string) => ((dynamicMap[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
           return unionPermissions(base, inherited);
         })
       );
-      
+
       const { granted, denied } = customPermsResult;
-      
+
       // Merge granted permissions with standard permissions
       const mergedPerms = unionPermissions(standardPerms, granted);
-      
+
       // Remove denied permissions (custom roles override)
-      const finalPerms = mergedPerms.filter(p => !denied.includes(p));
-      
+      const finalPerms = mergedPerms.filter((p) => !denied.includes(p));
+
       setPermissions(finalPerms);
       console.log('User data loaded successfully');
     } catch (error) {
       console.error('Error loading user data:', error);
       // Ensure we don't leave the app in a broken state
-      setPermissions([]); 
+      setPermissions([]);
     }
   };
 
@@ -190,58 +202,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let cancelled = false;
+    let lastLoadedUserId: string | null = null;
+
+    const scheduleUserDataLoad = (u: User) => {
+      if (lastLoadedUserId === u.id) return;
+      lastLoadedUserId = u.id;
+      setTimeout(() => {
+        if (cancelled) return;
+        void loadUserData(u);
+      }, 0);
+    };
+
+    const applySession = (currentSession: Session | null, source: string) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      if (currentSession?.user) {
+        console.log(`Auth session applied (${source})`, currentSession.user.id);
+        scheduleUserDataLoad(currentSession.user);
+      } else {
+        lastLoadedUserId = null;
+        setProfile(null);
+        setRoles([]);
+        setPermissions([]);
+      }
+
+      setLoading(false);
+    };
+
     // Safety timeout to prevent infinite loading state
     const safetyTimeout = setTimeout(() => {
-      setLoading(prev => {
+      setLoading((prev) => {
         if (prev) {
           console.warn('Auth loading timed out, forcing completion');
           return false;
         }
         return prev;
       });
-    }, 5000); // 5 seconds timeout
+    }, 5000);
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        console.log('Auth state change:', event, currentSession?.user?.id);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-
-        if (currentSession?.user) {
-          await loadUserData(currentSession.user);
-        } else {
-          setProfile(null);
-          setRoles([]);
-          setPermissions([]);
-        }
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session (fallback if listener doesn't fire immediately)
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      if (currentSession?.user) {
-         // Only act if we're still waiting for the listener or state is out of sync
-         // checking !session is tricky due to closure, but we can check if loading is still true
-         // effectively, we just ensure data is loaded.
-         if (!session) { 
-            console.log('Session found via getSession', currentSession.user.id);
-            setSession(currentSession);
-            setUser(currentSession.user);
-            await loadUserData(currentSession.user);
-            setLoading(false);
-         }
-      } else if (!currentSession) {
-        console.log('No session found via getSession');
-        setLoading(false);
-      }
-    }).catch(err => {
-      console.error('getSession failed', err);
-      setLoading(false);
+    // Auth state listener MUST be synchronous; do not await or call Supabase inside callback.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      console.log('Auth state change:', event, currentSession?.user?.id);
+      applySession(currentSession, `onAuthStateChange:${event}`);
     });
 
+    // Initial session bootstrap
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: currentSession } }) => {
+        if (cancelled) return;
+        applySession(currentSession, 'getSession');
+      })
+      .catch((err) => {
+        console.error('getSession failed', err);
+        setLoading(false);
+      });
+
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
       clearTimeout(safetyTimeout);
     };
