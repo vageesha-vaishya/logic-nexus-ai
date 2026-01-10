@@ -109,7 +109,7 @@ export default function RolesPermissions() {
     
     setIsSaving(true);
     try {
-      await RoleService.updateRolePermissions(selectedRole, rolePermissions[selectedRole] || [], justification || undefined);
+      await roleService.updateRolePermissions(selectedRole, rolePermissions[selectedRole] || [], justification || undefined);
       toast.success('Permissions updated successfully');
       setModified(false);
       setJustification('');

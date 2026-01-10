@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
 import { Shipment, ShipmentStatus, statusConfig, normalizeShipmentType, formatShipmentType } from './shipments-data';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function Shipments() {
   const navigate = useNavigate();
