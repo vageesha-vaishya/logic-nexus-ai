@@ -65,9 +65,9 @@ export default function QuoteNew() {
       try {
         const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
         // Check if version already exists
-        const { data: existing, error: queryError } = await dao
+        const { data: existing, error: queryError } = await (dao
           .from('quotation_versions')
-          .select('id, version_number')
+          .select('id, version_number') as any)
           .eq('quote_id', createdQuoteId)
           .order('version_number', { ascending: false })
           .limit(1);
@@ -101,9 +101,9 @@ export default function QuoteNew() {
         if (insertError) {
           console.error('[QuoteNew] Error creating version:', insertError);
           // Check if version was created by another process
-          const { data: retry } = await dao
+          const { data: retry } = await (dao
             .from('quotation_versions')
-            .select('id')
+            .select('id') as any)
             .eq('quote_id', createdQuoteId)
             .limit(1)
             .maybeSingle();
