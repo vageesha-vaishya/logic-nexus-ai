@@ -270,22 +270,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear state first to ensure immediate UI feedback
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setRoles([]);
+    setPermissions([]);
+    
     try {
-      const { error } = await supabase.auth.signOut();
+      // Use scope: 'local' to avoid CORS/network issues with global sign out
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) {
         console.error('Error signing out:', error);
+        // Still navigate even if there's an error - user is already logged out locally
       }
+      navigate('/auth');
       return { error };
     } catch (error) {
       console.error('Unexpected error during sign out:', error);
-      return { error };
-    } finally {
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      setRoles([]);
-      setPermissions([]);
       navigate('/auth');
+      return { error: error as any };
     }
   };
 
