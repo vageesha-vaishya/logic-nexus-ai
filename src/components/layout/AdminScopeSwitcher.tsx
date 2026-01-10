@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-react';
@@ -22,25 +22,15 @@ export function AdminScopeSwitcher() {
   const [franchises, setFranchises] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
-  // If not platform admin, don't render anything
-  useEffect(() => {
-    if (!context.isPlatformAdmin) {
-      console.debug('AdminScopeSwitcher: User is not platform admin. Roles:', context);
-    }
-  }, [context.isPlatformAdmin]);
-
-  if (!context.isPlatformAdmin) {
-    return null;
-  }
-
   const adminOverride = preferences?.admin_override_enabled ?? false;
   const currentTenantId = preferences?.tenant_id ?? null;
   const currentFranchiseId = preferences?.franchise_id ?? null;
+  const isPlatformAdmin = context.isPlatformAdmin;
 
   // Load franchises when tenant changes or on initial load
-  const loadFranchises = async (tenantId: string | null) => {
+  const loadFranchises = useCallback(async (tenantId: string | null) => {
     try {
-      let q = (supabase as any).from('franchises').select('id, name, tenant_id').order('name');
+      let q = supabase.from('franchises').select('id, name, tenant_id').order('name');
       if (tenantId) {
         q = q.eq('tenant_id', tenantId);
       }
@@ -49,12 +39,12 @@ export function AdminScopeSwitcher() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [supabase]);
 
-  const loadData = async (tenantIdOverride?: string | null) => {
+  const loadData = useCallback(async (tenantIdOverride?: string | null) => {
     setLoadingData(true);
     try {
-      const { data: tData } = await (supabase as any).from('tenants').select('id, name').order('name');
+      const { data: tData } = await supabase.from('tenants').select('id, name').order('name');
       setTenants(tData || []);
       
       // Use override if provided, otherwise use current preference
@@ -64,20 +54,33 @@ export function AdminScopeSwitcher() {
       console.error(e);
     }
     setLoadingData(false);
-  };
+  }, [supabase, currentTenantId, loadFranchises]);
 
+  // Debug logging (only when component mounts)
   useEffect(() => {
-    if (adminOverride && open) {
+    if (!isPlatformAdmin) {
+      console.debug('AdminScopeSwitcher: User is not platform admin. Context:', context);
+    }
+  }, [isPlatformAdmin, context]);
+
+  // Load data when admin override is enabled and popover opens
+  useEffect(() => {
+    if (adminOverride && open && isPlatformAdmin) {
       loadData();
     }
-  }, [adminOverride, open]);
+  }, [adminOverride, open, isPlatformAdmin, loadData]);
 
   // Reload franchises when tenant preference changes
   useEffect(() => {
-    if (adminOverride && open) {
+    if (adminOverride && open && isPlatformAdmin) {
       loadFranchises(currentTenantId);
     }
-  }, [currentTenantId]);
+  }, [currentTenantId, adminOverride, open, isPlatformAdmin, loadFranchises]);
+
+  // If not platform admin, don't render anything
+  if (!isPlatformAdmin) {
+    return null;
+  }
 
   const handleToggleOverride = async (checked: boolean) => {
     await setAdminOverride(checked);
