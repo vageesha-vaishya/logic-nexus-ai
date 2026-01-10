@@ -454,7 +454,9 @@ export default function DataImportExport({
     if (!selectedFile) return;
 
     const effectiveTenantId = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
-    const effectiveFranchiseId = context.isPlatformAdmin ? selectedFranchiseId : context.franchiseId;
+    const effectiveFranchiseId = context.isPlatformAdmin 
+      ? (selectedFranchiseId === 'none' ? null : selectedFranchiseId) 
+      : context.franchiseId;
 
     if (!effectiveTenantId) {
       toast.error("Please select a tenant for this import.");
@@ -478,7 +480,9 @@ export default function DataImportExport({
             entity_name: entityName,
             table_name: tableName,
             file_name: selectedFile.name,
-            imported_by: context.userId
+            imported_by: context.userId,
+            tenant_id: effectiveTenantId,
+            franchise_id: effectiveFranchiseId || null
         });
         importSessionId = session.id;
     } catch (e) {

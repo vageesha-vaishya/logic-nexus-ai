@@ -1,5 +1,4 @@
 import DataImportExport, { DataField, ExportTemplate } from '@/components/system/DataImportExport';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { z } from 'zod';
 
 const accountFields: DataField[] = [
@@ -32,11 +31,26 @@ const defaultExportTemplate: ExportTemplate = {
 };
 
 const validationSchema = z.object({
-  name: z.string().trim().min(1, 'Account Name is required'),
-  email: z.string().email().nullish().or(z.literal('')),
-  website: z.string().url().nullish().or(z.literal('')),
-  annual_revenue: z.number().nullish(),
-  employee_count: z.number().int().nullish(),
+  name: z.preprocess(
+    (val) => (val === null || val === undefined) ? '' : String(val),
+    z.string().trim().min(1, 'Account Name is required')
+  ),
+  email: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : String(val),
+    z.string().email().nullish()
+  ),
+  website: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : String(val),
+    z.string().url().nullish()
+  ),
+  annual_revenue: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : Number(val),
+    z.number().nullish()
+  ),
+  employee_count: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : Number(val),
+    z.number().int().nullish()
+  ),
 });
 
 export default function AccountsImportExport() {

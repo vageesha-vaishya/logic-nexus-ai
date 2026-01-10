@@ -104,28 +104,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data;
   };
 
-  const refreshProfile = async () => {
-    if (user) {
-      const profileData = await fetchProfile(user.id);
-      setProfile(profileData);
-      const rolesData = await fetchUserRoles(user.id);
-      setRoles(rolesData);
+  const loadUserData = async (currentUser: User) => {
+    try {
+      console.log('Loading user data for:', currentUser.id);
       
-      // Resolve permissions using dynamic role map and hierarchy (inheritance)
-      let dynamicMap: Record<string, string[]> = {};
-      try {
-        dynamicMap = await RoleService.getRolePermissions();
-      } catch (e) {
-        dynamicMap = {};
-        void 0;
-      }
-      let hierarchyParents: Record<string, string[]> = {};
-      try {
-        const { childrenToParents } = await RoleService.getRoleHierarchy();
-        hierarchyParents = childrenToParents;
-      } catch (e) { void 0; }
+      // Fetch all required data in parallel for performance
+      const [
+        profileResult, 
+        rolesResult, 
+        customPermsResult,
+        dynamicMapResult, 
+        hierarchyResult
+      ] = await Promise.all([
+        fetchProfile(currentUser.id),
+        fetchUserRoles(currentUser.id),
+        fetchCustomPermissions(currentUser.id),
+        RoleService.getRolePermissions().catch(e => {
+          console.warn('Failed to load dynamic permissions', e);
+          return {} as Record<string, string[]>;
+        }),
+        RoleService.getRoleHierarchy().catch(e => {
+          console.warn('Failed to load role hierarchy', e);
+          return { parentsToChildren: {}, childrenToParents: {}, available: false };
+        })
+      ]);
+
+      setProfile(profileResult);
+      setRoles(rolesResult);
+      
+      const dynamicMap = dynamicMapResult;
+      const hierarchyParents = hierarchyResult.childrenToParents || {};
+
       const standardPerms = unionPermissions(
-        ...rolesData.map(r => {
+        ...rolesResult.map(r => {
           const base = (dynamicMap[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
           const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
             if (visited.has(roleId)) return [];
@@ -142,7 +153,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return unionPermissions(base, inherited);
         })
       );
-      const { granted, denied } = await fetchCustomPermissions(user.id);
+      
+      const { granted, denied } = customPermsResult;
       
       // Merge granted permissions with standard permissions
       const mergedPerms = unionPermissions(standardPerms, granted);
@@ -151,6 +163,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const finalPerms = mergedPerms.filter(p => !denied.includes(p));
       
       setPermissions(finalPerms);
+      console.log('User data loaded successfully');
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      // Ensure we don't leave the app in a broken state
+      setPermissions([]); 
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      await loadUserData(user);
     }
   };
 
@@ -161,79 +184,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Safety timeout to prevent infinite loading state
+    const safetyTimeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) {
+          console.warn('Auth loading timed out, forcing completion');
+          return false;
+        }
+        return prev;
+      });
+    }, 5000); // 5 seconds timeout
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
+      async (event, currentSession) => {
+        console.log('Auth state change:', event, currentSession?.user?.id);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
         if (currentSession?.user) {
-          setTimeout(() => {
-            // Load dynamic permissions first
-            RoleService.getRolePermissions().then(map => {
-              // Dynamic role map loaded - use it for permission resolution
-              return map;
-            }).catch(e => {
-              console.warn('Failed to load dynamic permissions on init', e);
-              return {} as Record<string, string[]>;
-            }).then(async (map) => {
-              fetchProfile(currentSession.user.id).then(setProfile);
-              fetchUserRoles(currentSession.user.id).then(async (rolesData) => {
-                setRoles(rolesData);
-                
-                // Resolve inheritance
-                let hierarchyParents: Record<string, string[]> = {};
-              try {
-                const { childrenToParents } = await RoleService.getRoleHierarchy();
-                hierarchyParents = childrenToParents;
-              } catch (e) { void 0; }
-                const standardPerms = unionPermissions(
-                  ...rolesData.map((r) => {
-                    const base = (map[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
-                    const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
-                      if (visited.has(roleId)) return [];
-                      visited.add(roleId);
-                      const direct = hierarchyParents[roleId] || [];
-                      const all = [...direct];
-                      direct.forEach(pr => {
-                        all.push(...collectAncestors(pr, visited));
-                      });
-                      return Array.from(new Set(all));
-                    };
-                    const parents = collectAncestors(r.role);
-                    const inherited = parents.flatMap(p => ((map[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
-                    return unionPermissions(base, inherited);
-                  })
-                );
-                
-                const { granted, denied } = await fetchCustomPermissions(currentSession.user.id);
-                const mergedPerms = unionPermissions(standardPerms, granted);
-                const finalPerms = mergedPerms.filter(p => !denied.includes(p));
-                setPermissions(finalPerms);
-                setLoading(false);
-              });
-            });
-          }, 0);
+          await loadUserData(currentSession.user);
         } else {
           setProfile(null);
           setRoles([]);
           setPermissions([]);
-          setLoading(false);
         }
+        setLoading(false);
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (!currentSession?.user) {
-        setPermissions([]);
+    // Check for existing session (fallback if listener doesn't fire immediately)
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+      if (currentSession?.user) {
+         // Only act if we're still waiting for the listener or state is out of sync
+         // checking !session is tricky due to closure, but we can check if loading is still true
+         // effectively, we just ensure data is loaded.
+         if (!session) { 
+            console.log('Session found via getSession', currentSession.user.id);
+            setSession(currentSession);
+            setUser(currentSession.user);
+            await loadUserData(currentSession.user);
+            setLoading(false);
+         }
+      } else if (!currentSession) {
+        console.log('No session found via getSession');
         setLoading(false);
       }
+    }).catch(err => {
+      console.error('getSession failed', err);
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
 
@@ -275,7 +280,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isTenantAdmin = () => hasRole('tenant_admin');
   const isFranchiseAdmin = () => hasRole('franchise_admin');
 
-  const hasPermission = (permission: Permission) => permissions.includes(permission);
+  const hasPermission = (permission: Permission) => {
+    // Platform admin has implicit full access
+    if (isPlatformAdmin()) return true;
+    return permissions.includes('*') || permissions.includes(permission);
+  };
 
   return (
     <AuthContext.Provider

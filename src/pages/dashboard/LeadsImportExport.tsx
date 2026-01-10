@@ -27,11 +27,26 @@ const leadExportFields: DataField[] = [
 ];
 
 const leadSchema = z.object({
-  first_name: z.string().trim().min(1, 'First Name is required'),
-  last_name: z.string().trim().min(1, 'Last Name is required'),
-  email: z.string().email().nullish().or(z.literal('')),
-  phone: z.string().nullish(),
-  status: z.string().nullish(), // Could use enum validation if strict
+  first_name: z.preprocess(
+    (val) => (val === null || val === undefined) ? '' : String(val),
+    z.string().trim().min(1, 'First Name is required')
+  ),
+  last_name: z.preprocess(
+    (val) => (val === null || val === undefined) ? '' : String(val),
+    z.string().trim().min(1, 'Last Name is required')
+  ),
+  email: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : String(val),
+    z.string().email().nullish()
+  ),
+  phone: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : String(val),
+    z.string().nullish()
+  ),
+  status: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : String(val),
+    z.string().nullish()
+  ),
 });
 
 const defaultTemplate: ExportTemplate = {

@@ -30,9 +30,18 @@ const defaultExportTemplate: ExportTemplate = {
 };
 
 const validationSchema = z.object({
-  first_name: z.string().trim().min(1, 'First Name is required'),
-  last_name: z.string().trim().min(1, 'Last Name is required'),
-  email: z.string().email().nullish().or(z.literal('')),
+  first_name: z.preprocess(
+    (val) => (val === null || val === undefined) ? '' : String(val),
+    z.string().trim().min(1, 'First Name is required')
+  ),
+  last_name: z.preprocess(
+    (val) => (val === null || val === undefined) ? '' : String(val),
+    z.string().trim().min(1, 'Last Name is required')
+  ),
+  email: z.preprocess(
+    (val) => (val === null || val === undefined || val === '') ? null : String(val),
+    z.string().email().nullish()
+  ),
 });
 
 export default function ContactsImportExport() {

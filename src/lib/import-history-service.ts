@@ -23,7 +23,14 @@ export const ImportHistoryService = {
    */
   async createSession(
     supabase: SupabaseClient, 
-    data: { entity_name: string; table_name: string; file_name: string; imported_by?: string }
+    data: { 
+      entity_name: string; 
+      table_name: string; 
+      file_name: string; 
+      imported_by?: string;
+      tenant_id?: string;
+      franchise_id?: string | null;
+    }
   ) {
     const { data: session, error } = await supabase
       .from('import_history')
@@ -32,6 +39,8 @@ export const ImportHistoryService = {
         table_name: data.table_name,
         file_name: data.file_name,
         imported_by: data.imported_by,
+        tenant_id: data.tenant_id,
+        franchise_id: data.franchise_id,
         status: 'partial', // Initially partial until complete
         summary: { success: 0, failed: 0, inserted: 0, updated: 0 }
       })

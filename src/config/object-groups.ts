@@ -1,4 +1,4 @@
-import { type LucideIcon, Building2, Users, UserPlus, TrendingUp, CheckSquare, Mail, Settings, FileText, Package, GitBranch, Palette, Home, Shield } from 'lucide-react';
+import { type LucideIcon, Building2, Users, UserPlus, TrendingUp, CheckSquare, Mail, Settings, FileText, Package, GitBranch, Palette, Home, Shield, ArrowRightLeft } from 'lucide-react';
 
 export type ObjectMenuItem = {
   name: string;
@@ -38,6 +38,7 @@ export const OBJECT_GROUPS: ObjectGroup[] = [
       { name: 'Lead Routing', to: '/dashboard/lead-routing', icon: GitBranch, description: 'Rules for auto-routing' },
       { name: 'Tenants', to: '/dashboard/tenants', icon: FileText, description: 'Multi-tenant administration' },
       { name: 'Franchises', to: '/dashboard/franchises', icon: Package, description: 'Franchise entities' },
+      { name: 'Transfer Center', to: '/dashboard/transfers', icon: ArrowRightLeft, description: 'Move records between entities' },
       { name: 'Users', to: '/dashboard/users', icon: Users, description: 'Manage users and roles' },
       { name: 'Roles & Permissions', to: '/dashboard/settings/permissions', icon: Shield, description: 'Configure access control' },
       { name: 'Security Overview', to: '/dashboard/security-overview', icon: Shield, description: 'RLS policies and security' },

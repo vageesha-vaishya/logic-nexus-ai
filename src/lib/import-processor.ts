@@ -37,19 +37,20 @@ export const processImportRow = (
         isValid: true
     };
 
+    const strValue = rawValue === null || rawValue === undefined ? '' : String(rawValue);
+
     // Apply cleaning based on DB field name
     // This is a heuristic. Ideally, we'd pass field types.
-    if (dbField === 'email' && typeof rawValue === 'string') {
-        result = cleanEmail(rawValue);
-    } else if ((dbField === 'website' || dbField === 'linkedin_url') && typeof rawValue === 'string') {
-        result = cleanUrl(rawValue);
-    } else if ((dbField === 'phone' || dbField === 'mobile') && typeof rawValue === 'string') {
-        result = cleanPhone(rawValue);
+    if (dbField === 'email') {
+        result = cleanEmail(strValue);
+    } else if (dbField === 'website' || dbField === 'linkedin_url') {
+        result = cleanUrl(strValue);
+    } else if (dbField === 'phone' || dbField === 'mobile') {
+        result = cleanPhone(strValue);
     } else if (
-        (dbField.includes('address') || dbField === 'city' || dbField === 'country' || dbField === 'state') 
-        && typeof rawValue === 'string'
+        dbField.includes('address') || dbField === 'city' || dbField === 'country' || dbField === 'state'
     ) {
-        result = cleanAddress(rawValue);
+        result = cleanAddress(strValue);
     }
 
     if (result.corrected) {

@@ -108,6 +108,7 @@ import QuotationTests from "./pages/testing/QuotationTests";
 import QuotePortal from "./pages/portal/QuotePortal";
     
 import RolesPermissions from "./pages/dashboard/RolesPermissions";
+import TransferCenter from "./pages/dashboard/TransferCenter";
 
 const queryClient = new QueryClient();
 
@@ -562,6 +563,14 @@ const App = () => (
             />
             {/* Public customer portal */}
             <Route path="/portal/quote/:token" element={<QuotePortal />} />
+            <Route 
+              path="/dashboard/transfers" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <TransferCenter />
+                </ProtectedRoute>
+              } 
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             {/* Salesforce-style navigation placeholder routes */}
             <Route path="/dashboard/files" element={<ProtectedRoute requiredPermissions={["files.view"]}><Files /></ProtectedRoute>} />

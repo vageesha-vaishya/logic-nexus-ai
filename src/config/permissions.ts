@@ -1,5 +1,6 @@
 // Permission slugs modeled after Salesforce-style modules and actions
 export type Permission =
+  | '*'
   | 'leads.view'
   | 'leads.create'
   | 'leads.edit'
@@ -62,7 +63,8 @@ export type Permission =
   | 'services.view' | 'services.create' | 'services.edit' | 'services.delete'
   | 'service_type_mappings.view' | 'service_type_mappings.create' | 'service_type_mappings.edit' | 'service_type_mappings.delete'
   | 'ports_locations.view' | 'ports_locations.create' | 'ports_locations.edit' | 'ports_locations.delete'
-  | 'consignees.view' | 'consignees.create' | 'consignees.edit' | 'consignees.delete';
+  | 'consignees.view' | 'consignees.create' | 'consignees.edit' | 'consignees.delete'
+  | 'transfers.view' | 'transfers.create' | 'transfers.approve' | 'transfers.reject';
 
 
 export const ROLE_PERMISSIONS: Record<
@@ -76,6 +78,7 @@ export const ROLE_PERMISSIONS: Record<
     'contacts.view','contacts.create','contacts.edit','contacts.delete',
     'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
     'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.templates.manage',
+    'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.reject',
     'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',
@@ -98,6 +101,7 @@ export const ROLE_PERMISSIONS: Record<
     'contacts.view','contacts.create','contacts.edit','contacts.delete',
     'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
     'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.templates.manage',
+    'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.reject',
     'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',

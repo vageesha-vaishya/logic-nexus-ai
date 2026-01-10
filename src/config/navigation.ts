@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft } from 'lucide-react';
 import type { Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -85,6 +85,15 @@ export const APP_MENU: MenuModule[] = [
     items: [
       { name: 'My Subscription', path: '/dashboard/subscriptions', icon: CreditCard, description: 'Manage subscription' },
       { name: 'Tenant Plans', path: '/dashboard/tenant-subscriptions', icon: DollarSign, description: 'Assign tenant plans' },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { name: 'Tenants', path: '/dashboard/tenants', icon: Building2, description: 'Manage tenants', roles: ['platform_admin'] },
+      { name: 'Franchises', path: '/dashboard/franchises', icon: Package, description: 'Franchise entities', roles: ['platform_admin', 'tenant_admin'] },
+      { name: 'Users', path: '/dashboard/users', icon: Users, description: 'Manage users and roles', permissions: ['admin.users.manage'] },
+      { name: 'Transfer Center', path: '/dashboard/transfers', icon: ArrowRightLeft, description: 'Move records between entities', permissions: ['transfers.view'] },
     ],
   },
   {
