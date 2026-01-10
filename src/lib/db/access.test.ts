@@ -65,6 +65,21 @@ describe('ScopedDataAccess', () => {
       expect(mockQueryBuilder.eq).toHaveBeenCalledWith('franchise_id', 'franchise-456');
     });
 
+    it('should apply tenant and franchise filters for Platform Admin with override', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: true,
+        isTenantAdmin: false,
+        isFranchiseAdmin: false,
+        adminOverrideEnabled: true,
+        tenantId: 'tenant-123',
+        franchiseId: 'franchise-456',
+      };
+
+      withScope(mockQueryBuilder, context);
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('franchise_id', 'franchise-456');
+    });
+
     it('should apply tenant filter for Tenant Admin', () => {
       const context: DataAccessContext = {
         isPlatformAdmin: false,
@@ -75,6 +90,20 @@ describe('ScopedDataAccess', () => {
 
       withScope(mockQueryBuilder, context);
       expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+    });
+
+    it('should apply franchise filter for Tenant Admin with franchiseId', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: true,
+        isFranchiseAdmin: false,
+        tenantId: 'tenant-123',
+        franchiseId: 'franchise-456',
+      };
+
+      withScope(mockQueryBuilder, context);
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('franchise_id', 'franchise-456');
     });
 
     it('should apply tenant and franchise filters for Franchise Admin', () => {
@@ -116,11 +145,7 @@ describe('ScopedDataAccess', () => {
         isPlatformAdmin: true,
         isTenantAdmin: false,
         isFranchiseAdmin: false,
-        tenantId: 'tenant-123', // Even if present, shouldn't force inject if not desired?
-        // Wait, the logic says: "Only inject if not platform admin, or if platform admin didn't specify them (optional)"
-        // Let's check implementation:
-        // if (!this.context.isPlatformAdmin) { ... }
-        // So for Platform Admin it does NOT inject automatically.
+        tenantId: 'tenant-123',
       };
 
       const dao = new ScopedDataAccess(mockSupabase, context);
@@ -129,6 +154,20 @@ describe('ScopedDataAccess', () => {
       expect(mockQueryBuilder.insert).toHaveBeenCalledWith({
         name: 'Test Lead',
       });
+    });
+
+    it('should apply no filter for Platform Admin with override enabled but no tenant selected (All Tenants)', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: true,
+        isTenantAdmin: false,
+        isFranchiseAdmin: false,
+        adminOverrideEnabled: true,
+        tenantId: null,
+      };
+
+      withScope(mockQueryBuilder, context);
+      // Should NOT call eq('tenant_id', ...)
+      expect(mockQueryBuilder.eq).not.toHaveBeenCalled();
     });
   });
 });

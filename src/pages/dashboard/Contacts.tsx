@@ -25,6 +25,8 @@ interface Contact {
   created_at: string;
 }
 
+import { ScopedDataAccess } from '@/lib/db/access';
+
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,18 +36,17 @@ export default function Contacts() {
 
   useEffect(() => {
     fetchContacts();
-  }, []);
+  }, [context]);
 
   const fetchContacts = async () => {
     try {
-      let query = supabase.from('contacts').select('*, accounts(name)').order('created_at', { ascending: false });
-      if (!context.adminOverrideEnabled && context.franchiseId) {
-        query = query.eq('franchise_id', context.franchiseId);
-      }
-      const { data, error } = await query;
+      const { data, error } = await new ScopedDataAccess(supabase, context)
+        .from('contacts')
+        .select('*, accounts(name)')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setContacts(data || []);
+      setContacts((data as unknown as Contact[]) || []);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load contacts');

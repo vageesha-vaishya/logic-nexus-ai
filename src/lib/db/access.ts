@@ -28,6 +28,11 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
 
   // Admin Override Logic
   if (context.isPlatformAdmin && context.adminOverrideEnabled) {
+    // Debug logging for troubleshooting filtering issues
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      console.debug(`[ScopedDataAccess] Platform Admin Override: Tenant=${context.tenantId}, Franchise=${context.franchiseId}`);
+    }
+
     if (context.tenantId) {
       scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
     }
@@ -46,6 +51,15 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
   // Tenant Admin: Must scope to their tenant
   if (context.isTenantAdmin && context.tenantId) {
     scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    
+    // Allow Tenant Admin to filter by franchise if specified (e.g. preference or strict assignment)
+    if (context.franchiseId) {
+      // Debug logging for troubleshooting filtering issues
+      if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+        console.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${context.franchiseId}`);
+      }
+      scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
+    }
   }
   
   // Franchise Admin: Must scope to their franchise (and implicitly tenant)
@@ -70,6 +84,10 @@ export class ScopedDataAccess {
     private supabase: SupabaseClient<Database>,
     private context: DataAccessContext
   ) {}
+
+  public get client() {
+    return this.supabase;
+  }
 
   private async logAudit(action: string, resourceType: string, details: any) {
     if (!this.context.userId) return;
@@ -111,6 +129,17 @@ export class ScopedDataAccess {
         return withScope(updateQuery, this.context);
       },
 
+      upsert: (values: any, options?: { onConflict?: string; ignoreDuplicates?: boolean; count?: 'exact' | 'planned' | 'estimated'; defaultToNull?: boolean }) => {
+        // Auto-inject tenant_id/franchise_id if missing and context has them
+        const injectedValues = Array.isArray(values) 
+          ? values.map(v => this.injectScope(v)) 
+          : this.injectScope(values);
+
+        const upsertQuery = query.upsert(injectedValues, options);
+        this.logAudit('UPSERT', table as string, { count: Array.isArray(values) ? values.length : 1 });
+        return withScope(upsertQuery, this.context);
+      },
+
       delete: () => {
         const deleteQuery = query.delete();
         this.logAudit('DELETE', table as string, {});
@@ -121,8 +150,10 @@ export class ScopedDataAccess {
 
   private injectScope(value: any) {
     const newValue = { ...value };
-    // Only inject if not platform admin, or if platform admin didn't specify them (optional)
-    if (!this.context.isPlatformAdmin) {
+    // Inject if not platform admin, or if platform admin has enabled override
+    const shouldInject = !this.context.isPlatformAdmin || (this.context.isPlatformAdmin && this.context.adminOverrideEnabled);
+
+    if (shouldInject) {
       if (this.context.tenantId && !newValue.tenant_id) {
         newValue.tenant_id = this.context.tenantId;
       }

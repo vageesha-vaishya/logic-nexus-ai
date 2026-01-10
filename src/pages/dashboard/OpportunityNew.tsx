@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function OpportunityNew() {
   const navigate = useNavigate();

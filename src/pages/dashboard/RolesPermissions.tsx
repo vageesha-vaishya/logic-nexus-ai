@@ -14,8 +14,13 @@ import { Shield, Save, RotateCcw, Lock, AlertTriangle } from 'lucide-react';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { RoleService, DbRole, DbPermission } from '@/lib/api/roles';
 import { buildShipmentsMatrix, detectConflicts, isSensitiveChange } from '@/lib/auth/PermissionsValidator';
+import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 export default function RolesPermissions() {
+  const { supabase, context } = useCRM();
+  const roleService = new RoleService(new ScopedDataAccess(supabase, context));
+
   const [roles, setRoles] = useState<DbRole[]>([]);
   const [permissions, setPermissions] = useState<DbPermission[]>([]);
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
@@ -41,10 +46,10 @@ export default function RolesPermissions() {
     setIsLoading(true);
     try {
       const [rolesData, permsData, rolePermsMap, hierarchy] = await Promise.all([
-        RoleService.getRoles(),
-        RoleService.getPermissions(),
-        RoleService.getRolePermissions(),
-        RoleService.getRoleHierarchy()
+        roleService.getRoles(),
+        roleService.getPermissions(),
+        roleService.getRolePermissions(),
+        roleService.getRoleHierarchy()
       ]);
 
       if (rolesData.length === 0) {
@@ -75,7 +80,7 @@ export default function RolesPermissions() {
 
   const seedDefaults = async () => {
     try {
-      await RoleService.seedFromConfig();
+      await roleService.seedFromConfig();
       toast.success('Database seeded with default roles and permissions');
       loadData();
     } catch (error) {
@@ -277,7 +282,7 @@ export default function RolesPermissions() {
                     <Button variant="destructive" onClick={async () => {
                       if (!selectedRoleData) return;
                       try {
-                        await RoleService.deleteRole(selectedRoleData.id);
+                        await roleService.deleteRole(selectedRoleData.id);
                         toast.success('Role deleted');
                         loadData();
                       } catch (e) {
@@ -483,7 +488,7 @@ export default function RolesPermissions() {
                   <div className="flex justify-end">
                     <Button onClick={async () => {
                       try {
-                        await RoleService.setRoleInheritance(selectedRole || '', hierarchyParents[selectedRole || ''] || []);
+                        await roleService.setRoleInheritance(selectedRole || '', hierarchyParents[selectedRole || ''] || []);
                         toast.success('Inheritance updated');
                       } catch (e) {
                         toast.error('Failed to update inheritance');
@@ -543,23 +548,23 @@ export default function RolesPermissions() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={async () => {
+            <Button type="button" onClick={async () => {
               try {
-                await RoleService.createRole({
+                await roleService.createRole({
                   id: createForm.id,
                   label: createForm.label,
                   description: createForm.description,
                   level: createForm.level,
                   can_manage_scopes: createForm.scopes,
                   is_system: false
-                } as any);
-                setShowCreateDialog(false);
+                });
                 toast.success('Role created');
+                setShowCreateDialog(false);
                 loadData();
               } catch (e) {
                 toast.error('Failed to create role');
               }
-            }}>Create</Button>
+            }}>Create Role</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -605,7 +610,7 @@ export default function RolesPermissions() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
             <Button onClick={async () => {
               try {
-                await RoleService.updateRole(selectedRole || '', {
+                await roleService.updateRole(selectedRole || '', {
                   label: editForm.label,
                   description: editForm.description,
                   level: editForm.level,

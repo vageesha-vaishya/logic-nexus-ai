@@ -9,11 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { ROLE_MATRIX, UserRole, canManageRole, validateHierarchy } from '@/lib/auth/RoleMatrix';
 import { RoleService } from '@/lib/api/roles';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -40,7 +40,7 @@ interface UserFormProps {
 export function UserForm({ user, onSuccess }: UserFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, supabase } = useCRM();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<UserFormValues | null>(null);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -77,7 +77,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
   useEffect(() => {
     fetchTenants();
-  }, []);
+  }, [context]);
 
   useEffect(() => {
     // If tenant admin, force tenant selection
@@ -98,17 +98,16 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
     if (selectedTenantId) {
       fetchFranchises(selectedTenantId);
     }
-  }, [selectedTenantId]);
+  }, [selectedTenantId, context]);
 
   const fetchTenants = async () => {
     try {
-      let query = supabase.from('tenants').select('*').eq('is_active', true);
+      const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await (db as any)
+        .from('tenants')
+        .select('*')
+        .eq('is_active', true);
       
-      if (context.isTenantAdmin && context.tenantId) {
-        query = query.eq('id', context.tenantId);
-      }
-      
-      const { data, error } = await query;
       if (error) throw error;
       setTenants(data || []);
     } catch (error: any) {
@@ -118,17 +117,18 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
   const fetchFranchises = async (tenantId: string) => {
     try {
-      let query = supabase
+      // Note: ScopedDataAccess automatically filters by tenant_id if the user is a tenant admin.
+      // However, since we are passing tenantId explicitly (e.g. platform admin selecting a tenant),
+      // we should still use eq('tenant_id', tenantId) to filter for the selected tenant.
+      // If the user is a tenant admin, ScopedDataAccess will enforce their tenantId anyway.
+      
+      const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await (db as any)
         .from('franchises')
         .select('*')
         .eq('tenant_id', tenantId)
         .eq('is_active', true);
       
-      if (context.isFranchiseAdmin && context.franchiseId) {
-        query = query.eq('id', context.franchiseId);
-      }
-      
-      const { data, error } = await query;
       if (error) throw error;
       setFranchises(data || []);
     } catch (error: any) {
@@ -168,7 +168,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
     try {
       if (user) {
-        // Update profile
+        // Update profile - direct supabase call as profiles table is not tenant-scoped
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -187,7 +187,8 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         const primaryAssignment = { role: values.role as UserRole, tenant_id: values.tenant_id || null, franchise_id: values.franchise_id || null };
         const hasPrimary = assignedRoles.some(r => r.role === primaryAssignment.role && r.tenant_id === primaryAssignment.tenant_id && r.franchise_id === primaryAssignment.franchise_id);
         const finalAssignments = hasPrimary ? assignedRoles : [primaryAssignment, ...assignedRoles];
-        await RoleService.assignRolesToUser(user.id, finalAssignments, true);
+        const roleService = new RoleService(new ScopedDataAccess(supabase, context));
+        await roleService.assignRolesToUser(user.id, finalAssignments, true);
 
         toast({
           title: 'Success',
@@ -239,7 +240,8 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
           // Assign additional roles after creation
           const { data: created } = await supabase.from('profiles').select('id').eq('email', values.email).single();
           if (created?.id && assignedRoles.length > 0) {
-            await RoleService.assignRolesToUser(created.id, assignedRoles, false);
+            const roleService = new RoleService(new ScopedDataAccess(supabase, context as unknown as DataAccessContext));
+            await roleService.assignRolesToUser(created.id, assignedRoles, false);
           }
         } catch (e) {
           console.warn('Failed to assign additional roles on creation', e);

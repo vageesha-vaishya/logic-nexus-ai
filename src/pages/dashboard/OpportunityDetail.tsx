@@ -58,7 +58,8 @@ export default function OpportunityDetail() {
 
   const fetchOpportunity = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('opportunities')
         .select(`
           *,
@@ -82,7 +83,7 @@ export default function OpportunityDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id, supabase, navigate, toast]);
+  }, [id, supabase, context, navigate, toast]);
 
   useEffect(() => {
     fetchOpportunity();
@@ -92,7 +93,8 @@ export default function OpportunityDetail() {
     if (!id) return;
     setLoadingHistory(true);
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('opportunity_probability_history' as never)
         .select(`
           *,
@@ -147,7 +149,8 @@ export default function OpportunityDetail() {
         closed_at: ['closed_won', 'closed_lost'].includes(formData.stage) ? new Date().toISOString() : null,
       };
 
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('opportunities')
         .update(updateData)
         .eq('id', id);
@@ -167,7 +170,8 @@ export default function OpportunityDetail() {
 
   const saveSalesforceId = async () => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('opportunities')
         .update({ salesforce_opportunity_id: sfIdInput || null } as unknown as Database['public']['Tables']['opportunities']['Update'])
         .eq('id', id);
@@ -200,7 +204,8 @@ export default function OpportunityDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('opportunities')
         .delete()
         .eq('id', id);
@@ -221,7 +226,8 @@ export default function OpportunityDetail() {
     const fetchQuotes = async () => {
       if (!id) return;
       try {
-        const { data, error } = await supabase
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const { data, error } = await dao
           .from('quotes')
           .select('*')
           .eq('opportunity_id', id)
@@ -236,18 +242,19 @@ export default function OpportunityDetail() {
       }
     };
     fetchQuotes();
-  }, [id, supabase]);
+  }, [id, supabase, context]);
 
   const makePrimary = async (quoteId: string) => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('quotes')
         .update({ is_primary: true, opportunity_id: id } as unknown as Database['public']['Tables']['quotes']['Update'])
         .eq('id', quoteId);
       if (error) throw error;
       toast.success('Primary quote updated');
       await fetchOpportunity();
-      const { data } = await supabase
+      const { data } = await dao
         .from('quotes')
         .select('*')
         .eq('opportunity_id', id)

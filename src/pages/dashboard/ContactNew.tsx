@@ -6,6 +6,7 @@ import { ContactForm } from '@/components/crm/ContactForm';
 import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 export default function ContactNew() {
   const navigate = useNavigate();
@@ -13,19 +14,18 @@ export default function ContactNew() {
 
   const handleCreate = async (formData: any) => {
     try {
-      const tenant_id = context.isPlatformAdmin ? formData.tenant_id : context.tenantId;
-      
-      if (!tenant_id) {
+      // Platform admins must select a tenant
+      if (context.isPlatformAdmin && !formData.tenant_id) {
         toast.error('Tenant is required');
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await new ScopedDataAccess(supabase, context)
         .from('contacts')
         .insert({
           ...formData,
-          tenant_id,
-          franchise_id: formData.franchise_id || context.franchiseId,
+          // ScopedDataAccess will automatically inject tenant_id and franchise_id from context
+          // for non-platform admins. Platform admins must provide them in formData.
           account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
           reports_to: formData.reports_to === 'none' || formData.reports_to === '' ? null : formData.reports_to,
         })

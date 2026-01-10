@@ -47,11 +47,11 @@ export default function Shipments() {
 
   const fetchShipments = async () => {
     try {
-      let query = supabase.from('shipments').select('*, accounts(name)').order('created_at', { ascending: false });
-      if (!context.adminOverrideEnabled && context.franchiseId) {
-        query = query.eq('franchise_id', context.franchiseId);
-      }
-      const { data, error } = await query;
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
+        .from('shipments')
+        .select('*, accounts(name)')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setShipments(data as unknown as Shipment[]);

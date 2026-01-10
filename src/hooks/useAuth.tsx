@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ROLE_PERMISSIONS, unionPermissions, type Permission } from '@/config/permissions';
 import { RoleService } from '@/lib/api/roles';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
@@ -122,8 +123,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const timeout = <T,>(ms: number, fallback: T) =>
         new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms));
 
+      // Create a temporary scoped access with minimal context for fetching system definitions
+      // These tables (auth_role_permissions, auth_role_hierarchy) are system-wide
+      const systemContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: false,
+        isFranchiseAdmin: false,
+        userId: currentUser.id
+      };
+      const sda = new ScopedDataAccess(supabase, systemContext);
+      const roleService = new RoleService(sda);
+
       const dynamicMapPromise = Promise.race([
-        RoleService.getRolePermissions().catch((e) => {
+        roleService.getRolePermissions().catch((e) => {
           console.warn('Failed to load dynamic permissions', e);
           return {} as Record<string, string[]>;
         }),
@@ -131,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       const hierarchyPromise = Promise.race([
-        RoleService.getRoleHierarchy().catch((e) => {
+        roleService.getRoleHierarchy().catch((e) => {
           console.warn('Failed to load role hierarchy', e);
           return { parentsToChildren: {}, childrenToParents: {}, available: false };
         }),

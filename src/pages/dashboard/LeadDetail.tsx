@@ -18,11 +18,12 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Lead, statusConfig } from './leads-data';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -32,7 +33,8 @@ export default function LeadDetail() {
 
   const fetchLead = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('leads')
         .select('*')
         .eq('id', id)
@@ -51,28 +53,28 @@ export default function LeadDetail() {
 
   useEffect(() => {
     if (id) {
-        fetchLead();
-        
-        // Real-time subscription for lead updates (e.g. score changes)
-        const channel = supabase
-            .channel(`lead-detail-${id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'leads',
-                    filter: `id=eq.${id}`
-                },
-                (payload) => {
-                    setLead(payload.new as unknown as Lead);
-                }
-            )
-            .subscribe();
+      fetchLead();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+      // Real-time subscription for lead updates (e.g. score changes)
+      const channel = supabase
+        .channel(`lead-detail-${id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'leads',
+            filter: `id=eq.${id}`
+          },
+          (payload) => {
+            setLead(payload.new as unknown as Lead);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [id, fetchLead, supabase]);
 

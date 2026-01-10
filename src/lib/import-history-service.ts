@@ -1,4 +1,4 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 export interface ImportSession {
   id: string;
@@ -22,7 +22,7 @@ export const ImportHistoryService = {
    * Starts a new import session log
    */
   async createSession(
-    supabase: SupabaseClient, 
+    db: ScopedDataAccess, 
     data: { 
       entity_name: string; 
       table_name: string; 
@@ -32,7 +32,7 @@ export const ImportHistoryService = {
       franchise_id?: string | null;
     }
   ) {
-    const { data: session, error } = await supabase
+    const { data: session, error } = await db
       .from('import_history')
       .insert({
         entity_name: data.entity_name,
@@ -55,13 +55,13 @@ export const ImportHistoryService = {
    * Logs details for a batch of processed records
    */
   async logDetails(
-    supabase: SupabaseClient,
+    db: ScopedDataAccess,
     importId: string,
     details: ImportDetail[]
   ) {
     if (!details.length) return;
 
-    const { error } = await supabase
+    const { error } = await db
       .from('import_history_details')
       .insert(
         details.map(d => ({
@@ -80,14 +80,14 @@ export const ImportHistoryService = {
    * Logs validation or processing errors for a batch
    */
   async logErrors(
-    supabase: SupabaseClient,
+    db: ScopedDataAccess,
     importId: string,
     errors: { rowNumber: number; field: string; errorMessage: string; rawData: any }[]
   ) {
     if (!errors.length) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('import_errors')
         .insert(
           errors.map(e => ({
@@ -109,11 +109,11 @@ export const ImportHistoryService = {
    * Updates the session status and summary
    */
   async updateSession(
-    supabase: SupabaseClient,
+    db: ScopedDataAccess,
     id: string,
-    updates: { status?: string; summary?: any }
+    updates: { status?: string; summary?: any; reverted_at?: string; reverted_by?: string }
   ) {
-    const { error } = await supabase
+    const { error } = await db
       .from('import_history')
       .update(updates)
       .eq('id', id);
@@ -125,11 +125,11 @@ export const ImportHistoryService = {
    * Performs the revert operation
    */
   async revertImport(
-    supabase: SupabaseClient,
+    db: ScopedDataAccess,
     importId: string
   ): Promise<{ revertedInserts: number; revertedUpdates: number }> {
     // 1. Get Session Info
-    const { data: session, error: sessionError } = await supabase
+    const { data: session, error: sessionError } = await db
       .from('import_history')
       .select('*')
       .eq('id', importId)
@@ -142,13 +142,12 @@ export const ImportHistoryService = {
 
     // 2. Fetch all details (handling pagination if needed, but for now assuming it fits in memory or we chunk it)
     // Supabase limit is usually 1000. We might need to page.
-    // Let's implement paging to be safe.
     let allDetails: any[] = [];
     let page = 0;
     const pageSize = 1000;
     
     while (true) {
-        const { data: details, error: detailsError } = await supabase
+        const { data: details, error: detailsError } = await db
             .from('import_history_details')
             .select('*')
             .eq('import_id', importId)
@@ -171,7 +170,7 @@ export const ImportHistoryService = {
         // Delete in batches of 1000
         for (let i = 0; i < idsToDelete.length; i += 1000) {
             const batch = idsToDelete.slice(i, i + 1000);
-            const { error: deleteError } = await supabase
+            const { error: deleteError } = await db
                 .from(tableName as any)
                 .delete()
                 .in('id', batch);
@@ -189,7 +188,7 @@ export const ImportHistoryService = {
             
         for (let i = 0; i < recordsToRestore.length; i += 1000) {
             const batch = recordsToRestore.slice(i, i + 1000);
-            const { error: restoreError } = await supabase
+            const { error: restoreError } = await db
                 .from(tableName as any)
                 .upsert(batch); // Upsert will update based on PK (id)
             
@@ -198,10 +197,10 @@ export const ImportHistoryService = {
     }
 
     // 5. Update Status
-    await this.updateSession(supabase, importId, { 
+    await this.updateSession(db, importId, { 
         status: 'reverted',
         reverted_at: new Date().toISOString(),
-        reverted_by: (await supabase.auth.getUser()).data.user?.id
+        reverted_by: (await db.client.auth.getUser()).data.user?.id
     });
 
     return {

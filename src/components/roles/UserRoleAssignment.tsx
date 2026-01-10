@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useCRM } from "@/hooks/useCRM";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, Plus } from "lucide-react";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 interface UserRoleAssignmentProps {
   userId: string;
@@ -21,28 +22,30 @@ interface UserRoleAssignmentProps {
 
 export function UserRoleAssignment({ userId }: UserRoleAssignmentProps) {
   const { profile } = useAuth();
+  const { supabase, context } = useCRM();
   const queryClient = useQueryClient();
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
 
   // Fetch available custom roles
   const { data: availableRoles } = useQuery({
-    queryKey: ["custom_roles"],
+    queryKey: ["custom_roles", context.tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await (db as any)
         .from("custom_roles")
         .select("*")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
   // Fetch user's assigned custom roles
   const { data: userRoles, isLoading } = useQuery({
-    queryKey: ["user_custom_roles", userId],
+    queryKey: ["user_custom_roles", userId, context.tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await new ScopedDataAccess(supabase, context)
         .from("user_custom_roles")
         .select(`
           *,
@@ -50,19 +53,44 @@ export function UserRoleAssignment({ userId }: UserRoleAssignmentProps) {
         `)
         .eq("user_id", userId);
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
   // Assign role mutation
   const assignMutation = useMutation({
     mutationFn: async (roleId: string) => {
-      const { error } = await supabase.from("user_custom_roles").insert({
-        user_id: userId,
-        role_id: roleId,
-        tenant_id: profile?.id, // Should be actual tenant_id
-        assigned_by: profile?.id,
-      });
+      // We need to determine the tenant_id for the assignment.
+      // If we are scoped to a tenant (context.tenantId), use that.
+      // If platform admin and no tenant selected in context (which is rare for this view if it's tenant-specific), 
+      // we might need to handle it. But usually custom roles are tenant-specific.
+      
+      const tenantId = context.tenantId;
+      
+      if (!tenantId && !context.isPlatformAdmin) {
+        throw new Error("No tenant context found");
+      }
+
+      // If platform admin and no tenant, maybe we shouldn't assign? 
+      // But ScopedDataAccess handles injection if we use it for insert?
+      // Wait, ScopedDataAccess.insert injects tenant_id if it's missing in payload?
+      // Yes, if configured.
+      
+      // Let's use ScopedDataAccess for insert too.
+      
+      const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await (db as any)
+        .from("user_custom_roles")
+        .insert({
+          user_id: userId,
+          role_id: roleId,
+          // tenant_id will be injected by ScopedDataAccess if not provided and user is scoped.
+          // If platform admin, we should probably provide it if we know it.
+          // For now, let's assume the context has the correct tenant or we rely on the custom_role's tenant?
+          // Actually, user_custom_roles table usually has tenant_id.
+          tenant_id: tenantId, 
+          assigned_by: profile?.id,
+        });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -78,7 +106,8 @@ export function UserRoleAssignment({ userId }: UserRoleAssignmentProps) {
   // Revoke role mutation
   const revokeMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      const { error } = await supabase
+      const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await (db as any)
         .from("user_custom_roles")
         .delete()
         .eq("id", assignmentId);

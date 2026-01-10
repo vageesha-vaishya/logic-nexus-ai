@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -183,6 +184,7 @@ export default function DataImportExport({
   const navigate = useNavigate();
   const location = useLocation();
   const { supabase, context } = useCRM();
+  const db = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
   const MAX_IMPORT_FILE_BYTES = DEFAULT_MAX_IMPORT_FILE_BYTES;
   
   // State
@@ -463,6 +465,16 @@ export default function DataImportExport({
       return;
     }
 
+    // Create a scoped DB instance for this import operation
+    const importContext = {
+        ...context,
+        tenantId: effectiveTenantId,
+        franchiseId: effectiveFranchiseId,
+        // If platform admin selected a tenant, we treat it as an overridden scope
+        adminOverrideEnabled: context.isPlatformAdmin ? true : context.adminOverrideEnabled
+    };
+    const importDb = new ScopedDataAccess(supabase, importContext as unknown as DataAccessContext);
+
     setProcessingAction('import');
     setImporting(true);
     setImportStep(4);
@@ -476,7 +488,7 @@ export default function DataImportExport({
 
     let importSessionId: string | undefined;
     try {
-        const session = await ImportHistoryService.createSession(supabase, {
+        const session = await ImportHistoryService.createSession(importDb, {
             entity_name: entityName,
             table_name: tableName,
             file_name: selectedFile.name,
@@ -536,7 +548,7 @@ export default function DataImportExport({
                 if (phones.length) orParts.push(`phone.in.(${JSON.stringify(phones).slice(1,-1)})`);
                 
                 if (orParts.length) {
-                   const { data } = await supabase.from(tableName as any).select('*').or(orParts.join(','));
+                   const { data } = await importDb.from(tableName as any).select('*').or(orParts.join(','));
                    if (data) existingRecords = data;
                 }
             }
@@ -572,7 +584,8 @@ export default function DataImportExport({
 
         // Execute Inserts
         if (recordsToInsert.length > 0) {
-            const { data: inserted, error } = await supabase.from(tableName as any).insert(recordsToInsert).select();
+            const insertRes = await (importDb as any).from(tableName).insert(recordsToInsert).select();
+            const { data: inserted, error } = insertRes;
             if (error) {
                 result.failed += recordsToInsert.length;
                 result.errors.push(`Insert error: ${error.message}`);
@@ -592,7 +605,8 @@ export default function DataImportExport({
 
         // Execute Updates
         if (recordsToUpdate.length > 0) {
-             const { data: updated, error } = await supabase.from(tableName as any).upsert(recordsToUpdate).select();
+             const updateRes = await (importDb as any).from(tableName).upsert(recordsToUpdate).select();
+             const { data: updated, error } = updateRes;
              if (error) {
                  result.failed += recordsToUpdate.length;
                  result.errors.push(`Update error: ${error.message}`);
@@ -605,15 +619,15 @@ export default function DataImportExport({
         // Log History
         if (importSessionId) {
              if (importDetails.length > 0) {
-                 await ImportHistoryService.logDetails(supabase, importSessionId, importDetails);
+                 await ImportHistoryService.logDetails(importDb, importSessionId, importDetails);
              }
 
              if (batchErrors.length > 0) {
-                 await ImportHistoryService.logErrors(supabase, importSessionId, batchErrors);
+                 await ImportHistoryService.logErrors(importDb, importSessionId, batchErrors);
              }
              
              // Update session summary periodically (commit point)
-             await ImportHistoryService.updateSession(supabase, importSessionId, {
+             await ImportHistoryService.updateSession(importDb, importSessionId, {
                  status: 'partial',
                  summary: {
                      success: result.success,
@@ -879,7 +893,7 @@ export default function DataImportExport({
     setProcessingAction('revert');
     setImporting(true);
     try {
-      const result = await ImportHistoryService.revertImport(supabase, importResult.importId);
+      const result = await ImportHistoryService.revertImport(db, importResult.importId);
       
       toast.success(`Revert successful: ${result.revertedInserts} inserts deleted, ${result.revertedUpdates} updates restored.`);
       setImportResult(prev => prev ? { ...prev, success: 0, insertedIds: [] } : null);
@@ -894,12 +908,9 @@ export default function DataImportExport({
   const handleExport = async (format: 'xlsx' | 'csv') => {
     setExportStage('counting');
     try {
-      let query = supabase.from(tableName as any).select('*');
+      let query = db.from(tableName as any).select('*');
       
-      // Apply context filters
-      if (!context.adminOverrideEnabled && context.franchiseId) {
-        query = query.eq('franchise_id', context.franchiseId);
-      }
+      // ScopedDataAccess automatically applies context filters
       
       // Apply custom filters from props
       if (onExportFilterApply) {
@@ -1000,7 +1011,7 @@ export default function DataImportExport({
     try {
       const toastId = toast.loading("Reverting import...");
       
-      const result = await ImportHistoryService.revertImport(supabase, importId);
+      const result = await ImportHistoryService.revertImport(db, importId);
       
       toast.dismiss(toastId);
       toast.success(`Reverted successfully: ${result.revertedInserts} inserts removed, ${result.revertedUpdates} updates restored.`);

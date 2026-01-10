@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EntityCard } from '@/components/system/EntityCard';
 import { EmptyState } from '@/components/system/EmptyState';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 interface Account {
   id: string;
@@ -32,7 +33,7 @@ export default function Accounts() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
 
   useEffect(() => {
     fetchAccounts();
@@ -40,17 +41,16 @@ export default function Accounts() {
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('accounts')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setAccounts(data || []);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      setAccounts(data as unknown as Account[]);
+    } catch (error) {
       toast.error('Failed to load accounts');
-      console.error('Error:', message);
     } finally {
       setLoading(false);
     }

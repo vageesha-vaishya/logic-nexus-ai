@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { useCRM } from "@/hooks/useCRM";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Package, MapPin, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ import { Carrier, Shipment, ShipmentStatus, statusConfig, stages, Address } from
 export default function ShipmentsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { supabase, context } = useCRM();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,8 +82,9 @@ export default function ShipmentsPipeline() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       
-      const { data: shipmentsData, error: shipmentsError } = await supabase
+      const { data: shipmentsData, error: shipmentsError } = await dao
         .from("shipments")
         .select("*")
         .order("created_at", { ascending: false });
@@ -89,7 +92,7 @@ export default function ShipmentsPipeline() {
       if (shipmentsError) throw shipmentsError;
       (setShipments as any)(shipmentsData || []);
 
-      const { data: carriersData, error: carriersError } = await supabase
+      const { data: carriersData, error: carriersError } = await dao
         .from("carriers")
         .select("id, carrier_name")
         .eq("is_active", true);
@@ -106,7 +109,7 @@ export default function ShipmentsPipeline() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, toast]);
+  }, [supabase, context, toast]);
 
   useEffect(() => {
     fetchData();
@@ -137,7 +140,8 @@ export default function ShipmentsPipeline() {
 
   const handleStatusChange = async (shipmentId: string, newStatus: ShipmentStatus) => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("shipments")
         .update({ status: newStatus })
         .eq("id", shipmentId);
@@ -238,7 +242,8 @@ export default function ShipmentsPipeline() {
     if (selectedShipments.size === 0) return;
     
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("shipments")
         .delete()
         .in("id", Array.from(selectedShipments));
@@ -315,7 +320,8 @@ export default function ShipmentsPipeline() {
   const handleMarkPodReceived = async (shipmentId: string) => {
     try {
       const now = new Date().toISOString();
-      const { error } = await (supabase as any)
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("shipments")
         .update({ pod_received: true, pod_received_at: now })
         .eq("id", shipmentId);

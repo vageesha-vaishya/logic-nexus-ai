@@ -12,6 +12,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function AccountDetail() {
   const { id } = useParams();
@@ -39,7 +40,8 @@ export default function AccountDetail() {
 
   const fetchAccount = async () => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('accounts')
         .select('*')
         .eq('id', id)
@@ -50,7 +52,7 @@ export default function AccountDetail() {
       
       // Fetch parent account if exists
       if (data?.parent_account_id) {
-        const { data: parentData } = await supabase
+        const { data: parentData } = await dao
           .from('accounts')
           .select('id, name')
           .eq('id', data.parent_account_id)
@@ -76,7 +78,8 @@ export default function AccountDetail() {
 
   const fetchActivities = async (accountId: string) => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('activities')
         .select('*')
         .eq('account_id', accountId)
@@ -92,8 +95,9 @@ export default function AccountDetail() {
   const fetchRelationships = async (accountId: string) => {
     try {
       // Check if table exists by trying to select 1
-      const { data, error } = await (supabase as any)
-        .from('account_relationships')
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
+        .from('account_relationships' as any)
         .select(`
           id, relationship_type, notes,
           to_account:to_account_id(id, name)
@@ -108,8 +112,9 @@ export default function AccountDetail() {
 
   const fetchSegments = async (accountId: string) => {
     try {
-      const { data, error } = await (supabase as any)
-        .from('segment_members')
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
+        .from('segment_members' as any)
         .select(`
           segment:segment_id(id, name, description)
         `)
@@ -126,7 +131,8 @@ export default function AccountDetail() {
 
   const fetchRelatedContacts = async (accountId: string) => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('contacts')
         .select('id, first_name, last_name, email, phone')
         .eq('account_id', accountId)
@@ -140,7 +146,8 @@ export default function AccountDetail() {
 
   const fetchRelatedOpportunities = async (accountId: string) => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('opportunities')
         .select('id, name, stage, amount, close_date')
         .eq('account_id', accountId)
@@ -154,7 +161,8 @@ export default function AccountDetail() {
 
   const fetchChildAccounts = async (accountId: string) => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('accounts')
         .select('id, name, account_type, status')
         .eq('parent_account_id', accountId)
@@ -184,7 +192,8 @@ export default function AccountDetail() {
         if (payload[key] === '') delete payload[key];
       });
 
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('accounts')
         .update(payload)
         .eq('id', id);
@@ -202,7 +211,8 @@ export default function AccountDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('accounts')
         .delete()
         .eq('id', id);

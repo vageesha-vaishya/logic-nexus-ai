@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Button } from '@/components/ui/button';
-import { Shield } from 'lucide-react';
+import { Shield, Check } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -13,6 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export function AdminScopeSwitcher() {
   const { context, preferences, setAdminOverride, setScopePreference, supabase } = useCRM();
@@ -27,6 +29,9 @@ export function AdminScopeSwitcher() {
   const currentFranchiseId = preferences?.franchise_id ?? null;
   const isPlatformAdmin = context.isPlatformAdmin;
 
+  // Initialize Data Access Object for logging
+  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
+
   // Load franchises when tenant changes or on initial load
   const loadFranchises = useCallback(async (tenantId: string | null) => {
     try {
@@ -38,6 +43,7 @@ export function AdminScopeSwitcher() {
       setFranchises(fData || []);
     } catch (e) {
       console.error(e);
+      toast.error("Failed to load franchises");
     }
   }, [supabase]);
 
@@ -52,6 +58,7 @@ export function AdminScopeSwitcher() {
       await loadFranchises(effectiveTenantId);
     } catch (e) {
       console.error(e);
+      toast.error("Failed to load scope data");
     }
     setLoadingData(false);
   }, [supabase, currentTenantId, loadFranchises]);
@@ -64,11 +71,15 @@ export function AdminScopeSwitcher() {
   }, [isPlatformAdmin, context]);
 
   // Load data when admin override is enabled and popover opens
+  // OR if override is enabled and we need tenant name for button label
   useEffect(() => {
-    if (adminOverride && open && isPlatformAdmin) {
-      loadData();
+    if (adminOverride && isPlatformAdmin) {
+      // We load data if open OR if we don't have tenants list yet (to show label)
+      if (open || tenants.length === 0) {
+        loadData();
+      }
     }
-  }, [adminOverride, open, isPlatformAdmin, loadData]);
+  }, [adminOverride, open, isPlatformAdmin, loadData, tenants.length]);
 
   // Reload franchises when tenant preference changes
   useEffect(() => {
@@ -83,30 +94,58 @@ export function AdminScopeSwitcher() {
   }
 
   const handleToggleOverride = async (checked: boolean) => {
-    await setAdminOverride(checked);
-    if (checked) {
-      loadData();
+    try {
+      await setAdminOverride(checked);
+      dao.logViewPreference('admin_override', checked ? 'enabled' : 'disabled');
+      toast.success(checked ? "Scoped View Enabled" : "Global Admin View Restored");
+      if (checked) {
+        loadData();
+      }
+    } catch (error) {
+      toast.error("Failed to toggle admin override");
     }
   };
 
   const handleTenantChange = async (val: string) => {
     const newVal = val === 'all' ? null : val;
-    // Reset franchise when tenant changes and immediately load filtered franchises
-    await setScopePreference(newVal, null);
-    await loadFranchises(newVal);
+    try {
+      // Reset franchise when tenant changes and immediately load filtered franchises
+      // Explicitly pass adminOverride to prevent state synchronization issues
+      await setScopePreference(newVal, null, adminOverride);
+      dao.logViewPreference('scope_change', `Tenant: ${newVal || 'All'}, Franchise: All`);
+      await loadFranchises(newVal);
+      toast.success("Tenant Scope Updated");
+    } catch (error) {
+      toast.error("Failed to update tenant scope");
+    }
   };
 
   const handleFranchiseChange = async (val: string) => {
     const newVal = val === 'all' ? null : val;
-    await setScopePreference(currentTenantId, newVal);
+    try {
+      // Explicitly pass adminOverride to prevent state synchronization issues
+      await setScopePreference(currentTenantId, newVal, adminOverride);
+      dao.logViewPreference('scope_change', `Tenant: ${currentTenantId || 'All'}, Franchise: ${newVal || 'All'}`);
+      toast.success("Franchise Scope Updated");
+    } catch (error) {
+      toast.error("Failed to update franchise scope");
+    }
+  };
+
+  // Resolve scope label
+  const getScopeLabel = () => {
+    if (!adminOverride) return "Global Admin";
+    if (!currentTenantId) return "All Tenants";
+    const tenant = tenants.find(t => t.id === currentTenantId);
+    return tenant ? tenant.name : "Scoped View";
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant={adminOverride ? "destructive" : "outline"} size="sm" className="gap-2">
-          <Shield className="h-4 w-4" />
-          {adminOverride ? "Scoped View" : "Global Admin"}
+        <Button variant={adminOverride ? "destructive" : "outline"} size="sm" className="gap-2 max-w-[200px]">
+          <Shield className="h-4 w-4 shrink-0" />
+          <span className="truncate">{getScopeLabel()}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-4" align="end">

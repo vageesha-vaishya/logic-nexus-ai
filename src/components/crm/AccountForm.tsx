@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Account name is required').max(200, 'Name too long'),
@@ -45,6 +46,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   const { supabase, context } = useCRM();
   
   const form = useForm<AccountFormData>({
+    mode: 'onChange',
     resolver: zodResolver(accountSchema),
     defaultValues: {
       name: initialData?.name || '',
@@ -98,18 +100,14 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   };
 
   const loadParentAccounts = async () => {
-    let query = supabase
+    const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+    let query = db
       .from('accounts')
       .select('id, name')
       .eq('status', 'active')
       .order('name');
 
-    // Filter by tenant/franchise based on user role
-    if (context.franchiseId) {
-      query = query.eq('franchise_id', context.franchiseId);
-    } else if (context.tenantId) {
-      query = query.eq('tenant_id', context.tenantId);
-    }
+    // Filter by tenant/franchise is handled by ScopedDataAccess
 
     // Exclude current account when editing
     if (initialData?.id) {
@@ -117,7 +115,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
     }
 
     const { data } = await query;
-    if (data) setParentAccounts(data);
+    if (data) setParentAccounts(data as any[]);
   };
 
   const handleFormSubmit = (data: AccountFormData) => {

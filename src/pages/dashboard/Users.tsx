@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RoleService } from '@/lib/api/roles';
 
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+
 export default function Users() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -48,29 +50,21 @@ export default function Users() {
 
   useEffect(() => {
     fetchUsers();
-    supabase.from('tenants').select('id,name').then(({ data }) => setTenants(data || []));
-    supabase.from('franchises').select('id,name').then(({ data }) => setFranchises(data || []));
-  }, []);
+    const scopedDb = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+    scopedDb.from('tenants').select('id,name').then(({ data }) => setTenants(data || []));
+    scopedDb.from('franchises').select('id,name').then(({ data }) => setFranchises(data || []));
+  }, [context]);
 
   const fetchUsers = async () => {
     try {
       // First, get the user IDs based on role context
       let userIds: string[] | null = null;
 
-      if (context.isTenantAdmin && context.tenantId) {
-        // Tenant admin can see all users in their tenant (including all franchises)
-        const { data: roles } = await supabase
+      if (!context.isPlatformAdmin || context.adminOverrideEnabled) {
+        const { data: roles } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
           .from('user_roles')
-          .select('user_id')
-          .eq('tenant_id', context.tenantId);
-        userIds = roles?.map(r => r.user_id) || [];
-      } else if (context.isFranchiseAdmin && context.franchiseId) {
-        // Franchise admin can only see users in their franchise
-        const { data: roles } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('franchise_id', context.franchiseId);
-        userIds = roles?.map(r => r.user_id) || [];
+          .select('user_id');
+        userIds = roles?.map((r: any) => r.user_id) || [];
       }
 
       // Build the main query
@@ -279,7 +273,8 @@ export default function Users() {
               <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancel</Button>
               <Button onClick={async () => {
                 try {
-                  await RoleService.bulkAssignRoles(selectedIds, { role: bulkRole, tenant_id: bulkTenant || null, franchise_id: bulkFranchise || null });
+                  const roleService = new RoleService(new ScopedDataAccess(supabase, context));
+                  await roleService.bulkAssignRoles(selectedIds, { role: bulkRole, tenant_id: bulkTenant || null, franchise_id: bulkFranchise || null });
                   toast({ title: 'Success', description: 'Roles assigned' });
                   setShowBulkDialog(false);
                   setSelectedIds([]);

@@ -11,10 +11,12 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+
 export default function ContactDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
   const [contact, setContact] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -29,11 +31,11 @@ export default function ContactDetail() {
       fetchSegments(id);
       fetchActivities(id);
     }
-  }, [id]);
+  }, [id, context]);
 
   const fetchContact = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
         .from('contacts')
         .select(`
           *,
@@ -55,7 +57,7 @@ export default function ContactDetail() {
 
   const fetchActivities = async (contactId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
         .from('activities')
         .select('*')
         .eq('contact_id', contactId)
@@ -70,8 +72,11 @@ export default function ContactDetail() {
 
   const fetchSegments = async (contactId: string) => {
     try {
-      const { data, error } = await (supabase as any)
-        .from('segment_members')
+      // Use ScopedDataAccess to ensure tenant isolation if segment_members supports it.
+      // If segment_members table lacks tenant_id, this might need adjustment, 
+      // but typically all tables should be scoped in this architecture.
+      const { data, error } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+        .from('segment_members' as any) 
         .select(`
           segment:segment_id(id, name, description)
         `)
@@ -87,7 +92,7 @@ export default function ContactDetail() {
 
   const handleUpdate = async (formData: any) => {
     try {
-      const { error } = await supabase
+      const { error } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
         .from('contacts')
         .update({
           ...formData,
@@ -109,7 +114,7 @@ export default function ContactDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      const { error } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
         .from('contacts')
         .delete()
         .eq('id', id);

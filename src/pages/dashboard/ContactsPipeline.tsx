@@ -5,10 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, AlertCircle, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCRM } from "@/hooks/useCRM";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
 import { Draggable } from "@/components/kanban/Draggable";
@@ -16,6 +16,7 @@ import { SwimLane } from "@/components/kanban/SwimLane";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
 
@@ -60,6 +61,7 @@ const stages: ContactStage[] = ['new_contact','verified','key_decision_maker','a
 export default function ContactsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { supabase, context } = useCRM();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -74,15 +76,25 @@ export default function ContactsPipeline() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [context]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: c, error: ce } = await supabase.from('contacts').select('*').order('created_at', { ascending: false });
+      const scopedDb = new ScopedDataAccess(supabase, context);
+      
+      const { data: c, error: ce } = await scopedDb
+        .from('contacts')
+        .select('*')
+        .order('created_at', { ascending: false });
       if (ce) throw ce;
       setContacts((c || []) as Contact[]);
-      const { data: a, error: ae } = await supabase.from('activities').select('id, contact_id, created_at').order('created_at', { ascending: false }).limit(1000);
+      
+      const { data: a, error: ae } = await scopedDb
+        .from('activities')
+        .select('id, contact_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1000);
       if (ae) throw ae;
       setActivities((a || []) as Activity[]);
     } catch (error) {

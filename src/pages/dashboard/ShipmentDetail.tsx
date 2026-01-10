@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TrackingTimeline } from '@/components/logistics/TrackingTimeline';
 import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
@@ -34,7 +35,8 @@ export default function ShipmentDetail() {
 
   const fetchShipment = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('shipments')
         .select('*, accounts(name), contacts(first_name, last_name)')
         .eq('id', id)
@@ -48,11 +50,12 @@ export default function ShipmentDetail() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, id, toast]);
+  }, [supabase, context, id, toast]);
 
   const fetchAttachments = useCallback(async () => {
     try {
-      const { data, error } = await (supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await (dao
         .from('shipment_attachments' as any)
         .select('*')
         .eq('shipment_id', id)
@@ -68,7 +71,7 @@ export default function ShipmentDetail() {
     } catch (error: unknown) {
       console.warn('Failed to load attachments', error);
     }
-  }, [supabase, id]);
+  }, [supabase, context, id]);
 
   useEffect(() => {
     if (id) {
@@ -96,7 +99,8 @@ export default function ShipmentDetail() {
         .getPublicUrl(path);
       const publicUrl = urlData?.publicUrl ?? null;
 
-      const { error: metaErr } = await (supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error: metaErr } = await (dao
         .from('shipment_attachments' as any)
         .insert([{
           shipment_id: id,
@@ -112,7 +116,7 @@ export default function ShipmentDetail() {
         }]) as any);
       if (metaErr) throw metaErr;
 
-      const { error: updErr } = await supabase
+      const { error: updErr } = await dao
         .from('shipments')
         .update({ pod_received: true, pod_received_at: new Date().toISOString() })
         .eq('id', id);

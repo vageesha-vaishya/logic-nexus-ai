@@ -75,7 +75,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   });
 
   const fetchAccounts = async () => {
-    const { data } = await supabase
+    const { data } = await new ScopedDataAccess(supabase, context)
       .from('accounts')
       .select('id, name')
       .order('name');
@@ -83,16 +83,15 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   };
 
   const fetchContacts = async () => {
-    let query = supabase
+    let query = new ScopedDataAccess(supabase, context)
       .from('contacts')
-      .select('id, first_name, last_name')
-      .order('last_name');
+      .select('id, first_name, last_name');
 
     if (initialData?.id) {
       query = query.neq('id', initialData.id);
     }
 
-    const { data } = await query;
+    const { data } = await query.order('last_name');
     if (data) setContacts(data);
   };
 
@@ -108,7 +107,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   }, [context]);
 
   const fetchTenants = async () => {
-    const { data } = await supabase
+    const { data } = await new ScopedDataAccess(supabase, context)
       .from('tenants')
       .select('id, name')
       .eq('is_active', true)
@@ -117,13 +116,24 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   };
 
   const fetchFranchises = async () => {
-    let query = supabase
+    let query = new ScopedDataAccess(supabase, context)
       .from('franchises')
       .select('id, name, code')
       .eq('is_active', true);
     
+    // Note: ScopedDataAccess handles tenant scoping automatically for Tenant Admin.
+    // But for Platform Admin selecting a tenant (which might happen outside this form or if we pass tenant_id),
+    // we might need manual filtering if the form allows selecting tenant first.
+    // In this form, franchises are fetched on mount/context change.
+    // If we want to filter franchises by selected tenant in the form (for Platform Admin),
+    // we would need to listen to form.watch('tenant_id').
+    // But for now, let's just stick to initial fetch logic but using ScopedDataAccess.
+    
     if (context.isTenantAdmin && context.tenantId) {
-      query = query.eq('tenant_id', context.tenantId);
+      // ScopedDataAccess already does this, but keeping it explicitly doesn't hurt, 
+      // or we can rely on ScopedDataAccess.
+      // Actually, ScopedDataAccess.from('franchises') will inject .eq('tenant_id', context.tenantId) if isTenantAdmin.
+      // So we don't need to add it manually.
     }
     
     const { data } = await query.order('name');
