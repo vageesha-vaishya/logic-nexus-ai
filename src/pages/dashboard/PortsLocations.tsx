@@ -64,7 +64,7 @@ export default function PortsLocations() {
 
       if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
         try {
-          const count = await seedPortsForTenant(supabase, tenantId as string);
+          const count = await seedPortsForTenant(scopedDb, tenantId as string);
           if (count > 0) toast.success(`Seeded ${count} demo ports/locations`);
           const { data: seeded } = await scopedDb
             .from('ports_locations')
@@ -149,7 +149,7 @@ export default function PortsLocations() {
               variant="outline"
               onClick={async () => {
                 const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-                const count = await seedPortsForTenant(supabase, tenantId as string);
+                const count = await seedPortsForTenant(scopedDb, tenantId as string);
                 if (count > 0) fetchPorts();
               }}
             >Seed Demo Ports</Button>

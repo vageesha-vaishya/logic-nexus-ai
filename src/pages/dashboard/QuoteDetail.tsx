@@ -8,12 +8,11 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [loading, setLoading] = useState(true);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
@@ -25,8 +24,7 @@ export default function QuoteDetail() {
       try {
         if (!id) throw new Error('Missing quote identifier');
         // Allow navigating by either UUID id or quote_number (e.g., QT-2025-002)
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('quotes')
           .select('id, tenant_id, quote_number')
           .or(`id.eq.${id},quote_number.eq.${id}`)
@@ -52,8 +50,7 @@ export default function QuoteDetail() {
       console.log('[QuoteDetail] Loading latest version for quote:', resolvedId);
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await (dao
+        const { data, error } = await (scopedDb
           .from('quotation_versions')
           .select('id, version_number') as any)
           .eq('quote_id', resolvedId)
@@ -77,7 +74,7 @@ export default function QuoteDetail() {
         let finalTenantId = tenantId;
         if (!finalTenantId) {
           // Fallback: fetch tenant from quote if not already set
-          const { data: qRow, error: qError } = await dao
+          const { data: qRow, error: qError } = await scopedDb
             .from('quotes')
             .select('tenant_id')
             .eq('id', resolvedId)

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users2, Trash2, ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -25,7 +24,7 @@ export default function UserDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,9 +35,8 @@ export default function UserDetail() {
   const fetchUser = async () => {
     try {
       setLoading(true);
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('profiles')
         .select(`
           *,
@@ -68,8 +66,7 @@ export default function UserDetail() {
     try {
       // Verify access before delete
       if (!context.isPlatformAdmin || context.adminOverrideEnabled) {
-        const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data: roles } = await (db as any)
+        const { data: roles } = await (scopedDb as any)
           .from('user_roles')
           .select('user_id')
           .eq('user_id', id);
@@ -89,8 +86,7 @@ export default function UserDetail() {
       // But the current requirement seems to be "Delete User".
       // We will proceed with delete but with the access check above.
       
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('profiles')
         .delete()
         .eq('id', id);

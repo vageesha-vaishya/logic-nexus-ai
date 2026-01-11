@@ -20,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ScopedDataAccess, type DataAccessContext } from '@/lib/db/access';
 
 export default function Carriers() {
   const navigate = useNavigate();
@@ -212,8 +211,7 @@ export default function Carriers() {
     }
 
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('carriers')
         .select('*')
         .order('carrier_name');
@@ -245,8 +243,7 @@ export default function Carriers() {
   const handleDeleteCarrier = async (id: string) => {
     if (!confirm('Delete this carrier? This action cannot be undone.')) return;
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao.from('carriers').delete().eq('id', id);
+      const { error } = await scopedDb.from('carriers').delete().eq('id', id);
       if (error) throw error;
       toast.success('Carrier deleted');
       fetchCarriers();

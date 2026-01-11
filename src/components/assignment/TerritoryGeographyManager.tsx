@@ -67,8 +67,8 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
   const fetchMappings = async () => {
     try {
       setLoading(true);
-      const { data, error } = await sb
-        .from('territory_geographies')
+      const { data, error } = await scopedDb
+        .from('territory_geographies', true)
         .select('id, territory_id, continent_id, country_id, state_id, city_id')
         .eq('territory_id', territoryId);
 
@@ -222,7 +222,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
       }
 
       const { error } = await scopedDb
-        .from('territory_geographies')
+        .from('territory_geographies', true)
         .insert(payload);
 
       if (error) {
@@ -256,7 +256,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
         return toast.error('Geography mapping is unavailable');
       }
       const { error } = await scopedDb
-        .from('territory_geographies')
+        .from('territory_geographies', true)
         .delete()
         .eq('id', id);
 

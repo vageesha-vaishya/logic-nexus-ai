@@ -6,11 +6,10 @@ import { ContactForm } from '@/components/crm/ContactForm';
 import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { ScopedDataAccess } from '@/lib/db/access';
 
 export default function ContactNew() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
 
   const handleCreate = async (formData: any) => {
     try {
@@ -20,7 +19,7 @@ export default function ContactNew() {
         return;
       }
 
-      const { data, error } = await new ScopedDataAccess(supabase, context)
+      const { data, error } = await scopedDb
         .from('contacts')
         .insert({
           ...formData,

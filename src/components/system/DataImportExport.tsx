@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+import { DataAccessContext } from '@/lib/db/access';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -183,8 +183,8 @@ export default function DataImportExport({
 }: DataImportExportProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { supabase, context } = useCRM();
-  const db = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
+  const { supabase, context, scopedDb } = useCRM();
+  const db = scopedDb;
   const MAX_IMPORT_FILE_BYTES = DEFAULT_MAX_IMPORT_FILE_BYTES;
   
   // State
@@ -224,7 +224,7 @@ export default function DataImportExport({
   useEffect(() => {
     if (context.isPlatformAdmin) {
       const fetchTenants = async () => {
-        const { data } = await supabase
+        const { data } = await db
           .from('tenants')
           .select('id, name')
           .eq('is_active', true)
@@ -233,13 +233,13 @@ export default function DataImportExport({
       };
       fetchTenants();
     }
-  }, [context.isPlatformAdmin, supabase]);
+  }, [context.isPlatformAdmin, db]);
 
   // Fetch franchises when tenant is selected
   useEffect(() => {
     if (selectedTenantId) {
       const fetchFranchises = async () => {
-        const { data } = await supabase
+        const { data } = await db
           .from('franchises')
           .select('id, name')
           .eq('tenant_id', selectedTenantId)
@@ -252,7 +252,7 @@ export default function DataImportExport({
       setFranchises([]);
       setSelectedFranchiseId('');
     }
-  }, [selectedTenantId, supabase]);
+  }, [selectedTenantId, db]);
 
   // Refs
   const csvParserRef = useRef<Papa.Parser | null>(null);
@@ -475,7 +475,7 @@ export default function DataImportExport({
         // If platform admin selected a tenant, we treat it as an overridden scope
         adminOverrideEnabled: context.isPlatformAdmin ? true : context.adminOverrideEnabled
     };
-    const importDb = new ScopedDataAccess(supabase, importContext as unknown as DataAccessContext);
+    const importDb = scopedDb.withContext(importContext as unknown as DataAccessContext);
 
     setProcessingAction('import');
     setImporting(true);

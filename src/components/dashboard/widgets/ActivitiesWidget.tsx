@@ -8,12 +8,11 @@ import { WidgetProps } from '@/types/dashboard';
 import { useDashboardData, ActivityItem } from '@/hooks/useDashboardData';
 import { CheckSquare, Phone, Calendar, Mail, StickyNote } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { toast } from 'sonner';
 
 export function ActivitiesWidget({ config, onRemove, onEdit }: WidgetProps) {
   const { t } = useTranslation();
-  const { context, supabase } = useCRM();
+  const { context, scopedDb } = useCRM();
   const { loading, myActivities, leadNamesById, setMyActivities } = useDashboardData();
 
   const renderTypeBadge = (t_type: string | null) => {
@@ -39,8 +38,7 @@ export function ActivitiesWidget({ config, onRemove, onEdit }: WidgetProps) {
   const assignActivityOwner = async (activityId: string, newOwnerId: string | 'none') => {
     try {
       const assigned_to = newOwnerId === 'none' ? null : newOwnerId;
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('activities')
         .update({ assigned_to })
         .eq('id', activityId);

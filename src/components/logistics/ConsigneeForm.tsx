@@ -9,7 +9,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 // Safely convert Supabase JSON/text to an object record
 const toRecord = (value: any): Record<string, any> => {
@@ -41,7 +40,7 @@ const consigneeSchema = z.object({
 });
 
 export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string; onSuccess?: () => void }) {
-  const { context, supabase } = useCRM();
+  const { context, scopedDb } = useCRM();
   const { roles } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,8 +68,7 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
       if (!consigneeId) return;
       setIsLoading(true);
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('consignees')
           .select('*')
           .eq('id', consigneeId)
@@ -101,7 +99,7 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
     };
     loadConsignee();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [consigneeId]);
+  }, [consigneeId, scopedDb]);
 
   const onSubmit = async (values: z.infer<typeof consigneeSchema>) => {
     // Basic validation for tenant context, though ScopedDataAccess handles the enforcement
@@ -113,8 +111,6 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
 
     setIsSubmitting(true);
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      
       const consigneeData: any = {
         company_name: values.company_name,
         contact_person: values.contact_person || null,
@@ -136,14 +132,14 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
       };
 
       if (consigneeId) {
-        const { error } = await dao
+        const { error } = await scopedDb
           .from('consignees')
           .update(consigneeData)
           .eq('id', consigneeId);
         if (error) throw error;
         toast.success('Consignee updated successfully');
       } else {
-        const { error } = await dao.from('consignees').insert([consigneeData]);
+        const { error } = await scopedDb.from('consignees').insert([consigneeData]);
         if (error) throw error;
         toast.success('Consignee created successfully');
         form.reset();

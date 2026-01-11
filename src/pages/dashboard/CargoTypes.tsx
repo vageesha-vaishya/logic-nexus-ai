@@ -41,9 +41,8 @@ export default function CargoTypes() {
       
       if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
         try {
-          await supabase.from("cargo_types").insert([
+          await scopedDb.from("cargo_types").insert([
             {
-              tenant_id: tenantId,
               cargo_type_name: "General Cargo",
               cargo_code: "GEN",
               hazmat_class: null,
@@ -52,7 +51,6 @@ export default function CargoTypes() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               cargo_type_name: "Perishable Goods",
               cargo_code: "PER",
               hazmat_class: null,
@@ -61,7 +59,6 @@ export default function CargoTypes() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               cargo_type_name: "Hazardous Materials",
               cargo_code: "HAZ",
               hazmat_class: "Class 3",
@@ -70,7 +67,6 @@ export default function CargoTypes() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               cargo_type_name: "Oversized Machinery",
               cargo_code: "OVS",
               hazmat_class: null,

@@ -42,9 +42,8 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const payload: Database["public"]["Tables"]["cargo_types"]["Insert"] = {
+      const payload: any = {
         cargo_type_name: values.cargo_type_name,
-        tenant_id: context.tenantId!,
         cargo_code: values.cargo_code || null,
         hazmat_class: values.hazmat_class || null,
         temperature_controlled: values.temperature_controlled,
@@ -52,7 +51,7 @@ export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
         description: values.description || null,
         is_active: values.is_active,
       };
-      const { error } = await supabase.from("cargo_types").insert(payload);
+      const { error } = await scopedDb.from("cargo_types").insert(payload);
 
       if (error) throw error;
 

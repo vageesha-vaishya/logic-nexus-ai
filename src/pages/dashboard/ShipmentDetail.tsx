@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TrackingTimeline } from '@/components/logistics/TrackingTimeline';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
@@ -30,13 +29,12 @@ export default function ShipmentDetail() {
   };
   const [attachments, setAttachments] = useState<ShipmentAttachment[]>([]);
   const [podUploading, setPodUploading] = useState(false);
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [podFile, setPodFile] = useState<File | null>(null);
 
   const fetchShipment = useCallback(async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('shipments')
         .select('*, accounts(name), contacts(first_name, last_name)')
         .eq('id', id)
@@ -54,8 +52,7 @@ export default function ShipmentDetail() {
 
   const fetchAttachments = useCallback(async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await (dao
+      const { data, error } = await (scopedDb
         .from('shipment_attachments' as any)
         .select('*')
         .eq('shipment_id', id)
@@ -99,14 +96,12 @@ export default function ShipmentDetail() {
         .getPublicUrl(path);
       const publicUrl = urlData?.publicUrl ?? null;
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      
       // Use shipment's tenant/franchise if available, otherwise fallback to context
       // This ensures attachments for tenant-owned shipments are properly scoped even when uploaded by Platform Admin
       const targetTenantId = shipment?.tenant_id || context?.tenantId;
       const targetFranchiseId = shipment?.franchise_id || context?.franchiseId;
 
-      const { error: metaErr } = await (dao
+      const { error: metaErr } = await (scopedDb
         .from('shipment_attachments' as any)
         .insert([{
           shipment_id: id,
@@ -122,7 +117,7 @@ export default function ShipmentDetail() {
         }]) as any);
       if (metaErr) throw metaErr;
 
-      const { error: updErr } = await dao
+      const { error: updErr } = await scopedDb
         .from('shipments')
         .update({ pod_received: true, pod_received_at: new Date().toISOString() })
         .eq('id', id);

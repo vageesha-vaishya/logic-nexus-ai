@@ -19,7 +19,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
-import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
 type AccountType = 'prospect' | 'customer' | 'partner' | 'vendor';
@@ -62,7 +61,7 @@ const stages: AccountStage[] = ['new_account','kyc_pending','active','vip','paym
 export default function AccountsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,8 +102,7 @@ export default function AccountsPipeline() {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from("accounts")
         .select("*")
         .order("created_at", { ascending: false });
@@ -157,8 +155,7 @@ export default function AccountsPipeline() {
     else if (newStage === 'active' || newStage === 'vip') updates.status = 'active';
     else updates.status = 'pending';
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao.from('accounts').update(updates).eq('id', accountId);
+      const { error } = await scopedDb.from('accounts').update(updates).eq('id', accountId);
       if (error) throw error;
       setAccounts((prev) => prev.map((a) => a.id === accountId ? { ...a, ...updates } : a));
       toast({ title: 'Success', description: 'Account stage updated' });
@@ -170,13 +167,12 @@ export default function AccountsPipeline() {
   const handleBulkStageChange = async (newStage: AccountStage) => {
     if (selected.size === 0) return;
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       const updates: { status: AccountStatusDB } = { status: 'pending' };
       if (newStage === 'blocked' || newStage === 'inactive') updates.status = 'inactive';
       else if (newStage === 'active' || newStage === 'vip') updates.status = 'active';
       else updates.status = 'pending';
 
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('accounts')
         .update(updates)
         .in('id', Array.from(selected));

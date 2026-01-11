@@ -11,7 +11,6 @@ import { Switch } from '@/components/ui/switch';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { ScopedDataAccess, type DataAccessContext } from '@/lib/db/access';
 
 const carrierSchema = z.object({
   carrier_name: z.string().min(1, 'Carrier name is required'),
@@ -33,7 +32,7 @@ const carrierSchema = z.object({
 });
 
 export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSuccess?: () => void }) {
-  const { context, supabase } = useCRM();
+  const { context, supabase, scopedDb } = useCRM();
   const { roles } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -74,8 +73,7 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
     const loadCarrier = async () => {
       if (!carrierId) return;
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('carriers')
           .select('*')
           .eq('id', carrierId)
@@ -140,15 +138,13 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
           postal_code: values.postal_code || '',
         },
       };
-
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-
+      
       if (carrierId) {
         // Allow platform admins to change tenant association
         if (context.isPlatformAdmin && selectedTenantId) {
           carrierData.tenant_id = selectedTenantId;
         }
-        const { error } = await dao
+        const { error } = await scopedDb
           .from('carriers')
           .update(carrierData)
           .eq('id', carrierId);
@@ -164,7 +160,7 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
           setIsSubmitting(false);
           return;
         }
-        const { error } = await dao.from('carriers').insert([{ ...carrierData, tenant_id: effectiveTenantId }]);
+        const { error } = await scopedDb.from('carriers').insert([{ ...carrierData, tenant_id: effectiveTenantId }]);
         if (error) throw error;
         toast.success('Carrier created successfully');
         onSuccess?.();
@@ -182,8 +178,7 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
     if (!confirm('Delete this carrier? This action cannot be undone.')) return;
     setIsSubmitting(true);
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('carriers')
         .delete()
         .eq('id', carrierId);

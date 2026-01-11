@@ -15,7 +15,7 @@ type ContactSelectDialogProps = {
 };
 
 export default function ContactSelectDialogList({ open, onOpenChange, onSelect }: ContactSelectDialogProps) {
-  const { supabase } = useCRM();
+  const { scopedDb } = useCRM();
   const [loading, setLoading] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -32,18 +32,20 @@ export default function ContactSelectDialogList({ open, onOpenChange, onSelect }
     const fetch = async () => {
       setLoading(true);
       try {
-        const { data: contactsData, error: contactsErr } = await (supabase as any)
+        const { data: contactsData, error: contactsErr } = await scopedDb
           .from('contacts')
           .select('*, accounts(*)')
           .order('created_at', { ascending: false })
           .limit(200);
         if (contactsErr) throw contactsErr;
-        const { data: accountsData, error: accountsErr } = await (supabase as any)
+
+        const { data: accountsData, error: accountsErr } = await scopedDb
           .from('accounts')
           .select('id, name')
           .order('name', { ascending: true })
           .limit(200);
         if (accountsErr) throw accountsErr;
+
         setContacts(contactsData || []);
         setAccounts(accountsData || []);
       } catch (err: any) {
@@ -54,7 +56,7 @@ export default function ContactSelectDialogList({ open, onOpenChange, onSelect }
       }
     };
     fetch();
-  }, [open, supabase]);
+  }, [open, scopedDb]);
 
   const filtered = useMemo(() => {
     const res = contacts.filter((c) => {

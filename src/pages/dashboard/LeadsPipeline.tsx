@@ -23,7 +23,6 @@ import { Palette } from 'lucide-react';
 import { ViewToggle } from '@/components/ui/view-toggle';
 import { DashboardOverview, ContactsSection, TasksSection, DashboardStats, CreateTaskDialog } from '@/components/crm/LeadsPipelineComponents';
 import { Task } from '@/components/crm/TaskScheduler';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
@@ -52,7 +51,7 @@ export default function LeadsPipeline() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const { state: viewState, setTheme, setView, setPipeline, setWorkspace } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const isNavigatingAwayFromPipeline = useRef(false);
@@ -80,7 +79,6 @@ export default function LeadsPipeline() {
     if (!context) return;
     try {
       setIsSavingDefault(true);
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       try {
         localStorage.setItem('leadsViewMode', 'pipeline');
         localStorage.setItem('leadsTheme', viewState.theme);
@@ -91,8 +89,8 @@ export default function LeadsPipeline() {
         const userViewKey = `user:${context.userId}:leads.default_view`;
         const userThemeKey = `user:${context.userId}:leads.default_theme`;
         const [{ error: vErr }, { error: tErr }] = await Promise.all([
-          dao.setSystemSetting(userViewKey, 'pipeline'),
-          dao.setSystemSetting(userThemeKey, viewState.theme),
+          scopedDb.setSystemSetting(userViewKey, 'pipeline'),
+          scopedDb.setSystemSetting(userThemeKey, viewState.theme),
         ]);
         if (vErr || tErr) throw (vErr || tErr);
       }
@@ -117,9 +115,8 @@ export default function LeadsPipeline() {
     
     const loadThemeDefault = async () => {
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
         const userThemeKey = `user:${context.userId}:leads.default_theme`;
-        const { data: themeData } = await dao.getSystemSetting(userThemeKey);
+        const { data: themeData } = await scopedDb.getSystemSetting(userThemeKey);
         const defaultTheme = themeData?.setting_value;
         
         if (defaultTheme && typeof defaultTheme === 'string' && defaultTheme !== viewState.theme) {
@@ -187,8 +184,7 @@ export default function LeadsPipeline() {
     
     setLoading(true);
     try {
-      const dataAccess = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dataAccess
+      const { data, error } = await scopedDb
         .from('leads')
         .select('*')
         .order('created_at', { ascending: false });
@@ -216,8 +212,7 @@ export default function LeadsPipeline() {
   const fetchTasks = useCallback(async () => {
     if (!isContextReady) return;
     try {
-      const dataAccess = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await (dataAccess.from('activities') as any)
+      const { data, error } = await (scopedDb.from('activities') as any)
         .select('*')
         .eq('activity_type', 'task')
         .order('due_date', { ascending: true });
@@ -319,8 +314,7 @@ export default function LeadsPipeline() {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
 
     try {
-      const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      const { error } = await (dataAccess.from('activities') as any)
+      const { error } = await (scopedDb.from('activities') as any)
         .update({ status: newStatus })
         .eq('id', taskId);
 
@@ -341,8 +335,7 @@ export default function LeadsPipeline() {
     if (!isContextReady) return;
     setIsSavingTask(true);
     try {
-      const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      const { data, error } = await (dataAccess.from('activities') as any).insert({
+      const { data, error } = await (scopedDb.from('activities') as any).insert({
         subject: taskData.title,
         due_date: taskData.due_date,
         priority: taskData.priority,
@@ -389,8 +382,7 @@ export default function LeadsPipeline() {
     if (!isContextReady) return;
 
     try {
-      const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      const { error } = await (dataAccess.from('leads') as any).update({ status: newStatus }).eq('id', leadId);
+      const { error } = await (scopedDb.from('leads') as any).update({ status: newStatus }).eq('id', leadId);
 
       if (error) throw error;
       toast.success(`Lead moved to ${statusConfig[newStatus].label}`);
@@ -419,8 +411,7 @@ export default function LeadsPipeline() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, ...leadUpdates } : l));
 
     try {
-      const dataAccess = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      const { error } = await (dataAccess.from('leads') as any)
+      const { error } = await (scopedDb.from('leads') as any)
         .update(leadUpdates)
         .eq('id', id);
 

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 export function AssignmentHistory() {
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

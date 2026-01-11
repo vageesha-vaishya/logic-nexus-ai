@@ -387,7 +387,7 @@ export default function ServiceTypeMappings() {
 
   const handleToggleActive = async (row: MappingRow, next: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_type_mappings')
         .update({ is_active: next })
         .eq('id', row.id);
@@ -401,7 +401,7 @@ export default function ServiceTypeMappings() {
 
   const handleDelete = async (row: MappingRow) => {
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_type_mappings')
         .delete()
         .eq('id', row.id);

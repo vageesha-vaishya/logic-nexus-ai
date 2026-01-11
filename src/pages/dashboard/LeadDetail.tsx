@@ -18,12 +18,11 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Lead, statusConfig } from './leads-data';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -33,8 +32,7 @@ export default function LeadDetail() {
 
   const fetchLead = useCallback(async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('leads')
         .select('*')
         .eq('id', id)
@@ -121,8 +119,7 @@ export default function LeadDetail() {
 
   const handleDelete = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('leads')
         .delete()
         .eq('id', id);

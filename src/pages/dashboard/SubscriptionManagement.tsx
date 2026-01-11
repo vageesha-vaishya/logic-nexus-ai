@@ -40,7 +40,7 @@ export default function SubscriptionManagement() {
   const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const { supabase, context, user } = useCRM();
+  const { scopedDb, context, user } = useCRM();
   const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
@@ -55,8 +55,8 @@ export default function SubscriptionManagement() {
   const fetchData = async () => {
     try {
       // Fetch available plans first (public read)
-      const { data: plansData, error: plansError } = await supabase
-        .from('subscription_plans')
+      const { data: plansData, error: plansError } = await scopedDb
+        .from('subscription_plans', true)
         .select('*')
         .eq('is_active', true)
         .eq('plan_type', 'crm_base')
@@ -68,7 +68,7 @@ export default function SubscriptionManagement() {
       // Fetch current subscription for the effective tenant scope
       const tenantScope = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
       if (tenantScope) {
-        const { data: subData, error: subError } = await supabase
+        const { data: subData, error: subError } = await scopedDb
           .from('tenant_subscriptions')
           .select('*, subscription_plans(*)')
           .eq('tenant_id', tenantScope)
@@ -97,8 +97,8 @@ export default function SubscriptionManagement() {
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tenants')
+      const { data, error } = await scopedDb
+        .from('tenants', true)
         .select('id, name')
         .eq('is_active', true)
         .order('name');
@@ -123,7 +123,7 @@ export default function SubscriptionManagement() {
         ? (selectedTenantId ?? undefined)
         : context.tenantId;
       if (!effectiveTenantId && user?.id) {
-        const { data: tid, error: tidError } = await supabase.rpc('get_user_tenant_id', { check_user_id: user.id });
+        const { data: tid, error: tidError } = await scopedDb.rpc('get_user_tenant_id', { check_user_id: user.id });
         if (tidError) {
           console.warn('Failed to resolve tenant_id via RPC:', tidError.message);
         }
@@ -136,14 +136,14 @@ export default function SubscriptionManagement() {
 
       // Cancel current subscription
       if (currentSubscription) {
-        await supabase
+        await scopedDb
           .from('tenant_subscriptions')
           .update({ status: 'canceled', canceled_at: new Date().toISOString() })
           .eq('id', currentSubscription.id);
       }
 
       // Create new subscription
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('tenant_subscriptions')
         .insert([{ 
           tenant_id: effectiveTenantId,

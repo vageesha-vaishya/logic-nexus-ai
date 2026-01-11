@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Package, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -17,7 +16,7 @@ interface Shipment {
 }
 
 export function ShipmentsWidget() {
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,8 +25,7 @@ export function ShipmentsWidget() {
       if (!context?.userId) return;
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('shipments')
           .select('id, shipment_number, status, origin_city, destination_city')
           .order('created_at', { ascending: false })

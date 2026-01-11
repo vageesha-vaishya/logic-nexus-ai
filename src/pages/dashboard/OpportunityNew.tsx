@@ -4,11 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function OpportunityNew() {
   const navigate = useNavigate();
-  const { supabase, user, context } = useCRM();
+  const { supabase, user, context, scopedDb } = useCRM();
 
   const handleSubmit = async (formData: any) => {
     try {
@@ -39,8 +38,7 @@ export default function OpportunityNew() {
         return;
       }
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('opportunities')
         .insert(opportunityData);
 

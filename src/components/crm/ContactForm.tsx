@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+
 const contactSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
   last_name: z.string().min(1, 'Last name is required').max(100),
@@ -42,7 +42,7 @@ interface ContactFormProps {
 }
 
 export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProps) {
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -75,7 +75,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   });
 
   const fetchAccounts = async () => {
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('accounts')
       .select('id, name')
       .order('name');
@@ -83,7 +83,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   };
 
   const fetchContacts = async () => {
-    let query = new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    let query = scopedDb
       .from('contacts')
       .select('id, first_name, last_name');
 
@@ -107,7 +107,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   }, [context]);
 
   const fetchTenants = async () => {
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('tenants')
       .select('id, name')
       .eq('is_active', true)
@@ -116,7 +116,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   };
 
   const fetchFranchises = async () => {
-    let query = new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    let query = scopedDb
       .from('franchises')
       .select('id, name, code')
       .eq('is_active', true);

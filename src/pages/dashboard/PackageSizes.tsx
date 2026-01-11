@@ -36,9 +36,8 @@ export default function PackageSizes() {
       
       if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
         try {
-          await supabase.from("package_sizes").insert([
+          await scopedDb.from("package_sizes").insert([
             {
-              tenant_id: tenantId,
               size_name: "20ft Container",
               size_code: "20FT",
               length_ft: 20,
@@ -48,7 +47,6 @@ export default function PackageSizes() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               size_name: "40ft Container",
               size_code: "40FT",
               length_ft: 40,
@@ -58,7 +56,6 @@ export default function PackageSizes() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               size_name: "Pallet (48x40)",
               size_code: "PAL48x40",
               length_ft: 4,

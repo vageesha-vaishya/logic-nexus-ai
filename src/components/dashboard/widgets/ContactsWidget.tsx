@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { User, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Contact {
@@ -16,7 +15,7 @@ interface Contact {
 }
 
 export function ContactsWidget() {
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,8 +24,7 @@ export function ContactsWidget() {
       if (!context?.userId) return;
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('contacts')
           .select('id, first_name, last_name, email, title')
           .order('created_at', { ascending: false })

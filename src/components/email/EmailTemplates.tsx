@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, FileText, Edit, Trash2, Copy, Eye } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,33 +20,22 @@ export function EmailTemplates() {
   const [previewing, setPreviewing] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   const [tenants, setTenants] = useState<any[]>([]);
-  const [selectedTenantId, setSelectedTenantId] = useState<string>("");
   const { toast } = useToast();
-  const { context, user } = useCRM();
+  const { context, user, scopedDb, setScopePreference } = useCRM();
   const { roles } = useAuth();
-
-  const getTenantId = () => {
-    if (context?.isPlatformAdmin && selectedTenantId) return selectedTenantId;
-    return (
-      context?.tenantId ||
-      roles?.find((r) => !!r.tenant_id)?.tenant_id ||
-      null
-    );
-  };
 
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const tenantId = getTenantId();
+      const tenantId = context?.tenantId;
       if (!tenantId) {
         setTemplates([]);
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from("email_templates")
         .select("*")
-        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -67,23 +55,21 @@ export function EmailTemplates() {
     const init = async () => {
       try {
         if (context?.isPlatformAdmin) {
-          const { data, error } = await supabase
-            .from("tenants")
+          // Use global access for tenants list as it's a platform admin operation
+          const { data, error } = await scopedDb
+            .from("tenants", true)
             .select("id, name")
             .eq("is_active", true)
             .order("name");
           if (error) throw error;
           setTenants(data || []);
-          setSelectedTenantId((prev) => prev || (data?.[0]?.id ?? ""));
-        } else {
-          setSelectedTenantId(
-            context?.tenantId || roles?.find((r) => !!r.tenant_id)?.tenant_id || ""
-          );
+          
+          // If no tenant is selected, maybe select the first one?
+          // Or let the user choose.
+          // For now, let's respect the current context.
         }
       } catch (err: any) {
         toast({ title: "Error", description: err.message, variant: "destructive" });
-      } finally {
-        fetchTemplates();
       }
     };
     init();
@@ -93,11 +79,17 @@ export function EmailTemplates() {
   useEffect(() => {
     fetchTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTenantId]);
+  }, [context?.tenantId]);
+
+  const handleTenantChange = async (value: string) => {
+    // When platform admin selects a tenant, we enable admin override
+    await setScopePreference(value, null, true);
+  };
+
 
   const seedTemplates = async () => {
     try {
-      const tenantId = getTenantId();
+      const tenantId = context?.tenantId;
       if (!tenantId) {
         toast({ title: "No tenant selected", description: "Please switch to a tenant or assign a tenant role to seed templates.", variant: "destructive" });
         return;
@@ -150,7 +142,7 @@ export function EmailTemplates() {
             "<p>Hi {{first_name}},</p><p>Thanks for your time today. As a recap: {{recap_points}}.</p><p>I’ll follow up with the next steps and materials.</p><p>Best,<br>{{sender_name}}</p>",
         },
       ];
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from("email_templates")
         .insert(
           seeds.map((s) => ({
@@ -196,7 +188,7 @@ export function EmailTemplates() {
     }
     try {
       setSaving(true);
-      const tenantId = getTenantId();
+      const tenantId = context?.tenantId;
       if (!tenantId) {
         toast({ title: "No tenant selected", description: "Please switch to a tenant or assign a tenant role before saving templates.", variant: "destructive" });
         return;
@@ -215,14 +207,14 @@ export function EmailTemplates() {
       };
       let resp;
       if (editing.id) {
-        resp = await supabase
+        resp = await scopedDb
           .from("email_templates")
           .update({ ...payload, updated_at: new Date().toISOString() })
           .eq("id", editing.id)
           .select("*")
           .single();
       } else {
-        resp = await supabase
+        resp = await scopedDb
           .from("email_templates")
           .insert([{ ...payload }])
           .select("*");
@@ -242,7 +234,7 @@ export function EmailTemplates() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this template?")) return;
     try {
-      const { error } = await supabase.from("email_templates").delete().eq("id", id);
+      const { error } = await scopedDb.from("email_templates").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Deleted", description: "Template removed" });
       fetchTemplates();
@@ -253,7 +245,7 @@ export function EmailTemplates() {
 
   const handleDuplicate = async (t: any) => {
     try {
-      const tenantId = getTenantId() || t.tenant_id;
+      const tenantId = context?.tenantId || t.tenant_id;
       if (!tenantId) {
         toast({ title: "No tenant selected", description: "Please switch to a tenant or assign a tenant role before duplicating.", variant: "destructive" });
         return;
@@ -270,7 +262,7 @@ export function EmailTemplates() {
         tenant_id: tenantId,
         created_by: user?.id || null,
       };
-      const { error } = await supabase.from("email_templates").insert([copy]);
+      const { error } = await scopedDb.from("email_templates").insert([copy]);
       if (error) throw error;
       toast({ title: "Duplicated", description: "Template copy created" });
       fetchTemplates();
@@ -292,7 +284,7 @@ export function EmailTemplates() {
           {context?.isPlatformAdmin && (
             <div className="min-w-[240px]">
               <Label>Tenant</Label>
-              <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+              <Select value={context?.tenantId || ""} onValueChange={handleTenantChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose tenant" />
                 </SelectTrigger>
@@ -325,7 +317,7 @@ export function EmailTemplates() {
           <CardContent className="p-8 text-center">
             <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground mb-4">
-              No email templates created{context?.isPlatformAdmin && !getTenantId() ? 
+              No email templates created{context?.isPlatformAdmin && !context?.tenantId ? 
                 ". Choose a tenant to manage templates." : ""}
             </p>
             <div className="flex justify-center gap-2">

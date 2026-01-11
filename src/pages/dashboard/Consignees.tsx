@@ -21,11 +21,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Consignee } from '@/domain/common/types';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function Consignees() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const { roles } = useAuth();
   const [consignees, setConsignees] = useState<Consignee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,8 +43,7 @@ export default function Consignees() {
 
   const fetchConsignees = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('consignees')
         .select('id, tenant_id, company_name, contact_person, contact_email, tax_id, customs_id, is_active')
         .order('company_name');
@@ -56,7 +54,7 @@ export default function Consignees() {
       // Dev-only: auto-seed demo consignees if none exist (only when tenant scoped)
       if (!context.isPlatformAdmin && rows.length === 0 && import.meta.env.DEV) {
         try {
-          await dao.from('consignees').insert([
+          await scopedDb.from('consignees').insert([
             {
               company_name: 'Acme Imports',
               contact_person: 'Jamie Rivera',
@@ -84,7 +82,7 @@ export default function Consignees() {
           ]);
           toast.success('Seeded demo consignees');
           // Refresh after seeding
-          const { data: refreshed } = await dao
+          const { data: refreshed } = await scopedDb
             .from('consignees')
             .select('id, tenant_id, company_name, contact_person, contact_email, tax_id, customs_id, is_active')
             .order('company_name');
@@ -123,8 +121,7 @@ export default function Consignees() {
 
   const onDelete = async (id: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao.from('consignees').delete().eq('id', id);
+      const { error } = await scopedDb.from('consignees').delete().eq('id', id);
       if (error) throw error;
       toast.success('Consignee deleted');
       fetchConsignees();

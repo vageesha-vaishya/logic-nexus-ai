@@ -25,14 +25,12 @@ interface Contact {
   created_at: string;
 }
 
-import { ScopedDataAccess } from '@/lib/db/access';
-
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
 
   useEffect(() => {
     fetchContacts();
@@ -40,7 +38,7 @@ export default function Contacts() {
 
   const fetchContacts = async () => {
     try {
-      const { data, error } = await new ScopedDataAccess(supabase, context)
+      const { data, error } = await scopedDb
         .from('contacts')
         .select('*, accounts(name)')
         .order('created_at', { ascending: false });

@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { toast } from 'sonner';
 
 export default function AccountNew() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
 
   const handleCreate = async (formData: any) => {
     try {
@@ -24,8 +23,7 @@ export default function AccountNew() {
         return;
       }
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('accounts')
         .insert({
           ...formData,

@@ -88,6 +88,14 @@ export class ScopedDataAccess {
     return this.context;
   }
 
+  /**
+   * Creates a new ScopedDataAccess instance with a different context.
+   * Useful for temporary context switching (e.g. Platform Admin impersonation during import).
+   */
+  public withContext(context: DataAccessContext): ScopedDataAccess {
+    return new ScopedDataAccess(this.supabase, context);
+  }
+
   private async logAudit(action: string, resourceType: string, details: any) {
     if (!this.context.userId) return;
     

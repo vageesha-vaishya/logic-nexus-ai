@@ -10,7 +10,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Account name is required').max(200, 'Name too long'),
@@ -43,7 +42,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
   const [parentAccounts, setParentAccounts] = useState<any[]>([]);
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   
   const form = useForm<AccountFormData>({
     mode: 'onChange',
@@ -77,7 +76,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   }, [context]);
 
   const loadTenants = async () => {
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('tenants')
       .select('id, name')
       .eq('is_active', true)
@@ -89,7 +88,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   const loadFranchises = async () => {
     if (!context.tenantId) return;
     
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('franchises')
       .select('id, name')
       .eq('tenant_id', context.tenantId)
@@ -100,8 +99,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   };
 
   const loadParentAccounts = async () => {
-    const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-    let query = db
+    let query = scopedDb
       .from('accounts')
       .select('id, name')
       .eq('status', 'active')

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
 type VersionStatus = 'draft' | 'sent' | 'internal_review' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
@@ -21,6 +21,7 @@ const statusTransitions: StatusTransition[] = [
 
 export function useVersionStatus() {
   const [isUpdating, setIsUpdating] = useState(false);
+  const { scopedDb } = useCRM();
 
   const getAvailableTransitions = (currentStatus: VersionStatus): VersionStatus[] => {
     const transition = statusTransitions.find(t => t.from === currentStatus);
@@ -30,7 +31,7 @@ export function useVersionStatus() {
   const updateVersionStatus = async (versionId: string, newStatus: VersionStatus) => {
     setIsUpdating(true);
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('quotation_versions')
         .update({ status: newStatus })
         .eq('id', versionId);
@@ -63,7 +64,7 @@ export function useVersionStatus() {
   const setCurrentVersion = async (versionId: string) => {
     setIsUpdating(true);
     try {
-      const { error } = await supabase.rpc('set_current_version', {
+      const { error } = await scopedDb.rpc('set_current_version', {
         p_version_id: versionId,
       });
 

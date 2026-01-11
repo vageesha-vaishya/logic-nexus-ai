@@ -14,7 +14,6 @@ import { toast } from 'sonner';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EntityCard } from '@/components/system/EntityCard';
 import { EmptyState } from '@/components/system/EmptyState';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 interface Account {
   id: string;
@@ -33,7 +32,7 @@ export default function Accounts() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
 
   useEffect(() => {
     fetchAccounts();
@@ -41,8 +40,7 @@ export default function Accounts() {
 
   const fetchAccounts = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('accounts')
         .select('*')
         .order('created_at', { ascending: false });

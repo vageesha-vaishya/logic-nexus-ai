@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Building2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Account {
@@ -15,7 +14,7 @@ interface Account {
 }
 
 export function AccountsWidget() {
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,8 +23,7 @@ export function AccountsWidget() {
       if (!context?.userId) return;
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('accounts')
           .select('id, name, industry, status')
           .order('created_at', { ascending: false })

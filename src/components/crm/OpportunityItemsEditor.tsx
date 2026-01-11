@@ -21,9 +21,7 @@ type OppItem = {
 };
 
 export function OpportunityItemsEditor({ opportunityId }: { opportunityId: string }) {
-  const { supabase } = useCRM();
-  // Cast Supabase to any for new tables not present in generated types
-  const db: any = supabase as any;
+  const { scopedDb } = useCRM();
   const [items, setItems] = useState<OppItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,7 +29,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const { data, error } = await db
+        const { data, error } = await scopedDb
           .from('opportunity_items')
           .select('*')
           .eq('opportunity_id', opportunityId)
@@ -56,7 +54,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
       }
     };
     if (opportunityId) fetchItems();
-  }, [opportunityId]);
+  }, [opportunityId, scopedDb]);
 
   const addItem = () => {
     setItems((prev) => ([
@@ -92,8 +90,9 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
   const handleSave = async () => {
     try {
       setSaving(true);
+      
       // Replace all items for simplicity
-      const { error: delErr } = await db
+      const { error: delErr } = await scopedDb
         .from('opportunity_items')
         .delete()
         .eq('opportunity_id', opportunityId);
@@ -113,7 +112,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
       }));
 
       if (payload.length > 0) {
-        const { error: insErr } = await db.from('opportunity_items').insert(payload as any[]);
+        const { error: insErr } = await scopedDb.from('opportunity_items').insert(payload as any[]);
         if (insErr) throw insErr;
       }
 

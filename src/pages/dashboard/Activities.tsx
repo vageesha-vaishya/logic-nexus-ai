@@ -21,7 +21,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 interface Activity {
   id: string;
@@ -81,14 +80,12 @@ export default function Activities() {
   const [priorityAdv, setPriorityAdv] = useState<'any' | 'low' | 'medium' | 'high' | 'urgent'>('any');
   const [dueStart, setDueStart] = useState<string>('');
   const [dueEnd, setDueEnd] = useState<string>('');
-  // Create scoped data access for proper filtering
-  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
 
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
-      // Use ScopedDataAccess for proper tenant/franchise filtering
-      const { data, error } = await dao
+      // Use scopedDb for proper tenant/franchise filtering
+      const { data, error } = await scopedDb
         .from('activities')
         .select(`
           *,
@@ -124,7 +121,7 @@ export default function Activities() {
         )
       );
       if (leadIds.length > 0) {
-        const { data: leadRefs, error: leadErr } = await dao
+        const { data: leadRefs, error: leadErr } = await scopedDb
           .from('leads')
           .select('id, first_name, last_name, company')
           .in('id', leadIds);
@@ -146,7 +143,7 @@ export default function Activities() {
     } finally {
       setLoading(false);
     }
-  }, [dao]);
+  }, [scopedDb]);
 
   useEffect(() => {
     fetchActivities();

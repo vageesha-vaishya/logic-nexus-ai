@@ -15,11 +15,10 @@ import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbS
 import { RoleService, DbRole, DbPermission } from '@/lib/api/roles';
 import { buildShipmentsMatrix, detectConflicts, isSensitiveChange } from '@/lib/auth/PermissionsValidator';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess } from '@/lib/db/access';
 
 export default function RolesPermissions() {
-  const { supabase, context } = useCRM();
-  const roleService = new RoleService(new ScopedDataAccess(supabase, context));
+  const { supabase, context, scopedDb } = useCRM();
+  const roleService = new RoleService(scopedDb);
 
   const [roles, setRoles] = useState<DbRole[]>([]);
   const [permissions, setPermissions] = useState<DbPermission[]>([]);

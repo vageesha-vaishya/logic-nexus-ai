@@ -19,12 +19,11 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 import { Quote, QuoteStatus, statusConfig, stages } from "./quotes-data";
-import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 export default function QuotesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context, supabase } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,8 +83,7 @@ export default function QuotesPipeline() {
     try {
       setLoading(true);
       
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from("quotes")
         .select(`
           *,
@@ -110,8 +108,7 @@ export default function QuotesPipeline() {
 
   const fetchAccounts = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from("accounts")
         .select("id, name")
         .limit(100)
@@ -139,8 +136,7 @@ export default function QuotesPipeline() {
     }
 
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from("quotes")
         .update({ status: newStatus })
         .eq("id", quoteId);
@@ -232,8 +228,7 @@ export default function QuotesPipeline() {
     if (selectedQuotes.size === 0) return;
 
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from("quotes")
         .delete()
         .in("id", Array.from(selectedQuotes));
@@ -261,8 +256,7 @@ export default function QuotesPipeline() {
     if (selectedQuotes.size === 0) return;
 
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from("quotes")
         .update({ status: newStatus })
         .in("id", Array.from(selectedQuotes));

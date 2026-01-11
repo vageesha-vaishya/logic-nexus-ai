@@ -10,7 +10,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { FormSection, FormGrid } from '@/components/forms/FormLayout';
 import { AsyncComboboxField, FileUploadField } from '@/components/forms/AdvancedFields';
 import { Switch } from '@/components/ui/switch';
@@ -56,7 +55,7 @@ interface LeadFormProps {
 export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<LeadFormData | null>(null);
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
   const [currentFranchise, setCurrentFranchise] = useState<{ id: string; name: string } | null>(null);
@@ -101,7 +100,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   }, [context.isPlatformAdmin, context.isTenantAdmin, context.franchiseId, watchedTenantId]);
 
   const fetchTenants = async () => {
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('tenants')
       .select('id, name')
       .order('name');
@@ -109,7 +108,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   };
 
   const fetchFranchises = async (tenantId: string) => {
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('franchises')
       .select('id, name')
       .eq('tenant_id', tenantId)
@@ -119,7 +118,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
 
   const fetchCurrentFranchise = async () => {
     if (!context.franchiseId) return;
-    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
+    const { data } = await scopedDb
       .from('franchises')
       .select('id, name')
       .eq('id', context.franchiseId)

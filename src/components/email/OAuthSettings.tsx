@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { Info, Save } from "lucide-react";
@@ -41,7 +40,7 @@ export function OAuthSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
 
   useEffect(() => {
     fetchOAuthConfigs();
@@ -50,10 +49,9 @@ export function OAuthSettings() {
   const fetchOAuthConfigs = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("oauth_configurations" as any)
+      const { data, error } = await scopedDb
+        .from("oauth_configurations")
         .select("*")
-        .eq("user_id", context.userId)
         .in("provider", ["office365", "gmail"]);
 
       if (error) throw error;
@@ -117,7 +115,7 @@ export function OAuthSettings() {
     try {
       const configData = {
         user_id: context.userId,
-        tenant_id: context.tenantId,
+        // tenant_id: context.tenantId, // ScopedDataAccess handles tenant_id
         provider: config.provider,
         client_id: config.client_id,
         client_secret: config.client_secret,
@@ -128,14 +126,14 @@ export function OAuthSettings() {
 
       let error;
       if (config.id) {
-        const { error: updateError } = await supabase
-          .from("oauth_configurations" as any)
+        const { error: updateError } = await scopedDb
+          .from("oauth_configurations")
           .update(configData)
           .eq("id", config.id);
         error = updateError;
       } else {
-        const { error: insertError } = await supabase
-          .from("oauth_configurations" as any)
+        const { error: insertError } = await scopedDb
+          .from("oauth_configurations")
           .insert(configData);
         error = insertError;
       }

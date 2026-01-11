@@ -36,7 +36,7 @@ const stageColors: Record<string, string> = {
 };
 
 export function OpportunitySelectDialog({ open, onOpenChange, onSelect }: OpportunitySelectDialogProps) {
-  const { supabase } = useCRM();
+  const { scopedDb } = useCRM();
   const [loading, setLoading] = useState(false);
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [nameQuery, setNameQuery] = useState('');
@@ -47,7 +47,7 @@ export function OpportunitySelectDialog({ open, onOpenChange, onSelect }: Opport
     const fetchOpportunities = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await scopedDb
           .from('opportunities')
           .select(`
             *,
@@ -64,7 +64,7 @@ export function OpportunitySelectDialog({ open, onOpenChange, onSelect }: Opport
       }
     };
     fetchOpportunities();
-  }, [open]);
+  }, [open, scopedDb]);
 
   const filtered = useMemo(() => {
     return opportunities.filter((o) => {

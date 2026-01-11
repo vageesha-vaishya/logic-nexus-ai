@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { TrendingUp, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -17,7 +16,7 @@ interface Opportunity {
 }
 
 export function OpportunitiesWidget() {
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,8 +25,7 @@ export function OpportunitiesWidget() {
       if (!context?.userId) return;
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('opportunities')
           .select('id, name, amount, stage, account:accounts(name)')
           .order('created_at', { ascending: false })

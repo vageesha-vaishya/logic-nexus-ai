@@ -36,23 +36,20 @@ export default function Incoterms() {
       
       if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
         try {
-          await supabase.from("incoterms").insert([
+          await scopedDb.from("incoterms").insert([
             {
-              tenant_id: tenantId,
               incoterm_code: "FOB",
               incoterm_name: "Free On Board",
               description: "Seller delivers goods on board the vessel at the named port of shipment.",
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               incoterm_code: "CIF",
               incoterm_name: "Cost, Insurance and Freight",
               description: "Seller covers cost, insurance, and freight to port of destination.",
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               incoterm_code: "EXW",
               incoterm_name: "Ex Works",
               description: "Buyer bears all costs and risks involved in taking goods from seller's premises to desired destination.",

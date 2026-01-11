@@ -6,11 +6,10 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ShipmentForm } from '@/components/logistics/ShipmentForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function ShipmentNew() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
 
   const handleSubmit = async (data: any) => {
     try {
@@ -29,10 +28,8 @@ export default function ShipmentNew() {
         declared_value: typeof data.declared_value === 'number' ? data.declared_value : (data.declared_value ? parseFloat(data.declared_value) : null),
       };
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-
       // Create shipment and get the new ID to attach files under it
-      const { data: inserted, error } = await dao
+      const { data: inserted, error } = await scopedDb
         .from('shipments')
         .insert([shipmentData])
         .select('id')
@@ -67,7 +64,7 @@ export default function ShipmentNew() {
               .getPublicUrl(path);
             const publicUrl = urlData?.publicUrl ?? null;
 
-            const { error: metaErr } = await (dao as any)
+            const { error: metaErr } = await (scopedDb as any)
               .from('shipment_attachments')
               .insert([{
                 shipment_id: shipmentId,

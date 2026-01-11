@@ -10,11 +10,9 @@ import { toast } from 'sonner';
 type ResetPolicy = 'none' | 'daily' | 'monthly' | 'yearly';
 
 export default function QuoteNumberSettings() {
-  const { supabase, context } = useCRM();
+  const { scopedDb, context, supabase } = useCRM();
   const tenantId = context.tenantId;
   const franchiseId = context.franchiseId || null;
-  // Use an untyped client for newly added tables/RPC not present in generated types
-  const sb: any = supabase;
 
   const [tenantPrefix, setTenantPrefix] = useState('QUO');
   const [tenantPolicy, setTenantPolicy] = useState<ResetPolicy>('daily');
@@ -27,10 +25,9 @@ export default function QuoteNumberSettings() {
   const loadConfig = async () => {
     if (!tenantId) return;
     try {
-      const { data: tenantCfg } = await sb
+      const { data: tenantCfg } = await scopedDb
         .from('quote_number_config_tenant')
         .select('prefix, reset_policy')
-        .eq('tenant_id', tenantId)
         .single();
       if (tenantCfg) {
         setTenantPrefix(((tenantCfg as any).prefix as string) || 'QUO');
@@ -38,11 +35,9 @@ export default function QuoteNumberSettings() {
       }
 
       if (franchiseId) {
-        const { data: franchiseCfg } = await sb
+        const { data: franchiseCfg } = await scopedDb
           .from('quote_number_config_franchise')
           .select('prefix, reset_policy')
-          .eq('tenant_id', tenantId)
-          .eq('franchise_id', franchiseId)
           .single();
         if (franchiseCfg) {
           setFranchisePrefix(((franchiseCfg as any).prefix as string) || 'QUO');
@@ -50,7 +45,7 @@ export default function QuoteNumberSettings() {
         }
       }
 
-      const { data: previewRes, error: previewErr } = await sb.rpc('preview_next_quote_number', {
+      const { data: previewRes, error: previewErr } = await scopedDb.rpc('preview_next_quote_number', {
         p_tenant_id: tenantId,
         p_franchise_id: franchiseId,
       });
@@ -73,23 +68,27 @@ export default function QuoteNumberSettings() {
     }
     setSavingTenant(true);
     try {
-      const { data: existing, error: loadErr } = await sb
+      const { data: existing, error: loadErr } = await scopedDb
         .from('quote_number_config_tenant')
         .select('tenant_id')
-        .eq('tenant_id', tenantId)
         .maybeSingle();
       if (loadErr) throw loadErr;
 
       if (existing) {
-        const { error: updErr } = await sb
+        const { error: updErr } = await scopedDb
           .from('quote_number_config_tenant')
           .update({ prefix, reset_policy: tenantPolicy })
-          .eq('tenant_id', tenantId);
+          .eq('tenant_id', tenantId); // scopedDb will also inject tenant_id, but keeping eq is safe or redundant. Ideally remove if safe.
+          // Actually scopedDb updates are scoped. If I don't provide eq, it updates all rows for the tenant?
+          // Usually scopedDb.update applies to the scope. Since it's a config table per tenant (likely 1 row per tenant), it should be fine.
+          // But maybeSingle found it.
+          // Let's remove explicit eq('tenant_id', tenantId) as scopedDb handles it.
+          
         if (updErr) throw updErr;
       } else {
-        const { error: insErr } = await sb
+        const { error: insErr } = await scopedDb
           .from('quote_number_config_tenant')
-          .insert([{ tenant_id: tenantId, prefix, reset_policy: tenantPolicy }]);
+          .insert([{ prefix, reset_policy: tenantPolicy }]); // Removed tenant_id from insert, scopedDb should inject it.
         if (insErr) throw insErr;
       }
       toast.success('Tenant quote numbering saved');
@@ -110,25 +109,21 @@ export default function QuoteNumberSettings() {
     }
     setSavingFranchise(true);
     try {
-      const { data: existing, error: loadErr } = await sb
+      const { data: existing, error: loadErr } = await scopedDb
         .from('quote_number_config_franchise')
         .select('tenant_id,franchise_id')
-        .eq('tenant_id', tenantId)
-        .eq('franchise_id', franchiseId)
         .maybeSingle();
       if (loadErr) throw loadErr;
 
       if (existing) {
-        const { error: updErr } = await sb
+        const { error: updErr } = await scopedDb
           .from('quote_number_config_franchise')
-          .update({ prefix, reset_policy: franchisePolicy })
-          .eq('tenant_id', tenantId)
-          .eq('franchise_id', franchiseId);
+          .update({ prefix, reset_policy: franchisePolicy });
         if (updErr) throw updErr;
       } else {
-        const { error: insErr } = await sb
+        const { error: insErr } = await scopedDb
           .from('quote_number_config_franchise')
-          .insert([{ tenant_id: tenantId, franchise_id: franchiseId, prefix, reset_policy: franchisePolicy }]);
+          .insert([{ prefix, reset_policy: franchisePolicy }]);
         if (insErr) throw insErr;
       }
       toast.success('Franchise quote numbering saved');

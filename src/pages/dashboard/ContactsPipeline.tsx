@@ -16,7 +16,6 @@ import { SwimLane } from "@/components/kanban/SwimLane";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
 
@@ -61,7 +60,7 @@ const stages: ContactStage[] = ['new_contact','verified','key_decision_maker','a
 export default function ContactsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -81,7 +80,6 @@ export default function ContactsPipeline() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const scopedDb = new ScopedDataAccess(supabase, context);
       
       const { data: c, error: ce } = await scopedDb
         .from('contacts')

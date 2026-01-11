@@ -15,7 +15,6 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
-import { ScopedDataAccess } from '@/lib/db/access';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { LeadCard } from '@/components/crm/LeadCard';
@@ -35,7 +34,7 @@ export default function Leads() {
   const [loading, setLoading] = useState(true);
   const [isSavingDefault, setIsSavingDefault] = useState(false);
   const [didSetDefault, setDidSetDefault] = useState(false);
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const {
     state: viewState,
     setView,
@@ -112,12 +111,11 @@ export default function Leads() {
       if (!context?.userId) return;
       if (viewState.hydrationSource !== 'default') return;
       try {
-        const dao = new ScopedDataAccess(supabase, context);
         const userViewKey = `user:${context.userId}:leads.default_view`;
         const userThemeKey = `user:${context.userId}:leads.default_theme`;
         const [{ data: viewData }, { data: themeData }] = await Promise.all([
-          dao.getSystemSetting(userViewKey),
-          dao.getSystemSetting(userThemeKey),
+          scopedDb.getSystemSetting(userViewKey),
+          scopedDb.getSystemSetting(userThemeKey),
         ]);
         const defaultView = viewData?.setting_value;
         const defaultTheme = themeData?.setting_value;
@@ -146,8 +144,7 @@ export default function Leads() {
       } catch {
         void 0;
       }
-      const dao = new ScopedDataAccess(supabase, context);
-      dao.logViewPreference('leads', 'pipeline');
+      scopedDb.logViewPreference('leads', 'pipeline');
       setView('pipeline');
       const nextPipelineQ = searchQuery;
       const nextPipelineStatus = statusFilter !== 'all' ? [statusFilter] : [];
@@ -163,8 +160,7 @@ export default function Leads() {
       } catch {
         void 0;
       }
-      const dao = new ScopedDataAccess(supabase, context);
-      dao.logViewPreference('leads', mode);
+      scopedDb.logViewPreference('leads', mode);
       setView(mode as any);
     }
   };
@@ -172,7 +168,6 @@ export default function Leads() {
   const handleSetDefaultView = async () => {
     try {
       setIsSavingDefault(true);
-      const dao = new ScopedDataAccess(supabase, context);
       try {
         localStorage.setItem('leadsViewMode', viewState.view);
         localStorage.setItem('leadsTheme', viewState.theme);
@@ -183,8 +178,8 @@ export default function Leads() {
         const userViewKey = `user:${context.userId}:leads.default_view`;
         const userThemeKey = `user:${context.userId}:leads.default_theme`;
         const [{ error: vErr }, { error: tErr }] = await Promise.all([
-          dao.setSystemSetting(userViewKey, viewState.view),
-          dao.setSystemSetting(userThemeKey, viewState.theme),
+          scopedDb.setSystemSetting(userViewKey, viewState.view),
+          scopedDb.setSystemSetting(userThemeKey, viewState.theme),
         ]);
         if (vErr || tErr) throw (vErr || tErr);
       }
@@ -215,8 +210,7 @@ export default function Leads() {
 
   const fetchLeads = useCallback(async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('leads')
         .select('*')
         .order('created_at', { ascending: false });
@@ -352,8 +346,7 @@ export default function Leads() {
     if (!window.confirm(t('leads.messages.deleteConfirm', { count: selectedIds.size }))) return;
     
     try {
-      const dao = new ScopedDataAccess(supabase, context);
-      const { error } = await dao.from('leads').delete().in('id', Array.from(selectedIds));
+      const { error } = await scopedDb.from('leads').delete().in('id', Array.from(selectedIds));
       if (error) throw error;
       
       toast.success(t('leads.messages.deleteSuccess', { count: selectedIds.size }));
@@ -369,8 +362,7 @@ export default function Leads() {
     if (!window.confirm(t('leads.messages.deleteConfirmSingle', 'Delete this lead?'))) return;
     
     try {
-      const dao = new ScopedDataAccess(supabase, context);
-      const { error } = await dao.from('leads').delete().eq('id', id);
+      const { error } = await scopedDb.from('leads').delete().eq('id', id);
       if (error) throw error;
       
       toast.success(t('leads.messages.deleteSuccessSingle', 'Lead deleted'));

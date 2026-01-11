@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { ArrowLeft, Edit, Trash2, Building2, Phone, Mail, Globe, DollarSign, Users } from 'lucide-react';
@@ -12,12 +11,11 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function AccountDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -40,8 +38,7 @@ export default function AccountDetail() {
 
   const fetchAccount = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('accounts')
         .select('*')
         .eq('id', id)
@@ -52,7 +49,7 @@ export default function AccountDetail() {
       
       // Fetch parent account if exists
       if (data?.parent_account_id) {
-        const { data: parentData } = await dao
+        const { data: parentData } = await scopedDb
           .from('accounts')
           .select('id, name')
           .eq('id', data.parent_account_id)
@@ -78,8 +75,7 @@ export default function AccountDetail() {
 
   const fetchActivities = async (accountId: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('activities')
         .select('*')
         .eq('account_id', accountId)
@@ -95,8 +91,7 @@ export default function AccountDetail() {
   const fetchRelationships = async (accountId: string) => {
     try {
       // Check if table exists by trying to select 1
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('account_relationships' as any)
         .select(`
           id, relationship_type, notes,
@@ -112,8 +107,7 @@ export default function AccountDetail() {
 
   const fetchSegments = async (accountId: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('segment_members' as any)
         .select(`
           segment:segment_id(id, name, description)
@@ -131,8 +125,7 @@ export default function AccountDetail() {
 
   const fetchRelatedContacts = async (accountId: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('contacts')
         .select('id, first_name, last_name, email, phone')
         .eq('account_id', accountId)
@@ -146,8 +139,7 @@ export default function AccountDetail() {
 
   const fetchRelatedOpportunities = async (accountId: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('opportunities')
         .select('id, name, stage, amount, close_date')
         .eq('account_id', accountId)
@@ -161,8 +153,7 @@ export default function AccountDetail() {
 
   const fetchChildAccounts = async (accountId: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('accounts')
         .select('id, name, account_type, status')
         .eq('parent_account_id', accountId)
@@ -192,8 +183,7 @@ export default function AccountDetail() {
         if (payload[key] === '') delete payload[key];
       });
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('accounts')
         .update(payload)
         .eq('id', id);
@@ -211,8 +201,7 @@ export default function AccountDetail() {
 
   const handleDelete = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('accounts')
         .delete()
         .eq('id', id);

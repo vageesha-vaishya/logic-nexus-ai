@@ -15,7 +15,7 @@ type AccountSelectDialogProps = {
 };
 
 export default function AccountSelectDialogList({ open, onOpenChange, onSelect }: AccountSelectDialogProps) {
-  const { supabase } = useCRM();
+  const { scopedDb } = useCRM();
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
 
@@ -31,7 +31,7 @@ export default function AccountSelectDialogList({ open, onOpenChange, onSelect }
     const fetch = async () => {
       setLoading(true);
       try {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await scopedDb
           .from('accounts')
           .select('*')
           .order('created_at', { ascending: false })
@@ -46,7 +46,7 @@ export default function AccountSelectDialogList({ open, onOpenChange, onSelect }
       }
     };
     fetch();
-  }, [open, supabase]);
+  }, [open, scopedDb]);
 
   const filtered = useMemo(() => {
     const res = accounts.filter((a) => {

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { FileText, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -17,7 +16,7 @@ interface Quote {
 }
 
 export function QuotesWidget() {
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,8 +25,7 @@ export function QuotesWidget() {
       if (!context?.userId) return;
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('quotes')
           .select('id, quote_number, total_amount, status, account:accounts(name)')
           .order('created_at', { ascending: false })

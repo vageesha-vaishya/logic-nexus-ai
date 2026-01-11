@@ -29,12 +29,10 @@ import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
 import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import type { Database } from '@/integrations/supabase/types';
 
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
-
 export default function OpportunityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -58,8 +56,7 @@ export default function OpportunityDetail() {
 
   const fetchOpportunity = useCallback(async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('opportunities')
         .select(`
           *,
@@ -83,7 +80,7 @@ export default function OpportunityDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id, supabase, context, navigate, toast]);
+  }, [id, scopedDb, navigate]);
 
   useEffect(() => {
     fetchOpportunity();
@@ -93,8 +90,7 @@ export default function OpportunityDetail() {
     if (!id) return;
     setLoadingHistory(true);
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('opportunity_probability_history' as never)
         .select(`
           *,
@@ -149,8 +145,7 @@ export default function OpportunityDetail() {
         closed_at: ['closed_won', 'closed_lost'].includes(formData.stage) ? new Date().toISOString() : null,
       };
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('opportunities')
         .update(updateData)
         .eq('id', id);
@@ -170,8 +165,7 @@ export default function OpportunityDetail() {
 
   const saveSalesforceId = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('opportunities')
         .update({ salesforce_opportunity_id: sfIdInput || null } as unknown as Database['public']['Tables']['opportunities']['Update'])
         .eq('id', id);
@@ -204,8 +198,7 @@ export default function OpportunityDetail() {
 
   const handleDelete = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('opportunities')
         .delete()
         .eq('id', id);
@@ -226,8 +219,7 @@ export default function OpportunityDetail() {
     const fetchQuotes = async () => {
       if (!id) return;
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data, error } = await dao
+        const { data, error } = await scopedDb
           .from('quotes')
           .select('*')
           .eq('opportunity_id', id)
@@ -242,19 +234,18 @@ export default function OpportunityDetail() {
       }
     };
     fetchQuotes();
-  }, [id, supabase, context]);
+  }, [id, scopedDb]);
 
   const makePrimary = async (quoteId: string) => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
+      const { error } = await scopedDb
         .from('quotes')
         .update({ is_primary: true, opportunity_id: id } as unknown as Database['public']['Tables']['quotes']['Update'])
         .eq('id', quoteId);
       if (error) throw error;
       toast.success('Primary quote updated');
       await fetchOpportunity();
-      const { data } = await dao
+      const { data } = await scopedDb
         .from('quotes')
         .select('*')
         .eq('opportunity_id', id)

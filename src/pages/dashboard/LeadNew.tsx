@@ -8,11 +8,10 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function LeadNew() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { context, scopedDb } = useCRM();
 
   const handleCreate = async (formData: any) => {
     try {
@@ -36,8 +35,7 @@ export default function LeadNew() {
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
       };
 
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('leads')
         .insert({
           ...rest,

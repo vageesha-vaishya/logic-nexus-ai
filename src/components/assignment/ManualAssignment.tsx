@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) {
-  const { supabase, context } = useCRM();
+  const { scopedDb, context, supabase } = useCRM();
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [reason, setReason] = useState('');
@@ -26,7 +26,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
   const fetchUsers = async () => {
     try {
       // Get all active profiles
-      const { data: allProfiles } = await supabase
+      const { data: allProfiles } = await scopedDb
         .from('profiles')
         .select('id, first_name, last_name, email')
         .eq('is_active', true);
@@ -34,13 +34,9 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
       if (!allProfiles) return;
 
       // Get user capacity data
-      let capacityQuery = supabase
+      const { data: capacities } = await scopedDb
         .from('user_capacity')
         .select('user_id, is_available, current_leads, max_leads');
-
-      if (context.tenantId) capacityQuery = capacityQuery.eq('tenant_id', context.tenantId);
-
-      const { data: capacities } = await capacityQuery;
 
       // Filter to available users with capacity
       const availableUsers = allProfiles.filter(profile => {
@@ -64,7 +60,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
     setLoading(true);
     try {
       // Get lead details first
-      const { data: lead } = await supabase
+      const { data: lead } = await scopedDb
         .from('leads')
         .select('id, tenant_id, franchise_id, first_name, last_name, company, email, phone, status')
         .eq('id', leadId)
@@ -73,7 +69,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
       if (!lead) throw new Error('Lead not found');
 
       // Update lead owner
-      const { error: updateError } = await supabase
+      const { error: updateError } = await scopedDb
         .from('leads')
         .update({ owner_id: selectedUser })
         .eq('id', leadId);
@@ -81,7 +77,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
       if (updateError) throw updateError;
 
       // Record assignment history
-      const { error: historyError } = await supabase
+      const { error: historyError } = await scopedDb
         .from('lead_assignment_history')
         .insert({
           lead_id: leadId,
@@ -90,40 +86,32 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
           assignment_method: 'manual',
           reason: reason || 'Manual assignment',
           assigned_by: context.userId,
-          tenant_id: lead.tenant_id,
-          franchise_id: lead.franchise_id,
         });
 
       if (historyError) throw historyError;
 
       // Update capacities
       if (currentOwnerId) {
-        await supabase.rpc('decrement_user_lead_count', {
+        await scopedDb.rpc('decrement_user_lead_count', {
           p_user_id: currentOwnerId,
           p_tenant_id: lead.tenant_id,
         });
       }
 
-      await supabase.rpc('increment_user_lead_count', {
+      await scopedDb.rpc('increment_user_lead_count', {
         p_user_id: selectedUser,
         p_tenant_id: lead.tenant_id,
       });
 
       // Auto-link existing unlinked tasks assigned to the new owner within the same scope (best-effort)
       try {
-        let linkQuery = supabase
+        const { error: linkErr } = await scopedDb
           .from('activities')
           .update({ lead_id: leadId })
           .eq('assigned_to', selectedUser)
           .is('lead_id', null)
-          .eq('activity_type', 'task')
-          .eq('tenant_id', lead.tenant_id);
+          .eq('activity_type', 'task');
 
-        if (lead.franchise_id) {
-          linkQuery = linkQuery.eq('franchise_id', lead.franchise_id);
-        }
-
-        const { error: linkErr } = await linkQuery;
         if (linkErr) {
           console.warn('Auto-link tasks skipped:', linkErr.message || linkErr);
         }
@@ -133,7 +121,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
 
       // Send email notification to the assignee (best-effort)
       try {
-        const { data: assignee, error: assigneeErr } = await supabase
+        const { data: assignee, error: assigneeErr } = await scopedDb
           .from('profiles')
           .select('id, email, first_name, last_name')
           .eq('id', selectedUser)
@@ -141,19 +129,12 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
 
         if (!assigneeErr && assignee?.email) {
           // Choose active email account
-          let emailQuery = supabase
+          const { data: emailAccount } = await scopedDb
             .from('email_accounts')
             .select('id, email_address, is_primary')
             .eq('is_active', true)
-            .limit(1);
-
-          if (lead.franchise_id) {
-            emailQuery = emailQuery.eq('franchise_id', lead.franchise_id);
-          } else if (lead.tenant_id) {
-            emailQuery = emailQuery.eq('tenant_id', lead.tenant_id);
-          }
-
-          const { data: emailAccount } = await emailQuery.single();
+            .limit(1)
+            .single();
 
           if (emailAccount?.id) {
             const subject = `New Lead Assigned: ${lead.first_name} ${lead.last_name}`;

@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function AssignmentRuleForm({ rule, tenantId, onSave, onCancel }: Props) {
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [users, setUsers] = useState<any[]>([]);
   const [territories, setTerritories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,9 +56,20 @@ export function AssignmentRuleForm({ rule, tenantId, onSave, onCancel }: Props) 
   }, []);
 
   const fetchUsers = async () => {
-    // TODO: Verify if profiles table has tenant_id or if we need to filter differently
-    const { data } = await scopedDb.from('profiles').select('id, first_name, last_name, email');
-    setUsers(data || []);
+    // Filter profiles by tenant via user_roles
+    let query = scopedDb.client
+      .from('profiles')
+      .select('id, first_name, last_name, email, user_roles!inner(tenant_id)');
+    
+    if (effectiveTenantId) {
+      query = query.eq('user_roles.tenant_id', effectiveTenantId);
+    }
+
+    const { data } = await query;
+    
+    // Deduplicate users (in case of multiple roles)
+    const uniqueUsers = data ? Array.from(new Map(data.map((item: any) => [item.id, item])).values()) : [];
+    setUsers(uniqueUsers);
   };
 
   const fetchTerritories = async () => {

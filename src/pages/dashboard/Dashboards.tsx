@@ -123,7 +123,7 @@ export default function Dashboards() {
         console.error('Failed to load dashboard preferences:', err);
         toast({
           title: t('Error'),
-          description: t('Failed to load dashboard preferences'),
+          description: t('Failed to load dashboard preferences') + (err instanceof Error ? ': ' + err.message : ''),
           variant: 'destructive',
         });
       } finally {

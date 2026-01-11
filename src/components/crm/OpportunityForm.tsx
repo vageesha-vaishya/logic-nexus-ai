@@ -9,7 +9,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRM } from '@/hooks/useCRM';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { stageProbabilityMap, OpportunityStage } from '@/pages/dashboard/opportunities-data';
 
 const opportunitySchema = z.object({
@@ -56,7 +55,7 @@ const stageLabels = {
 };
 
 export function OpportunityForm({ opportunity, onSubmit, onCancel }: OpportunityFormProps) {
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
@@ -87,24 +86,22 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
 
   useEffect(() => {
     const fetchData = async () => {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      
       // Fetch accounts
-      const { data: accountsData } = await dao
+      const { data: accountsData } = await scopedDb
         .from('accounts')
         .select('id, name')
         .order('name');
       if (accountsData) setAccounts(accountsData);
 
       // Fetch contacts (include account_id for filtering)
-      const { data: contactsData } = await dao
+      const { data: contactsData } = await scopedDb
         .from('contacts')
         .select('id, first_name, last_name, account_id')
         .order('first_name');
       if (contactsData) setContacts(contactsData);
 
       // Fetch leads
-      const { data: leadsData } = await dao
+      const { data: leadsData } = await scopedDb
         .from('leads')
         .select('id, first_name, last_name, company')
         .order('first_name');
@@ -112,7 +109,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
 
       // Fetch tenants for platform admin
       if (context.isPlatformAdmin) {
-        const { data: tenantsData } = await dao
+        const { data: tenantsData } = await scopedDb
           .from('tenants')
           .select('id, name')
           .eq('is_active', true)
@@ -122,7 +119,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
 
       // Fetch franchises for platform admin and tenant admin
       if (context.isPlatformAdmin || context.isTenantAdmin) {
-        let query = dao
+        let query = scopedDb
           .from('franchises')
           .select('id, name, code')
           .eq('is_active', true);

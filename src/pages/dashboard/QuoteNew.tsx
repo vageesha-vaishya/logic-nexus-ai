@@ -11,10 +11,9 @@ import { QuoteTemplate } from '@/components/sales/templates/types';
 import { FileText } from 'lucide-react';
 import { QuoteFormValues } from '@/components/sales/quote-form/types';
 import { toast } from 'sonner';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function QuoteNew() {
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -46,8 +45,7 @@ export default function QuoteNew() {
     setCreatedQuoteId(quoteId);
     // Fetch tenant_id for the created quote to ensure version insert works
     (async () => {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data } = await dao
+      const { data } = await scopedDb
         .from('quotes')
         .select('tenant_id')
         .eq('id', quoteId)
@@ -63,9 +61,8 @@ export default function QuoteNew() {
       console.log('[QuoteNew] Ensuring version exists for quote:', createdQuoteId);
       
       try {
-        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
         // Check if version already exists
-        const { data: existing, error: queryError } = await (dao
+        const { data: existing, error: queryError } = await (scopedDb
           .from('quotation_versions')
           .select('id, version_number') as any)
           .eq('quote_id', createdQuoteId)
@@ -92,7 +89,7 @@ export default function QuoteNew() {
           return;
         }
         
-        const { data: v, error: insertError } = await dao
+        const { data: v, error: insertError } = await scopedDb
           .from('quotation_versions')
           .insert({ quote_id: createdQuoteId, tenant_id: finalTenantId, version_number: 1 })
           .select('id')

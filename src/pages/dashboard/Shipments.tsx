@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
 import { Shipment, ShipmentStatus, statusConfig, normalizeShipmentType, formatShipmentType } from './shipments-data';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function Shipments() {
   const navigate = useNavigate();
@@ -28,7 +27,7 @@ export default function Shipments() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
 
   // Advanced per-column filters
   const [filterShipmentNo, setFilterShipmentNo] = useState('');
@@ -48,8 +47,7 @@ export default function Shipments() {
 
   const fetchShipments = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('shipments')
         .select('*, accounts(name)')
         .order('created_at', { ascending: false });

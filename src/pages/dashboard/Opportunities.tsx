@@ -16,11 +16,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { matchText, TextOp } from '@/lib/utils';
 import { Opportunity, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function Opportunities() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -44,8 +43,7 @@ export default function Opportunities() {
 
   const fetchOpportunities = async () => {
     try {
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { data, error } = await dao
+      const { data, error } = await scopedDb
         .from('opportunities')
         .select(`
           *,

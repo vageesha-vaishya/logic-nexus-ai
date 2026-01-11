@@ -38,7 +38,7 @@ const stageColors: Record<string, string> = {
 };
 
 export default function OpportunitySelectDialogList({ open, onOpenChange, onSelect }: OpportunitySelectDialogProps) {
-  const { supabase } = useCRM();
+  const { scopedDb, context } = useCRM();
   const [loading, setLoading] = useState(false);
   const [opportunities, setOpportunities] = useState<any[]>([]);
 
@@ -61,7 +61,7 @@ export default function OpportunitySelectDialogList({ open, onOpenChange, onSele
     const fetch = async () => {
       setLoading(true);
       try {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await scopedDb
           .from('opportunities')
           .select('*, accounts(*), contacts(*)')
           .order('created_at', { ascending: false })
@@ -76,7 +76,7 @@ export default function OpportunitySelectDialogList({ open, onOpenChange, onSele
       }
     };
     fetch();
-  }, [open, supabase]);
+  }, [open, scopedDb, context.tenantId]);
 
   const filtered = useMemo(() => {
     const res = opportunities.filter((o) => {
