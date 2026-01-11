@@ -128,6 +128,7 @@ export type Database = {
           contact_id: string | null
           created_at: string | null
           created_by: string | null
+          custom_fields: Json | null
           description: string | null
           due_date: string | null
           franchise_id: string | null
@@ -147,6 +148,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          custom_fields?: Json | null
           description?: string | null
           due_date?: string | null
           franchise_id?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          custom_fields?: Json | null
           description?: string | null
           due_date?: string | null
           franchise_id?: string | null
@@ -7969,6 +7972,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      reload_postgrest_schema: { Args: never; Returns: undefined }
       set_admin_override: {
         Args: {
           p_enabled: boolean
