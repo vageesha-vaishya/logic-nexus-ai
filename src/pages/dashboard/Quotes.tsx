@@ -16,14 +16,11 @@ import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import type { Database } from '@/integrations/supabase/types';
+import { Quote, QuoteStatus, statusConfig } from '@/pages/dashboard/quotes-data';
 import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
-type Quote = Database['public']['Tables']['quotes']['Row'] & { account?: any; contact?: any; opportunity?: any; carrier?: any; service_type?: any };
-type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 
 export default function Quotes() {
   const navigate = useNavigate();
