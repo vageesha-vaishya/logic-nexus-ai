@@ -7938,7 +7938,13 @@ export type Database = {
       account_type: "prospect" | "customer" | "partner" | "vendor"
       activity_status: "planned" | "in_progress" | "completed" | "cancelled"
       activity_type: "call" | "email" | "meeting" | "task" | "note"
-      app_role: "platform_admin" | "tenant_admin" | "franchise_admin" | "user"
+      app_role:
+        | "platform_admin"
+        | "tenant_admin"
+        | "franchise_admin"
+        | "user"
+        | "sales_manager"
+        | "viewer"
       billing_period: "monthly" | "annual"
       container_type:
         | "20ft_standard"
@@ -8165,7 +8171,14 @@ export const Constants = {
       account_type: ["prospect", "customer", "partner", "vendor"],
       activity_status: ["planned", "in_progress", "completed", "cancelled"],
       activity_type: ["call", "email", "meeting", "task", "note"],
-      app_role: ["platform_admin", "tenant_admin", "franchise_admin", "user"],
+      app_role: [
+        "platform_admin",
+        "tenant_admin",
+        "franchise_admin",
+        "user",
+        "sales_manager",
+        "viewer",
+      ],
       billing_period: ["monthly", "annual"],
       container_type: [
         "20ft_standard",
