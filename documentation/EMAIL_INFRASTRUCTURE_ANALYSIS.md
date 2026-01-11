@@ -66,16 +66,143 @@ This document provides a comprehensive analysis and implementation roadmap for e
 └───────┘ └───────┘ └───────┘
 ```
 
-### 1.2 Email Scope by Level
+### 1.2 Email Visibility Hierarchy (Critical Business Rule)
 
-| Level | Scope | Email Visibility | Management Capabilities |
-|-------|-------|------------------|-------------------------|
-| **Platform Admin** | All tenants | All emails across platform | Global templates, settings, analytics |
-| **Tenant Admin** | Single tenant | All franchisee emails | Tenant-level templates, shared templates |
-| **Franchise Admin** | Single franchise | Own franchise emails | Local templates, team inbox |
-| **User** | Assigned records | Related entity emails only | Personal inbox, send within scope |
+The email visibility follows a **strict hierarchical cascade** model:
 
-### 1.3 Email Data Isolation
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           EMAIL VISIBILITY FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  SUPER ADMIN (Platform Admin)                                                   │
+│  ├── Can see ALL tenant emails                                                  │
+│  ├── Can see ALL franchisee emails                                              │
+│  ├── Can see ALL user emails across the entire platform                         │
+│  └── Full administrative control over email configuration                       │
+│                                                                                  │
+│  TENANT ADMIN                                                                   │
+│  ├── Can see ALL emails within their tenant                                     │
+│  ├── Can see ALL associated franchisee emails                                   │
+│  ├── Can see ALL franchisee user emails                                         │
+│  └── Can manage tenant-level email templates & settings                         │
+│                                                                                  │
+│  FRANCHISEE ADMIN                                                               │
+│  ├── Can see ALL emails within their franchisee                                 │
+│  ├── Can see ALL user emails within their franchisee                            │
+│  └── Can manage franchisee-level templates & settings                           │
+│                                                                                  │
+│  USER (Standard User)                                                           │
+│  ├── Can see ONLY their own emails                                              │
+│  ├── Can see emails linked to their assigned records (leads, contacts, etc.)    │
+│  └── Can send emails within their permission scope                              │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.3 Email Scope Matrix by Role Level
+
+| Role Level | Own Emails | Team Emails | Franchisee Emails | Tenant Emails | All Platform Emails |
+|------------|:----------:|:-----------:|:-----------------:|:-------------:|:-------------------:|
+| **Super Admin** | ✅ | ✅ | ✅ (All Franchisees) | ✅ (All Tenants) | ✅ |
+| **Tenant Admin** | ✅ | ✅ | ✅ (All Tenant's Franchisees) | ✅ | ❌ |
+| **Franchisee Admin** | ✅ | ✅ | ✅ (Own Franchisee Only) | ❌ | ❌ |
+| **Sales Manager** | ✅ | ✅ (Direct Reports) | ❌ | ❌ | ❌ |
+| **Sales Rep / User** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Viewer** | ✅ (Read-Only) | ❌ | ❌ | ❌ | ❌ |
+
+### 1.4 Enhanced Visibility Logic
+
+```typescript
+// src/lib/email-visibility.ts
+
+/**
+ * Email Visibility Determination Service
+ * Implements hierarchical cascade visibility model
+ */
+export class EmailVisibilityService {
+  /**
+   * Determines what emails a user can see based on their role
+   */
+  static getVisibilityScope(userRole: string, context: DataAccessContext): EmailVisibilityScope {
+    switch (userRole) {
+      case 'platform_admin':
+      case 'super_admin':
+        // Super Admin: See ALL emails across entire platform
+        return {
+          scope: 'platform',
+          filter: {}, // No filter - sees everything
+          canSeeAllTenants: true,
+          canSeeAllFranchisees: true,
+          canSeeAllUsers: true,
+        };
+
+      case 'tenant_admin':
+        // Tenant Admin: See all emails within their tenant + all franchisees + all users
+        return {
+          scope: 'tenant',
+          filter: { tenant_id: context.tenantId },
+          canSeeAllTenants: false,
+          canSeeAllFranchisees: true, // All franchisees under this tenant
+          canSeeAllUsers: true, // All users under this tenant
+        };
+
+      case 'franchise_admin':
+        // Franchisee Admin: See all emails within their franchisee + all franchisee users
+        return {
+          scope: 'franchise',
+          filter: { 
+            tenant_id: context.tenantId,
+            franchise_id: context.franchiseId 
+          },
+          canSeeAllTenants: false,
+          canSeeAllFranchisees: false,
+          canSeeAllUsers: true, // All users under this franchisee only
+        };
+
+      case 'sales_manager':
+        // Sales Manager: Own emails + direct reports' emails
+        return {
+          scope: 'team',
+          filter: { 
+            tenant_id: context.tenantId,
+            franchise_id: context.franchiseId,
+            // Filter by team member IDs
+          },
+          canSeeAllTenants: false,
+          canSeeAllFranchisees: false,
+          canSeeAllUsers: false,
+          canSeeTeam: true,
+        };
+
+      default:
+        // Regular User: Only own emails
+        return {
+          scope: 'user',
+          filter: { 
+            tenant_id: context.tenantId,
+            franchise_id: context.franchiseId,
+            user_id: context.userId 
+          },
+          canSeeAllTenants: false,
+          canSeeAllFranchisees: false,
+          canSeeAllUsers: false,
+        };
+    }
+  }
+}
+
+interface EmailVisibilityScope {
+  scope: 'platform' | 'tenant' | 'franchise' | 'team' | 'user';
+  filter: Record<string, string | undefined>;
+  canSeeAllTenants: boolean;
+  canSeeAllFranchisees: boolean;
+  canSeeAllUsers: boolean;
+  canSeeTeam?: boolean;
+}
+```
+
+### 1.5 Email Data Isolation
 
 ```sql
 -- All email tables enforce multi-tenant isolation via RLS
@@ -83,9 +210,10 @@ This document provides a comprehensive analysis and implementation roadmap for e
 
 emails (
   id UUID PRIMARY KEY,
-  -- Multi-tenant columns (REQUIRED)
+  -- Multi-tenant columns (REQUIRED for hierarchical visibility)
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   franchise_id UUID REFERENCES franchises(id),
+  user_id UUID NOT NULL REFERENCES auth.users(id), -- Email owner
   
   -- Email metadata
   account_id UUID NOT NULL REFERENCES email_accounts(id),
@@ -175,64 +303,233 @@ export function useEmailPermission(permission: EmailPermission): boolean {
 }
 ```
 
-### 2.3 RLS Policy Implementation
+### 2.3 Enhanced RLS Policy Implementation (Hierarchical Cascade)
 
 ```sql
--- Email visibility based on role and scope
-CREATE POLICY "Email access based on role scope"
+-- =====================================================
+-- HELPER FUNCTIONS FOR ROLE-BASED ACCESS
+-- =====================================================
+
+-- Check if user is a Super Admin (Platform Admin)
+CREATE OR REPLACE FUNCTION public.is_super_admin(_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    JOIN public.auth_roles ar ON ur.role = ar.id
+    WHERE ur.user_id = _user_id
+    AND ar.id IN ('platform_admin', 'super_admin')
+  );
+$$;
+
+-- Check if user is a Tenant Admin
+CREATE OR REPLACE FUNCTION public.is_tenant_admin(_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    JOIN public.auth_roles ar ON ur.role = ar.id
+    WHERE ur.user_id = _user_id
+    AND ar.id = 'tenant_admin'
+  );
+$$;
+
+-- Check if user is a Franchisee Admin
+CREATE OR REPLACE FUNCTION public.is_franchise_admin(_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    JOIN public.auth_roles ar ON ur.role = ar.id
+    WHERE ur.user_id = _user_id
+    AND ar.id = 'franchise_admin'
+  );
+$$;
+
+-- Get all franchisee IDs under a tenant
+CREATE OR REPLACE FUNCTION public.get_tenant_franchise_ids(_tenant_id UUID)
+RETURNS UUID[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT ARRAY_AGG(id) FROM public.franchises 
+  WHERE tenant_id = _tenant_id AND is_active = true;
+$$;
+
+-- Get all user IDs within a franchisee
+CREATE OR REPLACE FUNCTION public.get_franchise_user_ids(_franchise_id UUID)
+RETURNS UUID[]
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT ARRAY_AGG(user_id) FROM public.profiles 
+  WHERE franchise_id = _franchise_id;
+$$;
+
+-- =====================================================
+-- EMAIL VISIBILITY RLS POLICY (Hierarchical Cascade)
+-- =====================================================
+
+-- Drop existing policy if exists
+DROP POLICY IF EXISTS "Email access based on role scope" ON public.emails;
+
+-- Create comprehensive hierarchical visibility policy
+CREATE POLICY "Email hierarchical visibility"
 ON public.emails
 FOR SELECT
 TO authenticated
 USING (
-  -- Platform admins see everything
-  public.has_role(auth.uid(), 'platform_admin')
+  -- =====================================================
+  -- LEVEL 1: SUPER ADMIN (Platform Admin)
+  -- Can see ALL emails across entire platform
+  -- =====================================================
+  public.is_super_admin(auth.uid())
+  
   OR
-  -- Tenant admins see all within their tenant
-  (public.has_role(auth.uid(), 'tenant_admin') 
-   AND tenant_id = public.get_user_tenant_id(auth.uid()))
+  
+  -- =====================================================
+  -- LEVEL 2: TENANT ADMIN
+  -- Can see ALL emails within their tenant:
+  --   - All tenant-level emails
+  --   - All associated franchisee emails
+  --   - All franchisee user emails
+  -- =====================================================
+  (
+    public.is_tenant_admin(auth.uid())
+    AND tenant_id = public.get_user_tenant_id(auth.uid())
+    -- This includes:
+    -- - Emails where tenant_id matches (covers all franchisees under tenant)
+    -- - No additional filter needed since franchise_id is always under tenant_id
+  )
+  
   OR
-  -- Franchise admins see their franchise
-  (public.has_role(auth.uid(), 'franchise_admin') 
-   AND franchise_id = public.get_user_franchise_id(auth.uid()))
+  
+  -- =====================================================
+  -- LEVEL 3: FRANCHISEE ADMIN
+  -- Can see ALL emails within their franchisee:
+  --   - All franchisee-level emails
+  --   - All franchisee user emails
+  -- =====================================================
+  (
+    public.is_franchise_admin(auth.uid())
+    AND tenant_id = public.get_user_tenant_id(auth.uid())
+    AND franchise_id = public.get_user_franchise_id(auth.uid())
+  )
+  
   OR
-  -- Regular users see emails linked to their assigned records
+  
+  -- =====================================================
+  -- LEVEL 4: SALES MANAGER
+  -- Can see own emails + direct reports' emails
+  -- =====================================================
+  (
+    public.has_role(auth.uid(), 'sales_manager')
+    AND tenant_id = public.get_user_tenant_id(auth.uid())
+    AND franchise_id = public.get_user_franchise_id(auth.uid())
+    AND (
+      -- Own emails via email account ownership
+      account_id IN (SELECT id FROM email_accounts WHERE user_id = auth.uid())
+      OR
+      -- Direct reports' emails (users reporting to this manager)
+      account_id IN (
+        SELECT ea.id FROM email_accounts ea
+        JOIN profiles p ON ea.user_id = p.id
+        WHERE p.reports_to = auth.uid()
+      )
+    )
+  )
+  
+  OR
+  
+  -- =====================================================
+  -- LEVEL 5: REGULAR USER
+  -- Can see ONLY their own emails + emails linked to assigned records
+  -- =====================================================
   (
     tenant_id = public.get_user_tenant_id(auth.uid())
     AND (
       -- Direct ownership through email account
-      account_id IN (
-        SELECT id FROM email_accounts WHERE user_id = auth.uid()
-      )
+      account_id IN (SELECT id FROM email_accounts WHERE user_id = auth.uid())
       OR
       -- Related to assigned leads
-      lead_id IN (
-        SELECT id FROM leads WHERE owner_id = auth.uid()
-      )
+      lead_id IN (SELECT id FROM leads WHERE owner_id = auth.uid())
       OR
       -- Related to assigned contacts
-      contact_id IN (
-        SELECT id FROM contacts WHERE owner_id = auth.uid()
-      )
+      contact_id IN (SELECT id FROM contacts WHERE owner_id = auth.uid())
+      OR
+      -- Related to assigned accounts (CRM)
+      account_id_crm IN (SELECT id FROM accounts WHERE owner_id = auth.uid())
       OR
       -- Related to assigned opportunities
-      opportunity_id IN (
-        SELECT id FROM opportunities WHERE owner_id = auth.uid()
-      )
+      opportunity_id IN (SELECT id FROM opportunities WHERE owner_id = auth.uid())
     )
   )
 );
 
--- Template sharing rules
-CREATE POLICY "Template access by scope"
+-- =====================================================
+-- EMAIL ACCOUNTS VISIBILITY (Same Hierarchy)
+-- =====================================================
+CREATE POLICY "Email accounts hierarchical visibility"
+ON public.email_accounts
+FOR SELECT
+TO authenticated
+USING (
+  -- Super Admin sees all
+  public.is_super_admin(auth.uid())
+  OR
+  -- Tenant Admin sees all within tenant
+  (public.is_tenant_admin(auth.uid()) 
+   AND tenant_id = public.get_user_tenant_id(auth.uid()))
+  OR
+  -- Franchisee Admin sees all within franchisee
+  (public.is_franchise_admin(auth.uid()) 
+   AND tenant_id = public.get_user_tenant_id(auth.uid())
+   AND franchise_id = public.get_user_franchise_id(auth.uid()))
+  OR
+  -- Regular users see only their own accounts
+  (user_id = auth.uid())
+);
+
+-- =====================================================
+-- EMAIL TEMPLATES VISIBILITY (Hierarchical + Sharing)
+-- =====================================================
+CREATE POLICY "Email templates hierarchical visibility"
 ON public.email_templates
 FOR SELECT
 TO authenticated
 USING (
-  -- Global templates (created by platform admin)
+  -- Super Admin sees all templates
+  public.is_super_admin(auth.uid())
+  OR
+  -- Global templates (created by platform admin, shared to all)
   (is_shared = true AND tenant_id IS NULL)
   OR
-  -- Tenant-shared templates
+  -- Tenant Admin sees all tenant templates + all franchisee templates
+  (public.is_tenant_admin(auth.uid()) 
+   AND tenant_id = public.get_user_tenant_id(auth.uid()))
+  OR
+  -- Tenant-shared templates visible to tenant members
   (is_shared = true AND tenant_id = public.get_user_tenant_id(auth.uid()))
+  OR
+  -- Franchisee Admin sees franchisee templates
+  (public.is_franchise_admin(auth.uid()) 
+   AND franchise_id = public.get_user_franchise_id(auth.uid()))
   OR
   -- Franchise templates for franchise members
   (franchise_id = public.get_user_franchise_id(auth.uid()))
@@ -240,6 +537,71 @@ USING (
   -- Own templates
   (created_by = auth.uid())
 );
+
+-- =====================================================
+-- EMAIL FILTERS VISIBILITY
+-- =====================================================
+CREATE POLICY "Email filters hierarchical visibility"
+ON public.email_filters
+FOR SELECT
+TO authenticated
+USING (
+  -- Super Admin sees all
+  public.is_super_admin(auth.uid())
+  OR
+  -- Tenant Admin sees all within tenant
+  (public.is_tenant_admin(auth.uid()) 
+   AND tenant_id = public.get_user_tenant_id(auth.uid()))
+  OR
+  -- Users see only their own filters
+  (user_id = auth.uid())
+);
+```
+
+### 2.4 Visibility Verification Functions
+
+```sql
+-- Function to verify email visibility for debugging/auditing
+CREATE OR REPLACE FUNCTION public.debug_email_visibility(_email_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  result JSON;
+  email_record RECORD;
+  viewer_tenant_id UUID;
+  viewer_franchise_id UUID;
+BEGIN
+  -- Get email details
+  SELECT * INTO email_record FROM emails WHERE id = _email_id;
+  
+  -- Get viewer's context
+  viewer_tenant_id := public.get_user_tenant_id(auth.uid());
+  viewer_franchise_id := public.get_user_franchise_id(auth.uid());
+  
+  result := json_build_object(
+    'email_id', _email_id,
+    'email_tenant_id', email_record.tenant_id,
+    'email_franchise_id', email_record.franchise_id,
+    'viewer_id', auth.uid(),
+    'viewer_tenant_id', viewer_tenant_id,
+    'viewer_franchise_id', viewer_franchise_id,
+    'is_super_admin', public.is_super_admin(auth.uid()),
+    'is_tenant_admin', public.is_tenant_admin(auth.uid()),
+    'is_franchise_admin', public.is_franchise_admin(auth.uid()),
+    'can_view', (
+      public.is_super_admin(auth.uid())
+      OR (public.is_tenant_admin(auth.uid()) AND email_record.tenant_id = viewer_tenant_id)
+      OR (public.is_franchise_admin(auth.uid()) AND email_record.franchise_id = viewer_franchise_id)
+      OR email_record.account_id IN (SELECT id FROM email_accounts WHERE user_id = auth.uid())
+    )
+  );
+  
+  RETURN result;
+END;
+$$;
 ```
 
 ---
