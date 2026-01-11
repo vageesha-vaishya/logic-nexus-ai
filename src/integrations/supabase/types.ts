@@ -1926,6 +1926,77 @@ export type Database = {
         }
         Relationships: []
       }
+      email_audit_log: {
+        Row: {
+          created_at: string
+          email_id: string | null
+          event_data: Json | null
+          event_type: string
+          franchise_id: string | null
+          id: string
+          ip_address: unknown
+          scheduled_email_id: string | null
+          tenant_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email_id?: string | null
+          event_data?: Json | null
+          event_type: string
+          franchise_id?: string | null
+          id?: string
+          ip_address?: unknown
+          scheduled_email_id?: string | null
+          tenant_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email_id?: string | null
+          event_data?: Json | null
+          event_type?: string
+          franchise_id?: string | null
+          id?: string
+          ip_address?: unknown
+          scheduled_email_id?: string | null
+          tenant_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_audit_log_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_audit_log_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_audit_log_scheduled_email_id_fkey"
+            columns: ["scheduled_email_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_emails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_filters: {
         Row: {
           account_id: string | null
@@ -2037,6 +2108,9 @@ export type Database = {
         Row: {
           account_id: string
           account_id_crm: string | null
+          ai_category: string | null
+          ai_sentiment: string | null
+          ai_urgency: string | null
           attachments: Json | null
           bcc_emails: Json | null
           body_html: string | null
@@ -2082,10 +2156,14 @@ export type Database = {
           thread_id: string | null
           to_emails: Json
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           account_id: string
           account_id_crm?: string | null
+          ai_category?: string | null
+          ai_sentiment?: string | null
+          ai_urgency?: string | null
           attachments?: Json | null
           bcc_emails?: Json | null
           body_html?: string | null
@@ -2131,10 +2209,14 @@ export type Database = {
           thread_id?: string | null
           to_emails?: Json
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           account_id?: string
           account_id_crm?: string | null
+          ai_category?: string | null
+          ai_sentiment?: string | null
+          ai_urgency?: string | null
           attachments?: Json | null
           bcc_emails?: Json | null
           body_html?: string | null
@@ -2180,6 +2262,7 @@ export type Database = {
           thread_id?: string | null
           to_emails?: Json
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -5668,6 +5751,113 @@ export type Database = {
           },
         ]
       }
+      scheduled_emails: {
+        Row: {
+          account_id: string | null
+          bcc_emails: Json | null
+          body_html: string | null
+          body_text: string | null
+          cc_emails: Json | null
+          created_at: string
+          error_message: string | null
+          franchise_id: string | null
+          id: string
+          max_retries: number | null
+          metadata: Json | null
+          priority: string | null
+          retry_count: number | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          subject: string | null
+          template_id: string | null
+          template_variables: Json | null
+          tenant_id: string
+          to_emails: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          bcc_emails?: Json | null
+          body_html?: string | null
+          body_text?: string | null
+          cc_emails?: Json | null
+          created_at?: string
+          error_message?: string | null
+          franchise_id?: string | null
+          id?: string
+          max_retries?: number | null
+          metadata?: Json | null
+          priority?: string | null
+          retry_count?: number | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          template_id?: string | null
+          template_variables?: Json | null
+          tenant_id: string
+          to_emails: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          bcc_emails?: Json | null
+          body_html?: string | null
+          body_text?: string | null
+          cc_emails?: Json | null
+          created_at?: string
+          error_message?: string | null
+          franchise_id?: string | null
+          id?: string
+          max_retries?: number | null
+          metadata?: Json | null
+          priority?: string | null
+          retry_count?: number | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          template_id?: string | null
+          template_variables?: Json | null
+          tenant_id?: string
+          to_emails?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_emails_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_emails_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_emails_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_emails_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_leg_categories: {
         Row: {
           code: string
@@ -7658,7 +7848,10 @@ export type Database = {
         Returns: undefined
       }
       is_current_user_platform_admin: { Args: never; Returns: boolean }
+      is_franchise_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_tenant_admin: { Args: { _user_id: string }; Returns: boolean }
       preview_next_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
