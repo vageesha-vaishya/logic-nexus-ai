@@ -26,7 +26,7 @@ interface PackageSizeFormProps {
 }
 
 export function PackageSizeForm({ onSuccess }: PackageSizeFormProps) {
-  const { supabase, context } = useCRM();
+  const { scopedDb } = useCRM();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,9 +39,8 @@ export function PackageSizeForm({ onSuccess }: PackageSizeFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const payload: Database["public"]["Tables"]["package_sizes"]["Insert"] = {
+      const payload: Omit<Database["public"]["Tables"]["package_sizes"]["Insert"], "tenant_id"> = {
         size_name: values.size_name,
-        tenant_id: context.tenantId!,
         size_code: values.size_code,
         length_ft: values.length_ft,
         width_ft: values.width_ft,
@@ -50,7 +49,7 @@ export function PackageSizeForm({ onSuccess }: PackageSizeFormProps) {
         description: values.description,
         is_active: values.is_active,
       };
-      const { error } = await supabase.from("package_sizes").insert(payload);
+      const { error } = await scopedDb.from("package_sizes").insert(payload as any);
 
       if (error) throw error;
 

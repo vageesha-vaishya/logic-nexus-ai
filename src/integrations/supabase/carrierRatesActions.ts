@@ -1,4 +1,6 @@
 import { supabase as defaultClient } from '@/integrations/supabase/client';
+import { ScopedDataAccess } from '@/lib/db/access';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 type ChargeInput = {
   type: string;
@@ -51,7 +53,7 @@ const chargeTypeMap = (mode: string | undefined, type: string): string => {
   }
 };
 
-export async function createCarrierRate(params: CreateRateParams, client = defaultClient): Promise<string> {
+export async function createCarrierRate(params: CreateRateParams, client: ScopedDataAccess | SupabaseClient<any> = defaultClient): Promise<string> {
   // Pre-generate an ID so we can rely on it even if RLS prevents returning the inserted row
   const preGeneratedId = crypto.randomUUID();
   const payload: any = {
@@ -144,7 +146,7 @@ export async function upsertRatesAndChargesForQuote(
   destination_port_id: string | null,
   carrierQuotes: CarrierQuoteInput[],
   existingRateIds: string[] = [],
-  client = defaultClient,
+  client: ScopedDataAccess | SupabaseClient<any> = defaultClient,
 ): Promise<string[]> {
   const finalRateIds: string[] = [];
   const keptRateIds = new Set<string>();
@@ -225,7 +227,7 @@ export async function upsertRatesAndChargesForQuote(
 
 export async function listCarrierRatesForQuote(
   quoteId: string,
-  client = defaultClient,
+  client: ScopedDataAccess | SupabaseClient<any> = defaultClient,
 ): Promise<Array<{ id: string; carrier_id: string; mode: string | null; charges: any[] }>> {
   // Primary: fetch by rate_reference_id = quoteId
   const { data: byRef, error: refErr } = (client as any)
@@ -401,7 +403,7 @@ export async function recordCustomerSelection(
   option_id: string,
   reason: string | null,
   user_id: string,
-  client = defaultClient,
+  client: ScopedDataAccess | SupabaseClient<any> = defaultClient,
 ): Promise<void> {
   const { error } = (client as any).rpc('record_customer_selection', {
     p_tenant_id: tenant_id,

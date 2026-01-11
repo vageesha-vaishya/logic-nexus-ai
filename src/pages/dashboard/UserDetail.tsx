@@ -35,24 +35,10 @@ export default function UserDetail() {
 
   const fetchUser = async () => {
     try {
-      // 1. Verify access: Ensure the target user has a role within the current scope
-      // (Unless platform admin without override)
-      if (!context.isPlatformAdmin || context.adminOverrideEnabled) {
-        const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-        const { data: roles, error: roleError } = await (db as any)
-          .from('user_roles')
-          .select('user_id')
-          .eq('user_id', id);
-        
-        if (roleError) throw roleError;
-        
-        if (!roles || roles.length === 0) {
-          throw new Error('User not found or access denied');
-        }
-      }
-
-      // 2. Fetch profile using raw client (profiles is a global table)
-      const { data, error } = await supabase
+      setLoading(true);
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      
+      const { data, error } = await dao
         .from('profiles')
         .select(`
           *,
@@ -93,7 +79,7 @@ export default function UserDetail() {
         }
       }
 
-      // Use raw client for profiles delete as it is a global table
+      // Use ScopedDataAccess for delete to ensure audit logging
       // TODO: For tenant admins, this should probably only remove the tenant role, not delete the profile?
       // For now, we allow delete if they have access, but strictly strictly speaking, 
       // deleting a global profile should probably be restricted to Platform Admins, 
@@ -103,7 +89,8 @@ export default function UserDetail() {
       // But the current requirement seems to be "Delete User".
       // We will proceed with delete but with the access check above.
       
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('profiles')
         .delete()
         .eq('id', id);

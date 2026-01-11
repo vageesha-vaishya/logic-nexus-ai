@@ -12,92 +12,92 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 export default function CargoTypes() {
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
   type CargoTypeRow = Database["public"]["Tables"]["cargo_types"]["Row"];
   const [cargoTypes, setCargoTypes] = useState<CargoTypeRow[]>([]);
   const [open, setOpen] = useState(false);
 
   const fetchCargoTypes = useCallback(async () => {
-    const isPlatform = context.isPlatformAdmin;
-    const tenantId = context.tenantId;
-    if (!isPlatform && !tenantId) return;
+    try {
+      const { data, error } = await scopedDb
+        .from("cargo_types")
+        .select("*")
+        .order("cargo_type_name");
 
-    let query = supabase
-      .from("cargo_types")
-      .select("*");
-    if (!isPlatform) {
-      query = query.eq("tenant_id", tenantId as string);
-    }
-    const { data, error } = await query.order("cargo_type_name");
-
-    if (error) {
-      console.error("Error fetching cargo types:", error);
-      return;
-    }
-
-    const rows = (data || []) as CargoTypeRow[];
-    // Dev-only: auto-seed demo cargo types if none exist (only when tenant scoped)
-    if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
-      try {
-        await supabase.from("cargo_types").insert([
-          {
-            tenant_id: tenantId,
-            cargo_type_name: "General Cargo",
-            cargo_code: "GEN",
-            hazmat_class: null,
-            temperature_controlled: false,
-            requires_special_handling: false,
-            is_active: true,
-          },
-          {
-            tenant_id: tenantId,
-            cargo_type_name: "Perishable Goods",
-            cargo_code: "PER",
-            hazmat_class: null,
-            temperature_controlled: true,
-            requires_special_handling: false,
-            is_active: true,
-          },
-          {
-            tenant_id: tenantId,
-            cargo_type_name: "Hazardous Materials",
-            cargo_code: "HAZ",
-            hazmat_class: "Class 3",
-            temperature_controlled: false,
-            requires_special_handling: true,
-            is_active: true,
-          },
-          {
-            tenant_id: tenantId,
-            cargo_type_name: "Oversized Machinery",
-            cargo_code: "OVS",
-            hazmat_class: null,
-            temperature_controlled: false,
-            requires_special_handling: true,
-            is_active: false,
-          },
-        ]);
-        toast.success("Seeded demo cargo types");
-        const { data: seeded } = await supabase
-          .from("cargo_types")
-          .select("*")
-          .eq("tenant_id", tenantId as string)
-          .order("cargo_type_name");
-        setCargoTypes((seeded || []) as CargoTypeRow[]);
-      } catch (seedErr: unknown) {
-        const message = seedErr instanceof Error ? seedErr.message : String(seedErr);
-        console.warn("Cargo types seed failed:", message);
-        setCargoTypes([]);
+      if (error) {
+        console.error("Error fetching cargo types:", error);
+        return;
       }
-    } else {
+
+      const rows = (data || []) as CargoTypeRow[];
       setCargoTypes(rows);
+      
+      // Dev-only: auto-seed demo cargo types if none exist
+      // We keep using raw supabase for seeding to ensure we can explicitly set data if needed,
+      // but strictly speaking scopedDb could work too. For safety in this refactor, 
+      // we'll leave the seeding logic mostly as is but check against the data we just fetched.
+      const isPlatform = context.isPlatformAdmin;
+      const tenantId = context.tenantId;
+      
+      if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
+        try {
+          await supabase.from("cargo_types").insert([
+            {
+              tenant_id: tenantId,
+              cargo_type_name: "General Cargo",
+              cargo_code: "GEN",
+              hazmat_class: null,
+              temperature_controlled: false,
+              requires_special_handling: false,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              cargo_type_name: "Perishable Goods",
+              cargo_code: "PER",
+              hazmat_class: null,
+              temperature_controlled: true,
+              requires_special_handling: false,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              cargo_type_name: "Hazardous Materials",
+              cargo_code: "HAZ",
+              hazmat_class: "Class 3",
+              temperature_controlled: false,
+              requires_special_handling: true,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              cargo_type_name: "Oversized Machinery",
+              cargo_code: "OVS",
+              hazmat_class: null,
+              temperature_controlled: false,
+              requires_special_handling: true,
+              is_active: false,
+            },
+          ]);
+          toast.success("Seeded demo cargo types");
+          // Re-fetch using scopedDb
+          const { data: seeded } = await scopedDb
+            .from("cargo_types")
+            .select("*")
+            .order("cargo_type_name");
+          setCargoTypes((seeded || []) as CargoTypeRow[]);
+        } catch (seedErr: unknown) {
+          const message = seedErr instanceof Error ? seedErr.message : String(seedErr);
+          console.warn("Cargo types seed failed:", message);
+        }
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching cargo types:", err);
     }
-  }, [context.isPlatformAdmin, context.tenantId, supabase]);
+  }, [context.isPlatformAdmin, context.tenantId, scopedDb, supabase]);
 
   useEffect(() => {
-    if (context.isPlatformAdmin || context.tenantId) {
-      fetchCargoTypes();
-    }
+    fetchCargoTypes();
   }, [context.isPlatformAdmin, context.tenantId, fetchCargoTypes]);
 
 

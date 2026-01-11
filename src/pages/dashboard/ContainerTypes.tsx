@@ -4,16 +4,17 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import type { Database } from '@/integrations/supabase/types';
 
 export default function ContainerTypes() {
   type ContainerType = Database['public']['Tables']['container_types']['Row'];
+  const { scopedDb } = useCRM();
   const [items, setItems] = useState<ContainerType[]>([]);
   const [newItem, setNewItem] = useState<{ name: string; code: string }>({ name: '', code: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('container_types').select('*').order('name');
+    const { data } = await scopedDb.from('container_types').select('*').order('name');
     setItems((data ?? []) as ContainerType[]);
   };
 
@@ -21,21 +22,18 @@ export default function ContainerTypes() {
 
   const add = async () => {
     if (!newItem.name) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const meta = userData?.user?.user_metadata as Record<string, unknown> | undefined;
-    const tenantId = typeof meta?.tenant_id === 'string' ? meta.tenant_id : null;
-    await supabase.from('container_types').insert({ ...newItem, tenant_id: tenantId });
+    await scopedDb.from('container_types').insert(newItem);
     setNewItem({ name: '', code: '' });
     load();
   };
 
   const update = async (id: string, patch: Partial<Pick<ContainerType, 'name' | 'code' | 'is_active'>>) => {
-    await supabase.from('container_types').update(patch).eq('id', id);
+    await scopedDb.from('container_types').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('container_types').delete().eq('id', id);
+    await scopedDb.from('container_types').delete().eq('id', id);
     load();
   };
 

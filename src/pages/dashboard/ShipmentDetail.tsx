@@ -100,12 +100,18 @@ export default function ShipmentDetail() {
       const publicUrl = urlData?.publicUrl ?? null;
 
       const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      
+      // Use shipment's tenant/franchise if available, otherwise fallback to context
+      // This ensures attachments for tenant-owned shipments are properly scoped even when uploaded by Platform Admin
+      const targetTenantId = shipment?.tenant_id || context?.tenantId;
+      const targetFranchiseId = shipment?.franchise_id || context?.franchiseId;
+
       const { error: metaErr } = await (dao
         .from('shipment_attachments' as any)
         .insert([{
           shipment_id: id,
-          tenant_id: context?.tenantId,
-          franchise_id: context?.franchiseId,
+          tenant_id: targetTenantId,
+          franchise_id: targetFranchiseId,
           created_by: context?.userId,
           name: podFile.name,
           path,

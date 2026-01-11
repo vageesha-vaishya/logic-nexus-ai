@@ -77,26 +77,26 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
   }, [context]);
 
   const loadTenants = async () => {
-    const { data } = await supabase
+    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
       .from('tenants')
       .select('id, name')
       .eq('is_active', true)
       .order('name');
     
-    if (data) setTenants(data);
+    if (data) setTenants(data as any[]);
   };
 
   const loadFranchises = async () => {
     if (!context.tenantId) return;
     
-    const { data } = await supabase
+    const { data } = await new ScopedDataAccess(supabase, context as unknown as DataAccessContext)
       .from('franchises')
       .select('id, name')
       .eq('tenant_id', context.tenantId)
       .eq('is_active', true)
       .order('name');
     
-    if (data) setFranchises(data);
+    if (data) setFranchises(data as any[]);
   };
 
   const loadParentAccounts = async () => {

@@ -22,7 +22,7 @@ interface PackageCategoryFormProps {
 }
 
 export function PackageCategoryForm({ onSuccess }: PackageCategoryFormProps) {
-  const { supabase, context } = useCRM();
+  const { scopedDb } = useCRM();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -36,14 +36,13 @@ export function PackageCategoryForm({ onSuccess }: PackageCategoryFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const payload: Database["public"]["Tables"]["package_categories"]["Insert"] = {
+      const payload: Omit<Database["public"]["Tables"]["package_categories"]["Insert"], "tenant_id"> = {
         category_name: values.category_name,
-        tenant_id: context.tenantId!,
         category_code: values.category_code,
         description: values.description,
         is_active: values.is_active,
       };
-      const { error } = await supabase.from("package_categories").insert(payload);
+      const { error } = await scopedDb.from("package_categories").insert(payload as any);
 
       if (error) throw error;
 

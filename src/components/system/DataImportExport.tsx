@@ -261,6 +261,8 @@ export default function DataImportExport({
   const importStartedAtRef = useRef<number | null>(null);
   const [importPaused, setImportPaused] = useState(false);
   const [importProcessedRows, setImportProcessedRows] = useState(0);
+  const [totalRowCount, setTotalRowCount] = useState(0);
+  const [countingRows, setCountingRows] = useState(false);
   const [importEtaSeconds, setImportEtaSeconds] = useState<number | null>(null);
 
   // Export State
@@ -696,21 +698,38 @@ export default function DataImportExport({
                 });
                 
                 // Calculate Progress & ETA
-                if (results.meta && results.meta.cursor) {
-                    processedSize = results.meta.cursor;
-                }
-                const currentProgress = Math.min(100, Math.round((processedSize / totalSize) * 100));
-                setProgress(currentProgress);
+                if (totalRowCount > 0) {
+                   // Row-based progress
+                   const currentProgress = Math.min(100, Math.round((rowIndex / totalRowCount) * 100));
+                   setProgress(currentProgress);
+                   
+                   if (rowIndex % 100 === 0 && importStartedAtRef.current) {
+                      const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
+                      if (elapsed > 1) {
+                          const rate = rowIndex / elapsed; // rows per second
+                          const remainingRows = totalRowCount - rowIndex;
+                          const eta = remainingRows / rate;
+                          setImportEtaSeconds(Math.ceil(eta));
+                      }
+                   }
+                } else {
+                   // Fallback to byte-based progress
+                   if (results.meta && results.meta.cursor) {
+                       processedSize = results.meta.cursor;
+                   }
+                   const currentProgress = Math.min(100, Math.round((processedSize / totalSize) * 100));
+                   setProgress(currentProgress);
 
-                // Calculate ETA every 100 rows or so
-                if (rowIndex % 100 === 0 && importStartedAtRef.current) {
-                    const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
-                    if (elapsed > 1 && processedSize > 0) {
-                        const rate = processedSize / elapsed; // bytes per second
-                        const remainingBytes = totalSize - processedSize;
-                        const eta = remainingBytes / rate;
-                        setImportEtaSeconds(Math.ceil(eta));
-                    }
+                   // Calculate ETA every 100 rows or so
+                   if (rowIndex % 100 === 0 && importStartedAtRef.current) {
+                       const elapsed = (Date.now() - importStartedAtRef.current) / 1000;
+                       if (elapsed > 1 && processedSize > 0) {
+                           const rate = processedSize / elapsed; // bytes per second
+                           const remainingBytes = totalSize - processedSize;
+                           const eta = remainingBytes / rate;
+                           setImportEtaSeconds(Math.ceil(eta));
+                       }
+                   }
                 }
                 
                 // Validate

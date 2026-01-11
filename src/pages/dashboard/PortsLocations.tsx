@@ -24,7 +24,7 @@ import {
 
 export default function PortsLocations() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
   const { roles } = useAuth();
   const [ports, setPorts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,41 +48,32 @@ export default function PortsLocations() {
   }, [context.isPlatformAdmin, context.tenantId, roles]);
 
   const fetchPorts = async () => {
-    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-    const isPlatform = context.isPlatformAdmin;
-    if (!isPlatform && !tenantId) {
-      setLoading(false);
-      return;
-    }
-
     try {
-      let query = supabase
+      const { data, error } = await scopedDb
         .from('ports_locations')
-        .select('*');
-      if (!isPlatform) {
-        query = query.eq('tenant_id', tenantId as string);
-      }
-      const { data, error } = await query.order('location_name');
+        .select('*')
+        .order('location_name');
 
       if (error) throw error;
       const rows = data || [];
-      // Dev-only: auto-seed demo ports/locations if none exist (only when tenant scoped)
-      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+      setPorts(rows);
+
+      // Dev-only: auto-seed demo ports/locations if none exist
+      const tenantId = context.tenantId || roles?.[0]?.tenant_id;
+      const isPlatform = context.isPlatformAdmin;
+
+      if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
         try {
           const count = await seedPortsForTenant(supabase, tenantId as string);
           if (count > 0) toast.success(`Seeded ${count} demo ports/locations`);
-          const { data: seeded } = await supabase
+          const { data: seeded } = await scopedDb
             .from('ports_locations')
             .select('*')
-            .eq('tenant_id', tenantId as string)
             .order('location_name');
           setPorts(seeded || []);
         } catch (seedErr: any) {
           console.warn('Ports/locations seed failed:', seedErr?.message || seedErr);
-          setPorts([]);
         }
-      } else {
-        setPorts(rows);
       }
     } catch (error: any) {
       toast.error('Failed to load ports/locations', {
@@ -111,7 +102,7 @@ export default function PortsLocations() {
 
   const onDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('ports_locations').delete().eq('id', id);
+      const { error } = await scopedDb.from('ports_locations').delete().eq('id', id);
       if (error) throw error;
       toast.success('Port/Location deleted');
       fetchPorts();

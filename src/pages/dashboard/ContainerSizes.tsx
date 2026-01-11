@@ -4,15 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import type { ContainerSize } from '@/domain/common/types';
 
 export default function ContainerSizes() {
+  const { scopedDb } = useCRM();
   const [items, setItems] = useState<ContainerSize[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await supabase
+    const { data } = await scopedDb
       .from('container_sizes')
       .select('id, name, code, description, is_active, tenant_id')
       .order('name');
@@ -23,25 +24,18 @@ export default function ContainerSizes() {
 
   const add = async () => {
     if (!newItem.name) return;
-    const { data: userData } = await supabase.auth.getUser();
-    let tenantId: string | null = null;
-    const meta = userData?.user?.user_metadata;
-    if (meta && typeof meta === 'object' && 'tenant_id' in meta) {
-      const v = (meta as Record<string, unknown>)['tenant_id'];
-      tenantId = typeof v === 'string' ? v : null;
-    }
-    await supabase.from('container_sizes').insert({ ...newItem, tenant_id: tenantId });
+    await scopedDb.from('container_sizes').insert({ ...newItem });
     setNewItem({ name: '', code: '', description: '' });
     load();
   };
 
   const update = async (id: string, patch: Partial<ContainerSize>) => {
-    await supabase.from('container_sizes').update(patch).eq('id', id);
+    await scopedDb.from('container_sizes').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('container_sizes').delete().eq('id', id);
+    await scopedDb.from('container_sizes').delete().eq('id', id);
     load();
   };
 

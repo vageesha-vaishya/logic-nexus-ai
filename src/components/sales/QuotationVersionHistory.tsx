@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -80,7 +80,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
       const versionIds = versionsWithCurrent.map((v: any) => v.id);
       if (versionIds.length > 0) {
-        const { data: opts, error: oErr } = await supabase
+        const { data: opts, error: oErr } = await scopedDb
           .from('quotation_version_options')
           .select(`
             id,
@@ -98,7 +98,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
         const carrierRateIds = (opts ?? []).map((o: any) => o.carrier_rate_id).filter(Boolean);
         const rateMap: Record<string, any> = {};
         if (carrierRateIds.length > 0) {
-          const { data: rates, error: rErr } = await supabase
+          const { data: rates, error: rErr } = await scopedDb
             .from('carrier_rates')
             .select('id, carrier_name, currency, base_rate, mode, valid_until')
             .in('id', carrierRateIds);
@@ -270,34 +270,34 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
       for (const b of chunk(optionIds, 1000)) {
         if (!b.length) continue;
-        const { error } = await supabase.from('quote_charges').delete().in('quote_option_id', b);
+        const { error } = await scopedDb.from('quote_charges').delete().in('quote_option_id', b);
         if (error) throw error;
       }
       for (const b of chunk(quoteLegIds, 1000)) {
         if (!b.length) continue;
-        const { error } = await supabase.from('quote_charges').delete().in('leg_id', b);
+        const { error } = await scopedDb.from('quote_charges').delete().in('leg_id', b);
         if (error) throw error;
       }
 
       for (const b of chunk(quoteLegIds, 1000)) {
         if (!b.length) continue;
-        const { error } = await supabase.from('quote_legs').delete().in('id', b);
+        const { error } = await scopedDb.from('quote_legs').delete().in('id', b);
         if (error) throw error;
       }
       for (const b of chunk(compLegIds, 1000)) {
         if (!b.length) continue;
-        const { error } = await supabase.from('quotation_version_option_legs').delete().in('id', b);
+        const { error } = await scopedDb.from('quotation_version_option_legs').delete().in('id', b);
         if (error) throw error;
       }
 
       for (const b of chunk(optionIds, 1000)) {
         if (!b.length) continue;
-        const { error } = await supabase.from('quotation_version_options').delete().in('id', b);
+        const { error } = await scopedDb.from('quotation_version_options').delete().in('id', b);
         if (error) throw error;
       }
       for (const b of chunk(versionIds, 1000)) {
         if (!b.length) continue;
-        const { error } = await supabase.from('quotation_versions').delete().in('id', b);
+        const { error } = await scopedDb.from('quotation_versions').delete().in('id', b);
         if (error) throw error;
       }
 
@@ -355,7 +355,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
 
   const handleSetCurrent = async (versionId: string) => {
     try {
-      const { error } = await supabase.rpc('set_current_version', {
+      const { error } = await scopedDb.rpc('set_current_version', {
         p_version_id: versionId,
       });
       if (error) throw error;

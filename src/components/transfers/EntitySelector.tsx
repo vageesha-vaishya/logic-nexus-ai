@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TransferService, TransferEntityType, TransferableEntity } from '@/lib/transfer-service';
+import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,6 +33,8 @@ export function EntitySelector({
   selectedEntities,
   onSelectionChange,
 }: EntitySelectorProps) {
+  const { supabase, context } = useCRM();
+  const dao = new ScopedDataAccess(supabase, context);
   const [activeTab, setActiveTab] = useState<TransferEntityType>('lead');
   const [search, setSearch] = useState('');
   const [entities, setEntities] = useState<TransferableEntity[]>([]);
@@ -42,6 +46,7 @@ export function EntitySelector({
       setLoading(true);
       try {
         const data = await TransferService.getTransferableEntities(
+          dao,
           activeTab,
           tenantId,
           franchiseId,

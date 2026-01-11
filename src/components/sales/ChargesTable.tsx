@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useCRM } from '@/hooks/useCRM';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+
 
 type ChargeRow = {
   charge_side_id?: string;
@@ -31,6 +32,7 @@ type CombinedRow = {
 };
 
 export default function ChargesTable({ charges, onChange, defaultCurrencyId, onSaveClick, saveDisabled }: { charges: ChargeRow[]; onChange: (rows: ChargeRow[]) => void; defaultCurrencyId?: string | null; onSaveClick?: () => void; saveDisabled?: boolean }) {
+  const { scopedDb } = useCRM();
   const [sides, setSides] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [bases, setBases] = useState<any[]>([]);
@@ -38,16 +40,16 @@ export default function ChargesTable({ charges, onChange, defaultCurrencyId, onS
 
   useEffect(() => {
     (async () => {
-      const { data: ss } = await supabase.from('charge_sides').select('id, name, code').order('name');
+      const { data: ss } = await scopedDb.from('charge_sides', true).select('id, name, code').order('name');
       setSides(ss ?? []);
-      const { data: cc } = await supabase.from('charge_categories').select('id, name, code').order('name');
+      const { data: cc } = await scopedDb.from('charge_categories', true).select('id, name, code').order('name');
       setCategories(cc ?? []);
-      const { data: bb } = await supabase.from('charge_bases').select('id, name, code').order('name');
+      const { data: bb } = await scopedDb.from('charge_bases', true).select('id, name, code').order('name');
       setBases(bb ?? []);
-      const { data: cur } = await supabase.from('currencies').select('id, code').order('code');
+      const { data: cur } = await scopedDb.from('currencies', true).select('id, code').order('code');
       setCurrencies(cur ?? []);
     })();
-  }, []);
+  }, [scopedDb]);
 
   const totals = useMemo(() => {
     const buy = charges.filter(c => c.side === 'buy').reduce((s, c) => s + (c.amount || (c.rate ?? 0) * (c.quantity ?? 1)), 0);

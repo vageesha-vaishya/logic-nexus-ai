@@ -121,7 +121,8 @@ export default function LeadDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('leads')
         .delete()
         .eq('id', id);

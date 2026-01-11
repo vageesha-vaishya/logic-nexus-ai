@@ -4,15 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import type { Currency } from '@/domain/common/types';
 
 export default function Currencies() {
+  const { scopedDb } = useCRM();
   const [items, setItems] = useState<Currency[]>([]);
   const [newItem, setNewItem] = useState({ code: '', name: '', symbol: '' });
 
   const load = async () => {
-    const { data } = await supabase
+    const { data } = await scopedDb
       .from('currencies')
       .select('id, code, name, symbol, is_active')
       .order('code');
@@ -23,18 +24,18 @@ export default function Currencies() {
 
   const add = async () => {
     if (!newItem.code) return;
-    await supabase.from('currencies').insert({ ...newItem });
+    await scopedDb.from('currencies').insert({ ...newItem });
     setNewItem({ code: '', name: '', symbol: '' });
     load();
   };
 
   const update = async (id: string, patch: Partial<Currency>) => {
-    await supabase.from('currencies').update(patch).eq('id', id);
+    await scopedDb.from('currencies').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('currencies').delete().eq('id', id);
+    await scopedDb.from('currencies').delete().eq('id', id);
     load();
   };
 

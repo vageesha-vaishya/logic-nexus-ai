@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TransferService } from '@/lib/transfer-service';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,14 +20,14 @@ export default function TransferCenter() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, supabase, scopedDb } = useCRM();
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [transfersData, statsData] = await Promise.all([
-        TransferService.getTransfers(),
-        TransferService.getTransferStats(context?.tenantId),
+        TransferService.getTransfers(scopedDb),
+        TransferService.getTransferStats(scopedDb, context?.tenantId),
       ]);
       setTransfers(transfersData || []);
       setStats(statsData);

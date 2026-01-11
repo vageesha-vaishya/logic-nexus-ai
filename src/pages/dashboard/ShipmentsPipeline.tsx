@@ -271,7 +271,8 @@ export default function ShipmentsPipeline() {
     if (selectedShipments.size === 0) return;
     
     try {
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("shipments")
         .update({ status: newStatus })
         .in("id", Array.from(selectedShipments));
@@ -301,7 +302,8 @@ export default function ShipmentsPipeline() {
     if (selectedShipments.size === 0) return;
     try {
       const now = new Date().toISOString();
-      const { error } = await (supabase as any)
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from("shipments")
         .update({ pod_received: true, pod_received_at: now })
         .in("id", Array.from(selectedShipments));

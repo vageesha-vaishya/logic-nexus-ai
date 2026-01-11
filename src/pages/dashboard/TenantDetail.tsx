@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Building2, Trash2, ArrowLeft, Upload, FileText, Check, Clock, RefreshCcw, Download } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -32,6 +33,7 @@ export default function TenantDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { supabase, context } = useCRM();
   const [tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'profile'|'contracts'|'documents'|'import'|'reports'>('profile');
@@ -108,7 +110,8 @@ export default function TenantDetail() {
   
   const saveSettings = async (next: any, successMessage = 'Settings saved') => {
     try {
-      const { error } = await supabase
+      const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await db
         .from('tenants')
         .update({ settings: next })
         .eq('id', id);

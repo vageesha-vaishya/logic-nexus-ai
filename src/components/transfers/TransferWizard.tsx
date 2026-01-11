@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TransferService, TransferType, TransferEntityType, TransferValidationResult, CreateTransferPayload } from '@/lib/transfer-service';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { TransferTypeSelector } from './TransferTypeSelector';
 import { EntitySelector } from './EntitySelector';
 import { DestinationSelector } from './DestinationSelector';
@@ -26,6 +27,7 @@ const STEPS = [
 
 export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizardProps) {
   const { context, supabase } = useCRM();
+  const dao = new ScopedDataAccess(supabase, context);
   const { toast } = useToast();
   
   const [currentStep, setCurrentStep] = useState(0);
@@ -47,7 +49,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await TransferService.getAvailableTenants();
+        const data = await TransferService.getAvailableTenants(dao);
         setTenants(data);
       } catch (e) {
         console.error(e);
@@ -162,7 +164,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
 
     setSubmitting(true);
     try {
-      await TransferService.createTransfer(payload);
+      await TransferService.createTransfer(dao, payload);
       toast({
         title: 'Transfer Request Created',
         description: `${selectedEntities.length} entities queued for transfer approval.`,

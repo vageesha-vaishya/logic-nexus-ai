@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useTransportModes } from '@/hooks/useTransportModes';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { Plus, Pencil, Trash2, MoveUp, MoveDown } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
@@ -24,6 +24,7 @@ interface TransportModeForm {
 
 export default function TransportModes() {
   const { toast } = useToast();
+  const { scopedDb } = useCRM();
   const { data: modes, refetch } = useTransportModes();
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -60,8 +61,8 @@ export default function TransportModes() {
       return;
     }
 
-    const { error } = await supabase
-      .from('transport_modes')
+    const { error } = await scopedDb
+      .from('transport_modes', true)
       .insert([formData]);
 
     if (error) {
@@ -117,8 +118,8 @@ export default function TransportModes() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this transport mode?')) return;
 
-    const { error } = await supabase
-      .from('transport_modes')
+    const { error } = await scopedDb
+      .from('transport_modes', true)
       .delete()
       .eq('id', id);
 

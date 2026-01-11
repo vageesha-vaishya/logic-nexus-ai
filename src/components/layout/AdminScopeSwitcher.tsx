@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export function AdminScopeSwitcher() {
-  const { context, preferences, setAdminOverride, setScopePreference, supabase } = useCRM();
+  const { context, preferences, setAdminOverride, setScopePreference, scopedDb } = useCRM();
   const [open, setOpen] = useState(false);
   
   const [tenants, setTenants] = useState<any[]>([]);
@@ -29,13 +29,10 @@ export function AdminScopeSwitcher() {
   const currentFranchiseId = preferences?.franchise_id ?? null;
   const isPlatformAdmin = context.isPlatformAdmin;
 
-  // Initialize Data Access Object for logging
-  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
-
   // Load franchises when tenant changes or on initial load
   const loadFranchises = useCallback(async (tenantId: string | null) => {
     try {
-      let q = supabase.from('franchises').select('id, name, tenant_id').order('name');
+      let q = scopedDb.from('franchises', true).select('id, name, tenant_id').order('name');
       if (tenantId) {
         q = q.eq('tenant_id', tenantId);
       }
@@ -45,12 +42,12 @@ export function AdminScopeSwitcher() {
       console.error(e);
       toast.error("Failed to load franchises");
     }
-  }, [supabase]);
+  }, [scopedDb]);
 
   const loadData = useCallback(async (tenantIdOverride?: string | null) => {
     setLoadingData(true);
     try {
-      const { data: tData } = await supabase.from('tenants').select('id, name').order('name');
+      const { data: tData } = await scopedDb.from('tenants', true).select('id, name').order('name');
       setTenants(tData || []);
       
       // Use override if provided, otherwise use current preference
@@ -61,7 +58,7 @@ export function AdminScopeSwitcher() {
       toast.error("Failed to load scope data");
     }
     setLoadingData(false);
-  }, [supabase, currentTenantId, loadFranchises]);
+  }, [scopedDb, currentTenantId, loadFranchises]);
 
   // Debug logging (only when component mounts)
   useEffect(() => {
@@ -96,7 +93,7 @@ export function AdminScopeSwitcher() {
   const handleToggleOverride = async (checked: boolean) => {
     try {
       await setAdminOverride(checked);
-      dao.logViewPreference('admin_override', checked ? 'enabled' : 'disabled');
+      scopedDb.logViewPreference('admin_override', checked ? 'enabled' : 'disabled');
       toast.success(checked ? "Scoped View Enabled" : "Global Admin View Restored");
       if (checked) {
         loadData();
@@ -112,7 +109,7 @@ export function AdminScopeSwitcher() {
       // Reset franchise when tenant changes and immediately load filtered franchises
       // Explicitly pass adminOverride to prevent state synchronization issues
       await setScopePreference(newVal, null, adminOverride);
-      dao.logViewPreference('scope_change', `Tenant: ${newVal || 'All'}, Franchise: All`);
+      scopedDb.logViewPreference('scope_change', `Tenant: ${newVal || 'All'}, Franchise: All`);
       await loadFranchises(newVal);
       toast.success("Tenant Scope Updated");
     } catch (error) {
@@ -125,7 +122,7 @@ export function AdminScopeSwitcher() {
     try {
       // Explicitly pass adminOverride to prevent state synchronization issues
       await setScopePreference(currentTenantId, newVal, adminOverride);
-      dao.logViewPreference('scope_change', `Tenant: ${currentTenantId || 'All'}, Franchise: ${newVal || 'All'}`);
+      scopedDb.logViewPreference('scope_change', `Tenant: ${currentTenantId || 'All'}, Franchise: ${newVal || 'All'}`);
       toast.success("Franchise Scope Updated");
     } catch (error) {
       toast.error("Failed to update franchise scope");

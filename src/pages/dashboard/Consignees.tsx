@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
 import type { Consignee } from '@/domain/common/types';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export default function Consignees() {
   const navigate = useNavigate();
@@ -39,38 +39,25 @@ export default function Consignees() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
   useEffect(() => {
-    if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
-      fetchConsignees();
-    } else {
-      setLoading(false);
-    }
-  }, [context.isPlatformAdmin, context.tenantId, roles]);
+    fetchConsignees();
+  }, [context]);
 
   const fetchConsignees = async () => {
-    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-    const isPlatform = context.isPlatformAdmin;
-    if (!isPlatform && !tenantId) {
-      setLoading(false);
-      return;
-    }
-
     try {
-      let query = supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('consignees')
-        .select('id, tenant_id, company_name, contact_person, contact_email, tax_id, customs_id, is_active');
-      if (!isPlatform) {
-        query = query.eq('tenant_id', tenantId as string);
-      }
-      const { data, error } = await query.order('company_name');
+        .select('id, tenant_id, company_name, contact_person, contact_email, tax_id, customs_id, is_active')
+        .order('company_name');
 
       if (error) throw error;
       const rows = (data || []) as Consignee[];
+      
       // Dev-only: auto-seed demo consignees if none exist (only when tenant scoped)
-      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
+      if (!context.isPlatformAdmin && rows.length === 0 && import.meta.env.DEV) {
         try {
-          await supabase.from('consignees').insert([
+          await dao.from('consignees').insert([
             {
-              tenant_id: tenantId,
               company_name: 'Acme Imports',
               contact_person: 'Jamie Rivera',
               contact_email: 'jamie@acme-imports.example',
@@ -79,7 +66,6 @@ export default function Consignees() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               company_name: 'Global Retail Ltd',
               contact_person: 'Priya Singh',
               contact_email: 'priya@globalretail.example',
@@ -88,7 +74,6 @@ export default function Consignees() {
               is_active: true,
             },
             {
-              tenant_id: tenantId,
               company_name: 'Pacific Pharmaceuticals',
               contact_person: 'Ethan Wu',
               contact_email: 'ethan@pacpharma.example',
@@ -98,25 +83,23 @@ export default function Consignees() {
             },
           ]);
           toast.success('Seeded demo consignees');
-          const { data: seeded } = await supabase
+          // Refresh after seeding
+          const { data: refreshed } = await dao
             .from('consignees')
-            .select('*')
-            .eq('tenant_id', tenantId as string)
+            .select('id, tenant_id, company_name, contact_person, contact_email, tax_id, customs_id, is_active')
             .order('company_name');
-          setConsignees(seeded || []);
-        } catch (seedErr: unknown) {
-          const msg = seedErr instanceof Error ? seedErr.message : String(seedErr);
-          console.warn('Consignee seed failed:', msg);
+          setConsignees((refreshed || []) as Consignee[]);
+        } catch (seedError) {
+          console.error('Auto-seed failed:', seedError);
+          // If seeding fails, just show empty
           setConsignees([]);
         }
       } else {
         setConsignees(rows);
       }
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      toast.error('Failed to load consignees', {
-        description: msg,
-      });
+    } catch (error: any) {
+      toast.error('Failed to load consignees');
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -140,7 +123,8 @@ export default function Consignees() {
 
   const onDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('consignees').delete().eq('id', id);
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao.from('consignees').delete().eq('id', id);
       if (error) throw error;
       toast.success('Consignee deleted');
       fetchConsignees();

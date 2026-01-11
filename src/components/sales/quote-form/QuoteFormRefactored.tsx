@@ -25,7 +25,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
   // We can access context data here if needed for submission logic
   const { resolvedTenantId } = useQuoteContext();
   const [composerVersionId, setComposerVersionId] = useState<string>(''); // Placeholder for logic
-  const { supabase } = useCRM();
+  const { scopedDb } = useCRM();
   
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema),
@@ -61,7 +61,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
       const opportunityId = data.opportunity_id || '';
 
       if (opportunityId && (!accountId || !contactId)) {
-        const { data: opp, error: oppError } = await supabase
+        const { data: opp, error: oppError } = await scopedDb
           .from('opportunities')
           .select('id, account_id, contact_id')
           .eq('id', opportunityId)
@@ -98,21 +98,21 @@ function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
       };
 
       // Basic DB connectivity check
-      const { error: connectivityError } = await supabase.from('quotes').select('id').limit(1);
+      const { error: connectivityError } = await scopedDb.from('quotes').select('id').limit(1);
       if (connectivityError) {
         throw connectivityError;
       }
 
       let savedId = quoteId || '';
       if (quoteId) {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await scopedDb
           .from('quotes')
           .update(payload)
           .eq('id', quoteId);
         if (updateError) throw updateError;
         savedId = quoteId;
       } else {
-        const { data: inserted, error: insertError } = await supabase
+        const { data: inserted, error: insertError } = await scopedDb
           .from('quotes')
           .insert(payload)
           .select('id')

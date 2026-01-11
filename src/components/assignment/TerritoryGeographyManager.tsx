@@ -14,8 +14,7 @@ interface Props {
 }
 
 export function TerritoryGeographyManager({ territoryId }: Props) {
-  const { supabase } = useCRM();
-  const sb: any = supabase as any;
+  const { scopedDb, supabase } = useCRM();
   const [mappings, setMappings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
@@ -42,28 +41,28 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
   }, [territoryId]);
 
   const fetchMasterData = async () => {
-    try {
-      const [contRes, countRes, stateRes, cityRes] = await Promise.all([
-        supabase.from('continents').select('id, name').eq('is_active', true).order('name'),
-        supabase.from('countries').select('id, name, continent_id').eq('is_active', true).order('name'),
-        supabase.from('states').select('id, name, country_id').eq('is_active', true).order('name'),
-        supabase.from('cities').select('id, name, country_id, state_id').eq('is_active', true).order('name')
-      ]);
+      try {
+        const [contRes, countRes, stateRes, cityRes] = await Promise.all([
+          scopedDb.from('continents', true).select('id, name').eq('is_active', true).order('name'),
+          scopedDb.from('countries', true).select('id, name, continent_id').eq('is_active', true).order('name'),
+          scopedDb.from('states', true).select('id, name, country_id').eq('is_active', true).order('name'),
+          scopedDb.from('cities', true).select('id, name, country_id, state_id').eq('is_active', true).order('name')
+        ]);
 
-      if (contRes.error) throw contRes.error;
-      if (countRes.error) throw countRes.error;
-      if (stateRes.error) throw stateRes.error;
-      if (cityRes.error) throw cityRes.error;
+        if (contRes.error) throw contRes.error;
+        if (countRes.error) throw countRes.error;
+        if (stateRes.error) throw stateRes.error;
+        if (cityRes.error) throw cityRes.error;
 
-      setContinents(contRes.data || []);
-      setCountries(countRes.data || []);
-      setStates(stateRes.data || []);
-      setCities(cityRes.data || []);
-    } catch (error) {
-      console.error('Error fetching master data:', error);
-      toast.error('Failed to load geographical data');
-    }
-  };
+        setContinents(contRes.data || []);
+        setCountries(countRes.data || []);
+        setStates(stateRes.data || []);
+        setCities(cityRes.data || []);
+      } catch (error) {
+        console.error('Error fetching master data:', error);
+        toast.error('Failed to load geographical data');
+      }
+    };
 
   const fetchMappings = async () => {
     try {
@@ -222,7 +221,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
         return;
       }
 
-      const { error } = await sb
+      const { error } = await scopedDb
         .from('territory_geographies')
         .insert(payload);
 
@@ -256,7 +255,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
       if (unavailable) {
         return toast.error('Geography mapping is unavailable');
       }
-      const { error } = await sb
+      const { error } = await scopedDb
         .from('territory_geographies')
         .delete()
         .eq('id', id);

@@ -56,12 +56,13 @@ export function AssignmentRuleForm({ rule, tenantId, onSave, onCancel }: Props) 
   }, []);
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('profiles').select('id, first_name, last_name, email');
+    // TODO: Verify if profiles table has tenant_id or if we need to filter differently
+    const { data } = await scopedDb.from('profiles').select('id, first_name, last_name, email');
     setUsers(data || []);
   };
 
   const fetchTerritories = async () => {
-    let query = supabase.from('territories').select('*').eq('is_active', true);
+    let query = scopedDb.from('territories').select('*').eq('is_active', true);
     if (effectiveTenantId) query = query.eq('tenant_id', effectiveTenantId);
     const { data } = await query;
     setTerritories(data || []);
@@ -82,13 +83,13 @@ export function AssignmentRuleForm({ rule, tenantId, onSave, onCancel }: Props) 
       };
 
       if (rule?.id) {
-        const { error } = await supabase
+        const { error } = await scopedDb
           .from('lead_assignment_rules')
           .update(payload)
           .eq('id', rule.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await scopedDb
           .from('lead_assignment_rules')
           .insert(payload);
         if (error) throw error;

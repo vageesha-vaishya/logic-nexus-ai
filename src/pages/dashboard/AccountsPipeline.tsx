@@ -167,6 +167,31 @@ export default function AccountsPipeline() {
     }
   };
 
+  const handleBulkStageChange = async (newStage: AccountStage) => {
+    if (selected.size === 0) return;
+    try {
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const updates: { status: AccountStatusDB } = { status: 'pending' };
+      if (newStage === 'blocked' || newStage === 'inactive') updates.status = 'inactive';
+      else if (newStage === 'active' || newStage === 'vip') updates.status = 'active';
+      else updates.status = 'pending';
+
+      const { error } = await dao
+        .from('accounts')
+        .update(updates)
+        .in('id', Array.from(selected));
+
+      if (error) throw error;
+
+      setAccounts((prev) => prev.map((a) => selected.has(a.id) ? { ...a, ...updates } : a));
+      toast({ title: 'Success', description: `${selected.size} accounts updated` });
+      setSelected(new Set());
+      setBulkMode(false);
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update accounts', variant: 'destructive' });
+    }
+  };
+
   const handleDragStart = (e: DragStartEvent) => {
     setActiveId(e.active.id as string);
   };
@@ -336,6 +361,23 @@ export default function AccountsPipeline() {
                     <CheckSquare className="h-4 w-4 mr-2" />
                     {bulkMode ? "Cancel Selection" : "Bulk Select"}
                   </Button>
+                  
+                  {bulkMode && selected.size > 0 && (
+                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-4">
+                      <Separator orientation="vertical" className="h-6" />
+                      <span className="text-sm text-muted-foreground">{selected.size} selected</span>
+                      <Select onValueChange={(v) => handleBulkStageChange(v as AccountStage)}>
+                        <SelectTrigger className="w-[180px] h-8">
+                          <SelectValue placeholder="Move to stage..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stages.map((stage) => (
+                            <SelectItem key={stage} value={stage}>{stageLabels[stage]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <Popover>

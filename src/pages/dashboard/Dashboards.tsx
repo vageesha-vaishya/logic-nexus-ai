@@ -1,34 +1,223 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Phone, Calendar, CheckSquare, Mail, StickyNote } from 'lucide-react';
+import { AlertCircle, Plus, Layout, Save, X, GripVertical, Users, Eye } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useCRM } from '@/hooks/useCRM';
-import { Link } from 'react-router-dom';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAssignableUsers } from '@/hooks/useAssignableUsers';
-import { toast } from 'sonner';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
-import { useDashboardData, ActivityItem } from '@/hooks/useDashboardData';
-import { StatsCards } from '@/components/dashboard/StatsCards';
-import { WidgetContainer } from '@/components/dashboard/WidgetContainer';
 import { useTranslation } from 'react-i18next';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  DragStartEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+import { WidgetConfig, WidgetType, WidgetSize } from '@/types/dashboard';
+import { AVAILABLE_WIDGETS, getWidgetDefinition } from '@/config/widgets';
+import { DraggableWidget } from '@/components/dashboard/DraggableWidget';
+import { WidgetSettingsDialog } from '@/components/dashboard/WidgetSettingsDialog';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { useCRM } from '@/hooks/useCRM';
+import { DashboardService } from '@/lib/dashboard-service';
+import { useToast } from '@/components/ui/use-toast';
+
+const DEFAULT_WIDGETS: WidgetConfig[] = [
+  { id: 'stats-1', type: 'stats', title: 'KPIs', size: 'full', order: 0 },
+  { id: 'leads-1', type: 'leads', title: 'My Leads', size: 'medium', order: 1 },
+  { id: 'activities-1', type: 'activities', title: 'My Activities', size: 'medium', order: 2 },
+];
 
 export default function Dashboards() {
   const { t } = useTranslation();
-  const { supabase, context } = useCRM();
-  const { formatLabel } = useAssignableUsers();
-  
-  const { 
-    loading, 
-    myLeads, 
-    myActivities, 
-    assignableUsers, 
-    leadNamesById, 
-    setMyActivities,
-    error
-  } = useDashboardData();
+  const { error } = useDashboardData(); // Still check for data errors
+  const { scopedDb, user } = useCRM();
+  const { toast } = useToast();
+
+  // State
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(DEFAULT_WIDGETS);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [editingWidget, setEditingWidget] = useState<WidgetConfig | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Team View State
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+
+  // New Widget Form State
+  const [newWidgetType, setNewWidgetType] = useState<WidgetType>('accounts');
+  const [newWidgetTitle, setNewWidgetTitle] = useState('');
+  const [newWidgetSize, setNewWidgetSize] = useState<WidgetSize>('medium');
+
+  const isOwnDashboard = !viewingUserId || viewingUserId === user?.id;
+
+  // Load Team Members
+  useEffect(() => {
+    const loadTeam = async () => {
+      try {
+        const members = await DashboardService.getTeamMembers(scopedDb);
+        setTeamMembers(members || []);
+      } catch (err) {
+        console.error('Failed to load team members:', err);
+      }
+    };
+    loadTeam();
+  }, [scopedDb]);
+
+  // Load Widgets
+  useEffect(() => {
+    const loadWidgets = async () => {
+      if (!user) return;
+      
+      const targetUserId = viewingUserId || user.id;
+      setIsLoading(true);
+      
+      try {
+        const savedWidgets = await DashboardService.getPreferences(scopedDb, targetUserId);
+        if (savedWidgets && savedWidgets.length > 0) {
+          setWidgets(savedWidgets);
+        } else {
+          // Fallback to local storage only for own dashboard if DB is empty (migration path)
+          // Or just default. Let's try localStorage if it's own dashboard.
+          if (targetUserId === user.id) {
+             const local = localStorage.getItem('dashboard_widgets');
+             if (local) {
+               setWidgets(JSON.parse(local));
+             } else {
+               setWidgets(DEFAULT_WIDGETS);
+             }
+          } else {
+            setWidgets(DEFAULT_WIDGETS);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard preferences:', err);
+        toast({
+          title: t('Error'),
+          description: t('Failed to load dashboard preferences'),
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWidgets();
+  }, [user, viewingUserId, scopedDb, toast, t]);
+
+  // Save Widgets (Debounced or on change)
+  useEffect(() => {
+    if (!isOwnDashboard || isLoading) return;
+
+    // Save to local storage as backup/immediate sync
+    localStorage.setItem('dashboard_widgets', JSON.stringify(widgets));
+
+    // Save to DB
+    const saveToDb = async () => {
+      try {
+        await DashboardService.savePreferences(scopedDb, widgets);
+      } catch (err) {
+        console.error('Failed to save dashboard preferences:', err);
+      }
+    };
+
+    // Debounce saving to DB
+    const timeout = setTimeout(saveToDb, 1000);
+    return () => clearTimeout(timeout);
+  }, [widgets, isOwnDashboard, isLoading, scopedDb]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setWidgets((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        // Update order property
+        return newItems.map((item, index) => ({ ...item, order: index }));
+      });
+    }
+    setActiveId(null);
+  };
+
+  const handleAddWidget = () => {
+    const def = getWidgetDefinition(newWidgetType);
+    if (!def) return;
+
+    const newWidget: WidgetConfig = {
+      id: `${newWidgetType}-${Date.now()}`,
+      type: newWidgetType,
+      title: newWidgetTitle || def.label,
+      size: newWidgetSize,
+      order: widgets.length,
+    };
+
+    setWidgets([...widgets, newWidget]);
+    setIsAddDialogOpen(false);
+    setNewWidgetTitle('');
+    setNewWidgetSize('medium');
+    setIsEditMode(true); // Switch to edit mode to allow immediate positioning
+  };
+
+  const handleRemoveWidget = (id: string) => {
+    if (confirm(t('Are you sure you want to remove this widget?'))) {
+      setWidgets(widgets.filter((w) => w.id !== id));
+    }
+  };
+
+  const handleEditWidget = (id: string, newConfig: Partial<WidgetConfig>) => {
+    setWidgets(widgets.map(w => w.id === id ? { ...w, ...newConfig } : w));
+  };
+
+  const handleOpenSettings = (id: string) => {
+    const widget = widgets.find(w => w.id === id);
+    if (widget) {
+      setEditingWidget(widget);
+    }
+  };
+
+  const activeWidget = activeId ? widgets.find(w => w.id === activeId) : null;
 
   if (error) {
     return (
@@ -48,178 +237,173 @@ export default function Dashboards() {
     );
   }
 
-  const renderTypeBadge = (t: string | null) => {
-    const type = (t || '').toLowerCase();
-    const map: Record<string, { label: string; icon?: any }> = {
-      task: { label: 'Task', icon: CheckSquare },
-      call: { label: 'Call', icon: Phone },
-      meeting: { label: 'Meeting', icon: Calendar },
-      email: { label: 'Email', icon: Mail },
-      note: { label: 'Note', icon: StickyNote },
-    };
-    const meta = map[type];
-    const label = meta?.label || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Activity');
-    const Icon = meta?.icon;
-    return (
-      <Badge variant="outline" className="ml-2 text-xs">
-        {Icon ? <Icon className="mr-1 h-3 w-3" /> : null}
-        {label}
-      </Badge>
-    );
-  };
-
-  const assignActivityOwner = async (activityId: string, newOwnerId: string | 'none') => {
-    try {
-      const assigned_to = newOwnerId === 'none' ? null : newOwnerId;
-      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
-      const { error } = await dao
-        .from('activities')
-        .update({ assigned_to })
-        .eq('id', activityId);
-      if (error) throw error;
-      // Optimistically update local state; remove items reassigned away from me
-      setMyActivities((prev) => {
-        const updated = prev.map((a) => (a.id === activityId ? { ...a, assigned_to } : a));
-        return updated.filter((a) => a.assigned_to === context.userId);
-      });
-      toast.success(t('Activity assignment updated'));
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.message || t('Failed to update assignment'));
-    }
-  };
-
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">{t('Dashboards')}</h1>
-          <p className="text-muted-foreground">{t('Your work at a glance')}</p>
-        </div>
-
-        {/* KPI Stats Cards */}
-        <StatsCards loading={loading} />
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* My Leads Widget */}
-          <WidgetContainer
-            title={t('My Leads')}
-            action={
-              <Button variant="link" className="p-0" asChild>
-                <Link to="/dashboard/leads">{t('View all')}</Link>
-              </Button>
-            }
-          >
-            {loading ? (
-              <p className="text-sm text-muted-foreground">{t('Loading...')}</p>
-            ) : myLeads.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('No assigned leads yet')}</p>
-            ) : (
-              <ul className="space-y-3">
-                {myLeads.map((l) => (
-                  <li key={l.id} className="flex items-center justify-between">
-                    <div>
-                      <Link to={`/dashboard/leads/${l.id}`} className="font-medium hover:underline">
-                        {l.first_name} {l.last_name}
-                      </Link>
-                      {l.company && (
-                        <span className="ml-2 text-sm text-muted-foreground">· {l.company}</span>
-                      )}
-                    </div>
-                    <Badge variant="secondary">{l.status}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </WidgetContainer>
-
-          {/* My Activities Widget */}
-          <WidgetContainer
-            title={context.isPlatformAdmin ? t('Recent Activities') : t('My Activities')}
-            action={
-              <Button variant="link" className="p-0" asChild>
-                <Link to="/dashboard/activities">{t('View all')}</Link>
-              </Button>
-            }
-          >
-            {loading ? (
-              <p className="text-sm text-muted-foreground">{t('Loading...')}</p>
-            ) : myActivities.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('No upcoming tasks')}</p>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(
-                  myActivities.reduce<Record<string, ActivityItem[]>>((acc, a) => {
-                    const key = a.lead_id ?? 'none';
-                    if (!acc[key]) acc[key] = [];
-                    acc[key].push(a);
-                    return acc;
-                  }, {})
-                ).map(([groupId, items]) => {
-                  const isNone = groupId === 'none';
-                  const headerLabel = isNone
-                    ? t('No Lead')
-                    : (leadNamesById[groupId] ?? t('Lead'));
-                  return (
-                    <div key={groupId} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                          {isNone ? (
-                            headerLabel
-                          ) : (
-                            <Link to={`/dashboard/leads/${groupId}`} className="hover:underline">
-                              {headerLabel}
-                            </Link>
-                          )}
+      <div className="space-y-6 pb-20">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">{t('Dashboards')}</h1>
+            <p className="text-muted-foreground">{t('Your work at a glance')}</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            {/* Team View Selector */}
+            {teamMembers.length > 0 && (
+              <Select value={viewingUserId || 'me'} onValueChange={(v) => setViewingUserId(v === 'me' ? null : v)}>
+                <SelectTrigger className="w-[200px]">
+                  <Users className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder={t("View Team Member")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="me">{t("My Dashboard")}</SelectItem>
+                  {teamMembers
+                    .filter(m => m.id !== user?.id)
+                    .map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={member.avatar_url} />
+                            <AvatarFallback>{member.first_name?.[0]}{member.last_name?.[0]}</AvatarFallback>
+                          </Avatar>
+                          {member.first_name} {member.last_name}
                         </div>
-                      </div>
-                      <ul className="space-y-3">
-                        {items.map((a) => {
-                          const overdue = a.due_date ? new Date(a.due_date) < new Date() : false;
-                          return (
-                            <li key={a.id} className="flex items-center justify-between">
-                              <div>
-                                <Link to={`/dashboard/activities/${a.id}`} className="font-medium hover:underline">
-                                  {a.subject || a.activity_type}
-                                </Link>
-                                {/* Show activity type label */}
-                                {renderTypeBadge(a.activity_type)}
-                                {a.due_date && (
-                                  <span className={`ml-2 text-sm ${overdue ? 'text-red-600' : 'text-muted-foreground'}`}>
-                                    {new Date(a.due_date).toLocaleDateString()}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant={overdue ? 'destructive' : 'secondary'}>
-                                  {overdue ? t('Overdue') : (a.status ?? t('planned'))}
-                                </Badge>
-                                <Select
-                                  onValueChange={(v) => assignActivityOwner(a.id, v as any)}
-                                  defaultValue={a.assigned_to ?? 'none'}
-                                >
-                                  <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder={t('Assign To')} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">{t('Unassigned')}</SelectItem>
-                                    {assignableUsers.map((u) => (
-                                      <SelectItem key={u.id} value={u.id}>{formatLabel(u)}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
+                      </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
-          </WidgetContainer>
+
+            {isEditMode ? (
+              <>
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('Add Widget')}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{t('Add New Widget')}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>{t('Widget Type')}</Label>
+                        <Select 
+                          value={newWidgetType} 
+                          onValueChange={(v) => {
+                            setNewWidgetType(v as WidgetType);
+                            const def = getWidgetDefinition(v);
+                            if (def) setNewWidgetSize(def.defaultSize);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AVAILABLE_WIDGETS.map((w) => (
+                              <SelectItem key={w.type} value={w.type}>
+                                {w.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground">
+                          {getWidgetDefinition(newWidgetType)?.description}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t('Title (Optional)')}</Label>
+                        <Input 
+                          placeholder={getWidgetDefinition(newWidgetType)?.label} 
+                          value={newWidgetTitle}
+                          onChange={(e) => setNewWidgetTitle(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t('Size')}</Label>
+                        <Select value={newWidgetSize} onValueChange={(v) => setNewWidgetSize(v as WidgetSize)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="small">{t('Small (1/4)')}</SelectItem>
+                            <SelectItem value="medium">{t('Medium (1/2)')}</SelectItem>
+                            <SelectItem value="large">{t('Large (3/4)')}</SelectItem>
+                            <SelectItem value="full">{t('Full Width')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={handleAddWidget} className="w-full">
+                        {t('Add Widget')}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button variant="default" size="sm" onClick={() => setIsEditMode(false)}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {t('Done')}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
+                <Layout className="mr-2 h-4 w-4" />
+                {t('Customize')}
+              </Button>
+            )}
+          </div>
         </div>
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={widgets} strategy={rectSortingStrategy}>
+            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-min ${!isOwnDashboard ? 'pointer-events-none' : ''}`}>
+              {widgets.map((widget) => (
+                <DraggableWidget
+                  key={widget.id}
+                  config={widget}
+                  onRemove={handleRemoveWidget}
+                  onEdit={handleEditWidget}
+                  onSettings={handleOpenSettings}
+                  isEditMode={isEditMode && isOwnDashboard}
+                />
+              ))}
+            </div>
+          </SortableContext>
+          
+          <DragOverlay
+            dropAnimation={{
+              sideEffects: defaultDropAnimationSideEffects({
+                styles: {
+                  active: {
+                    opacity: '0.5',
+                  },
+                },
+              }),
+            }}
+          >
+            {activeWidget ? (
+              <DraggableWidget
+                config={activeWidget}
+                onRemove={handleRemoveWidget}
+                onEdit={handleEditWidget}
+                onSettings={handleOpenSettings}
+                isEditMode={true}
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+
+        <WidgetSettingsDialog 
+          open={!!editingWidget} 
+          onOpenChange={(open) => !open && setEditingWidget(null)} 
+          config={editingWidget}
+          onSave={handleEditWidget}
+        />
       </div>
     </DashboardLayout>
   );

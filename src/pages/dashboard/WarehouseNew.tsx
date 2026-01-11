@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 export default function WarehouseNew() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
 
   const handleSubmit = async (data: WarehouseFormData) => {
     try {
@@ -28,7 +28,7 @@ export default function WarehouseNew() {
         capacity_sqft: data.capacity_sqft ? parseFloat(data.capacity_sqft) : null,
       };
 
-      const { error } = await supabase.from('warehouses').insert([warehouseData] as any);
+      const { error } = await scopedDb.from('warehouses').insert([warehouseData] as any);
 
       if (error) throw error;
 

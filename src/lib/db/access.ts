@@ -84,29 +84,44 @@ export class ScopedDataAccess {
     return this.supabase;
   }
 
+  public get accessContext(): DataAccessContext {
+    return this.context;
+  }
+
   private async logAudit(action: string, resourceType: string, details: any) {
     if (!this.context.userId) return;
     
-    // Fire and forget audit log to avoid blocking the UI
-    this.supabase.from('audit_logs').insert({
+    const payload: any = {
       user_id: this.context.userId,
       action,
       resource_type: resourceType,
       details: details,
-    }).then(({ error }) => {
+    };
+
+    if (this.context.tenantId) payload.tenant_id = this.context.tenantId;
+    if (this.context.franchiseId) payload.franchise_id = this.context.franchiseId;
+
+    // Fire and forget audit log to avoid blocking the UI
+    this.supabase.from('audit_logs').insert(payload).then(({ error }) => {
       if (error) console.warn('Audit log failed:', error);
     });
   }
 
   /**
-   * Creates a query builder for the specified table with automatic scope filtering.
-   * Returns methods that apply tenant/franchise filters based on user context.
+   * Wrapper for RPC calls to maintain interface compatibility with SupabaseClient.
+   * Note: RPCs must handle their own scoping via arguments.
    */
+  public rpc(fn: string, args?: any, options?: { head?: boolean; count?: 'exact' | 'planned' | 'estimated' }) {
+    return this.supabase.rpc(fn as any, args, options);
+  }
+
   /**
    * Creates a query builder for the specified table with automatic scope filtering.
    * The select() method applies scope filters immediately and returns the full query builder.
+   * @param table The table to query
+   * @param isGlobal If true, skips scope injection and filtering (for global reference tables)
    */
-  from(table: TableName) {
+  from(table: TableName, isGlobal: boolean = false) {
     const baseQuery = this.supabase.from(table);
     const ctx = this.context;
     const logAudit = this.logAudit.bind(this);
@@ -116,43 +131,61 @@ export class ScopedDataAccess {
     return {
       select: (columns = '*', options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
         let selectQuery = baseQuery.select(columns, options as any) as any;
-        // Apply scope filters and return the query builder for further chaining
-        return applyScopeFilter(selectQuery);
+        // Apply scope filters unless it's a global table
+        if (!isGlobal) {
+          return applyScopeFilter(selectQuery);
+        }
+        return selectQuery;
       },
       
       insert: (values: any) => {
-        // Auto-inject tenant_id/franchise_id if missing
-        const injectedValues = Array.isArray(values) 
-          ? values.map(v => injectScope(v)) 
-          : injectScope(values);
+        // Auto-inject tenant_id/franchise_id if missing and not global
+        let finalValues = values;
+        if (!isGlobal) {
+          finalValues = Array.isArray(values) 
+            ? values.map(v => injectScope(v)) 
+            : injectScope(values);
+        }
         
         logAudit('INSERT', table as string, { count: Array.isArray(values) ? values.length : 1 });
-        return baseQuery.insert(injectedValues) as any;
+        return baseQuery.insert(finalValues) as any;
       },
 
       update: (values: any) => {
         let updateQuery = baseQuery.update(values) as any;
         logAudit('UPDATE', table as string, { values });
-        // Apply scope filters and return the query builder for further chaining
-        return applyScopeFilter(updateQuery);
+        // Apply scope filters unless it's a global table
+        if (!isGlobal) {
+          return applyScopeFilter(updateQuery);
+        }
+        return updateQuery;
       },
 
       upsert: (values: any, options?: { onConflict?: string; ignoreDuplicates?: boolean; count?: 'exact' | 'planned' | 'estimated'; defaultToNull?: boolean }) => {
-        const injectedValues = Array.isArray(values) 
-          ? values.map(v => injectScope(v)) 
-          : injectScope(values);
+        let finalValues = values;
+        if (!isGlobal) {
+          finalValues = Array.isArray(values) 
+            ? values.map(v => injectScope(v)) 
+            : injectScope(values);
+        }
 
         logAudit('UPSERT', table as string, { count: Array.isArray(values) ? values.length : 1 });
-        let upsertQuery = baseQuery.upsert(injectedValues, options) as any;
-        // Apply scope filters and return the query builder for further chaining
-        return applyScopeFilter(upsertQuery);
+        let upsertQuery = baseQuery.upsert(finalValues, options) as any;
+        // Apply scope filters unless it's a global table
+        if (!isGlobal) {
+          return applyScopeFilter(upsertQuery);
+        }
+        return upsertQuery;
       },
 
       delete: () => {
         let deleteQuery = baseQuery.delete() as any;
         logAudit('DELETE', table as string, {});
-        // Apply scope filters and return the query builder for further chaining
-        return applyScopeFilter(deleteQuery);
+        // Apply scope filters unless it's a global table
+        if (!isGlobal) {
+          return applyScopeFilter(deleteQuery);
+        }
+        return deleteQuery;
       }
     };
   }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, Download, Search, Plus, Edit2, Trash2, Save, X, Filter, FileSpreadsheet, Database, RefreshCw, Info } from 'lucide-react';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { supabase as defaultSupabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { ActionsToolbar } from '@/components/ui/ActionsToolbar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,7 @@ type FormData = Omit<CodeRecord, 'id' | 'created_at' | 'updated_at'>;
 
 // Main Application Component
 const AESHTSCodeManager: React.FC = () => {
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const { scopedDb } = useCRM();
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [codes, setCodes] = useState<CodeRecord[]>([]);
   const [filteredCodes, setFilteredCodes] = useState<CodeRecord[]>([]);
@@ -95,22 +94,19 @@ const AESHTSCodeManager: React.FC = () => {
 
   // Initialize Supabase: use the application's default supabase client
   useEffect(() => {
-    setSupabase(defaultSupabase);
     setIsConnected(true);
-    loadCodes(defaultSupabase);
+    loadCodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [scopedDb]);
 
   // Table creation helper removed — migrations handle schema
 
   // Load codes from Supabase
-  const loadCodes = async (client: SupabaseClient | null = supabase) => {
-    if (!client) return;
-    
+  const loadCodes = async () => {
     setLoading(true);
     try {
-      const { data, error } = await client
-        .from('aes_hts_codes')
+      const { data, error } = await scopedDb
+        .from('aes_hts_codes', true)
         .select('*')
         .order('hts_code', { ascending: true });
       
@@ -215,7 +211,6 @@ const AESHTSCodeManager: React.FC = () => {
   // CRUD Operations
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const client = supabase ?? defaultSupabase;
 
     setLoading(true);
     try {
@@ -238,21 +233,21 @@ const AESHTSCodeManager: React.FC = () => {
         if (!editingId) {
           throw new Error('Missing record id for update');
         }
-        const { error } = await client
-          .from('aes_hts_codes')
+        const { error } = await scopedDb
+          .from('aes_hts_codes', true)
           .update({ ...formData, updated_at: new Date().toISOString() })
           .eq('id', editingId);
 
         if (error) throw error;
       } else {
-        const { error } = await client
-          .from('aes_hts_codes')
+        const { error } = await scopedDb
+          .from('aes_hts_codes', true)
           .insert([formData]);
 
         if (error) throw error;
       }
       
-      await loadCodes(client);
+      await loadCodes();
       resetForm();
       setActiveTab('browse');
     } catch (err: unknown) {
@@ -285,12 +280,12 @@ const AESHTSCodeManager: React.FC = () => {
   const handleDelete = async (id: string | undefined) => {
     if (!confirm('Are you sure you want to delete this code?')) return;
     
-    if (!supabase || !id) return;
+    if (!id) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('aes_hts_codes')
+      const { error } = await scopedDb
+        .from('aes_hts_codes', true)
         .delete()
         .eq('id', id);
       
@@ -377,17 +372,15 @@ const AESHTSCodeManager: React.FC = () => {
 
       // Query live codes from Supabase right before import to avoid race conditions
       let existingSet = new Set<string>((codes || []).map(c => (c.hts_code || '').trim()));
-      if (supabase) {
-        try {
-          const { data, error } = await supabase.from('aes_hts_codes').select('hts_code');
-          if (error) {
-            console.warn('Failed to fetch live codes before import, using cached list:', error.message);
-          } else if (data) {
-            existingSet = new Set<string>((data as Array<{ hts_code: string }>).map(d => (d.hts_code || '').trim()));
-          }
-        } catch (fetchErr) {
-          console.warn('Error while fetching live codes before import:', fetchErr);
+      try {
+        const { data, error } = await scopedDb.from('aes_hts_codes', true).select('hts_code');
+        if (error) {
+          console.warn('Failed to fetch live codes before import, using cached list:', error.message);
+        } else if (data) {
+          existingSet = new Set<string>((data as Array<{ hts_code: string }>).map(d => (d.hts_code || '').trim()));
         }
+      } catch (fetchErr) {
+        console.warn('Error while fetching live codes before import:', fetchErr);
       }
       const seenSet = new Set<string>();
       const validSanitized = sanitized.filter((r, idx) => {
@@ -457,36 +450,13 @@ const AESHTSCodeManager: React.FC = () => {
       });
       setImportErrors(errors);
 
-      if (supabase) {
-        if (!validSanitized.length) {
-          alert('No valid rows to import. Please review and download the errors CSV.');
-        } else {
-          const { error } = await supabase.from('aes_hts_codes').insert(validSanitized);
-          if (error) throw error;
-          await loadCodes();
-          alert(`Imported ${validSanitized.length} valid records${errors.length ? `; ${errors.length} rows failed validation` : ''}.`);
-        }
+      if (!validSanitized.length) {
+        alert('No valid rows to import. Please review and download the errors CSV.');
       } else {
-        const toCodeRecord = (d: Record<string, string>): CodeRecord => ({
-          id: undefined,
-          hts_code: d['hts_code'] || '',
-          schedule_b: d['schedule_b'] || '',
-          category: d['category'] || '',
-          sub_category: d['sub_category'] || '',
-          sub_sub_category: d['sub_sub_category'] || '',
-          description: d['description'] || '',
-          uom1: d['uom1'] || '',
-          uom2: d['uom2'] || '',
-          duty_rate: d['duty_rate'] || '',
-          special_provisions: d['special_provisions'] || ''
-        });
-        const validLocal = validSanitized.map((d, i) => ({ ...toCodeRecord(d), id: `import-${i}` }));
-        if (validLocal.length) {
-          setCodes([...codes, ...validLocal]);
-          alert(`Imported ${validLocal.length} valid rows locally${errors.length ? `; ${errors.length} rows failed validation` : ''}. Connect to Supabase to save permanently.`);
-        } else {
-          alert('No valid rows to import locally. Please review and download the errors CSV.');
-        }
+        const { error } = await scopedDb.from('aes_hts_codes', true).insert(validSanitized);
+        if (error) throw error;
+        await loadCodes();
+        alert(`Imported ${validSanitized.length} valid records${errors.length ? `; ${errors.length} rows failed validation` : ''}.`);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

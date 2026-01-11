@@ -94,6 +94,10 @@ export default function QuoteDetail() {
         }
         
         if (!finalTenantId) {
+          finalTenantId = context.tenantId;
+        }
+
+        if (!finalTenantId) {
           const { data: { user } } = await supabase.auth.getUser();
           finalTenantId = user?.user_metadata?.tenant_id;
         }

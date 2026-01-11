@@ -168,8 +168,9 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
 
     try {
       if (user) {
-        // Update profile - direct supabase call as profiles table is not tenant-scoped
-        const { error: profileError } = await supabase
+        // Update profile - using ScopedDataAccess for audit logging
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const { error: profileError } = await dao
           .from('profiles')
           .update({
             first_name: values.first_name,
@@ -238,9 +239,10 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         
         try {
           // Assign additional roles after creation
-          const { data: created } = await supabase.from('profiles').select('id').eq('email', values.email).single();
+          const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+          const { data: created } = await dao.from('profiles').select('id').eq('email', values.email).single();
           if (created?.id && assignedRoles.length > 0) {
-            const roleService = new RoleService(new ScopedDataAccess(supabase, context as unknown as DataAccessContext));
+            const roleService = new RoleService(dao);
             await roleService.assignRolesToUser(created.id, assignedRoles, false);
           }
         } catch (e) {

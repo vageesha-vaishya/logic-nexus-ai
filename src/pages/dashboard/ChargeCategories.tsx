@@ -4,15 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import type { ChargeCategory } from '@/domain/common/types';
 
 export default function ChargeCategories() {
+  const { scopedDb } = useCRM();
   const [items, setItems] = useState<ChargeCategory[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await supabase
+    const { data } = await scopedDb
       .from('charge_categories')
       .select('id, name, code, description, is_active')
       .order('name');
@@ -23,18 +24,18 @@ export default function ChargeCategories() {
 
   const add = async () => {
     if (!newItem.name) return;
-    await supabase.from('charge_categories').insert({ ...newItem });
+    await scopedDb.from('charge_categories').insert({ ...newItem });
     setNewItem({ name: '', code: '', description: '' });
     load();
   };
 
   const update = async (id: string, patch: Partial<ChargeCategory>) => {
-    await supabase.from('charge_categories').update(patch).eq('id', id);
+    await scopedDb.from('charge_categories').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('charge_categories').delete().eq('id', id);
+    await scopedDb.from('charge_categories').delete().eq('id', id);
     load();
   };
 

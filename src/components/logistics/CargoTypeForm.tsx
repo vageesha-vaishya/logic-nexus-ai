@@ -25,7 +25,7 @@ interface CargoTypeFormProps {
 }
 
 export function CargoTypeForm({ onSuccess }: CargoTypeFormProps) {
-  const { supabase, context } = useCRM();
+  const { scopedDb, context } = useCRM();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

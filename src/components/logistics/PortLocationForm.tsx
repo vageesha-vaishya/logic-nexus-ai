@@ -42,7 +42,7 @@ const portLocationSchema = z.object({
 });
 
 export function PortLocationForm({ locationId, onSuccess }: { locationId?: string; onSuccess?: () => void }) {
-  const { context, supabase } = useCRM();
+  const { scopedDb } = useCRM();
   const { roles } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +69,7 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
       if (!locationId) return;
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await scopedDb
           .from('ports_locations')
           .select('*')
           .eq('id', locationId)
@@ -104,16 +104,9 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
     };
     loadLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationId]);
+  }, [locationId, scopedDb]);
 
   const onSubmit = async (values: z.infer<typeof portLocationSchema>) => {
-    const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-
-    if (!tenantId) {
-      toast.error('No tenant selected');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const locationData: any = {
@@ -131,18 +124,17 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
           latitude: values.latitude || '',
           longitude: values.longitude || '',
         },
-        tenant_id: tenantId,
       };
 
       if (locationId) {
-        const { error } = await supabase
+        const { error } = await scopedDb
           .from('ports_locations')
           .update(locationData)
           .eq('id', locationId);
         if (error) throw error;
         toast.success('Port/Location updated successfully');
       } else {
-        const { error } = await supabase.from('ports_locations').insert([locationData]);
+        const { error } = await scopedDb.from('ports_locations').insert([locationData]);
         if (error) throw error;
         toast.success('Port/Location created successfully');
         form.reset();

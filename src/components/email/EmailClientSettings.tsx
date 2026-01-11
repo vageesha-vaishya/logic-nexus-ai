@@ -99,7 +99,7 @@ function emptyForm(): EmailAccountForm {
 }
 
 export const EmailClientSettings: React.FC = () => {
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   type EmailAccountRow = Tables<"email_accounts">;
   const [accounts, setAccounts] = useState<EmailAccountRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -120,7 +120,7 @@ export const EmailClientSettings: React.FC = () => {
   useEffect(() => {
     const loadAccounts = async () => {
       setLoading(true);
-      const query = supabase
+      const query = scopedDb
         .from("email_accounts")
         .select("*")
         .eq("is_active", true)
@@ -147,7 +147,7 @@ export const EmailClientSettings: React.FC = () => {
       }));
     };
     loadAccounts();
-  }, []);
+  }, [scopedDb]);
 
   useEffect(() => {
     // Apply preset when changed
@@ -174,7 +174,7 @@ export const EmailClientSettings: React.FC = () => {
     e.preventDefault();
     setSaving(true);
 
-    const { data: authData, error: userError } = await supabase.auth.getUser();
+    const { data: authData, error: userError } = await scopedDb.client.auth.getUser();
     if (userError || !authData?.user) {
       setSaving(false);
       toast({ title: "Not signed in", description: "Please sign in to save email settings.", variant: "destructive" });
@@ -204,7 +204,7 @@ export const EmailClientSettings: React.FC = () => {
       settings: { preset: form.preset },
     };
 
-    const { error } = await supabase.from("email_accounts").insert(payload);
+    const { error } = await scopedDb.from("email_accounts").insert(payload);
     setSaving(false);
     if (error) {
       toast({ title: "Failed to save account", description: error.message, variant: "destructive" });
@@ -213,7 +213,7 @@ export const EmailClientSettings: React.FC = () => {
     toast({ title: "Email account saved", description: "SMTP/IMAP settings stored successfully." });
     setForm(emptyForm());
     // refresh list
-    const { data } = await supabase
+    const { data } = await scopedDb
       .from("email_accounts")
       .select("*")
       .eq("is_active", true)
@@ -232,7 +232,7 @@ export const EmailClientSettings: React.FC = () => {
         return;
       }
       setTestingId(account.id as string);
-      const { data, error } = await supabase.functions.invoke("send-email", {
+      const { data, error } = await scopedDb.client.functions.invoke("send-email", {
         body: {
           accountId: account.id,
           to: [account.email_address],
@@ -463,21 +463,21 @@ export const EmailClientSettings: React.FC = () => {
                   onClick={async () => {
                     if (!targetAccountId) return;
                     try {
-                      const { error } = await supabase
+                      const { error } = await scopedDb
                         .from("email_accounts")
                         .update({ settings: clientSettings })
                         .eq("id", targetAccountId);
                       if (error) throw error;
                       toast({ title: "Client defaults saved", description: "Outlook-style settings applied to selected account." });
                       // Refresh accounts to reflect settings
-                      const { data } = await supabase
+                      const { data } = await scopedDb
                         .from("email_accounts")
                         .select("*")
                         .eq("is_active", true)
                         .order("created_at", { ascending: false });
                       setAccounts((data as EmailAccountRow[]) || []);
-                    } catch (err: any) {
-                      toast({ title: "Failed to save defaults", description: err.message, variant: "destructive" });
+                    } catch (error: any) {
+                      toast({ title: "Failed to save settings", description: error.message, variant: "destructive" });
                     }
                   }}
                 >

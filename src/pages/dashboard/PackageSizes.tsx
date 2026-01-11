@@ -10,81 +10,76 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 export default function PackageSizes() {
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
   const [sizes, setSizes] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (context.isPlatformAdmin || context.tenantId) {
-      fetchSizes();
-    }
+    fetchSizes();
   }, [context.isPlatformAdmin, context.tenantId]);
 
   const fetchSizes = async () => {
-    const isPlatform = context.isPlatformAdmin;
-    const tenantId = context.tenantId;
-    if (!isPlatform && !tenantId) return;
+    try {
+      const { data, error } = await scopedDb.from("package_sizes").select("*").order("size_name");
 
-    let query = supabase.from("package_sizes").select("*");
-    if (!isPlatform) {
-      query = query.eq("tenant_id", tenantId as string);
-    }
-    const { data, error } = await query.order("size_name");
-
-    if (error) {
-      console.error("Error fetching package sizes:", error);
-      return;
-    }
-
-    const rows = data || [];
-    // Dev-only: auto-seed demo sizes if none exist (only when tenant scoped)
-    if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
-      try {
-        await supabase.from("package_sizes").insert([
-          {
-            tenant_id: tenantId,
-            size_name: "20ft Container",
-            size_code: "20FT",
-            length_ft: 20,
-            width_ft: 8,
-            height_ft: 8.5,
-            max_weight_kg: 28200,
-            is_active: true,
-          },
-          {
-            tenant_id: tenantId,
-            size_name: "40ft Container",
-            size_code: "40FT",
-            length_ft: 40,
-            width_ft: 8,
-            height_ft: 8.5,
-            max_weight_kg: 30480,
-            is_active: true,
-          },
-          {
-            tenant_id: tenantId,
-            size_name: "Pallet (48x40)",
-            size_code: "PAL48x40",
-            length_ft: 4,
-            width_ft: 3.33,
-            height_ft: null,
-            max_weight_kg: 1000,
-            is_active: false,
-          },
-        ]);
-        toast.success("Seeded demo package sizes");
-        const { data: seeded } = await supabase
-          .from("package_sizes")
-          .select("*")
-          .eq("tenant_id", tenantId as string)
-          .order("size_name");
-        setSizes(seeded || []);
-      } catch (seedErr: any) {
-        console.warn("Package sizes seed failed:", seedErr?.message || seedErr);
-        setSizes([]);
+      if (error) {
+        console.error("Error fetching package sizes:", error);
+        return;
       }
-    } else {
+
+      const rows = data || [];
       setSizes(rows);
+
+      // Dev-only: auto-seed demo sizes if none exist
+      const isPlatform = context.isPlatformAdmin;
+      const tenantId = context.tenantId;
+      
+      if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
+        try {
+          await supabase.from("package_sizes").insert([
+            {
+              tenant_id: tenantId,
+              size_name: "20ft Container",
+              size_code: "20FT",
+              length_ft: 20,
+              width_ft: 8,
+              height_ft: 8.5,
+              max_weight_kg: 28200,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              size_name: "40ft Container",
+              size_code: "40FT",
+              length_ft: 40,
+              width_ft: 8,
+              height_ft: 8.5,
+              max_weight_kg: 30480,
+              is_active: true,
+            },
+            {
+              tenant_id: tenantId,
+              size_name: "Pallet (48x40)",
+              size_code: "PAL48x40",
+              length_ft: 4,
+              width_ft: 3.33,
+              height_ft: null,
+              max_weight_kg: 1000,
+              is_active: false,
+            },
+          ]);
+          toast.success("Seeded demo package sizes");
+          const { data: seeded } = await scopedDb
+            .from("package_sizes")
+            .select("*")
+            .order("size_name");
+          setSizes(seeded || []);
+        } catch (seedErr: any) {
+          console.warn("Package sizes seed failed:", seedErr?.message || seedErr);
+        }
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching package sizes:", err);
     }
   };
 

@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { CrudFormLayout } from '@/components/system/CrudFormLayout';
@@ -56,7 +55,7 @@ interface FranchiseFormProps {
 export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [tenants, setTenants] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -106,13 +105,13 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
     // If not platform admin, we don't need to fetch tenants as we use the context one
     if (!context.isPlatformAdmin) return;
     
-    const { data } = await supabase.from('tenants').select('id, name').eq('is_active', true);
+    const { data } = await scopedDb.from('tenants').select('id, name').eq('is_active', true);
     setTenants(data || []);
   };
 
   const fetchManagers = async (tenantId: string) => {
     // Get users associated with this tenant
-    const { data: userRoles } = await supabase
+    const { data: userRoles } = await scopedDb
       .from('user_roles')
       .select('user_id')
       .eq('tenant_id', tenantId);
@@ -122,7 +121,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       // Remove duplicates
       const uniqueUserIds = Array.from(new Set(userIds));
       
-      const { data: profiles } = await supabase
+      const { data: profiles } = await scopedDb
         .from('profiles')
         .select('id, first_name, last_name, email')
         .in('id', uniqueUserIds);
@@ -158,7 +157,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       };
 
       if (franchise) {
-        const { error } = await supabase
+        const { error } = await scopedDb
           .from('franchises')
           .update(data)
           .eq('id', franchise.id);
@@ -171,7 +170,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
         });
         onSuccess?.();
       } else {
-        const { error } = await supabase
+        const { error } = await scopedDb
           .from('franchises')
           .insert([data]);
 

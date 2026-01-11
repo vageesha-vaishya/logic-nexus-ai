@@ -4,14 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableCell, TableBody } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 
 export default function ChargeBases() {
+  const { scopedDb } = useCRM();
   const [items, setItems] = useState<any[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
   const load = async () => {
-    const { data } = await supabase.from('charge_bases').select('*').order('name');
+    // charge_bases is a global table
+    const { data } = await scopedDb.from('charge_bases', true).select('*').order('name');
     setItems(data ?? []);
   };
 
@@ -19,18 +21,18 @@ export default function ChargeBases() {
 
   const add = async () => {
     if (!newItem.name) return;
-    await supabase.from('charge_bases').insert({ ...newItem });
+    await scopedDb.from('charge_bases', true).insert({ ...newItem });
     setNewItem({ name: '', code: '', description: '' });
     load();
   };
 
   const update = async (id: string, patch: any) => {
-    await supabase.from('charge_bases').update(patch).eq('id', id);
+    await scopedDb.from('charge_bases', true).update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
-    await supabase.from('charge_bases').delete().eq('id', id);
+    await scopedDb.from('charge_bases', true).delete().eq('id', id);
     load();
   };
 

@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 export default function VehicleNew() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
 
   const handleSubmit = async (data: any) => {
     try {
@@ -22,7 +22,7 @@ export default function VehicleNew() {
         capacity_cbm: data.capacity_cbm ? parseFloat(data.capacity_cbm) : null,
       };
 
-      const { error } = await supabase.from('vehicles').insert([vehicleData]);
+      const { error } = await scopedDb.from('vehicles').insert([vehicleData]);
 
       if (error) throw error;
 

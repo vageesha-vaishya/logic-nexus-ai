@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 export type TransferStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'failed';
 export type TransferType = 'tenant_to_tenant' | 'tenant_to_franchise' | 'franchise_to_franchise';
@@ -82,14 +82,21 @@ const ENTITY_NAME_FIELD: Record<TransferEntityType, string> = {
 };
 
 export const TransferService = {
-  async createTransfer(payload: CreateTransferPayload) {
+  async createTransfer(db: ScopedDataAccess, payload: CreateTransferPayload) {
     const { items, ...transferData } = payload;
     
-    const { data: transfer, error: transferError } = await (supabase as any)
+    const { isPlatformAdmin, tenantId, adminOverrideEnabled } = db.accessContext;
+    if (!isPlatformAdmin && !adminOverrideEnabled && tenantId && payload.source_tenant_id !== tenantId) {
+      throw new Error("Unauthorized: Cannot initiate transfer from another tenant");
+    }
+    
+    // Use raw client for entity_transfers to avoid automatic scope injection which might fail
+    // if the table doesn't have standard tenant_id column or if we need cross-tenant access
+    const { data: transfer, error: transferError } = await (db.client as any)
       .from('entity_transfers')
       .insert({
         ...transferData,
-        requested_by: (await supabase.auth.getUser()).data.user?.id
+        requested_by: (await db.client.auth.getUser()).data.user?.id
       })
       .select()
       .single();
@@ -103,20 +110,21 @@ export const TransferService = {
       status: 'pending'
     }));
 
-    const { error: itemsError } = await (supabase as any)
+    const { error: itemsError } = await (db.client as any)
       .from('entity_transfer_items')
       .insert(itemsData);
 
     if (itemsError) {
-      await (supabase as any).from('entity_transfers').delete().eq('id', transfer.id);
+      await (db.client as any).from('entity_transfers').delete().eq('id', transfer.id);
       throw itemsError;
     }
 
     return transfer;
   },
 
-  async getTransfers(filters?: { status?: TransferStatus; tenantId?: string }) {
-    let query = (supabase as any)
+  async getTransfers(db: ScopedDataAccess, filters?: { status?: TransferStatus; tenantId?: string }) {
+    // Use raw client for entity_transfers as it involves source/target tenants
+    let query = (db.client as any)
       .from('entity_transfers')
       .select(`
         *,
@@ -128,11 +136,22 @@ export const TransferService = {
       `)
       .order('created_at', { ascending: false });
 
+    const { isPlatformAdmin, tenantId, adminOverrideEnabled } = db.accessContext;
+    
+    // Determine effective tenant filter
+    // If not Platform Admin (or overriding), enforce tenant scope
+    let effectiveTenantId = filters?.tenantId;
+    
+    if (!isPlatformAdmin || adminOverrideEnabled) {
+      effectiveTenantId = tenantId || undefined;
+    }
+
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
-    if (filters?.tenantId) {
-      query = query.or(`source_tenant_id.eq.${filters.tenantId},target_tenant_id.eq.${filters.tenantId}`);
+    
+    if (effectiveTenantId) {
+      query = query.or(`source_tenant_id.eq.${effectiveTenantId},target_tenant_id.eq.${effectiveTenantId}`);
     }
 
     const { data, error } = await query;
@@ -140,8 +159,8 @@ export const TransferService = {
     return data;
   },
 
-  async getTransfer(id: string) {
-    const { data, error } = await (supabase as any)
+  async getTransfer(db: ScopedDataAccess, id: string) {
+    let query = (db.client as any)
       .from('entity_transfers')
       .select(`
         *,
@@ -152,18 +171,26 @@ export const TransferService = {
         requester:profiles!entity_transfers_requested_by_fkey_profiles(email),
         items:entity_transfer_items(*)
       `)
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+
+    const { isPlatformAdmin, tenantId, adminOverrideEnabled } = db.accessContext;
+
+    // Enforce tenant scope for non-platform admins (or overriding)
+    if ((!isPlatformAdmin || adminOverrideEnabled) && tenantId) {
+      query = query.or(`source_tenant_id.eq.${tenantId},target_tenant_id.eq.${tenantId}`);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) throw error;
     return data;
   },
 
-  async approveTransfer(id: string): Promise<{ success: boolean; processed?: number; succeeded?: number; failed?: number; message?: string }> {
-    const user = (await supabase.auth.getUser()).data.user;
+  async approveTransfer(db: ScopedDataAccess, id: string): Promise<{ success: boolean; processed?: number; succeeded?: number; failed?: number; message?: string }> {
+    const user = (await db.client.auth.getUser()).data.user;
     if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await (supabase as any).rpc('execute_transfer', {
+    const { data, error } = await (db.client as any).rpc('execute_transfer', {
       p_transfer_id: id,
       p_approver_id: user.id
     });
@@ -172,11 +199,11 @@ export const TransferService = {
     return data as { success: boolean; processed?: number; succeeded?: number; failed?: number; message?: string };
   },
 
-  async rejectTransfer(id: string, reason: string) {
-    const user = (await supabase.auth.getUser()).data.user;
+  async rejectTransfer(db: ScopedDataAccess, id: string, reason: string) {
+    const user = (await db.client.auth.getUser()).data.user;
     if (!user) throw new Error('Not authenticated');
 
-    const { error } = await (supabase as any)
+    const { error } = await (db.client as any)
       .from('entity_transfers')
       .update({
         status: 'rejected',
@@ -191,6 +218,7 @@ export const TransferService = {
 
   // Get entities available for transfer from a tenant/franchise
   async getTransferableEntities(
+    db: ScopedDataAccess,
     entityType: TransferEntityType,
     tenantId: string,
     franchiseId?: string,
@@ -199,8 +227,14 @@ export const TransferService = {
     const table = ENTITY_TABLE_MAP[entityType];
     const nameField = ENTITY_NAME_FIELD[entityType];
 
-    let query = (supabase as any)
-      .from(table)
+    // Use ScopedDataAccess for entities to enforce RLS/scoping where appropriate
+    // But since we are explicitly passing tenantId, we might be listing entities for a specific tenant
+    // If db is scoped to a different tenant (e.g. Tenant Admin trying to access another tenant), ScopedDataAccess would block it
+    // However, this function seems to imply we want to list entities for *source* tenant
+    // We'll use db.from() to leverage standard access patterns, but chain .eq('tenant_id') 
+    
+    // Cast to any to avoid type issues with table name string
+    let query = (db.from(table as any) as any)
       .select(`id, ${nameField}, tenant_id, franchise_id, created_at`)
       .eq('tenant_id', tenantId);
 
@@ -228,7 +262,7 @@ export const TransferService = {
   },
 
   // Validate transfer before submission
-  async validateTransfer(payload: CreateTransferPayload): Promise<TransferValidationResult> {
+  async validateTransfer(db: ScopedDataAccess, payload: CreateTransferPayload): Promise<TransferValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -249,8 +283,9 @@ export const TransferService = {
     // Check if items exist and belong to source
     for (const item of payload.items) {
       const table = ENTITY_TABLE_MAP[item.entity_type];
-      const { data, error } = await (supabase as any)
-        .from(table)
+      
+      // Use db.from to check existence and ownership respecting scope
+      const { data, error } = await (db.from(table as any) as any)
         .select('id, tenant_id, franchise_id')
         .eq('id', item.entity_id)
         .single();
@@ -293,30 +328,32 @@ export const TransferService = {
   },
 
   // Get available tenants for transfer
-  async getAvailableTenants() {
-    const { data, error } = await (supabase as any)
-      .from('tenants')
+  async getAvailableTenants(db: ScopedDataAccess) {
+    // Use db.from to get tenants respecting scope
+    // Platform Admins see all, Tenant Admins see theirs
+    const { data, error } = await db.from('tenants')
       .select('id, name')
       .order('name');
 
     if (error) throw error;
-    return data || [];
+    return (data as any[]) || [];
   },
 
   // Get franchises for a tenant
-  async getFranchisesForTenant(tenantId: string) {
-    const { data, error } = await (supabase as any)
-      .from('franchises')
+  async getFranchisesForTenant(db: ScopedDataAccess, tenantId: string) {
+    // Use db.from to get franchises respecting scope
+    const { data, error } = await db.from('franchises')
       .select('id, name')
       .eq('tenant_id', tenantId)
       .order('name');
 
     if (error) throw error;
-    return data || [];
+    return (data as any[]) || [];
   },
 
   // Bulk create transfer with multiple entity types
   async createBulkTransfer(
+    db: ScopedDataAccess,
     payload: Omit<CreateTransferPayload, 'items'>,
     entities: { type: TransferEntityType; ids: string[] }[]
   ) {
@@ -324,24 +361,29 @@ export const TransferService = {
       e.ids.map(id => ({ entity_type: e.type, entity_id: id }))
     );
 
-    return this.createTransfer({ ...payload, items });
+    return this.createTransfer(db, { ...payload, items });
   },
 
   // Get transfer statistics
-  async getTransferStats(tenantId?: string) {
-    let query = (supabase as any)
+  async getTransferStats(db: ScopedDataAccess, tenantId?: string) {
+    // Use db.client for entity_transfers stats
+    let query = (db.client as any)
       .from('entity_transfers')
       .select('status', { count: 'exact' });
 
-    if (tenantId) {
-      query = query.or(`source_tenant_id.eq.${tenantId},target_tenant_id.eq.${tenantId}`);
+    const { isPlatformAdmin, tenantId: contextTenantId, adminOverrideEnabled } = db.accessContext;
+    const isEffectiveTenantAdmin = !isPlatformAdmin || adminOverrideEnabled;
+    const effectiveTenantId = isEffectiveTenantAdmin && contextTenantId ? contextTenantId : tenantId;
+
+    if (effectiveTenantId) {
+      query = query.or(`source_tenant_id.eq.${effectiveTenantId},target_tenant_id.eq.${effectiveTenantId}`);
     }
 
     const { data, error, count } = await query;
     if (error) throw error;
 
     // Get counts by status
-    const stats = {
+    const stats: any = {
       total: count || 0,
       pending: 0,
       approved: 0,
@@ -352,13 +394,13 @@ export const TransferService = {
 
     // Fetch individual counts
     for (const status of ['pending', 'approved', 'completed', 'rejected', 'failed'] as TransferStatus[]) {
-      let statusQuery = (supabase as any)
+      let statusQuery = (db.client as any)
         .from('entity_transfers')
         .select('*', { count: 'exact', head: true })
         .eq('status', status);
 
-      if (tenantId) {
-        statusQuery = statusQuery.or(`source_tenant_id.eq.${tenantId},target_tenant_id.eq.${tenantId}`);
+      if (effectiveTenantId) {
+        statusQuery = statusQuery.or(`source_tenant_id.eq.${effectiveTenantId},target_tenant_id.eq.${effectiveTenantId}`);
       }
 
       const { count: statusCount } = await statusQuery;
@@ -368,3 +410,4 @@ export const TransferService = {
     return stats;
   },
 };
+

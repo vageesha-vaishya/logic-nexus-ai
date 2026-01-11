@@ -27,7 +27,7 @@ type MappingRow = {
 const FALLBACK_SERVICE_TYPES = ['ocean', 'air', 'trucking', 'courier', 'moving', 'railway_transport'] as const;
 
 export default function ServiceTypeMappings() {
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   type ServiceRow = {
     id: string;
@@ -129,15 +129,15 @@ export default function ServiceTypeMappings() {
 
   const fetchServices = async () => {
     try {
-      let query = supabase
+      let query = scopedDb
         .from('services')
         .select('id, service_name, service_type, tenant_id, is_active');
-      if (!isPlatform) {
-        query = query.eq('tenant_id', tenantId as string);
-      } else if (selectedTenantId) {
-        // Scope to selected tenant for admins to reduce payload and ensure correct filtering
+      
+      // For platform admins, we manually apply the selected tenant filter if present
+      if (isPlatform && selectedTenantId) {
         query = query.eq('tenant_id', selectedTenantId);
       }
+      
       const { data, error } = await query.order('service_name');
       if (error) throw error;
       setServices((data || []) as ServiceRow[]);
@@ -158,10 +158,24 @@ export default function ServiceTypeMappings() {
 
   const fetchMappings = async () => {
     try {
-      let query = supabase
+      let query = scopedDb
         .from('service_type_mappings')
         .select('*');
-      if (!isPlatform) query = query.eq('tenant_id', tenantId as string);
+        
+      if (isPlatform && selectedTenantId) {
+         // If platform admin selects a tenant, filter by it. 
+         // Note: The original code for fetchMappings only filtered by tenantId if !isPlatform. 
+         // But for platform admins, if they selected a tenant, we probably should filter too?
+         // The original code: if (!isPlatform) query = query.eq('tenant_id', tenantId as string);
+         // It didn't seem to use selectedTenantId for mappings? 
+         // Wait, let's look at the original code in fetchMappings:
+         // if (!isPlatform) query = query.eq('tenant_id', tenantId as string);
+         // It seems it fetches ALL mappings for platform admin? 
+         // But listTenantFilter is used in useMemo to filter visible mappings.
+         // Okay, for now I will replicate original behavior but use scopedDb.
+         // scopedDb handles the !isPlatform case automatically.
+      }
+      
       const { data, error } = await query.order('service_type').order('priority', { ascending: false });
       if (error) throw error;
       const rows = Array.isArray(data) ? (data as MappingRow[]) : [];
@@ -175,8 +189,8 @@ export default function ServiceTypeMappings() {
 
   const fetchTypes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('service_types')
+      const { data, error } = await scopedDb
+        .from('service_types', true)
         .select('name, is_active')
         .eq('is_active', true)
         .order('name');
@@ -190,8 +204,8 @@ export default function ServiceTypeMappings() {
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tenants')
+      const { data, error } = await scopedDb
+        .from('tenants', true)
         .select('id, name')
         .order('name');
       if (error) throw error;
@@ -342,7 +356,7 @@ export default function ServiceTypeMappings() {
         conditions: conditionsObj,
         is_active: newIsActive,
       } as const;
-      const { error } = await supabase.from('service_type_mappings').insert(payload);
+      const { error } = await scopedDb.from('service_type_mappings').insert(payload);
       if (error) throw error;
       toast.success('Mapping created');
       setOpen(false);
@@ -357,7 +371,7 @@ export default function ServiceTypeMappings() {
 
   const handleToggleDefault = async (row: MappingRow, next: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_type_mappings')
         .update({ is_default: next })
         .eq('id', row.id);
@@ -435,7 +449,7 @@ export default function ServiceTypeMappings() {
         conditions: conditionsObj,
         is_active: editIsActive,
       } as const;
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_type_mappings')
         .update(payload)
         .eq('id', editingRow.id);

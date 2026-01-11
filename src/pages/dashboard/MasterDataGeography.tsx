@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import * as XLSX from 'xlsx';
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Plus, Upload, Download, FileText, AlertCircle } from 'lucide-react';
 
 export default function MasterDataGeography() {
+  const { scopedDb } = useCRM();
   const { toast } = useToast();
   const [tab, setTab] = useState('continents');
   const [continents, setContinents] = useState<any[]>([]);
@@ -62,10 +63,10 @@ export default function MasterDataGeography() {
     setLoading(true);
     try {
       const [contRes, countryRes, stateRes, cityRes] = await Promise.all([
-        (supabase as any).from('continents').select('*').order('name'),
-        (supabase as any).from('countries').select('*').order('name'),
-        (supabase as any).from('states').select('*').order('name'),
-        (supabase as any).from('cities').select('*').order('name'),
+        scopedDb.from('continents', true).select('*').order('name'),
+        scopedDb.from('countries', true).select('*').order('name'),
+        scopedDb.from('states', true).select('*').order('name'),
+        scopedDb.from('cities', true).select('*').order('name'),
       ]);
       setContinents(contRes.data || []);
       setCountries(countryRes.data || []);
@@ -84,7 +85,7 @@ export default function MasterDataGeography() {
 
   const addRow = async (table: string, values: any) => {
     try {
-      const { error } = await (supabase as any).from(table).insert(values);
+      const { error } = await scopedDb.from(table, true).insert(values);
       if (error) throw error;
       toast({ title: 'Created', description: 'Row created successfully' });
       loadData();
@@ -95,7 +96,7 @@ export default function MasterDataGeography() {
 
   const updateRow = async (table: string, id: string, values: any) => {
     try {
-      const { error } = await (supabase as any).from(table).update(values).eq('id', id);
+      const { error } = await scopedDb.from(table, true).update(values).eq('id', id);
       if (error) throw error;
       toast({ title: 'Updated', description: 'Row updated successfully' });
       loadData();
@@ -106,7 +107,7 @@ export default function MasterDataGeography() {
 
   const deleteRow = async (table: string, id: string) => {
     try {
-      const { error } = await (supabase as any).from(table).delete().eq('id', id);
+      const { error } = await scopedDb.from(table, true).delete().eq('id', id);
       if (error) throw error;
       toast({ title: 'Deleted', description: 'Row deleted successfully' });
       loadData();
@@ -184,7 +185,7 @@ export default function MasterDataGeography() {
                       const rows = await parseFileRows(file);
                       const payload = rows.map(r => ({ name: r[0]?.trim(), code_international: r[1]?.trim() || null, code_national: r[2]?.trim() || null })).filter(p => p.name);
                       if (payload.length === 0) return toast({ title: 'No valid rows found', variant: 'destructive' });
-                      const { error } = await (supabase as any).from('continents').insert(payload);
+                      const { error } = await scopedDb.from('continents', true).insert(payload);
                       if (error) throw error;
                       toast({ title: 'Imported', description: `Imported ${payload.length} continents` });
                       if (contFileRef.current) contFileRef.current.value = '';
@@ -379,7 +380,7 @@ export default function MasterDataGeography() {
                         return { name, code_iso2: iso2.toUpperCase(), code_iso3: iso3 ? iso3.toUpperCase() : null, phone_code: phone || null, continent_id };
                       }).filter(Boolean);
                       if (payload.length === 0) return toast({ title: 'No valid rows found', variant: 'destructive' });
-                      const { error } = await (supabase as any).from('countries').upsert(payload, { onConflict: 'code_iso2' });
+                      const { error } = await scopedDb.from('countries', true).upsert(payload, { onConflict: 'code_iso2' });
                       if (error) throw error;
                       toast({ title: 'Imported', description: `Imported ${payload.length} countries` });
                       setCountryImportErrors(errors);
@@ -600,7 +601,7 @@ export default function MasterDataGeography() {
                         return { name, country_id, code_iso: iso || null };
                       }).filter(Boolean);
                       if (payload.length === 0) return toast({ title: 'No valid rows found', variant: 'destructive' });
-                      const { error } = await (supabase as any).from('states').upsert(payload, { onConflict: 'country_id,code_iso' });
+                      const { error } = await scopedDb.from('states', true).upsert(payload, { onConflict: 'country_id,code_iso' });
                       if (error) throw error;
                       toast({ title: 'Imported', description: `Imported ${payload.length} states` });
                       setStateImportErrors(errors);
@@ -847,7 +848,7 @@ export default function MasterDataGeography() {
                         return { name, country_id, state_id, code_national: nat || null, latitude: isNaN(lat) ? null : lat, longitude: isNaN(lng) ? null : lng };
                       }).filter(Boolean);
                       if (payload.length === 0) return toast({ title: 'No valid rows found', variant: 'destructive' });
-                      const { error } = await (supabase as any).from('cities').upsert(payload, { onConflict: 'country_id,state_id,name' });
+                      const { error } = await scopedDb.from('cities', true).upsert(payload, { onConflict: 'country_id,state_id,name' });
                       if (error) throw error;
                       toast({ title: 'Imported', description: `Imported ${payload.length} cities` });
                       setCityImportErrors(errors);

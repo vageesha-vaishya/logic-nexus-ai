@@ -24,7 +24,6 @@ import {
 import { Upload, FileSpreadsheet, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface ImportFranchiseModalProps {
@@ -44,7 +43,7 @@ export function ImportFranchiseModal({
   onOpenChange,
   onImportComplete,
 }: ImportFranchiseModalProps) {
-  const { context } = useCRM();
+  const { context, scopedDb, supabase } = useCRM();
   const [file, setFile] = useState<File | null>(null);
   const [data, setData] = useState<ImportData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -158,7 +157,7 @@ export function ImportFranchiseModal({
         };
       });
       
-      const { error } = await supabase.from('franchises').insert(franchisesToInsert);
+      const { error } = await scopedDb.from('franchises').insert(franchisesToInsert);
       
       if (error) throw error;
       

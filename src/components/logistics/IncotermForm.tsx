@@ -21,7 +21,7 @@ interface IncotermFormProps {
 }
 
 export function IncotermForm({ onSuccess }: IncotermFormProps) {
-  const { supabase, context } = useCRM();
+  const { scopedDb } = useCRM();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -35,9 +35,8 @@ export function IncotermForm({ onSuccess }: IncotermFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const { error } = await supabase.from("incoterms").insert({
+      const { error } = await scopedDb.from("incoterms").insert({
         ...values,
-        tenant_id: context.tenantId!,
       } as any);
 
       if (error) throw error;

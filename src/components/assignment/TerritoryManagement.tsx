@@ -21,7 +21,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function TerritoryManagement() {
-  const { supabase, context } = useCRM();
+  const { scopedDb, supabase, context } = useCRM();
   const [territories, setTerritories] = useState<any[]>([]);
   const [geographyCounts, setGeographyCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -70,7 +70,7 @@ export function TerritoryManagement() {
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await supabase.from('tenants').select('id, name').order('name');
+      const { data, error } = await scopedDb.from('tenants').select('id, name').order('name');
       if (error) throw error;
       setTenants(data || []);
       
@@ -201,7 +201,7 @@ export function TerritoryManagement() {
     if (!confirm('Are you sure you want to delete this territory?')) return;
 
     try {
-      const { error } = await supabase.from('territories').delete().eq('id', id);
+      const { error } = await scopedDb.from('territories').delete().eq('id', id);
       if (error) throw error;
       toast.success('Territory deleted');
       fetchTerritories();

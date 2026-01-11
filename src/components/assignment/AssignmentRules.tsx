@@ -35,7 +35,7 @@ interface Props {
 }
 
 export function AssignmentRules({ onUpdate }: Props) {
-  const { supabase, context } = useCRM();
+  const { scopedDb, context } = useCRM();
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRule, setSelectedRule] = useState<AssignmentRule | null>(null);
@@ -65,7 +65,7 @@ export function AssignmentRules({ onUpdate }: Props) {
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await supabase.from('tenants').select('id, name').order('name');
+      const { data, error } = await scopedDb.from('tenants').select('id, name').order('name');
       if (error) throw error;
       setTenants(data || []);
       
@@ -83,7 +83,7 @@ export function AssignmentRules({ onUpdate }: Props) {
     if (!effectiveTenantId) return;
 
     try {
-      const query = supabase
+      const query = scopedDb
         .from('lead_assignment_rules')
         .select('*')
         .eq('tenant_id', effectiveTenantId)
@@ -121,7 +121,7 @@ export function AssignmentRules({ onUpdate }: Props) {
     if (!confirm('Are you sure you want to delete this rule?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('lead_assignment_rules')
         .delete()
         .eq('id', ruleId);

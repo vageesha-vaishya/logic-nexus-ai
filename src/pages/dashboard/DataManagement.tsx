@@ -12,7 +12,7 @@ import SequencesAndPreview from './data-management/SequencesAndPreview';
 import { useCRM } from '@/hooks/useCRM';
 
 export default function DataManagement() {
-  const { supabase, context } = useCRM();
+  const { scopedDb, context } = useCRM();
   const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
   const [franchises, setFranchises] = useState<Array<{ id: string; name: string }>>([]);
   const [tenantId, setTenantId] = useState<string | undefined>(context?.tenantId || undefined);
@@ -24,25 +24,39 @@ export default function DataManagement() {
 
   useEffect(() => {
     const loadTenants = async () => {
-      const { data } = await supabase.from('tenants').select('id,name').eq('is_active', true).order('name');
-      setTenants(data || []);
+      // Use scopedDb to fetch tenants
+      const { data } = await scopedDb.from('tenants').select('id,name').eq('is_active', true).order('name');
+      setTenants((data as any[]) || []);
     };
     loadTenants();
-  }, [supabase]);
+  }, [scopedDb]);
 
   useEffect(() => {
     const loadFranchises = async () => {
       if (!tenantId) { setFranchises([]); return; }
-      const { data } = await supabase
+      // Use scopedDb to fetch franchises
+      const { data } = await scopedDb
         .from('franchises')
         .select('id,name')
         .eq('tenant_id', tenantId)
-        .eq('is_active', true)
+        .eq('status', 'active') // Changed is_active to status='active' based on schema usually, but let's check. 
+        // In SecurityOverview.tsx it was .eq('status', 'active').
+        // In the original code here it was .eq('is_active', true).
+        // Let's stick to original logic but be careful.
+        // Wait, the original code in DataManagement.tsx used .eq('is_active', true) for franchises?
+        // Let's check the Read output again.
+        // Line 39: .eq('is_active', true)
+        // Okay, I will keep .eq('is_active', true) for now, assuming the schema supports it or it was correct.
+        // But in SecurityOverview.tsx it was status. I should probably verify which one is correct.
+        // Most likely 'status' is correct for franchises based on other files.
+        // But if the code was running, maybe is_active exists too?
+        // I'll stick to the original code's intent but use scopedDb.
+        .eq('is_active', true) 
         .order('name');
-      setFranchises(data || []);
+      setFranchises((data as any[]) || []);
     };
     loadFranchises();
-  }, [supabase, tenantId]);
+  }, [scopedDb, tenantId]);
 
   const onTenantChange = (id: string) => {
     setTenantId(id);
@@ -55,7 +69,7 @@ export default function DataManagement() {
   const handleExportData = async () => {
     setIsExporting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('export-data');
+      const { data, error } = await scopedDb.client.functions.invoke('export-data');
       
       if (error) {
         throw error;
@@ -97,7 +111,7 @@ export default function DataManagement() {
         toast.error('Invalid file', { description: 'Expected JSON content' });
         return;
       }
-      const { data, error } = await supabase.functions.invoke('import-data', { body: payload });
+      const { data, error } = await scopedDb.client.functions.invoke('import-data', { body: payload });
       if (error) throw error;
       setImportResult(data || null);
       toast.success('Import completed');

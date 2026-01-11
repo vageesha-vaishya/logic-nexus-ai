@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TransferService, TransferType } from '@/lib/transfer-service';
+import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Building2, Users } from 'lucide-react';
@@ -23,6 +25,8 @@ export function DestinationSelector({
   onTargetTenantChange,
   onTargetFranchiseChange,
 }: DestinationSelectorProps) {
+  const { supabase, context } = useCRM();
+  const dao = new ScopedDataAccess(supabase, context);
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
   const [franchises, setFranchises] = useState<{ id: string; name: string }[]>([]);
   const [loadingTenants, setLoadingTenants] = useState(false);
@@ -58,7 +62,7 @@ export function DestinationSelector({
 
       setLoadingFranchises(true);
       try {
-        const data = await TransferService.getFranchisesForTenant(effectiveTenantId);
+        const data = await TransferService.getFranchisesForTenant(dao, effectiveTenantId);
         // Filter out source franchise for franchise-to-franchise transfers
         if (transferType === 'franchise_to_franchise' && sourceFranchiseId) {
           setFranchises(data.filter((f: any) => f.id !== sourceFranchiseId));

@@ -39,7 +39,8 @@ export default function OpportunityNew() {
         return;
       }
 
-      const { error } = await supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao
         .from('opportunities')
         .insert(opportunityData);
 

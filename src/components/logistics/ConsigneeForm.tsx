@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 // Safely convert Supabase JSON/text to an object record
 const toRecord = (value: any): Record<string, any> => {
@@ -68,7 +69,8 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
       if (!consigneeId) return;
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
+        const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+        const { data, error } = await dao
           .from('consignees')
           .select('*')
           .eq('id', consigneeId)
@@ -102,15 +104,17 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
   }, [consigneeId]);
 
   const onSubmit = async (values: z.infer<typeof consigneeSchema>) => {
+    // Basic validation for tenant context, though ScopedDataAccess handles the enforcement
     const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-
-    if (!tenantId) {
+    if (!tenantId && !context.isPlatformAdmin) {
       toast.error('No tenant selected');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      
       const consigneeData: any = {
         company_name: values.company_name,
         contact_person: values.contact_person || null,
@@ -126,18 +130,20 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
           country: values.country || '',
           postal_code: values.postal_code || '',
         },
-        tenant_id: tenantId,
+        // For platform admins creating records, we might need to explicitly set tenant_id if not in context
+        // But for now, we assume context.tenantId is set or handled by ScopedDataAccess
+        ...(tenantId ? { tenant_id: tenantId } : {}),
       };
 
       if (consigneeId) {
-        const { error } = await supabase
+        const { error } = await dao
           .from('consignees')
           .update(consigneeData)
           .eq('id', consigneeId);
         if (error) throw error;
         toast.success('Consignee updated successfully');
       } else {
-        const { error } = await supabase.from('consignees').insert([consigneeData]);
+        const { error } = await dao.from('consignees').insert([consigneeData]);
         if (error) throw error;
         toast.success('Consignee created successfully');
         form.reset();
@@ -330,9 +336,14 @@ export function ConsigneeForm({ consigneeId, onSuccess }: { consigneeId?: string
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting || isLoading}>
-          {isSubmitting ? (consigneeId ? 'Updating...' : 'Creating...') : (consigneeId ? 'Update Consignee' : 'Create Consignee')}
-        </Button>
+        <div className="flex justify-end gap-3 pt-4">
+          <Button type="button" variant="outline" onClick={() => onSuccess?.()}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : (consigneeId ? 'Update Consignee' : 'Create Consignee')}
+          </Button>
+        </div>
       </form>
     </Form>
   );

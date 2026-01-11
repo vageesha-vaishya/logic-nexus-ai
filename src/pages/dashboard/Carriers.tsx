@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ScopedDataAccess, type DataAccessContext } from '@/lib/db/access';
 
 export default function Carriers() {
   const navigate = useNavigate();
@@ -210,20 +211,12 @@ export default function Carriers() {
       return;
     }
 
-    // Platform admins see all carriers if no tenant is selected
-
     try {
-      let query = supabase
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data, error } = await dao
         .from('carriers')
-        .select('*');
-      if (!isPlatform) {
-        // Tenant users: always scope by tenant
-        query = query.eq('tenant_id', tenantId as string);
-      } else if (tenantId) {
-        // Platform admin with tenant selected: scope by selected tenant
-        query = query.eq('tenant_id', tenantId as string);
-      } // else platform admin without tenant filter: show all
-      const { data, error } = await query.order('carrier_name');
+        .select('*')
+        .order('carrier_name');
 
       if (error) throw error;
       const rows = data || [];
@@ -252,7 +245,8 @@ export default function Carriers() {
   const handleDeleteCarrier = async (id: string) => {
     if (!confirm('Delete this carrier? This action cannot be undone.')) return;
     try {
-      const { error } = await supabase.from('carriers').delete().eq('id', id);
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { error } = await dao.from('carriers').delete().eq('id', id);
       if (error) throw error;
       toast.success('Carrier deleted');
       fetchCarriers();

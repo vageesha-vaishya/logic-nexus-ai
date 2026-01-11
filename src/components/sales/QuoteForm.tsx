@@ -78,7 +78,7 @@ type CarrierQuote = {
 };
 
 export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: (quoteId: string) => void }) {
-  const { context, supabase, user } = useCRM();
+  const { context, scopedDb, supabase, user } = useCRM();
   const { roles } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -215,7 +215,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     try {
       const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
 
-      let query = supabase
+      let query = scopedDb
         .from('service_type_mappings')
         .select('service_type_id, service_id, is_default, priority')
         .eq('is_active', true)
@@ -234,7 +234,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       const servicesById: Record<string, any> = {};
       if (serviceIds.length > 0) {
-        const { data: svcData, error: svcErr } = await supabase
+        const { data: svcData, error: svcErr } = await scopedDb
           .from('services')
           .select('id, service_name, is_active')
           .in('id', serviceIds)
@@ -253,7 +253,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Resolve service_type_id to canonical service_types (UUID id + name + code)
       let serviceTypesForDropdown: { id: string; code: string; name: string }[] = [];
       if (uniqueTypeIds.length > 0) {
-        const { data: typeRows, error: typesErr } = await (supabase as any)
+        const { data: typeRows, error: typesErr } = await scopedDb
           .from('service_types')
           .select('id, name, code')
           .in('id', uniqueTypeIds);
@@ -291,7 +291,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       if (!tenantId && (mappingsError || mappingRows.length === 0 || noResolvedTypes || noServices)) {
         try {
           // Fetch active service types globally
-          const { data: fallbackTypes } = await (supabase as any)
+          const { data: fallbackTypes } = await scopedDb
             .from('service_types')
             .select('id, name, code')
             .eq('is_active', true)
@@ -305,7 +305,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
 
           // Fetch services scoped to tenant when available; otherwise global active
-          const svcQuery = supabase
+          const svcQuery = scopedDb
             .from('services')
             .select('id, service_name, service_type, tenant_id, is_active')
             .eq('is_active', true)
@@ -354,10 +354,9 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (!tenantId) return;
 
         // Get user's most recent quote to pre-populate fields
-        const { data: lastQuote, error } = await supabase
+        const { data: lastQuote, error } = await scopedDb
           .from('quotes')
           .select('opportunity_id, account_id, contact_id')
-          .eq('tenant_id', tenantId)
           .eq('created_by', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -394,7 +393,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     (async () => {
       setIsHydrating(true);
       try {
-        const { data: quote, error: quoteErr } = await supabase
+        const { data: quote, error: quoteErr } = await scopedDb
           .from('quotes')
           .select(`
             *,
@@ -432,7 +431,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         const selCarrierId = (quote as any).carrier_id;
         if (selCarrierId) {
           try {
-            const { data: carrierData } = await supabase
+            const { data: carrierData } = await scopedDb
               .from('carriers')
               .select('id, carrier_name')
               .eq('id', selCarrierId)
@@ -498,7 +497,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Fetch account if not already prepared from opportunity
         if (selAccId && !accountToAdd) {
           try {
-            const { data: accData } = await supabase
+            const { data: accData } = await scopedDb
               .from('accounts')
               .select('id, name')
               .eq('id', selAccId)
@@ -603,7 +602,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }
 
         // Load items; tolerate RLS issues by falling back to empty
-        const { data: itemsRes, error: itemsErr } = await supabase
+        const { data: itemsRes, error: itemsErr } = await scopedDb
           .from('quote_items')
           .select('line_number, product_name, description, quantity, unit_price, discount_percent, package_category_id, package_size_id')
           .eq('quote_id', quoteId)
@@ -625,7 +624,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         // Load carrier rates and charges using robust helper with fallbacks
         try {
-          const rows = await listCarrierRatesForQuote(quoteId, supabase as any);
+          const rows = await listCarrierRatesForQuote(quoteId, scopedDb);
           if (Array.isArray(rows)) {
             const mapped = rows.map((r: any) => ({
               carrier_rate_id: String(r.id),
@@ -667,7 +666,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         try {
           const selServiceId = (quote as any).service_id;
           if (selServiceId && !services.some((s: any) => String(s.id) === String(selServiceId))) {
-            const { data } = await supabase
+            const { data } = await scopedDb
               .from('services')
               .select('id, service_name, service_type')
               .eq('id', selServiceId)
@@ -808,7 +807,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           const selServiceTypeId = (quote as any).service_type_id;
           if (selServiceTypeId && !serviceTypes.some((st: any) => String(st.id) === String(selServiceTypeId))) {
             try {
-              const { data: stData } = await (supabase as any)
+              const { data: stData } = await scopedDb
                 .from('service_types')
                 .select('id, name, code')
                 .eq('id', selServiceTypeId)
@@ -1045,13 +1044,13 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       if (tenantId) {
         const [consigneesRes, portsRes, accountsRes, contactsRes, opportunitiesRes, pkgCatsRes, pkgSizesRes] = await Promise.all([
-          supabase.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-          supabase.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-          supabase.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
-          supabase.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
-          supabase.from('opportunities').select('id, name, account_id, contact_id, tenant_id').eq('tenant_id', tenantId),
-          supabase.from('package_categories').select('*').eq('tenant_id', tenantId).eq('is_active', true),
-          supabase.from('package_sizes').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          scopedDb.from('consignees').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          scopedDb.from('ports_locations').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          scopedDb.from('accounts').select('id, name, tenant_id').eq('tenant_id', tenantId),
+          scopedDb.from('contacts').select('id, first_name, last_name, account_id').eq('tenant_id', tenantId),
+          scopedDb.from('opportunities').select('id, name, account_id, contact_id, tenant_id').eq('tenant_id', tenantId),
+          scopedDb.from('package_categories').select('*').eq('tenant_id', tenantId).eq('is_active', true),
+          scopedDb.from('package_sizes').select('*').eq('tenant_id', tenantId).eq('is_active', true),
         ]);
 
         if (consigneesRes.error) throw consigneesRes.error;
@@ -1073,7 +1072,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Fallback: if tenant-scoped lists are empty, attempt global fetch (subject to RLS)
         try {
           if (!pkgCatsRes.data || pkgCatsRes.data.length === 0) {
-            const { data: globalCats } = await supabase
+            const { data: globalCats } = await scopedDb
               .from('package_categories')
               .select('*')
               .eq('is_active', true);
@@ -1084,7 +1083,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }
         try {
           if (!pkgSizesRes.data || pkgSizesRes.data.length === 0) {
-            const { data: globalSizes } = await supabase
+            const { data: globalSizes } = await scopedDb
               .from('package_sizes')
               .select('*')
               .eq('is_active', true);
@@ -1108,8 +1107,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Attempt to fetch categories and sizes globally if permitted
         try {
           const [{ data: cats = [] }, { data: sizes = [] }] = await Promise.all([
-            supabase.from('package_categories').select('*').eq('is_active', true),
-            supabase.from('package_sizes').select('*').eq('is_active', true),
+            scopedDb.from('package_categories').select('*').eq('is_active', true),
+            scopedDb.from('package_sizes').select('*').eq('is_active', true),
           ]);
           setPackageCategories(cats || []);
           setPackageSizes(sizes || []);
@@ -1138,7 +1137,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       try {
         const curAccountId = form.getValues('account_id');
         if (curAccountId && !accountsList.some((a: any) => String(a.id) === String(curAccountId))) {
-          const { data } = await supabase
+          const { data } = await scopedDb
             .from('accounts')
             .select('id, name, tenant_id')
             .eq('id', curAccountId)
@@ -1155,7 +1154,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 const resolved = { id: (labelData as any).id ?? curAccountId, name: (labelData as any).name } as any;
                 setAccounts((prev) => [resolved, ...prev]);
                 try {
-                  await supabase.from('audit_logs').insert([{ 
+                  await scopedDb.from('audit_logs').insert([{ 
                     user_id: user?.id || null,
                     action: 'label_fallback_used',
                     resource_type: 'account',
@@ -1174,7 +1173,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         const curContactId = form.getValues('contact_id');
         if (curContactId && !contactsList.some((c: any) => String(c.id) === String(curContactId))) {
-          const { data } = await supabase
+          const { data } = await scopedDb
             .from('contacts')
             .select('id, first_name, last_name, account_id')
             .eq('id', curContactId)
@@ -1211,7 +1210,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                   [String(curContactId)]: [first, last].filter(Boolean).join(' ').trim() || 'Selected Contact',
                 }));
                 try {
-                  await supabase.from('audit_logs').insert([{ 
+                  await scopedDb.from('audit_logs').insert([{ 
                     user_id: user?.id || null,
                     action: 'label_fallback_used',
                     resource_type: 'contact',
@@ -1230,7 +1229,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         const curOppId = form.getValues('opportunity_id');
         if (curOppId && !opportunitiesList.some((o: any) => String(o.id) === String(curOppId))) {
-          const { data } = await supabase
+          const { data } = await scopedDb
             .from('opportunities')
             .select('id, name, account_id, contact_id, tenant_id')
             .eq('id', curOppId)
@@ -1250,7 +1249,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 const resolved = { id: (labelData as any).id ?? curOppId, name: (labelData as any).name } as any;
                 setOpportunities((prev) => [resolved, ...prev]);
                 try {
-                  await supabase.from('audit_logs').insert([{ 
+                  await scopedDb.from('audit_logs').insert([{ 
                     user_id: user?.id || null,
                     action: 'label_fallback_used',
                     resource_type: 'opportunity',
@@ -1317,7 +1316,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             return raw.split('_')[0];
         }
       })();
-      const carriersRes: any = await (supabase as any)
+      const carriersRes: any = await (scopedDb as any)
         .from('carrier_service_types')
         .select('carrier_id, service_type, is_active, carriers:carrier_id(id, carrier_name, tenant_id, is_active)')
         .or(tenantId ? `tenant_id.eq.${tenantId},tenant_id.is.null` : 'tenant_id.is.null')
@@ -1340,7 +1339,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Ensure saved carrier (in edit mode) appears in the list even if not mapped
       const selectedCarrierId = form.getValues('carrier_id');
       if (selectedCarrierId && !mapped.some((c: any) => String(c.id) === String(selectedCarrierId))) {
-        const { data: selCarrier } = await supabase
+        const { data: selCarrier } = await scopedDb
           .from('carriers')
           .select('id, carrier_name, is_active')
           .eq('id', selectedCarrierId)
@@ -1363,7 +1362,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (carriers.some((c: any) => String(c.id) === String(id))) return;
     (async () => {
       try {
-        const { data: selCarrier } = await supabase
+        const { data: selCarrier } = await scopedDb
           .from('carriers')
           .select('id, carrier_name, is_active')
           .eq('id', id)
@@ -1394,7 +1393,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     if (quoteId) return;
     const preview = async () => {
       try {
-        const { data, error } = await (supabase as any).rpc('preview_next_quote_number', {
+        const { data, error } = await (scopedDb as any).rpc('preview_next_quote_number', {
           p_tenant_id: tenantId,
           p_franchise_id: franchiseId,
         });
@@ -1406,7 +1405,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
     };
     preview();
-  }, [context.tenantId, context.franchiseId, roles, quoteId, supabase]);
+  }, [context.tenantId, context.franchiseId, roles, quoteId, scopedDb]);
 
   // When account changes, clear contact if it no longer belongs to the selected account
   useEffect(() => {
@@ -1434,13 +1433,14 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     (async () => {
       try {
         if (!resolvedTenantId) { setResolvedTenantName(null); return; }
-        const { data, error } = await supabase.from('tenants').select('name').eq('id', resolvedTenantId).maybeSingle();
+        const { data, error } = await scopedDb.from('tenants').select('name').eq('id', resolvedTenantId).maybeSingle();
         if (!error) setResolvedTenantName((data as any)?.name ?? null);
       } catch {
         // ignore
       }
     })();
-  }, [resolvedTenantId, supabase]);
+  }, [resolvedTenantId, scopedDb]);
+
 
 
   const addItem = () => {
@@ -1478,7 +1478,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         if (missingCatIds.length > 0) {
           try {
-            const { data: cats } = await supabase
+            const { data: cats } = await scopedDb
               .from('package_categories')
               .select('id, category_name, is_active')
               .in('id', missingCatIds);
@@ -1498,7 +1498,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
         if (missingSizeIds.length > 0) {
           try {
-            const { data: sizes } = await supabase
+            const { data: sizes } = await scopedDb
               .from('package_sizes')
               .select('id, size_name, size_code, is_active')
               .in('id', missingSizeIds);
@@ -1521,7 +1521,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       }
     };
     resolveMissingLabels();
-  }, [items, packageCategories, packageSizes, supabase]);
+  }, [items, packageCategories, packageSizes, scopedDb]);
 
   // ===== Import/Export helpers =====
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1917,7 +1917,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       // Only generate a quote number for new quotes
       let quoteNumber: string | null = null;
       if (!quoteId) {
-        const { data: genNumber, error: genError } = await (supabase as any).rpc('generate_quote_number', {
+        const { data: genNumber, error: genError } = await scopedDb.rpc('generate_quote_number', {
           p_tenant_id: tenantId,
           p_franchise_id: franchiseId,
         });
@@ -1957,7 +1957,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       let quote: any = null;
       if (quoteId) {
-        const { data: updated, error: updateErr } = await supabase
+        const { data: updated, error: updateErr } = await scopedDb
           .from('quotes')
           .update(quoteData)
           .eq('id', quoteId)
@@ -1966,7 +1966,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         if (updateErr) throw updateErr;
         quote = updated || { id: quoteId };
       } else {
-        const { data: created, error: quoteError } = await supabase
+        const { data: created, error: quoteError } = await scopedDb
           .from('quotes')
           .insert([quoteData])
           .select()
@@ -1989,7 +1989,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             if (nextStage === 'closed_won') {
               updatePayload.closed_at = new Date().toISOString();
             }
-            await supabase.from('opportunities').update(updatePayload).eq('id', oppId);
+            await scopedDb.from('opportunities').update(updatePayload).eq('id', oppId);
           }
         }
       } catch (e) {
@@ -2012,19 +2012,19 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
       // Replace existing items on edit; insert on create
       if (quoteId) {
-        const { error: delErr } = await supabase
+        const { error: delErr } = await scopedDb
           .from('quote_items')
           .delete()
           .eq('quote_id', quoteId);
         if (delErr) throw delErr;
       }
-      const { error: itemsError } = await supabase.from('quote_items').insert(itemsData);
+      const { error: itemsError } = await scopedDb.from('quote_items').insert(itemsData);
 
       if (itemsError) throw itemsError;
 
       // Immediately reload items to ensure all fields (including container size) are persisted
       try {
-        const { data: savedItems } = await supabase
+        const { data: savedItems } = await scopedDb
           .from('quote_items')
           .select('line_number, product_name, description, quantity, unit_price, discount_percent, package_category_id, package_size_id')
           .eq('quote_id', quote.id)
@@ -2064,7 +2064,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               selling_charges: cq.selling_charges || [],
             })),
             existingRateIds,
-            supabase as any,
+            scopedDb as any,
           );
           if (rateIds.length > 0) {
             await createQuotationVersionWithOptions(
@@ -2077,7 +2077,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 created_by: user?.id || null,
                 change_reason: 'Initial options from captured carrier rates',
               },
-              supabase as any,
+              scopedDb as any,
             );
           }
         }

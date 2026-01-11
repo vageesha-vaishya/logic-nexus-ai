@@ -27,7 +27,7 @@ type ServiceRow = {
 };
 
 export default function Services() {
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [types, setTypes] = useState<{ name: string; is_active: boolean }[]>([]);
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
@@ -73,8 +73,8 @@ export default function Services() {
 
   const fetchTypes = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('service_types')
+      const { data, error } = await scopedDb
+        .from('service_types', true)
         .select('name, is_active')
         .eq('is_active', true)
         .order('name');
@@ -88,8 +88,8 @@ export default function Services() {
 
   const fetchTenants = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('tenants')
+      const { data, error } = await scopedDb
+        .from('tenants', true)
         .select('id, name')
         .eq('is_active', true)
         .order('name');
@@ -105,15 +105,18 @@ export default function Services() {
   const fetchServices = useCallback(async () => {
     try {
       // Platform admins can view all services across tenants; others are tenant-scoped
-      let query = supabase
+      // scopedDb handles tenant scoping automatically for non-platform users
+      let query = scopedDb
         .from('services')
         .select('id, tenant_id, service_name, service_type, service_code, description, pricing_unit, base_price, transit_time_days, is_active')
         .order('service_name');
 
-      if (!isPlatform) {
-        if (!tenantId) return; // non-admin without tenant context: nothing to show
-        query = query.eq('tenant_id', tenantId);
+      if (!isPlatform && !tenantId) {
+         return; // non-admin without tenant context: nothing to show
       }
+      // Note: original code manually filtered by tenantId if !isPlatform. 
+      // scopedDb does this automatically, so we don't need to add .eq('tenant_id', tenantId) explicitly 
+      // unless we want to be doubly sure, but scopedDb is designed for this.
 
       const { data, error } = await query;
       if (error) throw error;
@@ -197,7 +200,7 @@ export default function Services() {
         transit_time_days: transitDays === '' ? null : Number(transitDays),
         is_active: isActive,
       };
-      const { error } = await supabase.from('services').insert(payload);
+      const { error } = await scopedDb.from('services').insert(payload);
       if (error) throw error;
       toast.success('Service created');
       setOpen(false);
@@ -215,7 +218,7 @@ export default function Services() {
         toast.error('Only admins can update services');
         return;
       }
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('services')
         .update({ is_active: next })
         .eq('id', row.id);
@@ -233,7 +236,7 @@ export default function Services() {
         toast.error('Only admins can delete services');
         return;
       }
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('services')
         .delete()
         .eq('id', row.id);
@@ -294,7 +297,7 @@ export default function Services() {
         }
         payload.tenant_id = editTenantId;
       }
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('services')
         .update(payload)
         .eq('id', editingRow.id);

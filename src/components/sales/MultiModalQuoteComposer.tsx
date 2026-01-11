@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationWorkflowStepper } from './composer/QuotationWorkflowStepper';
 import { QuoteDetailsStep } from './composer/QuoteDetailsStep';
@@ -41,6 +41,7 @@ const STEPS = [
 ];
 
 export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId }: MultiModalQuoteComposerProps) {
+  const { scopedDb } = useCRM();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -142,14 +143,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     try {
       // Step 1: Resolve tenant ID
       console.log('[Composer] Step 1: Resolving tenant ID');
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await scopedDb.client.auth.getUser();
       const userTenantId = user?.user_metadata?.tenant_id;
       let resolvedTenantId: string | null = userTenantId ?? null;
 
       // Fallback 1: fetch from quote context
       if (!resolvedTenantId && quoteId) {
         try {
-          const { data: quoteRow, error: quoteError } = await supabase
+          const { data: quoteRow, error: quoteError } = await scopedDb
             .from('quotes')
             .select('tenant_id, franchise_id')
             .eq('id', quoteId)
@@ -173,7 +174,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       // Fallback 2: fetch from quotation version
       if (!resolvedTenantId && versionId) {
         try {
-          const { data: versionRow, error: versionError } = await supabase
+          const { data: versionRow, error: versionError } = await scopedDb
             .from('quotation_versions')
             .select('tenant_id')
             .eq('id', versionId)
@@ -193,7 +194,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       // Fallback 3: fetch from existing option if provided
       if (!resolvedTenantId && initialOptionId) {
         try {
-          const { data: optionRow, error: optionError } = await supabase
+          const { data: optionRow, error: optionError } = await scopedDb
             .from('quotation_version_options')
             .select('tenant_id')
             .eq('id', initialOptionId)
@@ -234,7 +235,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string) => {
           try {
-            const { data, error } = await (supabase
+            const { data, error } = await (scopedDb
               .from(table as any)
               .select('*')
               .eq('is_active', true) as any);
@@ -318,7 +319,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
 
       // Query for existing options
-      const { data: existingOptions, error: queryError } = await supabase
+      const { data: existingOptions, error: queryError } = await scopedDb
         .from('quotation_version_options')
         .select('id, created_at')
         .eq('quotation_version_id', versionId)
@@ -347,7 +348,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Create new option only if none exists
       console.log('[Composer] Creating new option for version');
-      const { data: newOption, error: insertError } = await supabase
+      const { data: newOption, error: insertError } = await scopedDb
         .from('quotation_version_options')
         .insert({
           quotation_version_id: versionId,
@@ -360,7 +361,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         console.error('[Composer] Error creating option:', insertError);
         
         // Check if option was created by another process
-        const { data: retry } = await supabase
+        const { data: retry } = await scopedDb
           .from('quotation_version_options')
           .select('id')
           .eq('quotation_version_id', versionId)
@@ -398,10 +399,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const ensureTenantForSave = async (): Promise<string | null> => {
     if (tenantId) return tenantId;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await scopedDb.client.auth.getUser();
       let resolved: string | null = user?.user_metadata?.tenant_id ?? null;
       if (!resolved && quoteId) {
-        const { data: q } = await supabase
+        const { data: q } = await scopedDb
           .from('quotes')
           .select('tenant_id')
           .eq('id', quoteId)
@@ -409,7 +410,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         resolved = (q as any)?.tenant_id ?? null;
       }
       if (!resolved && versionId) {
-        const { data: v } = await supabase
+        const { data: v } = await scopedDb
           .from('quotation_versions')
           .select('tenant_id')
           .eq('id', versionId)
@@ -417,7 +418,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         resolved = (v as any)?.tenant_id ?? null;
       }
       if (!resolved && optionId) {
-        const { data: o } = await supabase
+        const { data: o } = await scopedDb
           .from('quotation_version_options')
           .select('tenant_id')
           .eq('id', optionId)
@@ -437,7 +438,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     setLoading(true);
     try {
       // Load legs from quotation_version_option_legs to align with FK on quote_charges.leg_id
-      const { data: legData, error: legError } = await supabase
+      const { data: legData, error: legError } = await scopedDb
         .from('quotation_version_option_legs')
         .select(`
           *,
@@ -499,7 +500,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         setLegs(legsWithCharges);
       }
       // Load combined charges (leg_id IS NULL) and pair buy/sell
-      const { data: combinedData, error: combinedErr } = await supabase
+      const { data: combinedData, error: combinedErr } = await scopedDb
         .from('quote_charges' as any)
         .select(`*, charge_sides(code)`)
         .eq('quote_option_id', optionId)
@@ -969,7 +970,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (!currentOptionId) {
         // This should rarely happen now that we call ensureOptionExists in loadInitialData
         console.log('[Composer] No optionId - checking for existing options');
-        const { data: existingOptions } = await supabase
+        const { data: existingOptions } = await scopedDb
           .from('quotation_version_options')
           .select('id')
           .eq('quotation_version_id', versionId)
@@ -982,7 +983,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           console.log('[Composer] Using existing option:', currentOptionId);
         } else {
           console.log('[Composer] Creating new option during save');
-          const { data: newOption, error: optError } = await supabase
+          const { data: newOption, error: optError } = await scopedDb
             .from('quotation_version_options')
             .insert({
               quotation_version_id: versionId,
@@ -1010,7 +1011,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Delete tracked charges first
       if (chargesToDelete.length > 0) {
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await scopedDb
           .from('quote_charges')
           .delete()
           .in('id', chargesToDelete);
@@ -1026,8 +1027,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Get charge side IDs
       const [buySideRes, sellSideRes] = await Promise.all([
-        supabase.from('charge_sides').select('id').eq('code', 'buy').single(),
-        supabase.from('charge_sides').select('id').eq('code', 'sell').single()
+        scopedDb.from('charge_sides').select('id').eq('code', 'buy').single(),
+        scopedDb.from('charge_sides').select('id').eq('code', 'sell').single()
       ]);
 
       if (buySideRes.error || sellSideRes.error || !buySideRes.data || !sellSideRes.data) {
@@ -1038,7 +1039,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const sellSideId = sellSideRes.data.id;
 
       // Clean up orphaned legs and their charges
-      const { data: existingLegs } = await supabase
+      const { data: existingLegs } = await scopedDb
         .from('quotation_version_option_legs')
         .select('id')
         .eq('quotation_version_option_id', currentOptionId);
@@ -1055,7 +1056,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       
       if (toDeleteLegIds.length > 0) {
         // Delete charges associated with removed legs
-        const { error: chargeDeleteError } = await supabase
+        const { error: chargeDeleteError } = await scopedDb
           .from('quote_charges')
           .delete()
           .in('leg_id', toDeleteLegIds)
@@ -1067,7 +1068,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         }
         
         // Delete the legs themselves
-        const { error: legDeleteError } = await supabase
+        const { error: legDeleteError } = await scopedDb
           .from('quotation_version_option_legs')
           .delete()
           .in('id', toDeleteLegIds);
@@ -1087,7 +1088,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         
         if (leg.id.startsWith('leg-')) {
           // New leg
-          const { data: newLeg, error: legError } = await supabase
+          const { data: newLeg, error: legError } = await scopedDb
             .from('quotation_version_option_legs')
             .insert({
               quotation_version_option_id: currentOptionId,
@@ -1109,7 +1110,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           legId = (newLeg as any).id;
         } else {
           // Update existing leg
-          const { error: updateError } = await supabase
+          const { error: updateError } = await scopedDb
             .from('quotation_version_option_legs')
             .update({
               mode: leg.mode,
@@ -1142,7 +1143,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           // Handle buy side
           if (charge.buy?.dbChargeId) {
             // Update existing
-            const { error: updateError } = await supabase
+            const { error: updateError } = await scopedDb
               .from('quote_charges')
               .update({
                 ...chargeData,
@@ -1154,7 +1155,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             if (updateError) throw updateError;
           } else {
             // Insert new
-            const { error: insertError } = await supabase
+            const { error: insertError } = await scopedDb
               .from('quote_charges')
               .insert({
                 ...chargeData,
@@ -1169,7 +1170,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           // Handle sell side
           if (charge.sell?.dbChargeId) {
             // Update existing
-            const { error: updateError } = await supabase
+            const { error: updateError } = await scopedDb
               .from('quote_charges')
               .update({
                 ...chargeData,
@@ -1181,7 +1182,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             if (updateError) throw updateError;
           } else {
             // Insert new
-            const { error: insertError } = await supabase
+            const { error: insertError } = await scopedDb
               .from('quote_charges')
               .insert({
                 ...chargeData,
@@ -1212,7 +1213,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         // Handle buy side
         if (charge.buy?.dbChargeId) {
-          const { error: updateError } = await supabase
+          const { error: updateError } = await scopedDb
             .from('quote_charges')
             .update({
               ...chargeData,
@@ -1223,7 +1224,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .eq('id', charge.buy.dbChargeId);
           if (updateError) throw updateError;
         } else {
-          const { error: insertError } = await supabase
+          const { error: insertError } = await scopedDb
             .from('quote_charges')
             .insert({
               ...chargeData,
@@ -1237,7 +1238,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         // Handle sell side
         if (charge.sell?.dbChargeId) {
-          const { error: updateError } = await supabase
+          const { error: updateError } = await scopedDb
             .from('quote_charges')
             .update({
               ...chargeData,
@@ -1248,7 +1249,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .eq('id', charge.sell.dbChargeId);
           if (updateError) throw updateError;
         } else {
-          const { error: insertError } = await supabase
+          const { error: insertError } = await scopedDb
             .from('quote_charges')
             .insert({
               ...chargeData,

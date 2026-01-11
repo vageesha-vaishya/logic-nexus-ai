@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { TransferService, EntityTransfer, TransferEntityType } from '@/lib/transfer-service';
+import { useCRM } from '@/hooks/useCRM';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -84,7 +86,7 @@ export function TransferDetailDialog({
     if (!transferId || !rejectReason.trim()) return;
     setActionLoading(true);
     try {
-      await TransferService.rejectTransfer(transferId, rejectReason);
+      await TransferService.rejectTransfer(dao, transferId, rejectReason);
       toast({ title: 'Transfer Rejected' });
       onOpenChange(false);
       onActionComplete();

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +26,7 @@ export default function SecurityOverview() {
   const params = new URLSearchParams(location.search);
   const tabParam = params.get('tab');
   const initialTab = tabParam ?? 'sql';
-  const { supabase: crmSupabase, context } = useCRM();
+  const { scopedDb, context } = useCRM();
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM leads LIMIT 10;');
   const [queryResult, setQueryResult] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -55,25 +54,25 @@ export default function SecurityOverview() {
 
   useEffect(() => {
     const loadTenants = async () => {
-      const { data } = await crmSupabase.from('tenants').select('id,name').eq('is_active', true).order('name');
-      setTenants(data || []);
+      const { data } = await scopedDb.from('tenants').select('id,name').eq('is_active', true).order('name');
+      setTenants((data as any[]) || []);
     };
     loadTenants();
-  }, [crmSupabase]);
+  }, [scopedDb]);
 
   useEffect(() => {
     const loadFranchises = async () => {
       if (!tenantId) { setFranchises([]); return; }
-      const { data } = await crmSupabase
+      const { data } = await scopedDb
         .from('franchises')
         .select('id,name')
         .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .order('name');
-      setFranchises(data || []);
+      setFranchises((data as any[]) || []);
     };
     loadFranchises();
-  }, [crmSupabase, tenantId]);
+  }, [scopedDb, tenantId]);
 
   const onTenantChange = (id: string) => {
     setTenantId(id);
@@ -91,7 +90,7 @@ export default function SecurityOverview() {
   const executeQuery = async () => {
     setIsExecuting(true);
     try {
-      const { data, error } = await supabase.rpc('execute_sql_query' as any, { 
+      const { data, error } = await scopedDb.rpc('execute_sql_query', { 
         query_text: sqlQuery 
       });
       
@@ -118,7 +117,7 @@ export default function SecurityOverview() {
   const { data: enums, isLoading: enumsLoading } = useQuery({
     queryKey: ['security-enums'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_database_enums' as any);
+      const { data, error } = await scopedDb.rpc('get_database_enums' as any);
       if (error) throw error;
       return data as unknown as Array<{ enum_type: string; labels: string }>;
     }
@@ -127,7 +126,7 @@ export default function SecurityOverview() {
   const { data: rlsStatus, isLoading: rlsLoading } = useQuery({
     queryKey: ['rls-status'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_rls_status' as any);
+      const { data, error } = await scopedDb.rpc('get_rls_status' as any);
       if (error) throw error;
       return data as unknown as Array<{ table_name: string; rls_enabled: boolean; policy_count: number }>;
     }
@@ -136,7 +135,7 @@ export default function SecurityOverview() {
   const { data: policies, isLoading: policiesLoading } = useQuery({
     queryKey: ['rls-policies'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_rls_policies' as any);
+      const { data, error } = await scopedDb.rpc('get_rls_policies' as any);
       if (error) throw error;
       return data as unknown as Array<{
         table_name: string;
@@ -151,7 +150,7 @@ export default function SecurityOverview() {
   const { data: schema, isLoading: schemaLoading } = useQuery({
     queryKey: ['database-schema'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_database_schema' as any);
+      const { data, error } = await scopedDb.rpc('get_database_schema' as any);
       if (error) throw error;
       return data as unknown as Array<{
         table_name: string;
@@ -170,7 +169,7 @@ export default function SecurityOverview() {
   const { data: schemaTables, isLoading: schemaTablesLoading } = useQuery({
     queryKey: ['database-tables'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_database_tables' as any);
+      const { data, error } = await scopedDb.rpc('get_database_tables' as any);
       if (error) throw error;
       return data as unknown as Array<{
         table_name: string;
@@ -201,8 +200,7 @@ export default function SecurityOverview() {
       setTableError(null);
       try {
         // Use dynamic table name with a loose type to avoid TS literal union overload errors
-        const { data, error } = await (supabase as any)
-          .from(selectedTable)
+        const { data, error } = await (scopedDb.from as any)(selectedTable)
           .select('*')
           .limit(50);
         if (error) throw error;
@@ -219,7 +217,7 @@ export default function SecurityOverview() {
   const { data: schemaConstraints, isLoading: schemaConstraintsLoading } = useQuery({
     queryKey: ['database-constraints'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_table_constraints' as any);
+      const { data, error } = await scopedDb.rpc('get_table_constraints' as any);
       if (error) throw error;
       return data as unknown as Array<{
         table_name: string;
@@ -233,7 +231,7 @@ export default function SecurityOverview() {
   const { data: schemaIndexes, isLoading: schemaIndexesLoading } = useQuery({
     queryKey: ['database-indexes'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_table_indexes' as any);
+      const { data, error } = await scopedDb.rpc('get_table_indexes' as any);
       if (error) throw error;
       return data as unknown as Array<{
         table_name: string;
@@ -249,7 +247,7 @@ export default function SecurityOverview() {
     queryKey: ['database-functions'],
     queryFn: async () => {
       // Primary: use dedicated RPC for listing functions
-      const { data, error } = await supabase.rpc('get_database_functions' as any);
+      const { data, error } = await scopedDb.rpc('get_database_functions' as any);
       if (!error) {
         return (data ?? []) as unknown as Array<{
           name: string;
@@ -294,7 +292,7 @@ export default function SecurityOverview() {
         ORDER BY n.nspname, p.proname;
       `;
 
-      const { data: fallbackData, error: fallbackError } = await supabase.rpc('execute_sql_query' as any, { query_text: sql });
+      const { data: fallbackData, error: fallbackError } = await scopedDb.rpc('execute_sql_query' as any, { query_text: sql });
       if (fallbackError) {
         // Surface the original error to the UI for clarity
         throw error;
@@ -442,7 +440,7 @@ export default function SecurityOverview() {
         }
       }
 
-      let query = (supabase.from as any)(selectedTableForSearch).select('*', { count: 'exact' });
+      let query = (scopedDb.from as any)(selectedTableForSearch).select('*', { count: 'exact' });
 
       // Apply typed filters (AND semantics)
       const tableFilter = tableFilters[selectedTableForSearch] || {};

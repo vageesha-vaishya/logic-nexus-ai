@@ -21,7 +21,7 @@ type ServiceTypeRow = {
 };
 
 export default function ServiceTypes() {
-  const { supabase, context } = useCRM();
+  const { scopedDb, context } = useCRM();
   const [types, setTypes] = useState<ServiceTypeRow[]>([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -49,7 +49,7 @@ export default function ServiceTypes() {
 
   const fetchTypes = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from('service_types')
         .select('*')
         .order('name');
@@ -97,7 +97,7 @@ export default function ServiceTypes() {
         description: description || null, 
         is_active: isActive 
       } as const;
-      const { error } = await supabase.from('service_types').insert(payload);
+      const { error } = await scopedDb.from('service_types').insert(payload);
       if (error) throw error;
       toast.success('Service type created');
       setOpen(false);
@@ -115,7 +115,7 @@ export default function ServiceTypes() {
         toast.error('Only platform admins can update service types');
         return;
       }
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_types')
         .update({ is_active: next })
         .eq('id', row.id);
@@ -133,7 +133,7 @@ export default function ServiceTypes() {
         toast.error('Only platform admins can delete service types');
         return;
       }
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_types')
         .delete()
         .eq('id', row.id);
@@ -176,7 +176,7 @@ export default function ServiceTypes() {
         description: editDescription || null,
         is_active: editIsActive,
       } as const;
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('service_types')
         .update(payload)
         .eq('id', editingRow.id);

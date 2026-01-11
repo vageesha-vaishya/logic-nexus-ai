@@ -6,7 +6,6 @@ import { ArrowRight, Search } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
 export function AssignmentHistory() {
   const { supabase, context } = useCRM();
@@ -14,15 +13,12 @@ export function AssignmentHistory() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Create scoped data access for proper filtering
-  const dao = useMemo(() => new ScopedDataAccess(supabase, context as unknown as DataAccessContext), [supabase, context]);
-
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         setLoading(true);
         // Use ScopedDataAccess for proper tenant/franchise filtering
-        const { data: historyData, error } = await dao
+        const { data: historyData, error } = await scopedDb
           .from('lead_assignment_history')
           .select('*')
           .order('assigned_at', { ascending: false })
@@ -30,7 +26,7 @@ export function AssignmentHistory() {
 
         if (error) throw error;
 
-        // Fetch related data separately using dao for proper scoping
+        // Fetch related data separately using scopedDb for proper scoping
         if (historyData && historyData.length > 0) {
           const leadIds = (historyData as any[]).map(h => h.lead_id).filter(Boolean);
           const userIds = [...new Set([
@@ -39,8 +35,8 @@ export function AssignmentHistory() {
           ])];
 
           const [{ data: leadsData }, { data: profilesData }] = await Promise.all([
-            dao.from('leads').select('id, first_name, last_name, company').in('id', leadIds),
-            supabase.from('profiles').select('id, first_name, last_name').in('id', userIds)
+            scopedDb.from('leads').select('id, first_name, last_name, company').in('id', leadIds),
+            scopedDb.from('profiles').select('id, first_name, last_name').in('id', userIds)
           ]);
 
           const leadsMap = new Map((leadsData as any[])?.map(l => [l.id, l]));
@@ -67,7 +63,7 @@ export function AssignmentHistory() {
 
     fetchHistory();
     // Include context._version to trigger re-fetch when scope changes
-  }, [dao, context.tenantId, context.franchiseId, context._version, supabase]);
+  }, [scopedDb, context.tenantId, context.franchiseId, context._version]);
 
   const filteredHistory = history.filter((item) => {
     const searchLower = searchQuery.toLowerCase();

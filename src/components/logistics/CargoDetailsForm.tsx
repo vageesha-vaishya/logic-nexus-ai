@@ -30,7 +30,7 @@ const cargoDetailsSchema = z.object({
 export type CargoDetailsFormData = z.infer<typeof cargoDetailsSchema> & { id?: string };
 
 export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Partial<CargoDetailsFormData>; onSuccess?: () => void }) {
-  const { supabase, context } = useCRM();
+  const { scopedDb } = useCRM();
   type ServiceTypeOption = Pick<Database["public"]["Tables"]["service_types"]["Row"], "name" | "description" | "is_active">;
   type ServiceOption = Pick<Database["public"]["Tables"]["services"]["Row"], "id" | "service_name" | "service_type" | "service_code" | "is_active">;
   type CargoTypeOption = { id: string; cargo_type_name: string; is_active: boolean | null };
@@ -61,7 +61,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   useEffect(() => {
     // Load service types (publicly viewable per migration)
     (async () => {
-      const { data } = await supabase.from("service_types").select("name, description, is_active");
+      const { data } = await scopedDb.from("service_types", true).select("name, description, is_active");
       const values = (data || []).filter((t) => (t as ServiceTypeOption).is_active !== false) as ServiceTypeOption[];
       // Fallback to known values if empty
       setServiceTypes(
@@ -77,15 +77,14 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
             ]
       );
     })();
-  }, [supabase]);
+  }, [scopedDb]);
 
   useEffect(() => {
     // Load cargo types for tenant
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from("cargo_types")
-        .select("id, cargo_type_name, is_active")
-        .eq("tenant_id", context.tenantId);
+        .select("id, cargo_type_name, is_active");
       if (!error && data) {
         const rows = data.filter((c) => c.is_active !== false).map(c => ({
           id: c.id,
@@ -95,16 +94,14 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
         setCargoTypes(rows);
       }
     })();
-  }, [supabase, context.tenantId]);
+  }, [scopedDb]);
 
   useEffect(() => {
     // Load services for tenant filtered by service_type
     (async () => {
-      if (!context.tenantId) return;
-      let query = supabase
+      let query = scopedDb
         .from("services")
-        .select("id, service_name, service_type, service_code, is_active")
-        .eq("tenant_id", context.tenantId);
+        .select("id, service_name, service_type, service_code, is_active");
       if (selectedType) {
         query = query.eq("service_type", selectedType);
       }
@@ -114,13 +111,12 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
         setServices(rows.filter((s) => s.is_active !== false));
       }
     })();
-  }, [supabase, context.tenantId, selectedType]);
+  }, [scopedDb, selectedType]);
 
   async function handleSubmit(values: CargoDetailsFormData) {
     try {
       if (initialData?.id) {
-        const updatePayload: Database["public"]["Tables"]["cargo_details"]["Update"] = {
-          tenant_id: context.tenantId!,
+        const updatePayload: Omit<Database["public"]["Tables"]["cargo_details"]["Update"], "tenant_id"> = {
           service_type: values.service_type,
           service_id: values.service_id,
           cargo_type_id: values.cargo_type_id,
@@ -134,12 +130,11 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           weight_kg: values.total_weight_kg,
           volume_cbm: values.total_volume_cbm,
         };
-        const { error } = await supabase.from("cargo_details").update(updatePayload).eq("id", initialData.id);
+        const { error } = await scopedDb.from("cargo_details").update(updatePayload as any).eq("id", initialData.id);
         if (error) throw error;
         toast.success("Cargo details updated");
       } else {
-        const insertPayload: Database["public"]["Tables"]["cargo_details"]["Insert"] = {
-          tenant_id: context.tenantId!,
+        const insertPayload: Omit<Database["public"]["Tables"]["cargo_details"]["Insert"], "tenant_id"> = {
           service_type: values.service_type,
           service_id: values.service_id,
           cargo_type_id: values.cargo_type_id,
@@ -153,7 +148,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           weight_kg: values.total_weight_kg,
           volume_cbm: values.total_volume_cbm,
         };
-        const { error } = await supabase.from("cargo_details").insert(insertPayload);
+        const { error } = await scopedDb.from("cargo_details").insert(insertPayload as any);
         if (error) throw error;
         toast.success("Cargo details created");
         form.reset();

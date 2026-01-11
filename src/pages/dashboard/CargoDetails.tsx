@@ -29,9 +29,9 @@ export default function CargoDetails() {
     setLoading(true);
     try {
       const [{ data: cd }, { data: svc }, { data: ct }] = await Promise.all([
-        supabase.from("cargo_details").select("*").eq("tenant_id", context.tenantId),
-        supabase.from("services").select("id, service_name, service_type, service_code").eq("tenant_id", context.tenantId),
-        supabase.from("cargo_types").select("id, cargo_type_name").eq("tenant_id", context.tenantId),
+        scopedDb.from("cargo_details").select("*"),
+        scopedDb.from("services").select("id, service_name, service_type, service_code"),
+        scopedDb.from("cargo_types").select("id, cargo_type_name"),
       ]);
       setDetails((cd || []) as CargoDetail[]);
       setServices(svc || []);
@@ -67,7 +67,7 @@ export default function CargoDetails() {
 
   async function handleDelete(id: string) {
     try {
-      const { error } = await supabase.from("cargo_details").delete().eq("id", id);
+      const { error } = await scopedDb.from("cargo_details").delete().eq("id", id);
       if (error) throw error;
       toast.success("Cargo details deleted");
       fetchData();

@@ -1,5 +1,6 @@
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { ScopedDataAccess } from '@/lib/db/access';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 
 export function useCRM() {
@@ -144,10 +145,13 @@ export function useCRM() {
     }
   }, [user, pref?.tenant_id, pref?.franchise_id]);
 
+  const scopedDb = useMemo(() => new ScopedDataAccess(supabase, context), [context]);
+
   return {
     user,
     context,
     supabase,
+    scopedDb,
     preferences: pref,
     loadingPreferences: loadingPref,
     setScopePreference,

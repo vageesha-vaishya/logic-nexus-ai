@@ -47,6 +47,8 @@ interface ShipmentFormProps {
   onCancel: () => void;
 }
 
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+
 export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormProps) {
   const { supabase, context } = useCRM();
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
@@ -92,10 +94,11 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('accounts').select('id, name').order('name');
-      if (data) setAccounts(data as { id: string; name: string }[]);
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data } = await dao.from('accounts').select('id, name').order('name');
+      if (data) setAccounts(data as unknown as { id: string; name: string }[]);
     })();
-  }, [supabase]);
+  }, [context]);
 
   const { isSubmitting } = form.formState;
 

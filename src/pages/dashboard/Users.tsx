@@ -67,8 +67,9 @@ export default function Users() {
         userIds = roles?.map((r: any) => r.user_id) || [];
       }
 
-      // Build the main query
-      let query = supabase
+      // Build the main query using ScopedDataAccess for audit logging
+      const dao = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      let query = dao
         .from('profiles')
         .select(`
           *,
@@ -86,8 +87,9 @@ export default function Users() {
       if (profilesError) throw profilesError;
 
       // Fetch all tenants and franchises to map names
-      const { data: tenantsData } = await supabase.from('tenants').select('id, name');
-      const { data: franchisesData } = await supabase.from('franchises').select('id, name');
+      const scopedDb = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
+      const { data: tenantsData } = await scopedDb.from('tenants').select('id, name');
+      const { data: franchisesData } = await scopedDb.from('franchises').select('id, name');
 
       // Create lookup maps
       const tenantsMap = new Map(tenantsData?.map(t => [t.id, t.name]) || []);
