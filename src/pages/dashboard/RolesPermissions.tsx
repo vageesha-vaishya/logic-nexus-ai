@@ -37,11 +37,7 @@ export default function RolesPermissions() {
   const [inheritanceAvailable, setInheritanceAvailable] = useState(true);
   const [justification, setJustification] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [rolesData, permsData, rolePermsMap, hierarchy] = await Promise.all([
@@ -75,7 +71,11 @@ export default function RolesPermissions() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [roleService]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const seedDefaults = async () => {
     try {

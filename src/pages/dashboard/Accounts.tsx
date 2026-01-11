@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Building2, Phone, Mail, Globe, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,24 +35,39 @@ export default function Accounts() {
   const { context, scopedDb } = useCRM();
 
   useEffect(() => {
-    fetchAccounts();
-  }, []);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Accounts: context updated', context);
+      console.log('Accounts: scopedDb context', scopedDb.accessContext);
+    }
+  }, [context, scopedDb]);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
+      console.log('Accounts: fetching with scopedDb', scopedDb.accessContext);
       const { data, error } = await scopedDb
         .from('accounts')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log(`Accounts: fetched ${data?.length} records`);
+      if (data && data.length > 0) {
+        console.log('Accounts: first record tenant_id:', (data[0] as any).tenant_id);
+      }
+
       setAccounts(data as unknown as Account[]);
     } catch (error) {
+      console.error('Accounts: fetch error', error);
       toast.error('Failed to load accounts');
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   const filteredAccounts = accounts.filter(account =>
     account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

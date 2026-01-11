@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -19,30 +19,20 @@ import { EntityCard } from '@/components/system/EntityCard';
 export default function Franchises() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [franchises, setFranchises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
-  useEffect(() => {
-    fetchFranchises();
-  }, []);
-
-  const fetchFranchises = async () => {
+  const fetchFranchises = useCallback(async () => {
     try {
-      let query = supabase
+      const { data, error } = await scopedDb
         .from('franchises')
         // Disambiguate embed: direct FK franchises.tenant_id -> tenants.id
         // Avoid PostgREST error: more than one relationship between franchises and tenants
-        .select('*, tenants:tenants!franchises_tenant_id_fkey(name)');
-
-      // Filter by tenant if not platform_admin
-      if (!context.isPlatformAdmin && context.tenantId) {
-        query = query.eq('tenant_id', context.tenantId);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .select('*, tenants:tenants!franchises_tenant_id_fkey(name)')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setFranchises(data || []);
@@ -55,7 +45,11 @@ export default function Franchises() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb, toast]);
+
+  useEffect(() => {
+    fetchFranchises();
+  }, [fetchFranchises]);
 
   const handleExport = () => {
     try {

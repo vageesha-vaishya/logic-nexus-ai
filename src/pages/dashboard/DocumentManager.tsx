@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,8 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Loader2, Save, History, FileText, Split, Eye } from 'lucide-react';
+import { useCRM } from '@/hooks/useCRM';
 
 export default function DocumentManager() {
+  const { scopedDb } = useCRM();
   const [document, setDocument] = useState<Document | null>(null);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<DocumentVersion | null>(null);
@@ -32,17 +34,13 @@ export default function DocumentManager() {
   // Hardcoded path for this specific task, but could be dynamic
   const DOC_PATH = 'docs/COMPETITIVE_ANALYSIS_AND_ROADMAP.md';
 
-  useEffect(() => {
-    loadDocument();
-  }, []);
-
-  const loadDocument = async () => {
+  const loadDocument = useCallback(async () => {
     try {
       setLoading(true);
-      const doc = await DocumentService.getDocumentByPath(DOC_PATH);
+      const doc = await DocumentService.getDocumentByPath(DOC_PATH, scopedDb);
       setDocument(doc);
       
-      const vers = await DocumentService.getVersions(doc.id);
+      const vers = await DocumentService.getVersions(doc.id, scopedDb);
       setVersions(vers);
       
       if (vers.length > 0) {
@@ -55,7 +53,11 @@ export default function DocumentManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    loadDocument();
+  }, [loadDocument]);
 
   const handleSave = async () => {
     if (!document) return;
@@ -70,7 +72,8 @@ export default function DocumentManager() {
         document.id,
         currentContent,
         changeType,
-        changeNotes
+        changeNotes,
+        scopedDb
       );
       toast.success('Version saved successfully');
       setChangeNotes('');
@@ -89,7 +92,7 @@ export default function DocumentManager() {
     
     try {
       setSaving(true);
-      await DocumentService.revertToVersion(document.id, version.version);
+      await DocumentService.revertToVersion(document.id, version.version, scopedDb);
       toast.success(`Reverted to version ${version.version}`);
       await loadDocument();
     } catch (error) {

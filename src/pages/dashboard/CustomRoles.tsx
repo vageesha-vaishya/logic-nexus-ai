@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCRM } from "@/hooks/useCRM";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import {
 
 export default function CustomRoles() {
   const { profile } = useAuth();
+  const { scopedDb } = useCRM();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<any>(null);
@@ -28,9 +30,9 @@ export default function CustomRoles() {
   const [roleToDelete, setRoleToDelete] = useState<any>(null);
 
   const { data: roles, isLoading } = useQuery({
-    queryKey: ["custom_roles"],
+    queryKey: ["custom_roles", scopedDb.accessContext],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from("custom_roles")
         .select(`
           *,
@@ -45,7 +47,7 @@ export default function CustomRoles() {
 
   const deleteMutation = useMutation({
     mutationFn: async (roleId: string) => {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from("custom_roles")
         .delete()
         .eq("id", roleId);
@@ -187,6 +189,7 @@ export default function CustomRoles() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         role={selectedRole}
+        scopedDb={scopedDb}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

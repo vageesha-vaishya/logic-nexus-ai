@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -95,26 +95,34 @@ export default function AccountsPipeline() {
     })
   );
 
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
-
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('AccountsPipeline: fetching with scopedDb', scopedDb.accessContext);
+
       const { data, error } = await scopedDb
         .from("accounts")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      console.log(`AccountsPipeline: fetched ${data?.length} records`);
+      if (data && data.length > 0) {
+        console.log('AccountsPipeline: first record tenant_id:', (data[0] as any).tenant_id);
+      }
+
       setAccounts((data || []) as unknown as Account[]);
     } catch (error) {
       toast({ title: "Error", description: "Failed to fetch accounts", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   const computeStage = (a: Account): AccountStage => {
     const status = (a.status || '').toLowerCase();

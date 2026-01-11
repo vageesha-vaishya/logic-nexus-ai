@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -37,11 +37,7 @@ export default function Opportunities() {
   const [probMin, setProbMin] = useState<string>('');
   const [probMax, setProbMax] = useState<string>('');
 
-  useEffect(() => {
-    fetchOpportunities();
-  }, []);
-
-  const fetchOpportunities = async () => {
+  const fetchOpportunities = useCallback(async () => {
     try {
       const { data, error } = await scopedDb
         .from('opportunities')
@@ -62,7 +58,11 @@ export default function Opportunities() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchOpportunities();
+  }, [fetchOpportunities]);
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-';

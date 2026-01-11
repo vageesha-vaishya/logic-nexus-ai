@@ -238,7 +238,7 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, context, context._version, ownerFilter, scoreFilter, searchQuery, statusFilter]);
+  }, [scopedDb, ownerFilter, scoreFilter, searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchLeads();

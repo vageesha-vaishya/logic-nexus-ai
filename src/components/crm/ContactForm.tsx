@@ -69,8 +69,8 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
       account_id: initialData?.account_id || '',
       is_primary: initialData?.is_primary || false,
       notes: initialData?.notes || '',
-      tenant_id: initialData?.tenant_id || '',
-      franchise_id: initialData?.franchise_id || '',
+      tenant_id: initialData?.tenant_id || context.tenantId || '',
+      franchise_id: initialData?.franchise_id || context.franchiseId || '',
     },
   });
 
@@ -108,7 +108,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
 
   const fetchTenants = async () => {
     const { data } = await scopedDb
-      .from('tenants')
+      .from('tenants', true)
       .select('id, name')
       .eq('is_active', true)
       .order('name');

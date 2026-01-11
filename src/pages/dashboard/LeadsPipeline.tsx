@@ -207,7 +207,7 @@ export default function LeadsPipeline() {
       setLoading(false);
       setInitialLoadComplete(true);
     }
-  }, [supabase, context, isContextReady]);
+  }, [scopedDb, isContextReady]);
 
   const fetchTasks = useCallback(async () => {
     if (!isContextReady) return;
@@ -232,14 +232,14 @@ export default function LeadsPipeline() {
     } catch (e) {
       console.error('Error fetching tasks', e);
     }
-  }, [supabase, context, isContextReady]);
+  }, [scopedDb, isContextReady]);
 
   // Fetch whenever scope changes (tenant / franchise / override)
   useEffect(() => {
     if (!isContextReady) return;
     fetchLeads();
     fetchTasks();
-  }, [isContextReady, (context as any)?._version, fetchLeads, fetchTasks]);
+  }, [isContextReady, scopedDb, fetchLeads, fetchTasks]);
 
   // Real-time subscription - separate from fetch
   useEffect(() => {

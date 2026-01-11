@@ -56,49 +56,50 @@ export default function Quotes() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  useEffect(() => {
-    const fetchQuotes = async () => {
-      try {
-        const { data, error } = await scopedDb
-          .from('quotes')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        
-        if (error) throw error;
+  const fetchQuotes = useCallback(async () => {
+    try {
+      const { data, error } = await scopedDb
+        .from('quotes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
 
-        // Fetch related data separately
-        const quotesWithRelations = await Promise.all(
-          ((data || []) as any[]).map(async (quote) => {
-            const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
-              quote.account_id ? scopedDb.from('accounts').select('name').eq('id', quote.account_id).single() : null,
-              quote.contact_id ? scopedDb.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
-              quote.opportunity_id ? scopedDb.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
-              quote.carrier_id ? scopedDb.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
-              quote.service_type_id ? scopedDb.from('service_types').select('name').eq('id', quote.service_type_id).single() : null,
-            ]);
+      // Fetch related data separately
+      const quotesWithRelations = await Promise.all(
+        ((data || []) as any[]).map(async (quote) => {
+          const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
+            quote.account_id ? scopedDb.from('accounts').select('name').eq('id', quote.account_id).single() : null,
+            quote.contact_id ? scopedDb.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
+            quote.opportunity_id ? scopedDb.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
+            quote.carrier_id ? scopedDb.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
+            quote.service_type_id ? scopedDb.from('service_types').select('name').eq('id', quote.service_type_id).single() : null,
+          ]);
 
-        return {
-          ...quote,
-          accounts: account?.data || null,
-          contacts: contact?.data || null,
-          opportunities: opportunity?.data || null,
-          carriers: carrier?.data || null,
-          service_types: serviceType?.data || null,
-        };
-      })
-    );
+          return {
+            ...quote,
+            accounts: account?.data || null,
+            contacts: contact?.data || null,
+            opportunities: opportunity?.data || null,
+            carriers: carrier?.data || null,
+            service_types: serviceType?.data || null,
+          };
+        })
+      );
 
-        setQuotes(quotesWithRelations as unknown as Quote[]);
-      } catch (err: unknown) {
-        const description = err instanceof Error ? err.message : String(err);
-        toast.error('Failed to load quotes', { description });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchQuotes();
+      setQuotes(quotesWithRelations as unknown as Quote[]);
+    } catch (err: unknown) {
+      const description = err instanceof Error ? err.message : String(err);
+      toast.error('Failed to load quotes', { description });
+    } finally {
+      setLoading(false);
+    }
   }, [scopedDb]);
+
+  useEffect(() => {
+    fetchQuotes();
+  }, [fetchQuotes]);
 
   const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 

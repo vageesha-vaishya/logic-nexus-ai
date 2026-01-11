@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ export default function Warehouses() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
-  const { supabase } = useCRM();
+  const { scopedDb } = useCRM();
 
   // Advanced filters
   const [filterName, setFilterName] = useState('');
@@ -53,13 +53,9 @@ export default function Warehouses() {
   const [utilMax, setUtilMax] = useState<string>('');
   const [statusActive, setStatusActive] = useState<string>('all');
 
-  useEffect(() => {
-    fetchWarehouses();
-  }, []);
-
-  const fetchWarehouses = async () => {
+  const fetchWarehouses = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from('warehouses')
         .select('*')
         .order('name');
@@ -73,7 +69,11 @@ export default function Warehouses() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchWarehouses();
+  }, [fetchWarehouses]);
 
   const filteredWarehouses = warehouses.filter(warehouse => {
     const globalQuery = searchQuery.trim().toLowerCase();

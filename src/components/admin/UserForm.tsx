@@ -104,7 +104,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
     try {
       const db = new ScopedDataAccess(supabase, context as unknown as DataAccessContext);
       const { data, error } = await (db as any)
-        .from('tenants')
+        .from('tenants', true)
         .select('*')
         .eq('is_active', true);
       

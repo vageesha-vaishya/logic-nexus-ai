@@ -49,10 +49,13 @@ interface CustomRoleDialogProps {
   role?: any;
 }
 
-export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogProps) {
+export function CustomRoleDialog({ open, onOpenChange, role, scopedDb }: CustomRoleDialogProps & { scopedDb?: any }) {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [allPermissions, setAllPermissions] = useState<string[]>([]);
+  
+  // Use the provided scopedDb or fallback to global supabase client
+  const db = scopedDb || supabase;
 
   useEffect(() => {
     // Extract all unique permissions from ROLE_PERMISSIONS
@@ -98,7 +101,7 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
     mutationFn: async (data: FormData) => {
       if (role) {
         // Update existing role
-        const { error: roleError } = await supabase
+        const { error: roleError } = await db
           .from("custom_roles")
           .update({
             name: data.name,
@@ -110,7 +113,7 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
         if (roleError) throw roleError;
 
         // Delete old permissions
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await db
           .from("custom_role_permissions")
           .delete()
           .eq("role_id", role.id);
@@ -119,7 +122,7 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
 
         // Insert new permissions
         if (data.permissions.length > 0) {
-          const { error: permError } = await supabase
+          const { error: permError } = await db
             .from("custom_role_permissions")
             .insert(
               data.permissions.map((perm) => ({
@@ -133,14 +136,20 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
         }
       } else {
         // Create new role
-        const { data: newRole, error: roleError } = await supabase
-          .from("custom_roles")
-          .insert({
+        const roleData: any = {
             name: data.name,
             description: data.description,
             is_active: data.is_active,
-            tenant_id: profile?.id, // This should be the actual tenant_id
-          })
+        };
+
+        // Only manually set tenant_id if we don't have scopedDb to inject it
+        if (!scopedDb) {
+            roleData.tenant_id = (profile as any)?.tenant_id || profile?.id;
+        }
+
+        const { data: newRole, error: roleError } = await db
+          .from("custom_roles")
+          .insert(roleData)
           .select()
           .single();
 
@@ -148,7 +157,7 @@ export function CustomRoleDialog({ open, onOpenChange, role }: CustomRoleDialogP
 
         // Insert permissions
         if (data.permissions.length > 0) {
-          const { error: permError } = await supabase
+          const { error: permError } = await db
             .from("custom_role_permissions")
             .insert(
               data.permissions.map((perm) => ({

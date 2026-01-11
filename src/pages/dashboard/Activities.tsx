@@ -60,7 +60,7 @@ export default function Activities() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const { fetchAssignableUsers, formatLabel } = useAssignableUsers();
   const [typeFilter, setTypeFilter] = useState<'any' | 'email' | 'call' | 'task' | 'meeting' | 'note'>('any');
   const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me' | string>('any');
@@ -84,6 +84,8 @@ export default function Activities() {
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('Activities: fetching with scopedDb', scopedDb.accessContext);
+      
       // Use scopedDb for proper tenant/franchise filtering
       const { data, error } = await scopedDb
         .from('activities')
@@ -110,6 +112,12 @@ export default function Activities() {
         .order('due_date', { ascending: true, nullsFirst: false });
 
       if (error) throw error;
+      
+      console.log(`Activities: fetched ${data?.length} records`);
+      if (data && data.length > 0) {
+        console.log('Activities: first record tenant_id:', (data[0] as any).tenant_id);
+      }
+
       setActivities((data as Activity[]) || []);
 
       // Fetch lead names referenced by activities for grouping headers
@@ -147,8 +155,7 @@ export default function Activities() {
 
   useEffect(() => {
     fetchActivities();
-    // Include context._version to trigger re-fetch when scope changes
-  }, [fetchActivities, context.tenantId, context.franchiseId, context._version]);
+  }, [fetchActivities]);
 
   const handleMarkComplete = async (activityId: string) => {
     try {

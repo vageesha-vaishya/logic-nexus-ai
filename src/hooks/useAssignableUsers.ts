@@ -29,8 +29,8 @@ export function useAssignableUsers() {
 
       if (!supabase) return { data: [] as AssignableUser[], error: null };
 
-      // Platform admins: query profiles globally
-      if (context?.isPlatformAdmin) {
+      // Platform admins: query profiles globally ONLY if override is disabled
+      if (context?.isPlatformAdmin && !context.adminOverrideEnabled) {
         let query = supabase
           .from("profiles")
           .select("id, first_name, last_name, email")
@@ -47,17 +47,26 @@ export function useAssignableUsers() {
         return { data: (data ?? []) as AssignableUser[], error };
       }
 
-      // For tenant admin or franchise admin/users, find user_ids via user_roles then fetch profiles
-      const isTenantScope = !!context?.isTenantAdmin;
-      const scopeKey = isTenantScope ? "tenant_id" : "franchise_id";
-      const scopeValue = isTenantScope ? context?.tenantId : context?.franchiseId;
+      // For tenant admin or franchise admin/users (or Platform Admin with override), 
+      // find user_ids via user_roles then fetch profiles
+      let scopeKey: string | null = null;
+      let scopeValue: string | null = null;
 
-      if (!scopeValue) return { data: [] as AssignableUser[], error: null };
+      // Priority: Franchise > Tenant
+      if (context?.franchiseId) {
+        scopeKey = "franchise_id";
+        scopeValue = context.franchiseId;
+      } else if (context?.tenantId) {
+        scopeKey = "tenant_id";
+        scopeValue = context.tenantId;
+      }
+
+      if (!scopeKey || !scopeValue) return { data: [] as AssignableUser[], error: null };
 
       const { data: roles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id")
-        .eq(scopeKey, scopeValue)
+        .eq(scopeKey as "tenant_id" | "franchise_id", scopeValue)
         .limit(1000);
 
       if (rolesError) return { data: [] as AssignableUser[], error: rolesError };

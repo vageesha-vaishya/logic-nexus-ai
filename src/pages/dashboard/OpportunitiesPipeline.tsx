@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,12 +77,7 @@ export default function OpportunitiesPipeline() {
     })
   );
 
-  useEffect(() => {
-    fetchOpportunities();
-    fetchAccounts();
-  }, []);
-
-  const fetchOpportunities = async () => {
+  const fetchOpportunities = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -111,9 +106,9 @@ export default function OpportunitiesPipeline() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       const { data, error } = await scopedDb
         .from("accounts")
@@ -126,7 +121,12 @@ export default function OpportunitiesPipeline() {
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchOpportunities();
+    fetchAccounts();
+  }, [fetchOpportunities, fetchAccounts]);
 
   const handleStageChange = async (opportunityId: string, newStage: Stage) => {
     try {

@@ -27,8 +27,8 @@ export interface DocumentVersion {
 }
 
 export const DocumentService = {
-  async getDocumentByPath(path: string): Promise<Document> {
-    const { data, error } = await (supabase as any)
+  async getDocumentByPath(path: string, db: any = supabase): Promise<Document> {
+    const { data, error } = await db
       .from('documents')
       .select('*')
       .eq('path', path)
@@ -38,8 +38,8 @@ export const DocumentService = {
     return data as Document;
   },
 
-  async getVersions(documentId: string): Promise<DocumentVersion[]> {
-    const { data, error } = await (supabase as any)
+  async getVersions(documentId: string, db: any = supabase): Promise<DocumentVersion[]> {
+    const { data, error } = await db
       .from('document_versions')
       .select(`
         *,
@@ -54,8 +54,8 @@ export const DocumentService = {
     return (data || []) as DocumentVersion[];
   },
 
-  async getVersion(documentId: string, version: string): Promise<DocumentVersion> {
-    const { data, error } = await (supabase as any)
+  async getVersion(documentId: string, version: string, db: any = supabase): Promise<DocumentVersion> {
+    const { data, error } = await db
       .from('document_versions')
       .select('*')
       .eq('document_id', documentId)
@@ -70,10 +70,11 @@ export const DocumentService = {
     documentId: string, 
     content: string, 
     changeType: 'major' | 'minor' | 'patch', 
-    notes: string
+    notes: string,
+    db: any = supabase
   ) {
     // Get latest version to calculate diff
-    const { data: latestVersion } = await (supabase as any)
+    const { data: latestVersion } = await db
       .from('document_versions')
       .select('*')
       .eq('document_id', documentId)
@@ -107,7 +108,7 @@ export const DocumentService = {
       };
     }
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await db
       .from('document_versions')
       .insert({
         document_id: documentId,
@@ -124,7 +125,7 @@ export const DocumentService = {
     if (error) throw error;
 
     // Update document current_version
-    await (supabase as any)
+    await db
       .from('documents')
       .update({ 
         current_version: newVersionNumber,
@@ -135,13 +136,14 @@ export const DocumentService = {
     return data;
   },
 
-  async revertToVersion(documentId: string, targetVersion: string) {
-    const version = await this.getVersion(documentId, targetVersion);
+  async revertToVersion(documentId: string, targetVersion: string, db: any = supabase) {
+    const version = await this.getVersion(documentId, targetVersion, db);
     return this.createVersion(
       documentId, 
       version.content, 
       'patch', 
-      `Reverted to version ${targetVersion}`
+      `Reverted to version ${targetVersion}`,
+      db
     );
   }
 };

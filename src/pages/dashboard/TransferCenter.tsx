@@ -22,7 +22,7 @@ export default function TransferCenter() {
   const { toast } = useToast();
   const { context, supabase, scopedDb } = useCRM();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [transfersData, statsData] = await Promise.all([
@@ -36,9 +36,9 @@ export default function TransferCenter() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb, context?.tenantId]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const pendingTransfers = transfers.filter(t => t.status === 'pending');
   const historyTransfers = transfers.filter(t => t.status !== 'pending');

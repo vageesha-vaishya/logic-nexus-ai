@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,15 @@ export default function ChargeCategories() {
   const [items, setItems] = useState<ChargeCategory[]>([]);
   const [newItem, setNewItem] = useState({ name: '', code: '', description: '' });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const { data } = await scopedDb
       .from('charge_categories')
       .select('id, name, code, description, is_active')
       .order('name');
     setItems((data ?? []) as ChargeCategory[]);
-  };
+  }, [scopedDb]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const add = async () => {
     if (!newItem.name) return;

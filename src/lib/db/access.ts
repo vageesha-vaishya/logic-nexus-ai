@@ -215,6 +215,9 @@ export class ScopedDataAccess {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
         console.debug(`[ScopedDataAccess] Platform Admin Override applied: Tenant=${ctx.tenantId}, Franchise=${ctx.franchiseId}`);
       }
+      
+      // LOGGING FOR DEBUGGING
+      console.log(`[ScopedDataAccess] Applying Admin Override Filters. Tenant: ${ctx.tenantId}, Franchise: ${ctx.franchiseId}`);
 
       if (ctx.tenantId) {
         query = query.eq('tenant_id', ctx.tenantId);

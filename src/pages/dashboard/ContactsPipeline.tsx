@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,19 +73,22 @@ export default function ContactsPipeline() {
   });
   const [showFields, setShowFields] = useState({ email: true, phone: true, title: true });
 
-  useEffect(() => {
-    fetchData();
-  }, [context]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('ContactsPipeline: fetching with scopedDb', scopedDb.accessContext);
       
       const { data: c, error: ce } = await scopedDb
         .from('contacts')
         .select('*')
         .order('created_at', { ascending: false });
       if (ce) throw ce;
+      
+      console.log(`ContactsPipeline: fetched ${c?.length} records`);
+      if (c && c.length > 0) {
+        console.log('ContactsPipeline: first record tenant_id:', (c[0] as any).tenant_id);
+      }
+
       setContacts((c || []) as Contact[]);
       
       const { data: a, error: ae } = await scopedDb
@@ -100,7 +103,11 @@ export default function ContactsPipeline() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const latestActivityByContact = useMemo(() => {
     const m: Record<string, number> = {};

@@ -71,6 +71,10 @@
       "value": "Value"
     },
     "messages": {
+      "loading": "Loading leads...",
+      "noLeads": "No leads found",
+      "noLeadsDescSearch": "Try adjusting your search",
+      "noLeadsDescNew": "Get started by creating a new lead",
       "loadError": "Failed to load leads",
       "defaultViewSet": "Default view set to {{view}}",
       "defaultViewError": "Failed to update default view",

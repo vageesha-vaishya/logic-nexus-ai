@@ -75,7 +75,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       expected_close_date: initialData?.expected_close_date || '',
       description: initialData?.description || '',
       notes: initialData?.notes || '',
-      tenant_id: initialData?.tenant_id || '',
+      tenant_id: initialData?.tenant_id || context.tenantId || '',
       franchise_id: initialData?.franchise_id || context.franchiseId || '',
       service_id: (initialData as any)?.custom_fields?.service_id || '',
       attachments: [],
@@ -100,8 +100,9 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
   }, [context.isPlatformAdmin, context.isTenantAdmin, context.franchiseId, watchedTenantId]);
 
   const fetchTenants = async () => {
+    // Pass true for isGlobal to avoid filtering tenants table by tenant_id (which doesn't exist)
     const { data } = await scopedDb
-      .from('tenants')
+      .from('tenants', true)
       .select('id, name')
       .order('name');
     if (data) setTenants(data as any[]);

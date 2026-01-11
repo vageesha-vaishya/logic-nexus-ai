@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, User, Mail, Phone, Building2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,17 +33,27 @@ export default function Contacts() {
   const { supabase, context, scopedDb } = useCRM();
 
   useEffect(() => {
-    fetchContacts();
-  }, [context]);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Contacts: context updated', context);
+      console.log('Contacts: scopedDb context', scopedDb.accessContext);
+    }
+  }, [context, scopedDb]);
 
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     try {
+      console.log('Contacts: fetching with scopedDb', scopedDb.accessContext);
       const { data, error } = await scopedDb
         .from('contacts')
         .select('*, accounts(name)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      console.log(`Contacts: fetched ${data?.length} records`);
+      if (data && data.length > 0) {
+        console.log('Contacts: first record tenant_id:', (data[0] as any).tenant_id);
+      }
+
       setContacts((data as unknown as Contact[]) || []);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -52,7 +62,11 @@ export default function Contacts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb]);
+
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
 
   const filteredContacts = contacts.filter(contact =>
     `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||

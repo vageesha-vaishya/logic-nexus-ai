@@ -1,9 +1,23 @@
+import { createContext, useContext, ReactNode, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { ScopedDataAccess } from '@/lib/db/access';
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 
-export function useCRM() {
+interface CRMContextType {
+  user: any;
+  context: DataAccessContext;
+  supabase: any;
+  scopedDb: ScopedDataAccess;
+  preferences: { tenant_id: string | null; franchise_id: string | null; admin_override_enabled: boolean } | null;
+  loadingPreferences: boolean;
+  setScopePreference: (tenantId: string | null, franchiseId: string | null, adminOverride?: boolean) => Promise<void>;
+  setAdminOverride: (enabled: boolean, tenantIdOverride?: string | null, franchiseIdOverride?: string | null) => Promise<void>;
+  setFranchisePreference: (fid: string | null, ao?: boolean) => Promise<void>;
+}
+
+const CRMContext = createContext<CRMContextType | undefined>(undefined);
+
+export function CRMProvider({ children }: { children: ReactNode }) {
   const { user, roles } = useAuth();
   const [pref, setPref] = useState<{ tenant_id: string | null; franchise_id: string | null; admin_override_enabled: boolean } | null>(null);
   const [loadingPref, setLoadingPref] = useState(false);
@@ -147,7 +161,7 @@ export function useCRM() {
 
   const scopedDb = useMemo(() => new ScopedDataAccess(supabase, context), [context]);
 
-  return {
+  const value = {
     user,
     context,
     supabase,
@@ -156,7 +170,16 @@ export function useCRM() {
     loadingPreferences: loadingPref,
     setScopePreference,
     setAdminOverride,
-    // Backward compatibility wrapper
     setFranchisePreference: (fid: string | null, ao?: boolean) => setScopePreference(pref?.tenant_id ?? null, fid, ao),
   };
+
+  return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>;
+}
+
+export function useCRM() {
+  const context = useContext(CRMContext);
+  if (context === undefined) {
+    throw new Error('useCRM must be used within a CRMProvider');
+  }
+  return context;
 }

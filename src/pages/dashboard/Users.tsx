@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -46,13 +46,7 @@ export default function Users() {
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchUsers();
-    scopedDb.from('tenants').select('id,name').then(({ data }) => setTenants(data || []));
-    scopedDb.from('franchises').select('id,name').then(({ data }) => setFranchises(data || []));
-  }, [context]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       // First, get the user IDs based on role context
       let userIds: string[] | null = null;
@@ -98,16 +92,25 @@ export default function Users() {
           tenant_name: role.tenant_id ? tenantsMap.get(role.tenant_id) : null,
           franchise_name: role.franchise_id ? franchisesMap.get(role.franchise_id) : null,
         }))
-      })) || [];
+      }));
 
-      setUsers(enrichedUsers as UserRow[]);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
+      setUsers(enrichedUsers || []);
+    } catch (error: any) {
+      toast({
+        title: 'Error fetching users',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [context.isPlatformAdmin, context.adminOverrideEnabled, scopedDb, toast]);
+
+  useEffect(() => {
+    fetchUsers();
+    scopedDb.from('tenants').select('id,name').then(({ data }) => setTenants(data || []));
+    scopedDb.from('franchises').select('id,name').then(({ data }) => setFranchises(data || []));
+  }, [fetchUsers, scopedDb]);
 
   return (
     <DashboardLayout>

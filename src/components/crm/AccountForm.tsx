@@ -58,8 +58,8 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
       annual_revenue: initialData?.annual_revenue != null ? String(initialData?.annual_revenue) : '',
       employee_count: initialData?.employee_count != null ? String(initialData?.employee_count) : '',
       description: initialData?.description || '',
-      tenant_id: initialData?.tenant_id ?? undefined,
-      franchise_id: initialData?.franchise_id ?? undefined,
+      tenant_id: initialData?.tenant_id ?? context.tenantId ?? undefined,
+      franchise_id: initialData?.franchise_id ?? context.franchiseId ?? undefined,
       parent_account_id: initialData?.parent_account_id ?? 'none',
     },
   });
@@ -77,7 +77,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
 
   const loadTenants = async () => {
     const { data } = await scopedDb
-      .from('tenants')
+      .from('tenants', true)
       .select('id, name')
       .eq('is_active', true)
       .order('name');

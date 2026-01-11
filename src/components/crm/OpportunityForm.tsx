@@ -79,8 +79,8 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
       competitors: opportunity?.competitors || '',
       type: opportunity?.type || '',
       forecast_category: opportunity?.forecast_category || '',
-      tenant_id: opportunity?.tenant_id || '',
-      franchise_id: opportunity?.franchise_id || '',
+      tenant_id: opportunity?.tenant_id || context.tenantId || '',
+      franchise_id: opportunity?.franchise_id || context.franchiseId || '',
     },
   });
 
@@ -110,7 +110,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
       // Fetch tenants for platform admin
       if (context.isPlatformAdmin) {
         const { data: tenantsData } = await scopedDb
-          .from('tenants')
+          .from('tenants', true)
           .select('id, name')
           .eq('is_active', true)
           .order('name');
