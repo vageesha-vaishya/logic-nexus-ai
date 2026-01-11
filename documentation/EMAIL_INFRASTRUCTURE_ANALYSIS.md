@@ -20,16 +20,18 @@ This document provides a comprehensive analysis and implementation roadmap for e
 
 1. [Multi-Tenant Architecture](#1-multi-tenant-architecture)
 2. [Role Matrix & Access Control](#2-role-matrix--access-control)
-3. [Database Design for Performance](#3-database-design-for-performance)
-4. [Current Implementation Status](#4-current-implementation-status)
-5. [Module-Wise Implementation Plan](#5-module-wise-implementation-plan)
-6. [UI/UX Design Standards](#6-uiux-design-standards)
-7. [AI Enhancement Opportunities](#7-ai-enhancement-opportunities)
-8. [Security & Compliance](#8-security--compliance)
-9. [Implementation Roadmap](#9-implementation-roadmap)
-10. [Technical Requirements](#10-technical-requirements)
-11. [Cost Analysis](#11-cost-analysis)
-12. [Risk Assessment](#12-risk-assessment)
+3. [Communication Continuity & Team Collaboration](#3-communication-continuity--team-collaboration)
+4. [Complete Activity History & 360° View](#4-complete-activity-history--360-view)
+5. [Database Design for Performance](#5-database-design-for-performance)
+6. [Current Implementation Status](#6-current-implementation-status)
+7. [Module-Wise Implementation Plan](#7-module-wise-implementation-plan)
+8. [UI/UX Design Standards](#8-uiux-design-standards)
+9. [AI Enhancement Opportunities](#9-ai-enhancement-opportunities)
+10. [Security & Compliance](#10-security--compliance)
+11. [Implementation Roadmap](#11-implementation-roadmap)
+12. [Technical Requirements](#12-technical-requirements)
+13. [Cost Analysis](#13-cost-analysis)
+14. [Risk Assessment](#14-risk-assessment)
 
 ---
 
@@ -606,9 +608,698 @@ $$;
 
 ---
 
-## 3. Database Design for Performance
+## 3. Communication Continuity & Team Collaboration
 
-### 3.1 Optimized Schema for Email Storage
+### 3.1 Industry Research: How Top CRMs Handle Vacation Coverage
+
+Based on research of **Salesforce**, **HubSpot**, **Zoho**, **Pipedrive**, and **Freshsales**, here's how leading CRMs solve the vacation/handover problem:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    TOP CRM COMMUNICATION CONTINUITY PATTERNS                         │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 1. RECORD-LEVEL EMAIL ASSOCIATION (Salesforce, HubSpot)                     │    │
+│  │    • All emails are linked to RECORDS (Lead, Contact, Account, Opportunity) │    │
+│  │    • Anyone with record access can see ALL communication history            │    │
+│  │    • Email is NOT personal - it belongs to the RECORD                       │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 2. SHARED INBOX / TEAM INBOX (Zoho TeamInbox, Freshworks, HubSpot)         │    │
+│  │    • Team-shared email addresses (sales@company.com)                        │    │
+│  │    • All team members see all conversations                                 │    │
+│  │    • Assignment, @mentions, internal notes                                  │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 3. ACTIVITY TIMELINE (Salesforce, Dynamics 365)                             │    │
+│  │    • Unified view of ALL touchpoints on a record                            │    │
+│  │    • Emails, calls, meetings, notes, tasks - all in one timeline            │    │
+│  │    • Filterable by type, date, user                                         │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 4. USER AVAILABILITY / OUT-OF-OFFICE (HubSpot, Salesforce)                  │    │
+│  │    • Users set "Out of Office" status                                       │    │
+│  │    • Auto-reassignment of conversations                                     │    │
+│  │    • Backup user receives notifications                                     │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 5. CUSTOMER 360° VIEW (Salesforce Customer 360, Gainsight)                  │    │
+│  │    • Complete customer profile with all interactions                        │    │
+│  │    • Cross-departmental visibility (Sales, Marketing, Support)              │    │
+│  │    • Real-time sync across all touchpoints                                  │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 SOS Logistics Pro: Recommended Communication Model
+
+#### Option A: Record-Centric Email Model (RECOMMENDED)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                     RECORD-CENTRIC EMAIL VISIBILITY MODEL                            │
+│                                                                                      │
+│  User A creates Lead "ABC Corp" and sends email → Email linked to Lead             │
+│                                                                                      │
+│  ┌─────────────────────────────┐          ┌─────────────────────────────┐           │
+│  │       USER A (Owner)        │          │       USER B (Colleague)    │           │
+│  │  • Creates Lead "ABC Corp"  │          │  • Has access to Lead view  │           │
+│  │  • Sends email to lead      │          │  • Can see ALL emails on    │           │
+│  │  • On vacation              │──────────│    the Lead record          │           │
+│  │                             │          │  • Can continue conversation│           │
+│  └─────────────────────────────┘          └─────────────────────────────┘           │
+│                                                                                      │
+│  KEY PRINCIPLE: "If you can see the record, you can see its communications"        │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Implementation for SOS Logistics Pro
+
+```typescript
+// src/lib/email-record-association.ts
+
+/**
+ * Email Association Service
+ * Follows Salesforce/HubSpot pattern: emails belong to RECORDS, not users
+ */
+
+export interface EmailAssociation {
+  email_id: string;
+  // Record associations - email can be linked to multiple records
+  lead_id?: string;
+  contact_id?: string;
+  account_id?: string;
+  opportunity_id?: string;
+  quote_id?: string;
+  shipment_id?: string;
+  // Primary record determines main visibility
+  primary_record_type: 'lead' | 'contact' | 'account' | 'opportunity' | 'quote' | 'shipment';
+  primary_record_id: string;
+}
+
+/**
+ * Visibility Logic:
+ * 1. User can see email if they can see ANY associated record
+ * 2. This means team members covering for vacationing colleague see all relevant emails
+ * 3. Managers with record access automatically see team communications
+ */
+export function canUserSeeRecordEmail(
+  userId: string,
+  userRole: string,
+  recordOwnerId: string,
+  recordTenantId: string,
+  recordFranchiseId: string,
+  context: DataAccessContext
+): boolean {
+  // Super Admin: sees everything
+  if (context.isPlatformAdmin) return true;
+  
+  // Tenant Admin: sees all within tenant
+  if (userRole === 'tenant_admin' && context.tenantId === recordTenantId) return true;
+  
+  // Franchise Admin: sees all within franchise
+  if (userRole === 'franchise_admin' && context.franchiseId === recordFranchiseId) return true;
+  
+  // Sales Manager: sees team records
+  if (userRole === 'sales_manager') {
+    // Check if record owner is in user's team
+    return isUserInTeam(recordOwnerId, userId);
+  }
+  
+  // Regular user: only if assigned to record or is owner
+  return recordOwnerId === userId || isUserAssignedToRecord(userId, recordId);
+}
+```
+
+### 3.3 Shared Inbox Implementation
+
+```sql
+-- =====================================================
+-- SHARED INBOX / TEAM EMAIL SUPPORT
+-- =====================================================
+
+-- Team Inboxes for shared email addresses
+CREATE TABLE public.shared_inboxes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  franchise_id UUID REFERENCES franchises(id),
+  
+  -- Inbox details
+  name TEXT NOT NULL, -- e.g., "Sales Team", "Support"
+  email_address TEXT NOT NULL, -- e.g., sales@company.com
+  description TEXT,
+  
+  -- Configuration
+  auto_assign BOOLEAN DEFAULT false,
+  assignment_method TEXT DEFAULT 'round_robin', -- round_robin, least_busy, manual
+  
+  -- Metadata
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  
+  CONSTRAINT unique_tenant_inbox_email UNIQUE (tenant_id, email_address)
+);
+
+-- Team inbox membership
+CREATE TABLE public.shared_inbox_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  inbox_id UUID NOT NULL REFERENCES shared_inboxes(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  
+  -- Role in inbox
+  role TEXT DEFAULT 'member', -- owner, admin, member
+  
+  -- Notifications
+  receive_notifications BOOLEAN DEFAULT true,
+  
+  created_at TIMESTAMPTZ DEFAULT now(),
+  
+  CONSTRAINT unique_inbox_member UNIQUE (inbox_id, user_id)
+);
+
+-- RLS: All inbox members can see all inbox emails
+CREATE POLICY "Shared inbox email visibility"
+ON public.emails
+FOR SELECT
+TO authenticated
+USING (
+  -- If email belongs to a shared inbox the user is member of
+  EXISTS (
+    SELECT 1 FROM shared_inbox_members sim
+    JOIN shared_inboxes si ON sim.inbox_id = si.id
+    JOIN email_accounts ea ON ea.email_address = si.email_address
+    WHERE sim.user_id = auth.uid()
+    AND ea.id = emails.account_id
+  )
+);
+```
+
+### 3.4 User Availability & Out-of-Office (HubSpot Pattern)
+
+```sql
+-- =====================================================
+-- USER AVAILABILITY MANAGEMENT
+-- =====================================================
+
+CREATE TABLE public.user_availability (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  franchise_id UUID REFERENCES franchises(id),
+  
+  -- Status
+  status TEXT DEFAULT 'available', -- available, busy, away, out_of_office
+  
+  -- Out of Office settings
+  out_of_office_start TIMESTAMPTZ,
+  out_of_office_end TIMESTAMPTZ,
+  out_of_office_message TEXT,
+  
+  -- Backup/Coverage
+  backup_user_id UUID REFERENCES auth.users(id),
+  auto_reassign_conversations BOOLEAN DEFAULT false,
+  auto_reassign_new_leads BOOLEAN DEFAULT false,
+  
+  -- Working hours (for routing)
+  working_hours JSONB DEFAULT '{"monday":{"start":"09:00","end":"17:00"}}'::jsonb,
+  timezone TEXT DEFAULT 'UTC',
+  
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  
+  CONSTRAINT unique_user_availability UNIQUE (user_id)
+);
+
+-- Index for quick lookup of available users
+CREATE INDEX idx_user_availability_status ON user_availability(tenant_id, franchise_id, status);
+CREATE INDEX idx_user_availability_backup ON user_availability(backup_user_id);
+```
+
+```typescript
+// src/lib/user-availability.ts
+
+export interface UserAvailability {
+  userId: string;
+  status: 'available' | 'busy' | 'away' | 'out_of_office';
+  outOfOffice?: {
+    start: Date;
+    end: Date;
+    message: string;
+    backupUserId?: string;
+  };
+}
+
+/**
+ * When user is out of office:
+ * 1. Show OOO badge on their profile
+ * 2. Auto-route new conversations to backup user
+ * 3. Backup user receives notifications
+ * 4. All team members with record access can still see communications
+ */
+export async function handleOutOfOfficeRouting(
+  originalOwnerId: string,
+  recordType: string,
+  recordId: string
+): Promise<string | null> {
+  const availability = await getUserAvailability(originalOwnerId);
+  
+  if (availability.status === 'out_of_office' && availability.outOfOffice?.backupUserId) {
+    // Auto-assign to backup user
+    return availability.outOfOffice.backupUserId;
+  }
+  
+  return null; // Keep with original owner
+}
+```
+
+### 3.5 Vacation Handover Workflow (Best Practice from Top CRMs)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                      VACATION HANDOVER WORKFLOW                                      │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  BEFORE VACATION (User Action):                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 1. Set status to "Out of Office"                                            │    │
+│  │ 2. Set vacation dates (start/end)                                           │    │
+│  │ 3. Select backup user                                                        │    │
+│  │ 4. Toggle: "Auto-reassign new conversations"                                │    │
+│  │ 5. Add out-of-office message                                                 │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  DURING VACATION (System Behavior):                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 1. New emails to user's records → Notification to backup user               │    │
+│  │ 2. Backup user can view & reply to all conversations                        │    │
+│  │ 3. Internal notes added: "[Handled by BackupUser during vacation]"          │    │
+│  │ 4. Original user's profile shows OOO badge                                  │    │
+│  │ 5. Timeline shows who handled each communication                            │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  AFTER VACATION (Return Sync):                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │ 1. User sees summary: "5 conversations handled during your absence"         │    │
+│  │ 2. All communication history visible in record timeline                     │    │
+│  │ 3. Automatic status reset to "Available"                                    │    │
+│  │ 4. Option to take back reassigned records or keep with backup               │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Complete Activity History & 360° View
+
+### 4.1 Industry Standard: Unified Activity Timeline
+
+Based on **Salesforce Activity 360**, **Dynamics 365 Timeline**, and **HubSpot Activity Feed**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                      ACTIVITY TIMELINE ARCHITECTURE                                  │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                     RECORD ACTIVITY TIMELINE                                │    │
+│  │                                                                              │    │
+│  │  ──────────────────────────────────────────────────────────────────────     │    │
+│  │  ▼ Today                                                                     │    │
+│  │  ├─📧 Email: "Re: Quote for ocean freight" - John (2 hours ago)             │    │
+│  │  ├─📞 Call: 15 min call with client - Sarah (4 hours ago)                   │    │
+│  │  ├─📝 Note: "Client confirmed budget approval" - John (5 hours ago)         │    │
+│  │  ──────────────────────────────────────────────────────────────────────     │    │
+│  │  ▼ Yesterday                                                                 │    │
+│  │  ├─📄 Quote: Version 2 sent - System                                        │    │
+│  │  ├─📧 Email: "Quote attached" - John                                        │    │
+│  │  ├─✅ Task: "Follow up on quote" completed - Sarah                          │    │
+│  │  ──────────────────────────────────────────────────────────────────────     │    │
+│  │  ▼ Last Week                                                                 │    │
+│  │  ├─🚀 Stage Change: Lead → Opportunity - John                               │    │
+│  │  ├─📅 Meeting: "Initial discovery call" - John, Sarah                       │    │
+│  │  ├─📧 Email: "Introduction" - John                                          │    │
+│  │  └─➕ Created: Lead created from web form - System                          │    │
+│  │                                                                              │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Platform-Wide Activity Logging
+
+#### Activity History at Different Levels
+
+| Level | What to Track | Who Can See | Use Case |
+|-------|--------------|-------------|----------|
+| **Platform** | All activities across all tenants | Super Admin only | System health, compliance audits |
+| **Tenant** | All activities within tenant | Tenant Admin + | Business analytics, team performance |
+| **Franchisee** | All activities within franchisee | Franchise Admin + | Local team management |
+| **User** | Own activities | Self + Managers | Personal productivity |
+| **Record** | All activities on a record | Anyone with record access | Customer communication history |
+
+### 4.3 Unified Activity Table Design
+
+```sql
+-- =====================================================
+-- UNIFIED ACTIVITY TRACKING (Customer 360 Pattern)
+-- =====================================================
+
+CREATE TABLE public.activity_timeline (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- Multi-tenant scope
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  franchise_id UUID REFERENCES franchises(id),
+  
+  -- Actor
+  user_id UUID REFERENCES auth.users(id), -- Who performed the action (NULL for system)
+  user_name TEXT, -- Cached for performance
+  
+  -- Activity type
+  activity_type TEXT NOT NULL, -- email, call, note, task, meeting, stage_change, created, etc.
+  activity_subtype TEXT, -- email_sent, email_received, call_inbound, etc.
+  
+  -- Related record (polymorphic)
+  record_type TEXT NOT NULL, -- lead, contact, account, opportunity, quote, shipment
+  record_id UUID NOT NULL,
+  record_name TEXT, -- Cached for display
+  
+  -- Activity details
+  subject TEXT NOT NULL,
+  description TEXT,
+  metadata JSONB DEFAULT '{}', -- Type-specific data
+  
+  -- Related email (if applicable)
+  email_id UUID REFERENCES emails(id),
+  
+  -- Timestamps
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  
+  -- Full-text search
+  search_vector TSVECTOR GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce(subject, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(record_name, '')), 'C')
+  ) STORED
+);
+
+-- Indexes for fast querying
+CREATE INDEX idx_activity_record ON activity_timeline(record_type, record_id, occurred_at DESC);
+CREATE INDEX idx_activity_tenant ON activity_timeline(tenant_id, occurred_at DESC);
+CREATE INDEX idx_activity_franchise ON activity_timeline(tenant_id, franchise_id, occurred_at DESC);
+CREATE INDEX idx_activity_user ON activity_timeline(user_id, occurred_at DESC);
+CREATE INDEX idx_activity_type ON activity_timeline(activity_type, occurred_at DESC);
+CREATE INDEX idx_activity_search ON activity_timeline USING GIN(search_vector);
+
+-- Partitioning for large-scale deployments (optional)
+-- Consider partitioning by tenant_id and time for very large datasets
+```
+
+### 4.4 Activity Timeline RLS Policies
+
+```sql
+-- =====================================================
+-- ACTIVITY TIMELINE VISIBILITY (Hierarchical)
+-- =====================================================
+
+CREATE POLICY "Activity timeline hierarchical visibility"
+ON public.activity_timeline
+FOR SELECT
+TO authenticated
+USING (
+  -- Super Admin: sees ALL platform activities
+  public.is_super_admin(auth.uid())
+  OR
+  -- Tenant Admin: sees all tenant activities
+  (public.is_tenant_admin(auth.uid()) 
+   AND tenant_id = public.get_user_tenant_id(auth.uid()))
+  OR
+  -- Franchise Admin: sees all franchise activities
+  (public.is_franchise_admin(auth.uid()) 
+   AND franchise_id = public.get_user_franchise_id(auth.uid()))
+  OR
+  -- Anyone with record access can see record activities
+  -- (Uses record-level permissions)
+  public.can_access_record(auth.uid(), record_type, record_id)
+);
+
+-- Helper function to check record access
+CREATE OR REPLACE FUNCTION public.can_access_record(
+  _user_id UUID,
+  _record_type TEXT,
+  _record_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  has_access BOOLEAN;
+BEGIN
+  -- Dynamic check based on record type
+  CASE _record_type
+    WHEN 'lead' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM leads 
+        WHERE id = _record_id 
+        AND (owner_id = _user_id OR assigned_to = _user_id
+             OR tenant_id = public.get_user_tenant_id(_user_id))
+      ) INTO has_access;
+    WHEN 'contact' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM contacts 
+        WHERE id = _record_id 
+        AND (owner_id = _user_id 
+             OR tenant_id = public.get_user_tenant_id(_user_id))
+      ) INTO has_access;
+    WHEN 'account' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM accounts 
+        WHERE id = _record_id 
+        AND (owner_id = _user_id 
+             OR tenant_id = public.get_user_tenant_id(_user_id))
+      ) INTO has_access;
+    WHEN 'opportunity' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM opportunities 
+        WHERE id = _record_id 
+        AND (owner_id = _user_id 
+             OR tenant_id = public.get_user_tenant_id(_user_id))
+      ) INTO has_access;
+    WHEN 'quote' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM quotes 
+        WHERE id = _record_id 
+        AND tenant_id = public.get_user_tenant_id(_user_id)
+      ) INTO has_access;
+    WHEN 'shipment' THEN
+      SELECT EXISTS (
+        SELECT 1 FROM shipments 
+        WHERE id = _record_id 
+        AND tenant_id = public.get_user_tenant_id(_user_id)
+      ) INTO has_access;
+    ELSE
+      has_access := false;
+  END CASE;
+  
+  RETURN has_access;
+END;
+$$;
+```
+
+### 4.5 Complete Communication History View
+
+```typescript
+// src/components/crm/ActivityTimeline.tsx
+
+interface ActivityTimelineProps {
+  recordType: 'lead' | 'contact' | 'account' | 'opportunity' | 'quote' | 'shipment';
+  recordId: string;
+  scope?: 'record' | 'franchise' | 'tenant' | 'platform';
+}
+
+/**
+ * Unified Activity Timeline Component
+ * Shows complete history of all interactions with a record/entity
+ * 
+ * Features (inspired by Salesforce & HubSpot):
+ * - Chronological timeline view
+ * - Filter by activity type (emails, calls, notes, tasks)
+ * - Filter by user
+ * - Group by day/week/month
+ * - Quick inline actions (reply to email, add note)
+ * - Real-time updates via Supabase Realtime
+ */
+
+// Activity types for SOS Logistics Pro
+export const ACTIVITY_TYPES = {
+  // Communication
+  email_sent: { icon: 'Mail', color: 'blue', label: 'Email Sent' },
+  email_received: { icon: 'MailOpen', color: 'green', label: 'Email Received' },
+  call_outbound: { icon: 'PhoneOutgoing', color: 'orange', label: 'Outbound Call' },
+  call_inbound: { icon: 'PhoneIncoming', color: 'teal', label: 'Inbound Call' },
+  meeting: { icon: 'Calendar', color: 'purple', label: 'Meeting' },
+  
+  // Notes & Tasks
+  note: { icon: 'FileText', color: 'gray', label: 'Note' },
+  task_created: { icon: 'CheckSquare', color: 'yellow', label: 'Task Created' },
+  task_completed: { icon: 'CheckCircle', color: 'green', label: 'Task Completed' },
+  
+  // Record changes
+  stage_change: { icon: 'ArrowRight', color: 'indigo', label: 'Stage Changed' },
+  owner_change: { icon: 'UserCheck', color: 'pink', label: 'Owner Changed' },
+  created: { icon: 'Plus', color: 'emerald', label: 'Created' },
+  
+  // Logistics-specific
+  shipment_created: { icon: 'Ship', color: 'blue', label: 'Shipment Created' },
+  shipment_status: { icon: 'Truck', color: 'amber', label: 'Status Updated' },
+  document_uploaded: { icon: 'Upload', color: 'slate', label: 'Document Uploaded' },
+  quote_sent: { icon: 'FileCheck', color: 'violet', label: 'Quote Sent' },
+};
+```
+
+### 4.6 Shipment Communication History (Logistics-Specific)
+
+```sql
+-- =====================================================
+-- SHIPMENT-SPECIFIC ACTIVITY TRACKING
+-- =====================================================
+
+-- All communications related to a shipment are tracked
+-- This allows any team member to see complete history
+
+CREATE OR REPLACE VIEW public.shipment_communication_history AS
+SELECT 
+  s.id AS shipment_id,
+  s.reference_number,
+  at.id AS activity_id,
+  at.activity_type,
+  at.subject,
+  at.description,
+  at.occurred_at,
+  at.user_name,
+  at.email_id,
+  e.from_email,
+  e.to_emails,
+  e.body_text
+FROM shipments s
+LEFT JOIN activity_timeline at ON at.record_type = 'shipment' AND at.record_id = s.id
+LEFT JOIN emails e ON e.id = at.email_id
+ORDER BY at.occurred_at DESC;
+
+-- Query for complete shipment history (with all related records)
+CREATE OR REPLACE FUNCTION public.get_shipment_full_history(_shipment_id UUID)
+RETURNS TABLE (
+  activity_id UUID,
+  activity_type TEXT,
+  subject TEXT,
+  description TEXT,
+  occurred_at TIMESTAMPTZ,
+  user_name TEXT,
+  related_record_type TEXT,
+  related_record_name TEXT
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  -- Get activities directly on shipment
+  SELECT id, activity_type, subject, description, occurred_at, user_name, 
+         'shipment' as related_record_type, NULL as related_record_name
+  FROM activity_timeline WHERE record_type = 'shipment' AND record_id = _shipment_id
+  
+  UNION ALL
+  
+  -- Get activities on related opportunity
+  SELECT at.id, at.activity_type, at.subject, at.description, at.occurred_at, at.user_name,
+         'opportunity' as related_record_type, o.name
+  FROM activity_timeline at
+  JOIN opportunities o ON o.id = at.record_id
+  JOIN shipments s ON s.opportunity_id = o.id
+  WHERE at.record_type = 'opportunity' AND s.id = _shipment_id
+  
+  UNION ALL
+  
+  -- Get activities on related account
+  SELECT at.id, at.activity_type, at.subject, at.description, at.occurred_at, at.user_name,
+         'account' as related_record_type, a.name
+  FROM activity_timeline at
+  JOIN accounts a ON a.id = at.record_id
+  JOIN shipments s ON s.account_id = a.id
+  WHERE at.record_type = 'account' AND s.id = _shipment_id
+  
+  ORDER BY occurred_at DESC
+$$;
+```
+
+### 4.7 Platform-Wide Communication Dashboard
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    COMMUNICATION HISTORY DASHBOARD                                   │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌─ Scope Selector ──────────────────────────────────────────────────────────────┐  │
+│  │  [Platform ▼]  [All Tenants ▼]  [All Franchisees ▼]  [All Time ▼]            │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                      │
+│  ┌─ Summary Stats ───────────────────────────────────────────────────────────────┐  │
+│  │  📧 12,456 Emails  │  📞 3,421 Calls  │  📝 8,901 Notes  │  ✅ 5,678 Tasks   │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                      │
+│  ┌─ Activity Feed ─────────────────────────────────────────────────────────────┐    │
+│  │  Filter: [All Types ▼] [All Users ▼] [Search...               ] [🔍]        │    │
+│  │  ───────────────────────────────────────────────────────────────────────    │    │
+│  │  │ 📧 John sent email to ABC Corp - "Re: Quote #1234"           2m ago     │    │
+│  │  │ 📞 Sarah logged call with XYZ Ltd - "Discussed pricing"      15m ago    │    │
+│  │  │ 📄 Quote #1235 sent to Global Shipping Co                    1h ago     │    │
+│  │  │ 🚀 Lead "Maritime Express" converted to Opportunity          2h ago     │    │
+│  │  │ ✅ Task "Follow up on RFQ" completed by Mike                  3h ago     │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌─ By Franchisee ─────────────────────────────────────────────────────────────┐    │
+│  │  LA Office:    ████████████ 2,341 activities                                │    │
+│  │  NYC Office:   ██████████ 1,987 activities                                  │    │
+│  │  Chicago:      ████████ 1,456 activities                                    │    │
+│  │  Miami:        ██████ 1,023 activities                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.8 Key Implementation Recommendations
+
+Based on research of top CRMs, SOS Logistics Pro should implement:
+
+1. **Record-Centric Email Model**: All emails link to records, not just users. Anyone with record access sees all communications.
+
+2. **Unified Activity Timeline**: Single view per record showing emails, calls, notes, tasks, stage changes.
+
+3. **Shared Team Inboxes**: Support for sales@company.com with round-robin assignment and shared visibility.
+
+4. **Out-of-Office Management**: User availability status, backup user assignment, auto-routing.
+
+5. **Hierarchical Visibility**: Platform → Tenant → Franchise → User cascade for complete oversight.
+
+6. **360° Customer View**: Cross-departmental visibility linking leads, contacts, accounts, opportunities, quotes, shipments.
+
+---
+
+## 5. Database Design for Performance
+
+### 5.1 Optimized Schema for Email Storage
 
 ```sql
 -- =====================================================
