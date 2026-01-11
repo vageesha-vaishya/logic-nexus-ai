@@ -102,7 +102,7 @@ export function AssignmentRules({ onUpdate }: Props) {
 
   const handleToggleActive = async (ruleId: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('lead_assignment_rules')
         .update({ is_active: !isActive })
         .eq('id', ruleId);
@@ -143,7 +143,7 @@ export function AssignmentRules({ onUpdate }: Props) {
     const newPriority = direction === 'up' ? rule.priority + 1 : rule.priority - 1;
 
     try {
-      const { error } = await supabase
+      const { error } = await scopedDb
         .from('lead_assignment_rules')
         .update({ priority: newPriority })
         .eq('id', ruleId);

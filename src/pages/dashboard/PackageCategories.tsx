@@ -8,6 +8,9 @@ import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
+
+type PackageCategoryRow = Database["public"]["Tables"]["package_categories"]["Row"];
 
 export default function PackageCategories() {
   const { supabase, scopedDb, context } = useCRM();
@@ -20,16 +23,10 @@ export default function PackageCategories() {
     const isPlatform = context.isPlatformAdmin;
     const tenantId = context.tenantId;
     
-    // ScopedDb handles the check for tenantId if not platform admin
     if (!isPlatform && !tenantId) return;
 
     try {
-      // Use scopedDb for automatic tenant filtering
       let query = scopedDb.from("package_categories").select("*");
-      
-      // No need to manually filter by tenant_id for non-platform admins
-      // scopedDb handles it.
-      
       const { data, error } = await query.order("category_name");
 
       if (error) {
@@ -38,52 +35,17 @@ export default function PackageCategories() {
       }
 
       const rows = (data as PackageCategoryRow[]) || [];
-      
-      // Dev-only: auto-seed demo categories if none exist (only when tenant scoped)
-      // Note: scopedDb.insert will auto-inject tenant_id
-      if (!isPlatform && rows.length === 0 && import.meta.env.DEV) {
-        try {
-          await scopedDb.from("package_categories").insert([
-            {
-              // tenant_id is injected by scopedDb
-              category_name: "Container",
-              category_code: "CONT",
-              description: "Standard shipping containers",
-              is_active: true,
-            },
-            {
-              category_name: "Palletized",
-              category_code: "PAL",
-              description: "Goods packed on pallets",
-              is_active: true,
-            },
-            {
-              category_name: "Loose",
-              category_code: "LOOSE",
-              description: "Loose cargo items",
-              is_active: false,
-            },
-          ] as any);
-          
-          toast.success("Seeded demo package categories");
-          const { data: seeded } = await scopedDb
-            .from("package_categories")
-            .select("*")
-            .order("category_name");
-          setCategories((seeded as PackageCategoryRow[]) || []);
-        } catch (seedErr: any) {
-          console.warn("Package categories seed failed:", seedErr?.message || seedErr);
-          setCategories([]);
-        }
-      } else {
-        setCategories(rows);
-      }
+      setCategories(rows);
     } catch (err) {
       console.error("Error in fetchCategories:", err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchCategories();
+  }, [context.tenantId]);
 
   const handleSave = async (data: any) => {
     try {
@@ -102,7 +64,6 @@ export default function PackageCategories() {
       } else {
         const { error } = await scopedDb.from("package_categories").insert([
           {
-            // tenant_id injected by scopedDb
             category_name: data.category_name,
             category_code: data.category_code,
             description: data.description,
@@ -139,7 +100,7 @@ export default function PackageCategories() {
         </div>
         <div className="space-y-4">
         <div className="flex justify-end">
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -152,7 +113,7 @@ export default function PackageCategories() {
               </DialogHeader>
               <PackageCategoryForm
                 onSuccess={() => {
-                  setOpen(false);
+                  setIsDialogOpen(false);
                   fetchCategories();
                 }}
               />

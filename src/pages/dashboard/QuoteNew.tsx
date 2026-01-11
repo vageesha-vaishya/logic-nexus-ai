@@ -98,7 +98,7 @@ export default function QuoteNew() {
         if (insertError) {
           console.error('[QuoteNew] Error creating version:', insertError);
           // Check if version was created by another process
-          const { data: retry } = await (dao
+          const { data: retry } = await (scopedDb
             .from('quotation_versions')
             .select('id') as any)
             .eq('quote_id', createdQuoteId)

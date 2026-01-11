@@ -24,7 +24,7 @@ interface TransportModeForm {
 
 export default function TransportModes() {
   const { toast } = useToast();
-  const { scopedDb } = useCRM();
+  const { scopedDb, supabase } = useCRM();
   const { data: modes, refetch } = useTransportModes();
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);

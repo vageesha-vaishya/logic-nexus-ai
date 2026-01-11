@@ -36,6 +36,7 @@ type Option = {
 };
 
 export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
+  const { supabase, scopedDb } = useCRM();
   const [versions, setVersions] = useState<Version[]>([]);
   const [optionsByVersion, setOptionsByVersion] = useState<Record<string, Option[]>>({});
   const [loading, setLoading] = useState(false);

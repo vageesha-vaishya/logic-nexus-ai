@@ -61,8 +61,8 @@ export default function Dashboard() {
     };
 
     fetchDashboardStats();
-    // Include context._version to trigger re-fetch when scope changes
-  }, [dao, context.tenantId, context.franchiseId, context._version, toast]);
+    // Trigger re-fetch when scope changes
+  }, [dao, context.tenantId, context.franchiseId, toast]);
 
   const statCards = [
     {

@@ -477,7 +477,7 @@ const AESHTSCodeManager: React.FC = () => {
 
   // Seed sample data to Supabase
   const seedDatabase = async () => {
-    const client = supabase ?? defaultSupabase;
+    const client = scopedDb;
 
     if (!confirm('This will add sample HTS/Schedule B codes to your database. Continue?')) return;
 
@@ -518,7 +518,7 @@ const AESHTSCodeManager: React.FC = () => {
       
       if (error) throw error;
       
-      await loadCodes(client);
+      await loadCodes();
       alert(`Successfully seeded ${sanitized.length} sample records`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

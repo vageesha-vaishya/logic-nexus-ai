@@ -63,7 +63,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
     const load = async () => {
       if (!targetTenantId) return;
       try {
-        const data = await TransferService.getFranchisesForTenant(targetTenantId);
+        const data = await TransferService.getFranchisesForTenant(dao, targetTenantId);
         setFranchises(data);
       } catch (e) {
         console.error(e);
@@ -93,7 +93,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
       try {
         const payload = buildPayload();
         if (payload) {
-          const result = await TransferService.validateTransfer(payload);
+          const result = await TransferService.validateTransfer(dao, payload);
           setValidation(result);
         }
       } catch (error) {

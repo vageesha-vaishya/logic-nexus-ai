@@ -200,7 +200,7 @@ export async function upsertRatesAndChargesForQuote(
       ...((cq.buying_charges || []) as ChargeInput[]),
       ...((cq.selling_charges || []) as ChargeInput[]),
     ];
-    await upsertChargesForRate(tenant_id, rateId!, cq.mode, mergedCharges, client);
+    await upsertChargesForRate(tenant_id, rateId!, cq.mode, mergedCharges, client as any);
 
     finalRateIds.push(rateId!);
     keptRateIds.add(rateId!);

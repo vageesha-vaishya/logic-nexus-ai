@@ -7,7 +7,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, Pagi
 import { useSort } from '@/hooks/useSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useCRM } from '@/hooks/useCRM';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
@@ -16,11 +16,14 @@ import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Quote, QuoteStatus } from "@/types/crm";
+import type { Database } from '@/integrations/supabase/types';
 import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
+type Quote = Database['public']['Tables']['quotes']['Row'] & { account?: any; contact?: any; opportunity?: any; carrier?: any; service_type?: any };
+type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 
 export default function Quotes() {
   const navigate = useNavigate();
@@ -129,13 +132,13 @@ export default function Quotes() {
   const filteredQuotes = quotes.filter((q) => {
     const quoteNum = q.quote_number || (q.id ? String(q.id).slice(0, 8) : '');
     const matchesQuoteNum = matchText(quoteNum, quoteNumberQuery, quoteNumberOp);
-    const customerName = q.accounts?.name || '';
+    const customerName = (q as any).account?.name || '';
     const matchesCustomer = matchText(customerName, customerQuery, customerOp);
-    const contactName = q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : '';
+    const contactName = (q as any).contact ? `${(q as any).contact.first_name} ${(q as any).contact.last_name}` : '';
     const matchesContact = matchText(contactName, contactQuery, contactOp);
-    const opportunityName = q.opportunities?.name || '';
+    const opportunityName = (q as any).opportunity?.name || '';
     const matchesOpportunity = matchText(opportunityName, opportunityQuery, opportunityOp);
-    const carrierName = q.carriers?.carrier_name || '';
+    const carrierName = (q as any).carrier?.carrier_name || '';
     const matchesCarrier = matchText(carrierName, carrierQuery, carrierOp);
     const statusVal = (q.status || '').toLowerCase();
     const matchesStatus = quoteStatus && quoteStatus !== 'any' ? statusVal === quoteStatus.toLowerCase() : true;
@@ -153,21 +156,21 @@ export default function Quotes() {
     );
   });
 
-  const { sorted: sortedQuotes, sortField, sortDirection, onSort } = useSort<Quote>(
+  const { sorted: sortedQuotes, sortField, sortDirection, onSort } = useSort<any>(
     filteredQuotes,
     {
       initialField: 'created_at',
       initialDirection: 'desc',
       accessors: {
-        quote_number: (q: Quote) => q.quote_number || (q.id ? String(q.id).slice(0, 8) : ''),
-        customer: (q: Quote) => q.accounts?.name || '',
-        contact: (q: Quote) => (q.contacts ? `${q.contacts.first_name} ${q.contacts.last_name}` : ''),
-        opportunity: (q: Quote) => q.opportunities?.name || '',
-        carrier: (q: Quote) => q.carriers?.carrier_name || '',
-        status: (q: Quote) => q.status || '',
-        sell_price: (q: Quote) => Number(q.sell_price ?? 0),
-        margin: (q: Quote) => (q.sell_price != null && q.cost_price != null ? Number(q.sell_price) - Number(q.cost_price) : 0),
-        created_at: (q: Quote) => (q.created_at ? new Date(q.created_at).getTime() : 0),
+        quote_number: (q: any) => q.quote_number || (q.id ? String(q.id).slice(0, 8) : ''),
+        customer: (q: any) => q.account?.name || '',
+        contact: (q: any) => (q.contact ? `${q.contact.first_name} ${q.contact.last_name}` : ''),
+        opportunity: (q: any) => q.opportunity?.name || '',
+        carrier: (q: any) => q.carrier?.carrier_name || '',
+        status: (q: any) => q.status || '',
+        sell_price: (q: any) => Number(q.sell_price ?? 0),
+        margin: (q: any) => (q.sell_price != null && q.cost_price != null ? Number(q.sell_price) - Number(q.cost_price) : 0),
+        created_at: (q: any) => (q.created_at ? new Date(q.created_at).getTime() : 0),
       },
     }
   );

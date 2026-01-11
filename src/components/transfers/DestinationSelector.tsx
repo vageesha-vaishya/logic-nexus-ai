@@ -37,7 +37,7 @@ export function DestinationSelector({
     const load = async () => {
       setLoadingTenants(true);
       try {
-        const data = await TransferService.getAvailableTenants();
+        const data = await TransferService.getAvailableTenants(dao);
         setTenants(data);
       } catch (error) {
         console.error('Error loading tenants:', error);

@@ -38,13 +38,15 @@ export function TransferDetailDialog({
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
   const { toast } = useToast();
+  const { supabase, context, scopedDb } = useCRM();
+  const dao = new ScopedDataAccess(supabase, context);
 
   useEffect(() => {
     const load = async () => {
       if (!transferId) return;
       setLoading(true);
       try {
-        const data = await TransferService.getTransfer(transferId);
+        const data = await TransferService.getTransfer(dao, transferId);
         setTransfer(data);
       } catch (error: any) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -64,7 +66,7 @@ export function TransferDetailDialog({
     if (!transferId) return;
     setActionLoading(true);
     try {
-      const result = await TransferService.approveTransfer(transferId);
+      const result = await TransferService.approveTransfer(dao, transferId);
       if (result.success) {
         toast({
           title: 'Transfer Completed',

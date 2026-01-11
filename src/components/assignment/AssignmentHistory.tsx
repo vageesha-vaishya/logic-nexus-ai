@@ -62,8 +62,8 @@ export function AssignmentHistory() {
     };
 
     fetchHistory();
-    // Include context._version to trigger re-fetch when scope changes
-  }, [scopedDb, context.tenantId, context.franchiseId, context._version]);
+    // Trigger re-fetch when scope changes
+  }, [scopedDb, context.tenantId, context.franchiseId]);
 
   const filteredHistory = history.filter((item) => {
     const searchLower = searchQuery.toLowerCase();
