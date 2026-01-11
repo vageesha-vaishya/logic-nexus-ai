@@ -1786,6 +1786,47 @@ export type Database = {
           },
         ]
       }
+      dashboard_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          layout: Json | null
+          tenant_id: string | null
+          theme_overrides: Json | null
+          updated_at: string
+          user_id: string
+          widgets: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          layout?: Json | null
+          tenant_id?: string | null
+          theme_overrides?: Json | null
+          updated_at?: string
+          user_id: string
+          widgets?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          layout?: Json | null
+          tenant_id?: string | null
+          theme_overrides?: Json | null
+          updated_at?: string
+          user_id?: string
+          widgets?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_preferences_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           created_at: string | null
