@@ -2132,6 +2132,8 @@ $$;
 
 ### 9.1 Phase 1: Foundation (Weeks 1-2)
 
+> **Detailed Implementation Plan:** See [`documentation/EMAIL_PHASE_1_IMPLEMENTATION.md`](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/documentation/EMAIL_PHASE_1_IMPLEMENTATION.md) for full technical specifications, DNS requirements, and configuration templates.
+
 | Task | Owner | Effort | Deliverable |
 |------|-------|--------|-------------|
 | Add Resend integration | Backend | 2 days | `send-email-resend/` edge function |
