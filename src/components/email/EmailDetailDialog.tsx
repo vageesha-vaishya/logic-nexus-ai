@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2, UserPlus } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailToLeadDialog } from "./EmailToLeadDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Email {
   id: string;
@@ -34,6 +35,28 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
   const [showFullBody, setShowFullBody] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [showConvertToLead, setShowConvertToLead] = useState(false);
+  
+  const handleDownload = useCallback(async (path: string, filename: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('email-attachments')
+        .download(path);
+      
+      if (error) throw error;
+      
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  }, []);
   const clampStyle = showFullBody
     ? {}
     : {

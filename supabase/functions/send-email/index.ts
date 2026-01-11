@@ -186,7 +186,7 @@ export class GmailProvider extends EmailProvider {
     messageLines.push(`--${hasAttachments ? altBoundary : boundary}`);
     messageLines.push(`Content-Type: text/html; charset=UTF-8`);
     messageLines.push("");
-    messageLines.push(req.body);
+    messageLines.push(req.body || "");
     messageLines.push("");
     
     if (hasAttachments) {
