@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Trash2, UserPlus, Users } from "lucide-react";
+import { Loader2, Trash2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface EmailAccount {
@@ -22,7 +22,7 @@ interface EmailDelegationDialogProps {
 }
 
 interface Delegate {
-  id: string; // delegation id
+  id: string;
   user_id: string;
   permissions: string[];
   user: {
@@ -39,6 +39,12 @@ interface User {
   last_name: string;
   email: string;
   avatar_url?: string;
+}
+
+interface DelegationRow {
+  id: string;
+  delegate_user_id: string;
+  permissions: string[];
 }
 
 export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDelegationDialogProps) {
@@ -60,17 +66,15 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
     if (!account) return;
     setLoading(true);
     try {
-      // Fetch existing delegations
-      const { data: delegations, error: delError } = await supabase
-        .from("email_account_delegations")
-        .select(`
-          id,
-          delegate_user_id,
-          permissions
-        `)
+      // Fetch existing delegations using raw query since types may not be regenerated yet
+      const { data: delegationsRaw, error: delError } = await supabase
+        .from("email_account_delegations" as any)
+        .select(`id, delegate_user_id, permissions`)
         .eq("account_id", account.id);
 
       if (delError) throw delError;
+
+      const delegations = (delegationsRaw || []) as unknown as DelegationRow[];
 
       // Get user details for delegates
       const delegateUserIds = delegations.map(d => d.delegate_user_id);
@@ -95,12 +99,6 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
       setDelegates(delegatesWithUsers);
 
       // Fetch available users (potential delegates)
-      // Logic: Users in the same franchise or tenant
-      let userQuery = supabase
-        .from("profiles")
-        .select("id, first_name, last_name, email, avatar_url")
-        .neq("id", context.userId); // Exclude self
-
       let scopeUserIds: string[] = [];
       
       if (context.franchiseId) {
@@ -117,16 +115,18 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
         scopeUserIds = roles?.map(r => r.user_id) || [];
       }
 
+      let userQuery = supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, avatar_url")
+        .neq("id", context.userId || '');
+
       if (scopeUserIds.length > 0) {
         userQuery = userQuery.in("id", scopeUserIds);
       }
       
-      // Also exclude already delegated users
+      // Exclude already delegated users
       if (delegateUserIds.length > 0) {
-        // userQuery.not("id", "in", `(${delegateUserIds.join(',')})`) // syntax might be tricky with array
-        // simpler to fetch and filter in JS if list is small, or use .not('id', 'in', ...) correctly
-        // Supabase .not('id', 'in', array) works
-         userQuery = userQuery.not('id', 'in', `(${delegateUserIds.join(',')})`);
+        userQuery = userQuery.not('id', 'in', `(${delegateUserIds.join(',')})`);
       }
 
       const { data: users, error: potentialError } = await userQuery.limit(50);
@@ -150,12 +150,12 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
     setAdding(true);
     try {
       const { error } = await supabase
-        .from("email_account_delegations")
+        .from("email_account_delegations" as any)
         .insert({
           account_id: account.id,
           delegate_user_id: selectedUserId,
           permissions: ["read", "send"]
-        });
+        } as any);
 
       if (error) throw error;
 
@@ -165,7 +165,7 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
       });
       
       setSelectedUserId("");
-      fetchData(); // Refresh list
+      fetchData();
     } catch (error: any) {
       toast({
         title: "Error adding delegate",
@@ -180,7 +180,7 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
   const handleRemoveDelegate = async (delegationId: string) => {
     try {
       const { error } = await supabase
-        .from("email_account_delegations")
+        .from("email_account_delegations" as any)
         .delete()
         .eq("id", delegationId);
 

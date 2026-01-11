@@ -1874,6 +1874,53 @@ export type Database = {
           },
         ]
       }
+      email_account_delegations: {
+        Row: {
+          account_id: string
+          created_at: string | null
+          delegate_user_id: string
+          expires_at: string | null
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          is_active: boolean | null
+          permissions: Json
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string | null
+          delegate_user_id: string
+          expires_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string | null
+          delegate_user_id?: string
+          expires_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_account_delegations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_accounts: {
         Row: {
           access_token: string | null
@@ -7783,6 +7830,12 @@ export type Database = {
           table_type: string
         }[]
       }
+      get_franchise_user_ids: {
+        Args: { _franchise_id: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
       get_platform_admins: {
         Args: never
         Returns: {
@@ -7810,6 +7863,12 @@ export type Database = {
           policy_count: number
           rls_enabled: boolean
           table_name: string
+        }[]
+      }
+      get_sales_manager_team_user_ids: {
+        Args: { _manager_id: string }
+        Returns: {
+          user_id: string
         }[]
       }
       get_table_constraints: {
@@ -7891,8 +7950,10 @@ export type Database = {
       is_current_user_platform_admin: { Args: never; Returns: boolean }
       is_franchise_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_sales_manager: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_viewer: { Args: { _user_id: string }; Returns: boolean }
       preview_next_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
