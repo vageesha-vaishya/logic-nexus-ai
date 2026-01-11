@@ -21,7 +21,8 @@ export interface Opportunity {
   owner_id: string | null;
   franchise_id: string | null;
   accounts?: { name: string } | null;
-  contacts?: { first_name: string; last_name: string } | null;
+  contacts?: { first_name: string; last_name: string; email: string } | null;
+  leads?: { first_name: string; last_name: string; email: string } | null;
   salesforce_sync_status?: string | null;
   salesforce_last_synced?: string | null;
   salesforce_error?: string | null;

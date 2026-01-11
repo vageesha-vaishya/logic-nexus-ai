@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ContactForm } from '@/components/crm/ContactForm';
+import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { ArrowLeft, Edit, Trash2, User, Phone, Mail, Building2, Linkedin } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
@@ -329,6 +330,14 @@ export default function ContactDetail() {
                 )}
               </CardContent>
             </Card>
+
+            <div className="md:col-span-2">
+              <EmailHistoryPanel 
+                emailAddress={contact.email} 
+                entityType="contact" 
+                entityId={contact.id} 
+              />
+            </div>
 
             {contact.notes && (
               <Card className="md:col-span-2">

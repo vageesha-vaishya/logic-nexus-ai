@@ -40,6 +40,7 @@ export interface Shipment {
   pod_received_at?: string | null;
   account_id?: string | null;
   accounts?: { name: string } | null;
+  contacts?: { first_name: string; last_name: string; email: string } | null;
   tenant_id?: string | null;
   franchise_id?: string | null;
 }

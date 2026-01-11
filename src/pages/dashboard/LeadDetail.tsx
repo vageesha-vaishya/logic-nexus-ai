@@ -10,6 +10,7 @@ import type { LeadFormData } from '@/components/crm/LeadForm';
 import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
+import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
 import { ManualAssignment } from '@/components/assignment/ManualAssignment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -383,6 +384,12 @@ export default function LeadDetail() {
             )}
 
             <div className="md:col-span-2">
+              <EmailHistoryPanel 
+                emailAddress={lead.email} 
+                entityType="lead" 
+                entityId={lead.id} 
+                className="mb-6"
+              />
               <LeadActivitiesTimeline leadId={lead.id} />
             </div>
 

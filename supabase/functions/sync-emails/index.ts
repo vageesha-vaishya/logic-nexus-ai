@@ -1,6 +1,7 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { simpleParser } from "https://esm.sh/mailparser@3.6.4";
 import { Logger } from '../_shared/logger.ts';
 
 const corsHeaders = {
@@ -11,7 +12,11 @@ const corsHeaders = {
 type GmailHeader = { name: string; value: string };
 type GmailMessagePart = {
   mimeType?: string;
-  body?: { data?: string };
+  body?: { 
+    data?: string;
+    attachmentId?: string;
+    size?: number;
+  };
   headers?: GmailHeader[];
   parts?: GmailMessagePart[];
   filename?: string | null;
@@ -59,6 +64,35 @@ serve(async (req) => {
     if (accountError || !account) {
       throw new Error("Email account not found");
     }
+
+    // Helper to upload attachment to storage
+    const uploadAttachment = async (contentBase64: string, filename: string, messageId: string) => {
+      try {
+        const path = `${messageId}/${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        // Convert base64 to Uint8Array
+        const binaryString = atob(contentBase64.replace(/-/g, "+").replace(/_/g, "/"));
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const { error } = await supabase.storage
+          .from('email-attachments')
+          .upload(path, bytes, {
+            contentType: 'application/octet-stream',
+            upsert: true
+          });
+          
+        if (error) {
+          console.error(`Failed to upload attachment ${path}:`, error);
+          return null;
+        }
+        return path;
+      } catch (e) {
+        console.error("Error uploading attachment:", e);
+        return null;
+      }
+    };
 
     let syncedCount = 0;
 
@@ -341,12 +375,13 @@ serve(async (req) => {
             const references = headers['references'] ? headers['references'].split(/\s+/) : [];
             const messageId = headers['message-id'] || msgData.id;
 
-            // Extract body and check for inline images
+            // Extract body, check for inline images, and process attachments
             let bodyText = "";
             let bodyHtml = "";
             let hasInlineImages = false;
+            const attachmentsList: any[] = [];
             
-            const getBody = (part: GmailMessagePart): void => {
+            const processMessageParts = async (part: GmailMessagePart) => {
               if (part.mimeType === "text/plain" && part.body?.data) {
                 bodyText = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
               } else if (part.mimeType === "text/html" && part.body?.data) {
@@ -355,14 +390,46 @@ serve(async (req) => {
                 if (bodyHtml.includes('cid:') || bodyHtml.includes('data:image/')) {
                   hasInlineImages = true;
                 }
-              } else if (part.mimeType?.startsWith('image/') && part.headers?.find((h: GmailHeader) => h.name === 'Content-ID')) {
+              } else if (part.filename && part.body?.attachmentId) {
+                // It's an attachment
+                try {
+                  const attResp = await fetch(
+                    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgData.id}/attachments/${part.body.attachmentId}`,
+                    { headers: { Authorization: `Bearer ${account.access_token}` } }
+                  );
+                  
+                  if (attResp.ok) {
+                    const attData = await attResp.json();
+                    if (attData.data) {
+                      const uploadedPath = await uploadAttachment(attData.data, part.filename, msgData.id);
+                      if (uploadedPath) {
+                        attachmentsList.push({
+                          filename: part.filename,
+                          path: uploadedPath,
+                          size: attData.size || part.body.size,
+                          type: part.mimeType,
+                          content_id: part.headers?.find((h: GmailHeader) => h.name === 'Content-ID')?.value
+                        });
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error(`Failed to process attachment ${part.filename}:`, e);
+                }
+              }
+
+              if (part.mimeType?.startsWith('image/') && part.headers?.find((h: GmailHeader) => h.name === 'Content-ID')) {
                 hasInlineImages = true;
-              } else if (part.parts) {
-                part.parts.forEach(getBody);
+              }
+
+              if (part.parts) {
+                for (const subPart of part.parts) {
+                  await processMessageParts(subPart);
+                }
               }
             };
             
-            getBody(msgData.payload);
+            await processMessageParts(msgData.payload);
 
             // Check if email already exists
             const { data: existing } = await supabase
@@ -393,8 +460,8 @@ serve(async (req) => {
               body_text: bodyText || bodyHtml.replace(/<[^>]*>/g, ""),
               body_html: bodyHtml || bodyText,
               snippet: msgData.snippet || "",
-              has_attachments: (msgData.payload.parts as GmailMessagePart[] | undefined)?.some((p: GmailMessagePart) => !!p.filename) || false,
-              attachments: [],
+              has_attachments: attachmentsList.length > 0,
+              attachments: attachmentsList,
               direction: "inbound",
               status: "received",
               is_read: !msgData.labelIds?.includes("UNREAD"),
@@ -654,6 +721,37 @@ serve(async (req) => {
           const hasInlineImages = bodyHtml?.includes('cid:') || bodyHtml?.includes('data:image/') || false;
           const internetMessageId = m.internetMessageId || m.id;
 
+          // Process attachments if present
+          const attachmentsList: any[] = [];
+          if (m.hasAttachments) {
+             try {
+                const attRes = await fetch(
+                   `https://graph.microsoft.com/v1.0/me/messages/${m.id}/attachments`,
+                   { headers: { Authorization: `Bearer ${officeToken}` } }
+                );
+                if (attRes.ok) {
+                   const attJson = await attRes.json();
+                   const attachments = attJson.value || [];
+                   for (const att of attachments) {
+                      if (att['@odata.type'] === '#microsoft.graph.fileAttachment' && att.contentBytes) {
+                         const uploadedPath = await uploadAttachment(att.contentBytes, att.name, m.id);
+                         if (uploadedPath) {
+                            attachmentsList.push({
+                               filename: att.name,
+                               path: uploadedPath,
+                               size: att.size,
+                               type: att.contentType,
+                               content_id: att.contentId
+                            });
+                         }
+                      }
+                   }
+                }
+             } catch (e) {
+                console.error(`Failed to fetch Office365 attachments for ${m.id}`, e);
+             }
+          }
+
           // Check if exists
           const { data: existing } = await supabase
             .from("emails")
@@ -684,7 +782,7 @@ serve(async (req) => {
             body_html: bodyHtml,
             snippet: m.bodyPreview || "",
             has_attachments: !!m.hasAttachments,
-            attachments: [],
+            attachments: attachmentsList,
             direction: "inbound",
             status: "received",
             is_read: !!m.isRead,

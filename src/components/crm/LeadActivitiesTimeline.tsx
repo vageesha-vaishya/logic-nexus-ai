@@ -33,6 +33,7 @@ interface Activity {
   created_at: string;
   is_automated?: boolean;
   metadata?: any;
+  custom_fields?: any;
 }
 
 interface LeadActivitiesTimelineProps {
@@ -231,6 +232,16 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
                     ) : (
                         <div className="space-y-1">
                           <div>{activity.status} • {activity.priority} priority</div>
+                          {activity.custom_fields?.to && (
+                            <div className="text-xs text-muted-foreground">
+                              <span className="font-semibold">To:</span> {activity.custom_fields.to}
+                            </div>
+                          )}
+                          {activity.custom_fields?.from && (
+                            <div className="text-xs text-muted-foreground">
+                              <span className="font-semibold">From:</span> {activity.custom_fields.from}
+                            </div>
+                          )}
                           {activity.description && (
                             <div className="mt-2 text-gray-700 bg-slate-50 p-2 rounded text-sm whitespace-pre-wrap">
                               {activity.description}

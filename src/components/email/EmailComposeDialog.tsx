@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 // import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Paperclip, X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link as LinkIcon, Eraser } from "lucide-react";
+import { Send, Paperclip, X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link as LinkIcon, Eraser, Loader2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
+import { useRef } from "react";
 
 interface EmailComposeDialogProps {
   open: boolean;
@@ -18,12 +19,16 @@ interface EmailComposeDialogProps {
     subject: string;
     body?: string;
   };
+  initialTo?: string[];
+  onSent?: () => void;
+  entityType?: string;
+  entityId?: string;
 }
 
-export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailComposeDialogProps) {
+export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onSent, entityType, entityId }: EmailComposeDialogProps) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccount, setSelectedAccount] = useState("");
-  const [to, setTo] = useState(replyTo?.to || "");
+  const [to, setTo] = useState(replyTo?.to || (initialTo ? initialTo.join(", ") : ""));
   const [cc, setCc] = useState("");
   const [subject, setSubject] = useState(replyTo?.subject || "");
   const [body, setBody] = useState(replyTo?.body || "");
@@ -38,6 +43,11 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
     ribbon: true,
     signatureHtml: "",
   });
+
+  // Attachments state
+  const [attachments, setAttachments] = useState<{ name: string; path: string; type: string; url: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -113,6 +123,51 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setIsUploading(true);
+      const files = Array.from(e.target.files);
+      
+      for (const file of files) {
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+          const filePath = `${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('email-attachments')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('email-attachments')
+            .getPublicUrl(filePath);
+
+          setAttachments(prev => [...prev, {
+            name: file.name,
+            path: filePath,
+            type: file.type,
+            url: publicUrl
+          }]);
+        } catch (error: any) {
+          console.error("Upload error:", error);
+          toast({
+            title: "Upload Failed",
+            description: `Failed to upload ${file.name}: ${error.message}`,
+            variant: "destructive",
+          });
+        }
+      }
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
     if (!selectedAccount || !to || !subject) {
       toast({
@@ -138,6 +193,11 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
           cc: cc ? cc.split(",").map(e => e.trim()) : [],
           subject,
           body: editorHtml || plainToHtml(body),
+          attachments: attachments.map(a => ({
+            filename: a.name,
+            path: a.path,
+            contentType: a.type
+          })),
         },
       });
 
@@ -155,11 +215,91 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
         throw new Error(description);
       }
 
+      // Create activity log automatically
+      if (entityType && entityId) {
+        try {
+          let tenantId = context.tenantId;
+          let franchiseId = context.franchiseId;
+
+          const tableMap: Record<string, string> = {
+            lead: 'leads',
+            contact: 'contacts',
+            account: 'accounts',
+            opportunity: 'opportunities',
+            // shipment: 'shipments' // Activity table doesn't support shipment_id directly yet
+          };
+          const tableName = tableMap[entityType];
+
+          // Always try to fetch entity context to ensure activity matches entity scope
+          if (tableName) {
+            const { data: entityData, error: entityError } = await (supabase as any)
+              .from(tableName)
+              .select('tenant_id, franchise_id')
+              .eq('id', entityId)
+              .single();
+
+            if (entityData) {
+              // Use entity's tenant/franchise to ensure visibility consistency
+              // This is crucial for Tenant Admins (who have null franchiseId in context)
+              // creating activities for Franchise Leads.
+              tenantId = entityData.tenant_id;
+              franchiseId = entityData.franchise_id;
+            } else if (entityError) {
+              console.warn("Could not fetch entity context for activity creation:", entityError);
+            }
+          }
+
+          const activityData: any = {
+            activity_type: 'email',
+            status: 'completed',
+            priority: 'medium',
+            subject: subject,
+            description: (editorHtml || body || "").replace(/<[^>]+>/g, "").substring(0, 500), // Plain text preview
+            completed_at: new Date().toISOString(),
+            tenant_id: tenantId,
+            franchise_id: franchiseId,
+            created_by: (await supabase.auth.getUser()).data.user?.id,
+            custom_fields: {
+              to: to,
+              cc: cc,
+              email_body: editorHtml || body || ""
+            }
+          };
+
+          if (entityType === 'lead') activityData.lead_id = entityId;
+          if (entityType === 'contact') activityData.contact_id = entityId;
+          if (entityType === 'account') activityData.account_id = entityId;
+          if (entityType === 'opportunity') activityData.opportunity_id = entityId;
+
+          if (tenantId) {
+             const { error: activityError } = await supabase.from('activities').insert(activityData);
+             if (activityError) {
+               console.error("Failed to create activity:", activityError);
+               toast({
+                 title: "Warning",
+                 description: "Email sent, but failed to create activity log.",
+                 variant: "destructive", // or default/warning if available
+               });
+             }
+          } else {
+             console.warn("Skipping activity creation: tenantId missing");
+          }
+        } catch (err) {
+          console.error("Error creating activity log:", err);
+          toast({
+             title: "Warning",
+             description: "Email sent, but failed to create activity log.",
+             variant: "destructive",
+           });
+        }
+      }
+
       toast({
         title: "Success",
         description: "Email sent successfully",
       });
 
+      onSent?.();
       onOpenChange(false);
       resetForm();
     } catch (error: any) {
@@ -280,10 +420,31 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo }: EmailCompose
           </div>
 
           <div className="flex items-center justify-between pt-4">
-            <Button variant="outline" size="sm">
-              <Paperclip className="w-4 h-4 mr-2" />
-              Attach File
-            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              onChange={handleFileSelect}
+            />
+            <div className="flex flex-col gap-2">
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Paperclip className="w-4 h-4 mr-2" />}
+                Attach File
+              </Button>
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((file, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-secondary p-2 rounded-md text-sm">
+                      <span className="max-w-[150px] truncate">{file.name}</span>
+                      <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeAttachment(i)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>

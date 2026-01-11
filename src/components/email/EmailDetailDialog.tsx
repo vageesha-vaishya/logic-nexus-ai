@@ -2,10 +2,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
+import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
+import { EmailToLeadDialog } from "./EmailToLeadDialog";
 
 interface Email {
   id: string;
@@ -146,7 +147,13 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
                           {(attachment.size / 1024).toFixed(1)} KB
                         </p>
                       </div>
-                      <Button variant="ghost" size="sm">Download</Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDownload(attachment.path || attachment.url, attachment.name)}
+                      >
+                        Download
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -188,6 +195,16 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
           to: email.from_email,
           subject: email.subject,
           body: email.body_text,
+        }}
+      />
+
+      <EmailToLeadDialog
+        open={showConvertToLead}
+        onOpenChange={setShowConvertToLead}
+        email={email}
+        onSuccess={() => {
+          // Optional: Maybe add a label or note that lead was created
+          onRefresh();
         }}
       />
     </>

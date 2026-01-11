@@ -92,14 +92,47 @@ export default function ActivityNew() {
         toast.info('Email logged (sending functionality pending configuration)');
       }
 
+      // Extract fields that are not in the activities table (including location and others)
+      const { to, from, send_email, email_body, location, service_id, attachments, ...rest } = formData;
+      
+      const attachmentNames = Array.isArray(attachments)
+        ? attachments.map((f: any) => (typeof f?.name === 'string' ? f.name : '')).filter(Boolean)
+        : [];
+
+      // Get current user email for 'from' field if not provided
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email || '';
+
+      // For email activities, ensure email_body is populated from description if missing
+      const finalEmailBody = formData.activity_type === 'email' && !email_body && description 
+        ? description 
+        : email_body;
+
+      // Add email specific fields and extras to custom_fields if needed
+      const custom_fields = {
+        ...(formData.to ? { to: formData.to } : {}),
+        ...(formData.from ? { from: formData.from } : (formData.activity_type === 'email' ? { from: userEmail } : {})),
+        ...(formData.send_email ? { send_email: formData.send_email } : {}),
+        ...(formData.location ? { location: formData.location } : {}),
+        ...(finalEmailBody ? { email_body: finalEmailBody } : {}),
+        ...(service_id ? { service_id } : {}),
+        ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+      };
+
+      const activityData = {
+        ...rest,
+        due_date: rest.due_date ? rest.due_date : null,
+      };
+
       const { error } = await supabase
         .from('activities')
         .insert({
-          ...formData,
+          ...activityData,
           description,
+          custom_fields,
           tenant_id: tenantId,
           franchise_id: franchiseId,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: user?.id
         });
 
       if (error) throw error;
@@ -108,7 +141,7 @@ export default function ActivityNew() {
       navigate('/dashboard/activities');
     } catch (error: any) {
       console.error('Error creating activity:', error);
-      toast.error('Failed to create activity');
+      toast.error('Failed to create activity', { description: error.message || 'Unknown error' });
     }
   };
 

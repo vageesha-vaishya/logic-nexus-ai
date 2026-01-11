@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Mail, Settings, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Mail, Settings, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { EmailAccountDialog } from "./EmailAccountDialog";
+import { EmailDelegationDialog } from "./EmailDelegationDialog";
 import { format } from "date-fns";
 
 interface EmailAccount {
@@ -25,6 +26,7 @@ export function EmailAccounts() {
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [showDelegationDialog, setShowDelegationDialog] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<EmailAccount | null>(null);
   const { toast } = useToast();
 
@@ -287,6 +289,17 @@ export function EmailAccounts() {
                     size="sm"
                     onClick={() => {
                       setSelectedAccount(account);
+                      setShowDelegationDialog(true);
+                    }}
+                    title="Share Inbox"
+                  >
+                    <Users className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedAccount(account);
                       setShowDialog(true);
                     }}
                   >
@@ -316,6 +329,11 @@ export function EmailAccounts() {
           setSelectedAccount(null);
           fetchAccounts();
         }}
+      />
+      <EmailDelegationDialog
+        open={showDelegationDialog}
+        onOpenChange={setShowDelegationDialog}
+        account={selectedAccount}
       />
     </div>
   );

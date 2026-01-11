@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { OpportunityItemsEditor } from '@/components/crm/OpportunityItemsEditor';
+import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
 import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import type { Database } from '@/integrations/supabase/types';
@@ -586,6 +587,14 @@ export default function OpportunityDetail() {
 
             <TabsContent value="history" className="space-y-6">
               <OpportunityHistoryTab history={history} onRefresh={fetchHistory} />
+            </TabsContent>
+
+            <TabsContent value="emails" className="space-y-6">
+              <EmailHistoryPanel 
+                emailAddress={opportunity.contacts?.email || opportunity.leads?.email} 
+                entityType="opportunity" 
+                entityId={opportunity.id} 
+              />
             </TabsContent>
           </Tabs>
         )}

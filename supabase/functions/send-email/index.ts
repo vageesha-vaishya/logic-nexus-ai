@@ -12,7 +12,12 @@ export interface EmailRequest {
   bcc?: string[];
   subject?: string; // Optional if using template
   body?: string;    // Optional if using template
-  attachments?: unknown[];
+  attachments?: {
+    filename: string;
+    path?: string;
+    contentType: string;
+    content?: string; // Base64
+  }[];
   from?: string;
   replyTo?: string;
   templateId?: string;
@@ -60,6 +65,10 @@ export class ResendProvider extends EmailProvider {
         subject: req.subject,
         html: req.body,
         reply_to: req.replyTo,
+        attachments: req.attachments?.map(a => ({
+          filename: a.filename,
+          content: a.content,
+        })),
       }),
     });
 
@@ -145,27 +154,59 @@ export class GmailProvider extends EmailProvider {
     }
 
     // Construct MIME
+    const hasAttachments = req.attachments && req.attachments.length > 0;
     const boundary = `mixed_boundary_${Date.now()}`;
-    const messageLines = [
+    const altBoundary = `alt_boundary_${Date.now()}`;
+    
+    let messageLines = [
       senderEmail ? `From: ${senderEmail}` : "",
       `To: ${req.to.join(", ")}`,
       req.cc?.length ? `Cc: ${req.cc.join(", ")}` : "",
       `Subject: ${req.subject}`,
       "MIME-Version: 1.0",
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      `Content-Type: multipart/${hasAttachments ? 'mixed' : 'alternative'}; boundary="${boundary}"`,
       "",
       `--${boundary}`,
-      `Content-Type: text/plain; charset=UTF-8`,
-      "",
-      (req.body || "").replace(/<[^>]+>/g, ""),
-      "",
-      `--${boundary}`,
-      `Content-Type: text/html; charset=UTF-8`,
-      "",
-      req.body,
-      "",
-      `--${boundary}--`
-    ].filter(l => l !== undefined);
+    ];
+
+    if (hasAttachments) {
+       // Start alternative part
+       messageLines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+       messageLines.push("");
+       messageLines.push(`--${altBoundary}`);
+    }
+
+    // Text Body
+    messageLines.push(`Content-Type: text/plain; charset=UTF-8`);
+    messageLines.push("");
+    messageLines.push((req.body || "").replace(/<[^>]+>/g, ""));
+    messageLines.push("");
+    
+    // HTML Body
+    messageLines.push(`--${hasAttachments ? altBoundary : boundary}`);
+    messageLines.push(`Content-Type: text/html; charset=UTF-8`);
+    messageLines.push("");
+    messageLines.push(req.body);
+    messageLines.push("");
+    
+    if (hasAttachments) {
+      messageLines.push(`--${altBoundary}--`);
+      messageLines.push("");
+      
+      // Add attachments
+      for (const att of req.attachments!) {
+        messageLines.push(`--${boundary}`);
+        messageLines.push(`Content-Type: ${att.contentType}; name="${att.filename}"`);
+        messageLines.push(`Content-Disposition: attachment; filename="${att.filename}"`);
+        messageLines.push(`Content-Transfer-Encoding: base64`);
+        messageLines.push("");
+        messageLines.push(att.content!); 
+        messageLines.push("");
+      }
+    }
+    
+    messageLines.push(`--${boundary}--`);
+    messageLines = messageLines.filter(l => l !== undefined);
 
     const encodedMessage = btoa(unescape(encodeURIComponent(messageLines.join("\r\n"))))
       .replace(/\+/g, '-')
@@ -256,6 +297,12 @@ export class Office365Provider extends EmailProvider {
         toRecipients: req.to.map(addr => ({ emailAddress: { address: addr } })),
         ccRecipients: req.cc?.map(addr => ({ emailAddress: { address: addr } })) || [],
         bccRecipients: req.bcc?.map(addr => ({ emailAddress: { address: addr } })) || [],
+        attachments: req.attachments?.map(a => ({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          "name": a.filename,
+          "contentType": a.contentType,
+          "contentBytes": a.content
+        })) || []
       },
       saveToSentItems: true,
     };
@@ -307,6 +354,39 @@ export async function processTemplate(supabase: SupabaseClient, templateId: stri
   return { subject, body };
 }
 
+async function prepareAttachments(supabase: SupabaseClient, attachments: any[]) {
+  if (!attachments || attachments.length === 0) return [];
+  
+  const processed = [];
+  for (const att of attachments) {
+    if (att.content) {
+      processed.push(att); // Already base64
+      continue;
+    }
+    
+    if (att.path) {
+      const { data, error } = await supabase.storage
+        .from('email-attachments')
+        .download(att.path);
+        
+      if (error) {
+        console.error(`Failed to download attachment ${att.path}:`, error);
+        continue;
+      }
+      
+      const buffer = await data.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      
+      processed.push({
+        filename: att.filename,
+        contentType: att.contentType,
+        content: base64
+      });
+    }
+  }
+  return processed;
+}
+
 // --- Main Handler ---
 
 serve(async (req) => {
@@ -326,10 +406,14 @@ serve(async (req) => {
       from, reply_to, 
       provider: requestedProvider,
       templateId,
-      variables 
+      variables,
+      attachments
     } = payload;
 
     if (!to) throw new Error("Missing required field: to");
+
+    // Process attachments
+    const processedAttachments = await prepareAttachments(supabase, attachments);
 
     // 1. Process Template if present
     let subject = reqSubject;
@@ -390,7 +474,8 @@ serve(async (req) => {
           subject,
           body,
           from,
-          replyTo: reply_to
+          replyTo: reply_to,
+          attachments: processedAttachments
         });
         if (response.success) break; // Success, stop trying
       } catch (e: any) {

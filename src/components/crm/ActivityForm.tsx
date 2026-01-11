@@ -61,16 +61,21 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
   const form = useForm<ActivityFormData>({
     resolver: zodResolver(activitySchema),
     defaultValues: {
-      activity_type: initialData?.activity_type || 'task',
-      status: initialData?.status || 'planned',
-      priority: initialData?.priority || 'medium',
-      subject: initialData?.subject || '',
-      description: initialData?.description || '',
-      due_date: initialData?.due_date || '',
-      account_id: initialData?.account_id || null,
-      contact_id: initialData?.contact_id || null,
-      lead_id: initialData?.lead_id || null,
-    },
+        activity_type: initialData?.activity_type || 'task',
+        status: initialData?.status || 'planned',
+        priority: initialData?.priority || 'medium',
+        subject: initialData?.subject || '',
+        description: initialData?.description || '',
+        due_date: initialData?.due_date || '',
+        account_id: initialData?.account_id || null,
+        contact_id: initialData?.contact_id || null,
+        lead_id: initialData?.lead_id || null,
+        location: initialData?.location || '',
+        to: initialData?.to || '',
+        from: initialData?.from || '',
+        send_email: initialData?.send_email || false,
+        email_body: initialData?.email_body || '',
+      },
   });
 
   const { isSubmitting, isValid, errors } = form.formState;

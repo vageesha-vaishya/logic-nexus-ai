@@ -9,6 +9,7 @@ import { TrackingTimeline } from '@/components/logistics/TrackingTimeline';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
 
 export default function ShipmentDetail() {
@@ -36,7 +37,7 @@ export default function ShipmentDetail() {
     try {
       const { data, error } = await scopedDb
         .from('shipments')
-        .select('*, accounts(name), contacts(first_name, last_name)')
+        .select('*, accounts(name), contacts(first_name, last_name, email)')
         .eq('id', id)
         .single();
 
@@ -301,6 +302,13 @@ export default function ShipmentDetail() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Emails */}
+        <EmailHistoryPanel 
+          emailAddress={shipment.contacts?.email} 
+          entityType="shipment" 
+          entityId={shipment.id} 
+        />
 
         {/* Attachments */}
         <Card>

@@ -41,7 +41,14 @@ export default function ActivityDetail() {
         .single();
 
       if (error) throw error;
-      setActivity(data);
+      
+      // Flatten custom_fields into top-level for form compatibility
+      const flattened = {
+        ...data,
+        ...(data.custom_fields || {}),
+      };
+      
+      setActivity(flattened);
     } catch (error: any) {
       toast.error('Failed to load activity');
       console.error('Error:', error);
@@ -91,7 +98,7 @@ export default function ActivityDetail() {
       }
 
       // Extract extras for custom_fields
-      const { service_id, attachments, ...rest } = formData;
+      const { service_id, attachments, to, from, send_email, email_body, location, ...rest } = formData;
       const attachmentNames = Array.isArray(attachments)
         ? attachments.map((f: any) => (typeof f?.name === 'string' ? f.name : '')).filter(Boolean)
         : [];
@@ -99,6 +106,11 @@ export default function ActivityDetail() {
         ...(activity?.custom_fields || {}),
         ...(service_id ? { service_id } : {}),
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+        ...(to ? { to } : {}),
+        ...(from ? { from } : {}),
+        ...(send_email ? { send_email } : {}),
+        ...(email_body ? { email_body } : {}),
+        ...(location ? { location } : {}),
       };
 
       // Normalize payload to avoid NOT NULL and type errors

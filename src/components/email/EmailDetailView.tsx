@@ -5,6 +5,8 @@ import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, Chevr
 import { format } from "date-fns";
 import { useState } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Email {
   id: string;
@@ -28,6 +30,39 @@ export function EmailDetailView({ email }: EmailDetailViewProps) {
   const [showReply, setShowReply] = useState(false);
   const [showFullBody, setShowFullBody] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
+  const { toast } = useToast();
+
+  const handleDownload = async (path: string, filename: string) => {
+    try {
+      // If path starts with http/https, it's a public URL or already a full URL (legacy or external)
+      if (path.startsWith('http')) {
+        window.open(path, '_blank');
+        return;
+      }
+
+      // Otherwise assume it's in the email-attachments bucket
+      const { data, error } = await supabase.storage
+        .from('email-attachments')
+        .createSignedUrl(path, 60);
+
+      if (error) throw error;
+
+      // Create a temporary link to force download
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error: any) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const clampStyle = showFullBody
     ? {}
@@ -132,7 +167,13 @@ export function EmailDetailView({ email }: EmailDetailViewProps) {
                       {(attachment.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm">Download</Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleDownload(attachment.path || attachment.url, attachment.name)}
+                  >
+                    Download
+                  </Button>
                 </div>
               ))}
             </div>
