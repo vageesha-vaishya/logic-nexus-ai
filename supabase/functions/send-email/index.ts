@@ -6,18 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface EmailRequest {
+export interface EmailRequest {
   to: string[];
   cc?: string[];
   bcc?: string[];
-  subject: string;
-  body: string; // HTML content
+  subject?: string; // Optional if using template
+  body?: string;    // Optional if using template
   attachments?: unknown[];
   from?: string;
   replyTo?: string;
+  templateId?: string;
+  variables?: Record<string, string>;
 }
 
-interface EmailResponse {
+export interface EmailResponse {
   success: boolean;
   messageId?: string;
   error?: string;
@@ -25,19 +27,19 @@ interface EmailResponse {
   verificationMethod?: string;
 }
 
-interface ProviderConfig {
+export interface ProviderConfig {
   apiKey?: string;
   supabase: SupabaseClient;
   account?: any; // DB row for email_accounts
 }
 
-abstract class EmailProvider {
+export abstract class EmailProvider {
   constructor(protected config: ProviderConfig) {}
   abstract send(req: EmailRequest): Promise<EmailResponse>;
 }
 
 // --- Resend Provider (System/Transactional) ---
-class ResendProvider extends EmailProvider {
+export class ResendProvider extends EmailProvider {
   async send(req: EmailRequest): Promise<EmailResponse> {
     const apiKey = this.config.apiKey;
     if (!apiKey) throw new Error("Missing RESEND_API_KEY");
@@ -76,7 +78,7 @@ class ResendProvider extends EmailProvider {
 }
 
 // --- Gmail Provider (User/OAuth) ---
-class GmailProvider extends EmailProvider {
+export class GmailProvider extends EmailProvider {
   async send(req: EmailRequest): Promise<EmailResponse> {
     console.log("Sending via Gmail API");
     const account = this.config.account;
@@ -194,7 +196,7 @@ class GmailProvider extends EmailProvider {
 }
 
 // --- Office 365 Provider (User/OAuth) ---
-class Office365Provider extends EmailProvider {
+export class Office365Provider extends EmailProvider {
   async send(req: EmailRequest): Promise<EmailResponse> {
     console.log("Sending via Microsoft Graph API");
     const account = this.config.account;
@@ -272,13 +274,37 @@ class Office365Provider extends EmailProvider {
       throw new Error(`Office 365 API Error: ${txt}`);
     }
 
-    // Graph API sendMail returns 202 Accepted with no content
     return {
       success: true,
       messageId: `o365-${Date.now()}`,
-      verified: true // We assume true if API returned 202
+      verified: true
     };
   }
+}
+
+// --- Helpers ---
+
+export async function processTemplate(supabase: SupabaseClient, templateId: string, variables?: Record<string, string>) {
+  const { data: template, error } = await supabase
+    .from("email_templates")
+    .select("*")
+    .eq("id", templateId)
+    .single();
+
+  if (error || !template) throw new Error(`Template not found: ${error?.message}`);
+
+  let subject = template.subject;
+  let body = template.body_html || template.body_text;
+
+  if (variables) {
+    Object.entries(variables).forEach(([key, value]) => {
+      const regex = new RegExp(`{{${key}}}`, "g");
+      subject = subject.replace(regex, value);
+      body = body.replace(regex, value);
+    });
+  }
+
+  return { subject, body };
 }
 
 // --- Main Handler ---
@@ -292,22 +318,41 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const payload = await req.json();
-    const { accountId, to, cc, bcc, subject, body, from, reply_to, provider: requestedProvider } = payload;
+    const { 
+      accountId, 
+      to, cc, bcc, 
+      subject: reqSubject, 
+      body: reqBody, 
+      from, reply_to, 
+      provider: requestedProvider,
+      templateId,
+      variables 
+    } = payload;
 
-    if (!to || !subject) {
-      throw new Error("Missing required fields: to, subject");
+    if (!to) throw new Error("Missing required field: to");
+
+    // 1. Process Template if present
+    let subject = reqSubject;
+    let body = reqBody;
+
+    if (templateId) {
+      const templateData = await processTemplate(supabase, templateId, variables);
+      subject = templateData.subject;
+      body = templateData.body;
     }
 
-    // 1. Determine Provider Strategy
-    let provider: EmailProvider;
+    if (!subject) throw new Error("Missing required field: subject (or valid template)");
+
+    // 2. Determine Provider Strategy
+    let providers: EmailProvider[] = [];
     let account = null;
 
     if (requestedProvider === 'resend' || (!accountId && !requestedProvider)) {
-      // System Email Strategy
-      provider = new ResendProvider({
+      // System Email Strategy - Support Failover in future by adding more providers to this array
+      providers.push(new ResendProvider({
         apiKey: Deno.env.get("RESEND_API_KEY"),
         supabase
-      });
+      }));
     } else if (accountId) {
       // User Account Strategy
       const { data, error } = await supabase
@@ -320,9 +365,9 @@ serve(async (req) => {
       account = data;
 
       if (account.provider === "gmail") {
-        provider = new GmailProvider({ supabase, account });
+        providers.push(new GmailProvider({ supabase, account }));
       } else if (account.provider === "office365") {
-        provider = new Office365Provider({ supabase, account });
+        providers.push(new Office365Provider({ supabase, account }));
       } else if (account.provider === "smtp_imap") {
          throw new Error("Direct SMTP not supported in Edge Runtime. Use Resend or OAuth.");
       } else {
@@ -332,19 +377,33 @@ serve(async (req) => {
       throw new Error("Invalid request: Provide accountId or provider='resend'");
     }
 
-    // 2. Execute Send
-    const response = await provider.send({
-      to: Array.isArray(to) ? to : [to],
-      cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
-      bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
-      subject,
-      body,
-      from,
-      replyTo: reply_to
-    });
+    // 3. Execute Send with Failover/Retry Logic
+    let response: EmailResponse | null = null;
+    let lastError: Error | null = null;
 
-    // 3. Log to DB (if linked to an account)
-    // Only log if we have an accountId, otherwise it's a system email (audit log instead?)
+    for (const provider of providers) {
+      try {
+        response = await provider.send({
+          to: Array.isArray(to) ? to : [to],
+          cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
+          bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
+          subject,
+          body,
+          from,
+          replyTo: reply_to
+        });
+        if (response.success) break; // Success, stop trying
+      } catch (e: any) {
+        console.error("Provider send failed:", e);
+        lastError = e;
+        // Continue to next provider if available
+      }
+    }
+
+    if (!response && lastError) throw lastError;
+    if (!response) throw new Error("Unknown error: No response from providers");
+
+    // 4. Log to DB (if linked to an account)
     if (account && response.success) {
       await supabase.from("emails").insert({
         account_id: account.id,
@@ -375,7 +434,7 @@ serve(async (req) => {
     console.error("Email Send Error:", error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500, // Return 500 for failures to alert client
+      status: 500,
     });
   }
 });
