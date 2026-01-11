@@ -104,7 +104,7 @@ export default function QuoteDetail() {
           return;
         }
         
-        const { data: v, error: insertError } = await dao
+        const { data: v, error: insertError } = await scopedDb
           .from('quotation_versions')
           .insert({ quote_id: resolvedId, tenant_id: finalTenantId, version_number: 1 })
           .select('id')
@@ -113,7 +113,7 @@ export default function QuoteDetail() {
         if (insertError) {
           console.error('[QuoteDetail] Error creating version:', insertError);
           // Check if version was created by another process
-          const { data: retry } = await (dao
+          const { data: retry } = await (scopedDb
             .from('quotation_versions')
             .select('id') as any)
             .eq('quote_id', resolvedId)

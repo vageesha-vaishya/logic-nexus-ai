@@ -29,7 +29,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const { data, error } = await scopedDb
+        const { data, error } = await (scopedDb as any)
           .from('opportunity_items')
           .select('*')
           .eq('opportunity_id', opportunityId)
@@ -92,7 +92,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
       setSaving(true);
       
       // Replace all items for simplicity
-      const { error: delErr } = await scopedDb
+      const { error: delErr } = await (scopedDb as any)
         .from('opportunity_items')
         .delete()
         .eq('opportunity_id', opportunityId);
@@ -112,7 +112,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
       }));
 
       if (payload.length > 0) {
-        const { error: insErr } = await scopedDb.from('opportunity_items').insert(payload as any[]);
+        const { error: insErr } = await (scopedDb as any).from('opportunity_items').insert(payload as any[]);
         if (insErr) throw insErr;
       }
 

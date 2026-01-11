@@ -56,10 +56,10 @@ export function AssignmentAnalytics() {
         .select('id, first_name, last_name')
         .in('id', topUserIds);
 
-      const profilesMap = new Map(profilesData?.map(p => [p.id, p]));
+      const profilesMap = new Map(profilesData?.map((p: any) => [p.id, p]));
 
       const topAssignees = topUserIds.map(userId => {
-        const profile = profilesMap.get(userId);
+        const profile = profilesMap.get(userId) as any;
         return {
           count: assigneeCounts[userId],
           name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',

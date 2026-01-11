@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TransferService } from '@/lib/transfer-service';
 import { ScopedDataAccess } from '@/lib/db/access';
 import { Card, CardContent } from '@/components/ui/card';

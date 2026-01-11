@@ -15,7 +15,7 @@ export const DashboardService = {
     if (!targetUserId) throw new Error('User ID required');
 
     // Use maybeSingle() to return null if no record exists instead of error
-    const { data, error } = await db.client
+    const { data, error } = await (db.client as any)
       .from('dashboard_preferences')
       .select('widgets')
       .eq('user_id', targetUserId)
@@ -40,7 +40,7 @@ export const DashboardService = {
     if (tenantId) payload.tenant_id = tenantId;
     if (franchiseId) payload.franchise_id = franchiseId;
 
-    const { error } = await db.client
+    const { error } = await (db.client as any)
       .from('dashboard_preferences')
       .upsert(payload, { onConflict: 'user_id' });
 

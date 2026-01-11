@@ -85,7 +85,7 @@ export default function MasterDataGeography() {
 
   const addRow = async (table: string, values: any) => {
     try {
-      const { error } = await scopedDb.from(table, true).insert(values);
+      const { error } = await (scopedDb as any).from(table, true).insert(values);
       if (error) throw error;
       toast({ title: 'Created', description: 'Row created successfully' });
       loadData();
@@ -96,7 +96,7 @@ export default function MasterDataGeography() {
 
   const updateRow = async (table: string, id: string, values: any) => {
     try {
-      const { error } = await scopedDb.from(table, true).update(values).eq('id', id);
+      const { error } = await (scopedDb as any).from(table, true).update(values).eq('id', id);
       if (error) throw error;
       toast({ title: 'Updated', description: 'Row updated successfully' });
       loadData();
@@ -107,7 +107,7 @@ export default function MasterDataGeography() {
 
   const deleteRow = async (table: string, id: string) => {
     try {
-      const { error } = await scopedDb.from(table, true).delete().eq('id', id);
+      const { error } = await (scopedDb as any).from(table, true).delete().eq('id', id);
       if (error) throw error;
       toast({ title: 'Deleted', description: 'Row deleted successfully' });
       loadData();

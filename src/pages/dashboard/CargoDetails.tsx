@@ -13,7 +13,7 @@ import type { Database } from "@/integrations/supabase/types";
 type CargoDetail = Database["public"]["Tables"]["cargo_details"]["Row"];
 
 export default function CargoDetails() {
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const [details, setDetails] = useState<CargoDetail[]>([]);
   type ServiceRow = Pick<Database["public"]["Tables"]["services"]["Row"], "id" | "service_name" | "service_type" | "service_code">;
   type CargoTypeRow = { id: string; cargo_type_name: string };

@@ -191,7 +191,7 @@ export function KanbanDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [timeframe, ownerFilter, user?.id, dateFrom, dateTo, accountFilter, franchiseFilter, context.franchiseId, context.tenantId, context.isPlatformAdmin, context.adminOverrideEnabled, context._version]);
+  }, [timeframe, ownerFilter, user?.id, dateFrom, dateTo, accountFilter, franchiseFilter, context.franchiseId, context.tenantId, context.isPlatformAdmin, context.adminOverrideEnabled]);
 
   useEffect(() => {
     fetchKanbanStats();

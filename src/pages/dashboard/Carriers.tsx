@@ -23,7 +23,7 @@ import {
 
 export default function Carriers() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
   const { roles } = useAuth();
   const [carriers, setCarriers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
