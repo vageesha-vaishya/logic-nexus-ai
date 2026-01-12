@@ -11,20 +11,26 @@ import { toast } from "sonner";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
 
+interface EmailRecipient {
+  email: string;
+  name?: string;
+}
+
 interface Email {
   id: string;
   subject: string;
   from_email: string;
-  to_emails: string[];
-  snippet: string;
+  to_emails: EmailRecipient[] | string[];
+  snippet?: string;
+  body_text?: string;
   received_at: string;
   folder: string;
   has_attachments: boolean;
   thread_id?: string;
   from_name?: string;
   is_starred?: boolean;
-  body_text?: string;
   body_html?: string;
+  direction?: string;
 }
 
 interface EmailHistoryPanelProps {
@@ -92,10 +98,11 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
   }, [emailAddress, tenantId, accountId]);
 
   const filteredEmails = useMemo(() => {
-    return emails.filter(email => 
-      email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      email.snippet.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return emails.filter(email => {
+      const snippetText = email.snippet || email.body_text || '';
+      return email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        snippetText.toLowerCase().includes(searchQuery.toLowerCase());
+    });
   }, [emails, searchQuery]);
 
   const threads = useMemo(() => {
@@ -154,7 +161,11 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
   }
 
   const renderEmailItem = (email: Email, isThreadChild = false) => {
-    const isInbound = email.from_email.toLowerCase().includes(emailAddress.toLowerCase());
+    // Check direction or compare from_email with the entity's email
+    const isInbound = email.direction === 'inbound' || 
+      email.from_email.toLowerCase() !== emailAddress.toLowerCase();
+    const snippetText = email.snippet || email.body_text?.slice(0, 150) || '';
+    
     return (
       <button
         type="button"
@@ -167,7 +178,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
             {isInbound ? (
               <span className="flex items-center text-blue-600">
                 <ArrowDownLeft className="h-3 w-3 mr-1" />
-                {email.from_email}
+                {email.from_name || email.from_email}
               </span>
             ) : (
               <span className="flex items-center text-green-600">
@@ -184,7 +195,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
           {email.subject || '(No Subject)'}
         </div>
         <div className="text-xs text-muted-foreground line-clamp-2">
-          {email.snippet}
+          {snippetText}
         </div>
       </button>
     );
