@@ -336,6 +336,7 @@ export default function ContactDetail() {
                 emailAddress={contact.email} 
                 entityType="contact" 
                 entityId={contact.id} 
+                tenantId={contact.tenant_id}
               />
             </div>
 

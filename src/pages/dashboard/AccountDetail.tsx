@@ -286,6 +286,7 @@ export default function AccountDetail() {
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="related">Related</TabsTrigger>
               <TabsTrigger value="activities">Activities</TabsTrigger>
+              <TabsTrigger value="emails">Emails</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details">
@@ -599,6 +600,7 @@ export default function AccountDetail() {
                 emailAddress={account.email} 
                 entityType="account" 
                 entityId={account.id} 
+                tenantId={account.tenant_id}
               />
             </TabsContent>
           </Tabs>

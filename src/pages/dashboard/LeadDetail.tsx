@@ -81,6 +81,10 @@ export default function LeadDetail() {
     try {
       // Extract extras and merge into custom_fields
       const { service_id, attachments, ...rest } = formData || ({} as LeadFormData);
+      const payload: any = { ...rest };
+      payload.expected_close_date = rest.expected_close_date ? rest.expected_close_date : null;
+      if (payload.franchise_id === '') payload.franchise_id = null;
+      if (payload.tenant_id === '') delete payload.tenant_id;
       const attachmentList = Array.isArray(attachments) ? attachments : [];
       const attachmentNames = attachmentList
         .map((f) => {
@@ -100,7 +104,7 @@ export default function LeadDetail() {
       const { error } = await supabase
         .from('leads')
         .update({
-          ...rest,
+          ...payload,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
           custom_fields: Object.keys(mergedCustomFields as Record<string, unknown>).length ? mergedCustomFields : null,
         })
@@ -388,6 +392,7 @@ export default function LeadDetail() {
                 emailAddress={lead.email} 
                 entityType="lead" 
                 entityId={lead.id} 
+                tenantId={lead.tenant_id}
                 className="mb-6"
               />
               <LeadActivitiesTimeline leadId={lead.id} />

@@ -29,10 +29,12 @@ interface EmailHistoryPanelProps {
   emailAddress?: string | null;
   entityType: string; // 'lead', 'contact', 'account', 'opportunity', 'shipment'
   entityId: string;
+  tenantId?: string;
+  accountId?: string;
   className?: string;
 }
 
-export function EmailHistoryPanel({ emailAddress, entityType, entityId, className }: EmailHistoryPanelProps) {
+export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId, accountId, className }: EmailHistoryPanelProps) {
   const { supabase } = useCRM();
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,12 +54,20 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, classNam
       const { data, error } = await supabase.functions.invoke("search-emails", {
         body: { 
           email: emailAddress, 
+          tenantId,
+          accountId,
           page: 1, 
           pageSize: 50 
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // If the function returned a structured error
+        throw error;
+      }
+      if (data && (data as any).success === false) {
+        throw new Error((data as any).error || "Email search failed");
+      }
       
       const results = (data?.data as Email[]) || [];
       // Sort by date desc
@@ -65,9 +75,11 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, classNam
         new Date(b.received_at).getTime() - new Date(a.received_at).getTime()
       );
       setEmails(sorted);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching emails:", error);
-      toast.error("Failed to load email history");
+      toast.error("Failed to load email history", {
+        description: error.message || "Unknown error occurred"
+      });
     } finally {
       setLoading(false);
     }
@@ -75,7 +87,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, classNam
 
   useEffect(() => {
     fetchEmails();
-  }, [emailAddress]);
+  }, [emailAddress, tenantId, accountId]);
 
   const filteredEmails = useMemo(() => {
     return emails.filter(email => 

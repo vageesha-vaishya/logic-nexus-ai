@@ -21,10 +21,19 @@ Deno.serve(async (req: Request) => {
       return v;
     };
 
-    const supabase = createClient(
-      requireEnv("SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
-    );
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing Authorization header", code: "AUTH_REQUIRED" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_ANON_KEY"), {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
 
     type SearchPayload = {
       email: string;
@@ -39,8 +48,8 @@ Deno.serve(async (req: Request) => {
       payload = await req.json();
     } catch {
       return new Response(
-        JSON.stringify({ success: false, error: "Invalid JSON body" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Invalid JSON body", code: "BAD_REQUEST" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -48,7 +57,10 @@ Deno.serve(async (req: Request) => {
     let { page = 1, pageSize = 25 } = payload || ({} as SearchPayload);
 
     if (!email) {
-      throw new Error("Missing required field: email");
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing required field: email", code: "BAD_REQUEST" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
     }
 
     const targetEmail = String(email).toLowerCase().trim();
@@ -83,19 +95,28 @@ Deno.serve(async (req: Request) => {
     if (tenantId) toQuery = toQuery.eq("tenant_id", tenantId);
     if (accountId) toQuery = toQuery.eq("account_id", accountId);
     if (direction) toQuery = toQuery.eq("direction", direction);
-    const { data: toMatches, error: toErr } = await toQuery.contains("to_emails", [{ email: targetEmail }]);
+    const { data: toMatches, error: toErr } = await toQuery
+      .contains("to_emails", [{ email: targetEmail }])
+      .order("received_at", { ascending: false })
+      .range(from, to);
 
     let ccQuery = supabase.from("emails").select("*");
     if (tenantId) ccQuery = ccQuery.eq("tenant_id", tenantId);
     if (accountId) ccQuery = ccQuery.eq("account_id", accountId);
     if (direction) ccQuery = ccQuery.eq("direction", direction);
-    const { data: ccMatches, error: ccErr } = await ccQuery.contains("cc_emails", [{ email: targetEmail }]);
+    const { data: ccMatches, error: ccErr } = await ccQuery
+      .contains("cc_emails", [{ email: targetEmail }])
+      .order("received_at", { ascending: false })
+      .range(from, to);
 
     let bccQuery = supabase.from("emails").select("*");
     if (tenantId) bccQuery = bccQuery.eq("tenant_id", tenantId);
     if (accountId) bccQuery = bccQuery.eq("account_id", accountId);
     if (direction) bccQuery = bccQuery.eq("direction", direction);
-    const { data: bccMatches, error: bccErr } = await bccQuery.contains("bcc_emails", [{ email: targetEmail }]);
+    const { data: bccMatches, error: bccErr } = await bccQuery
+      .contains("bcc_emails", [{ email: targetEmail }])
+      .order("received_at", { ascending: false })
+      .range(from, to);
 
     if (toErr || ccErr || bccErr) {
       throw new Error(
@@ -129,7 +150,7 @@ Deno.serve(async (req: Request) => {
     console.error("Error searching emails:", error);
     return new Response(
       JSON.stringify({ success: false, error: (error instanceof Error) ? error.message : String(error) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   }
 });

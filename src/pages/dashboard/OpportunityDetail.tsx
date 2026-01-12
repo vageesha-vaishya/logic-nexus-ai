@@ -594,6 +594,7 @@ export default function OpportunityDetail() {
                 emailAddress={opportunity.contacts?.email || opportunity.leads?.email} 
                 entityType="opportunity" 
                 entityId={opportunity.id} 
+                tenantId={opportunity.tenant_id}
               />
             </TabsContent>
           </Tabs>
