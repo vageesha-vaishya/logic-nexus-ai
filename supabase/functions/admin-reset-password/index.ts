@@ -1,0 +1,133 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+type ResetPayload = {
+  target_user_id: string;
+  new_password?: string;
+  send_reset_link?: boolean;
+  redirect_url?: string;
+};
+
+serve(async (req: any) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    if (!serviceKey || !supabaseUrl || !anonKey) {
+      throw new Error("Supabase environment not configured");
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const supabaseUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
+    });
+
+    const { data: callerRes } = await supabaseUser.auth.getUser();
+    const callerId = callerRes?.user?.id;
+    if (!callerId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body: ResetPayload = await req.json();
+    const targetUserId = body?.target_user_id;
+    const newPassword = body?.new_password;
+    const sendResetLink = !!body?.send_reset_link;
+    const redirectUrl = body?.redirect_url || `${new URL(req.url).origin}/`;
+
+    if (!targetUserId || (!newPassword && !sendResetLink)) {
+      return new Response(JSON.stringify({ error: "Invalid payload" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Determine caller role and scope
+    const { data: callerRoles, error: rolesErr } = await supabaseAdmin
+      .from("user_roles")
+      .select("role, tenant_id, franchise_id")
+      .eq("user_id", callerId);
+    if (rolesErr) throw rolesErr;
+    const isPlatformAdmin = (callerRoles || []).some((r: any) => r.role === "platform_admin");
+    const tenantIds = Array.from(new Set((callerRoles || []).map((r: any) => r.tenant_id).filter(Boolean)));
+    const franchiseIds = Array.from(new Set((callerRoles || []).map((r: any) => r.franchise_id).filter(Boolean)));
+    const isTenantAdmin = (callerRoles || []).some((r: any) => r.role === "tenant_admin");
+    const isFranchiseAdmin = (callerRoles || []).some((r: any) => r.role === "franchise_admin");
+
+    // Get target user's roles
+    const { data: targetRoles, error: targetErr } = await supabaseAdmin
+      .from("user_roles")
+      .select("role, tenant_id, franchise_id")
+      .eq("user_id", targetUserId);
+    if (targetErr) throw targetErr;
+
+    const targetTenantIds = Array.from(new Set((targetRoles || []).map((r: any) => r.tenant_id).filter(Boolean)));
+    const targetFranchiseIds = Array.from(new Set((targetRoles || []).map((r: any) => r.franchise_id).filter(Boolean)));
+
+    // Scope check
+    let allowed = false;
+    if (isPlatformAdmin) {
+      allowed = true;
+    } else if (isTenantAdmin) {
+      allowed = tenantIds.some((tid) => targetTenantIds.includes(tid));
+    } else if (isFranchiseAdmin) {
+      allowed = franchiseIds.some((fid) => targetFranchiseIds.includes(fid));
+    }
+
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Access denied: out of scope" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Execute action
+    if (newPassword) {
+      const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+        password: newPassword,
+      });
+      if (updErr) throw updErr;
+    }
+
+    if (sendResetLink) {
+      // Generate recovery link to email to user
+      // Note: Supabase returns link; client may choose to send email via own system
+      const { data: { user }, error: userErr } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+      if (userErr) throw userErr;
+      const email = user?.email;
+      if (email) {
+        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: "recovery",
+          email,
+          options: { redirectTo: redirectUrl },
+        });
+        if (linkErr) throw linkErr;
+        return new Response(JSON.stringify({ success: true, recovery_link: linkData?.action_link }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error?.message || String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

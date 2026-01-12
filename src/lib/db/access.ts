@@ -133,7 +133,7 @@ export class ScopedDataAccess {
     const baseQuery = this.supabase.from(table);
     const ctx = this.context;
     const logAudit = this.logAudit.bind(this);
-    const injectScope = this.injectScope.bind(this);
+    const injectScope = (v: any) => this.injectScope(v, table);
     const applyScopeFilter = (query: any) => this.applyScopeFilter(query, table);
 
     return {
@@ -268,7 +268,7 @@ export class ScopedDataAccess {
     return query;
   }
 
-  private injectScope(value: any): any {
+  private injectScope(value: any, table?: TableName): any {
     const newValue = { ...value };
     // Inject if not platform admin, or if platform admin has enabled override
     const shouldInject = !this.context.isPlatformAdmin || (this.context.isPlatformAdmin && this.context.adminOverrideEnabled);
@@ -278,7 +278,10 @@ export class ScopedDataAccess {
         newValue.tenant_id = this.context.tenantId;
       }
       if (this.context.franchiseId && !newValue.franchise_id) {
-        newValue.franchise_id = this.context.franchiseId;
+        // Special-case: franchises table does not have franchise_id
+        if (table !== 'franchises') {
+          newValue.franchise_id = this.context.franchiseId;
+        }
       }
     }
     return newValue;

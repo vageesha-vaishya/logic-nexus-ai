@@ -112,7 +112,6 @@ serve(async (req: any) => {
       try {
         const encoder = new TextEncoder();
         const decoder = new TextDecoder();
-        let conn: Deno.Conn;
         let greetingConsumed = false;
 
         // Connect with improved error handling and STARTTLS fallback
@@ -168,7 +167,7 @@ serve(async (req: any) => {
           }
         };
 
-        conn = await connectImap();
+        const conn = await connectImap();
 
         // Helper to read server response with better buffering
         const readResponse = async () => {
@@ -182,7 +181,7 @@ serve(async (req: any) => {
         const sendCommand = async (tag: string, cmd: string) => {
           await conn.write(encoder.encode(`${tag} ${cmd}\r\n`));
           let responseText = "";
-          let chunks: Uint8Array[] = [];
+          const chunks: Uint8Array[] = [];
           
           while (true) {
             const { data, text } = await readResponse();
@@ -194,7 +193,7 @@ serve(async (req: any) => {
               break;
             }
             // Safety break for extremely large responses to prevent OOM in Edge Function (limit ~10MB)
-            let totalSize = chunks.reduce((acc, c) => acc + c.length, 0);
+            const totalSize = chunks.reduce((acc, c) => acc + c.length, 0);
             if (totalSize > 10 * 1024 * 1024) {
                throw new Error("Response too large (>10MB)");
             }

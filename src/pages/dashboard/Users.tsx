@@ -45,6 +45,11 @@ export default function Users() {
   const [bulkFranchise, setBulkFranchise] = useState<string>('');
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [resetMode, setResetMode] = useState<'set' | 'link'>('set');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -168,6 +173,7 @@ export default function Users() {
                     <TableHead>Franchise</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -215,6 +221,23 @@ export default function Users() {
                       </TableCell>
                       <TableCell>
                         {new Date(user.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {(context.isPlatformAdmin || context.isTenantAdmin || context.isFranchiseAdmin) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setResetUserId(user.id);
+                              setResetMode('set');
+                              setNewPassword('');
+                              setConfirmPassword('');
+                              setShowResetDialog(true);
+                            }}
+                          >
+                            Reset Password
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -284,6 +307,98 @@ export default function Users() {
                   toast({ title: 'Error', description: 'Failed to assign roles', variant: 'destructive' });
                 }
               }}>Assign</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+          <DialogContent onClick={(e) => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  variant={resetMode === 'set' ? 'default' : 'outline'}
+                  onClick={() => setResetMode('set')}
+                >
+                  Set New Password
+                </Button>
+                <Button
+                  variant={resetMode === 'link' ? 'default' : 'outline'}
+                  onClick={() => setResetMode('link')}
+                >
+                  Send Reset Link
+                </Button>
+              </div>
+              {resetMode === 'set' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">New Password</label>
+                    <input
+                      type="password"
+                      className="w-full border rounded px-3 py-2"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Confirm Password</label>
+                    <input
+                      type="password"
+                      className="w-full border rounded px-3 py-2"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowResetDialog(false)}>Cancel</Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    if (!resetUserId) return;
+                    if (resetMode === 'set') {
+                      if (!newPassword || newPassword !== confirmPassword) {
+                        toast({
+                          title: 'Error',
+                          description: 'Passwords do not match',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                    }
+                    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                      body: resetMode === 'set'
+                        ? { target_user_id: resetUserId, new_password: newPassword }
+                        : { target_user_id: resetUserId, send_reset_link: true, redirect_url: window.location.origin + '/' },
+                    });
+                    if (error) throw error;
+                    if (data?.error) throw new Error(data.error);
+                    if (resetMode === 'link' && data?.recovery_link) {
+                      toast({
+                        title: 'Reset Link Generated',
+                        description: 'Copy and share the recovery link with the user.',
+                      });
+                      // Optionally show link in a separate UI; keeping minimal for now
+                      console.log('Recovery link:', data.recovery_link);
+                    } else {
+                      toast({ title: 'Success', description: 'Password updated successfully' });
+                    }
+                    setShowResetDialog(false);
+                  } catch (err: any) {
+                    toast({
+                      title: 'Error',
+                      description: err?.message || 'Failed to reset password',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+              >
+                {resetMode === 'set' ? 'Update Password' : 'Generate Link'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
