@@ -7833,6 +7833,10 @@ export type Database = {
           table_type: string
         }[]
       }
+      get_delegated_email_account_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       get_franchise_user_ids: {
         Args: { _franchise_id: string }
         Returns: {
@@ -7913,6 +7917,10 @@ export type Database = {
           access_type: string
           permission_key: string
         }[]
+      }
+      get_user_email_account_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
       }
       get_user_franchise_id: {
         Args: { check_user_id: string }
