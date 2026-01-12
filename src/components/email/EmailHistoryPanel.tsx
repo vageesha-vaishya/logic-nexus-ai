@@ -60,12 +60,10 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
       // We search for emails where the address is in 'from', 'to', 'cc', or 'bcc'
       // The search-emails function handles this if we pass the email query
       const { data, error } = await supabase.functions.invoke("search-emails", {
-        body: { 
-          email: emailAddress, 
-          tenantId,
-          accountId,
-          page: 1, 
-          pageSize: 50 
+        body: {
+          email: emailAddress,
+          page: 1,
+          pageSize: 50,
         },
       });
 
