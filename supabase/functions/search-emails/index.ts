@@ -39,6 +39,12 @@ Deno.serve(async (req: Request) => {
       direction?: string | null;
       page?: number;
       pageSize?: number;
+      filterFrom?: string;
+      filterTo?: string;
+      filterSubject?: string;
+      filterHasAttachment?: boolean;
+      filterDateFrom?: string;
+      filterDateTo?: string;
     };
     
     let payload: SearchPayload | null;
@@ -51,7 +57,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { email, query: searchText, tenantId, accountId, direction } = payload || ({} as SearchPayload);
+    const {
+      email,
+      query: searchText,
+      tenantId,
+      accountId,
+      direction,
+      filterFrom,
+      filterTo,
+      filterSubject,
+      filterHasAttachment,
+      filterDateFrom,
+      filterDateTo,
+    } = payload || ({} as SearchPayload);
     let { page = 1, pageSize = 25 } = payload || ({} as SearchPayload);
 
     if (!email) {
@@ -82,11 +100,42 @@ Deno.serve(async (req: Request) => {
     // 2. Text Search (if provided)
     if (searchText) {
       const q = searchText.trim();
-      // Simple OR search across common fields
-      dbQuery = dbQuery.or(`subject.ilike.%${q}%,body_text.ilike.%${q}%,from_name.ilike.%${q}%,from_email.ilike.%${q}%`);
+      dbQuery = dbQuery.or(
+        `subject.ilike.%${q}%,body_text.ilike.%${q}%,from_name.ilike.%${q}%,from_email.ilike.%${q}%`
+      );
     }
 
-    // 3. Email Address Match (The core requirement)
+    // 3. Advanced filters: from, to, subject, attachments, date range
+    if (filterFrom && filterFrom.trim().length > 0) {
+      const f = filterFrom.trim();
+      dbQuery = dbQuery.ilike("from_email", `%${f}%`);
+    }
+
+    if (filterSubject && filterSubject.trim().length > 0) {
+      const s = filterSubject.trim();
+      dbQuery = dbQuery.ilike("subject", `%${s}%`);
+    }
+
+    if (filterHasAttachment) {
+      dbQuery = dbQuery.eq("has_attachments", true);
+    }
+
+    if (filterDateFrom) {
+      const d = new Date(filterDateFrom);
+      if (!Number.isNaN(d.getTime())) {
+        dbQuery = dbQuery.gte("received_at", d.toISOString());
+      }
+    }
+
+    if (filterDateTo) {
+      const d = new Date(filterDateTo);
+      if (!Number.isNaN(d.getTime())) {
+        d.setHours(23, 59, 59, 999);
+        dbQuery = dbQuery.lte("received_at", d.toISOString());
+      }
+    }
+
+    // 4. Email Address Match (The core requirement)
     // We want emails WHERE:
     //   from_email ILIKE targetEmail
     //   OR to_emails CONTAINS [targetEmail]
@@ -107,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
     dbQuery = dbQuery.or(orConditions);
 
-    // 4. Ordering and Pagination
+    // 5. Ordering and Pagination
     const { data, error, count } = await dbQuery
       .order("received_at", { ascending: false })
       .range(from, to);

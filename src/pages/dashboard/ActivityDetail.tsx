@@ -24,6 +24,7 @@ export default function ActivityDetail() {
   const navigate = useNavigate();
   const { supabase, context } = useCRM();
   const [activity, setActivity] = useState<any>(null);
+  const [rawActivity, setRawActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +42,8 @@ export default function ActivityDetail() {
         .single();
 
       if (error) throw error;
+
+      setRawActivity(data);
       
       // Flatten custom_fields into top-level for form compatibility
       const flattened = {
@@ -177,6 +180,13 @@ export default function ActivityDetail() {
     );
   }
 
+  const customFields = rawActivity?.custom_fields && typeof rawActivity.custom_fields === 'object'
+    ? (rawActivity.custom_fields as Record<string, any>)
+    : null;
+  const emailTo = (customFields?.to ?? (activity?.to as any)) as string | undefined;
+  const emailFrom = (customFields?.from ?? (activity?.from as any)) as string | undefined;
+  const emailBody = (customFields?.email_body ?? (activity?.email_body as any)) as string | undefined;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -211,6 +221,36 @@ export default function ActivityDetail() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+
+        {activity?.activity_type === 'email' && (emailTo || emailFrom || emailBody) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Email</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {emailFrom ? (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">From</div>
+                  <div className="text-sm text-muted-foreground">{emailFrom}</div>
+                </div>
+              ) : null}
+              {emailTo ? (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">To</div>
+                  <div className="text-sm text-muted-foreground">{emailTo}</div>
+                </div>
+              ) : null}
+              {emailBody ? (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">Body</div>
+                  <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words">
+                    {emailBody}
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

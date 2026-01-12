@@ -13,7 +13,6 @@ import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
 import { EmailClient } from "@/components/email/EmailClient";
-import { EmailHistoryPanel } from "@/components/email/EmailHistoryPanel"; // Keep for now if needed, or remove if unused
 import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
 import { ManualAssignment } from '@/components/assignment/ManualAssignment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -740,11 +739,11 @@ export default function LeadDetail() {
                 </TabsContent>
                 
                 <TabsContent value="email" className="pt-6">
-                  <EmailHistoryPanel 
-                    emailAddress={lead.email} 
-                    entityType="lead" 
-                    entityId={lead.id} 
-                    tenantId={lead.tenant_id}
+                  <EmailClient 
+                    entityType="lead"
+                    entityId={lead.id}
+                    emailAddress={lead.email}
+                    className="mt-0"
                   />
                 </TabsContent>
               </Tabs>

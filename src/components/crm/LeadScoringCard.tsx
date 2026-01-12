@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Star, Activity, User, Truck, Clock } from 'lucide-react';
+import { TrendingUp, Star, Activity, User, Truck, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 
 interface LeadScoringCardProps {
@@ -30,6 +30,7 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
     logistics: 0,
     decay: 0
   });
+  const [collapsed, setCollapsed] = useState(false);
 
   const getScoreGrade = (score: number) => {
     if (score >= 80) return { grade: 'A', color: 'text-green-600', bg: 'bg-green-500/10' };
@@ -117,14 +118,25 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Lead Score
-        </CardTitle>
-        <CardDescription>AI-powered qualification score</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex flex-col space-y-1.5">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Lead Score
+          </CardTitle>
+          <CardDescription>AI-powered qualification score</CardDescription>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed((prev) => !prev)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          aria-label={collapsed ? "Expand lead score" : "Collapse lead score"}
+        >
+          {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+        </button>
       </CardHeader>
-      <CardContent className="space-y-4">
+      {!collapsed && (
+        <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-baseline gap-2">
@@ -192,6 +204,7 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
           )}
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }

@@ -1,14 +1,14 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react-swc';
+import { defineConfig, configDefaults } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [],
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: './test/setup.ts',
+    exclude: [...configDefaults.exclude, 'tests/e2e/**'],
   },
   resolve: {
     alias: {

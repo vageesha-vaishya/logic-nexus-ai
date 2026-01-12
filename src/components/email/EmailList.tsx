@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, Paperclip, Star, Filter, Calendar as CalendarIcon, X } from "lucide-react";
+import { Search, RefreshCw, Paperclip, Star, Filter, ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -11,11 +11,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface AdvancedSearchFilters {
   from?: string;
@@ -25,6 +30,9 @@ export interface AdvancedSearchFilters {
   dateFrom?: Date;
   dateTo?: Date;
 }
+
+export type EmailSortField = "received_at" | "from_email" | "subject";
+export type EmailSortDirection = "asc" | "desc";
 
 interface EmailListProps {
   emails: (Email & { threadCount?: number })[];
@@ -44,6 +52,10 @@ interface EmailListProps {
   onAdvancedFiltersChange?: (filters: AdvancedSearchFilters) => void;
   conversationView?: boolean;
   onToggleConversationView?: (enabled: boolean) => void;
+  sortField?: EmailSortField;
+  sortDirection?: EmailSortDirection;
+  onSortFieldChange?: (field: EmailSortField) => void;
+  onToggleSortDirection?: () => void;
 }
 
 export function EmailList({
@@ -63,14 +75,43 @@ export function EmailList({
   advancedFilters = {},
   onAdvancedFiltersChange,
   conversationView = false,
-  onToggleConversationView
+  onToggleConversationView,
+  sortField = "received_at",
+  sortDirection = "desc",
+  onSortFieldChange,
+  onToggleSortDirection,
 }: EmailListProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   const updateFilter = (key: keyof AdvancedSearchFilters, value: any) => {
     if (onAdvancedFiltersChange) {
-      onAdvancedFiltersChange({ ...advancedFilters, [key]: value });
+      const next = { ...advancedFilters } as AdvancedSearchFilters;
+      const shouldClear =
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && value.trim() === "");
+      if (shouldClear) {
+        delete (next as any)[key];
+      } else {
+        (next as any)[key] = value;
+      }
+      onAdvancedFiltersChange(next);
     }
+  };
+
+  const hasAnyAdvancedFilters = Object.values(advancedFilters).some((v) => {
+    if (v === undefined || v === null) return false;
+    if (typeof v === "string") return v.trim().length > 0;
+    if (typeof v === "boolean") return v;
+    return true;
+  });
+
+  const dateToInputValue = (d?: Date) => {
+    if (!d) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
   };
 
   return (
@@ -86,9 +127,39 @@ export function EmailList({
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Sort emails">
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => onSortFieldChange?.("received_at")}
+                className={cn(sortField === "received_at" && "bg-accent")}
+              >
+                Date
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSortFieldChange?.("from_email")}
+                className={cn(sortField === "from_email" && "bg-accent")}
+              >
+                From
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSortFieldChange?.("subject")}
+                className={cn(sortField === "subject" && "bg-accent")}
+              >
+                Subject
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onToggleSortDirection?.()}>
+                {sortDirection === "asc" ? "Ascending" : "Descending"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Popover open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
             <PopoverTrigger asChild>
-              <Button variant={Object.keys(advancedFilters).length > 0 ? "secondary" : "outline"} size="icon">
+              <Button variant={hasAnyAdvancedFilters ? "secondary" : "outline"} size="icon" aria-label="Advanced search">
                 <Filter className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
@@ -104,12 +175,44 @@ export function EmailList({
                    />
                  </div>
                  <div className="space-y-2">
+                   <Label>To</Label>
+                   <Input
+                     value={advancedFilters.to || ""}
+                     onChange={(e) => updateFilter("to", e.target.value)}
+                     placeholder="Recipient email"
+                   />
+                 </div>
+                 <div className="space-y-2">
                    <Label>Subject</Label>
                    <Input 
                      value={advancedFilters.subject || ""} 
                      onChange={(e) => updateFilter('subject', e.target.value)}
                      placeholder="Subject line"
                    />
+                 </div>
+                 <div className="grid grid-cols-2 gap-3">
+                   <div className="space-y-2">
+                     <Label>Date From</Label>
+                     <Input
+                       type="date"
+                       value={dateToInputValue(advancedFilters.dateFrom)}
+                       onChange={(e) => {
+                         const v = e.target.value;
+                         updateFilter("dateFrom", v ? new Date(`${v}T00:00:00`) : undefined);
+                       }}
+                     />
+                   </div>
+                   <div className="space-y-2">
+                     <Label>Date To</Label>
+                     <Input
+                       type="date"
+                       value={dateToInputValue(advancedFilters.dateTo)}
+                       onChange={(e) => {
+                         const v = e.target.value;
+                         updateFilter("dateTo", v ? new Date(`${v}T00:00:00`) : undefined);
+                       }}
+                     />
+                   </div>
                  </div>
                  <div className="flex items-center space-x-2">
                    <Checkbox 
@@ -120,7 +223,15 @@ export function EmailList({
                    <Label htmlFor="has-attachment">Has Attachment</Label>
                  </div>
                  <div className="flex justify-end gap-2 pt-2">
-                   <Button variant="ghost" size="sm" onClick={() => onAdvancedFiltersChange?.({})}>Clear</Button>
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => {
+                       onAdvancedFiltersChange?.({});
+                     }}
+                   >
+                     Clear
+                   </Button>
                    <Button size="sm" onClick={() => setIsAdvancedOpen(false)}>Done</Button>
                  </div>
                </div>

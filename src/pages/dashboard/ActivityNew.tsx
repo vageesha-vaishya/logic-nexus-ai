@@ -80,16 +80,75 @@ export default function ActivityNew() {
         description = description ? `${description}\n\nLocation: ${formData.location}` : `Location: ${formData.location}`;
       }
 
-      // Handle email sending (placeholder)
+      const plainToHtml = (text: string) => {
+        const esc = (s: string) =>
+          s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return esc(String(text || "")).replace(/\n/g, "<br>");
+      };
+
+      // Handle email sending
       if (formData.activity_type === 'email' && formData.send_email) {
         if (!formData.to) {
           toast.error('Recipient email is required to send email');
           return;
         }
-        // TODO: Implement actual email sending via Edge Function
-        // For now, we just log it and append a note
-        description = `${description}\n\n[Sent via system to ${formData.to}]`;
-        toast.info('Email logged (sending functionality pending configuration)');
+
+        const { data: accounts, error: accountsError } = await supabase
+          .from('email_accounts')
+          .select('id, is_primary')
+          .eq('is_active', true)
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (accountsError) throw accountsError;
+        const accountId = accounts?.[0]?.id;
+        if (!accountId) {
+          toast.error('No active email account found. Connect an account in Email Management.');
+          return;
+        }
+
+        const subject = String(formData.subject || '').trim();
+        const emailHtmlBody = plainToHtml(String(formData.email_body || formData.description || ''));
+
+        const attachmentPayload = Array.isArray(formData.attachments)
+          ? formData.attachments
+              .map((a: any) => ({
+                filename: typeof a?.name === 'string' ? a.name : '',
+                path: typeof a?.path === 'string' ? a.path : undefined,
+                contentType: typeof a?.type === 'string' ? a.type : 'application/octet-stream',
+              }))
+              .filter((a: any) => a.filename && a.path)
+          : [];
+
+        const { data: sendData, error: sendError } = await supabase.functions.invoke("send-email", {
+          body: {
+            accountId,
+            to: [String(formData.to).trim()],
+            cc: [],
+            subject,
+            body: emailHtmlBody,
+            attachments: attachmentPayload,
+          },
+        });
+
+        if (sendError) {
+          let sendMessage = sendError.message;
+          const ctx = (sendError as any)?.context;
+          if (ctx) {
+            try {
+              const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
+              sendMessage = parsed?.error || parsed?.message || sendMessage;
+            } catch {
+            }
+          }
+          throw new Error(sendMessage);
+        }
+        if (sendData && (sendData as any).success === false) {
+          throw new Error((sendData as any).error || 'Failed to send email');
+        }
+
+        description = `${description || ''}\n\n[Sent via system to ${String(formData.to).trim()}]`.trim();
       }
 
       // Extract fields that are not in the activities table (including location and others)
@@ -117,6 +176,7 @@ export default function ActivityNew() {
         ...(finalEmailBody ? { email_body: finalEmailBody } : {}),
         ...(service_id ? { service_id } : {}),
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+        ...(formData.activity_type === 'email' && formData.send_email ? { sent_at: new Date().toISOString() } : {}),
       };
 
       const activityData = {

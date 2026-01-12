@@ -156,6 +156,7 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
         case 'link_clicked': return 'Link Clicked';
         case 'page_view': return `Page View: ${metadata?.url || 'Unknown'}`;
         case 'form_submission': return 'Form Submission';
+        case 'chatbot_message': return 'Chatbot Message';
         default: return type.replace(/_/g, ' ');
     }
   };

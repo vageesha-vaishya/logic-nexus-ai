@@ -52,7 +52,7 @@ describe('AdminScopeSwitcher', () => {
     expect(screen.getByText('Global Admin')).toBeInTheDocument();
   });
 
-  it('should render "Scoped View" button if user is platform admin and override is enabled', () => {
+  it('should render scoped button label if user is platform admin and override is enabled', () => {
     (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       context: { isPlatformAdmin: true },
       preferences: { admin_override_enabled: true },
@@ -62,6 +62,6 @@ describe('AdminScopeSwitcher', () => {
     });
 
     render(<AdminScopeSwitcher />);
-    expect(screen.getByText('Scoped View')).toBeInTheDocument();
+    expect(screen.getByText('All Tenants')).toBeInTheDocument();
   });
 });

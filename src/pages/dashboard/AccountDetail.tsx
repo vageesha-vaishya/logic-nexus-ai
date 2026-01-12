@@ -29,7 +29,7 @@ export default function AccountDetail() {
   const [relationships, setRelationships] = useState<any[]>([]);
   const [activeSegments, setActiveSegments] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
-  const [tab, setTab] = useState<'details' | 'related' | 'activities'>('details');
+  const [tab, setTab] = useState<'details' | 'related' | 'activities' | 'emails'>('details');
 
   useEffect(() => {
     // Reset UI state when navigating between accounts
@@ -282,7 +282,7 @@ export default function AccountDetail() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'details' | 'related' | 'activities')} key={id}>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as 'details' | 'related' | 'activities' | 'emails')} key={id}>
             <TabsList>
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="related">Related</TabsTrigger>

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   Inbox, Send, FileText, Star, Trash2, Archive, 
-  AlertCircle, Plus, RefreshCw, Folder, MoreHorizontal
+  AlertCircle, Plus, RefreshCw, Folder, MoreHorizontal, Bell, BellOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +28,8 @@ interface EmailSidebarProps {
   onCreateFolder?: (name: string) => void;
   onDeleteFolder?: (name: string) => void;
   className?: string;
+  notificationsEnabled?: boolean;
+  onToggleNotifications?: () => void;
 }
 
 export function EmailSidebar({
@@ -40,7 +42,9 @@ export function EmailSidebar({
   customFolders = [],
   onCreateFolder,
   onDeleteFolder,
-  className
+  className,
+  notificationsEnabled = true,
+  onToggleNotifications,
 }: EmailSidebarProps) {
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -88,9 +92,27 @@ export function EmailSidebar({
     <div className={cn("h-full flex flex-col p-2", className)}>
       <div className="flex items-center justify-between mb-4 px-2">
         <h2 className="font-semibold text-sm">Mailbox</h2>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onSync} disabled={loading}>
-          <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={onSync}
+            disabled={loading}
+            aria-label="Sync emails"
+          >
+            <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
+          </Button>
+          <Button
+            variant={notificationsEnabled ? "secondary" : "ghost"}
+            size="icon"
+            className="h-6 w-6"
+            onClick={onToggleNotifications}
+            aria-label={notificationsEnabled ? "Disable notifications" : "Enable notifications"}
+          >
+            {notificationsEnabled ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
+          </Button>
+        </div>
       </div>
       
       <Button className="w-full mb-4" onClick={onCompose}>
@@ -99,11 +121,11 @@ export function EmailSidebar({
       
       <nav className="space-y-1 overflow-y-auto flex-1">
         <NavItem id="inbox" icon={Inbox} label="Inbox" count={unreadCounts['inbox']} />
-        <NavItem id="sent" icon={Send} label="Sent Items" />
+        <NavItem id="sent" icon={Send} label="Sent Items" count={unreadCounts['sent'] || 0} />
         <NavItem id="all_mail" icon={Inbox} label="All Mail" />
-        <NavItem id="drafts" icon={FileText} label="Drafts" />
-        <NavItem id="flagged" icon={Star} label="Flagged" />
-        <NavItem id="trash" icon={Trash2} label="Trash" />
+        <NavItem id="drafts" icon={FileText} label="Drafts" count={unreadCounts['drafts'] || 0} />
+        <NavItem id="flagged" icon={Star} label="Flagged" count={unreadCounts['flagged'] || 0} />
+        <NavItem id="trash" icon={Trash2} label="Trash" count={unreadCounts['trash'] || 0} />
         
         <Separator className="my-4" />
         
@@ -137,8 +159,8 @@ export function EmailSidebar({
         </div>
         
         <nav className="space-y-1">
-          <NavItem id="archive" icon={Archive} label="Archive" />
-          <NavItem id="spam" icon={AlertCircle} label="Spam" />
+          <NavItem id="archive" icon={Archive} label="Archive" count={unreadCounts['archive'] || 0} />
+          <NavItem id="spam" icon={AlertCircle} label="Spam" count={unreadCounts['spam'] || 0} />
           {customFolders.map(folder => (
             <NavItem 
               key={folder} 

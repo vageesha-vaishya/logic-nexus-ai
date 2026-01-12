@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { 
   ResizableHandle, 
   ResizablePanel, 
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { EmailDetailView } from "./EmailDetailView";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailSidebar } from "./EmailSidebar";
-import { EmailList, AdvancedSearchFilters } from "./EmailList";
+import { EmailList, AdvancedSearchFilters, EmailSortDirection, EmailSortField } from "./EmailList";
 import { cn } from "@/lib/utils";
 import { Email } from "@/types/email";
 
@@ -42,12 +42,17 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   const [filterAttachments, setFilterAttachments] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({});
 
+  const [sortField, setSortField] = useState<EmailSortField>("received_at");
+  const [sortDirection, setSortDirection] = useState<EmailSortDirection>("desc");
+
   // Custom Folders State
   const [customFolders, setCustomFolders] = useState<string[]>([]);
 
   const [conversationView, setConversationView] = useState(true);
 
   const [replyTo, setReplyTo] = useState<{ to: string; subject: string; body?: string } | undefined>(undefined);
+  const notifiedEmailIdsRef = useRef<Set<string>>(new Set());
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
 
   // Layout check
   useEffect(() => {
@@ -63,13 +68,21 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       
       // Contextual mode (e.g. Lead Detail)
       if (emailAddress) {
+        const serverFilters: Record<string, any> = {
+          filterFrom: advancedFilters.from || undefined,
+          filterTo: advancedFilters.to || undefined,
+          filterSubject: advancedFilters.subject || undefined,
+          filterHasAttachment: advancedFilters.hasAttachment || undefined,
+          filterDateFrom: advancedFilters.dateFrom ? advancedFilters.dateFrom.toISOString() : undefined,
+          filterDateTo: advancedFilters.dateTo ? advancedFilters.dateTo.toISOString() : undefined,
+        };
         const { data, error } = await supabase.functions.invoke("search-emails", {
           body: { 
             email: emailAddress, 
             query: searchQuery,
             page: 1, 
             pageSize: 50,
-            ...advancedFilters // Pass advanced filters if API supports it
+            ...serverFilters
           },
         });
 
@@ -92,7 +105,6 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
         let query = supabase
           .from("emails")
           .select("*")
-          .order("received_at", { ascending: false })
           .limit(50);
 
         // Apply folder filter
@@ -121,6 +133,18 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
         if (advancedFilters.from) query = query.ilike('from_email', `%${advancedFilters.from}%`);
         if (advancedFilters.subject) query = query.ilike('subject', `%${advancedFilters.subject}%`);
         if (advancedFilters.hasAttachment) query = query.eq('has_attachments', true);
+        if (advancedFilters.dateFrom) query = query.gte("received_at", advancedFilters.dateFrom.toISOString());
+        if (advancedFilters.dateTo) {
+          const end = new Date(advancedFilters.dateTo);
+          end.setHours(23, 59, 59, 999);
+          query = query.lte("received_at", end.toISOString());
+        }
+
+        if (sortField === "received_at") {
+          query = query.order("received_at", { ascending: sortDirection === "asc" });
+        } else {
+          query = query.order(sortField, { ascending: sortDirection === "asc" });
+        }
 
         const { data, error } = await query;
         if (error) throw error;
@@ -137,25 +161,62 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     } finally {
       setLoading(false);
     }
-  }, [emailAddress, entityId, searchQuery, selectedFolder, filterUnread, filterFlagged, filterAttachments, advancedFilters, supabase, toast, customFolders]);
+  }, [emailAddress, entityId, searchQuery, selectedFolder, filterUnread, filterFlagged, filterAttachments, advancedFilters, sortField, sortDirection, supabase, toast, customFolders]);
 
   // Real-time subscription
   useEffect(() => {
+    if (emailAddress) return;
+
     const channel = supabase
-      .channel('email-updates')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'emails' },
-        (payload) => {
-          fetchEmails();
+      .channel("email-updates")
+      .on("postgres_changes", { event: "*", schema: "public", table: "emails" }, (payload) => {
+        const eventType = (payload as any).eventType as string | undefined;
+        const next = (payload as any).new as any;
+        const prev = (payload as any).old as any;
+
+        if (eventType === "INSERT" && next?.id) {
+          const inserted = next as Email;
+          setEmails((current) => {
+            if (current.some((e) => e.id === inserted.id)) return current;
+            return [inserted, ...current].slice(0, 50);
+          });
+
+          if (
+            notificationsEnabled &&
+            inserted.folder === "inbox" &&
+            inserted.is_read === false &&
+            !notifiedEmailIdsRef.current.has(inserted.id)
+          ) {
+            notifiedEmailIdsRef.current.add(inserted.id);
+            if (notifiedEmailIdsRef.current.size > 50) {
+              const first = notifiedEmailIdsRef.current.values().next().value as string | undefined;
+              if (first) notifiedEmailIdsRef.current.delete(first);
+            }
+            toast({
+              title: inserted.from_name || inserted.from_email || "New email",
+              description: inserted.subject || "(No Subject)",
+            });
+          }
+          return;
         }
-      )
+
+        if (eventType === "UPDATE" && next?.id) {
+          const updated = next as Email;
+          setEmails((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+          return;
+        }
+
+        if (eventType === "DELETE" && prev?.id) {
+          const deletedId = String(prev.id);
+          setEmails((current) => current.filter((e) => e.id !== deletedId));
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchEmails, supabase]);
+  }, [emailAddress, supabase, toast, notificationsEnabled]);
 
   useEffect(() => {
     fetchEmails();
@@ -167,6 +228,12 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     if (saved) {
       try {
         setCustomFolders(JSON.parse(saved));
+      } catch {}
+    }
+    const notif = localStorage.getItem('email_notifications_enabled');
+    if (notif) {
+      try {
+        setNotificationsEnabled(JSON.parse(notif));
       } catch {}
     }
   }, []);
@@ -205,10 +272,10 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   };
 
   // Derived state for filtering
-  const filteredEmails = useMemo(() => {
+  const filteredEmails = useMemo<(Email & { threadCount?: number })[]>(() => {
     // Basic filtering is done by fetchEmails mostly, but for contextual view
     // or additional client-side refinement:
-    return emails.filter(email => {
+    const filtered = emails.filter(email => {
       // Contextual folder logic
       if (emailAddress) {
         if (selectedFolder === 'all_mail') return true;
@@ -219,12 +286,64 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       
       // Apply advanced filters locally if not handled by server query (redundancy is safe)
       if (advancedFilters.from && !email.from_email.toLowerCase().includes(advancedFilters.from.toLowerCase()) && !email.from_name.toLowerCase().includes(advancedFilters.from.toLowerCase())) return false;
+      if (advancedFilters.to) {
+        const q = advancedFilters.to.toLowerCase();
+        const tos = Array.isArray(email.to_emails) ? email.to_emails : [];
+        const ccs = Array.isArray(email.cc_emails) ? email.cc_emails : [];
+        const bccs = Array.isArray(email.bcc_emails) ? email.bcc_emails : [];
+        const all = [...tos, ...ccs, ...bccs].map((s) => String(s).toLowerCase());
+        if (!all.some((s) => s.includes(q))) return false;
+      }
       if (advancedFilters.subject && !email.subject.toLowerCase().includes(advancedFilters.subject.toLowerCase())) return false;
       if (advancedFilters.hasAttachment && !email.has_attachments) return false;
+      if (advancedFilters.dateFrom) {
+        const from = new Date(advancedFilters.dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (new Date(email.received_at).getTime() < from.getTime()) return false;
+      }
+      if (advancedFilters.dateTo) {
+        const to = new Date(advancedFilters.dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(email.received_at).getTime() > to.getTime()) return false;
+      }
 
       return true;
     });
-  }, [emails, selectedFolder, emailAddress, advancedFilters]);
+
+    const getComparable = (e: Email) => {
+      if (sortField === "received_at") return new Date(e.received_at).getTime();
+      if (sortField === "from_email") return `${e.from_name || ""} ${e.from_email || ""}`.toLowerCase();
+      return String(e.subject || "").toLowerCase();
+    };
+
+    const dir = sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filtered].sort((a, b) => {
+      const av = getComparable(a) as any;
+      const bv = getComparable(b) as any;
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+
+    if (!conversationView) return sorted;
+
+    const byThread = new Map<string, { email: Email; count: number }>();
+    for (const e of sorted) {
+      const key = e.thread_id || e.id;
+      const existing = byThread.get(key);
+      if (!existing) {
+        byThread.set(key, { email: e, count: 1 });
+        continue;
+      }
+      existing.count += 1;
+      if (new Date(e.received_at).getTime() > new Date(existing.email.received_at).getTime()) {
+        existing.email = e;
+      }
+    }
+
+    return Array.from(byThread.values())
+      .map((v) => ({ ...v.email, threadCount: v.count }))
+      .sort((a, b) => (new Date(a.received_at).getTime() - new Date(b.received_at).getTime()) * dir);
+  }, [emails, selectedFolder, emailAddress, advancedFilters, sortField, sortDirection, conversationView]);
 
   const selectedThread = useMemo(() => {
     if (!selectedEmail) return null;
@@ -240,9 +359,15 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
 
   // Calculate unread counts (mock for now, ideally fetched from DB count query)
   const unreadCounts = useMemo(() => {
+    const by = (folder: string) => emails.filter(e => e.folder === folder);
     return {
-      inbox: emails.filter(e => !e.is_read && e.folder === 'inbox').length,
-      // ... calculate others if we had full dataset
+      inbox: by('inbox').filter(e => !e.is_read).length,
+      sent: by('sent').length,
+      drafts: by('drafts').length,
+      trash: by('trash').length,
+      spam: by('spam').length,
+      archive: by('archive').length,
+      flagged: emails.filter(e => e.is_starred).length,
     };
   }, [emails]);
 
@@ -316,21 +441,25 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
                    <Plus className="h-4 w-4" />
                </Button>
              </div>
-             <EmailList 
-               emails={filteredEmails}
-               selectedEmail={selectedEmail}
-               onSelect={handleEmailSelect}
-               searchQuery={searchQuery}
-               onSearchChange={setSearchQuery}
-               loading={loading}
-               filterUnread={filterUnread}
-               onToggleUnread={() => setFilterUnread(!filterUnread)}
-               filterFlagged={filterFlagged}
-               onToggleFlagged={() => setFilterFlagged(!filterFlagged)}
-               filterAttachments={filterAttachments}
-               onToggleAttachments={() => setFilterAttachments(!filterAttachments)}
-               advancedFilters={advancedFilters}
-               onAdvancedFiltersChange={setAdvancedFilters}
+            <EmailList 
+              emails={filteredEmails}
+              selectedEmail={selectedEmail}
+              onSelect={handleEmailSelect}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              loading={loading}
+              filterUnread={filterUnread}
+              onToggleUnread={() => setFilterUnread(!filterUnread)}
+              filterFlagged={filterFlagged}
+              onToggleFlagged={() => setFilterFlagged(!filterFlagged)}
+              filterAttachments={filterAttachments}
+              onToggleAttachments={() => setFilterAttachments(!filterAttachments)}
+              advancedFilters={advancedFilters}
+              onAdvancedFiltersChange={setAdvancedFilters}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSortFieldChange={setSortField}
+              onToggleSortDirection={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
              />
           </>
         ) : (
@@ -388,6 +517,14 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
             customFolders={customFolders}
             onCreateFolder={handleCreateFolder}
             onDeleteFolder={handleDeleteFolder}
+            notificationsEnabled={notificationsEnabled}
+            onToggleNotifications={() => {
+              setNotificationsEnabled((prev) => {
+                const next = !prev;
+                localStorage.setItem('email_notifications_enabled', JSON.stringify(next));
+                return next;
+              });
+            }}
           />
         </ResizablePanel>
         
@@ -412,6 +549,10 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
              onAdvancedFiltersChange={setAdvancedFilters}
              conversationView={conversationView}
              onToggleConversationView={setConversationView}
+             sortField={sortField}
+             sortDirection={sortDirection}
+             onSortFieldChange={setSortField}
+             onToggleSortDirection={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
           />
         </ResizablePanel>
         
