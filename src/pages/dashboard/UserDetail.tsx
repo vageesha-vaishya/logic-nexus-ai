@@ -36,7 +36,7 @@ export default function UserDetail() {
     try {
       setLoading(true);
       
-      const { data, error } = await scopedDb
+      const { data, error } = await supabase
         .from('profiles')
         .select(`
           *,

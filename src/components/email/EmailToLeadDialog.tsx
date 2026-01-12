@@ -3,22 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { LeadForm, LeadFormData } from "@/components/crm/LeadForm";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
-
-interface Email {
-  id: string;
-  subject: string;
-  from_email: string;
-  from_name: string;
-  body_text?: string;
-  snippet?: string;
-  received_at: string;
-}
+import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
+import { Email } from "@/types/email";
 
 interface EmailToLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   email: Email;
-  onSuccess?: () => void;
+  onSuccess?: (leadId?: string) => void;
 }
 
 export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: EmailToLeadDialogProps) {
@@ -35,13 +27,22 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
     };
   };
 
+  const getBodyText = (email: Email) => {
+    if (email.body_text) return email.body_text;
+    if (email.body_html) {
+      const doc = new DOMParser().parseFromString(email.body_html, 'text/html');
+      return doc.body.textContent || "";
+    }
+    return email.snippet || "";
+  };
+
   const { first_name, last_name } = parseName(email.from_name || email.from_email);
 
   const initialData: Partial<LeadFormData> = {
     first_name,
     last_name: last_name || "Unknown", // Last name is often required
     email: email.from_email,
-    description: `Created from email: ${email.subject}\n\n${email.body_text || email.snippet || ""}`,
+    description: `Created from email: ${email.subject}\n\n${getBodyText(email)}`,
     source: "email",
     status: "new",
     tenant_id: context.tenantId || undefined,
@@ -50,11 +51,51 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
   const handleSubmit = async (data: LeadFormData) => {
     try {
+      // Check for existing lead by email
+      if (data.email) {
+        const normalizedEmail = cleanEmail(data.email).value || data.email.trim().toLowerCase();
+        let query = supabase
+          .from("leads")
+          .select("id")
+          .eq("email", normalizedEmail);
+        if (context.tenantId) query = query.eq("tenant_id", context.tenantId);
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        const { data: existingLead } = await query.maybeSingle();
+
+        if (existingLead) {
+          toast.info("Lead already exists with this email");
+          onOpenChange(false);
+          onSuccess?.(existingLead.id);
+          return;
+        }
+      }
+
+      // Check for existing lead by phone
+      if (data.phone) {
+        const normalizedPhone = cleanPhone(data.phone).value || data.phone.trim();
+        let query = supabase
+          .from("leads")
+          .select("id")
+          .eq("phone", normalizedPhone);
+        if (context.tenantId) query = query.eq("tenant_id", context.tenantId);
+        if (context.franchiseId) query = query.eq("franchise_id", context.franchiseId);
+        const { data: existingByPhone } = await query.maybeSingle();
+
+        if (existingByPhone) {
+          toast.info("Lead already exists with this phone");
+          onOpenChange(false);
+          onSuccess?.(existingByPhone.id);
+          return;
+        }
+      }
+
       // 1. Create the lead
       const { data: lead, error } = await supabase
         .from("leads")
         .insert({
           ...data,
+          email: data.email ? (cleanEmail(data.email).value || data.email.trim().toLowerCase()) : null,
+          phone: data.phone ? (cleanPhone(data.phone).value || data.phone.trim()) : null,
           // Ensure tenant/franchise context is respected if not in data
           tenant_id: data.tenant_id || context.tenantId,
           franchise_id: data.franchise_id || context.franchiseId,
@@ -67,12 +108,29 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
       toast.success("Lead created successfully");
       
+      // Record automated activity for conversion
+      try {
+        await supabase
+          .from("lead_activities" as any)
+          .insert({
+            lead_id: lead.id,
+            type: "email_converted",
+            metadata: {
+              email_id: email.id,
+              subject: email.subject,
+              from_email: email.from_email,
+              received_at: email.received_at,
+            },
+            tenant_id: context.tenantId || null,
+          });
+      } catch {}
+      
       // 2. Optionally link the specific email to the lead if the schema supports it
       // But since we rely on email address matching, this might be implicit.
       // If there was an explicit link table, we'd update it here.
       
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(lead.id);
     } catch (error: any) {
       console.error("Error creating lead:", error);
       toast.error(error.message || "Failed to create lead");

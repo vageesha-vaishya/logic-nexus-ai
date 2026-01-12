@@ -23,7 +23,7 @@ type GmailMessagePart = {
 };
 type GraphRecipient = { emailAddress?: { address?: string; name?: string } };
 
-serve(async (req) => {
+serve(async (req: any) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -107,41 +107,108 @@ serve(async (req) => {
         ssl: account.imap_use_ssl,
       };
 
-      console.log("Syncing via IMAP:", imapConfig);
+      console.log(`Syncing via IMAP for ${account.email_address}:`, imapConfig);
 
       try {
-        // Connect to IMAP server
-        const conn = imapConfig.ssl
-          ? await Deno.connectTls({ hostname: imapConfig.hostname, port: imapConfig.port })
-          : await Deno.connect({ hostname: imapConfig.hostname, port: imapConfig.port });
-
         const encoder = new TextEncoder();
         const decoder = new TextDecoder();
+        let conn: Deno.Conn;
+        let greetingConsumed = false;
 
-        // Helper to read server response
-        const readResponse = async () => {
-          const buffer = new Uint8Array(4096);
-          const n = await conn.read(buffer);
-          if (n === null) throw new Error("Connection closed");
-          return decoder.decode(buffer.subarray(0, n));
+        // Connect with improved error handling and STARTTLS fallback
+        const connectImap = async (): Promise<Deno.Conn> => {
+          try {
+            console.log(`Attempting connection to ${imapConfig.hostname}:${imapConfig.port} (SSL: ${imapConfig.ssl})`);
+            if (imapConfig.ssl) {
+              return await Deno.connectTls({ hostname: imapConfig.hostname, port: imapConfig.port });
+            } else {
+              return await Deno.connect({ hostname: imapConfig.hostname, port: imapConfig.port });
+            }
+          } catch (connError: any) {
+             const errMsg = String(connError?.message || connError).toLowerCase();
+             console.error("Connection error:", errMsg);
+             
+             // Check for InvalidContentType (SSL on plain port) or handshake failure
+             if (imapConfig.ssl && (errMsg.includes("invalidcontenttype") || errMsg.includes("handshake") || errMsg.includes("record overflow"))) {
+               console.warn("SSL handshake failed. Attempting automatic fallback to STARTTLS on plain connection...");
+               
+               try {
+                 // 1. Connect Plain
+                 const plainConn = await Deno.connect({ hostname: imapConfig.hostname, port: imapConfig.port });
+                 const buf = new Uint8Array(2048);
+                 
+                 // 2. Read Greeting
+                 const n = await plainConn.read(buf);
+                 if (!n) throw new Error("Connection closed immediately");
+                 const greeting = new TextDecoder().decode(buf.subarray(0, n));
+                 console.log("Fallback Greeting:", greeting.trim());
+                 
+                 // 3. Send STARTTLS
+                 await plainConn.write(new TextEncoder().encode("A00 STARTTLS\r\n"));
+                 
+                 // 4. Read Response
+                 const n2 = await plainConn.read(buf);
+                 if (!n2) throw new Error("Connection closed during STARTTLS");
+                 const resp = new TextDecoder().decode(buf.subarray(0, n2));
+                 if (!resp.toUpperCase().includes("OK")) throw new Error("STARTTLS rejected: " + resp);
+                 
+                 console.log("STARTTLS accepted, upgrading connection...");
+                 
+                 // 5. Upgrade
+                 const secureConn = await Deno.startTls(plainConn, { hostname: imapConfig.hostname });
+                 greetingConsumed = true; // We already consumed the greeting
+                 return secureConn;
+               } catch (fallbackErr: any) {
+                 console.error("Fallback failed:", fallbackErr);
+                 throw new Error(`SSL/TLS Handshake Failed and STARTTLS Fallback failed. Please check your ports. SSL Error: ${errMsg}. Fallback Error: ${fallbackErr.message}`);
+               }
+             }
+             
+             throw connError;
+          }
         };
 
-        // Helper to send command
+        conn = await connectImap();
+
+        // Helper to read server response with better buffering
+        const readResponse = async () => {
+          const buffer = new Uint8Array(8192);
+          const n = await conn.read(buffer);
+          if (n === null) throw new Error("Connection closed");
+          return { data: buffer.subarray(0, n), text: decoder.decode(buffer.subarray(0, n)) };
+        };
+
+        // Helper to send command and read until completion
         const sendCommand = async (tag: string, cmd: string) => {
           await conn.write(encoder.encode(`${tag} ${cmd}\r\n`));
-          let response = "";
+          let responseText = "";
+          let chunks: Uint8Array[] = [];
+          
           while (true) {
-            const chunk = await readResponse();
-            response += chunk;
-            if (response.includes(`${tag} OK`) || response.includes(`${tag} NO`) || response.includes(`${tag} BAD`)) {
+            const { data, text } = await readResponse();
+            chunks.push(data);
+            responseText += text;
+            
+            // Check for completion tags
+            if (responseText.includes(`${tag} OK`) || responseText.includes(`${tag} NO`) || responseText.includes(`${tag} BAD`)) {
               break;
             }
+            // Safety break for extremely large responses to prevent OOM in Edge Function (limit ~10MB)
+            let totalSize = chunks.reduce((acc, c) => acc + c.length, 0);
+            if (totalSize > 10 * 1024 * 1024) {
+               throw new Error("Response too large (>10MB)");
+            }
           }
-          return response;
+          return responseText;
         };
 
         // IMAP conversation
-        await readResponse(); // Read greeting
+        if (!greetingConsumed) {
+          const { text: greeting } = await readResponse(); // Read greeting
+          console.log("IMAP Greeting:", greeting.trim());
+        } else {
+          console.log("IMAP Greeting: (Consumed during STARTTLS handshake)");
+        }
         
         // Login
         const loginResp = await sendCommand("A1", `LOGIN ${imapConfig.username} ${imapConfig.password}`);
@@ -167,7 +234,10 @@ serve(async (req) => {
             const headerMatch = fetchResp.match(/BODY\[HEADER\] \{[\d]+\}\r\n([\s\S]+?)\r\n\r\n/);
             const bodyMatch = fetchResp.match(/BODY\[TEXT\] \{[\d]+\}\r\n([\s\S]+?)\r\n\)/);
             
-            if (!headerMatch) continue;
+            if (!headerMatch) {
+                console.warn(`Could not parse headers for message ${msgId}. Response snippet: ${fetchResp.substring(0, 100)}...`);
+                continue;
+            }
 
             const headers = headerMatch[1];
             const bodyText = bodyMatch?.[1] || "";
@@ -187,7 +257,8 @@ serve(async (req) => {
             try {
               parsed = await simpleParser(rawMessage);
             } catch (e) {
-              console.error("IMAP mailparser error:", e);
+              console.error(`IMAP mailparser error for message ${msgId}:`, e);
+              // Fallback: continue with regex-extracted data if simpleParser fails
             }
 
             const messageIdHeader = parsed?.messageId

@@ -11,7 +11,8 @@ import {
   MoreHorizontal, 
   ChevronUp,
   Printer,
-  FolderInput
+  FolderInput,
+  UserPlus
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,9 +24,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { EmailComposeDialog } from "./EmailComposeDialog";
+import { EmailToLeadDialog } from "./EmailToLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 import { Email } from "@/types/email";
 
@@ -52,7 +56,23 @@ function EmailMessage({
   const [showReply, setShowReply] = useState(false);
   const [showFullBody, setShowFullBody] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
+  const [showConvert, setShowConvert] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleConvertSuccess = (leadId?: string) => {
+    if (leadId) {
+      toast({
+        title: "Lead Ready",
+        description: "You can view the lead now.",
+        action: (
+          <ToastAction altText="View Lead" onClick={() => navigate(`/dashboard/leads/${leadId}`)}>
+            View Lead
+          </ToastAction>
+        ),
+      });
+    }
+  };
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -140,6 +160,9 @@ function EmailMessage({
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowConvert(true)} title="Convert to Lead">
+            <UserPlus className="w-4 h-4" />
+          </Button>
           <Button variant="ghost" size="sm">
             <Star className={`w-4 h-4 ${email.is_starred ? "fill-warning text-warning" : ""}`} />
           </Button>
@@ -296,6 +319,12 @@ function EmailMessage({
           subject: email.subject,
           body: email.body_text,
         }}
+      />
+      <EmailToLeadDialog
+        open={showConvert}
+        onOpenChange={setShowConvert}
+        email={email}
+        onSuccess={handleConvertSuccess}
       />
     </div>
   );

@@ -55,7 +55,7 @@ interface FranchiseFormProps {
 export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context, scopedDb } = useCRM();
+  const { context, scopedDb, supabase } = useCRM();
   const [tenants, setTenants] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -121,7 +121,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       // Remove duplicates
       const uniqueUserIds = Array.from(new Set(userIds));
       
-      const { data: profiles } = await scopedDb
+      const { data: profiles } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email')
         .in('id', uniqueUserIds);

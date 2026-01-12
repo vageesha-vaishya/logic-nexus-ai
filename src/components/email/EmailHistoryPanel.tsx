@@ -160,8 +160,12 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
 
   const renderEmailItem = (email: Email, isThreadChild = false) => {
     // Check direction or compare from_email with the entity's email
-    const isInbound = email.direction === 'inbound' || 
-      email.from_email.toLowerCase() !== emailAddress.toLowerCase();
+    // If direction is explicit, use it.
+    // Otherwise: if from_email matches the entity's email, it is inbound (from entity).
+    // If from_email does NOT match, it is outbound (from us/others to entity).
+    const isInbound = email.direction 
+      ? email.direction === 'inbound'
+      : email.from_email.toLowerCase() === emailAddress.toLowerCase();
     const snippetText = email.snippet || email.body_text?.slice(0, 150) || '';
     
     return (

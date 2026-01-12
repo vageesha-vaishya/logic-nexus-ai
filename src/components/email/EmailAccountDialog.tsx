@@ -27,10 +27,12 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUsername, setSmtpUsername] = useState("");
   const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpUseTls, setSmtpUseTls] = useState(true);
   const [imapHost, setImapHost] = useState("");
   const [imapPort, setImapPort] = useState("993");
   const [imapUsername, setImapUsername] = useState("");
   const [imapPassword, setImapPassword] = useState("");
+  const [imapUseSsl, setImapUseSsl] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { context } = useCRM();
@@ -139,9 +141,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
       setSmtpHost(account.smtp_host || "");
       setSmtpPort(String(account.smtp_port || "587"));
       setSmtpUsername(account.smtp_username || "");
+      setSmtpUseTls(account.smtp_use_tls !== false);
       setImapHost(account.imap_host || "");
       setImapPort(String(account.imap_port || "993"));
       setImapUsername(account.imap_username || "");
+      setImapUseSsl(account.imap_use_ssl !== false);
     } else {
       resetForm();
     }
@@ -156,10 +160,12 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
     setSmtpPort("587");
     setSmtpUsername("");
     setSmtpPassword("");
+    setSmtpUseTls(true);
     setImapHost("");
     setImapPort("993");
     setImapUsername("");
     setImapPassword("");
+    setImapUseSsl(true);
   };
 
   const handleSave = async () => {
@@ -195,10 +201,12 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
         smtp_port: provider === "smtp_imap" ? parseInt(smtpPort) : null,
         smtp_username: provider === "smtp_imap" ? smtpUsername : null,
         smtp_password: provider === "smtp_imap" && smtpPassword ? smtpPassword : undefined,
+        smtp_use_tls: provider === "smtp_imap" ? smtpUseTls : true,
         imap_host: provider === "smtp_imap" ? imapHost : null,
         imap_port: provider === "smtp_imap" ? parseInt(imapPort) : null,
         imap_username: provider === "smtp_imap" ? imapUsername : null,
         imap_password: provider === "smtp_imap" && imapPassword ? imapPassword : undefined,
+        imap_use_ssl: provider === "smtp_imap" ? imapUseSsl : true,
       };
 
       let error;
@@ -375,6 +383,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                 />
               </div>
 
+              <div className="flex items-center gap-2">
+                <Switch checked={smtpUseTls} onCheckedChange={setSmtpUseTls} />
+                <Label>Use TLS/SSL</Label>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>IMAP Host *</Label>
@@ -411,6 +424,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                   value={imapPassword}
                   onChange={(e) => setImapPassword(e.target.value)}
                 />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch checked={imapUseSsl} onCheckedChange={setImapUseSsl} />
+                <Label>Use SSL/TLS (IMAP)</Label>
               </div>
 
               <div className="flex items-center gap-2">

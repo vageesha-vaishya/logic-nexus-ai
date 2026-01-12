@@ -26,7 +26,8 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
   const fetchUsers = async () => {
     try {
       // Get all active profiles
-      const { data: allProfiles } = await scopedDb
+      // Use supabase client directly as profiles table lacks tenant_id column
+      const { data: allProfiles } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email')
         .eq('is_active', true);

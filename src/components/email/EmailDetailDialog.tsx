@@ -88,6 +88,10 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
                 <Button variant="ghost" size="sm">
                   <Star className={`w-4 h-4 ${email.is_starred ? "fill-warning text-warning" : ""}`} />
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowConvertToLead(true)} title="Convert to Lead">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Convert
+                </Button>
               </div>
             </div>
           </DialogHeader>

@@ -36,7 +36,7 @@ export function AssignmentHistory() {
 
           const [{ data: leadsData }, { data: profilesData }] = await Promise.all([
             scopedDb.from('leads').select('id, first_name, last_name, company').in('id', leadIds),
-            scopedDb.from('profiles').select('id, first_name, last_name').in('id', userIds)
+            supabase.from('profiles').select('id, first_name, last_name').in('id', userIds)
           ]);
 
           const leadsMap = new Map((leadsData as any[])?.map(l => [l.id, l]));

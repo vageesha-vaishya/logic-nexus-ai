@@ -20,6 +20,14 @@ export default function ActivityNew() {
   // Map 'event' to 'meeting' to match ActivityForm schema
   const activityType = (typeParam === 'event' ? 'meeting' : typeParam) as 'task' | 'meeting' | 'call' | 'email' | 'note' | undefined;
 
+  const backPath = leadId 
+    ? `/dashboard/leads/${leadId}` 
+    : accountId 
+      ? `/dashboard/accounts/${accountId}` 
+      : contactId 
+        ? `/dashboard/contacts/${contactId}` 
+        : '/dashboard/activities';
+
   const initialData = {
     activity_type: activityType || 'task',
     lead_id: leadId || null,
@@ -184,7 +192,7 @@ export default function ActivityNew() {
         due_date: rest.due_date ? rest.due_date : null,
       };
 
-      const { error } = await supabase
+      const { data: newActivity, error } = await supabase
         .from('activities')
         .insert({
           ...activityData,
@@ -193,12 +201,43 @@ export default function ActivityNew() {
           tenant_id: tenantId,
           franchise_id: franchiseId,
           created_by: user?.id
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
       toast.success('Activity created successfully');
-      navigate('/dashboard/activities');
+      
+      // Determine target path based on form data or URL params
+      const targetLeadId = formData.lead_id || leadId;
+      const targetAccountId = formData.account_id || accountId;
+      const targetContactId = formData.contact_id || contactId;
+
+      const targetPath = targetLeadId 
+        ? `/dashboard/leads/${targetLeadId}` 
+        : targetAccountId 
+          ? `/dashboard/accounts/${targetAccountId}` 
+          : targetContactId 
+            ? `/dashboard/contacts/${targetContactId}` 
+            : backPath;
+
+      // If email activity and not sent via form, open composer in parent view
+      const shouldOpenComposer = formData.activity_type === 'email' && !formData.send_email;
+      
+      if (shouldOpenComposer && (targetLeadId || targetAccountId || targetContactId)) {
+        navigate(targetPath, {
+          state: {
+            openComposer: true,
+            initialSubject: formData.subject,
+            initialBody: formData.description,
+            activityId: newActivity?.id
+          }
+        });
+        return;
+      }
+
+      navigate(targetPath);
     } catch (error: any) {
       console.error('Error creating activity:', error);
       toast.error('Failed to create activity', { description: error.message || 'Unknown error' });
@@ -209,7 +248,7 @@ export default function ActivityNew() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/activities')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -221,7 +260,7 @@ export default function ActivityNew() {
         <ActivityForm 
           initialData={initialData}
           onSubmit={handleCreate}
-          onCancel={() => navigate('/dashboard/activities')}
+          onCancel={() => navigate(backPath)}
         />
       </div>
     </DashboardLayout>

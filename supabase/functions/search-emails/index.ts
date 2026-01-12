@@ -147,11 +147,15 @@ Deno.serve(async (req: Request) => {
     // or=(col1.op.val,col2.op.val)
     
     const jsonFilter = JSON.stringify([targetEmail]);
+    const jsonFilterObject = JSON.stringify([{ email: targetEmail }]);
     const orConditions = [
       `from_email.ilike.%${targetEmail}%`,
       `to_emails.cs.${jsonFilter}`,
+      `to_emails.cs.${jsonFilterObject}`,
       `cc_emails.cs.${jsonFilter}`,
-      `bcc_emails.cs.${jsonFilter}`
+      `cc_emails.cs.${jsonFilterObject}`,
+      `bcc_emails.cs.${jsonFilter}`,
+      `bcc_emails.cs.${jsonFilterObject}`
     ].join(",");
 
     dbQuery = dbQuery.or(orConditions);

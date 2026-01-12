@@ -58,8 +58,9 @@ export default function Users() {
         userIds = roles?.map((r: any) => r.user_id) || [];
       }
 
-      // Build the main query using ScopedDataAccess for audit logging
-      let query = scopedDb
+      // Build the main query using raw Supabase client as profiles table is global
+      // Scoping is handled via the userIds filter above derived from user_roles
+      let query = supabase
         .from('profiles')
         .select(`
           *,

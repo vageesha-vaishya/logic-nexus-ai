@@ -20,18 +20,21 @@ interface EmailComposeDialogProps {
     body?: string;
   };
   initialTo?: string[];
+  initialSubject?: string;
+  initialBody?: string;
+  existingActivityId?: string;
   onSent?: () => void;
   entityType?: string;
   entityId?: string;
 }
 
-export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onSent, entityType, entityId }: EmailComposeDialogProps) {
+export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, initialSubject, initialBody, existingActivityId, onSent, entityType, entityId }: EmailComposeDialogProps) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccount, setSelectedAccount] = useState("");
   const [to, setTo] = useState(replyTo?.to || (initialTo ? initialTo.join(", ") : ""));
   const [cc, setCc] = useState("");
-  const [subject, setSubject] = useState(replyTo?.subject || "");
-  const [body, setBody] = useState(replyTo?.body || "");
+  const [subject, setSubject] = useState(replyTo?.subject || initialSubject || "");
+  const [body, setBody] = useState(replyTo?.body || initialBody || "Hi, \n\n This is a test email from Logic Nexus AI.");
   const [editorHtml, setEditorHtml] = useState<string>("");
   const editorRef = { current: null as HTMLDivElement | null };
   const [sending, setSending] = useState(false);
@@ -53,51 +56,54 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
   useEffect(() => {
     if (open) {
       fetchAccounts();
+      let contentHtml = "";
+
       if (replyTo) {
         setTo(replyTo.to);
         
         // Smart subject handling
         let newSubject = replyTo.subject;
         if (!newSubject.toLowerCase().startsWith("re:") && !newSubject.toLowerCase().startsWith("fwd:")) {
-           // Default to Re: if not specified by caller (which sets it for Fwd)
-           // But actually caller sets it now. So just trust caller or append Re: if missing and it's a reply
-           // The caller (EmailClient) sets "Fwd: ..." for forwards.
-           // For replies, it passes the original subject.
-           // So if it's a reply (implied by this logic being here? No, replyTo prop is used for both)
-           // We need to know if it's a reply or forward or just a draft.
-           // Let's rely on the passed subject.
            newSubject = `Re: ${newSubject}`;
         }
         setSubject(newSubject);
         
         if (replyTo.body) {
-          // If body is passed, use it. Caller (EmailClient) formats the "Original Message" block for forwards.
-          // For replies, we might want to quote it.
-          // EmailClient passes raw body for Reply.
-          // Let's check if the body already contains "Original Message" or similar marker?
-          // No, EmailClient passes:
-          // Reply: raw body
-          // Forward: formatted body with headers
-          
           if (newSubject.toLowerCase().startsWith("fwd:")) {
              setBody(replyTo.body);
-             setEditorHtml(plainToHtml(replyTo.body));
+             contentHtml = plainToHtml(replyTo.body);
+             setEditorHtml(contentHtml);
           } else {
              // Reply
              const quoted = `\n\n--- Original Message ---\n${replyTo.body}`;
              setBody(quoted);
-             setEditorHtml(plainToHtml(quoted));
+             contentHtml = plainToHtml(quoted);
+             setEditorHtml(contentHtml);
           }
         }
+      } else {
+        // Handle initial values
+        if (initialSubject) setSubject(initialSubject);
+        if (initialBody) {
+          setBody(initialBody);
+          contentHtml = plainToHtml(initialBody);
+          setEditorHtml(contentHtml);
+        } else if (!body) {
+          const defaultBody = "Hi, \n\n This is a test email from Logic Nexus AI.";
+          setBody(defaultBody);
+          contentHtml = plainToHtml(defaultBody);
+          setEditorHtml(contentHtml);
+        }
       }
+
       // Initialize editor content
       setTimeout(() => {
         if (editorRef.current) {
-          editorRef.current.innerHTML = editorHtml || plainToHtml(body || "");
+          editorRef.current.innerHTML = contentHtml || editorHtml || plainToHtml(body || "");
         }
       }, 0);
     }
-  }, [open, replyTo]);
+  }, [open, replyTo, initialSubject, initialBody]);
 
   useEffect(() => {
     // Apply compose defaults when account changes
@@ -335,13 +341,38 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
           if (entityType === 'opportunity') activityData.opportunity_id = entityId;
 
           if (tenantId) {
-             const { error: activityError } = await supabase.from('activities').insert(activityData);
+             let activityError;
+             if (existingActivityId) {
+                // Fetch existing activity to merge custom_fields
+                const { data: existingActivity } = await supabase
+                  .from('activities')
+                  .select('custom_fields')
+                  .eq('id', existingActivityId)
+                  .single();
+
+                const mergedCustomFields = {
+                  ...(existingActivity?.custom_fields as object || {}),
+                  ...activityData.custom_fields
+                };
+
+                const updateData = {
+                  ...activityData,
+                  custom_fields: mergedCustomFields
+                };
+
+                const { error } = await supabase.from('activities').update(updateData).eq('id', existingActivityId);
+                activityError = error;
+             } else {
+                const { error } = await supabase.from('activities').insert(activityData);
+                activityError = error;
+             }
+
              if (activityError) {
-               console.error("Failed to create activity:", activityError);
+               console.error("Failed to create/update activity:", activityError);
                toast({
                  title: "Warning",
-                 description: "Email sent, but failed to create activity log.",
-                 variant: "destructive", // or default/warning if available
+                 description: "Email sent, but failed to update activity log.",
+                 variant: "destructive",
                });
              }
           } else {
@@ -380,7 +411,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
     setTo("");
     setCc("");
     setSubject("");
-    setBody("");
+    setBody("Hi, \n\n This is a test email from Logic Nexus AI.");
     setEditorHtml("");
   };
 

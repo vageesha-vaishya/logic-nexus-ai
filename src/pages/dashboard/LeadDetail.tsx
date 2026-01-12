@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,12 @@ import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
 import { EmailClient } from "@/components/email/EmailClient";
+import { EmailComposeDialog } from "@/components/email/EmailComposeDialog";
 import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
 import { ManualAssignment } from '@/components/assignment/ManualAssignment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon } from 'lucide-react';
+import { ArrowLeft, Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -28,6 +29,7 @@ import { getScoreGrade } from '@/utils/leadScoring';
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { supabase, scopedDb } = useCRM();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,25 @@ export default function LeadDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showConversionDialog, setShowConversionDialog] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeData, setComposeData] = useState<{ subject: string; body: string; activityId?: string } | null>(null);
   const [interactionStats, setInteractionStats] = useState<{ total: number; calls: number; emails: number; meetings: number; tasks: number; notes: number; automated: number } | null>(null);
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+
+  useEffect(() => {
+    if (location.state && (location.state as any).openComposer) {
+      const state = location.state as any;
+      setComposeData({
+        subject: state.initialSubject || '',
+        body: state.initialBody || '',
+        activityId: state.activityId
+      });
+      setComposeOpen(true);
+      
+      // Clear state without triggering re-navigation
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const fetchLead = useCallback(async () => {
     try {
@@ -363,6 +383,14 @@ export default function LeadDetail() {
             <Button variant="ghost" size="icon" aria-label="Back to leads" onClick={() => navigate('/dashboard/leads')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              aria-label={isLeftPanelOpen ? "Collapse sidebar" : "Expand sidebar"} 
+              onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+            >
+              {isLeftPanelOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </Button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-bold">{lead.first_name} {lead.last_name}</h1>
@@ -446,7 +474,7 @@ export default function LeadDetail() {
               </DropdownMenu>
             ) : null}
 
-            {!isEditing && !lead.converted_at && (
+            {!isEditing && (
               <>
                 <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
                   <DialogTrigger asChild>
@@ -472,10 +500,14 @@ export default function LeadDetail() {
                     />
                   </DialogContent>
                 </Dialog>
-                <Button onClick={() => setShowConversionDialog(true)}>
-                  <GitBranch className="mr-2 h-4 w-4" />
-                  Convert Lead
-                </Button>
+
+                {!lead.converted_at && (
+                  <Button onClick={() => setShowConversionDialog(true)}>
+                    <GitBranch className="mr-2 h-4 w-4" />
+                    Convert Lead
+                  </Button>
+                )}
+
                 <Button variant="outline" onClick={() => setIsEditing(true)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Edit
@@ -521,149 +553,151 @@ export default function LeadDetail() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 gap-6 transition-all duration-300 ${isLeftPanelOpen ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
             {/* Left Column - Details */}
-            <div className="space-y-6">
-              <LeadScoringCard
-                leadId={lead.id}
-                score={lead.lead_score || 0}
-                status={lead.status}
-                estimatedValue={lead.estimated_value}
-                lastActivityDate={lead.last_activity_date}
-                source={lead.source}
-                title={lead.title}
-              />
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserPlus className="h-5 w-5" />
-                    Lead Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status</p>
-                    <Badge className={`mt-1 ${getStatusColor(lead.status)}`}>{stage.label}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Source</p>
-                    <Badge variant="outline" className="mt-1">{lead.source}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Priority</p>
-                    <Badge className={`mt-1 ${priority.bg} ${priority.color}`}>{priority.label}</Badge>
-                  </div>
-                  {lead.company && (
+            {isLeftPanelOpen && (
+              <div className="space-y-6">
+                <LeadScoringCard
+                  leadId={lead.id}
+                  score={lead.lead_score || 0}
+                  status={lead.status}
+                  estimatedValue={lead.estimated_value}
+                  lastActivityDate={lead.last_activity_date}
+                  source={lead.source}
+                  title={lead.title}
+                />
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserPlus className="h-5 w-5" />
+                      Lead Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Company</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{lead.company}</span>
-                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Status</p>
+                      <Badge className={`mt-1 ${getStatusColor(lead.status)}`}>{stage.label}</Badge>
                     </div>
-                  )}
-                  {lead.title && (
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Title</p>
-                      <p className="text-sm">{lead.title}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Source</p>
+                      <Badge variant="outline" className="mt-1">{lead.source}</Badge>
                     </div>
-                  )}
-                  {(lead.custom_fields && (lead.custom_fields['hubspot_url'] || lead.custom_fields['salesforce_url'] || lead.custom_fields['external_crm_url'])) ? (
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">CRM</p>
-                      <a
-                        className="mt-1 inline-flex text-sm text-primary hover:underline"
-                        href={String(lead.custom_fields['external_crm_url'] || lead.custom_fields['salesforce_url'] || lead.custom_fields['hubspot_url'])}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open in CRM
-                      </a>
+                      <p className="text-sm font-medium text-muted-foreground">Priority</p>
+                      <Badge className={`mt-1 ${priority.bg} ${priority.color}`}>{priority.label}</Badge>
                     </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {lead.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <a href={`mailto:${lead.email}`} className="text-sm text-primary hover:underline">
-                        {lead.email}
-                      </a>
-                    </div>
-                  )}
-                  {lead.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <a href={`tel:${lead.phone}`} className="text-sm">{lead.phone}</a>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Opportunity Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {lead.estimated_value && (
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-green-600" />
-                      </div>
+                    {lead.company && (
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Estimated Value</p>
-                        <p className="text-xl font-bold text-green-700">
-                          ${lead.estimated_value?.toLocaleString()}
-                        </p>
+                        <p className="text-sm font-medium text-muted-foreground">Company</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{lead.company}</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {lead.expected_close_date && (
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Calendar className="h-5 w-5 text-blue-600" />
-                      </div>
+                    )}
+                    {lead.title && (
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Expected Close</p>
-                        <p className="text-sm font-semibold">{format(new Date(lead.expected_close_date), 'PPP')}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Title</p>
+                        <p className="text-sm">{lead.title}</p>
                       </div>
-                    </div>
-                  )}
+                    )}
+                    {(lead.custom_fields && (lead.custom_fields['hubspot_url'] || lead.custom_fields['salesforce_url'] || lead.custom_fields['external_crm_url'])) ? (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">CRM</p>
+                        <a
+                          className="mt-1 inline-flex text-sm text-primary hover:underline"
+                          href={String(lead.custom_fields['external_crm_url'] || lead.custom_fields['salesforce_url'] || lead.custom_fields['hubspot_url'])}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open in CRM
+                        </a>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium text-muted-foreground">Win Probability</span>
-                      <span className="font-bold">{lead.lead_score || 0}%</span>
-                    </div>
-                    <Progress value={lead.lead_score || 0} className="h-2" />
-                    <p className="text-xs text-muted-foreground">Based on current lead score</p>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {lead.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <a href={`mailto:${lead.email}`} className="text-sm text-primary hover:underline">
+                          {lead.email}
+                        </a>
+                      </div>
+                    )}
+                    {lead.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <a href={`tel:${lead.phone}`} className="text-sm">{lead.phone}</a>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Metadata</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <div>Created: {format(new Date(lead.created_at), 'PPpp')}</div>
-                  <div>Last Updated: {format(new Date(lead.updated_at), 'PPpp')}</div>
-                  {lead.lead_score && <div>Lead Score: {lead.lead_score}/100</div>}
-                  {lead.qualification_status && <div>Qualification: {lead.qualification_status}</div>}
-                </CardContent>
-              </Card>
-            </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Opportunity Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {lead.estimated_value && (
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                          <DollarSign className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Estimated Value</p>
+                          <p className="text-xl font-bold text-green-700">
+                            ${lead.estimated_value?.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {lead.expected_close_date && (
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Calendar className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Expected Close</p>
+                          <p className="text-sm font-semibold">{format(new Date(lead.expected_close_date), 'PPP')}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium text-muted-foreground">Win Probability</span>
+                        <span className="font-bold">{lead.lead_score || 0}%</span>
+                      </div>
+                      <Progress value={lead.lead_score || 0} className="h-2" />
+                      <p className="text-xs text-muted-foreground">Based on current lead score</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Metadata</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm text-muted-foreground">
+                    <div>Created: {format(new Date(lead.created_at), 'PPpp')}</div>
+                    <div>Last Updated: {format(new Date(lead.updated_at), 'PPpp')}</div>
+                    {lead.lead_score && <div>Lead Score: {lead.lead_score}/100</div>}
+                    {lead.qualification_status && <div>Qualification: {lead.qualification_status}</div>}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Right Column - Timeline & Activity */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className={`${isLeftPanelOpen ? 'lg:col-span-2' : ''} space-y-6`}>
               <Card>
                 <CardHeader>
                   <CardTitle>Interaction Metrics</CardTitle>
@@ -757,6 +791,19 @@ export default function LeadDetail() {
             onOpenChange={setShowConversionDialog}
             lead={lead}
             onConversionComplete={fetchLead}
+          />
+        )}
+
+        {lead && (
+          <EmailComposeDialog
+            open={composeOpen}
+            onOpenChange={setComposeOpen}
+            entityType="lead"
+            entityId={lead.id}
+            initialSubject={composeData?.subject}
+            initialBody={composeData?.body}
+            existingActivityId={composeData?.activityId}
+            initialTo={lead.email ? [lead.email] : undefined}
           />
         )}
 
