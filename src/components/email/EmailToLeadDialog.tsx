@@ -4,12 +4,23 @@ import { LeadForm, LeadFormData } from "@/components/crm/LeadForm";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
-import { Email } from "@/types/email";
+
+// Local interface for email data needed for conversion
+interface EmailForConversion {
+  id: string;
+  subject: string;
+  from_email: string;
+  from_name?: string;
+  body_text?: string;
+  body_html?: string;
+  snippet?: string;
+  received_at: string;
+}
 
 interface EmailToLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  email: Email;
+  email: EmailForConversion;
   onSuccess?: (leadId?: string) => void;
 }
 
@@ -27,7 +38,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
     };
   };
 
-  const getBodyText = (email: Email) => {
+  const getBodyText = (email: EmailForConversion) => {
     if (email.body_text) return email.body_text;
     if (email.body_html) {
       const doc = new DOMParser().parseFromString(email.body_html, 'text/html');
