@@ -8,6 +8,7 @@ import { useState, useCallback } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailToLeadDialog } from "./EmailToLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Email {
   id: string;
@@ -21,6 +22,7 @@ interface Email {
   has_attachments: boolean;
   attachments?: any[];
   labels?: string[];
+  snippet?: string;
 }
 
 interface EmailDetailDialogProps {
