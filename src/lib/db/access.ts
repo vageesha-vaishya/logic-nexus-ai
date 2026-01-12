@@ -134,7 +134,7 @@ export class ScopedDataAccess {
     const ctx = this.context;
     const logAudit = this.logAudit.bind(this);
     const injectScope = this.injectScope.bind(this);
-    const applyScopeFilter = this.applyScopeFilter.bind(this);
+    const applyScopeFilter = (query: any) => this.applyScopeFilter(query, table);
 
     return {
       select: (columns = '*', options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
@@ -202,7 +202,7 @@ export class ScopedDataAccess {
    * Applies scope filtering to a query based on user context.
    * Returns the query with tenant/franchise filters applied.
    */
-  private applyScopeFilter(query: any): any {
+  private applyScopeFilter(query: any, table?: TableName): any {
     const ctx = this.context;
 
     // Platform admins see everything UNLESS they have explicitly enabled override
@@ -223,7 +223,12 @@ export class ScopedDataAccess {
         query = query.eq('tenant_id', ctx.tenantId);
       }
       if (ctx.franchiseId) {
-        query = query.eq('franchise_id', ctx.franchiseId);
+        // Special-case: franchises table uses 'id' not 'franchise_id'
+        if (table === 'franchises') {
+          query = query.eq('id', ctx.franchiseId);
+        } else {
+          query = query.eq('franchise_id', ctx.franchiseId);
+        }
       }
       return query;
     }
@@ -236,7 +241,12 @@ export class ScopedDataAccess {
         if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
           console.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${ctx.franchiseId}`);
         }
-        query = query.eq('franchise_id', ctx.franchiseId);
+        // Special-case: franchises table uses 'id' not 'franchise_id'
+        if (table === 'franchises') {
+          query = query.eq('id', ctx.franchiseId);
+        } else {
+          query = query.eq('franchise_id', ctx.franchiseId);
+        }
       }
     }
     
@@ -246,7 +256,12 @@ export class ScopedDataAccess {
         query = query.eq('tenant_id', ctx.tenantId);
       }
       if (ctx.franchiseId) {
-        query = query.eq('franchise_id', ctx.franchiseId);
+        // Special-case: franchises table uses 'id' not 'franchise_id'
+        if (table === 'franchises') {
+          query = query.eq('id', ctx.franchiseId);
+        } else {
+          query = query.eq('franchise_id', ctx.franchiseId);
+        }
       }
     }
 
