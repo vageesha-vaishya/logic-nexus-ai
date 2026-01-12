@@ -65,12 +65,6 @@ Deno.serve(async (req: Request) => {
 
     const targetEmail = String(email).toLowerCase().trim();
 
-    // Base query builder
-    let baseQuery = supabase.from("emails").select("*");
-    if (tenantId) baseQuery = baseQuery.eq("tenant_id", tenantId);
-    if (accountId) baseQuery = baseQuery.eq("account_id", accountId);
-    if (direction) baseQuery = baseQuery.eq("direction", direction);
-
     // Paging with guardrails
     page = Number(page);
     pageSize = Number(pageSize);
@@ -80,8 +74,17 @@ Deno.serve(async (req: Request) => {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
+    // Helper to build base query with filters
+    const buildQuery = () => {
+      let q = supabase.from("emails").select("*");
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      if (accountId) q = q.eq("account_id", accountId);
+      if (direction) q = q.eq("direction", direction);
+      return q;
+    };
+
     // 1) From address direct match
-    const { data: fromMatches, error: fromErr } = await baseQuery
+    const { data: fromMatches, error: fromErr } = await buildQuery()
       .ilike("from_email", `%${targetEmail}%`)
       .order("received_at", { ascending: false })
       .range(from, to);
@@ -90,35 +93,28 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Query error (from): ${fromErr.message}`);
     }
 
-    // 2) To/CC/BCC contains target
-    let toQuery = supabase.from("emails").select("*");
-    if (tenantId) toQuery = toQuery.eq("tenant_id", tenantId);
-    if (accountId) toQuery = toQuery.eq("account_id", accountId);
-    if (direction) toQuery = toQuery.eq("direction", direction);
-    const { data: toMatches, error: toErr } = await toQuery
-      .contains("to_emails", [{ email: targetEmail }])
+    // 2) Search in to_emails, cc_emails, bcc_emails using text search
+    // The columns contain JSONB arrays like [{ email: "...", name: "..." }]
+    // Use filter with @> operator for JSONB containment
+    const jsonFilter = JSON.stringify([{ email: targetEmail }]);
+    
+    const { data: toMatches, error: toErr } = await buildQuery()
+      .filter("to_emails", "cs", jsonFilter)
       .order("received_at", { ascending: false })
       .range(from, to);
 
-    let ccQuery = supabase.from("emails").select("*");
-    if (tenantId) ccQuery = ccQuery.eq("tenant_id", tenantId);
-    if (accountId) ccQuery = ccQuery.eq("account_id", accountId);
-    if (direction) ccQuery = ccQuery.eq("direction", direction);
-    const { data: ccMatches, error: ccErr } = await ccQuery
-      .contains("cc_emails", [{ email: targetEmail }])
+    const { data: ccMatches, error: ccErr } = await buildQuery()
+      .filter("cc_emails", "cs", jsonFilter)
       .order("received_at", { ascending: false })
       .range(from, to);
 
-    let bccQuery = supabase.from("emails").select("*");
-    if (tenantId) bccQuery = bccQuery.eq("tenant_id", tenantId);
-    if (accountId) bccQuery = bccQuery.eq("account_id", accountId);
-    if (direction) bccQuery = bccQuery.eq("direction", direction);
-    const { data: bccMatches, error: bccErr } = await bccQuery
-      .contains("bcc_emails", [{ email: targetEmail }])
+    const { data: bccMatches, error: bccErr } = await buildQuery()
+      .filter("bcc_emails", "cs", jsonFilter)
       .order("received_at", { ascending: false })
       .range(from, to);
 
     if (toErr || ccErr || bccErr) {
+      console.error("Query errors:", { toErr, ccErr, bccErr });
       throw new Error(
         `Query error (recipients): ${toErr?.message || ccErr?.message || bccErr?.message}`
       );
