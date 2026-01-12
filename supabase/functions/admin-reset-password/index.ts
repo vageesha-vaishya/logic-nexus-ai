@@ -113,7 +113,9 @@ serve(async (req: any) => {
           options: { redirectTo: redirectUrl },
         });
         if (linkErr) throw linkErr;
-        return new Response(JSON.stringify({ success: true, recovery_link: linkData?.action_link }), {
+        // The generateLink response has properties.action_link
+        const actionLink = linkData?.properties?.action_link;
+        return new Response(JSON.stringify({ success: true, recovery_link: actionLink }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         });
