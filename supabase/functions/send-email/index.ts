@@ -1,3 +1,7 @@
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+};
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,6 +16,7 @@ export interface EmailRequest {
   bcc?: string[];
   subject?: string; // Optional if using template
   body?: string;    // Optional if using template
+  text?: string;
   attachments?: {
     filename: string;
     path?: string;
@@ -64,6 +69,7 @@ export class ResendProvider extends EmailProvider {
         bcc: req.bcc,
         subject: req.subject,
         html: req.body,
+        text: req.text,
         reply_to: req.replyTo,
         attachments: req.attachments?.map(a => ({
           filename: a.filename,
@@ -157,12 +163,22 @@ export class GmailProvider extends EmailProvider {
     const hasAttachments = req.attachments && req.attachments.length > 0;
     const boundary = `mixed_boundary_${Date.now()}`;
     const altBoundary = `alt_boundary_${Date.now()}`;
+    const replyTo = req.replyTo || "";
+    const unsubscribeEmail = Deno.env.get("EMAIL_UNSUBSCRIBE_MAILTO") || "unsubscribe@soslogistics.pro";
+    const unsubscribeUrl = req.variables?.unsubscribe_url || Deno.env.get("EMAIL_UNSUBSCRIBE_URL") || "";
+    const listUnsubscribe = [
+      unsubscribeEmail ? `<mailto:${unsubscribeEmail}>` : "",
+      unsubscribeUrl ? `<${unsubscribeUrl}>` : "",
+    ].filter(Boolean).join(", ");
     
     let messageLines = [
-      senderEmail ? `From: ${senderEmail}` : "",
+      senderEmail ? `From: ${account.display_name ? `"${account.display_name}" <${senderEmail}>` : senderEmail}` : "",
       `To: ${req.to.join(", ")}`,
       req.cc?.length ? `Cc: ${req.cc.join(", ")}` : "",
       `Subject: ${req.subject}`,
+      replyTo ? `Reply-To: ${replyTo}` : "",
+      listUnsubscribe ? `List-Unsubscribe: ${listUnsubscribe}` : "",
+      unsubscribeUrl ? `List-Unsubscribe-Post: List-Unsubscribe=One-Click` : "",
       "MIME-Version: 1.0",
       `Content-Type: multipart/${hasAttachments ? 'mixed' : 'alternative'}; boundary="${boundary}"`,
       "",
@@ -179,7 +195,7 @@ export class GmailProvider extends EmailProvider {
     // Text Body
     messageLines.push(`Content-Type: text/plain; charset=UTF-8`);
     messageLines.push("");
-    messageLines.push((req.body || "").replace(/<[^>]+>/g, ""));
+    messageLines.push(req.text || (req.body || "").replace(/<[^>]+>/g, ""));
     messageLines.push("");
     
     // HTML Body
@@ -294,6 +310,7 @@ export class Office365Provider extends EmailProvider {
       message: {
         subject: req.subject,
         body: { contentType: "HTML", content: req.body },
+        replyTo: req.replyTo ? [{ emailAddress: { address: req.replyTo } }] : [],
         toRecipients: req.to.map(addr => ({ emailAddress: { address: addr } })),
         ccRecipients: req.cc?.map(addr => ({ emailAddress: { address: addr } })) || [],
         bccRecipients: req.bcc?.map(addr => ({ emailAddress: { address: addr } })) || [],
@@ -387,9 +404,161 @@ async function prepareAttachments(supabase: SupabaseClient, attachments: any[]) 
   return processed;
 }
 
+function stripHtmlToText(input: string) {
+  const normalized = String(input || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  const withoutScripts = normalized
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "");
+  const withBreaks = withoutScripts
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p\s*>/gi, "\n\n")
+    .replace(/<\/div\s*>/gi, "\n")
+    .replace(/<\/li\s*>/gi, "\n")
+    .replace(/<\/h[1-6]\s*>/gi, "\n\n");
+  const withoutTags = withBreaks.replace(/<[^>]+>/g, "");
+  const decoded = withoutTags
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'");
+  return decoded.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function escapeHtml(s: string) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalizeInnerHtml(body: string) {
+  const raw = String(body || "").trim();
+  if (!raw) return "";
+  const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+  if (looksLikeHtml) return raw;
+  return escapeHtml(raw).replace(/\n/g, "<br>");
+}
+
+function renderBrandedEmail(params: {
+  subject: string;
+  innerHtml: string;
+  innerText: string;
+  to: string[];
+  fromLabel?: string;
+  replyTo?: string;
+  variables?: Record<string, string>;
+  trackingId?: string;
+}) {
+  const brandName = Deno.env.get("EMAIL_BRAND_NAME") || "SOS Logistics";
+  const logoUrl = Deno.env.get("EMAIL_BRAND_LOGO_URL") || "";
+  const brandUrl = Deno.env.get("EMAIL_BRAND_WEBSITE_URL") || "https://soslogistics.pro";
+  const primaryColor = Deno.env.get("EMAIL_BRAND_PRIMARY_COLOR") || "#0B3D91";
+  const supportEmail = Deno.env.get("EMAIL_SUPPORT_EMAIL") || "support@soslogistics.pro";
+  const supportPhone = Deno.env.get("EMAIL_SUPPORT_PHONE") || "";
+  const companyAddress = Deno.env.get("EMAIL_COMPANY_ADDRESS") || "";
+  const unsubscribeEmail = Deno.env.get("EMAIL_UNSUBSCRIBE_MAILTO") || "unsubscribe@soslogistics.pro";
+  const unsubscribeUrl = params.variables?.unsubscribe_url || Deno.env.get("EMAIL_UNSUBSCRIBE_URL") || "";
+  const trackingBase = Deno.env.get("EMAIL_TRACKING_PIXEL_BASE_URL") || "";
+  const recipientName = params.variables?.recipient_name || "";
+  const greeting = recipientName ? `Hi ${recipientName},` : "Hello,";
+  const closingName = params.variables?.sender_name || brandName;
+  const signatureTitle = params.variables?.sender_title || "";
+
+  const preheaderText = params.innerText.slice(0, 120).replace(/\s+/g, " ").trim();
+  const trackingPixelUrl = trackingBase && params.trackingId ? `${trackingBase.replace(/\/$/, "")}?tid=${encodeURIComponent(params.trackingId)}` : "";
+
+  const footerLines: string[] = [];
+  footerLines.push(`${brandName}`);
+  if (companyAddress) footerLines.push(companyAddress);
+  footerLines.push(`Support: ${supportEmail}${supportPhone ? ` | ${supportPhone}` : ""}`);
+  footerLines.push(unsubscribeUrl
+    ? `Unsubscribe: ${unsubscribeUrl}`
+    : `Unsubscribe: mailto:${unsubscribeEmail}`);
+
+  const text = [
+    greeting,
+    "",
+    params.innerText || "",
+    "",
+    "Regards,",
+    closingName,
+    signatureTitle ? signatureTitle : "",
+    "",
+    footerLines.join("\n"),
+  ].filter(Boolean).join("\n");
+
+  const headerLogo = logoUrl
+    ? `<a href="${escapeHtml(brandUrl)}" style="text-decoration:none;"><img src="${escapeHtml(logoUrl)}" width="160" alt="${escapeHtml(brandName)}" style="display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:160px;" /></a>`
+    : `<a href="${escapeHtml(brandUrl)}" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:18px;line-height:24px;">${escapeHtml(brandName)}</a>`;
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <title>${escapeHtml(params.subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f7fb;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">
+    ${escapeHtml(preheaderText)}
+  </div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f5f7fb;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e6eaf2;">
+          <tr>
+            <td style="background:${escapeHtml(primaryColor)};padding:16px 20px;">
+              ${headerLogo}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:22px 20px 12px 20px;font-family:Calibri,Segoe UI,Arial,sans-serif;color:#0f172a;">
+              <div style="font-size:16px;line-height:24px;margin:0 0 14px 0;">${escapeHtml(greeting)}</div>
+              <div style="font-size:14px;line-height:22px;color:#0f172a;">
+                ${params.innerHtml}
+              </div>
+              <div style="margin-top:18px;font-size:14px;line-height:22px;">
+                <div style="margin:0;">Regards,</div>
+                <div style="margin:0;font-weight:600;">${escapeHtml(closingName)}</div>
+                ${signatureTitle ? `<div style="margin:0;color:#475569;">${escapeHtml(signatureTitle)}</div>` : ""}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:14px 20px 20px 20px;background-color:#f8fafc;font-family:Calibri,Segoe UI,Arial,sans-serif;color:#475569;">
+              <div style="font-size:12px;line-height:18px;">
+                <div style="font-weight:600;color:#0f172a;">${escapeHtml(brandName)}</div>
+                ${companyAddress ? `<div>${escapeHtml(companyAddress)}</div>` : ""}
+                <div>Support: <a href="mailto:${escapeHtml(supportEmail)}" style="color:${escapeHtml(primaryColor)};text-decoration:none;">${escapeHtml(supportEmail)}</a>${supportPhone ? ` | ${escapeHtml(supportPhone)}` : ""}</div>
+                <div style="margin-top:10px;">
+                  ${unsubscribeUrl
+                    ? `<a href="${escapeHtml(unsubscribeUrl)}" style="color:${escapeHtml(primaryColor)};text-decoration:none;">Unsubscribe</a>`
+                    : `<a href="mailto:${escapeHtml(unsubscribeEmail)}?subject=Unsubscribe" style="color:${escapeHtml(primaryColor)};text-decoration:none;">Unsubscribe</a>`}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  ${trackingPixelUrl ? `<img src="${escapeHtml(trackingPixelUrl)}" width="1" height="1" alt="" style="display:none;opacity:0;" />` : ""}
+</body>
+</html>`;
+
+  return { html, text, unsubscribeUrl, unsubscribeEmail };
+}
+
 // --- Main Handler ---
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -426,9 +595,39 @@ serve(async (req) => {
     }
 
     if (!subject) throw new Error("Missing required field: subject (or valid template)");
+    if (!body) body = "";
+
+    let renderedHtml = "";
+    let renderedText = "";
+    let unsubscribeUrl = "";
+    let unsubscribeEmail = "";
+    const trackingId = (Deno.env.get("EMAIL_TRACKING_PIXEL_BASE_URL") ? crypto.randomUUID() : "");
+    try {
+      const innerHtml = normalizeInnerHtml(body);
+      const innerText = stripHtmlToText(body);
+      const rendered = renderBrandedEmail({
+        subject,
+        innerHtml,
+        innerText,
+        to: Array.isArray(to) ? to : [to],
+        replyTo: reply_to,
+        variables,
+        trackingId: trackingId || undefined,
+      });
+      renderedHtml = rendered.html;
+      renderedText = rendered.text;
+      unsubscribeUrl = rendered.unsubscribeUrl;
+      unsubscribeEmail = rendered.unsubscribeEmail;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(JSON.stringify({ success: false, error: `Email generation failed: ${msg}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     // 2. Determine Provider Strategy
-    let providers: EmailProvider[] = [];
+    const providers: EmailProvider[] = [];
     let account = null;
 
     if (requestedProvider === 'resend' || (!accountId && !requestedProvider)) {
@@ -472,9 +671,11 @@ serve(async (req) => {
           cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
           bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
           subject,
-          body,
+          body: renderedHtml,
+          text: renderedText,
           from,
           replyTo: reply_to,
+          variables,
           attachments: processedAttachments
         });
         if (response.success) break; // Success, stop trying
@@ -490,23 +691,29 @@ serve(async (req) => {
 
     // 4. Log to DB (if linked to an account)
     if (account && response.success) {
+      const normalizeEmail = (v: string) => String(v || "").trim().toLowerCase();
       await supabase.from("emails").insert({
         account_id: account.id,
         tenant_id: account.tenant_id,
         franchise_id: account.franchise_id,
         message_id: response.messageId || `sent-${Date.now()}`,
         subject,
-        from_email: account.email_address,
+        from_email: normalizeEmail(account.email_address),
         from_name: account.display_name,
-        to_emails: (Array.isArray(to) ? to : [to]).map(e => ({ email: e })),
-        cc_emails: cc ? (Array.isArray(cc) ? cc : [cc]).map(e => ({ email: e })) : [],
-        bcc_emails: bcc ? (Array.isArray(bcc) ? bcc : [bcc]).map(e => ({ email: e })) : [],
-        body_text: body.replace(/<[^>]+>/g, ""),
-        body_html: body,
+        to_emails: (Array.isArray(to) ? to : [to]).map(e => ({ email: normalizeEmail(e) })).filter(e => e.email),
+        cc_emails: cc ? (Array.isArray(cc) ? cc : [cc]).map(e => ({ email: normalizeEmail(e) })).filter(e => e.email) : [],
+        bcc_emails: bcc ? (Array.isArray(bcc) ? bcc : [bcc]).map(e => ({ email: normalizeEmail(e) })).filter(e => e.email) : [],
+        body_text: renderedText,
+        body_html: renderedHtml,
         direction: "outbound",
         status: "sent",
         folder: "sent",
         sent_at: new Date().toISOString(),
+        raw_headers: {
+          reply_to: reply_to || null,
+          list_unsubscribe: unsubscribeUrl ? { url: unsubscribeUrl, mailto: unsubscribeEmail } : { mailto: unsubscribeEmail },
+          tracking_id: trackingId || null,
+        },
       });
     }
 
@@ -519,7 +726,7 @@ serve(async (req) => {
     console.error("Email Send Error:", error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200,
     });
   }
 });

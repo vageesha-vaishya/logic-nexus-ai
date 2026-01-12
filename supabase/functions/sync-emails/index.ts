@@ -172,18 +172,79 @@ serve(async (req) => {
             const headers = headerMatch[1];
             const bodyText = bodyMatch?.[1] || "";
 
-            // Extract header fields
-            const subject = headers.match(/^Subject: (.+)$/mi)?.[1] || "(No Subject)";
-            const from = headers.match(/^From: (.+)$/mi)?.[1] || "";
-            const to = headers.match(/^To: (.+)$/mi)?.[1] || "";
-            const date = headers.match(/^Date: (.+)$/mi)?.[1] || new Date().toISOString();
-            const messageIdHeader = headers.match(/^Message-ID: <(.+)>$/mi)?.[1] || `imap-${msgId}-${Date.now()}`;
+            const normalizeEmail = (v: string) => String(v || "").trim().toLowerCase();
+            const encodeBase64 = (bytes: Uint8Array) => {
+              const chunkSize = 0x8000;
+              let binary = "";
+              for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+              }
+              return btoa(binary);
+            };
 
-            // Check if email already exists
+            const rawMessage = `${headers}\r\n\r\n${bodyText}`;
+            let parsed: any = null;
+            try {
+              parsed = await simpleParser(rawMessage);
+            } catch (e) {
+              console.error("IMAP mailparser error:", e);
+            }
+
+            const messageIdHeader = parsed?.messageId
+              ? String(parsed.messageId).replace(/[<>]/g, "")
+              : (headers.match(/^Message-ID:\s*<(.+)>$/mi)?.[1] || `imap-${msgId}-${Date.now()}`);
+
+            const subject = parsed?.subject || headers.match(/^Subject:\s*(.+)$/mi)?.[1] || "(No Subject)";
+            const parsedFrom = parsed?.from?.value?.[0];
+            const fromEmail = normalizeEmail(parsedFrom?.address || (headers.match(/^From:\s*(.+)$/mi)?.[1] || ""));
+            const fromName = (parsedFrom?.name || "").trim() || (headers.match(/^From:\s*(.+)$/mi)?.[1] || "").replace(/<.+>/, "").trim();
+
+            const toEmails = (parsed?.to?.value || [])
+              .map((v: any) => ({ email: normalizeEmail(v.address || ""), name: (v.name || "").trim() || undefined }))
+              .filter((v: any) => v.email);
+            const ccEmails = (parsed?.cc?.value || [])
+              .map((v: any) => ({ email: normalizeEmail(v.address || ""), name: (v.name || "").trim() || undefined }))
+              .filter((v: any) => v.email);
+            const bccEmails = (parsed?.bcc?.value || [])
+              .map((v: any) => ({ email: normalizeEmail(v.address || ""), name: (v.name || "").trim() || undefined }))
+              .filter((v: any) => v.email);
+
+            const parsedDate = parsed?.date ? new Date(parsed.date).toISOString() : null;
+            const headerDate = headers.match(/^Date:\s*(.+)$/mi)?.[1] || "";
+            const receivedAt = parsedDate || (headerDate ? new Date(headerDate).toISOString() : new Date().toISOString());
+
+            const parsedText = (parsed?.text || "").trim();
+            const parsedHtml = typeof parsed?.html === "string" ? parsed.html : "";
+            const finalText = parsedText || bodyText;
+            const finalHtml = parsedHtml || finalText;
+
+            const attachmentsList: any[] = [];
+            const parsedAttachments = Array.isArray(parsed?.attachments) ? parsed.attachments : [];
+            for (const att of parsedAttachments) {
+              try {
+                const filename = String(att?.filename || "attachment");
+                const content = att?.content instanceof Uint8Array ? att.content : null;
+                if (!content) continue;
+                const uploadedPath = await uploadAttachment(encodeBase64(content), filename, messageIdHeader);
+                if (uploadedPath) {
+                  attachmentsList.push({
+                    filename,
+                    path: uploadedPath,
+                    size: content.length,
+                    type: String(att?.contentType || "application/octet-stream"),
+                    content_id: att?.cid || null,
+                  });
+                }
+              } catch (e) {
+                console.error("IMAP attachment processing failed:", e);
+              }
+            }
+
             const { data: existing } = await supabase
               .from("emails")
               .select("id")
               .eq("message_id", messageIdHeader)
+              .eq("account_id", account.id)
               .single();
 
             if (existing) {
@@ -198,17 +259,21 @@ serve(async (req) => {
               franchise_id: account.franchise_id ?? null,
               message_id: messageIdHeader,
               subject,
-              from_email: (from.match(/<(.+)>/)?.[1] || from).toLowerCase(),
-              from_name: from.replace(/<.+>/, "").trim(),
-              to_emails: [{ email: (to.match(/<(.+)>/)?.[1] || to).toLowerCase() }],
-              body_text: bodyText,
-              body_html: bodyText,
-              snippet: bodyText.substring(0, 200),
+              from_email: fromEmail,
+              from_name: fromName || null,
+              to_emails: toEmails.length ? toEmails : [],
+              cc_emails: ccEmails,
+              bcc_emails: bccEmails,
+              body_text: finalText,
+              body_html: finalHtml,
+              snippet: String(finalText || "").substring(0, 200),
+              has_attachments: attachmentsList.length > 0,
+              attachments: attachmentsList,
               direction: "inbound",
               status: "received",
               is_read: fetchResp.includes("\\Seen"),
               folder: "inbox",
-              received_at: new Date(date).toISOString(),
+              received_at: receivedAt,
             });
 
             if (insertError) {
@@ -308,46 +373,57 @@ serve(async (req) => {
         }
       }
 
-      // Fetch messages from Gmail API
-      const gmailApiUrl = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=INBOX";
-      let listResponse = await fetch(gmailApiUrl, {
-        headers: { Authorization: `Bearer ${account.access_token}` },
-      });
+      const normalizeEmail = (v: string) => String(v || "").trim().toLowerCase();
+      const parseEmailList = (value?: string): { email: string; name?: string }[] => {
+        if (!value) return [];
+        return value
+          .split(",")
+          .map(part => part.trim())
+          .map(part => {
+            const m = part.match(/^(.*)<([^>]+)>$/);
+            const email = normalizeEmail(m ? m[2] : part);
+            const nameRaw = m ? m[1].trim() : "";
+            const name = nameRaw ? nameRaw.replace(/^"|"$/g, "") : undefined;
+            return email ? { email, name } : null;
+          })
+          .filter(Boolean) as { email: string; name?: string }[];
+      };
 
-      if (!listResponse.ok) {
-        const errorText = await listResponse.text();
-        console.error("Gmail API list error:", errorText);
-        if (listResponse.status === 401) {
-          // Try refresh once and retry
-          const refreshed = await refreshGmailToken();
-          if (refreshed) {
-            listResponse = await fetch(gmailApiUrl, {
-              headers: { Authorization: `Bearer ${account.access_token}` },
-            });
+      const syncGmailLabel = async (labelId: string, folder: string, direction: "inbound" | "outbound") => {
+        const gmailApiUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=${encodeURIComponent(labelId)}`;
+        let listResponse = await fetch(gmailApiUrl, {
+          headers: { Authorization: `Bearer ${account.access_token}` },
+        });
+
+        if (!listResponse.ok) {
+          const errorText = await listResponse.text();
+          console.error("Gmail API list error:", errorText);
+          if (listResponse.status === 401) {
+            const refreshed = await refreshGmailToken();
+            if (refreshed) {
+              listResponse = await fetch(gmailApiUrl, {
+                headers: { Authorization: `Bearer ${account.access_token}` },
+              });
+            }
           }
         }
-      }
 
-      if (!listResponse.ok) {
-        const errorText = await listResponse.text();
-        console.error("Gmail API list error (after refresh if attempted):", errorText);
-        throw new Error(`Gmail API error: ${listResponse.status} - ${errorText}`);
-      }
+        if (!listResponse.ok) {
+          const errorText = await listResponse.text();
+          console.error("Gmail API list error (after refresh if attempted):", errorText);
+          throw new Error(`Gmail API error: ${listResponse.status} - ${errorText}`);
+        }
 
-      const listData = await listResponse.json();
-      console.log(`Found ${listData.messages?.length || 0} messages in Gmail inbox`);
+        const listData = await listResponse.json();
+        console.log(`Found ${listData.messages?.length || 0} Gmail messages in ${folder}`);
 
-      if (listData.messages && listData.messages.length > 0) {
+        if (!listData.messages || listData.messages.length === 0) return;
+
         for (const msg of listData.messages) {
           try {
-            // Fetch full message details
             const msgResponse = await fetch(
               `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-              {
-                headers: {
-                  Authorization: `Bearer ${account.access_token}`,
-                },
-              }
+              { headers: { Authorization: `Bearer ${account.access_token}` } }
             );
 
             if (!msgResponse.ok) {
@@ -356,8 +432,7 @@ serve(async (req) => {
             }
 
             const msgData = await msgResponse.json();
-            
-            // Parse email headers
+
             const headers = (msgData.payload.headers as GmailHeader[]).reduce((acc: Record<string, string>, h: GmailHeader) => {
               acc[h.name.toLowerCase()] = h.value;
               return acc;
@@ -366,38 +441,36 @@ serve(async (req) => {
             const subject = headers.subject || "(No Subject)";
             const from = headers.from || "";
             const to = headers.to || "";
+            const ccHeader = headers.cc || "";
+            const bccHeader = headers.bcc || "";
             const date = headers.date || new Date().toISOString();
-            
-            // Extract additional email metadata
-            const priority = headers['x-priority'] || headers['priority'] || 'normal';
-            const importance = headers['importance'] || 'normal';
-            const inReplyTo = headers['in-reply-to'] || null;
-            const references = headers['references'] ? headers['references'].split(/\s+/) : [];
-            const messageId = headers['message-id'] || msgData.id;
 
-            // Extract body, check for inline images, and process attachments
+            const priority = headers["x-priority"] || headers["priority"] || "normal";
+            const importance = headers["importance"] || "normal";
+            const inReplyTo = headers["in-reply-to"] || null;
+            const references = headers["references"] ? headers["references"].split(/\s+/) : [];
+            const messageId = headers["message-id"] || msgData.id;
+
             let bodyText = "";
             let bodyHtml = "";
             let hasInlineImages = false;
             const attachmentsList: any[] = [];
-            
+
             const processMessageParts = async (part: GmailMessagePart) => {
               if (part.mimeType === "text/plain" && part.body?.data) {
                 bodyText = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
               } else if (part.mimeType === "text/html" && part.body?.data) {
                 bodyHtml = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-                // Check for inline images
-                if (bodyHtml.includes('cid:') || bodyHtml.includes('data:image/')) {
+                if (bodyHtml.includes("cid:") || bodyHtml.includes("data:image/")) {
                   hasInlineImages = true;
                 }
               } else if (part.filename && part.body?.attachmentId) {
-                // It's an attachment
                 try {
                   const attResp = await fetch(
                     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgData.id}/attachments/${part.body.attachmentId}`,
                     { headers: { Authorization: `Bearer ${account.access_token}` } }
                   );
-                  
+
                   if (attResp.ok) {
                     const attData = await attResp.json();
                     if (attData.data) {
@@ -408,7 +481,7 @@ serve(async (req) => {
                           path: uploadedPath,
                           size: attData.size || part.body.size,
                           type: part.mimeType,
-                          content_id: part.headers?.find((h: GmailHeader) => h.name === 'Content-ID')?.value
+                          content_id: part.headers?.find((h: GmailHeader) => h.name === "Content-ID")?.value
                         });
                       }
                     }
@@ -418,7 +491,7 @@ serve(async (req) => {
                 }
               }
 
-              if (part.mimeType?.startsWith('image/') && part.headers?.find((h: GmailHeader) => h.name === 'Content-ID')) {
+              if (part.mimeType?.startsWith("image/") && part.headers?.find((h: GmailHeader) => h.name === "Content-ID")) {
                 hasInlineImages = true;
               }
 
@@ -428,14 +501,14 @@ serve(async (req) => {
                 }
               }
             };
-            
+
             await processMessageParts(msgData.payload);
 
-            // Check if email already exists
             const { data: existing } = await supabase
               .from("emails")
               .select("id")
               .eq("message_id", msgData.id)
+              .eq("account_id", account.id)
               .single();
 
             if (existing) {
@@ -443,7 +516,6 @@ serve(async (req) => {
               continue;
             }
 
-            // Insert email with enhanced fields
             const emailPayload = {
               account_id: account.id,
               tenant_id: account.tenant_id ?? null,
@@ -451,34 +523,33 @@ serve(async (req) => {
               message_id: msgData.id,
               thread_id: msgData.threadId,
               subject,
-              from_email: (from.match(/<(.+)>/)?.[1] || from).toLowerCase(),
+              from_email: normalizeEmail((from.match(/<(.+)>/)?.[1] || from)),
               from_name: from.replace(/<.+>/, "").trim(),
-              to_emails: [{ email: (to.match(/<(.+)>/)?.[1] || to).toLowerCase() }],
-              cc_emails: [],
-              bcc_emails: [],
+              to_emails: parseEmailList(to),
+              cc_emails: parseEmailList(ccHeader),
+              bcc_emails: parseEmailList(bccHeader),
               reply_to: headers["reply-to"] || null,
               body_text: bodyText || bodyHtml.replace(/<[^>]*>/g, ""),
               body_html: bodyHtml || bodyText,
               snippet: msgData.snippet || "",
               has_attachments: attachmentsList.length > 0,
               attachments: attachmentsList,
-              direction: "inbound",
-              status: "received",
-              is_read: !msgData.labelIds?.includes("UNREAD"),
+              direction,
+              status: direction === "outbound" ? "sent" : "received",
+              is_read: direction === "outbound" ? true : !msgData.labelIds?.includes("UNREAD"),
               is_starred: msgData.labelIds?.includes("STARRED") || false,
               is_archived: false,
               is_spam: msgData.labelIds?.includes("SPAM") || false,
               is_deleted: false,
-              folder: "inbox",
+              folder,
               labels: msgData.labelIds || [],
               category: null,
               lead_id: null,
               contact_id: null,
               account_id_crm: null,
               opportunity_id: null,
-              sent_at: null,
+              sent_at: direction === "outbound" ? new Date(date).toISOString() : null,
               received_at: new Date(date).toISOString(),
-              // New enhanced fields
               priority,
               importance,
               in_reply_to: inReplyTo,
@@ -497,18 +568,16 @@ serve(async (req) => {
 
             if (insertError) {
               console.error(`Error inserting email ${msgData.id}:`, insertError);
-              // Log sync error to database
               await supabase.from("emails").upsert({
                 ...emailPayload,
                 sync_error: insertError.message,
-              }, { onConflict: 'message_id' });
+              }, { onConflict: "message_id" });
             } else {
               syncedCount++;
               console.log(`Synced email: ${subject}`);
             }
           } catch (msgError: unknown) {
             console.error(`Error processing message ${msg.id}:`, msgError instanceof Error ? msgError.message : String(msgError));
-            // Attempt to log the error
             try {
               await supabase.from("emails").insert({
                 account_id: account.id,
@@ -527,7 +596,10 @@ serve(async (req) => {
             } catch { void 0; }
           }
         }
-      }
+      };
+
+      await syncGmailLabel("INBOX", "inbox", "inbound");
+      await syncGmailLabel("SENT", "sent", "outbound");
     } else if (account.provider === "office365") {
       // Use Microsoft Outlook REST API (v2.0) with OAuth v2 tokens
       console.log("Syncing via Office365 (Outlook API) for:", account.email_address);
@@ -619,216 +691,200 @@ serve(async (req) => {
         }
       }
 
-      // List messages from Inbox using Microsoft Graph API
-      // Using lowerCamelCase field names as per Microsoft Graph API spec
-      const baseUrl = "https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages";
-      const query = new URLSearchParams({
-        "$top": "20",
-        "$select": [
-          "id",
-          "subject",
-          "from",
-          "sender",
-          "toRecipients",
-          "ccRecipients",
-          "bccRecipients",
-          "bodyPreview",
-          "body",
-          "hasAttachments",
-          "isRead",
-          "categories",
-          "conversationId",
-          "receivedDateTime",
-          "sentDateTime",
-          "importance",
-          "flag",
-          "internetMessageId",
-        ].join(","),
-        "$orderby": "receivedDateTime desc",
-      }).toString();
+      const syncOfficeFolder = async (folder: string, folderId: string, direction: "inbound" | "outbound") => {
+        const baseUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${folderId}/messages`;
+        const orderBy = direction === "outbound" ? "sentDateTime desc" : "receivedDateTime desc";
+        const query = new URLSearchParams({
+          "$top": "20",
+          "$select": [
+            "id",
+            "subject",
+            "from",
+            "sender",
+            "toRecipients",
+            "ccRecipients",
+            "bccRecipients",
+            "bodyPreview",
+            "body",
+            "hasAttachments",
+            "isRead",
+            "categories",
+            "conversationId",
+            "receivedDateTime",
+            "sentDateTime",
+            "importance",
+            "flag",
+            "internetMessageId",
+          ].join(","),
+          "$orderby": orderBy,
+        }).toString();
 
-      const listUrl = `${baseUrl}?${query}`;
-      let listRes = await fetch(listUrl, {
-        headers: { Authorization: `Bearer ${officeToken}` },
-      });
+        const listUrl = `${baseUrl}?${query}`;
+        let listRes = await fetch(listUrl, {
+          headers: { Authorization: `Bearer ${officeToken}` },
+        });
 
-      if (!listRes.ok) {
-        const errTxt = await listRes.text();
-        // If unauthorized, try to refresh once
-        if (listRes.status === 401) {
-          const { accessToken } = await refreshOfficeToken();
-          if (accessToken) {
-            officeToken = accessToken;
-            listRes = await fetch(listUrl, {
-              headers: { Authorization: `Bearer ${officeToken}` },
-            });
+        if (!listRes.ok) {
+          const errTxt = await listRes.text();
+          if (listRes.status === 401) {
+            const { accessToken } = await refreshOfficeToken();
+            if (accessToken) {
+              officeToken = accessToken;
+              listRes = await fetch(listUrl, {
+                headers: { Authorization: `Bearer ${officeToken}` },
+              });
+            } else {
+              return new Response(
+                JSON.stringify({ success: false, error: "Authorization required. Please re-authorize your Office 365 account.", code: "AUTH_REQUIRED" }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+              );
+            }
           } else {
-            return new Response(
-              JSON.stringify({ success: false, error: "Authorization required. Please re-authorize your Office 365 account.", code: "AUTH_REQUIRED" }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-            );
-          }
-        } else {
-          // Non-401 failure: return a structured error without re-reading body later
-          if (!listRes.ok) {
             return new Response(
               JSON.stringify({ success: false, error: `Office365 API error: ${listRes.status} - ${errTxt}`, code: "PROVIDER_ERROR" }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
             );
           }
         }
-      }
 
-      // Successful response at this point
-      const listJson = await listRes.json();
-      const messages = listJson.value || [];
-      console.log(`Found ${messages.length} Office365 messages`);
+        const listJson = await listRes.json();
+        const messages = listJson.value || [];
+        console.log(`Found ${messages.length} Office365 messages in ${folder}`);
 
-      // Debug: log structure of first message
-      if (messages.length > 0) {
-        console.log("First message keys:", Object.keys(messages[0]));
-      }
+        for (const m of messages) {
+          try {
+            const messageId = m.id || m.internetMessageId;
+            if (!messageId) continue;
 
-      for (const m of messages) {
-        try {
-          // Use lowerCamelCase properties as returned by Microsoft Graph API
-          const messageId = m.id || m.internetMessageId;
-          
-          // Skip if no valid message ID
-          if (!messageId) {
-            console.warn("Skipping message with no id or internetMessageId");
-            continue;
-          }
+            const subject = m.subject || "(No Subject)";
+            const fromAddr = (m.from?.emailAddress?.address || m.sender?.emailAddress?.address || "").toLowerCase();
+            const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddr;
 
-          const subject = m.subject || "(No Subject)";
-          const fromAddr = m.from?.emailAddress?.address || m.sender?.emailAddress?.address || "";
-          const fromName = m.from?.emailAddress?.name || m.sender?.emailAddress?.name || fromAddr;
+            const toRecipients = (m.toRecipients || []).map((r: GraphRecipient) => ({ email: (r.emailAddress?.address || "").toLowerCase(), name: r.emailAddress?.name || undefined }));
+            const ccRecipients = (m.ccRecipients || []).map((r: GraphRecipient) => ({ email: (r.emailAddress?.address || "").toLowerCase(), name: r.emailAddress?.name || undefined }));
+            const bccRecipients = (m.bccRecipients || []).map((r: GraphRecipient) => ({ email: (r.emailAddress?.address || "").toLowerCase(), name: r.emailAddress?.name || undefined }));
 
-          const toRecipients = (m.toRecipients || []).map((r: GraphRecipient) => ({ email: r.emailAddress?.address || "" }));
-          const ccRecipients = (m.ccRecipients || []).map((r: GraphRecipient) => ({ email: r.emailAddress?.address || "" }));
-          const bccRecipients = (m.bccRecipients || []).map((r: GraphRecipient) => ({ email: r.emailAddress?.address || "" }));
+            const bodyContentType = m.body?.contentType || "text";
+            const bodyContent = m.body?.content || "";
+            const bodyText = bodyContentType.toLowerCase() === "html" ? bodyContent.replace(/<[^>]*>/g, "") : bodyContent;
+            const bodyHtml = bodyContentType.toLowerCase() === "html" ? bodyContent : "";
 
-          const bodyContentType = m.body?.contentType || "text";
-          const bodyContent = m.body?.content || "";
-          const bodyText = bodyContentType.toLowerCase() === "html" ? bodyContent.replace(/<[^>]*>/g, "") : bodyContent;
-          const bodyHtml = bodyContentType.toLowerCase() === "html" ? bodyContent : "";
+            const receivedAt = m.receivedDateTime || null;
+            const sentAt = m.sentDateTime || null;
+            const messageTs = direction === "outbound" ? (sentAt || receivedAt || new Date().toISOString()) : (receivedAt || new Date().toISOString());
 
-          const receivedAt = m.receivedDateTime || new Date().toISOString();
-          const sentAt = m.sentDateTime || null;
-          
-          // Extract Office 365 specific metadata
-          const priority = m.importance?.toLowerCase() || 'normal';
-          const hasInlineImages = bodyHtml?.includes('cid:') || bodyHtml?.includes('data:image/') || false;
-          const internetMessageId = m.internetMessageId || m.id;
+            const priority = m.importance?.toLowerCase() || "normal";
+            const hasInlineImages = bodyHtml?.includes("cid:") || bodyHtml?.includes("data:image/") || false;
+            const internetMessageId = m.internetMessageId || m.id;
 
-          // Process attachments if present
-          const attachmentsList: any[] = [];
-          if (m.hasAttachments) {
-             try {
+            const attachmentsList: any[] = [];
+            if (m.hasAttachments) {
+              try {
                 const attRes = await fetch(
-                   `https://graph.microsoft.com/v1.0/me/messages/${m.id}/attachments`,
-                   { headers: { Authorization: `Bearer ${officeToken}` } }
+                  `https://graph.microsoft.com/v1.0/me/messages/${m.id}/attachments`,
+                  { headers: { Authorization: `Bearer ${officeToken}` } }
                 );
                 if (attRes.ok) {
-                   const attJson = await attRes.json();
-                   const attachments = attJson.value || [];
-                   for (const att of attachments) {
-                      if (att['@odata.type'] === '#microsoft.graph.fileAttachment' && att.contentBytes) {
-                         const uploadedPath = await uploadAttachment(att.contentBytes, att.name, m.id);
-                         if (uploadedPath) {
-                            attachmentsList.push({
-                               filename: att.name,
-                               path: uploadedPath,
-                               size: att.size,
-                               type: att.contentType,
-                               content_id: att.contentId
-                            });
-                         }
+                  const attJson = await attRes.json();
+                  const attachments = attJson.value || [];
+                  for (const att of attachments) {
+                    if (att["@odata.type"] === "#microsoft.graph.fileAttachment" && att.contentBytes) {
+                      const uploadedPath = await uploadAttachment(att.contentBytes, att.name, m.id);
+                      if (uploadedPath) {
+                        attachmentsList.push({
+                          filename: att.name,
+                          path: uploadedPath,
+                          size: att.size,
+                          type: att.contentType,
+                          content_id: att.contentId
+                        });
                       }
-                   }
+                    }
+                  }
                 }
-             } catch (e) {
+              } catch (e) {
                 console.error(`Failed to fetch Office365 attachments for ${m.id}`, e);
-             }
+              }
+            }
+
+            const { data: existing } = await supabase
+              .from("emails")
+              .select("id")
+              .eq("message_id", messageId)
+              .eq("account_id", account.id)
+              .single();
+
+            if (existing) continue;
+
+            const emailPayload = {
+              account_id: account.id,
+              tenant_id: account.tenant_id ?? null,
+              franchise_id: account.franchise_id ?? null,
+              message_id: messageId,
+              thread_id: m.conversationId ?? null,
+              subject,
+              from_email: fromAddr,
+              from_name: fromName,
+              to_emails: toRecipients,
+              cc_emails: ccRecipients,
+              bcc_emails: bccRecipients,
+              reply_to: null,
+              body_text: bodyText,
+              body_html: bodyHtml,
+              snippet: m.bodyPreview || "",
+              has_attachments: !!m.hasAttachments,
+              attachments: attachmentsList,
+              direction,
+              status: direction === "outbound" ? "sent" : "received",
+              is_read: direction === "outbound" ? true : !!m.isRead,
+              is_starred: m.flag?.flagStatus === "flagged" || false,
+              is_archived: false,
+              is_spam: false,
+              is_deleted: false,
+              folder,
+              labels: Array.isArray(m.categories) ? m.categories : [],
+              category: null,
+              lead_id: null,
+              contact_id: null,
+              account_id_crm: null,
+              opportunity_id: null,
+              sent_at: direction === "outbound" ? (sentAt || messageTs) : null,
+              received_at: messageTs,
+              priority,
+              importance: priority,
+              in_reply_to: null,
+              email_references: [],
+              size_bytes: null,
+              raw_headers: {
+                subject: m.subject,
+                from: fromAddr,
+                importance: m.importance,
+                conversationId: m.conversationId,
+              },
+              conversation_id: m.conversationId,
+              internet_message_id: internetMessageId,
+              has_inline_images: hasInlineImages,
+              last_sync_attempt: new Date().toISOString(),
+            };
+
+            const { error: insertErr } = await supabase.from("emails").insert(emailPayload);
+            if (insertErr) {
+              console.error("Error inserting Office365 email:", insertErr);
+            } else {
+              syncedCount++;
+              console.log(`Successfully synced email: ${subject}`);
+            }
+          } catch (msgErr: unknown) {
+            const msg = msgErr instanceof Error ? msgErr.message : String(msgErr);
+            console.error("Error processing Office365 message:", msg);
           }
-
-          // Check if exists
-          const { data: existing } = await supabase
-            .from("emails")
-            .select("id")
-            .eq("message_id", messageId)
-            .eq("account_id", account.id)
-            .single();
-
-          if (existing) {
-            console.log(`Email ${messageId} already exists, skipping`);
-            continue;
-          }
-
-          const emailPayload = {
-            account_id: account.id,
-            tenant_id: account.tenant_id ?? null,
-            franchise_id: account.franchise_id ?? null,
-            message_id: messageId,
-            thread_id: m.conversationId ?? null,
-            subject,
-            from_email: fromAddr,
-            from_name: fromName,
-            to_emails: toRecipients,
-            cc_emails: ccRecipients,
-            bcc_emails: bccRecipients,
-            reply_to: null,
-            body_text: bodyText,
-            body_html: bodyHtml,
-            snippet: m.bodyPreview || "",
-            has_attachments: !!m.hasAttachments,
-            attachments: attachmentsList,
-            direction: "inbound",
-            status: "received",
-            is_read: !!m.isRead,
-            is_starred: m.flag?.flagStatus === "flagged" || false,
-            is_archived: false,
-            is_spam: false,
-            is_deleted: false,
-            folder: "inbox",
-            labels: Array.isArray(m.categories) ? m.categories : [],
-            category: null,
-            lead_id: null,
-            contact_id: null,
-            account_id_crm: null,
-            opportunity_id: null,
-            sent_at: sentAt,
-            received_at: receivedAt,
-            // Enhanced Office 365 fields
-            priority,
-            importance: priority,
-            in_reply_to: null,
-            email_references: [],
-            size_bytes: null,
-            raw_headers: {
-              subject: m.subject,
-              from: fromAddr,
-              importance: m.importance,
-              conversationId: m.conversationId,
-            },
-            conversation_id: m.conversationId,
-            internet_message_id: internetMessageId,
-            has_inline_images: hasInlineImages,
-            last_sync_attempt: new Date().toISOString(),
-          };
-
-          const { error: insertErr } = await supabase.from("emails").insert(emailPayload);
-          if (insertErr) {
-            console.error("Error inserting Office365 email:", insertErr);
-          } else {
-            syncedCount++;
-            console.log(`Successfully synced email: ${subject}`);
-          }
-        } catch (msgErr: unknown) {
-          const msg = msgErr instanceof Error ? msgErr.message : String(msgErr);
-          console.error("Error processing Office365 message:", msg);
         }
-      }
+      };
+
+      const inboxRes = await syncOfficeFolder("inbox", "Inbox", "inbound");
+      if (inboxRes instanceof Response) return inboxRes;
+      const sentRes = await syncOfficeFolder("sent", "SentItems", "outbound");
+      if (sentRes instanceof Response) return sentRes;
     }
 
     console.log(`Total emails synced: ${syncedCount}`);

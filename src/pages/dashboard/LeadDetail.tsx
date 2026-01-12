@@ -1,35 +1,42 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { LeadForm } from '@/components/crm/LeadForm';
 import type { LeadFormData } from '@/components/crm/LeadForm';
 import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
-import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
+import { EmailClient } from "@/components/email/EmailClient";
+import { EmailHistoryPanel } from "@/components/email/EmailHistoryPanel"; // Keep for now if needed, or remove if unused
 import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
 import { ManualAssignment } from '@/components/assignment/ManualAssignment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ArrowLeft, Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Lead, statusConfig } from './leads-data';
+import { exportCsv, exportExcel } from '@/lib/import-export';
+import { getScoreGrade } from '@/utils/leadScoring';
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase, context, scopedDb } = useCRM();
+  const { supabase, scopedDb } = useCRM();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showConversionDialog, setShowConversionDialog] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+  const [interactionStats, setInteractionStats] = useState<{ total: number; calls: number; emails: number; meetings: number; tasks: number; notes: number; automated: number } | null>(null);
 
   const fetchLead = useCallback(async () => {
     try {
@@ -48,7 +55,7 @@ export default function LeadDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id, supabase]);
+  }, [id, scopedDb]);
 
   useEffect(() => {
     if (id) {
@@ -76,6 +83,47 @@ export default function LeadDetail() {
       };
     }
   }, [id, fetchLead, supabase]);
+
+  const fetchInteractionStats = useCallback(async () => {
+    if (!id) return;
+    try {
+      const [{ data: manual, error: manualError }, { data: automated, error: automatedError }] = await Promise.all([
+        supabase.from('activities').select('activity_type').eq('lead_id', id),
+        supabase.from('lead_activities' as any).select('type').eq('lead_id', id),
+      ]);
+
+      if (manualError) throw manualError;
+      if (automatedError) throw automatedError;
+
+      const manualTypes = (manual || []).map((a: any) => String(a.activity_type || '').toLowerCase());
+      const automatedCount = (automated || []).length;
+
+      const calls = manualTypes.filter((t) => t === 'call').length;
+      const emails = manualTypes.filter((t) => t === 'email').length;
+      const meetings = manualTypes.filter((t) => t === 'meeting').length;
+      const tasks = manualTypes.filter((t) => t === 'task').length;
+      const notes = manualTypes.filter((t) => t === 'note').length;
+      const total = manualTypes.length + automatedCount;
+
+      setInteractionStats({ total, calls, emails, meetings, tasks, notes, automated: automatedCount });
+    } catch {
+      setInteractionStats(null);
+    }
+  }, [id, supabase]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchInteractionStats();
+    const channel = supabase
+      .channel(`lead-detail-stats-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities', filter: `lead_id=eq.${id}` }, () => fetchInteractionStats())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_activities', filter: `lead_id=eq.${id}` }, () => fetchInteractionStats())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchInteractionStats, id, supabase]);
 
   const handleUpdate = async (formData: LeadFormData) => {
     try {
@@ -140,6 +188,138 @@ export default function LeadDetail() {
     }
   };
 
+  const priority = useMemo(() => getScoreGrade(lead?.lead_score || 0), [lead?.lead_score]);
+  const stage = useMemo(() => statusConfig[(lead?.status ?? 'new') as Lead['status']], [lead?.status]);
+
+  const exportLead = async (format: 'csv' | 'xlsx') => {
+    if (!lead) return;
+    const headers = [
+      'id',
+      'first_name',
+      'last_name',
+      'company',
+      'title',
+      'email',
+      'phone',
+      'status',
+      'source',
+      'lead_score',
+      'qualification_status',
+      'estimated_value',
+      'expected_close_date',
+      'last_activity_date',
+      'created_at',
+      'updated_at',
+    ];
+
+    const rows = [
+      {
+        id: lead.id,
+        first_name: lead.first_name,
+        last_name: lead.last_name,
+        company: lead.company ?? '',
+        title: lead.title ?? '',
+        email: lead.email ?? '',
+        phone: lead.phone ?? '',
+        status: lead.status,
+        source: lead.source ?? '',
+        lead_score: lead.lead_score ?? '',
+        qualification_status: lead.qualification_status ?? '',
+        estimated_value: lead.estimated_value ?? '',
+        expected_close_date: lead.expected_close_date ?? '',
+        last_activity_date: lead.last_activity_date ?? '',
+        created_at: lead.created_at,
+        updated_at: lead.updated_at,
+      },
+    ];
+
+    const filename = `lead_${lead.id}_${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+    if (format === 'csv') exportCsv(filename, headers, rows);
+    else exportExcel(filename, headers, rows);
+  };
+
+  const exportActivities = async (format: 'csv' | 'xlsx') => {
+    if (!lead) return;
+    try {
+      const [{ data: manual, error: manualError }, { data: automated, error: automatedError }] = await Promise.all([
+        supabase
+          .from('activities')
+          .select('*')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('lead_activities' as any)
+          .select('*')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (manualError) throw manualError;
+      if (automatedError) throw automatedError;
+
+      const rows = [
+        ...(manual || []).map((a: any) => ({
+          id: a.id,
+          lead_id: a.lead_id,
+          activity_type: a.activity_type,
+          subject: a.subject ?? '',
+          status: a.status ?? '',
+          priority: a.priority ?? '',
+          due_date: a.due_date ?? '',
+          completed_at: a.completed_at ?? '',
+          created_at: a.created_at ?? '',
+          is_automated: false,
+          description: a.description ?? '',
+          to: a.custom_fields?.to ?? '',
+          from: a.custom_fields?.from ?? '',
+          metadata: '',
+        })),
+        ...(automated || []).map((a: any) => ({
+          id: a.id,
+          lead_id: a.lead_id,
+          activity_type: a.type,
+          subject: '',
+          status: 'completed',
+          priority: 'low',
+          due_date: '',
+          completed_at: a.created_at ?? '',
+          created_at: a.created_at ?? '',
+          is_automated: true,
+          description: '',
+          to: '',
+          from: '',
+          metadata: a.metadata ? JSON.stringify(a.metadata) : '',
+        })),
+      ].sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
+
+      const headers = [
+        'id',
+        'lead_id',
+        'activity_type',
+        'subject',
+        'status',
+        'priority',
+        'due_date',
+        'completed_at',
+        'created_at',
+        'is_automated',
+        'description',
+        'to',
+        'from',
+        'metadata',
+      ];
+
+      const filename = `lead_${lead.id}_activities_${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+      if (format === 'csv') exportCsv(filename, headers, rows);
+      else exportExcel(filename, headers, rows);
+
+      toast.success('Export started');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Export failed', { description: message });
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -179,61 +359,135 @@ export default function LeadDetail() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/leads')}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-4">
+            <Button variant="ghost" size="icon" aria-label="Back to leads" onClick={() => navigate('/dashboard/leads')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">{lead.first_name} {lead.last_name}</h1>
-              <p className="text-muted-foreground">Lead Details</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-bold">{lead.first_name} {lead.last_name}</h1>
+                <Badge className={stage.color}>{stage.label}</Badge>
+                <Badge className={`${priority.bg} ${priority.color}`}>{priority.label}</Badge>
+                {lead.converted_at && (
+                  <Badge className="bg-green-500/10 text-green-700 dark:text-green-300">
+                    Converted {format(new Date(lead.converted_at), 'PPP')}
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {lead.company ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="h-4 w-4" />
+                    {lead.company}
+                  </span>
+                ) : null}
+                {lead.title ? <span>{lead.title}</span> : null}
+                {lead.email ? (
+                  <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                    <Mail className="h-4 w-4" />
+                    {lead.email}
+                  </a>
+                ) : null}
+                {lead.phone ? (
+                  <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                    <Phone className="h-4 w-4" />
+                    {lead.phone}
+                  </a>
+                ) : null}
+              </div>
             </div>
           </div>
-          {!isEditing && !lead.converted_at && (
-            <div className="flex gap-2">
-              <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
-                <DialogTrigger asChild>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isEditing ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=call`)}
+                  disabled={!lead.phone}
+                >
+                  <Phone className="mr-2 h-4 w-4" />
+                  Call
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=email`)}
+                  disabled={!lead.email}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Email
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=meeting`)}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Meeting
+                </Button>
+              </>
+            ) : null}
+
+            {!isEditing ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button variant="outline">
-                    <UsersIcon className="mr-2 h-4 w-4" />
-                    Assign Lead
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
                   </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Assign Lead</DialogTitle>
-                    <DialogDescription>
-                      Manually assign this lead to a user
-                    </DialogDescription>
-                  </DialogHeader>
-                  <ManualAssignment
-                    leadId={lead.id}
-                    currentOwnerId={lead.owner_id}
-                    onAssigned={() => {
-                      setShowAssignmentDialog(false);
-                      fetchLead();
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-              <Button onClick={() => setShowConversionDialog(true)}>
-                <GitBranch className="mr-2 h-4 w-4" />
-                Convert Lead
-              </Button>
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-          )}
-          {lead.converted_at && (
-            <Badge className="bg-green-500/10 text-green-500">
-              Converted on {format(new Date(lead.converted_at), 'PPP')}
-            </Badge>
-          )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Lead</DropdownMenuLabel>
+                  <DropdownMenuItem onSelect={() => exportLead('csv')}>Export Lead (CSV)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => exportLead('xlsx')}>Export Lead (Excel)</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Activities</DropdownMenuLabel>
+                  <DropdownMenuItem onSelect={() => exportActivities('csv')}>Export Activities (CSV)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => exportActivities('xlsx')}>Export Activities (Excel)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+
+            {!isEditing && !lead.converted_at && (
+              <>
+                <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <UsersIcon className="mr-2 h-4 w-4" />
+                      Assign Lead
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Assign Lead</DialogTitle>
+                      <DialogDescription>
+                        Manually assign this lead to a user
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ManualAssignment
+                      leadId={lead.id}
+                      currentOwnerId={lead.owner_id}
+                      onAssigned={() => {
+                        setShowAssignmentDialog(false);
+                        fetchLead();
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+                <Button onClick={() => setShowConversionDialog(true)}>
+                  <GitBranch className="mr-2 h-4 w-4" />
+                  Convert Lead
+                </Button>
+                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         {isEditing ? (
@@ -268,147 +522,233 @@ export default function LeadDetail() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            <LeadScoringCard
-                  leadId={lead.id}
-                  score={lead.lead_score || 0}
-                  status={lead.status}
-                  estimatedValue={lead.estimated_value}
-                  lastActivityDate={lead.last_activity_date}
-                  source={lead.source}
-                  title={lead.title}
-                />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5" />
-                  Lead Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Status</p>
-                  <Badge className={`mt-1 ${getStatusColor(lead.status)}`}>
-                    {lead.status}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Source</p>
-                  <Badge variant="outline" className="mt-1">{lead.source}</Badge>
-                </div>
-                {lead.company && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Company</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{lead.company}</span>
-                    </div>
-                  </div>
-                )}
-                {lead.title && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Title</p>
-                    <p className="text-sm">{lead.title}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {lead.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${lead.email}`} className="text-sm text-primary hover:underline">
-                      {lead.email}
-                    </a>
-                  </div>
-                )}
-                {lead.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${lead.phone}`} className="text-sm">{lead.phone}</a>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Opportunity Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {lead.estimated_value && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Estimated Value</p>
-                      <p className="text-sm font-semibold text-green-600">
-                        {lead.estimated_value?.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {lead.expected_close_date && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Expected Close Date</p>
-                      <p className="text-sm">{format(new Date(lead.expected_close_date), 'PPP')}</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {(lead.description || lead.notes) && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Details */}
+            <div className="space-y-6">
+              <LeadScoringCard
+                leadId={lead.id}
+                score={lead.lead_score || 0}
+                status={lead.status}
+                estimatedValue={lead.estimated_value}
+                lastActivityDate={lead.last_activity_date}
+                source={lead.source}
+                title={lead.title}
+              />
+              
               <Card>
                 <CardHeader>
-                  <CardTitle>Additional Information</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserPlus className="h-5 w-5" />
+                    Lead Information
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {lead.description && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Status</p>
+                    <Badge className={`mt-1 ${getStatusColor(lead.status)}`}>{stage.label}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Source</p>
+                    <Badge variant="outline" className="mt-1">{lead.source}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Priority</p>
+                    <Badge className={`mt-1 ${priority.bg} ${priority.color}`}>{priority.label}</Badge>
+                  </div>
+                  {lead.company && (
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-2">Description</p>
-                      <p className="text-sm whitespace-pre-wrap">{lead.description}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Company</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{lead.company}</span>
+                      </div>
                     </div>
                   )}
-                  {lead.notes && (
+                  {lead.title && (
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-2">Notes</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{lead.notes}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Title</p>
+                      <p className="text-sm">{lead.title}</p>
+                    </div>
+                  )}
+                  {(lead.custom_fields && (lead.custom_fields['hubspot_url'] || lead.custom_fields['salesforce_url'] || lead.custom_fields['external_crm_url'])) ? (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">CRM</p>
+                      <a
+                        className="mt-1 inline-flex text-sm text-primary hover:underline"
+                        href={String(lead.custom_fields['external_crm_url'] || lead.custom_fields['salesforce_url'] || lead.custom_fields['hubspot_url'])}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open in CRM
+                      </a>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {lead.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <a href={`mailto:${lead.email}`} className="text-sm text-primary hover:underline">
+                        {lead.email}
+                      </a>
+                    </div>
+                  )}
+                  {lead.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <a href={`tel:${lead.phone}`} className="text-sm">{lead.phone}</a>
                     </div>
                   )}
                 </CardContent>
               </Card>
-            )}
 
-            <div className="md:col-span-2">
-              <EmailHistoryPanel 
-                emailAddress={lead.email} 
-                entityType="lead" 
-                entityId={lead.id} 
-                tenantId={lead.tenant_id}
-                className="mb-6"
-              />
-              <LeadActivitiesTimeline leadId={lead.id} />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Opportunity Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {lead.estimated_value && (
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Estimated Value</p>
+                        <p className="text-xl font-bold text-green-700">
+                          ${lead.estimated_value?.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {lead.expected_close_date && (
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Expected Close</p>
+                        <p className="text-sm font-semibold">{format(new Date(lead.expected_close_date), 'PPP')}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-muted-foreground">Win Probability</span>
+                      <span className="font-bold">{lead.lead_score || 0}%</span>
+                    </div>
+                    <Progress value={lead.lead_score || 0} className="h-2" />
+                    <p className="text-xs text-muted-foreground">Based on current lead score</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Metadata</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <div>Created: {format(new Date(lead.created_at), 'PPpp')}</div>
+                  <div>Last Updated: {format(new Date(lead.updated_at), 'PPpp')}</div>
+                  {lead.lead_score && <div>Lead Score: {lead.lead_score}/100</div>}
+                  {lead.qualification_status && <div>Qualification: {lead.qualification_status}</div>}
+                </CardContent>
+              </Card>
             </div>
 
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Metadata</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <div>Created: {format(new Date(lead.created_at), 'PPpp')}</div>
-                <div>Last Updated: {format(new Date(lead.updated_at), 'PPpp')}</div>
-                {lead.lead_score && <div>Lead Score: {lead.lead_score}/100</div>}
-                {lead.qualification_status && <div>Qualification: {lead.qualification_status}</div>}
-              </CardContent>
-            </Card>
+            {/* Right Column - Timeline & Activity */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Interaction Metrics</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+                  <div className="space-y-1 p-3 rounded-lg bg-muted/50 text-center">
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Total</div>
+                    <div className="text-2xl font-bold">{interactionStats?.total ?? '-'}</div>
+                  </div>
+                  <div className="space-y-1 p-3 rounded-lg bg-muted/50 text-center">
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Automated</div>
+                    <div className="text-2xl font-bold">{interactionStats?.automated ?? '-'}</div>
+                  </div>
+                  <div className="space-y-1 p-3 rounded-lg bg-muted/50 text-center">
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Calls</div>
+                    <div className="text-2xl font-bold">{interactionStats?.calls ?? '-'}</div>
+                  </div>
+                  <div className="space-y-1 p-3 rounded-lg bg-muted/50 text-center">
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Emails</div>
+                    <div className="text-2xl font-bold">{interactionStats?.emails ?? '-'}</div>
+                  </div>
+                  <div className="space-y-1 p-3 rounded-lg bg-muted/50 text-center">
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Meetings</div>
+                    <div className="text-2xl font-bold">{interactionStats?.meetings ?? '-'}</div>
+                  </div>
+                  <div className="space-y-1 p-3 rounded-lg bg-muted/50 text-center">
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Tasks</div>
+                    <div className="text-2xl font-bold">{interactionStats ? interactionStats.tasks + interactionStats.notes : '-'}</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {(lead.description || lead.notes) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Additional Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {lead.description && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Description</p>
+                        <p className="text-sm whitespace-pre-wrap">{lead.description}</p>
+                      </div>
+                    )}
+                    {lead.notes && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Notes</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{lead.notes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              <Tabs defaultValue="activity" className="w-full">
+                <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent space-x-6">
+                  <TabsTrigger 
+                    value="activity" 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+                  >
+                    Activity Timeline
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="email" 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+                  >
+                    Email History
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="activity" className="pt-6">
+                  <LeadActivitiesTimeline leadId={lead.id} />
+                </TabsContent>
+                
+                <TabsContent value="email" className="pt-6">
+                  <EmailHistoryPanel 
+                    emailAddress={lead.email} 
+                    entityType="lead" 
+                    entityId={lead.id} 
+                    tenantId={lead.tenant_id}
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
         )}
 

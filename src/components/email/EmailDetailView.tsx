@@ -1,36 +1,91 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp } from "lucide-react";
+import { 
+  Reply, 
+  Forward, 
+  Archive, 
+  Trash2, 
+  Star, 
+  Paperclip, 
+  MoreHorizontal, 
+  ChevronUp,
+  Printer,
+  FolderInput
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useState } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface Email {
-  id: string;
-  subject: string;
-  from_email: string;
-  from_name: string;
-  body_text?: string;
-  body_html?: string;
-  received_at: string;
-  is_starred: boolean;
-  has_attachments: boolean;
-  attachments?: any[];
-  labels?: string[];
-}
+import { Email } from "@/types/email";
 
-interface EmailDetailViewProps {
+export interface EmailDetailViewProps {
   email: Email;
+  thread?: Email[];
+  onReply?: (email: Email) => void;
+  onForward?: (email: Email) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onMove?: (id: string, folder: string) => void;
+  customFolders?: string[];
 }
 
-export function EmailDetailView({ email }: EmailDetailViewProps) {
+function EmailMessage({ 
+  email, 
+  onReply, 
+  onForward, 
+  onArchive, 
+  onDelete,
+  onMove,
+  customFolders = []
+}: Omit<EmailDetailViewProps, 'thread'>) {
   const [showReply, setShowReply] = useState(false);
   const [showFullBody, setShowFullBody] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
   const { toast } = useToast();
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print Email - ${email.subject}</title>
+            <style>
+              body { font-family: sans-serif; padding: 20px; }
+              .header { margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+              .meta { color: #666; font-size: 0.9em; margin-bottom: 5px; }
+              .body { white-space: pre-wrap; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h2>${email.subject}</h2>
+              <div class="meta">From: ${email.from_name || email.from_email}</div>
+              <div class="meta">To: ${email.to_emails ? email.to_emails.join(', ') : 'Me'}</div>
+              <div class="meta">Date: ${format(new Date(email.received_at), "PPpp")}</div>
+            </div>
+            <div class="body">
+              ${email.body_html || email.body_text}
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
 
   const handleDownload = async (path: string, filename: string) => {
     try {
@@ -74,7 +129,7 @@ export function EmailDetailView({ email }: EmailDetailViewProps) {
       };
 
   return (
-    <div className="h-full w-full overflow-auto p-4">
+    <div className="w-full">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h2 className="text-2xl mb-2 break-words overflow-x-hidden">{email.subject}</h2>
@@ -185,21 +240,48 @@ export function EmailDetailView({ email }: EmailDetailViewProps) {
 
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          <Button onClick={() => setShowReply(true)}>
+          <Button onClick={() => onReply ? onReply(email) : setShowReply(true)}>
             <Reply className="w-4 h-4 mr-2" />
             Reply
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => onForward ? onForward(email) : null}>
             <Forward className="w-4 h-4 mr-2" />
             Forward
           </Button>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => onArchive?.(email.id)}>
             <Archive className="w-4 h-4 mr-2" />
             Archive
           </Button>
-          <Button variant="outline" size="sm">
+
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print
+          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FolderInput className="w-4 h-4 mr-2" />
+                Move to
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Move to folder</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onMove?.(email.id, 'inbox')}>
+                Inbox
+              </DropdownMenuItem>
+              {customFolders.map(folder => (
+                <DropdownMenuItem key={folder} onClick={() => onMove?.(email.id, folder)}>
+                  {folder}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="outline" size="sm" onClick={() => onDelete?.(email.id)}>
             <Trash2 className="w-4 h-4 mr-2" />
             Delete
           </Button>
@@ -215,6 +297,22 @@ export function EmailDetailView({ email }: EmailDetailViewProps) {
           body: email.body_text,
         }}
       />
+    </div>
+  );
+}
+
+export function EmailDetailView(props: EmailDetailViewProps) {
+  const { thread, email, ...rest } = props;
+  // If thread is provided and has items, use it. Otherwise use the single email.
+  const emailsToRender = thread && thread.length > 0 ? thread : [email];
+
+  return (
+    <div className="h-full w-full overflow-auto p-4 space-y-8">
+      {emailsToRender.map((e, index) => (
+        <div key={e.id} className={index < emailsToRender.length - 1 ? "border-b-2 pb-6" : ""}>
+          <EmailMessage email={e} {...rest} />
+        </div>
+      ))}
     </div>
   );
 }

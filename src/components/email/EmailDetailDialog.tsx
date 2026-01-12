@@ -53,18 +53,14 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) {
+      toast.success("Download started");
+    } catch (err: any) {
       console.error('Download failed:', err);
+      toast.error("Download failed", {
+        description: err.message || "Could not download attachment"
+      });
     }
   }, []);
-  const clampStyle = showFullBody
-    ? {}
-    : {
-        display: "-webkit-box",
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: "vertical" as const,
-        overflow: "hidden",
-      };
 
   return (
     <>
@@ -126,14 +122,16 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
           )}
 
           <div className={showFullBody ? "email-content prose prose-sm max-w-none break-words overflow-x-hidden" : "email-content prose prose-sm max-w-none break-words overflow-x-hidden relative"}>
-            {email.body_html ? (
-              <div style={clampStyle} dangerouslySetInnerHTML={{ __html: email.body_html }} />
-            ) : showFullBody ? (
+            {!showFullBody ? (
+              <div className="font-sans text-muted-foreground">
+                {email.snippet || email.body_text?.slice(0, 300) || "No preview available"}
+              </div>
+            ) : email.body_html ? (
+              <div dangerouslySetInnerHTML={{ __html: email.body_html }} />
+            ) : email.body_text ? (
               <pre className="whitespace-pre-wrap font-sans break-words overflow-x-hidden">{email.body_text}</pre>
             ) : (
-              <div className="font-sans" style={{ whiteSpace: "pre-wrap", ...clampStyle }}>
-                {email.body_text}
-              </div>
+              <div className="italic text-muted-foreground">No content available</div>
             )}
             {!showFullBody && (
               <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent" />

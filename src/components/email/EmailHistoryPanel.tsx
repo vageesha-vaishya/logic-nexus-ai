@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Mail, RefreshCw, Search, Plus, ExternalLink, Calendar, ArrowUpRight, ArrowDownLeft, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
+import { Mail, RefreshCw, Search, Plus, ArrowUpRight, ArrowDownLeft, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ interface Email {
   thread_id?: string;
   from_name?: string;
   is_starred?: boolean;
+  body_text?: string;
+  body_html?: string;
 }
 
 interface EmailHistoryPanelProps {
@@ -154,9 +156,10 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
   const renderEmailItem = (email: Email, isThreadChild = false) => {
     const isInbound = email.from_email.toLowerCase().includes(emailAddress.toLowerCase());
     return (
-      <div 
-        key={email.id} 
-        className={`p-3 hover:bg-muted/50 cursor-pointer transition-colors ${isThreadChild ? 'pl-8 border-l-2 border-muted ml-2' : ''}`}
+      <button
+        type="button"
+        key={email.id}
+        className={`w-full text-left p-3 hover:bg-muted/50 transition-colors ${isThreadChild ? 'pl-8 border-l-2 border-muted ml-2' : ''}`}
         onClick={() => setSelectedEmail(email)}
       >
         <div className="flex items-start justify-between gap-2 mb-1">
@@ -183,7 +186,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
         <div className="text-xs text-muted-foreground line-clamp-2">
           {email.snippet}
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -217,36 +220,43 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button 
-              size="sm" 
-              className="h-8" 
+              size="default" 
+              className="h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
               onClick={() => setShowCompose(true)}
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 mr-2" />
               Compose
             </Button>
           </div>
         </div>
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="relative mt-4">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search emails..."
-            className="pl-8 h-9"
+            className="pl-9 h-10 bg-muted/30 border-muted focus:bg-background transition-colors"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[500px]">
           {loading && emails.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-              Loading history...
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <RefreshCw className="h-8 w-8 mb-3 animate-spin text-primary/50" />
+              <p>Loading correspondence...</p>
             </div>
           ) : filteredEmails.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <Mail className="h-8 w-8 mb-2 opacity-20" />
-              <p className="text-sm">No emails found</p>
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-muted/5 mx-4 my-4 rounded-lg border border-dashed">
+              <div className="bg-muted/20 p-3 rounded-full mb-3">
+                <Mail className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+              <h3 className="font-medium text-foreground mb-1">No emails found</h3>
+              <p className="text-sm text-center max-w-xs mb-4">There is no correspondence history matching your criteria.</p>
+              <Button variant="outline" size="sm" onClick={() => setShowCompose(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Start Conversation
+              </Button>
             </div>
           ) : (
             <div className="divide-y">
@@ -255,9 +265,11 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
               ) : (
                 threads.map(thread => (
                   <div key={thread.id} className="border-b last:border-0">
-                    <div 
-                      className="p-3 hover:bg-muted/30 cursor-pointer flex items-center justify-between group"
+                    <button
+                      type="button"
+                      className="w-full text-left p-3 hover:bg-muted/30 flex items-center justify-between group"
                       onClick={() => toggleThread(thread.id)}
+                      aria-expanded={expandedThreads.has(thread.id)}
                     >
                       <div className="flex items-center gap-2 overflow-hidden">
                         {expandedThreads.has(thread.id) ? (
@@ -277,7 +289,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                     {expandedThreads.has(thread.id) && (
                       <div className="bg-muted/10 pb-2">
                         {thread.emails.map(email => renderEmailItem(email, true))}

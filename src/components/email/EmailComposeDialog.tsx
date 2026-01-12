@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 // import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Paperclip, X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link as LinkIcon, Eraser, Loader2, Trash2 } from "lucide-react";
+import { Send, Paperclip, X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link as LinkIcon, Eraser, Loader2, Trash2, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
@@ -48,16 +48,46 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
   const [attachments, setAttachments] = useState<{ name: string; path: string; type: string; url: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       fetchAccounts();
       if (replyTo) {
         setTo(replyTo.to);
-        setSubject(replyTo.subject.startsWith("Re:") ? replyTo.subject : `Re: ${replyTo.subject}`);
+        
+        // Smart subject handling
+        let newSubject = replyTo.subject;
+        if (!newSubject.toLowerCase().startsWith("re:") && !newSubject.toLowerCase().startsWith("fwd:")) {
+           // Default to Re: if not specified by caller (which sets it for Fwd)
+           // But actually caller sets it now. So just trust caller or append Re: if missing and it's a reply
+           // The caller (EmailClient) sets "Fwd: ..." for forwards.
+           // For replies, it passes the original subject.
+           // So if it's a reply (implied by this logic being here? No, replyTo prop is used for both)
+           // We need to know if it's a reply or forward or just a draft.
+           // Let's rely on the passed subject.
+           newSubject = `Re: ${newSubject}`;
+        }
+        setSubject(newSubject);
+        
         if (replyTo.body) {
-          setBody(`\n\n--- Original Message ---\n${replyTo.body}`);
-          setEditorHtml(plainToHtml(`\n\n--- Original Message ---\n${replyTo.body}`));
+          // If body is passed, use it. Caller (EmailClient) formats the "Original Message" block for forwards.
+          // For replies, we might want to quote it.
+          // EmailClient passes raw body for Reply.
+          // Let's check if the body already contains "Original Message" or similar marker?
+          // No, EmailClient passes:
+          // Reply: raw body
+          // Forward: formatted body with headers
+          
+          if (newSubject.toLowerCase().startsWith("fwd:")) {
+             setBody(replyTo.body);
+             setEditorHtml(plainToHtml(replyTo.body));
+          } else {
+             // Reply
+             const quoted = `\n\n--- Original Message ---\n${replyTo.body}`;
+             setBody(quoted);
+             setEditorHtml(plainToHtml(quoted));
+          }
         }
       }
       // Initialize editor content
@@ -164,6 +194,36 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
     }
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `inline_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+          const filePath = `${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('email-attachments')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('email-attachments')
+            .getPublicUrl(filePath);
+
+          if (editorRef.current) {
+            editorRef.current.focus();
+            document.execCommand('insertImage', false, publicUrl);
+            setEditorHtml(editorRef.current.innerHTML);
+          }
+      } catch (error: any) {
+          toast({ title: "Image Upload Failed", description: error.message, variant: "destructive" });
+      }
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  };
+
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
@@ -213,6 +273,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
           }
         }
         throw new Error(description);
+      }
+      if (data && (data as any).success === false) {
+        throw new Error((data as any).error || "Failed to send email");
       }
 
       // Create activity log automatically
@@ -345,12 +408,12 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto font-outlook">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden font-outlook flex flex-col">
         <DialogHeader>
           <DialogTitle>Compose Email</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           <div>
             <Label>From</Label>
             <Select value={selectedAccount} onValueChange={setSelectedAccount}>
@@ -406,6 +469,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
               <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyLeft")}> <AlignLeft className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyCenter")}> <AlignCenter className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyRight")}> <AlignRight className="w-4 h-4" /> </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => imageInputRef.current?.click()}> <ImageIcon className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={applyLink}> <LinkIcon className="w-4 h-4" /> </Button>
               <Button type="button" variant="ghost" size="sm" onClick={clearFormatting}> <Eraser className="w-4 h-4" /> </Button>
             </div>
@@ -419,42 +483,50 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, onS
             />
           </div>
 
-          <div className="flex items-center justify-between pt-4">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              multiple
-              onChange={handleFileSelect}
-            />
-            <div className="flex flex-col gap-2">
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Paperclip className="w-4 h-4 mr-2" />}
-                Attach File
-              </Button>
-              {attachments.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {attachments.map((file, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-secondary p-2 rounded-md text-sm">
-                      <span className="max-w-[150px] truncate">{file.name}</span>
-                      <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeAttachment(i)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((file, i) => (
+                <div key={i} className="flex items-center gap-2 bg-secondary p-2 rounded-md text-sm">
+                  <span className="max-w-[220px] truncate">{file.name}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAttachment(i)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-              )}
+              ))}
             </div>
+          )}
+        </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSend} disabled={sending}>
-                <Send className="w-4 h-4 mr-2" />
-                {sending ? "Sending..." : "Send"}
-              </Button>
-            </div>
+        <div className="shrink-0 border-t pt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-background">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            onChange={handleFileSelect}
+          />
+          <input
+            type="file"
+            ref={imageInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleImageSelect}
+          />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+              {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Paperclip className="w-4 h-4 mr-2" />}
+              Attach File
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSend} disabled={sending}>
+              <Send className="w-4 h-4 mr-2" />
+              {sending ? "Sending..." : "Send"}
+            </Button>
           </div>
         </div>
       </DialogContent>

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AccountForm } from '@/components/crm/AccountForm';
-import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
+import { EmailClient } from "@/components/email/EmailClient";
+import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel'; // Keep if needed or remove
 import { ArrowLeft, Edit, Trash2, Building2, Phone, Mail, Globe, DollarSign, Users } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
@@ -596,11 +597,10 @@ export default function AccountDetail() {
               </Card>
             </TabsContent>
             <TabsContent value="emails">
-              <EmailHistoryPanel 
+              <EmailClient 
                 emailAddress={account.email} 
                 entityType="account" 
                 entityId={account.id} 
-                tenantId={account.tenant_id}
               />
             </TabsContent>
           </Tabs>

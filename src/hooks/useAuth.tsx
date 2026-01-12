@@ -230,16 +230,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           lastLoadedUserId = currentSession.user.id;
           // Ensure loading is true while fetching user data
           setLoading(true);
+          console.log(`[Auth] Starting user data load for ${currentSession.user.id}`);
           loadUserData(currentSession.user)
+            .then(() => {
+              console.log(`[Auth] User data load completed for ${currentSession.user.id}`);
+            })
             .catch(err => {
-              console.error('Failed to load user data:', err);
+              console.error('[Auth] Failed to load user data:', err);
             })
             .finally(() => {
               setLoading(false);
             });
         } else {
-          // Same user, data already loaded
-          setLoading(false);
+          // Same user, data already loaded or loading in progress.
+          // Do NOT set loading to false here, as a previous fetch might still be running.
+          console.log(`[Auth] Skipping data load for ${currentSession.user.id} (already loaded/loading)`);
         }
       } else {
         lastLoadedUserId = null;

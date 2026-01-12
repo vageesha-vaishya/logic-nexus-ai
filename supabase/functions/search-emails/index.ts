@@ -1,7 +1,3 @@
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-  serve(handler: (req: Request) => Promise<Response> | Response): void;
-};
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -37,12 +33,14 @@ Deno.serve(async (req: Request) => {
 
     type SearchPayload = {
       email: string;
+      query?: string;
       tenantId?: string | null;
       accountId?: string | null;
       direction?: string | null;
       page?: number;
       pageSize?: number;
     };
+    
     let payload: SearchPayload | null;
     try {
       payload = await req.json();
@@ -53,7 +51,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { email, tenantId, accountId, direction } = payload || ({} as SearchPayload);
+    const { email, query: searchText, tenantId, accountId, direction } = payload || ({} as SearchPayload);
     let { page = 1, pageSize = 25 } = payload || ({} as SearchPayload);
 
     if (!email) {
@@ -74,74 +72,60 @@ Deno.serve(async (req: Request) => {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    // Helper to build base query with filters
-    const buildQuery = () => {
-      let q = supabase.from("emails").select("*");
-      if (tenantId) q = q.eq("tenant_id", tenantId);
-      if (accountId) q = q.eq("account_id", accountId);
-      if (direction) q = q.eq("direction", direction);
-      return q;
-    };
+    let dbQuery = supabase.from("emails").select("*", { count: "exact" });
 
-    // 1) From address direct match
-    const { data: fromMatches, error: fromErr } = await buildQuery()
-      .ilike("from_email", `%${targetEmail}%`)
-      .order("received_at", { ascending: false })
-      .range(from, to);
+    // 1. Scope filters
+    if (tenantId) dbQuery = dbQuery.eq("tenant_id", tenantId);
+    if (accountId) dbQuery = dbQuery.eq("account_id", accountId);
+    if (direction) dbQuery = dbQuery.eq("direction", direction);
 
-    if (fromErr) {
-      throw new Error(`Query error (from): ${fromErr.message}`);
+    // 2. Text Search (if provided)
+    if (searchText) {
+      const q = searchText.trim();
+      // Simple OR search across common fields
+      dbQuery = dbQuery.or(`subject.ilike.%${q}%,body_text.ilike.%${q}%,from_name.ilike.%${q}%,from_email.ilike.%${q}%`);
     }
 
-    // 2) Search in to_emails, cc_emails, bcc_emails using text search
-    // The columns contain JSONB arrays like [{ email: "...", name: "..." }]
-    // Use filter with @> operator for JSONB containment
-    const jsonFilter = JSON.stringify([{ email: targetEmail }]);
+    // 3. Email Address Match (The core requirement)
+    // We want emails WHERE:
+    //   from_email ILIKE targetEmail
+    //   OR to_emails CONTAINS [targetEmail]
+    //   OR cc_emails CONTAINS [targetEmail]
+    //   OR bcc_emails CONTAINS [targetEmail]
     
-    const { data: toMatches, error: toErr } = await buildQuery()
-      .filter("to_emails", "cs", jsonFilter)
+    // Note: 'to_emails' is a JSONB array of strings ["a@b.com", "c@d.com"]
+    // PostgREST syntax for OR with different operators:
+    // or=(col1.op.val,col2.op.val)
+    
+    const jsonFilter = JSON.stringify([targetEmail]);
+    const orConditions = [
+      `from_email.ilike.%${targetEmail}%`,
+      `to_emails.cs.${jsonFilter}`,
+      `cc_emails.cs.${jsonFilter}`,
+      `bcc_emails.cs.${jsonFilter}`
+    ].join(",");
+
+    dbQuery = dbQuery.or(orConditions);
+
+    // 4. Ordering and Pagination
+    const { data, error, count } = await dbQuery
       .order("received_at", { ascending: false })
       .range(from, to);
 
-    const { data: ccMatches, error: ccErr } = await buildQuery()
-      .filter("cc_emails", "cs", jsonFilter)
-      .order("received_at", { ascending: false })
-      .range(from, to);
-
-    const { data: bccMatches, error: bccErr } = await buildQuery()
-      .filter("bcc_emails", "cs", jsonFilter)
-      .order("received_at", { ascending: false })
-      .range(from, to);
-
-    if (toErr || ccErr || bccErr) {
-      console.error("Query errors:", { toErr, ccErr, bccErr });
-      throw new Error(
-        `Query error (recipients): ${toErr?.message || ccErr?.message || bccErr?.message}`
-      );
+    if (error) {
+      console.error("Query error:", error);
+      throw new Error(`Database query error: ${error.message}`);
     }
-
-    // Merge and de-duplicate by id
-    const byId: Record<string, unknown> = {};
-    for (const arr of [fromMatches || [], toMatches || [], ccMatches || [], bccMatches || []]) {
-      for (const e of arr as unknown[]) {
-        const id = (e as { id?: string })?.id;
-        if (id) byId[id] = e;
-      }
-    }
-    const toReceivedAt = (x: unknown): number => {
-      const v = (x as { received_at?: string })?.received_at;
-      return v ? new Date(v).getTime() : 0;
-    };
-    const merged = Object.values(byId).sort((a, b) => toReceivedAt(b) - toReceivedAt(a));
 
     return new Response(
       JSON.stringify({
         success: true,
-        count: merged.length,
-        data: merged.slice(0, pageSize),
+        count: count,
+        data: data,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
+
   } catch (error: unknown) {
     console.error("Error searching emails:", error);
     return new Response(
