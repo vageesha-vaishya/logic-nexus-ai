@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
+import JSZip from "jszip";
 import { toast } from "sonner";
 import { BackupDownloader } from "@/components/admin/BackupDownloader";
 
@@ -32,7 +33,6 @@ export default function DatabaseExport() {
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMode, setRestoreMode] = useState<'insert' | 'upsert'>('upsert');
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null);
-  const [backupType, setBackupType] = useState<'full' | 'incremental'>('full');
   
   // Export component selection
   const [exportOptions, setExportOptions] = useState({
@@ -168,7 +168,7 @@ export default function DatabaseExport() {
     return candidate;
   };
 
-  const saveToCloud = async (filename: string, content: string, type: string) => {
+  const saveToCloud = async (filename: string, content: string | Blob, type: string) => {
     const { data: { user } } = await scopedDb.client.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
@@ -177,7 +177,8 @@ export default function DatabaseExport() {
     const fullPath = dir ? `${userFolder}/${dir}/${filename}` : `${userFolder}/${filename}`;
     const finalPath = await resolveConflictPath(fullPath);
     if (!finalPath) return;
-    const blob = new Blob([content], { type });
+
+    const blob = content instanceof Blob ? content.slice(0, content.size, type) : new Blob([content], { type });
     const { error } = await scopedDb.client.storage.from('db-backups').upload(finalPath, blob, { upsert: conflictPolicy === 'overwrite' });
     if (error) throw error;
     toast.success('Saved to Cloud storage', { description: finalPath });
@@ -387,6 +388,25 @@ export default function DatabaseExport() {
     }
   };
 
+  const validateSQL = (sql: string, context: string) => {
+    const errors: string[] = [];
+    if (!sql.trim()) return errors;
+    
+    // Check for common issues
+    const openQuotes = (sql.match(/'/g) || []).length;
+    if (openQuotes % 2 !== 0) errors.push(`[${context}] Potentially unclosed single quote`);
+    
+    const openDoubleQuotes = (sql.match(/"/g) || []).length;
+    if (openDoubleQuotes % 2 !== 0) errors.push(`[${context}] Potentially unclosed double quote`);
+    
+    // Check for potentially dangerous operations in export (shouldn't happen but good to flag)
+    if (sql.toUpperCase().includes('DROP DATABASE')) errors.push(`[${context}] Contains DROP DATABASE statement`);
+    if (sql.toUpperCase().includes('TRUNCATE')) errors.push(`[${context}] Contains TRUNCATE statement`);
+    if (sql.includes('\u0000')) errors.push(`[${context}] Contains null byte characters`);
+    
+    return errors;
+  };
+
   const exportSchemaSQL = async () => {
     const hasAnySelected = Object.values(exportOptions).some(v => v);
     if (!hasAnySelected) {
@@ -395,341 +415,473 @@ export default function DatabaseExport() {
     }
 
     setLoading(true);
+    const summary: string[] = ["Database Export Summary", "=======================", `Date: ${new Date().toISOString()}`, ""];
+    
     try {
-      let sqlContent = `-- Database Schema Export\n-- Generated on: ${new Date().toISOString()}\n\n`;
-
-      // Export schema (tables and columns)
-      if (exportOptions.schema) {
-        const { data: schemaData, error } = await scopedDb.rpc("get_database_schema");
-        if (error) throw error;
-        
-        sqlContent += "-- Tables and Columns\n";
-        if (schemaData && Array.isArray(schemaData)) {
-          const tableGroups = schemaData.reduce((acc: any, row: any) => {
-            if (!acc[row.table_name]) {
-              acc[row.table_name] = [];
-            }
-            acc[row.table_name].push(row);
-            return acc;
-          }, {});
-
-          const resolveColumnType = (col: any) => {
-            const dt = (col.data_type || '').toString();
-            const udt = (col.udt_name || '').toString();
-            // Resolve enums/domains
-            if (dt.toUpperCase() === 'USER-DEFINED' && udt) {
-              return `"${udt}"`;
-            }
-            // Resolve arrays from udt_name (e.g., _uuid -> uuid[])
-            if (dt.toUpperCase() === 'ARRAY' && udt) {
-              const base = udt.startsWith('_') ? udt.slice(1) : udt;
-              return `${base}[]`;
-            }
-            // Length only for character types
-            if ((dt === 'character varying' || dt === 'varchar') && col.character_maximum_length) {
-              return `${dt}(${col.character_maximum_length})`;
-            }
-            return dt || 'text';
-          };
-
-          Object.entries(tableGroups).forEach(([tableName, columns]: [string, any]) => {
-            sqlContent += `\nCREATE TABLE IF NOT EXISTS "${tableName}" (\n`;
-            // Deduplicate column definitions by column_name
-            const seen = new Set<string>();
-            const uniqueCols = (columns as any[]).filter((col) => {
-              const name = col.column_name;
-              if (seen.has(name)) return false;
-              seen.add(name);
-              return true;
-            });
-            const columnDefs = uniqueCols.map((col: any) => {
-              let def = `  "${col.column_name}" ${resolveColumnType(col)}`;
-              if (col.is_nullable === false) {
-                def += ' NOT NULL';
-              }
-              if (col.column_default) {
-                def += ` DEFAULT ${col.column_default}`;
-              }
-              return def;
-            });
-            sqlContent += columnDefs.join(',\n') + '\n);\n';
-          });
-        }
-      }
-
-      // Export constraints
-      if (exportOptions.constraints) {
-        const { data: constraintsData, error } = await scopedDb.rpc("get_table_constraints");
-        if (error) throw error;
-        
-        sqlContent += "\n-- Constraints\n";
-        if (constraintsData && Array.isArray(constraintsData)) {
-          constraintsData.forEach((constraint: any) => {
-            // Use constraint_details provided by RPC for accuracy across PK, FK, UNIQUE, CHECK
-            const details = (constraint.constraint_details || '').toString();
-            if (details.trim().length > 0) {
-              sqlContent += `ALTER TABLE "${constraint.table_name}" ADD CONSTRAINT "${constraint.constraint_name}" ${details};\n`;
-            }
-          });
-        }
-      }
-
-      // Export indexes
-      if (exportOptions.indexes) {
-        const { data: indexesData, error } = await scopedDb.rpc("get_table_indexes");
-        if (error) throw error;
-        
-        sqlContent += "\n-- Indexes\n";
-        if (indexesData && Array.isArray(indexesData)) {
-          indexesData.forEach((index: any) => {
-            // Use full index definition from pg_get_indexdef for correctness
-            const def = (index.index_definition || '').toString();
-            if (def.trim().length > 0) {
-              sqlContent += `${def};\n`;
-            }
-          });
-        }
-      }
-
-      // Export database functions
-      if (exportOptions.dbFunctions) {
-        // Prefer RPC with full bodies; gracefully fall back to metadata-only
-        let functionsData: any[] | null = null;
-        try {
-          const { data: functionsWithBody } = await (scopedDb.rpc as any)("get_database_functions_with_body");
-          functionsData = functionsWithBody || null;
-        } catch (e) {
-          functionsData = null;
-        }
-        if (!functionsData) {
-          const { data: metaData, error } = await (scopedDb.rpc as any)("get_database_functions");
-          if (error) throw error;
-          functionsData = metaData || [];
-        }
-        
-        sqlContent += "\n-- Database Functions\n";
-        if (functionsData && Array.isArray(functionsData)) {
-          let anyPrinted = false;
-          functionsData.forEach((func: any) => {
-            const name = func?.name || func?.function_name;
-            const schema = func?.schema || 'public';
-            const def = func?.function_definition;
-            if (def && name) {
-              const trimmed = String(def).trim();
-              sqlContent += `-- Function: ${schema}.${name}\n`;
-              // pg_get_functiondef returns a full CREATE FUNCTION ... AS $$ ... $$; do not append another semicolon
-              sqlContent += `${trimmed}\n\n`;
-              anyPrinted = true;
-            } else if (name) {
-              sqlContent += `-- Function metadata only: ${schema}.${name} (${func?.argument_types ?? ''}) RETURNS ${func?.return_type ?? ''} [definition unavailable]\n`;
-              anyPrinted = true;
-            }
-          });
-          if (!anyPrinted) {
-            sqlContent += "-- No function definitions available from introspection.\n";
-          }
-        }
-      }
-
-      // Export RLS policies
-      if (exportOptions.rlsPolicies) {
-        const { data: policiesData, error } = await scopedDb.rpc("get_rls_policies");
-        if (error) throw error;
-        
-        sqlContent += "\n-- RLS Policies\n";
-        if (policiesData && Array.isArray(policiesData)) {
-          const tableGroups = policiesData.reduce((acc: any, policy: any) => {
-            if (!acc[policy.table_name]) {
-              acc[policy.table_name] = [];
-            }
-            acc[policy.table_name].push(policy);
-            return acc;
-          }, {});
-
-          Object.entries(tableGroups).forEach(([tableName, policies]: [string, any]) => {
-            sqlContent += `\n-- Enable RLS on ${tableName}\n`;
-            sqlContent += `ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY;\n`;
-            
-            policies.forEach((policy: any) => {
-              sqlContent += `CREATE POLICY "${policy.policy_name}" ON "${tableName}"\n`;
-              // 'command' comes from get_rls_policies; default to ALL if missing
-              sqlContent += `  FOR ${policy.command || 'ALL'}\n`;
-              // 'roles' is returned as text (e.g., "{authenticated,anon}"). Parse safely.
-              const rolesText = (policy.roles ?? '').toString();
-              if (rolesText.trim() !== '') {
-                const parsedRoles = rolesText
-                  .replace(/^{|}$/g, '')
-                  .split(',')
-                  .map((r: string) => r.trim())
-                  .filter((r: string) => r.length > 0);
-                if (parsedRoles.length > 0) {
-                  const rolesSql = parsedRoles
-                    .map((r: string) => {
-                      const lower = r.toLowerCase();
-                      if (lower === 'public') return 'PUBLIC';
-                      if (lower === 'current_user') return 'CURRENT_USER';
-                      if (lower === 'session_user') return 'SESSION_USER';
-                      return `"${r}"`;
-                    })
-                    .join(', ');
-                  sqlContent += `  TO ${rolesSql}\n`;
-                }
-              }
-              if (policy.using_expression) {
-                sqlContent += `  USING (${policy.using_expression})\n`;
-              }
-              if (policy.with_check_expression) {
-                sqlContent += `  WITH CHECK (${policy.with_check_expression})\n`;
-              }
-              sqlContent += ';\n';
-            });
-          });
-        }
-      }
-
-      // Export enums
-      if (exportOptions.enums) {
-        const { data: enumsData, error } = await scopedDb.rpc("get_database_enums");
-        if (error) throw error;
-        
-        sqlContent += "\n-- Enums\n";
-        if (enumsData && Array.isArray(enumsData)) {
-          enumsData.forEach((enumItem: any) => {
-            const enumType = enumItem?.enum_type;
-            const labelsText = (enumItem?.labels ?? '').toString();
-            if (!enumType || labelsText.trim() === '') return;
-            const labels = labelsText
-              .replace(/^{|}$/g, '')
-              .split(',')
-              .map((l: string) => l.trim())
-              .filter((l: string) => l.length > 0)
-              .map((l: string) => `'${l.replace(/'/g, "''")}'`)
-              .join(', ');
-            sqlContent += `CREATE TYPE "${enumType}" AS ENUM (${labels});\n`;
-          });
-        }
-      }
-
-      // Export table data as INSERT statements
-      if (exportOptions.tableData) {
-        const chosen = tables.filter(t => selected[t.table_name]);
-
-        // Build a table->column->data_type map for formatting
-        const { data: schemaData, error: schemaError } = await scopedDb.rpc("get_database_schema");
-        if (schemaError) throw schemaError;
-        const resolveDataTypeForValue = (col: any) => {
-          const dt = (col.data_type || '').toString();
-          const udt = (col.udt_name || '').toString();
-          if (dt.toUpperCase() === 'ARRAY' && udt) {
-            const base = udt.startsWith('_') ? udt.slice(1) : udt;
-            return `${base}[]`;
-          }
-          if (dt.toUpperCase() === 'USER-DEFINED' && udt) {
-            return udt;
-          }
-          return dt;
-        };
-        const typeMapByTable: Record<string, Record<string, string>> = (schemaData || []).reduce(
-          (acc: Record<string, Record<string, string>>, col: any) => {
-            if (!acc[col.table_name]) acc[col.table_name] = {};
-            acc[col.table_name][col.column_name] = resolveDataTypeForValue(col);
-            return acc;
-          },
-          {}
-        );
-
-        if (chosen.length > 0) {
-          sqlContent += "\n-- Table Data\n";
-
-          const escapeStr = (s: string) => s.replace(/'/g, "''");
-
-          const formatArray = (arr: any[], baseType?: string) => {
-            const numericTypes = [
-              "integer",
-              "bigint",
-              "smallint",
-              "numeric",
-              "real",
-              "double precision",
-            ];
-            const items = arr
-              .map((v) => {
-                if (v === null) return "NULL";
-                if (baseType && numericTypes.includes(baseType)) return String(v);
-                if (baseType === "boolean") return v ? "true" : "false";
-                const s = String(v)
-                  .replace(/"/g, '\\"')
-                  .replace(/\\/g, "\\\\")
-                  .replace(/'/g, "''");
-                return `"${s}"`;
-              })
-              .join(",");
-            const literal = `{${items}}`;
-            return baseType ? `'${literal}'::${baseType}[]` : `'${literal}'`;
-          };
-
-          const formatValue = (value: any, dataType?: string) => {
-            if (value === undefined) return "NULL";
-            if (value === null) return "NULL";
-
-            if (dataType === "json" || dataType === "jsonb") {
-              const json = JSON.stringify(value);
-              return `'${escapeStr(json)}'::${dataType}`;
-            }
-
-            if (dataType && dataType.endsWith("[]") && Array.isArray(value)) {
-              const baseType = dataType.slice(0, -2);
-              return formatArray(value, baseType);
-            }
-
-            if (typeof value === "string") return `'${escapeStr(value)}'`;
-            if (typeof value === "number") {
-              if (!Number.isFinite(value)) return "NULL";
-              return String(value);
-            }
-            if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-            if (value instanceof Date) return `'${value.toISOString()}'`;
-
-            if (typeof value === "object") {
-              const json = JSON.stringify(value);
-              return `'${escapeStr(json)}'`;
-            }
-
-            return `'${escapeStr(String(value))}'`;
-          };
-
-          for (const table of chosen) {
-            const { data, error } = await (scopedDb.from(table.table_name as any).select("*") as any);
-            if (error) {
-              console.error(`Failed exporting ${table.table_name}:`, error.message);
-              continue;
-            }
-
-            if (data && data.length > 0) {
-              sqlContent += `\n-- Data for table: ${table.table_name}\n`;
-
-              const colTypes = typeMapByTable[table.table_name] || {};
-              const columns = Object.keys(colTypes).length > 0 ? Object.keys(colTypes) : Object.keys(data[0]);
-              const columnNames = columns.map((col) => `"${col}"`).join(", ");
-
-              data.forEach((row: any) => {
-                const values = columns
-                  .map((col) => formatValue(row[col], colTypes[col]))
-                  .join(", ");
-                sqlContent += `INSERT INTO "${table.table_name}" (${columnNames}) VALUES (${values});\n`;
-              });
-            }
-          }
-        }
-      }
-
-      await saveFile(`schema-export.sql`, sqlContent, "text/plain");
+      const zip = new JSZip();
+      const validationErrors: string[] = [];
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       
-      const exportedItems = Object.entries(exportOptions)
-        .filter(([_, v]) => v)
-        .map(([k]) => k)
-        .join(", ");
-      toast.success("SQL Export complete", { description: `Exported: ${exportedItems}` });
+      // Track exported counts for summary
+      const counts: Record<string, number> = {
+        enums: 0,
+        tables: 0,
+        functions: 0,
+        indexes: 0,
+        constraints: 0,
+        policies: 0,
+        data_rows: 0,
+        edge_functions: 0
+      };
+
+      // 1. Enums / Types (001_enums.sql)
+      if (exportOptions.enums) {
+        try {
+          const { data: enumsData, error } = await scopedDb.rpc("get_database_enums");
+          if (error) throw error;
+          
+          if (enumsData && Array.isArray(enumsData) && enumsData.length > 0) {
+              let sql = "-- 001_enums.sql\n-- Database Enums and Types\n\n";
+              enumsData.forEach((enumItem: any) => {
+                  const enumType = enumItem?.enum_type;
+                  const labelsText = (enumItem?.labels ?? '').toString();
+                  if (!enumType || labelsText.trim() === '') return;
+                  
+                  const labels = labelsText
+                    .replace(/^{|}$/g, '')
+                    .split(',')
+                    .map((l: string) => l.trim())
+                    .filter((l: string) => l.length > 0)
+                    .map((l: string) => `'${l.replace(/'/g, "''")}'`)
+                    .join(', ');
+                    
+                  sql += `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '${enumType}') THEN
+        CREATE TYPE "${enumType}" AS ENUM (${labels});
+    END IF;
+END $$;\n\n`;
+                  counts.enums++;
+              });
+              validationErrors.push(...validateSQL(sql, 'Enums'));
+              zip.file("001_enums.sql", sql);
+              summary.push(`- Enums: ${counts.enums} exported`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting enums:", err);
+          summary.push(`- Enums: FAILED (${err.message})`);
+          validationErrors.push(`[Enums] Export failed: ${err.message}`);
+        }
+      }
+
+      // 2. Schema / Tables (002_tables.sql)
+      if (exportOptions.schema) {
+        try {
+          const { data: schemaData, error } = await scopedDb.rpc("get_database_schema");
+          if (error) throw error;
+          
+          if (schemaData && Array.isArray(schemaData) && schemaData.length > 0) {
+            let sql = "-- 002_tables.sql\n-- Tables Schema (Structure Only, No Constraints)\n\n";
+            const tableGroups = schemaData.reduce((acc: any, row: any) => {
+              if (!acc[row.table_name]) acc[row.table_name] = [];
+              acc[row.table_name].push(row);
+              return acc;
+            }, {});
+
+            const resolveColumnType = (col: any) => {
+              const dt = (col.data_type || '').toString();
+              const udt = (col.udt_name || '').toString();
+              if (dt.toUpperCase() === 'USER-DEFINED' && udt) return `"${udt}"`;
+              if (dt.toUpperCase() === 'ARRAY' && udt) {
+                const base = udt.startsWith('_') ? udt.slice(1) : udt;
+                return `${base}[]`;
+              }
+              if ((dt === 'character varying' || dt === 'varchar') && col.character_maximum_length) {
+                return `${dt}(${col.character_maximum_length})`;
+              }
+              return dt || 'text';
+            };
+
+            Object.entries(tableGroups).forEach(([tableName, columns]: [string, any]) => {
+              sql += `CREATE TABLE IF NOT EXISTS "${tableName}" (\n`;
+              const seen = new Set<string>();
+              const uniqueCols = (columns as any[]).filter((col) => {
+                const name = col.column_name;
+                if (seen.has(name)) return false;
+                seen.add(name);
+                return true;
+              });
+              const columnDefs = uniqueCols.map((col: any) => {
+                let def = `  "${col.column_name}" ${resolveColumnType(col)}`;
+                if (col.is_nullable === false) {
+                  def += ' NOT NULL';
+                }
+                if (col.column_default) {
+                  def += ` DEFAULT ${col.column_default}`;
+                }
+                return def;
+              });
+              sql += columnDefs.join(',\n') + '\n);\n\n';
+              counts.tables++;
+            });
+            
+            validationErrors.push(...validateSQL(sql, 'Tables'));
+            zip.file("002_tables.sql", sql);
+            summary.push(`- Tables: ${counts.tables} exported`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting tables:", err);
+          summary.push(`- Tables: FAILED (${err.message})`);
+          validationErrors.push(`[Tables] Export failed: ${err.message}`);
+        }
+      }
+
+      // 2b. Primary Keys & Unique (002b_primary_keys.sql)
+      if (exportOptions.constraints) {
+        try {
+          const { data: constraintsData, error } = await scopedDb.rpc("get_table_constraints");
+          if (error) throw error;
+          
+          if (constraintsData && Array.isArray(constraintsData) && constraintsData.length > 0) {
+            let sql = "-- 002b_primary_keys.sql\n-- Primary Keys and Unique Constraints\n\n";
+            let count = 0;
+            constraintsData.forEach((constraint: any) => {
+              const type = (constraint.constraint_type || '').toUpperCase();
+              const details = (constraint.constraint_details || '').toString();
+              const isPkOrUnique = type === 'PRIMARY KEY' || type === 'UNIQUE' || 
+                                   details.toUpperCase().startsWith('PRIMARY KEY') || 
+                                   details.toUpperCase().startsWith('UNIQUE');
+                                   
+              if (isPkOrUnique && details.trim().length > 0) {
+                sql += `ALTER TABLE "${constraint.table_name}" ADD CONSTRAINT "${constraint.constraint_name}" ${details};\n`;
+                count++;
+              }
+            });
+            if (count > 0) {
+                validationErrors.push(...validateSQL(sql, 'Primary Keys'));
+                zip.file("002b_primary_keys.sql", sql);
+                summary.push(`- Primary Keys & Unique: ${count} exported`);
+                counts.constraints += count;
+            }
+          }
+        } catch (err: any) {
+          console.error("Error exporting primary keys:", err);
+          summary.push(`- Primary Keys: FAILED (${err.message})`);
+          validationErrors.push(`[Primary Keys] Export failed: ${err.message}`);
+        }
+      }
+
+      // 3. Database Functions (003_functions.sql)
+      if (exportOptions.dbFunctions) {
+        try {
+          let functionsData: any[] | null = null;
+          try {
+            const { data } = await (scopedDb.rpc as any)("get_database_functions_with_body");
+            functionsData = data;
+          } catch (e) {
+            functionsData = null;
+          }
+          if (!functionsData) {
+            const { data } = await (scopedDb.rpc as any)("get_database_functions");
+            functionsData = data;
+          }
+          
+          if (functionsData && Array.isArray(functionsData) && functionsData.length > 0) {
+            let sql = "-- 003_functions.sql\n-- Database Functions\n\n";
+            functionsData.forEach((func: any) => {
+              const name = func?.name || func?.function_name;
+              const schema = func?.schema || 'public';
+              const def = func?.function_definition;
+              if (def && name) {
+                const trimmed = String(def).trim();
+                sql += `-- Function: ${schema}.${name}\n`;
+                sql += `${trimmed}\n\n`;
+                counts.functions++;
+              } else if (name) {
+                 sql += `-- Function metadata: ${schema}.${name} (definition unavailable)\n\n`;
+              }
+            });
+            validationErrors.push(...validateSQL(sql, 'Functions'));
+            zip.file("003_functions.sql", sql);
+            summary.push(`- Functions: ${counts.functions} exported`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting functions:", err);
+          summary.push(`- Functions: FAILED (${err.message})`);
+          validationErrors.push(`[Functions] Export failed: ${err.message}`);
+        }
+      }
+
+      // 4. Data (004_data.sql) - Moved BEFORE Constraints/Indexes to avoid FK issues
+      if (exportOptions.tableData) {
+        try {
+          const chosen = tables.filter(t => selected[t.table_name]);
+          if (chosen.length > 0) {
+              let sql = "-- 004_data.sql\n-- Table Data (Inserts)\n\n";
+              
+              // Helper to get schema info for type formatting
+              const { data: schemaData, error: schemaError } = await scopedDb.rpc("get_database_schema");
+              if (schemaError) throw schemaError;
+              
+              const resolveDataTypeForValue = (col: any) => {
+                const dt = (col.data_type || '').toString();
+                const udt = (col.udt_name || '').toString();
+                if (dt.toUpperCase() === 'ARRAY' && udt) {
+                  const base = udt.startsWith('_') ? udt.slice(1) : udt;
+                  return `${base}[]`;
+                }
+                if (dt.toUpperCase() === 'USER-DEFINED' && udt) {
+                  return udt;
+                }
+                return dt;
+              };
+              
+              const typeMapByTable: Record<string, Record<string, string>> = (schemaData || []).reduce(
+                (acc: Record<string, Record<string, string>>, col: any) => {
+                  if (!acc[col.table_name]) acc[col.table_name] = {};
+                  acc[col.table_name][col.column_name] = resolveDataTypeForValue(col);
+                  return acc;
+                },
+                {}
+              );
+              
+              const escapeStr = (s: string) => s.replace(/'/g, "''");
+              const formatArray = (arr: any[], baseType?: string): string => {
+                  const numericTypes = ["integer", "bigint", "smallint", "numeric", "real", "double precision"];
+                  const items = arr.map((v) => {
+                      if (v === null) return "NULL";
+                      if (baseType && numericTypes.includes(baseType)) return String(v);
+                      if (baseType === "boolean") return v ? "true" : "false";
+                      const s = String(v).replace(/"/g, '\\"').replace(/\\/g, "\\\\").replace(/'/g, "''");
+                      return `"${s}"`;
+                  }).join(",");
+                  const literal = `{${items}}`;
+                  return baseType ? `'${literal}'::${baseType}[]` : `'${literal}'`;
+              };
+
+              const formatValue = (value: any, dataType?: string) => {
+                  if (value === undefined || value === null) return "NULL";
+                  if (dataType === "json" || dataType === "jsonb") {
+                    const json = JSON.stringify(value);
+                    return `'${escapeStr(json)}'::${dataType}`;
+                  }
+                  if (dataType && dataType.endsWith("[]") && Array.isArray(value)) {
+                    return formatArray(value, dataType.slice(0, -2));
+                  }
+                  if (typeof value === "string") return `'${escapeStr(value)}'`;
+                  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "NULL";
+                  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+                  if (value instanceof Date) return `'${value.toISOString()}'`;
+                  if (typeof value === "object") {
+                    const json = JSON.stringify(value);
+                    return `'${escapeStr(json)}'`;
+                  }
+                  return `'${escapeStr(String(value))}'`;
+              };
+
+              for (const table of chosen) {
+                  const { data, error } = await (scopedDb.from(table.table_name as any).select("*") as any);
+                  if (error) {
+                      console.error(`Failed exporting ${table.table_name}:`, error.message);
+                      summary.push(`  - Table ${table.table_name}: FAILED (${error.message})`);
+                      continue;
+                  }
+                  if (data && data.length > 0) {
+                      sql += `\n-- Data for table: ${table.table_name}\n`;
+                      const colTypes = typeMapByTable[table.table_name] || {};
+                      const columns = Object.keys(colTypes).length > 0 ? Object.keys(colTypes) : Object.keys(data[0]);
+                      const columnNames = columns.map((col) => `"${col}"`).join(", ");
+                      
+                      data.forEach((row: any) => {
+                          const values = columns.map((col) => formatValue(row[col], colTypes[col])).join(", ");
+                          sql += `INSERT INTO "${table.table_name}" (${columnNames}) VALUES (${values});\n`;
+                          counts.data_rows++;
+                      });
+                  }
+              }
+              validationErrors.push(...validateSQL(sql, 'Data'));
+              zip.file("004_data.sql", sql);
+              summary.push(`- Data: ${counts.data_rows} rows exported across ${chosen.length} tables`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting data:", err);
+          summary.push(`- Data: FAILED (${err.message})`);
+          validationErrors.push(`[Data] Export failed: ${err.message}`);
+        }
+      }
+
+      // 5. Indexes (005_indexes.sql)
+      if (exportOptions.indexes) {
+        try {
+          const { data: indexesData, error } = await scopedDb.rpc("get_table_indexes");
+          if (error) throw error;
+          
+          if (indexesData && Array.isArray(indexesData) && indexesData.length > 0) {
+            let sql = "-- 005_indexes.sql\n-- Table Indexes\n\n";
+            indexesData.forEach((index: any) => {
+              const def = (index.index_definition || '').toString();
+              if (def.trim().length > 0) {
+                sql += `${def};\n`;
+                counts.indexes++;
+              }
+            });
+            validationErrors.push(...validateSQL(sql, 'Indexes'));
+            zip.file("005_indexes.sql", sql);
+            summary.push(`- Indexes: ${counts.indexes} exported`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting indexes:", err);
+          summary.push(`- Indexes: FAILED (${err.message})`);
+          validationErrors.push(`[Indexes] Export failed: ${err.message}`);
+        }
+      }
+
+      // 6. Foreign Keys & Checks (006_foreign_keys.sql)
+      if (exportOptions.constraints) {
+        try {
+          const { data: constraintsData, error } = await scopedDb.rpc("get_table_constraints");
+          if (error) throw error;
+          
+          if (constraintsData && Array.isArray(constraintsData) && constraintsData.length > 0) {
+            let sql = "-- 006_foreign_keys.sql\n-- Foreign Keys and Check Constraints\n\n";
+            let count = 0;
+            constraintsData.forEach((constraint: any) => {
+              const type = (constraint.constraint_type || '').toUpperCase();
+              const details = (constraint.constraint_details || '').toString();
+              const isPkOrUnique = type === 'PRIMARY KEY' || type === 'UNIQUE' || 
+                                   details.toUpperCase().startsWith('PRIMARY KEY') || 
+                                   details.toUpperCase().startsWith('UNIQUE');
+              
+              if (!isPkOrUnique && details.trim().length > 0) {
+                sql += `ALTER TABLE "${constraint.table_name}" ADD CONSTRAINT "${constraint.constraint_name}" ${details};\n`;
+                count++;
+              }
+            });
+            if (count > 0) {
+                validationErrors.push(...validateSQL(sql, 'Foreign Keys'));
+                zip.file("006_foreign_keys.sql", sql);
+                summary.push(`- Foreign Keys & Checks: ${count} exported`);
+                counts.constraints += count;
+            }
+          }
+        } catch (err: any) {
+          console.error("Error exporting foreign keys:", err);
+          summary.push(`- Foreign Keys: FAILED (${err.message})`);
+          validationErrors.push(`[Foreign Keys] Export failed: ${err.message}`);
+        }
+      }
+
+      // 7. RLS Policies (007_rls_policies.sql)
+      if (exportOptions.rlsPolicies) {
+        try {
+          const { data: policiesData, error } = await scopedDb.rpc("get_rls_policies");
+          if (error) throw error;
+          
+          if (policiesData && Array.isArray(policiesData) && policiesData.length > 0) {
+            let sql = "-- 007_rls_policies.sql\n-- Row Level Security Policies\n\n";
+            const tableGroups = policiesData.reduce((acc: any, policy: any) => {
+              if (!acc[policy.table_name]) {
+                acc[policy.table_name] = [];
+              }
+              acc[policy.table_name].push(policy);
+              return acc;
+            }, {});
+
+            Object.entries(tableGroups).forEach(([tableName, policies]: [string, any]) => {
+              sql += `\n-- Enable RLS on ${tableName}\n`;
+              sql += `ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY;\n`;
+              
+              policies.forEach((policy: any) => {
+                sql += `CREATE POLICY "${policy.policy_name}" ON "${tableName}"\n`;
+                sql += `  FOR ${policy.command || 'ALL'}\n`;
+                
+                const rolesText = (policy.roles ?? '').toString();
+                if (rolesText.trim() !== '') {
+                  const parsedRoles = rolesText
+                    .replace(/^{|}$/g, '')
+                    .split(',')
+                    .map((r: string) => r.trim())
+                    .filter((r: string) => r.length > 0);
+                  if (parsedRoles.length > 0) {
+                    const rolesSql = parsedRoles
+                      .map((r: string) => {
+                        const lower = r.toLowerCase();
+                        if (lower === 'public') return 'PUBLIC';
+                        if (lower === 'current_user') return 'CURRENT_USER';
+                        if (lower === 'session_user') return 'SESSION_USER';
+                        return `"${r}"`;
+                      })
+                      .join(', ');
+                    sql += `  TO ${rolesSql}\n`;
+                  }
+                }
+                if (policy.using_expression) {
+                  sql += `  USING (${policy.using_expression})\n`;
+                }
+                if (policy.with_check_expression) {
+                  sql += `  WITH CHECK (${policy.with_check_expression})\n`;
+                }
+                sql += ';\n';
+                counts.policies++;
+              });
+            });
+            validationErrors.push(...validateSQL(sql, 'RLS Policies'));
+            zip.file("007_rls_policies.sql", sql);
+            summary.push(`- RLS Policies: ${counts.policies} exported`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting RLS policies:", err);
+          summary.push(`- RLS Policies: FAILED (${err.message})`);
+          validationErrors.push(`[RLS Policies] Export failed: ${err.message}`);
+        }
+      }
+
+      // 8. Edge Functions (008_edge_functions.json)
+      if (exportOptions.edgeFunctions || exportOptions.secrets) {
+        try {
+          const { data, error } = await scopedDb.client.functions.invoke("list-edge-functions");
+          if (!error && data) {
+              zip.file("008_edge_functions.json", JSON.stringify(data, null, 2));
+              const funcCount = data.edge_functions ? data.edge_functions.length : 0;
+              counts.edge_functions = funcCount;
+              summary.push(`- Edge Functions: ${funcCount} exported`);
+          }
+        } catch (err: any) {
+          console.error("Error exporting edge functions:", err);
+          summary.push(`- Edge Functions: FAILED (${err.message})`);
+          // Don't fail the whole export for this
+        }
+      }
+
+      // Add Validation Report
+      if (validationErrors.length > 0) {
+          zip.file("validation_warnings.txt", "Validation Warnings:\n====================\n" + validationErrors.join("\n"));
+          toast.warning("Export completed with validation warnings", { description: "Check validation_warnings.txt in the zip file." });
+          summary.push("\nWARNING: Validation errors were found. See validation_warnings.txt.");
+      } else {
+          summary.push("\nValidation: Passed (No syntax issues detected)");
+      }
+      
+      // Add Summary Report
+      zip.file("export_summary.txt", summary.join("\n"));
+
+      // Generate Zip
+      const content = await zip.generateAsync({ type: "blob" });
+      
+      if (destination === 'cloud') {
+          // Upload zip to cloud
+          const fileName = `database_export_${timestamp}.zip`;
+          await saveToCloud(fileName, content, 'application/zip');
+      } else {
+          const url = URL.createObjectURL(content);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `database_export_${timestamp}.zip`;
+          a.click();
+          // Clean up
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+      
+      toast.success("Database Exported Successfully");
     } catch (e: any) {
       toast.error("SQL Export failed", { description: e.message || String(e) });
     } finally {
