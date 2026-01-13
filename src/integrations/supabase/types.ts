@@ -2234,6 +2234,7 @@ export type Database = {
           message_id: string
           opportunity_id: string | null
           priority: string | null
+          queue: string | null
           raw_headers: Json | null
           received_at: string | null
           reply_to: string | null
@@ -2287,6 +2288,7 @@ export type Database = {
           message_id: string
           opportunity_id?: string | null
           priority?: string | null
+          queue?: string | null
           raw_headers?: Json | null
           received_at?: string | null
           reply_to?: string | null
@@ -2340,6 +2342,7 @@ export type Database = {
           message_id?: string
           opportunity_id?: string | null
           priority?: string | null
+          queue?: string | null
           raw_headers?: Json | null
           received_at?: string | null
           reply_to?: string | null
@@ -7854,6 +7857,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_queue_counts: { Args: never; Returns: Json }
       get_rls_policies: {
         Args: never
         Returns: {
