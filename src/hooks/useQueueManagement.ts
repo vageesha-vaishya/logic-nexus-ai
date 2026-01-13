@@ -34,6 +34,12 @@ export interface QueueRuleCriteria {
   priority?: string;
   ai_category?: string;
   ai_sentiment?: string;
+  // New fields for multi-layered classification
+  header_contains?: Record<string, string>;
+  metadata_flags?: string[];
+  keywords?: string[];
+  whitelist_check?: boolean;
+  blacklist_check?: boolean;
 }
 
 export function useQueueManagement() {

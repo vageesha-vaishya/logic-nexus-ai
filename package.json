@@ -32,7 +32,16 @@
     "clear:versions:dry": "node supabase/migration-package/helpers/clear-quotation-versions.js --dry-run",
     "clear:versions:quo": "node supabase/migration-package/helpers/clear-quotation-versions.js --quotation-number=QUO-000002",
     "sync:docs": "node scripts/sync-document.js",
-    "migrate:docs": "export NODE_TLS_REJECT_UNAUTHORIZED=0 && cd supabase/migration-package/direct-migration && ./apply-migrations.sh ../../migrations/20260110_document_versioning.sql"
+    "migrate:docs": "export NODE_TLS_REJECT_UNAUTHORIZED=0 && cd supabase/migration-package/direct-migration && ./apply-migrations.sh ../../migrations/20260110_document_versioning.sql",
+    "supabase:exec": "bash ./scripts/supabase-exec.sh",
+    "supabase:status": "npx supabase status",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:db:reset": "npx supabase db reset",
+    "supabase:db:diff": "npx supabase db diff --schema public --use-mig-dir",
+    "supabase:db:push": "npx supabase db push",
+    "supabase:types:gen": "npx supabase gen types typescript --project-id ${VITE_SUPABASE_PROJECT_ID} > src/integrations/supabase/types.ts",
+    "supabase:functions:deploy": "npx supabase functions deploy --project-ref ${VITE_SUPABASE_PROJECT_ID}"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
