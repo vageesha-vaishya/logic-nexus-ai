@@ -4201,18 +4201,21 @@ export type Database = {
           created_at: string
           id: string
           queue_id: string
+          tenant_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           queue_id: string
+          tenant_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
           queue_id?: string
+          tenant_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -4224,10 +4227,74 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "queue_members_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "queue_members_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      queue_rules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criteria: Json
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+          queue_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+          queue_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+          queue_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "queue_rules_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "queue_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -7677,6 +7744,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_email_to_queue: {
+        Args: { p_email_id: string; p_queue_name: string }
+        Returns: boolean
+      }
       assign_franchisee_account_contact: {
         Args: {
           p_account_data: Json
@@ -7929,6 +8000,17 @@ export type Database = {
       get_user_franchise_id: {
         Args: { check_user_id: string }
         Returns: string
+      }
+      get_user_queues: {
+        Args: never
+        Returns: {
+          description: string
+          email_count: number
+          queue_id: string
+          queue_name: string
+          queue_type: string
+          unread_count: number
+        }[]
       }
       get_user_tenant_id: { Args: { check_user_id: string }; Returns: string }
       get_weight_break_rate: {

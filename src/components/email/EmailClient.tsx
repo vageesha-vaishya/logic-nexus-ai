@@ -186,45 +186,24 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
 
   const fetchQueueCounts = useCallback(async () => {
     try {
-      // 1. Fetch all available queues to ensure they appear in sidebar even if count is 0
-      const { data: queuesData, error: queuesError } = await supabase
-        .from('queues')
-        .select('name')
-        .eq('tenant_id', (await supabase.auth.getSession()).data.session?.user?.user_metadata?.tenant_id); // Optimistic tenant check if needed, but RLS usually handles it
+      // Use get_user_queues for permission-aware queue counts
+      const { data: userQueues, error } = await supabase.rpc('get_user_queues');
       
-      // If we can't fetch queues directly (e.g. RLS), we'll rely on get_queue_counts
-      const allQueues = queuesData?.map(q => q.name) || [];
-      
-      // 2. Fetch counts
-      const { data: countsData, error: countsError } = await supabase.rpc('get_queue_counts');
-      
-      if (countsError) throw countsError;
+      if (error) throw error;
 
-      const counts = countsData as Record<string, number> || {};
+      const counts: Record<string, number> = {};
       
-      // 3. Merge: Start with 0 for all known queues, then overlay actual counts
-      const mergedCounts: Record<string, number> = {};
-      
-      // Default queues we expect to exist (fallback if DB is empty)
-      const defaultQueues = ['support_general', 'sales_inbound', 'support_priority', 'cfm_negative'];
-      
-      // Combine defaults, DB queues, and any queues returned by counts
-      const uniqueQueues = new Set([...defaultQueues, ...allQueues, ...Object.keys(counts)]);
-      
-      uniqueQueues.forEach(q => {
-        mergedCounts[q] = counts[q] || 0;
-      });
+      if (userQueues && Array.isArray(userQueues)) {
+        (userQueues as any[]).forEach((q: { queue_name: string; email_count: number }) => {
+          counts[q.queue_name] = q.email_count;
+        });
+      }
 
-      setQueueCounts(mergedCounts);
+      setQueueCounts(counts);
     } catch (err) {
       console.error("Error fetching queue counts:", err);
-      // Fallback to defaults
-      setQueueCounts({
-        'support_general': 0,
-        'sales_inbound': 0,
-        'support_priority': 0,
-        'cfm_negative': 0
-      });
+      // Fallback to empty - user may not have queue access
+      setQueueCounts({});
     }
   }, [supabase]);
 
