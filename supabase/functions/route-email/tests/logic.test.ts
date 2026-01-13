@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { determineRoute } from '../../_shared/routing-logic';
+import { determineRoute } from '../../_shared/routing-logic.ts';
 
 describe('Email Routing Logic', () => {
   it('routes negative feedback to cfm_negative with 30m SLA', () => {

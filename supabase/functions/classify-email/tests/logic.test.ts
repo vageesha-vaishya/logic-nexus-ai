@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyEmailContent } from '../../_shared/classification-logic';
+import { classifyEmailContent } from '../../_shared/classification-logic.ts';
 
 describe('Email Classification Logic', () => {
   it('classifies feedback correctly', () => {
