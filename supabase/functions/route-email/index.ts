@@ -1,3 +1,5 @@
+import { determineRoute } from '../_shared/routing-logic.ts';
+
 const corsHeadersRoute = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -27,18 +29,11 @@ denoRoute.serve(async (req: Request) => {
       });
     }
 
-    let queue = "support_general";
-    let sla_minutes = 60;
-    if (category === "feedback" && (sentiment === "negative" || sentiment === "very_negative")) {
-      queue = "cfm_negative";
-      sla_minutes = 30;
-    } else if (category === "crm" && sentiment === "very_negative") {
-      queue = "support_priority";
-      sla_minutes = 15;
-    } else if (payload?.intent === "sales") {
-      queue = "sales_inbound";
-      sla_minutes = 120;
-    }
+    const { queue, sla_minutes } = determineRoute({
+      category,
+      sentiment,
+      intent: payload?.intent
+    });
 
     return new Response(JSON.stringify({
       queue,

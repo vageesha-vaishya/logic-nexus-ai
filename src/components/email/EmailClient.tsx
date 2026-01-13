@@ -54,6 +54,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   const [replyTo, setReplyTo] = useState<{ to: string; subject: string; body?: string } | undefined>(undefined);
   const notifiedEmailIdsRef = useRef<Set<string>>(new Set());
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const [queueCounts, setQueueCounts] = useState<Record<string, number>>({});
 
   // Layout check
   useEffect(() => {
@@ -178,6 +179,13 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     }
   }, [emailAddress, entityId, searchQuery, selectedFolder, filterUnread, filterFlagged, filterAttachments, advancedFilters, sortField, sortDirection, supabase, toast, customFolders]);
 
+  const fetchQueueCounts = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_queue_counts');
+    if (!error && data) {
+      setQueueCounts(data as Record<string, number>);
+    }
+  }, [supabase]);
+
   // Real-time subscription
   useEffect(() => {
     if (emailAddress) return;
@@ -185,6 +193,9 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     const channel = supabase
       .channel("email-updates")
       .on("postgres_changes", { event: "*", schema: "public", table: "emails" }, (payload) => {
+        // Refresh queue counts on any change
+        fetchQueueCounts();
+
         const eventType = (payload as any).eventType as string | undefined;
         const next = (payload as any).new as any;
         const prev = (payload as any).old as any;
@@ -235,7 +246,8 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
 
   useEffect(() => {
     fetchEmails();
-  }, [fetchEmails]);
+    fetchQueueCounts();
+  }, [fetchEmails, fetchQueueCounts]);
 
   // Load custom folders from localStorage for now (mock persistence)
   useEffect(() => {
@@ -379,6 +391,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
 
   // Calculate unread counts (mock for now, ideally fetched from DB count query)
   const [unreadStats, setUnreadStats] = useState<Record<string, number>>({});
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -573,6 +586,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
                 return next;
               });
             }}
+            queueCounts={queueCounts}
           />
         </ResizablePanel>
         

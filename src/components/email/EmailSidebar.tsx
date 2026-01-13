@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   Inbox, Send, FileText, Star, Trash2, Archive, 
-  AlertCircle, Plus, RefreshCw, Folder, MoreHorizontal, Bell, BellOff
+  AlertCircle, Plus, RefreshCw, Folder, MoreHorizontal, Bell, BellOff, List
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -30,6 +30,7 @@ interface EmailSidebarProps {
   className?: string;
   notificationsEnabled?: boolean;
   onToggleNotifications?: () => void;
+  queueCounts?: Record<string, number>;
 }
 
 interface NavItemProps {
@@ -87,6 +88,7 @@ export function EmailSidebar({
   className,
   notificationsEnabled = true,
   onToggleNotifications,
+  queueCounts = {},
 }: EmailSidebarProps) {
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -211,6 +213,23 @@ export function EmailSidebar({
         </div>
         
         <nav className="space-y-1">
+          <div className="flex items-center justify-between px-2 mb-2 mt-4">
+             <div className="text-xs font-semibold text-muted-foreground">QUEUES</div>
+          </div>
+          {Object.entries(queueCounts).map(([queue, count]) => (
+            <NavItem 
+              key={queue} 
+              id={`queue_${queue}`} 
+              icon={List} 
+              label={queue} 
+              count={count} 
+              selectedFolder={selectedFolder}
+              onFolderSelect={onFolderSelect}
+            />
+          ))}
+
+          <Separator className="my-4" />
+
           <NavItem 
             id="archive" 
             icon={Archive} 
