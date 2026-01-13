@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
 import { toast } from "sonner";
+import { BackupDownloader } from "@/components/admin/BackupDownloader";
 
 type TableInfo = {
   table_name: string;
@@ -1256,6 +1257,9 @@ export default function DatabaseExport() {
           <div className="text-sm text-muted-foreground">Rows: {queryResult.length}</div>
         </CardContent>
       </Card>
+
+      {/* Cloud Storage Backups */}
+      <BackupDownloader />
     </div>
   );
 }
