@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,8 @@ import { buildShipmentsMatrix, detectConflicts, isSensitiveChange } from '@/lib/
 import { useCRM } from '@/hooks/useCRM';
 
 export default function RolesPermissions() {
-  const { supabase, context, scopedDb } = useCRM();
-  const roleService = new RoleService(scopedDb);
+const { supabase, context, scopedDb } = useCRM();
+const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
 
   const [roles, setRoles] = useState<DbRole[]>([]);
   const [permissions, setPermissions] = useState<DbPermission[]>([]);
