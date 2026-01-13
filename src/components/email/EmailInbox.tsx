@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { 
   Mail, Search, RefreshCw, Star, Archive, Trash2, 
   Plus, Reply, Forward, MoreVertical, Paperclip, Flag, Circle, ArrowUpDown
@@ -46,6 +48,8 @@ export function EmailInbox() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<"received_at" | "from_email" | "subject" | "priority">("received_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [conversationView, setConversationView] = useState(false);
+  const [threads, setThreads] = useState<any[]>([]);
   const { toast } = useToast();
   const { roles } = useAuth();
 
@@ -70,6 +74,26 @@ export function EmailInbox() {
 
       const looksLikeEmail = /@/.test(searchQuery.trim());
       const tenantId = getTenantId();
+
+      if (conversationView) {
+        const { data, error } = await supabase.functions.invoke("search-emails", {
+          body: {
+            tenantId,
+            accountId: selectedAccountId || undefined,
+            folder: selectedFolder,
+            groupBy: "conversation",
+            page: 1,
+            pageSize: 50,
+            sortGroupBy: "date",
+            sortDirection,
+          },
+        });
+        if (error) throw error as any;
+        const grouped = (data?.data as any[]) || [];
+        setThreads(grouped);
+        setEmails([]);
+        return;
+      }
 
       if (searchQuery && looksLikeEmail) {
         const direction = selectedFolder === "inbox" ? "inbound" : selectedFolder === "sent" ? "outbound" : undefined;
@@ -121,7 +145,7 @@ export function EmailInbox() {
 
   useEffect(() => {
     fetchEmails();
-  }, [selectedFolder, searchQuery, selectedAccountId, sortField, sortDirection]);
+  }, [selectedFolder, searchQuery, selectedAccountId, sortField, sortDirection, conversationView]);
 
   const fetchAccounts = async () => {
     try {
@@ -394,6 +418,15 @@ export function EmailInbox() {
             <ArrowUpDown className="w-4 h-4" />
             {sortDirection === "asc" ? "Asc" : "Desc"}
           </Button>
+          <div className="flex items-center gap-2 pl-2 border-l">
+            <Switch
+              id="conversation-view"
+              checked={conversationView}
+              onCheckedChange={setConversationView}
+              className="h-5 w-9"
+            />
+            <Label htmlFor="conversation-view" className="text-xs whitespace-nowrap cursor-pointer">Threads</Label>
+          </div>
         </div>
       </div>
 
@@ -401,6 +434,63 @@ export function EmailInbox() {
         <Card>
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">Loading emails...</div>
+          ) : conversationView ? (
+            threads.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No threads found</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {threads.map((thread) => {
+                  const latest = thread.latestEmail;
+                  return (
+                    <div
+                      key={thread.id}
+                      className={`p-4 hover:bg-accent/5 cursor-pointer transition-colors ${!latest.is_read ? "bg-primary/5" : ""} overflow-x-hidden`}
+                      onClick={() => handleEmailClick(latest)}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs h-5 px-1.5 min-w-[1.5rem] flex justify-center">
+                            {thread.count}
+                          </Badge>
+                        </div>
+                        <div className="flex-1 min-w-0 max-w-[100ch]">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`font-medium ${!latest.is_read ? "font-bold" : ""} break-words whitespace-normal lg:truncate`}>
+                                {latest.subject || "(No Subject)"}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{format(new Date(latest.received_at), "MMM d, h:mm a")}</span>
+                          </div>
+                          <div
+                            className="text-sm text-muted-foreground break-words whitespace-normal"
+                            style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } as any}
+                          >
+                            {clampText(latest.snippet || "", 100)}
+                          </div>
+                          <div className="mt-1">
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 h-auto"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEmailClick(latest);
+                              }}
+                            >
+                              Open
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           ) : emails.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />

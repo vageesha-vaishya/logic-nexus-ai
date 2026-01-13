@@ -1,0 +1,72 @@
+providers:
+  gmail:
+    oauth_client_id: "${GMAIL_OAUTH_CLIENT_ID}"
+    oauth_client_secret: "${GMAIL_OAUTH_CLIENT_SECRET}"
+    webhook_verification_secret: "${GMAIL_WEBHOOK_SECRET}"
+    polling_interval_sec: 60
+  outlook:
+    tenant_id: "${MS_TENANT_ID}"
+    client_id: "${MS_CLIENT_ID}"
+    client_secret: "${MS_CLIENT_SECRET}"
+    subscription_resource: "/me/messages"
+    webhook_verification_secret: "${MS_WEBHOOK_SECRET}"
+    renewal_interval_min: 50
+
+correlation:
+  precedence: ["in_reply_to", "references", "provider_thread_id", "conversation_index", "message_id", "smart_matching"]
+  smart_matching:
+    min_subject_token_match: 0.7
+    min_recipient_hash_matches: 2
+
+threading:
+  gmail_thread_id: true
+  outlook_conversation_index: true
+  derive_conversation_id: "references_or_in_reply_to_fallback_message_id"
+
+routing:
+  queues:
+    support_general: { sla_minutes: 60 }
+    support_priority: { sla_minutes: 15 }
+    sales_inbound: { sla_minutes: 120 }
+    cfm_negative: { sla_minutes: 30 }
+  rules:
+    - name: "cfm_negative_sentiment"
+      when:
+        category: "feedback"
+        sentiment: ["negative", "very_negative"]
+      route_to: "cfm_negative"
+    - name: "support_vip"
+      when:
+        sender_domain_in: ["vip.example.com"]
+      route_to: "support_priority"
+    - name: "sales_lead"
+      when:
+        inferred_intent: "sales_opportunity"
+      route_to: "sales_inbound"
+
+cfm:
+  survey_sources: ["email", "customer_voice", "hubspot"]
+  identifiers:
+    subject_contains: ["NPS", "CSAT", "CES"]
+    from_aliases: ["surveys@", "feedback@"]
+  sentiment:
+    provider: "azure_cognitive"
+    threshold:
+      negative: 0.65
+      very_negative: 0.85
+  actions:
+    - on: "negative"
+      create_ticket: true
+      escalate_queue: "cfm_negative"
+      notify_channels: ["ops-slack", "cs-leads"]
+
+guardrails:
+  blocklist_domains: ["doctor.com", "personalmail.com"]
+  only_associate_if_contact_found: true
+  folder_level_tracking:
+    outlook_enabled: true
+    allowed_folders: ["Inbox", "Support"]
+  attachment_policy:
+    max_mb: 25
+    allowed_types: ["pdf", "png", "jpg", "docx", "xlsx"]
+

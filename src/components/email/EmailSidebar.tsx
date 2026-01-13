@@ -32,6 +32,48 @@ interface EmailSidebarProps {
   onToggleNotifications?: () => void;
 }
 
+interface NavItemProps {
+  id: string;
+  icon: any;
+  label: string;
+  count?: number;
+  isCustom?: boolean;
+  selectedFolder: string;
+  onFolderSelect: (folder: string) => void;
+  onDeleteFolder?: (name: string) => void;
+}
+
+const NavItem = ({ id, icon: Icon, label, count, isCustom = false, selectedFolder, onFolderSelect, onDeleteFolder }: NavItemProps) => (
+  <div className="group flex items-center gap-1">
+    <Button
+      variant={selectedFolder === id ? "secondary" : "ghost"}
+      className={cn("flex-1 justify-start gap-2", isCustom && "pl-4")}
+      onClick={() => onFolderSelect(id)}
+    >
+      <Icon className="h-4 w-4" />
+      <span className="flex-1 text-left truncate">{label}</span>
+      {count && count > 0 ? (
+        <span className="text-xs text-muted-foreground">{count}</span>
+      ) : null}
+    </Button>
+    {isCustom && onDeleteFolder && (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (confirm(`Delete folder "${label}"?`)) {
+            onDeleteFolder(id);
+          }
+        }}
+      >
+        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+      </Button>
+    )}
+  </div>
+);
+
 export function EmailSidebar({
   selectedFolder,
   onFolderSelect,
@@ -56,37 +98,6 @@ export function EmailSidebar({
       setIsCreateFolderOpen(false);
     }
   };
-
-  const NavItem = ({ id, icon: Icon, label, count, isCustom = false }: any) => (
-    <div className="group flex items-center gap-1">
-      <Button
-        variant={selectedFolder === id ? "secondary" : "ghost"}
-        className={cn("flex-1 justify-start gap-2", isCustom && "pl-4")}
-        onClick={() => onFolderSelect(id)}
-      >
-        <Icon className="h-4 w-4" />
-        <span className="flex-1 text-left truncate">{label}</span>
-        {count > 0 && (
-          <span className="text-xs text-muted-foreground">{count}</span>
-        )}
-      </Button>
-      {isCustom && onDeleteFolder && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (confirm(`Delete folder "${label}"?`)) {
-              onDeleteFolder(id);
-            }
-          }}
-        >
-          <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-        </Button>
-      )}
-    </div>
-  );
 
   return (
     <div className={cn("h-full flex flex-col p-2", className)}>
@@ -120,12 +131,53 @@ export function EmailSidebar({
       </Button>
       
       <nav className="space-y-1 overflow-y-auto flex-1">
-        <NavItem id="inbox" icon={Inbox} label="Inbox" count={unreadCounts['inbox']} />
-        <NavItem id="sent" icon={Send} label="Sent Items" count={unreadCounts['sent'] || 0} />
-        <NavItem id="all_mail" icon={Inbox} label="All Mail" />
-        <NavItem id="drafts" icon={FileText} label="Drafts" count={unreadCounts['drafts'] || 0} />
-        <NavItem id="flagged" icon={Star} label="Flagged" count={unreadCounts['flagged'] || 0} />
-        <NavItem id="trash" icon={Trash2} label="Trash" count={unreadCounts['trash'] || 0} />
+        <NavItem 
+          id="inbox" 
+          icon={Inbox} 
+          label="Inbox" 
+          count={unreadCounts['inbox']} 
+          selectedFolder={selectedFolder}
+          onFolderSelect={onFolderSelect}
+        />
+        <NavItem 
+          id="sent" 
+          icon={Send} 
+          label="Sent Items" 
+          count={unreadCounts['sent'] || 0} 
+          selectedFolder={selectedFolder}
+          onFolderSelect={onFolderSelect}
+        />
+        <NavItem 
+          id="all_mail" 
+          icon={Inbox} 
+          label="All Mail" 
+          selectedFolder={selectedFolder}
+          onFolderSelect={onFolderSelect}
+        />
+        <NavItem 
+          id="drafts" 
+          icon={FileText} 
+          label="Drafts" 
+          count={unreadCounts['drafts'] || 0} 
+          selectedFolder={selectedFolder}
+          onFolderSelect={onFolderSelect}
+        />
+        <NavItem 
+          id="flagged" 
+          icon={Star} 
+          label="Flagged" 
+          count={unreadCounts['flagged'] || 0} 
+          selectedFolder={selectedFolder}
+          onFolderSelect={onFolderSelect}
+        />
+        <NavItem 
+          id="trash" 
+          icon={Trash2} 
+          label="Trash" 
+          count={unreadCounts['trash'] || 0} 
+          selectedFolder={selectedFolder}
+          onFolderSelect={onFolderSelect}
+        />
         
         <Separator className="my-4" />
         
@@ -159,8 +211,22 @@ export function EmailSidebar({
         </div>
         
         <nav className="space-y-1">
-          <NavItem id="archive" icon={Archive} label="Archive" count={unreadCounts['archive'] || 0} />
-          <NavItem id="spam" icon={AlertCircle} label="Spam" count={unreadCounts['spam'] || 0} />
+          <NavItem 
+            id="archive" 
+            icon={Archive} 
+            label="Archive" 
+            count={unreadCounts['archive'] || 0} 
+            selectedFolder={selectedFolder}
+            onFolderSelect={onFolderSelect}
+          />
+          <NavItem 
+            id="spam" 
+            icon={AlertCircle} 
+            label="Spam" 
+            count={unreadCounts['spam'] || 0} 
+            selectedFolder={selectedFolder}
+            onFolderSelect={onFolderSelect}
+          />
           {customFolders.map(folder => (
             <NavItem 
               key={folder} 
@@ -168,6 +234,9 @@ export function EmailSidebar({
               icon={Folder} 
               label={folder} 
               isCustom={true} 
+              selectedFolder={selectedFolder}
+              onFolderSelect={onFolderSelect}
+              onDeleteFolder={onDeleteFolder}
             />
           ))}
         </nav>
