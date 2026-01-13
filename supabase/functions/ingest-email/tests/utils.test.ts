@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseAddress, normalizeGmailPayload, normalizeOutlookPayload, correlateThread, NormalizedEmail } from '../utils';
+import { parseAddress, normalizeGmailPayload, normalizeOutlookPayload, correlateThread, NormalizedEmail } from '../utils.ts';
 
 describe('Email Utils', () => {
   describe('parseAddress', () => {
