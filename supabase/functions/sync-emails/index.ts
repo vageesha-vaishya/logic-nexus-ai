@@ -39,7 +39,7 @@ serve(async (req: any) => {
       requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    let payload: { accountId: string } | null;
+    let payload: any;
     try {
       payload = await req.json();
     } catch {
@@ -48,7 +48,52 @@ serve(async (req: any) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const { accountId } = (payload || {}) as { accountId: string };
+    const { accountId, mode } = (payload || {}) as { accountId?: string; mode?: string };
+
+    if (mode === "test_pop3") {
+      try {
+        const cfg = (payload?.pop3 || {}) as { hostname?: string; port?: number; username?: string; password?: string; ssl?: boolean };
+        if (!cfg.hostname || !cfg.port || !cfg.username || !cfg.password) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Missing POP3 fields" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+          );
+        }
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+        const conn = cfg.ssl
+          ? await Deno.connectTls({ hostname: cfg.hostname, port: cfg.port })
+          : await Deno.connect({ hostname: cfg.hostname, port: cfg.port });
+        const readLine = async () => {
+          const buf = new Uint8Array(4096);
+          const n = await conn.read(buf);
+          if (n === null) throw new Error("Connection closed");
+          return decoder.decode(buf.subarray(0, n));
+        };
+        const send = async (cmd: string) => {
+          await conn.write(encoder.encode(`${cmd}\r\n`));
+          return await readLine();
+        };
+        const greet = await readLine();
+        if (!/^\+OK/.test(greet)) throw new Error(`POP3 greet failed: ${greet}`);
+        const userResp = await send(`USER ${cfg.username}`);
+        if (!/^\+OK/.test(userResp)) throw new Error(`POP3 USER failed: ${userResp}`);
+        const passResp = await send(`PASS ${cfg.password}`);
+        if (!/^\+OK/.test(passResp)) throw new Error(`POP3 PASS failed: ${passResp}`);
+        await send("QUIT");
+        conn.close();
+        return new Response(
+          JSON.stringify({ success: true, provider: "pop3", message: "Connection successful" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return new Response(
+          JSON.stringify({ success: false, provider: "pop3", error: msg }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
+    }
 
     if (!accountId) {
       throw new Error("Missing required field: accountId");

@@ -151,6 +151,7 @@ export function EmailAccounts() {
       office365: "bg-blue-500/10 text-blue-500",
       gmail: "bg-red-500/10 text-red-500",
       smtp_imap: "bg-purple-500/10 text-purple-500",
+      pop3: "bg-amber-500/10 text-amber-600",
       other: "bg-foreground/10 text-foreground/80",
     };
     return colors[provider] || colors.other;

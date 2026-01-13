@@ -7,6 +7,28 @@ ADD COLUMN IF NOT EXISTS pop3_password text,
 ADD COLUMN IF NOT EXISTS pop3_use_ssl boolean DEFAULT false,
 ADD COLUMN IF NOT EXISTS pop3_delete_policy text DEFAULT 'keep';
 
+-- Extend provider check to include POP3
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.email_accounts'::regclass
+      AND conname = 'email_accounts_provider_check'
+  ) THEN
+    ALTER TABLE public.email_accounts
+    DROP CONSTRAINT email_accounts_provider_check;
+  END IF;
+  BEGIN
+    ALTER TABLE public.email_accounts
+    ADD CONSTRAINT email_accounts_provider_check
+    CHECK (provider IN ('office365','gmail','smtp_imap','pop3','other'));
+  EXCEPTION WHEN duplicate_object THEN
+    -- Constraint already exists with desired definition
+    NULL;
+  END;
+END $$;
+
 -- Constrain delete policy values
 DO $$
 BEGIN

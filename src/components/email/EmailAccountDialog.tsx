@@ -23,11 +23,18 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
   const [emailAddress, setEmailAddress] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
+  const [pop3Host, setPop3Host] = useState("");
+  const [pop3Port, setPop3Port] = useState("995");
+  const [pop3Username, setPop3Username] = useState("");
+  const [pop3Password, setPop3Password] = useState("");
+  const [pop3UseSsl, setPop3UseSsl] = useState(true);
+  const [pop3DeletePolicy, setPop3DeletePolicy] = useState<"keep" | "delete_after_fetch">("keep");
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUsername, setSmtpUsername] = useState("");
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpUseTls, setSmtpUseTls] = useState(true);
+  const [testingPop3, setTestingPop3] = useState(false);
   const [imapHost, setImapHost] = useState("");
   const [imapPort, setImapPort] = useState("993");
   const [imapUsername, setImapUsername] = useState("");
@@ -138,6 +145,12 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
       setEmailAddress(account.email_address);
       setDisplayName(account.display_name || "");
       setIsPrimary(account.is_primary);
+      setPop3Host(account.pop3_host || "");
+      setPop3Port(String(account.pop3_port || "995"));
+      setPop3Username(account.pop3_username || "");
+      setPop3Password("");
+      setPop3UseSsl(account.pop3_use_ssl !== false);
+      setPop3DeletePolicy((account.pop3_delete_policy as any) || "keep");
       setSmtpHost(account.smtp_host || "");
       setSmtpPort(String(account.smtp_port || "587"));
       setSmtpUsername(account.smtp_username || "");
@@ -156,6 +169,12 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
     setEmailAddress("");
     setDisplayName("");
     setIsPrimary(false);
+    setPop3Host("");
+    setPop3Port("995");
+    setPop3Username("");
+    setPop3Password("");
+    setPop3UseSsl(true);
+    setPop3DeletePolicy("keep");
     setSmtpHost("");
     setSmtpPort("587");
     setSmtpUsername("");
@@ -186,6 +205,14 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
       });
       return;
     }
+    if (provider === "pop3" && (!pop3Host || !pop3Username)) {
+      toast({
+        title: "Error",
+        description: "POP3 host and username are required",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -197,6 +224,12 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
         email_address: emailAddress,
         display_name: displayName,
         is_primary: isPrimary,
+        pop3_host: provider === "pop3" ? pop3Host : null,
+        pop3_port: provider === "pop3" ? parseInt(pop3Port) : null,
+        pop3_username: provider === "pop3" ? pop3Username : null,
+        pop3_password: provider === "pop3" && pop3Password ? pop3Password : undefined,
+        pop3_use_ssl: provider === "pop3" ? pop3UseSsl : true,
+        pop3_delete_policy: provider === "pop3" ? pop3DeletePolicy : "keep",
         smtp_host: provider === "smtp_imap" ? smtpHost : null,
         smtp_port: provider === "smtp_imap" ? parseInt(smtpPort) : null,
         smtp_username: provider === "smtp_imap" ? smtpUsername : null,
@@ -250,10 +283,11 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
         </DialogHeader>
 
         <Tabs value={provider} onValueChange={setProvider}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="gmail">Gmail</TabsTrigger>
             <TabsTrigger value="office365">Office 365</TabsTrigger>
             <TabsTrigger value="smtp_imap">SMTP/IMAP</TabsTrigger>
+            <TabsTrigger value="pop3">POP3</TabsTrigger>
           </TabsList>
 
           <TabsContent value="gmail" className="space-y-4">
@@ -431,6 +465,130 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                 <Label>Use SSL/TLS (IMAP)</Label>
               </div>
 
+              <div className="flex items-center gap-2">
+                <Switch checked={isPrimary} onCheckedChange={setIsPrimary} />
+                <Label>Set as primary account</Label>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="pop3" className="space-y-4">
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 mb-4">
+              <p className="text-sm text-yellow-600 dark:text-yellow-500 font-medium">
+                POP3 receives emails and optionally deletes them from the server after fetching. Sending requires SMTP configured elsewhere.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label>Email Address *</Label>
+                <Input
+                  type="email"
+                  placeholder="you@domain.com"
+                  value={emailAddress}
+                  onChange={(e) => setEmailAddress(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Display Name</Label>
+                <Input
+                  placeholder="Your Name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>POP3 Host *</Label>
+                  <Input
+                    placeholder="pop.example.com"
+                    value={pop3Host}
+                    onChange={(e) => setPop3Host(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>POP3 Port *</Label>
+                  <Input
+                    placeholder="995"
+                    value={pop3Port}
+                    onChange={(e) => setPop3Port(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>POP3 Username *</Label>
+                <Input
+                  placeholder="username"
+                  value={pop3Username}
+                  onChange={(e) => setPop3Username(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>POP3 Password *</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={pop3Password}
+                  onChange={(e) => setPop3Password(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={pop3UseSsl} onCheckedChange={setPop3UseSsl} />
+                <Label>Use SSL/TLS</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>Delete Policy</Label>
+                <Select value={pop3DeletePolicy} onValueChange={(v) => setPop3DeletePolicy(v as any)}>
+                  <SelectTrigger><SelectValue placeholder="Select policy" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keep">Keep on server</SelectItem>
+                    <SelectItem value="delete_after_fetch">Delete after fetch</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Delete removes messages from the POP3 server after successful sync.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!pop3Host || !pop3Port || !pop3Username || !pop3Password) {
+                      toast({ title: "Error", description: "Enter host, port, username, and password", variant: "destructive" });
+                      return;
+                    }
+                    try {
+                      setTestingPop3(true);
+                      const { data, error } = await supabase.functions.invoke("sync-emails", {
+                        body: {
+                          mode: "test_pop3",
+                          pop3: {
+                            hostname: pop3Host,
+                            port: parseInt(pop3Port),
+                            username: pop3Username,
+                            password: pop3Password,
+                            ssl: pop3UseSsl,
+                          }
+                        }
+                      });
+                      if (error) throw error;
+                      const ok = (data as any)?.success;
+                      if (ok) {
+                        toast({ title: "Connection successful", description: "POP3 credentials validated" });
+                      } else {
+                        const msg = (data as any)?.error || "Connection failed";
+                        toast({ title: "Connection failed", description: msg, variant: "destructive" });
+                      }
+                    } catch (e: any) {
+                      toast({ title: "Error", description: e.message || String(e), variant: "destructive" });
+                    } finally {
+                      setTestingPop3(false);
+                    }
+                  }}
+                  disabled={testingPop3}
+                >
+                  {testingPop3 ? "Testing..." : "Test Connection"}
+                </Button>
+              </div>
               <div className="flex items-center gap-2">
                 <Switch checked={isPrimary} onCheckedChange={setIsPrimary} />
                 <Label>Set as primary account</Label>
