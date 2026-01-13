@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.routing_events (
 ALTER TABLE public.routing_events ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Tenant admins can view routing events" ON public.routing_events;
 CREATE POLICY "Tenant admins can view routing events"
   ON public.routing_events
   FOR SELECT
@@ -45,6 +46,7 @@ CREATE POLICY "Tenant admins can view routing events"
     )
   );
 
+DROP POLICY IF EXISTS "Users can view routing events for accessible emails" ON public.routing_events;
 CREATE POLICY "Users can view routing events for accessible emails"
   ON public.routing_events
   FOR SELECT
@@ -60,6 +62,7 @@ CREATE POLICY "Users can view routing events for accessible emails"
     )
   );
 
+DROP POLICY IF EXISTS "Service role can manage all" ON public.routing_events;
 CREATE POLICY "Service role can manage all"
   ON public.routing_events
   FOR ALL
@@ -81,3 +84,79 @@ AS $$
     GROUP BY queue
   ) t;
 $$;
+
+-- BACKFILL LOGIC FOR EXISTING EMAILS
+DO $$
+DECLARE
+    r RECORD;
+    v_category TEXT;
+    v_sentiment TEXT;
+    v_intent TEXT;
+    v_queue TEXT;
+    v_sla INTEGER;
+    v_combined TEXT;
+BEGIN
+    FOR r IN SELECT id, subject, body_text FROM emails WHERE queue IS NULL LOOP
+        v_combined := LOWER(COALESCE(r.subject, '') || ' ' || COALESCE(r.body_text, ''));
+        
+        -- 1. Classification
+        -- Category
+        IF v_combined LIKE '%feedback%' OR v_combined LIKE '%survey%' OR v_combined LIKE '%nps%' THEN
+            v_category := 'feedback';
+        ELSIF v_combined LIKE '%support%' OR v_combined LIKE '%help%' OR v_combined LIKE '%issue%' OR v_combined LIKE '%quote%' THEN
+            v_category := 'crm';
+        ELSE
+            v_category := 'non_crm';
+        END IF;
+
+        -- Sentiment
+        IF v_combined LIKE '%angry%' OR v_combined LIKE '%upset%' OR v_combined LIKE '%terrible%' OR v_combined LIKE '%worst%' THEN
+            v_sentiment := 'very_negative';
+        ELSIF v_combined LIKE '%bad%' OR v_combined LIKE '%poor%' OR v_combined LIKE '%disappointed%' THEN
+            v_sentiment := 'negative';
+        ELSIF v_combined LIKE '%great%' OR v_combined LIKE '%excellent%' OR v_combined LIKE '%love%' THEN
+            v_sentiment := 'positive';
+        ELSE
+            v_sentiment := 'neutral';
+        END IF;
+
+        -- Intent
+        IF v_combined LIKE '%price%' OR v_combined LIKE '%cost%' OR v_combined LIKE '%buy%' OR v_combined LIKE '%purchase%' THEN
+            v_intent := 'sales';
+        ELSIF v_combined LIKE '%broken%' OR v_combined LIKE '%error%' OR v_combined LIKE '%bug%' OR v_combined LIKE '%fail%' THEN
+            v_intent := 'support';
+        ELSE
+            v_intent := 'other';
+        END IF;
+
+        -- 2. Routing
+        v_queue := 'support_general';
+        v_sla := 60;
+
+        IF v_category = 'feedback' AND (v_sentiment = 'negative' OR v_sentiment = 'very_negative') THEN
+            v_queue := 'cfm_negative';
+            v_sla := 30;
+        ELSIF v_category = 'crm' AND v_sentiment = 'very_negative' THEN
+            v_queue := 'support_priority';
+            v_sla := 15;
+        ELSIF v_intent = 'sales' THEN
+            v_queue := 'sales_inbound';
+            v_sla := 120;
+        END IF;
+
+        -- 3. Update Email
+        UPDATE emails 
+        SET 
+            category = v_category,
+            ai_sentiment = v_sentiment,
+            intent = v_intent,
+            queue = v_queue,
+            ai_urgency = CASE WHEN v_sla <= 30 THEN 'high' ELSE 'medium' END
+        WHERE id = r.id;
+
+        -- 4. Insert Routing Event
+        INSERT INTO routing_events (email_id, queue, sla_minutes, metadata)
+        VALUES (r.id, v_queue, v_sla, jsonb_build_object('source', 'backfill'));
+        
+    END LOOP;
+END $$;

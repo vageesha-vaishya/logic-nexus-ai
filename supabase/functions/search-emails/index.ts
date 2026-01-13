@@ -106,6 +106,9 @@ Deno.serve(async (req: Request) => {
     if (payload?.folder) {
       if (payload.folder === "all_mail") {
         dbQuery = dbQuery.neq("folder", "trash").neq("folder", "spam");
+      } else if (payload.folder.startsWith("queue_")) {
+        const queueName = payload.folder.replace("queue_", "");
+        dbQuery = dbQuery.eq("queue", queueName);
       } else {
         dbQuery = dbQuery.eq("folder", payload.folder);
       }

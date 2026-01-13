@@ -104,13 +104,16 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       } 
       // General Inbox mode
       else {
-        let query = supabase.from("emails").select("*").limit(50);
+        let query = supabase.from("emails").select("*");
 
         // Apply folder filter
         if (selectedFolder === 'inbox' || selectedFolder === 'sent' || selectedFolder === 'drafts' || selectedFolder === 'trash' || selectedFolder === 'spam' || selectedFolder === 'archive') {
              query = query.eq("folder", selectedFolder);
         } else if (selectedFolder === 'all_mail') {
              query = query.neq("folder", "trash").neq("folder", "spam");
+        } else if (selectedFolder.startsWith('queue_')) {
+             const queueName = selectedFolder.replace('queue_', '');
+             query = query.eq("queue", queueName);
         } else if (customFolders.includes(selectedFolder)) {
              // For custom folders, assuming they are stored in 'folder' column or we use labels
              // If we use 'folder' column:
@@ -144,6 +147,8 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
         } else {
           query = query.order(sortField, { ascending: sortDirection === "asc" });
         }
+        
+        query = query.limit(50);
 
         if (conversationView && useServerGrouping) {
           const { data, error } = await supabase.functions.invoke("search-emails", {

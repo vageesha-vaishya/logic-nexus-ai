@@ -41,6 +41,13 @@ export interface Email {
   conversation_id?: string;
   importance?: 'high' | 'normal' | 'low';
   priority?: string;
+  
+  // AI / Routing
+  queue?: string;
+  category?: string;
+  intent?: string;
+  ai_sentiment?: string;
+  ai_urgency?: string;
 }
 
 export interface EmailAccount {

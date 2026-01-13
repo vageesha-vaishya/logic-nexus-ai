@@ -182,6 +182,23 @@ export function EmailSidebar({
         />
         
         <Separator className="my-4" />
+
+        <div className="flex items-center justify-between px-2 mb-2">
+           <div className="text-xs font-semibold text-muted-foreground">QUEUES</div>
+        </div>
+        {Object.entries(queueCounts).map(([queue, count]) => (
+          <NavItem 
+            key={queue} 
+            id={`queue_${queue}`} 
+            icon={List} 
+            label={queue} 
+            count={count} 
+            selectedFolder={selectedFolder}
+            onFolderSelect={onFolderSelect}
+          />
+        ))}
+
+        <Separator className="my-4" />
         
         <div className="flex items-center justify-between px-2 mb-2">
            <div className="text-xs font-semibold text-muted-foreground">FOLDERS</div>
@@ -212,24 +229,22 @@ export function EmailSidebar({
            </Dialog>
         </div>
         
-        <nav className="space-y-1">
-          <div className="flex items-center justify-between px-2 mb-2 mt-4">
-             <div className="text-xs font-semibold text-muted-foreground">QUEUES</div>
-          </div>
-          {Object.entries(queueCounts).map(([queue, count]) => (
+        {customFolders.map(folder => (
             <NavItem 
-              key={queue} 
-              id={`queue_${queue}`} 
-              icon={List} 
-              label={queue} 
-              count={count} 
+              key={folder} 
+              id={folder} 
+              icon={Folder} 
+              label={folder} 
+              isCustom={true} 
               selectedFolder={selectedFolder}
               onFolderSelect={onFolderSelect}
+              onDeleteFolder={onDeleteFolder}
             />
-          ))}
+        ))}
 
-          <Separator className="my-4" />
+        <Separator className="my-4" />
 
+        <nav className="space-y-1">
           <NavItem 
             id="archive" 
             icon={Archive} 
@@ -246,18 +261,6 @@ export function EmailSidebar({
             selectedFolder={selectedFolder}
             onFolderSelect={onFolderSelect}
           />
-          {customFolders.map(folder => (
-            <NavItem 
-              key={folder} 
-              id={folder} 
-              icon={Folder} 
-              label={folder} 
-              isCustom={true} 
-              selectedFolder={selectedFolder}
-              onFolderSelect={onFolderSelect}
-              onDeleteFolder={onDeleteFolder}
-            />
-          ))}
         </nav>
       </nav>
     </div>
