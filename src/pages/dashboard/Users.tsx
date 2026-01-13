@@ -202,7 +202,7 @@ export default function Users() {
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {user.user_roles?.map((role: UserRole, idx: number) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
+                            <Badge key={idx} variant="secondary" className="text-xs capitalize">
                               {role.role.replace('_', ' ')}
                             </Badge>
                           ))}
@@ -225,7 +225,7 @@ export default function Users() {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {(context.isPlatformAdmin || context.isTenantAdmin || context.isFranchiseAdmin) && (
                           <Button
-                            variant="outline"
+                            variant="secondary"
                             size="sm"
                             onClick={() => {
                               setResetUserId(user.id);
