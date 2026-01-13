@@ -52,6 +52,8 @@ interface EmailListProps {
   onAdvancedFiltersChange?: (filters: AdvancedSearchFilters) => void;
   conversationView?: boolean;
   onToggleConversationView?: (enabled: boolean) => void;
+  useServerGrouping?: boolean;
+  onToggleServerGrouping?: (enabled: boolean) => void;
   sortField?: EmailSortField;
   sortDirection?: EmailSortDirection;
   onSortFieldChange?: (field: EmailSortField) => void;
@@ -76,6 +78,8 @@ export function EmailList({
   onAdvancedFiltersChange,
   conversationView = false,
   onToggleConversationView,
+  useServerGrouping = false,
+  onToggleServerGrouping,
   sortField = "received_at",
   sortDirection = "desc",
   onSortFieldChange,
@@ -276,6 +280,17 @@ export function EmailList({
               <Label htmlFor="conversation-view" className="text-[10px] whitespace-nowrap cursor-pointer">Threads</Label>
             </div>
           )}
+          {onToggleServerGrouping && (
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="server-threads" 
+                checked={useServerGrouping}
+                onCheckedChange={onToggleServerGrouping}
+                className="h-5 w-9"
+              />
+              <Label htmlFor="server-threads" className="text-[10px] whitespace-nowrap cursor-pointer">Server Threads</Label>
+            </div>
+          )}
         </div>
       </div>
       
@@ -325,7 +340,7 @@ export function EmailList({
                       {email.folder}
                     </Badge>
                   )}
-                  {email.thread_id && (
+                  {(email.conversation_id || email.thread_id) && (
                      <Badge variant="secondary" className="text-[10px] h-4 px-1">
                        Thread
                      </Badge>

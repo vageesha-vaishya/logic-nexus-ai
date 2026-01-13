@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { Info, Save } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface OAuthConfig {
   id?: string;
@@ -20,6 +21,7 @@ interface OAuthConfig {
 }
 
 export function OAuthSettings() {
+  const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
   const [office365Config, setOffice365Config] = useState<OAuthConfig>({
     provider: "office365",
     client_id: "",
@@ -44,6 +46,11 @@ export function OAuthSettings() {
 
   useEffect(() => {
     fetchOAuthConfigs();
+    const mql = window.matchMedia("(pointer: coarse)");
+    setIsTouchDevice(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsTouchDevice(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
   }, []);
 
   const fetchOAuthConfigs = async () => {
@@ -168,6 +175,7 @@ export function OAuthSettings() {
   }
 
   return (
+    <TooltipProvider disableHoverableContent={isTouchDevice} delayDuration={isTouchDevice ? 0 : 200}>
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">OAuth Settings</h2>
@@ -211,15 +219,31 @@ export function OAuthSettings() {
                     <li>Go to "Certificates & secrets" → Create new client secret</li>
                     <li>Add redirect URI: <code className="bg-muted px-1 py-0.5 rounded">{office365Config.redirect_uri}</code></li>
                   </ol>
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  <p className="font-semibold mb-1">Graph permissions for message headers</p>
+                  <p className="mb-1">
+                    To retrieve internetMessageHeaders from Microsoft Graph, grant consent for
+                    Mail.Read or Mail.ReadWrite on your Azure AD app registration. Some tenants may
+                    restrict header access; when unavailable, the app falls back to cached raw headers.
+                  </p>
+                  <ul className="list-disc ml-4 space-y-1">
+                    <li>Required scopes: Mail.Read or Mail.ReadWrite</li>
+                    <li>Admin consent may be required depending on tenant policy</li>
+                  </ul>
                 </AlertDescription>
               </Alert>
 
-              <div className="space-y-4">
-                <div>
-                  <Label>Client ID (Application ID) *</Label>
-                  <Input
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    value={office365Config.client_id}
+              <div>
+                <Label>Client ID (Application ID) *</Label>
+                <Input
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  value={office365Config.client_id}
                     onChange={(e) => setOffice365Config({ ...office365Config, client_id: e.target.value })}
                   />
                 </div>
@@ -235,7 +259,21 @@ export function OAuthSettings() {
                 </div>
 
                 <div>
-                  <Label>Tenant ID (Directory ID) *</Label>
+                  <div className="flex items-center gap-2">
+                    <Label>Tenant ID (Directory ID) *</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="inline-flex items-center cursor-help">
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p className="text-sm">
+                          In Azure Portal: Azure Active Directory → App registrations → Your app → Overview → copy Directory (tenant) ID.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <Input
                     placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     value={office365Config.tenant_id}
@@ -338,5 +376,6 @@ export function OAuthSettings() {
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }

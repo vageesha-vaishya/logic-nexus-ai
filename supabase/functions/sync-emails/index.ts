@@ -309,6 +309,45 @@ serve(async (req: any) => {
                 console.error("IMAP attachment processing failed:", e);
               }
             }
+            const internetHeaders = Array.isArray(parsed?.headers)
+              ? Object.fromEntries(parsed.headers)
+              : (parsed?.headerLines || []).reduce((acc: Record<string, string>, h: any) => {
+                  if (h?.key && h?.line) acc[h.key] = h.line;
+                  return acc;
+                }, {});
+            const inReplyToHeader = headers.match(/^In-Reply-To:\s*(.+)$/mi)?.[1] || null;
+            const inReplyTo = inReplyToHeader
+              ? (inReplyToHeader.match(/<([^>]+)>/)?.[1] || inReplyToHeader.replace(/[<>]/g, "").trim())
+              : null;
+            const referencesHeader = headers.match(/^References:\s*(.+)$/mi)?.[1] || "";
+            const refMatches = referencesHeader.match(/<([^>]+)>/g) || [];
+            const references = refMatches.length
+              ? Array.from(new Set(refMatches.map((s) => s.replace(/[<>]/g, "")).filter(Boolean)))
+              : Array.from(new Set(referencesHeader.split(/\s+/).map((s) => s.replace(/[<>]/g, "")).filter(Boolean)));
+            const conversationId = references.length > 0 ? references[0] : (inReplyTo || messageIdHeader);
+            const hasInlineImages = !!(finalHtml?.includes("cid:") || finalHtml?.includes("data:image/"));
+            const sizeBytes = rawMessage.length;
+            const rawHeadersObj: Record<string, string> = (() => {
+              const lines = headers.split(/\r?\n/);
+              const out: Record<string, string> = {};
+              let currentKey: string | null = null;
+              for (const line of lines) {
+                if (/^\s/.test(line) && currentKey) {
+                  out[currentKey] = `${out[currentKey]} ${line.trim()}`;
+                  continue;
+                }
+                const m = line.match(/^([^:]+):\s*(.*)$/);
+                if (m) {
+                  const k = m[1].toLowerCase();
+                  const v = m[2];
+                  out[k] = v;
+                  currentKey = k;
+                } else {
+                  currentKey = null;
+                }
+              }
+              return out;
+            })();
 
             const { data: existing } = await supabase
               .from("emails")
@@ -328,6 +367,10 @@ serve(async (req: any) => {
               tenant_id: account.tenant_id ?? null,
               franchise_id: account.franchise_id ?? null,
               message_id: messageIdHeader,
+              internet_message_id: messageIdHeader,
+              conversation_id: conversationId,
+              in_reply_to: inReplyTo,
+              email_references: references,
               subject,
               from_email: fromEmail,
               from_name: fromName || null,
@@ -339,11 +382,16 @@ serve(async (req: any) => {
               snippet: String(finalText || "").substring(0, 200),
               has_attachments: attachmentsList.length > 0,
               attachments: attachmentsList,
+              has_inline_images: hasInlineImages,
+              size_bytes: sizeBytes,
+              raw_headers: rawHeadersObj,
+              ...(Object.keys(internetHeaders).length ? { raw_headers: { ...rawHeadersObj, internetMessageHeaders: internetHeaders } } : {}),
               direction: "inbound",
               status: "received",
               is_read: fetchResp.includes("\\Seen"),
               folder: "inbox",
               received_at: receivedAt,
+              last_sync_attempt: new Date().toISOString(),
             });
 
             if (insertError) {
@@ -354,6 +402,22 @@ serve(async (req: any) => {
             }
           } catch (msgError: unknown) {
             console.error(`Error processing IMAP message ${msgId}:`, msgError instanceof Error ? msgError.message : String(msgError));
+            try {
+              await supabase.from("emails").insert({
+                account_id: account.id,
+                tenant_id: account.tenant_id ?? null,
+                franchise_id: account.franchise_id ?? null,
+                message_id: `imap-${msgId}-${Date.now()}`,
+                subject: "(Error Processing)",
+                from_email: "error@sync.local",
+                from_name: "Sync Error",
+                to_emails: [],
+                direction: "inbound",
+                status: "error",
+                sync_error: msgError instanceof Error ? msgError.message : String(msgError),
+                last_sync_attempt: new Date().toISOString(),
+              });
+            } catch { void 0; }
           }
         }
 
@@ -670,6 +734,127 @@ serve(async (req: any) => {
 
       await syncGmailLabel("INBOX", "inbox", "inbound");
       await syncGmailLabel("SENT", "sent", "outbound");
+    } else if (account.provider === "pop3") {
+      // POP3: Simple inbox fetch with optional delete-after-fetch policy
+      console.log("Syncing via POP3 for account:", account.email_address);
+      const pop3 = {
+        hostname: account.pop3_host,
+        port: account.pop3_port || (account.pop3_use_ssl ? 995 : 110),
+        username: account.pop3_username,
+        password: account.pop3_password,
+        ssl: !!account.pop3_use_ssl,
+        deletePolicy: (account.pop3_delete_policy || "keep") as "keep" | "delete_after_fetch",
+      };
+      try {
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+        const conn = pop3.ssl
+          ? await Deno.connectTls({ hostname: pop3.hostname, port: pop3.port })
+          : await Deno.connect({ hostname: pop3.hostname, port: pop3.port });
+        const readLine = async () => {
+          const buf = new Uint8Array(8192);
+          const n = await conn.read(buf);
+          if (n === null) throw new Error("Connection closed");
+          return decoder.decode(buf.subarray(0, n));
+        };
+        const send = async (cmd: string) => {
+          await conn.write(encoder.encode(`${cmd}\r\n`));
+          return await readLine();
+        };
+        const greet = await readLine();
+        if (!/^\+OK/.test(greet)) throw new Error(`POP3 greeting failed: ${greet}`);
+        const userResp = await send(`USER ${pop3.username}`);
+        if (!/^\+OK/.test(userResp)) throw new Error(`POP3 USER failed: ${userResp}`);
+        const passResp = await send(`PASS ${pop3.password}`);
+        if (!/^\+OK/.test(passResp)) throw new Error(`POP3 PASS failed: ${passResp}`);
+        const statResp = await send("STAT");
+        if (!/^\+OK/.test(statResp)) throw new Error(`POP3 STAT failed: ${statResp}`);
+        const count = Number(statResp.split(" ")[1] || "0");
+        console.log(`POP3 mailbox has ${count} messages`);
+        const listResp = await send("LIST");
+        const lines = listResp.split("\r\n");
+        const ids = lines
+          .map((l) => l.match(/^(\d+)\s+(\d+)/))
+          .filter(Boolean)
+          .map((m) => Number((m as RegExpMatchArray)[1]));
+        for (const id of ids.slice(0, 50)) {
+          try {
+            await conn.write(encoder.encode(`RETR ${id}\r\n`));
+            let raw = "";
+            while (true) {
+              const chunk = await readLine();
+              raw += chunk;
+              if (/\r\n\.\r\n$/.test(raw)) break;
+              if (raw.length > 10 * 1024 * 1024) throw new Error("POP3 message too large");
+            }
+            const messageRaw = raw.replace(/\r\n\.\r\n$/, "");
+            let parsed: any = null;
+            try {
+              parsed = await simpleParser(messageRaw);
+            } catch { parsed = null; }
+            const messageId = parsed?.messageId ? String(parsed.messageId).replace(/[<>]/g, "") : `pop3-${id}-${Date.now()}`;
+            const subject = parsed?.subject || "(No Subject)";
+            const from = parsed?.from?.value?.[0];
+            const fromEmail = String(from?.address || "").toLowerCase();
+            const fromName = (from?.name || "").trim() || fromEmail;
+            const toEmails = (parsed?.to?.value || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            const ccEmails = (parsed?.cc?.value || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            const bccEmails = (parsed?.bcc?.value || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            const bodyText = (parsed?.text || "").trim();
+            const bodyHtml = typeof parsed?.html === "string" ? parsed.html : "";
+            const receivedAt = parsed?.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
+            const inReplyTo = parsed?.inReplyTo ? String(parsed.inReplyTo).replace(/[<>]/g, "") : null;
+            const references = Array.isArray(parsed?.references) ? parsed.references.map((r: string) => r.replace(/[<>]/g, "")).filter(Boolean) : [];
+            const conversationId = references.length ? references[0] : (inReplyTo || messageId);
+            const { data: existing } = await supabase
+              .from("emails")
+              .select("id")
+              .eq("message_id", messageId)
+              .eq("account_id", account.id)
+              .single();
+            if (existing) continue;
+            const { error: insErr } = await supabase.from("emails").insert({
+              account_id: account.id,
+              tenant_id: account.tenant_id ?? null,
+              franchise_id: account.franchise_id ?? null,
+              message_id: messageId,
+              internet_message_id: messageId,
+              conversation_id: conversationId,
+              in_reply_to: inReplyTo,
+              email_references: references,
+              subject,
+              from_email: fromEmail,
+              from_name: fromName,
+              to_emails: toEmails,
+              cc_emails: ccEmails,
+              bcc_emails: bccEmails,
+              body_text: bodyText,
+              body_html: bodyHtml || bodyText,
+              snippet: String(bodyText || "").substring(0, 200),
+              has_attachments: Array.isArray(parsed?.attachments) ? parsed.attachments.length > 0 : false,
+              attachments: [],
+              direction: "inbound",
+              status: "received",
+              is_read: false,
+              folder: "inbox",
+              received_at: receivedAt,
+              last_sync_attempt: new Date().toISOString(),
+            });
+            if (!insErr && pop3.deletePolicy === "delete_after_fetch") {
+              await send(`DELE ${id}`);
+            }
+            if (insErr) console.error("POP3 insert error:", insErr.message);
+            else syncedCount++;
+          } catch (e) {
+            console.error(`POP3 retrieval error for id ${id}:`, e instanceof Error ? e.message : String(e));
+          }
+        }
+        await send("QUIT");
+        conn.close();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`POP3 sync failed: ${msg}`);
+      }
     } else if (account.provider === "office365") {
       // Use Microsoft Outlook REST API (v2.0) with OAuth v2 tokens
       console.log("Syncing via Office365 (Outlook API) for:", account.email_address);
@@ -774,6 +959,7 @@ serve(async (req: any) => {
             "toRecipients",
             "ccRecipients",
             "bccRecipients",
+            "replyTo",
             "bodyPreview",
             "body",
             "hasAttachments",
@@ -785,6 +971,7 @@ serve(async (req: any) => {
             "importance",
             "flag",
             "internetMessageId",
+            "internetMessageHeaders",
           ].join(","),
           "$orderby": orderBy,
         }).toString();
@@ -898,7 +1085,7 @@ serve(async (req: any) => {
               to_emails: toRecipients,
               cc_emails: ccRecipients,
               bcc_emails: bccRecipients,
-              reply_to: null,
+              reply_to: (m.replyTo?.[0]?.emailAddress?.address || null) as string | null,
               body_text: bodyText,
               body_html: bodyHtml,
               snippet: m.bodyPreview || "",
@@ -930,6 +1117,12 @@ serve(async (req: any) => {
                 from: fromAddr,
                 importance: m.importance,
                 conversationId: m.conversationId,
+                internetMessageId: internetMessageId,
+                toRecipients: toRecipients.map(r => r.email),
+                ccRecipients: ccRecipients.map(r => r.email),
+                bccRecipients: bccRecipients.map(r => r.email),
+                replyTo: m.replyTo?.[0]?.emailAddress?.address || null,
+                internetMessageHeaders: m.internetMessageHeaders || undefined,
               },
               conversation_id: m.conversationId,
               internet_message_id: internetMessageId,

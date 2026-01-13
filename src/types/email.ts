@@ -38,6 +38,7 @@ export interface Email {
   attachments?: EmailAttachment[];
   
   thread_id?: string;
+  conversation_id?: string;
   importance?: 'high' | 'normal' | 'low';
   priority?: string;
 }

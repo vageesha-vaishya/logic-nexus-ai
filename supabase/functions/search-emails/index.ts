@@ -37,6 +37,7 @@ Deno.serve(async (req: Request) => {
       tenantId?: string | null;
       accountId?: string | null;
       direction?: string | null;
+      folder?: string | null;
       page?: number;
       pageSize?: number;
       filterFrom?: string;
@@ -45,6 +46,9 @@ Deno.serve(async (req: Request) => {
       filterHasAttachment?: boolean;
       filterDateFrom?: string;
       filterDateTo?: string;
+      groupBy?: "conversation" | "none";
+      sortGroupBy?: "date" | "count";
+      sortDirection?: "asc" | "desc";
     };
     
     let payload: SearchPayload | null;
@@ -69,17 +73,20 @@ Deno.serve(async (req: Request) => {
       filterHasAttachment,
       filterDateFrom,
       filterDateTo,
+      groupBy = "none",
+      sortGroupBy = "date",
+      sortDirection = "desc",
     } = payload || ({} as SearchPayload);
     let { page = 1, pageSize = 25 } = payload || ({} as SearchPayload);
 
-    if (!email) {
+    if (!email && groupBy !== "conversation") {
       return new Response(
         JSON.stringify({ success: false, error: "Missing required field: email", code: "BAD_REQUEST" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
-    const targetEmail = String(email).toLowerCase().trim();
+    const targetEmail = String(email || "").toLowerCase().trim();
 
     // Paging with guardrails
     page = Number(page);
@@ -96,6 +103,13 @@ Deno.serve(async (req: Request) => {
     if (tenantId) dbQuery = dbQuery.eq("tenant_id", tenantId);
     if (accountId) dbQuery = dbQuery.eq("account_id", accountId);
     if (direction) dbQuery = dbQuery.eq("direction", direction);
+    if (payload?.folder) {
+      if (payload.folder === "all_mail") {
+        dbQuery = dbQuery.neq("folder", "trash").neq("folder", "spam");
+      } else {
+        dbQuery = dbQuery.eq("folder", payload.folder);
+      }
+    }
 
     // 2. Text Search (if provided)
     if (searchText) {
@@ -158,26 +172,82 @@ Deno.serve(async (req: Request) => {
       `bcc_emails.cs.${jsonFilterObject}`
     ].join(",");
 
-    dbQuery = dbQuery.or(orConditions);
+    if (targetEmail) {
+      dbQuery = dbQuery.or(orConditions);
+    }
 
     // 5. Ordering and Pagination
     const { data, error, count } = await dbQuery
       .order("received_at", { ascending: false })
-      .range(from, to);
+      .range(groupBy === "conversation" ? 0 : from, groupBy === "conversation" ? Math.max(200, to) : to);
 
     if (error) {
       console.error("Query error:", error);
       throw new Error(`Database query error: ${error.message}`);
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        count: count,
-        data: data,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-    );
+    if (groupBy === "conversation") {
+      const emails = Array.isArray(data) ? data : [];
+      const normalizeSubject = (s: string) => s.replace(/^(Re:|Fwd:|FW:|Aw:)\s+/i, "").trim().toLowerCase();
+      const groups = new Map<string, { key: string; emails: any[]; latestEmail: any; count: number }>();
+      for (const e of emails) {
+        const key =
+          e.conversation_id ||
+          e.thread_id ||
+          (typeof e.subject === "string" ? normalizeSubject(e.subject) : "no_subject");
+        const g = groups.get(key);
+        if (!g) {
+          groups.set(key, { key, emails: [e], latestEmail: e, count: 1 });
+        } else {
+          g.emails.push(e);
+          g.count += 1;
+          if (new Date(e.received_at).getTime() > new Date(g.latestEmail.received_at).getTime()) {
+            g.latestEmail = e;
+          }
+        }
+      }
+      let grouped = Array.from(groups.values()).map((g) => ({
+        id: g.key,
+        count: g.count,
+        latestEmail: g.latestEmail,
+        emails: g.emails,
+      }));
+      if (sortGroupBy === "date") {
+        grouped = grouped.sort((a, b) => {
+          const diff =
+            new Date(a.latestEmail.received_at).getTime() -
+            new Date(b.latestEmail.received_at).getTime();
+          return (sortDirection === "asc" ? 1 : -1) * diff;
+        });
+      } else if (sortGroupBy === "count") {
+        grouped = grouped.sort((a, b) => (sortDirection === "asc" ? 1 : -1) * (a.count - b.count));
+      }
+      const totalThreads = grouped.length;
+      const start = from;
+      const end = Math.min(start + pageSize, totalThreads);
+      const pageItems = grouped.slice(start, end);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          totalThreads,
+          page,
+          pageSize,
+          data: pageItems,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          count: count,
+          page,
+          pageSize,
+          data: data,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
 
   } catch (error: unknown) {
     console.error("Error searching emails:", error);

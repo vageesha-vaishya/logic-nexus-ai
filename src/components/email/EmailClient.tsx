@@ -49,6 +49,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   const [customFolders, setCustomFolders] = useState<string[]>([]);
 
   const [conversationView, setConversationView] = useState(true);
+  const [useServerGrouping, setUseServerGrouping] = useState(false);
 
   const [replyTo, setReplyTo] = useState<{ to: string; subject: string; body?: string } | undefined>(undefined);
   const notifiedEmailIdsRef = useRef<Set<string>>(new Set());
@@ -102,10 +103,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       } 
       // General Inbox mode
       else {
-        let query = supabase
-          .from("emails")
-          .select("*")
-          .limit(50);
+        let query = supabase.from("emails").select("*").limit(50);
 
         // Apply folder filter
         if (selectedFolder === 'inbox' || selectedFolder === 'sent' || selectedFolder === 'drafts' || selectedFolder === 'trash' || selectedFolder === 'spam' || selectedFolder === 'archive') {
@@ -146,10 +144,27 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
           query = query.order(sortField, { ascending: sortDirection === "asc" });
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        setEmails(data as Email[]);
+        if (conversationView && useServerGrouping) {
+          const { data, error } = await supabase.functions.invoke("search-emails", {
+            body: {
+              folder: selectedFolder,
+              groupBy: "conversation",
+              sortGroupBy: "date",
+              sortDirection: sortDirection,
+              page: 1,
+              pageSize: 50,
+              query: searchQuery || undefined,
+            }
+          });
+          if (error) throw error;
+          const threads = (data?.data as any[]) || [];
+          const fetched = threads.map((t) => ({ ...t.latestEmail, threadCount: t.count })) as any;
+          setEmails(fetched as Email[]);
+        } else {
+          const { data, error } = await query;
+          if (error) throw error;
+          setEmails(data as Email[]);
+        }
       }
     } catch (error) {
       console.error("Error fetching emails:", error);
@@ -228,13 +243,17 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     if (saved) {
       try {
         setCustomFolders(JSON.parse(saved));
-      } catch {}
+      } catch (e) {
+        console.error(e);
+      }
     }
     const notif = localStorage.getItem('email_notifications_enabled');
     if (notif) {
       try {
         setNotificationsEnabled(JSON.parse(notif));
-      } catch {}
+      } catch (e) {
+        console.error(e);
+      }
     }
   }, []);
 
@@ -328,7 +347,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
 
     const byThread = new Map<string, { email: Email; count: number }>();
     for (const e of sorted) {
-      const key = e.thread_id || e.id;
+      const key = e.conversation_id || e.thread_id || e.id;
       const existing = byThread.get(key);
       if (!existing) {
         byThread.set(key, { email: e, count: 1 });
@@ -349,8 +368,9 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     if (!selectedEmail) return null;
     if (!conversationView) return [selectedEmail];
     
-    if (selectedEmail.thread_id) {
-       const thread = emails.filter(e => e.thread_id === selectedEmail.thread_id);
+    if (selectedEmail.conversation_id || selectedEmail.thread_id) {
+       const key = selectedEmail.conversation_id || selectedEmail.thread_id;
+       const thread = emails.filter(e => (e.conversation_id || e.thread_id) === key);
        return thread.length > 0 ? thread.sort((a, b) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime()) : [selectedEmail];
     }
     
@@ -358,18 +378,46 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   }, [selectedEmail, emails, conversationView]);
 
   // Calculate unread counts (mock for now, ideally fetched from DB count query)
-  const unreadCounts = useMemo(() => {
-    const by = (folder: string) => emails.filter(e => e.folder === folder);
-    return {
-      inbox: by('inbox').filter(e => !e.is_read).length,
-      sent: by('sent').length,
-      drafts: by('drafts').length,
-      trash: by('trash').length,
-      spam: by('spam').length,
-      archive: by('archive').length,
-      flagged: emails.filter(e => e.is_starred).length,
+  const [unreadStats, setUnreadStats] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("email-stats", {
+          body: { folder: selectedFolder },
+        });
+        if (!error && data?.success) {
+          setUnreadStats(data.unreadByFolder || {});
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      const by = (folder: string) => emails.filter(e => e.folder === folder);
+      setUnreadStats({
+        inbox: by('inbox').filter(e => !e.is_read).length,
+        sent: by('sent').length,
+        drafts: by('drafts').length,
+        trash: by('trash').length,
+        spam: by('spam').length,
+        archive: by('archive').length,
+        flagged: emails.filter(e => e.is_starred).length,
+      });
     };
-  }, [emails]);
+    fetchStats();
+  }, [emails, selectedFolder, supabase.functions]);
+
+  const unreadCounts = useMemo(() => {
+    const fallback = {
+      inbox: unreadStats['inbox'] ?? emails.filter(e => e.folder === 'inbox' && !e.is_read).length,
+      sent: unreadStats['sent'] ?? emails.filter(e => e.folder === 'sent').length,
+      drafts: unreadStats['drafts'] ?? emails.filter(e => e.folder === 'drafts').length,
+      trash: unreadStats['trash'] ?? emails.filter(e => e.folder === 'trash').length,
+      spam: unreadStats['spam'] ?? emails.filter(e => e.folder === 'spam').length,
+      archive: unreadStats['archive'] ?? emails.filter(e => e.folder === 'archive').length,
+      flagged: unreadStats['flagged'] ?? emails.filter(e => e.is_starred).length,
+    };
+    return fallback;
+  }, [unreadStats, emails]);
 
   const handleEmailSelect = (email: Email) => {
     setSelectedEmail(email);
@@ -549,6 +597,8 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
              onAdvancedFiltersChange={setAdvancedFilters}
              conversationView={conversationView}
              onToggleConversationView={setConversationView}
+             useServerGrouping={useServerGrouping}
+             onToggleServerGrouping={setUseServerGrouping}
              sortField={sortField}
              sortDirection={sortDirection}
              onSortFieldChange={setSortField}

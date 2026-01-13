@@ -27,6 +27,7 @@ interface Email {
   folder: string;
   has_attachments: boolean;
   thread_id?: string;
+  conversation_id?: string;
   from_name?: string;
   is_starred?: boolean;
   body_html?: string;
@@ -108,9 +109,9 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
 
     const groups: Record<string, Email[]> = {};
     filteredEmails.forEach(email => {
-       // Use thread_id if available, otherwise normalize subject
+       // Prefer conversation_id, then thread_id, otherwise normalize subject
        const subjectKey = email.subject.replace(/^(Re:|Fwd:|FW:|Aw:)\s+/i, '').trim().toLowerCase();
-       const key = email.thread_id || subjectKey || 'no_subject';
+       const key = email.conversation_id || email.thread_id || subjectKey || 'no_subject';
        
        if (!groups[key]) groups[key] = [];
        groups[key].push(email);
