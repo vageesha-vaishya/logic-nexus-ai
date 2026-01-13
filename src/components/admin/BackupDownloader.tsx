@@ -12,25 +12,48 @@ interface BackupFile {
   id: string | null;
   created_at: string | null;
   metadata: Record<string, any> | null;
+  fullPath?: string;
 }
 
 export function BackupDownloader() {
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [userFolder, setUserFolder] = useState<string | null>(null);
 
   const fetchBackups = async () => {
     setLoading(true);
     try {
+      // Get current user to determine their folder
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please log in to view backups");
+        setLoading(false);
+        return;
+      }
+      
+      const folder = user.id;
+      setUserFolder(folder);
+      
+      // List files from user's backup folder (including subfolders like db-exports)
       const { data, error } = await supabase.storage
         .from("db-backups")
-        .list("", {
+        .list(`${folder}/db-exports`, {
           limit: 100,
           sortBy: { column: "created_at", order: "desc" },
         });
 
       if (error) throw error;
-      setBackups(data as BackupFile[]);
+      
+      // Filter out folder placeholders and map with full path
+      const files = (data || [])
+        .filter(f => f.name && !f.name.endsWith('/'))
+        .map(f => ({
+          ...f,
+          fullPath: `${folder}/db-exports/${f.name}`,
+        }));
+      
+      setBackups(files as any);
     } catch (error: any) {
       toast.error("Failed to fetch backups", { description: error.message });
     } finally {
@@ -42,12 +65,13 @@ export function BackupDownloader() {
     fetchBackups();
   }, []);
 
-  const downloadBackup = async (fileName: string) => {
-    setDownloading(fileName);
+  const downloadBackup = async (backup: BackupFile) => {
+    const filePath = backup.fullPath || backup.name;
+    setDownloading(backup.name);
     try {
       const { data, error } = await supabase.storage
         .from("db-backups")
-        .download(fileName);
+        .download(filePath);
 
       if (error) throw error;
 
@@ -55,7 +79,7 @@ export function BackupDownloader() {
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileName;
+      a.download = backup.name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -125,7 +149,7 @@ export function BackupDownloader() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => downloadBackup(backup.name)}
+                    onClick={() => downloadBackup(backup)}
                     disabled={downloading === backup.name}
                   >
                     <Download className={`h-4 w-4 ${downloading === backup.name ? "animate-pulse" : ""}`} />
