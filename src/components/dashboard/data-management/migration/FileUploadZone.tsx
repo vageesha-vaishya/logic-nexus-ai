@@ -170,14 +170,14 @@ export function FileUploadZone({ onFileSelect, validationResult, selectedFile, d
               <FileText className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Data Files</p>
-                <p className="text-sm font-medium">{validationResult.manifest?.dataFiles.length || 0}</p>
+                <p className="text-sm font-medium">{validationResult.manifest?.dataFiles?.length || 0}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Schema Files</p>
-                <p className="text-sm font-medium">{validationResult.manifest?.schemaFiles.length || 0}</p>
+                <p className="text-sm font-medium">{validationResult.manifest?.schemaFiles?.length || 0}</p>
               </div>
             </div>
           </div>

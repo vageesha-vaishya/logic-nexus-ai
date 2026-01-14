@@ -60,18 +60,15 @@ export function useDatabaseMigration() {
   const pauseRef = useRef(false);
   const startTimeRef = useRef<number>(0);
 
-  // Validate connection to target Supabase
   const validateConnection = useCallback(async (config: SupabaseConnectionConfig): Promise<ConnectionValidationResult> => {
     setConnectionValidation({ isValid: false, status: 'validating', message: 'Validating connection...' });
     
     try {
-      // Validate URL format
       const urlPattern = /^https:\/\/[a-z0-9-]+\.supabase\.co$/;
       if (!urlPattern.test(config.projectUrl)) {
         throw new Error('Invalid Supabase project URL format. Expected: https://[project-ref].supabase.co');
       }
 
-      // Test API connectivity
       const testResponse = await fetch(`${config.projectUrl}/rest/v1/`, {
         method: 'HEAD',
         headers: {
@@ -84,22 +81,53 @@ export function useDatabaseMigration() {
         throw new Error(`API connectivity failed: ${testResponse.status} ${testResponse.statusText}`);
       }
 
-      // Test service role key if provided
+      const networkConnectivity = true;
+      const credentialValidity = true;
+
+      if (!config.serviceRoleKey) {
+        const result: ConnectionValidationResult = {
+          isValid: false,
+          status: 'error',
+          message: 'Service role key is required to validate database access. Please add it from Supabase dashboard (Settings → API).',
+          details: {
+            networkConnectivity,
+            credentialValidity,
+            databaseAccessible: false
+          }
+        };
+        setConnectionValidation(result);
+        return result;
+      }
+
       let dbAccessible = false;
-      if (config.serviceRoleKey) {
-        try {
-          const serviceResponse = await fetch(`${config.projectUrl}/rest/v1/`, {
-            method: 'GET',
-            headers: {
-              'apikey': config.serviceRoleKey,
-              'Authorization': `Bearer ${config.serviceRoleKey}`,
-              'Prefer': 'count=exact'
-            }
-          });
-          dbAccessible = serviceResponse.ok || serviceResponse.status === 404;
-        } catch {
-          dbAccessible = false;
+      try {
+        const serviceResponse = await fetch(`${config.projectUrl}/rest/v1/`, {
+          method: 'GET',
+          headers: {
+            'apikey': config.serviceRoleKey,
+            'Authorization': `Bearer ${config.serviceRoleKey}`,
+            'Prefer': 'count=exact'
+          }
+        });
+
+        if (!serviceResponse.ok && serviceResponse.status !== 404) {
+          throw new Error(`Database access using service role key failed: ${serviceResponse.status} ${serviceResponse.statusText}`);
         }
+
+        dbAccessible = true;
+      } catch (error: any) {
+        const result: ConnectionValidationResult = {
+          isValid: false,
+          status: 'error',
+          message: error.message || 'Database access using service role key failed',
+          details: {
+            networkConnectivity,
+            credentialValidity,
+            databaseAccessible: false
+          }
+        };
+        setConnectionValidation(result);
+        return result;
       }
 
       const result: ConnectionValidationResult = {
@@ -107,8 +135,8 @@ export function useDatabaseMigration() {
         status: 'success',
         message: 'Connection validated successfully',
         details: {
-          networkConnectivity: true,
-          credentialValidity: true,
+          networkConnectivity,
+          credentialValidity,
           databaseAccessible: dbAccessible
         }
       };
@@ -180,7 +208,8 @@ export function useDatabaseMigration() {
 
       // Parse manifest if exists
       let manifest: ZipManifest | undefined;
-      const manifestFile = zip.file(/manifest\.json$/i)[0];
+      const manifestFiles = zip.file(/manifest\.json$/i);
+      const manifestFile = manifestFiles && manifestFiles.length > 0 ? manifestFiles[0] : null;
       if (manifestFile) {
         try {
           const manifestContent = await manifestFile.async('text');

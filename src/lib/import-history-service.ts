@@ -84,7 +84,7 @@ export const ImportHistoryService = {
     importId: string,
     errors: { rowNumber: number; field: string; errorMessage: string; rawData: any }[]
   ) {
-    if (!errors.length) return;
+    if (!errors || !errors.length) return;
     
     try {
       const { error } = await db

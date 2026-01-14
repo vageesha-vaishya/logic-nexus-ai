@@ -2244,12 +2244,16 @@ END $$;\n\n`;
           totalStatements += insertStatements.length;
 
           // Execute in batches via RPC
-          for (let i = 0; i < insertStatements.length; i += batchSize) {
+          const insertCount = insertStatements?.length || 0;
+          for (let i = 0; i < insertCount; i += batchSize) {
             const batch = insertStatements.slice(i, i + batchSize);
+            if (!batch || batch.length === 0) continue;
+
             try {
               const { data: rpcData, error } = await scopedDb.rpc('execute_insert_batch', {
                 statements: batch
               });
+              
               if (error) {
                 failedStatements += batch.length;
                 if (!firstError) firstError = error.message;
@@ -2269,12 +2273,18 @@ END $$;\n\n`;
                 const f = typeof res?.failed === 'number' ? res.failed : 0;
                 successStatements += s;
                 failedStatements += f;
-                if (res?.error_rows?.length > 0) {
-                    if (!firstError) firstError = typeof res.error_rows[0].error === 'string' ? res.error_rows[0].error : 'Unknown error';
-                    console.error("Batch partial errors:", res.error_rows);
+                
+                const errorRows = Array.isArray(res?.error_rows) ? res.error_rows : [];
+                if (errorRows.length > 0) {
+                    if (!firstError) {
+                        const firstErrRow = errorRows[0];
+                        firstError = firstErrRow && typeof firstErrRow.error === 'string' ? firstErrRow.error : 'Unknown error';
+                    }
+                    console.error("Batch partial errors:", errorRows);
                 }
-                if (restoreSession && Array.isArray(res?.error_rows)) {
-                  const errs = (res.error_rows as any[]).map((e: any, idx: number) => ({
+                
+                if (restoreSession && errorRows.length > 0) {
+                  const errs = errorRows.map((e: any, idx: number) => ({
                     rowNumber: i + idx + 1,
                     field: 'statement',
                     errorMessage: typeof e.error === 'string' ? e.error : 'Unknown error',
@@ -2301,7 +2311,8 @@ END $$;\n\n`;
             }
 
             processedStatements += batch.length;
-            bytesProcessed += batch.join("\n").length;
+            const batchText = batch.join("\n");
+            bytesProcessed += batchText ? batchText.length : 0;
             const elapsedMs = Date.now() - startedAt;
             const bytesPerMs = elapsedMs > 0 ? bytesProcessed / elapsedMs : 0;
             const remainingBytes = Math.max(totalBytes - bytesProcessed, 0);
