@@ -7824,6 +7824,7 @@ export type Database = {
           validation_message: string
         }[]
       }
+      execute_insert_batch: { Args: { statements: string[] }; Returns: Json }
       execute_sql_query: { Args: { query_text: string }; Returns: Json }
       execute_transfer: {
         Args: { p_approver_id: string; p_transfer_id: string }
