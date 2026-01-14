@@ -218,8 +218,43 @@ COPY "${schemaName}"."${tableName}" (${columns.map(c => `"${c}"`).join(', ')}) F
     sql += values.join('\t') + '\n';
   });
   
-  sql += '\\.\n\n';
+  sql += '\\.\\n\\n';
   return sql;
+};
+
+export const validateDollarQuotes = (sql: string): string[] => {
+  const errors: string[] = [];
+  if (!sql) return errors;
+
+  let cleaned = sql;
+
+  cleaned = cleaned.replace(/'(?:''|[^'])*'/g, "''");
+
+  cleaned = cleaned.replace(/"(?:\\"|[^"])*"/g, '""');
+
+  cleaned = cleaned.replace(/--.*$/gm, '');
+
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  const matches = cleaned.match(/\$\$/g) || [];
+  if (matches.length % 2 !== 0) {
+    errors.push('[pg_dump_export] Unbalanced $$ dollar-quoted blocks');
+  }
+  return errors;
+};
+
+export const validateInsertTerminations = (sql: string): string[] => {
+  const errors: string[] = [];
+  const lines = sql.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith('INSERT INTO') && !trimmed.endsWith(';')) {
+      errors.push('[pg_dump_export] INSERT statement without terminating semicolon');
+      break;
+    }
+  }
+  return errors;
 };
 
 /**

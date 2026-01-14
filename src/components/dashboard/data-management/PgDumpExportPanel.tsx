@@ -32,8 +32,10 @@ import {
   generateRlsStatements,
   PgDumpOptions,
   defaultPgDumpOptions,
+  validateDollarQuotes,
+  validateInsertTerminations,
 } from "@/utils/pgDumpExport";
-import { resolveDataTypeForValue } from "@/utils/dbExportUtils";
+import { resolveDataTypeForValue, validateSQL } from "@/utils/dbExportUtils";
 import {
   Dialog,
   DialogContent,
@@ -100,6 +102,7 @@ export function PgDumpExportPanel() {
     setProgress(null);
     
     let sqlContent = '';
+    let dataSql = '';
     
     try {
       // 1. Header
@@ -265,7 +268,7 @@ export function PgDumpExportPanel() {
             const columns = Object.keys(data[0]);
             const typeMap = typeMapByTable[tableKey] || {};
             
-            sqlContent += generateInsertStatements(
+            dataSql += generateInsertStatements(
               table.schema_name,
               table.table_name,
               columns,
@@ -279,6 +282,8 @@ export function PgDumpExportPanel() {
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
+      
+      sqlContent += dataSql;
       
       // 8. Constraints
       updateProgress('Constraints', 88, 'Adding constraints...');
@@ -312,11 +317,19 @@ export function PgDumpExportPanel() {
         }
       }
       
-      // 10. Footer
       updateProgress('Finalizing', 98, 'Generating footer...');
       sqlContent += generatePgDumpFooter();
-      
-      // 11. Download
+
+      const structuralErrors: string[] = [];
+      structuralErrors.push(...validateDollarQuotes(sqlContent));
+      structuralErrors.push(...validateInsertTerminations(dataSql));
+      structuralErrors.push(...validateSQL(dataSql, 'pg_dump_export_data', false));
+
+      if (structuralErrors.length > 0) {
+        console.error('pg_dump export validation errors:', structuralErrors);
+        throw new Error(structuralErrors[0]);
+      }
+
       updateProgress('Complete', 100, 'Preparing download...');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = `database_export_${timestamp}.sql`;
