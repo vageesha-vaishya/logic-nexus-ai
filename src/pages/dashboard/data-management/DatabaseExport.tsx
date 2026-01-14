@@ -520,6 +520,8 @@ export default function DatabaseExport() {
         if (!exportOptions.secrets) {
             chosen = chosen.filter(t => t.schema_name !== 'vault');
         }
+        // Only base tables have data exports
+        chosen = chosen.filter(t => t.table_type === 'BASE TABLE');
 
         // Parallelize count checks for speed
          for (let i = 0; i < chosen.length; i++) {
@@ -890,6 +892,8 @@ END $$;\n\n`;
           if (!exportOptions.secrets) {
               chosen = chosen.filter(t => t.schema_name !== 'vault');
           }
+          // Skip views/materialized views for data export
+          chosen = chosen.filter(t => t.table_type === 'BASE TABLE');
 
           if (chosen.length > 0) {
               

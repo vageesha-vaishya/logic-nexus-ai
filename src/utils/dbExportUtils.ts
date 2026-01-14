@@ -19,36 +19,33 @@ export const validateSQL = (sql: string, context: string, validateReservedWords:
     const openDoubleQuotes = (sql.match(/"/g) || []).length;
     if (openDoubleQuotes % 2 !== 0) errors.push(`[${context}] Potentially unclosed double quote`);
     
+    // Helper: strip single-quoted literals to avoid false positives
+    const stripSingleQuotedLiterals = (s: string) => s.replace(/'(?:''|[^'])*'/g, "''");
+    const dangerScan = stripSingleQuotedLiterals(sql).toUpperCase();
+    
     // Check for potentially dangerous operations in export
-    if (sql.toUpperCase().includes('DROP DATABASE')) errors.push(`[${context}] Contains DROP DATABASE statement`);
-    if (sql.toUpperCase().includes('TRUNCATE')) errors.push(`[${context}] Contains TRUNCATE statement`);
+    if (dangerScan.includes('DROP DATABASE')) errors.push(`[${context}] Contains DROP DATABASE statement`);
+    if (dangerScan.includes('TRUNCATE')) errors.push(`[${context}] Contains TRUNCATE statement`);
     if (sql.includes('\u0000')) errors.push(`[${context}] Contains null byte characters`);
 
     // Reserved Word Check
     if (validateReservedWords && context === 'Tables') {
-        const reserved = ['USER', 'ORDER', 'GROUP', 'TABLE', 'Limit', 'Offset', 'Select', 'Insert', 'Update', 'Delete', 'Where', 'From', 'Into', 'Values'];
-        reserved.forEach(word => {
-            // Check if word exists as a token (surrounded by whitespace or separators)
-            // and is NOT quoted
-            const regex = new RegExp(`\\s${word}[\\s,)]`, 'i');
-            if (regex.test(sql)) {
-                // Simple check: if the word appears unquoted. 
-                // This is a heuristic and might produce false positives if not parsing fully.
-                // We check if the exact quoted version exists to potentially ignore, but that's not quite right.
-                // Better: check if the match itself is unquoted.
-                // For now, we keep the existing logic but maybe refine it.
-                // The original logic was:
-                // if (regex.test(sql) && !sql.includes(`"${word}"`) && !sql.includes(`"${word.toLowerCase()}"`) && !sql.includes(`"${word.toUpperCase()}"`))
-                
-                // Let's refine: strict check is hard without a parser.
-                // We'll stick to the original logic for parity, but exported.
-                const quotedUpper = `"${word.toUpperCase()}"`;
-                const quotedLower = `"${word.toLowerCase()}"`;
-                const quotedMixed = `"${word}"`;
-                
-                if (!sql.includes(quotedUpper) && !sql.includes(quotedLower) && !sql.includes(quotedMixed)) {
-                     errors.push(`[${context}] Potentially unquoted reserved word used: ${word}`);
-                }
+        // Focus on identifiers commonly used as names, avoid core SQL keywords
+        const candidates = ['USER', 'ORDER', 'GROUP', 'LIMIT', 'OFFSET'];
+        const unquotedSql = sql.replace(/"[^"]*"/g, '""'); // remove double-quoted identifiers from consideration
+        candidates.forEach(word => {
+            let pattern: RegExp;
+            if (word === 'ORDER') {
+                // Ignore ORDER BY keyword
+                pattern = /\bORDER\b(?!\s+BY)/i;
+            } else if (word === 'GROUP') {
+                // Ignore GROUP BY keyword
+                pattern = /\bGROUP\b(?!\s+BY)/i;
+            } else {
+                pattern = new RegExp(`\\b${word}\\b`, 'i');
+            }
+            if (pattern.test(unquotedSql)) {
+                errors.push(`[${context}] Potentially unquoted reserved word used: ${word}`);
             }
         });
     }

@@ -35,5 +35,6 @@ AS $$
   WHERE n.nspname IN ('public', 'auth', 'storage', 'extensions', 'vault')
     AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
     AND c.relname NOT IN ('spatial_ref_sys')
+    AND c.relname NOT LIKE 'pg_%'
   ORDER BY n.nspname, c.relname;
 $$;
