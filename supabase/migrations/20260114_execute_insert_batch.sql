@@ -32,7 +32,7 @@ BEGIN
 
   FOREACH s IN ARRAY statements LOOP
     -- Only allow INSERTs into public schema; skip any other statements
-    IF s ~* '^\s*INSERT\s+INTO\s+"public"\.' THEN
+    IF s ~* '^\s*INSERT\s+INTO\s+"?public"?\.' THEN
       BEGIN
         EXECUTE s;
         success_count := success_count + 1;
