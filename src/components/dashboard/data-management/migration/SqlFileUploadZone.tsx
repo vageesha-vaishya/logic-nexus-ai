@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   Upload, 
   FileCode, 
@@ -11,16 +13,31 @@ import {
   CheckCircle2, 
   X, 
   FileText,
-  Database,
   Table,
-  Loader2
+  Loader2,
+  AlertCircle,
+  Wrench,
+  ChevronDown,
+  Info,
+  FileWarning,
+  Trash2
 } from 'lucide-react';
-import { parseSqlFile, ParsedSqlFile, SqlParseProgress, getSqlPreview, validateSqlFile } from '@/utils/sqlFileParser';
+import { 
+  parseSqlFile, 
+  ParsedSqlFile, 
+  SqlParseProgress, 
+  getSqlPreview, 
+  validateSqlFile,
+  repairSqlFile,
+  checkFileIntegrity,
+  FileIntegrityIssue
+} from '@/utils/sqlFileParser';
 import { toast } from 'sonner';
 
 interface SqlFileUploadZoneProps {
   onFileSelected: (file: File, parsed: ParsedSqlFile) => void;
   onFileClear?: () => void;
+  onRepairApplied?: (repairedContent: string, parsed: ParsedSqlFile) => void;
   disabled?: boolean;
   maxSizeMb?: number;
 }
@@ -28,16 +45,20 @@ interface SqlFileUploadZoneProps {
 export function SqlFileUploadZone({ 
   onFileSelected, 
   onFileClear,
+  onRepairApplied,
   disabled = false,
   maxSizeMb = 100 
 }: SqlFileUploadZoneProps) {
   const [file, setFile] = useState<File | null>(null);
+  const [fileContent, setFileContent] = useState<string>('');
   const [parsed, setParsed] = useState<ParsedSqlFile | null>(null);
   const [parsing, setParsing] = useState(false);
   const [parseProgress, setParseProgress] = useState<SqlParseProgress | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
+  const [showIntegrityDetails, setShowIntegrityDetails] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (selectedFile: File) => {
@@ -61,9 +82,19 @@ export function SqlFileUploadZone({
     setParseProgress(null);
 
     try {
-      // Get preview
+      // Get file content and preview
       const text = await selectedFile.text();
+      setFileContent(text);
       setPreview(getSqlPreview(text, 50));
+
+      // Check file integrity first
+      const integrityReport = checkFileIntegrity(text, selectedFile.size);
+      if (!integrityReport.isLikelyComplete) {
+        toast.warning('File integrity issue detected', {
+          description: 'The file may be incomplete or corrupted. See details below.',
+          duration: 8000
+        });
+      }
 
       // Parse file
       const result = await parseSqlFile(selectedFile, (progress) => {
@@ -74,7 +105,16 @@ export function SqlFileUploadZone({
       
       // Validate
       const validation = validateSqlFile(result);
-      if (validation.issues.length > 0) {
+      
+      if (!result.metadata.isComplete) {
+        toast.error('Incomplete SQL file detected', {
+          description: result.metadata.truncatedTableName 
+            ? `Truncated statement found for table: ${result.metadata.truncatedTableName}`
+            : 'The file ends with an incomplete SQL statement',
+          duration: 10000
+        });
+        setShowIntegrityDetails(true);
+      } else if (validation.issues.length > 0) {
         toast.warning('File has potential issues', { 
           description: validation.issues[0],
           duration: 5000 
@@ -88,10 +128,47 @@ export function SqlFileUploadZone({
       toast.error('Failed to parse file', { description: err.message });
       setFile(null);
       setParsed(null);
+      setFileContent('');
     } finally {
       setParsing(false);
     }
   }, [maxSizeMb, onFileSelected]);
+
+  const handleRepair = async (mode: 'skip' | 'autoClose') => {
+    if (!parsed || !fileContent) return;
+    
+    setRepairing(true);
+    try {
+      const repairResult = repairSqlFile(
+        fileContent, 
+        parsed, 
+        { skipIncomplete: mode === 'skip', autoClose: mode === 'autoClose' }
+      );
+      
+      if (repairResult.success) {
+        // Re-parse the repaired content
+        const newParsed = await parseSqlFile(
+          new File([repairResult.repairedContent], file?.name || 'repaired.sql', { type: 'text/plain' })
+        );
+        
+        setParsed(newParsed);
+        setFileContent(repairResult.repairedContent);
+        setPreview(getSqlPreview(repairResult.repairedContent, 50));
+        
+        toast.success('File repaired successfully', {
+          description: repairResult.repairsApplied.join(', ')
+        });
+        
+        onRepairApplied?.(repairResult.repairedContent, newParsed);
+      } else {
+        toast.error('Could not repair file automatically');
+      }
+    } catch (err: any) {
+      toast.error('Repair failed', { description: err.message });
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -128,11 +205,29 @@ export function SqlFileUploadZone({
     setFile(null);
     setParsed(null);
     setPreview('');
+    setFileContent('');
     setShowPreview(false);
+    setShowIntegrityDetails(false);
     if (inputRef.current) {
       inputRef.current.value = '';
     }
     onFileClear?.();
+  };
+
+  const getSeverityIcon = (severity: FileIntegrityIssue['severity']) => {
+    switch (severity) {
+      case 'error': return <AlertCircle className="h-4 w-4 text-destructive" />;
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-warning" />;
+      case 'info': return <Info className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  const getSeverityColor = (severity: FileIntegrityIssue['severity']) => {
+    switch (severity) {
+      case 'error': return 'border-destructive/50 bg-destructive/10';
+      case 'warning': return 'border-warning/50 bg-warning/10';
+      case 'info': return 'border-blue-500/50 bg-blue-500/10';
+    }
   };
 
   const formatBytes = (bytes: number) => {
@@ -229,8 +324,129 @@ export function SqlFileUploadZone({
             {/* Parsed Info */}
             {parsed && !parsing && (
               <div className="space-y-3">
-                {/* Warnings */}
-                {parsed.warnings.length > 0 && (
+                {/* Critical: File Integrity Issues */}
+                {!parsed.metadata.isComplete && (
+                  <Alert variant="destructive">
+                    <FileWarning className="h-4 w-4" />
+                    <AlertTitle>Incomplete SQL File Detected</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                      <p>
+                        The file ends with an incomplete SQL statement
+                        {parsed.metadata.truncatedTableName && (
+                          <> affecting table <strong>{parsed.metadata.truncatedTableName}</strong></>
+                        )}.
+                      </p>
+                      
+                      {/* Incomplete Statement Preview */}
+                      {parsed.metadata.incompleteStatement && (
+                        <div className="mt-2 p-2 bg-destructive/20 rounded text-xs font-mono overflow-x-auto">
+                          {parsed.metadata.incompleteStatement.substring(0, 200)}...
+                        </div>
+                      )}
+                      
+                      {/* Repair Options */}
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleRepair('skip')}
+                          disabled={repairing}
+                        >
+                          {repairing ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Trash2 className="mr-2 h-3 w-3" />}
+                          Skip Incomplete Statement
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleRepair('autoClose')}
+                          disabled={repairing}
+                        >
+                          {repairing ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Wrench className="mr-2 h-3 w-3" />}
+                          Try Auto-Repair
+                        </Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Integrity Details Collapsible */}
+                {parsed.metadata.integrityIssues.length > 0 && (
+                  <Collapsible open={showIntegrityDetails} onOpenChange={setShowIntegrityDetails}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full justify-between">
+                        <span className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                          {parsed.metadata.integrityIssues.length} Integrity Issue(s) Detected
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${showIntegrityDetails ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 space-y-2">
+                      {parsed.metadata.integrityIssues.map((issue, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`p-3 rounded-lg border ${getSeverityColor(issue.severity)}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {getSeverityIcon(issue.severity)}
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium">{issue.description}</p>
+                              {issue.lineNumber && (
+                                <p className="text-xs text-muted-foreground">Line: {issue.lineNumber}</p>
+                              )}
+                              {issue.affectedTable && (
+                                <p className="text-xs text-muted-foreground">Table: {issue.affectedTable}</p>
+                              )}
+                              {issue.context && (
+                                <pre className="text-xs bg-muted/50 p-2 rounded mt-2 overflow-x-auto">
+                                  {issue.context}
+                                </pre>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Repair Suggestions */}
+                      {parsed.metadata.repairSuggestions.length > 0 && (
+                        <div className="mt-3 p-3 border rounded-lg bg-muted/50">
+                          <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <Wrench className="h-4 w-4" />
+                            Repair Suggestions
+                          </p>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {parsed.metadata.repairSuggestions.map((suggestion, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-primary">•</span>
+                                <span>
+                                  {suggestion.description}
+                                  {suggestion.automatable && (
+                                    <Badge variant="outline" className="ml-2 text-xs">Auto-fixable</Badge>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Missing Completion Marker Warning */}
+                {!parsed.metadata.hasProperEnding && parsed.metadata.isComplete && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Possible Incomplete Dump</AlertTitle>
+                    <AlertDescription>
+                      The file is missing the pg_dump completion marker. This may indicate the dump was interrupted.
+                      Consider regenerating the dump file if you experience issues during import.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* General Warnings */}
+                {parsed.warnings.length > 0 && parsed.metadata.isComplete && (
                   <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                     <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
                     <div className="space-y-1">
@@ -242,7 +458,7 @@ export function SqlFileUploadZone({
                 )}
 
                 {/* Success Summary */}
-                {parsed.warnings.length === 0 && (
+                {parsed.metadata.isComplete && parsed.warnings.length === 0 && parsed.metadata.hasProperEnding && (
                   <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                     <p className="text-sm text-green-600">File parsed successfully - ready for import</p>
