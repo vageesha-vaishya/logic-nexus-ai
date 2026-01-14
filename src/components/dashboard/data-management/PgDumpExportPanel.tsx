@@ -32,8 +32,8 @@ import {
   generateRlsStatements,
   PgDumpOptions,
   defaultPgDumpOptions,
-  validateDollarQuotes,
-  validateInsertTerminations,
+  validateAndRepairSql,
+  repairSqlSyntax,
 } from "@/utils/pgDumpExport";
 import { resolveDataTypeForValue, validateSQL } from "@/utils/dbExportUtils";
 import {
@@ -317,17 +317,47 @@ export function PgDumpExportPanel() {
         }
       }
       
-      updateProgress('Finalizing', 98, 'Generating footer...');
+      updateProgress('Validating', 96, 'Validating SQL syntax...');
       sqlContent += generatePgDumpFooter();
 
-      const structuralErrors: string[] = [];
-      structuralErrors.push(...validateDollarQuotes(sqlContent));
-      structuralErrors.push(...validateInsertTerminations(dataSql));
-      structuralErrors.push(...validateSQL(dataSql, 'pg_dump_export_data', false));
-
-      if (structuralErrors.length > 0) {
-        console.error('pg_dump export validation errors:', structuralErrors);
-        throw new Error(structuralErrors[0]);
+      // Comprehensive SQL validation with auto-repair
+      const fullSql = sqlContent;
+      const validationResult = validateAndRepairSql(fullSql);
+      
+      // Also validate data SQL separately
+      const dataValidation = validateSQL(dataSql, 'pg_dump_export_data', false);
+      
+      const allErrors = [...validationResult.errors, ...dataValidation];
+      
+      if (allErrors.length > 0) {
+        console.warn('pg_dump export validation warnings:', allErrors);
+        
+        // Attempt auto-repair
+        updateProgress('Repairing', 97, 'Attempting to repair SQL issues...');
+        const { repairedSql, repairs } = repairSqlSyntax(fullSql);
+        
+        if (repairs.length > 0) {
+          console.log('Applied SQL repairs:', repairs);
+          sqlContent = repairedSql;
+          
+          // Re-validate after repair
+          const revalidation = validateAndRepairSql(sqlContent);
+          if (revalidation.errors.length > 0) {
+            console.error('Errors remain after repair:', revalidation.errors);
+            toast.warning('Export completed with warnings', {
+              description: `${revalidation.errors.length} syntax issues could not be auto-repaired. The file may need manual review.`
+            });
+          } else {
+            toast.success('SQL issues auto-repaired', {
+              description: `Fixed ${repairs.length} syntax issue(s)`
+            });
+          }
+        } else {
+          // No repairs possible, warn but continue
+          toast.warning('Export completed with warnings', {
+            description: `${allErrors.length} potential issue(s) detected. Review the SQL file before import.`
+          });
+        }
       }
 
       updateProgress('Complete', 100, 'Preparing download...');

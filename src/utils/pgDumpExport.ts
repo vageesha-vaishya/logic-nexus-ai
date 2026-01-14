@@ -218,43 +218,8 @@ COPY "${schemaName}"."${tableName}" (${columns.map(c => `"${c}"`).join(', ')}) F
     sql += values.join('\t') + '\n';
   });
   
-  sql += '\\.\\n\\n';
+  sql += '\\.\n\n';
   return sql;
-};
-
-export const validateDollarQuotes = (sql: string): string[] => {
-  const errors: string[] = [];
-  if (!sql) return errors;
-
-  let cleaned = sql;
-
-  cleaned = cleaned.replace(/'(?:''|[^'])*'/g, "''");
-
-  cleaned = cleaned.replace(/"(?:\\"|[^"])*"/g, '""');
-
-  cleaned = cleaned.replace(/--.*$/gm, '');
-
-  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
-
-  const matches = cleaned.match(/\$\$/g) || [];
-  if (matches.length % 2 !== 0) {
-    errors.push('[pg_dump_export] Unbalanced $$ dollar-quoted blocks');
-  }
-  return errors;
-};
-
-export const validateInsertTerminations = (sql: string): string[] => {
-  const errors: string[] = [];
-  const lines = sql.split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.startsWith('INSERT INTO') && !trimmed.endsWith(';')) {
-      errors.push('[pg_dump_export] INSERT statement without terminating semicolon');
-      break;
-    }
-  }
-  return errors;
 };
 
 /**
@@ -362,6 +327,56 @@ export const generateIndexStatements = (
 };
 
 /**
+ * Validates and repairs dollar quotes in a function definition
+ */
+const repairFunctionDollarQuotes = (definition: string): string => {
+  if (!definition) return definition;
+  
+  // Find all dollar quote tags in the definition
+  const dollarQuotePattern = /\$([a-zA-Z_][a-zA-Z0-9_]*)?\$/g;
+  const markers: Array<{ tag: string; index: number }> = [];
+  let match;
+  
+  while ((match = dollarQuotePattern.exec(definition)) !== null) {
+    markers.push({ tag: match[0], index: match.index });
+  }
+  
+  // Check for balanced pairs
+  const tagCounts: Record<string, number> = {};
+  for (const marker of markers) {
+    tagCounts[marker.tag] = (tagCounts[marker.tag] || 0) + 1;
+  }
+  
+  // Find unbalanced tags
+  let repaired = definition;
+  for (const [tag, count] of Object.entries(tagCounts)) {
+    if (count % 2 !== 0) {
+      // Unbalanced - try to close it
+      // Look for the last occurrence of this tag
+      const lastIndex = repaired.lastIndexOf(tag);
+      if (lastIndex > -1) {
+        // Check if we need to add a closing tag
+        // Find if there's a semicolon after the function body
+        const afterLastTag = repaired.substring(lastIndex + tag.length);
+        if (!afterLastTag.includes(tag)) {
+          // Need to add closing tag before the final semicolon or at end
+          const semicolonMatch = afterLastTag.match(/;\s*$/);
+          if (semicolonMatch) {
+            const insertPos = lastIndex + tag.length + afterLastTag.indexOf(semicolonMatch[0]);
+            repaired = repaired.substring(0, insertPos) + '\n' + tag + repaired.substring(insertPos);
+          } else {
+            // No semicolon, add tag at end
+            repaired = repaired.trimEnd() + '\n' + tag + ';';
+          }
+        }
+      }
+    }
+  }
+  
+  return repaired;
+};
+
+/**
  * Generates function statements
  */
 export const generateFunctionStatements = (
@@ -382,9 +397,12 @@ export const generateFunctionStatements = (
   functions.forEach(func => {
     const name = func.name || func.function_name;
     const schema = func.schema || 'public';
-    const def = func.function_definition;
+    let def = func.function_definition;
     
     if (def && name) {
+      // Repair any unbalanced dollar quotes
+      def = repairFunctionDollarQuotes(def);
+      
       sql += `-- Function: ${schema}.${name}\n`;
       sql += `${def.trim()}\n\n`;
     }
@@ -486,4 +504,407 @@ export const generateSequenceResetStatements = (
   });
   sql += '\n';
   return sql;
+};
+
+// ============================================
+// SQL Validation & Repair Functions
+// ============================================
+
+export interface DollarQuoteBlock {
+  tag: string;
+  startIndex: number;
+  endIndex?: number;
+  isComplete: boolean;
+}
+
+export interface SqlValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  dollarQuotes: DollarQuoteBlock[];
+  repairSuggestions: SqlRepairSuggestion[];
+}
+
+export interface SqlRepairSuggestion {
+  type: 'close_dollar_quote' | 'close_string' | 'add_semicolon' | 'remove_incomplete' | 'fix_encoding';
+  description: string;
+  location?: { line: number; column: number };
+  automatable: boolean;
+  repair: () => string;
+}
+
+/**
+ * Finds all dollar-quoted blocks in SQL, handling both $$ and named tags like $BODY$, $function$
+ */
+export const findDollarQuoteBlocks = (sql: string): DollarQuoteBlock[] => {
+  const blocks: DollarQuoteBlock[] = [];
+  // Match $$ or $identifier$ - PostgreSQL allows letters, digits, underscores (but not starting with digit)
+  const dollarQuotePattern = /\$([a-zA-Z_][a-zA-Z0-9_]*)?\$/g;
+  
+  // First, we need to strip string literals and comments to avoid false positives
+  let cleanedForScan = sql;
+  
+  // Remove single-quoted strings (handling escaped quotes '')
+  cleanedForScan = cleanedForScan.replace(/'(?:''|[^'])*'/g, match => ' '.repeat(match.length));
+  
+  // Remove double-quoted identifiers
+  cleanedForScan = cleanedForScan.replace(/"(?:""|[^"])*"/g, match => ' '.repeat(match.length));
+  
+  // Remove line comments
+  cleanedForScan = cleanedForScan.replace(/--[^\n]*/g, match => ' '.repeat(match.length));
+  
+  // Remove block comments
+  cleanedForScan = cleanedForScan.replace(/\/\*[\s\S]*?\*\//g, match => ' '.repeat(match.length));
+  
+  // Now find all dollar quote markers
+  const markers: Array<{ tag: string; index: number }> = [];
+  let match;
+  
+  while ((match = dollarQuotePattern.exec(cleanedForScan)) !== null) {
+    markers.push({
+      tag: match[0], // Full tag like $$ or $BODY$
+      index: match.index
+    });
+  }
+  
+  // Pair up the markers
+  const openBlocks: Map<string, DollarQuoteBlock> = new Map();
+  
+  for (const marker of markers) {
+    if (openBlocks.has(marker.tag)) {
+      // This is a closing marker
+      const block = openBlocks.get(marker.tag)!;
+      block.endIndex = marker.index + marker.tag.length;
+      block.isComplete = true;
+      blocks.push(block);
+      openBlocks.delete(marker.tag);
+    } else {
+      // This is an opening marker
+      openBlocks.set(marker.tag, {
+        tag: marker.tag,
+        startIndex: marker.index,
+        isComplete: false
+      });
+    }
+  }
+  
+  // Add any unclosed blocks
+  for (const block of openBlocks.values()) {
+    blocks.push(block);
+  }
+  
+  return blocks;
+};
+
+/**
+ * Comprehensive validation for dollar-quoted blocks
+ * Handles both $$ and custom tags like $BODY$, $function$, etc.
+ */
+export const validateDollarQuotes = (sql: string): string[] => {
+  const errors: string[] = [];
+  if (!sql) return errors;
+  
+  const blocks = findDollarQuoteBlocks(sql);
+  const unclosedBlocks = blocks.filter(b => !b.isComplete);
+  
+  for (const block of unclosedBlocks) {
+    const lineNumber = sql.substring(0, block.startIndex).split('\n').length;
+    errors.push(`[pg_dump_export] Unclosed dollar-quoted block ${block.tag} at line ${lineNumber}`);
+  }
+  
+  return errors;
+};
+
+/**
+ * Validates INSERT statements have proper termination
+ */
+export const validateInsertTerminations = (sql: string): string[] => {
+  const errors: string[] = [];
+  if (!sql) return errors;
+  
+  // Process line by line, tracking multi-line INSERT statements
+  const lines = sql.split('\n');
+  let inInsert = false;
+  let insertStartLine = 0;
+  let parenDepth = 0;
+  let inString = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    if (!inInsert && /^INSERT\s+INTO/i.test(trimmed)) {
+      inInsert = true;
+      insertStartLine = i + 1;
+      parenDepth = 0;
+      inString = false;
+    }
+    
+    if (inInsert) {
+      // Track parentheses and strings
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        const prevChar = j > 0 ? line[j - 1] : '';
+        
+        if (char === "'" && prevChar !== "'") {
+          inString = !inString;
+        } else if (!inString) {
+          if (char === '(') parenDepth++;
+          else if (char === ')') parenDepth--;
+        }
+      }
+      
+      // Check if this line ends the INSERT
+      if (!inString && parenDepth === 0) {
+        if (trimmed.endsWith(';')) {
+          inInsert = false;
+        } else if (i === lines.length - 1 || (lines[i + 1] && /^(INSERT|UPDATE|DELETE|SELECT|CREATE|ALTER|DROP|--|$)/i.test(lines[i + 1].trim()))) {
+          // Next line starts a new statement but current INSERT doesn't end with semicolon
+          if (!trimmed.endsWith(';') && trimmed.length > 0) {
+            errors.push(`[pg_dump_export] INSERT statement starting at line ${insertStartLine} may be missing semicolon`);
+          }
+          inInsert = false;
+        }
+      }
+    }
+  }
+  
+  // Check if we ended while still in an INSERT
+  if (inInsert) {
+    errors.push(`[pg_dump_export] INSERT statement starting at line ${insertStartLine} appears incomplete`);
+  }
+  
+  return errors;
+};
+
+/**
+ * Attempts to repair common SQL syntax issues
+ */
+export const repairSqlSyntax = (sql: string): { repairedSql: string; repairs: string[] } => {
+  const repairs: string[] = [];
+  let repairedSql = sql;
+  
+  // 1. Fix unclosed dollar-quoted blocks
+  const blocks = findDollarQuoteBlocks(repairedSql);
+  const unclosedBlocks = blocks.filter(b => !b.isComplete);
+  
+  // Sort by position descending so we can insert from end to start
+  unclosedBlocks.sort((a, b) => b.startIndex - a.startIndex);
+  
+  for (const block of unclosedBlocks) {
+    // Find the end of the current statement context
+    const afterBlock = repairedSql.substring(block.startIndex);
+    
+    // Look for common statement terminators or end of file
+    const endPatterns = [
+      /;\s*\n\s*(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|SELECT|GRANT|REVOKE|COMMENT|--|\n\n)/i,
+      /\n\s*\n\s*(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)/i,
+    ];
+    
+    let insertPosition = repairedSql.length;
+    for (const pattern of endPatterns) {
+      const match = pattern.exec(afterBlock);
+      if (match) {
+        insertPosition = block.startIndex + match.index;
+        break;
+      }
+    }
+    
+    // Insert closing tag before the next statement
+    const closingTag = `\n${block.tag}`;
+    repairedSql = repairedSql.substring(0, insertPosition) + closingTag + repairedSql.substring(insertPosition);
+    repairs.push(`Added closing ${block.tag} at position ${insertPosition}`);
+  }
+  
+  // 2. Fix INSERT statements missing semicolons
+  const lines = repairedSql.split('\n');
+  const fixedLines: string[] = [];
+  let inInsert = false;
+  let parenDepth = 0;
+  let inString = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trim();
+    
+    if (!inInsert && /^INSERT\s+INTO/i.test(trimmed)) {
+      inInsert = true;
+      parenDepth = 0;
+      inString = false;
+    }
+    
+    if (inInsert) {
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        const prevChar = j > 0 ? line[j - 1] : '';
+        
+        if (char === "'" && prevChar !== "'") {
+          inString = !inString;
+        } else if (!inString) {
+          if (char === '(') parenDepth++;
+          else if (char === ')') parenDepth--;
+        }
+      }
+      
+      // Check if INSERT ends here
+      if (!inString && parenDepth === 0 && trimmed.endsWith(')')) {
+        const nextLine = i < lines.length - 1 ? lines[i + 1].trim() : '';
+        if (!trimmed.endsWith(';') && (nextLine === '' || /^(INSERT|UPDATE|DELETE|SELECT|CREATE|ALTER|DROP|--|COMMIT|ROLLBACK)/i.test(nextLine))) {
+          line = line + ';';
+          repairs.push(`Added missing semicolon after INSERT at line ${i + 1}`);
+          inInsert = false;
+        }
+      }
+      
+      if (trimmed.endsWith(';')) {
+        inInsert = false;
+      }
+    }
+    
+    fixedLines.push(line);
+  }
+  
+  repairedSql = fixedLines.join('\n');
+  
+  // 3. Fix unclosed single quotes (basic repair)
+  const quoteCount = (repairedSql.match(/'/g) || []).length;
+  if (quoteCount % 2 !== 0) {
+    // Try to find the last unclosed quote
+    let inQuote = false;
+    let lastQuotePos = -1;
+    
+    for (let i = 0; i < repairedSql.length; i++) {
+      if (repairedSql[i] === "'" && (i === 0 || repairedSql[i - 1] !== "'")) {
+        inQuote = !inQuote;
+        if (inQuote) lastQuotePos = i;
+      }
+    }
+    
+    if (inQuote && lastQuotePos > -1) {
+      // Find the end of the line
+      let endPos = repairedSql.indexOf('\n', lastQuotePos);
+      if (endPos === -1) endPos = repairedSql.length;
+      
+      repairedSql = repairedSql.substring(0, endPos) + "'" + repairedSql.substring(endPos);
+      repairs.push(`Added closing single quote near position ${endPos}`);
+    }
+  }
+  
+  return { repairedSql, repairs };
+};
+
+/**
+ * Comprehensive SQL validation with repair suggestions
+ */
+export const validateAndRepairSql = (sql: string): SqlValidationResult => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const repairSuggestions: SqlRepairSuggestion[] = [];
+  
+  if (!sql || !sql.trim()) {
+    return {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      dollarQuotes: [],
+      repairSuggestions: []
+    };
+  }
+  
+  // Find dollar quote blocks
+  const dollarQuotes = findDollarQuoteBlocks(sql);
+  const unclosedDollarQuotes = dollarQuotes.filter(b => !b.isComplete);
+  
+  // Check for unclosed dollar quotes
+  for (const block of unclosedDollarQuotes) {
+    const lineNumber = sql.substring(0, block.startIndex).split('\n').length;
+    errors.push(`Unclosed dollar-quoted block ${block.tag} at line ${lineNumber}`);
+    
+    repairSuggestions.push({
+      type: 'close_dollar_quote',
+      description: `Add closing ${block.tag} to complete the dollar-quoted string`,
+      location: { line: lineNumber, column: 0 },
+      automatable: true,
+      repair: () => {
+        const { repairedSql } = repairSqlSyntax(sql);
+        return repairedSql;
+      }
+    });
+  }
+  
+  // Check INSERT terminations
+  const insertErrors = validateInsertTerminations(sql);
+  errors.push(...insertErrors);
+  
+  if (insertErrors.length > 0) {
+    repairSuggestions.push({
+      type: 'add_semicolon',
+      description: 'Add missing semicolons to incomplete INSERT statements',
+      automatable: true,
+      repair: () => {
+        const { repairedSql } = repairSqlSyntax(sql);
+        return repairedSql;
+      }
+    });
+  }
+  
+  // Check for basic quote balance
+  const singleQuotes = (sql.match(/'/g) || []).length;
+  if (singleQuotes % 2 !== 0) {
+    warnings.push('Potentially unbalanced single quotes detected');
+    repairSuggestions.push({
+      type: 'close_string',
+      description: 'Close unclosed string literals',
+      automatable: true,
+      repair: () => {
+        const { repairedSql } = repairSqlSyntax(sql);
+        return repairedSql;
+      }
+    });
+  }
+  
+  // Check for null bytes
+  if (sql.includes('\u0000')) {
+    errors.push('SQL contains null byte characters which may cause import failures');
+    repairSuggestions.push({
+      type: 'fix_encoding',
+      description: 'Remove null byte characters',
+      automatable: true,
+      repair: () => sql.replace(/\u0000/g, '')
+    });
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    dollarQuotes,
+    repairSuggestions
+  };
+};
+
+/**
+ * Safely escapes content for dollar-quoted strings
+ */
+export const escapeDollarQuotedContent = (content: string, preferredTag: string = 'BODY'): { tag: string; escaped: string } => {
+  // Find a tag that doesn't appear in the content
+  let tag = preferredTag;
+  let attempts = 0;
+  
+  while (content.includes(`$${tag}$`) && attempts < 100) {
+    tag = `${preferredTag}_${attempts}`;
+    attempts++;
+  }
+  
+  // If all named tags conflict, try simple $$
+  if (content.includes(`$${tag}$`)) {
+    if (!content.includes('$$')) {
+      return { tag: '', escaped: content };
+    }
+    // Last resort: use a unique UUID-like tag
+    tag = `_${Date.now().toString(36)}`;
+  }
+  
+  const fullTag = tag ? `$${tag}$` : '$$';
+  return { tag: fullTag, escaped: content };
 };
