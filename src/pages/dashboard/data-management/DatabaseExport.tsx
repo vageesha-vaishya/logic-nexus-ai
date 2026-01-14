@@ -21,7 +21,7 @@ import Papa from "papaparse";
 import { validateSQL, resolveDataTypeForValue, formatValue, calculateChecksum, generateManifest, DetailedProgress, calculateSchemaSignature, sanitizeValue } from "@/utils/dbExportUtils";
 import { ExportProgressMeter } from "@/components/dashboard/data-management/ExportProgressMeter";
 import { ExportCompletionDialog } from "@/components/dashboard/data-management/ExportCompletionDialog";
-import { DatabaseMigrationPanel } from "@/components/dashboard/data-management/migration";
+import { DatabaseMigrationPanel, PgDumpImportWizard } from "@/components/dashboard/data-management/migration";
 import { PgDumpExportPanel } from "@/components/dashboard/data-management/PgDumpExportPanel";
 import { ImportHistoryService, ImportSession } from "@/lib/import-history-service";
 import { ImportReportDialog } from "@/components/system/ImportReportDialog";
@@ -3455,6 +3455,9 @@ END $$;\n\n`;
 
       {/* pg_dump Compatible Export */}
       <PgDumpExportPanel />
+
+      {/* pg_dump Import Wizard */}
+      <PgDumpImportWizard />
 
       {/* Database Migration Panel */}
       <DatabaseMigrationPanel />
