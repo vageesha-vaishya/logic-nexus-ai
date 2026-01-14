@@ -184,30 +184,30 @@ export function FileUploadZone({ onFileSelect, validationResult, selectedFile, d
         )}
 
         {/* Validation Messages */}
-        {validationResult && (validationResult.issues.length > 0 || validationResult.warnings.length > 0) && (
+        {validationResult && ((validationResult.issues?.length || 0) > 0 || (validationResult.warnings?.length || 0) > 0) && (
           <div className="space-y-2">
-            {validationResult.issues.length > 0 && (
+            {(validationResult.issues?.length || 0) > 0 && (
               <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
                 <div className="flex items-center gap-2 text-destructive text-sm font-medium mb-1">
                   <XCircle className="h-4 w-4" />
                   Issues
                 </div>
                 <ul className="list-disc list-inside text-xs text-destructive/80 space-y-0.5">
-                  {validationResult.issues.map((issue, idx) => (
+                  {(validationResult.issues || []).map((issue, idx) => (
                     <li key={idx}>{issue}</li>
                   ))}
                 </ul>
               </div>
             )}
             
-            {validationResult.warnings.length > 0 && (
+            {(validationResult.warnings?.length || 0) > 0 && (
               <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
                 <div className="flex items-center gap-2 text-amber-600 text-sm font-medium mb-1">
                   <AlertTriangle className="h-4 w-4" />
                   Warnings
                 </div>
                 <ul className="list-disc list-inside text-xs text-amber-600/80 space-y-0.5">
-                  {validationResult.warnings.map((warning, idx) => (
+                  {(validationResult.warnings || []).map((warning, idx) => (
                     <li key={idx}>{warning}</li>
                   ))}
                 </ul>
@@ -219,7 +219,9 @@ export function FileUploadZone({ onFileSelect, validationResult, selectedFile, d
         {/* Tables Preview */}
         {validationResult?.manifest?.tables && validationResult.manifest.tables.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Tables to Migrate ({validationResult.manifest.tables.length})</p>
+            <p className="text-sm font-medium">
+              Tables to Migrate ({validationResult.manifest.tables.length})
+            </p>
             <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-lg bg-muted/30">
               {validationResult.manifest.tables.map((table, idx) => (
                 <Badge key={idx} variant="outline" className="text-xs">

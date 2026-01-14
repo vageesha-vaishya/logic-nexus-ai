@@ -31,6 +31,14 @@ BEGIN
   END IF;
 
   FOREACH s IN ARRAY statements LOOP
+    s := trim(s);
+
+    IF s ~* '^\s*INSERT\s+INTO\s+"[^"]+"' AND s !~* '^\s*INSERT\s+INTO\s+"?public"?\.' THEN
+      s := regexp_replace(s, '^\s*INSERT\s+INTO\s+"([^"]+)"', 'INSERT INTO public."\\1"', 1, 1, 'i');
+    ELSIF s ~* '^\s*INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)' AND s !~* '^\s*INSERT\s+INTO\s+"?public"?\.' THEN
+      s := regexp_replace(s, '^\s*INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'INSERT INTO public.\\1', 1, 1, 'i');
+    END IF;
+
     -- Only allow INSERTs into public schema; skip any other statements
     IF s ~* '^\s*INSERT\s+INTO\s+"?public"?\.' THEN
       BEGIN
@@ -70,4 +78,3 @@ BEGIN
 END $$;
 
 GRANT EXECUTE ON FUNCTION public.execute_insert_batch(text[]) TO authenticated;
-

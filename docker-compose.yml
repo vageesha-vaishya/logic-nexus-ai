@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+  db:
+    image: supabase/postgres
+    container_name: supabase-db
+    restart: unless-stopped
+    ports:
+      - "54322:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+    networks:
+      - supabase-network
+
+  auth:
+    image: supabase/gotrue
+    container_name: supabase-auth
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "9999:9999"
+    environment:
+      GOTRUE_SITE_URL: http://localhost:54321
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@db:5432/postgres
+      GOTRUE_JWT_SECRET: super-secret-dev-jwt
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_OPERATOR_TOKEN: dev-operator-token
+      GOTRUE_LOG_LEVEL: info
+    networks:
+      - supabase-network
+
+  rest:
+    image: supabase/postgrest
+    container_name: supabase-rest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - auth
+    ports:
+      - "54321:3000"
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@db:5432/postgres
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_POOL: 20
+      PGRST_JWT_SECRET: super-secret-dev-jwt
+    networks:
+      - supabase-network
+
+  realtime:
+    image: supabase/realtime
+    container_name: supabase-realtime
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "4000:4000"
+    environment:
+      DB_HOST: db
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+      JWT_SECRET: super-secret-dev-jwt
+      PORT: 4000
+    networks:
+      - supabase-network
+
+  storage:
+    image: supabase/storage-api
+    container_name: supabase-storage
+    restart: unless-stopped
+    depends_on:
+      - db
+      - rest
+      - auth
+    ports:
+      - "5000:5000"
+    environment:
+      ANON_KEY: dev-anon-key
+      SERVICE_KEY: dev-service-role-key
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: super-secret-dev-jwt
+      DATABASE_URL: postgres://postgres:postgres@db:5432/postgres
+      PGOPTIONS: "-c search_path=storage,public"
+    networks:
+      - supabase-network
+
+  studio:
+    image: supabase/studio
+    container_name: supabase-studio
+    restart: unless-stopped
+    depends_on:
+      - rest
+      - auth
+      - storage
+    ports:
+      - "5555:3000"
+    environment:
+      STUDIO_PORT: 3000
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_ANON_KEY: dev-anon-key
+      SUPABASE_SERVICE_KEY: dev-service-role-key
+    networks:
+      - supabase-network
+
+networks:
+  supabase-network:
+    driver: bridge
+
+volumes:
+  supabase-db-data:
+

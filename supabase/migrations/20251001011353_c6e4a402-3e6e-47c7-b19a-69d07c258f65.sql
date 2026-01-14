@@ -59,8 +59,8 @@ CREATE TABLE public.profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Create user_roles table
-CREATE TABLE public.user_roles (
+-- Create user_roles table (idempotent for fresh/local environments)
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   role public.app_role NOT NULL,
@@ -106,16 +106,6 @@ ALTER TABLE public.invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Create helper functions (SECURITY DEFINER)
-CREATE OR REPLACE FUNCTION public.is_platform_admin(check_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT public.has_role(check_user_id, 'platform_admin'::public.app_role);
-$$;
-
 CREATE OR REPLACE FUNCTION public.has_role(check_user_id UUID, check_role public.app_role)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -128,6 +118,16 @@ AS $$
     WHERE user_id = check_user_id
       AND role = check_role
   );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_platform_admin(check_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.has_role(check_user_id, 'platform_admin'::public.app_role);
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_user_tenant_id(check_user_id UUID)

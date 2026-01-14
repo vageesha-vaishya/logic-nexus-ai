@@ -2240,7 +2240,7 @@ END $$;\n\n`;
           const sqlText = await file.async("text");
           totalBytes += sqlText.length;
           const lines = sqlText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
-          const insertStatements = lines.filter((l) => /^INSERT\s+INTO\s+"/i.test(l));
+          const insertStatements = lines.filter((l) => /^\s*INSERT\s+INTO\s+/i.test(l));
           totalStatements += insertStatements.length;
 
           // Execute in batches via RPC
@@ -2256,13 +2256,17 @@ END $$;\n\n`;
               
               if (error) {
                 failedStatements += batch.length;
-                if (!firstError) firstError = error.message;
-                console.error("Batch execution error:", error);
+                const rawMessage = error.message || 'Unknown error';
+                const displayMessage = /not authorized/i.test(rawMessage)
+                  ? 'Not authorized to run ZIP restore. Use a platform or tenant admin account.'
+                  : rawMessage;
+                if (!firstError) firstError = displayMessage;
+                console.error("Batch execution error:", displayMessage);
                 if (restoreSession) {
                   const errs = batch.map((stmt, idx) => ({
                     rowNumber: i + idx + 1,
                     field: 'statement',
-                    errorMessage: error.message || 'Unknown error',
+                    errorMessage: displayMessage,
                     rawData: stmt
                   }));
                   await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errs);
@@ -2278,7 +2282,11 @@ END $$;\n\n`;
                 if (errorRows.length > 0) {
                     if (!firstError) {
                         const firstErrRow = errorRows[0];
-                        firstError = firstErrRow && typeof firstErrRow.error === 'string' ? firstErrRow.error : 'Unknown error';
+                        let msg = firstErrRow && typeof firstErrRow.error === 'string' ? firstErrRow.error : 'Unknown error';
+                        if (msg === 'unsupported statement') {
+                          msg = 'Unsupported SQL statement in ZIP (only INSERT INTO public.* is allowed).';
+                        }
+                        firstError = msg;
                     }
                     console.error("Batch partial errors:", errorRows);
                 }
@@ -3091,41 +3099,53 @@ END $$;\n\n`;
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{restoreProgress.stage}</span>
+                    <span>{restoreProgress?.stage ?? "Preparing restore"}</span>
                     <span>
-                      {restoreProgress.totalRows > 0
-                        ? `${Math.min(100, Math.round((restoreProgress.processedRows / restoreProgress.totalRows) * 100))}%`
+                      {restoreProgress?.totalRows && restoreProgress.totalRows > 0
+                        ? `${Math.min(
+                            100,
+                            Math.round(
+                              ((restoreProgress.processedRows ?? 0) / restoreProgress.totalRows) * 100
+                            )
+                          )}%`
                         : "0%"}
                     </span>
                   </div>
                   <Progress
                     value={
-                      restoreProgress.totalRows > 0
-                        ? Math.min(100, (restoreProgress.processedRows / restoreProgress.totalRows) * 100)
+                      restoreProgress?.totalRows && restoreProgress.totalRows > 0
+                        ? Math.min(
+                            100,
+                            ((restoreProgress.processedRows ?? 0) / restoreProgress.totalRows) * 100
+                          )
                         : 0
                     }
                   />
                   <div className="text-xs text-muted-foreground space-y-1">
                     <div>
-                      Rows {restoreProgress.processedRows} / {restoreProgress.totalRows} · Restored{" "}
-                      {restoreProgress.restoredRows} · Failed {restoreProgress.failedRows}
+                      Rows {restoreProgress?.processedRows ?? 0} / {restoreProgress?.totalRows ?? 0} ·
+                      Restored {restoreProgress?.restoredRows ?? 0} · Failed{" "}
+                      {restoreProgress?.failedRows ?? 0}
                     </div>
                     <div>
-                      Batches {restoreProgress.batchIndex} / {restoreProgress.totalBatches} · Tables{" "}
-                      {restoreProgress.currentTableIndex} / {restoreProgress.totalTableCount}
+                      Batches {restoreProgress?.batchIndex ?? 0} /{" "}
+                      {restoreProgress?.totalBatches ?? 0} · Tables{" "}
+                      {restoreProgress?.currentTableIndex ?? 0} /{" "}
+                      {restoreProgress?.totalTableCount ?? 0}
                     </div>
                     <div>
-                      Elapsed {(restoreProgress.elapsedMs / 1000).toFixed(1)}s
-                      {restoreProgress.etaMs > 0 && (
-                        <> · ETA {(restoreProgress.etaMs / 1000).toFixed(1)}s</>
+                      Elapsed {((restoreProgress?.elapsedMs ?? 0) / 1000).toFixed(1)}s
+                      {restoreProgress?.etaMs && restoreProgress.etaMs > 0 && (
+                        <> · ETA {((restoreProgress.etaMs ?? 0) / 1000).toFixed(1)}s</>
                       )}
                     </div>
                     <div>
                       Data{" "}
-                      {(restoreProgress.bytesProcessed / (1024 * 1024)).toFixed(2)} MB /{" "}
-                      {(restoreProgress.totalBytes / (1024 * 1024)).toFixed(2)} MB ·{" "}
-                      {restoreProgress.mbPerSecond > 0 &&
-                        `${restoreProgress.mbPerSecond.toFixed(2)} MB/s`}
+                      {((restoreProgress?.bytesProcessed ?? 0) / (1024 * 1024)).toFixed(2)} MB /{" "}
+                      {((restoreProgress?.totalBytes ?? 0) / (1024 * 1024)).toFixed(2)} MB ·{" "}
+                      {restoreProgress?.mbPerSecond && restoreProgress.mbPerSecond > 0
+                        ? `${restoreProgress.mbPerSecond.toFixed(2)} MB/s`
+                        : ""}
                     </div>
                   </div>
                 </CardContent>

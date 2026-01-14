@@ -44,17 +44,28 @@ ALTER TABLE public.auth_role_hierarchy ENABLE ROW LEVEL SECURITY;
 
 -- Policies
 -- Platform admins can view and manage everything
-CREATE POLICY "Platform admins can manage roles" ON public.auth_roles
-    USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'platform_admin'));
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'user_roles'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Platform admins can manage roles" ON public.auth_roles ' ||
+            'USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = ''platform_admin''))';
 
-CREATE POLICY "Platform admins can manage permissions" ON public.auth_permissions
-    USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'platform_admin'));
+    EXECUTE 'CREATE POLICY "Platform admins can manage permissions" ON public.auth_permissions ' ||
+            'USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = ''platform_admin''))';
 
-CREATE POLICY "Platform admins can manage role permissions" ON public.auth_role_permissions
-    USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'platform_admin'));
+    EXECUTE 'CREATE POLICY "Platform admins can manage role permissions" ON public.auth_role_permissions ' ||
+            'USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = ''platform_admin''))';
 
-CREATE POLICY "Platform admins can manage hierarchy" ON public.auth_role_hierarchy
-    USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'platform_admin'));
+    EXECUTE 'CREATE POLICY "Platform admins can manage hierarchy" ON public.auth_role_hierarchy ' ||
+            'USING (auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = ''platform_admin''))';
+  END IF;
+END $$;
 
 -- Everyone can view roles and permissions (needed for UI/logic)
 CREATE POLICY "Everyone can view roles" ON public.auth_roles
