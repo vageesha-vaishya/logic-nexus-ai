@@ -3,3 +3,8 @@ export { FileUploadZone } from './FileUploadZone';
 export { MigrationProgressPanel } from './MigrationProgressPanel';
 export { MigrationSummaryReport } from './MigrationSummaryReport';
 export { DatabaseMigrationPanel } from './DatabaseMigrationPanel';
+export { ExternalDbConnectionForm } from './ExternalDbConnectionForm';
+export { SqlFileUploadZone } from './SqlFileUploadZone';
+export { ImportOptionsPanel, DEFAULT_IMPORT_OPTIONS } from './ImportOptionsPanel';
+export { ImportVerificationPanel } from './ImportVerificationPanel';
+export { PgDumpImportWizard } from './PgDumpImportWizard';
