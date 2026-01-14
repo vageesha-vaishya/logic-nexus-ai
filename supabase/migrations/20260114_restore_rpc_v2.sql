@@ -14,15 +14,19 @@ SET search_path = public
 AS $$
 DECLARE
     record jsonb;
+    row_number int := 0;
     keys text[];
     values text[];
     query text;
     inserted_count int := 0;
     error_count int := 0;
     errors text[] := ARRAY[]::text[];
+    error_rows jsonb := '[]'::jsonb;
     col text;
     val text;
     conflict_clause text;
+    err_code text;
+    err_constraint text;
 BEGIN
     -- Validate schema
     IF target_schema NOT IN ('public', 'auth', 'storage', 'extensions', 'vault') THEN
@@ -32,6 +36,7 @@ BEGIN
     -- Process each record
     FOR record IN SELECT * FROM jsonb_array_elements(data)
     LOOP
+        row_number := row_number + 1;
         BEGIN
             -- Extract keys and values
             SELECT array_agg(key), array_agg(value)
@@ -86,14 +91,25 @@ BEGIN
             inserted_count := inserted_count + 1;
         EXCEPTION WHEN OTHERS THEN
             error_count := error_count + 1;
+            GET STACK DIAGNOSTICS err_code = RETURNED_SQLSTATE,
+                                   err_constraint = CONSTRAINT_NAME;
             errors := array_append(errors, SQLERRM);
+            error_rows := error_rows || jsonb_build_array(
+                jsonb_build_object(
+                    'row_number', row_number,
+                    'error', SQLERRM,
+                    'code', err_code,
+                    'constraint', err_constraint
+                )
+            );
         END;
     END LOOP;
 
     RETURN jsonb_build_object(
         'success', inserted_count,
         'failed', error_count,
-        'errors', errors[1:5] -- Return first 5 errors
+        'errors', errors[1:5],
+        'error_rows', error_rows
     );
 END;
 $$;

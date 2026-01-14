@@ -1,4 +1,4 @@
- import { useEffect, useMemo, useState, useRef } from "react";
+ import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useCRM } from "@/hooks/useCRM";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,17 +8,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
- import { 
-   Loader2, 
-   Shield
- } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Loader2, 
+  Shield,
+  Eye
+} from "lucide-react";
 import Papa from "papaparse";
  import { toast } from "sonner";
  // import { BackupDownloader } from "@/components/admin/BackupDownloader";
- import { validateSQL, resolveDataTypeForValue, formatValue, calculateChecksum, generateManifest, DetailedProgress, calculateSchemaSignature } from "@/utils/dbExportUtils";
+import { validateSQL, resolveDataTypeForValue, formatValue, calculateChecksum, generateManifest, DetailedProgress, calculateSchemaSignature, sanitizeValue } from "@/utils/dbExportUtils";
 import { ExportProgressMeter } from "@/components/dashboard/data-management/ExportProgressMeter";
 import { ExportCompletionDialog } from "@/components/dashboard/data-management/ExportCompletionDialog";
+import { ImportHistoryService, ImportSession } from "@/lib/import-history-service";
+import { ImportReportDialog } from "@/components/system/ImportReportDialog";
 import ExportWorker from "@/workers/export.worker?worker";
+import JSZip from "jszip";
+import { Progress } from "@/components/ui/progress";
 
 type TableInfo = {
   schema_name: string;
@@ -31,8 +38,26 @@ type TableInfo = {
   row_estimate: number;
 };
 
+type RestoreProgressState = {
+  table: string | null;
+  processedRows: number;
+  totalRows: number;
+  restoredRows: number;
+  failedRows: number;
+  batchIndex: number;
+  totalBatches: number;
+  currentTableIndex: number;
+  totalTableCount: number;
+  elapsedMs: number;
+  etaMs: number;
+  stage: string;
+  bytesProcessed: number;
+  totalBytes: number;
+  mbPerSecond: number;
+};
+
 export default function DatabaseExport() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, supabase, context } = useCRM();
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
@@ -51,7 +76,11 @@ export default function DatabaseExport() {
   const [queryResult, setQueryResult] = useState<any[]>([]);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMode, setRestoreMode] = useState<'insert' | 'upsert'>('upsert');
+  const [isDryRun, setIsDryRun] = useState(false);
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null);
+  const [preImportIssues, setPreImportIssues] = useState<string[]>([]);
+  const [preImportWarnings, setPreImportWarnings] = useState<string[]>([]);
+  const [restoreProgress, setRestoreProgress] = useState<RestoreProgressState | null>(null);
   
   // Export Configuration
   const [batchSize] = useState(1000);
@@ -78,6 +107,77 @@ export default function DatabaseExport() {
   // Notification settings
   const [playSoundOnComplete, setPlaySoundOnComplete] = useState(false);
 
+  // Restore History
+  const [restoreHistoryData, setRestoreHistoryData] = useState<ImportSession[]>([]);
+  const [restoreHistoryLoading, setRestoreHistoryLoading] = useState(false);
+  const [reportSession, setReportSession] = useState<ImportSession | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>(context.tenantId || "");
+  const [selectedFranchiseId, setSelectedFranchiseId] = useState<string>(context.franchiseId ?? "none");
+
+  useEffect(() => {
+    if (context.isPlatformAdmin) {
+      const fetchTenants = async () => {
+        const { data } = await (supabase as any)
+          .from("tenants")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name");
+        if (data) setTenants(data);
+      };
+      fetchTenants();
+    }
+  }, [context.isPlatformAdmin, supabase]);
+
+  useEffect(() => {
+    if (selectedTenantId) {
+      const fetchFranchises = async () => {
+        const { data } = await (supabase as any)
+          .from("franchises")
+          .select("id, name")
+          .eq("tenant_id", selectedTenantId)
+          .eq("is_active", true)
+          .order("name");
+        if (data) setFranchises(data);
+      };
+      fetchFranchises();
+    } else {
+      setFranchises([]);
+      setSelectedFranchiseId("none");
+    }
+  }, [selectedTenantId, supabase]);
+
+  const fetchRestoreHistory = useCallback(async () => {
+    setRestoreHistoryLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('import_history')
+        .select('*')
+        .eq('entity_name', 'Database Restore')
+        .order('imported_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setRestoreHistoryData(data as ImportSession[]);
+    } catch (err: any) {
+      console.error(err);
+      if (err?.code === 'PGRST205') {
+        toast.error("Import history tables missing. Please run the migration.");
+      } else {
+        toast.error("Failed to load restore history");
+      }
+    } finally {
+      setRestoreHistoryLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchRestoreHistory();
+  }, [fetchRestoreHistory]);
+
   const playSuccessSound = () => {
     if (!playSoundOnComplete) return;
     try {
@@ -102,6 +202,27 @@ export default function DatabaseExport() {
       }, 200);
     } catch (e) {
       console.error("Audio playback failed", e);
+    }
+  };
+
+  const handleRestoreRevert = async (sessionId: string) => {
+    if (!context.isPlatformAdmin && !context.isTenantAdmin) {
+      toast.error("You do not have permission to revert restores.");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to revert this database restore? This will undo inserts and restore updated records where tracked.")) {
+      return;
+    }
+
+    try {
+      const toastId = toast.loading("Reverting restore...");
+      const result = await ImportHistoryService.revertImport(scopedDb as any, sessionId);
+      toast.dismiss(toastId);
+      toast.success(`Reverted restore: ${result.revertedInserts} inserts removed, ${result.revertedUpdates} updates restored.`);
+      fetchRestoreHistory();
+    } catch (err: any) {
+      toast.error(`Revert failed: ${err.message}`);
     }
   };
 
@@ -392,8 +513,8 @@ export default function DatabaseExport() {
       if (!prev) return null;
       const now = Date.now();
       let eta = prev.estimatedTimeRemaining;
+      let throughput = prev.currentThroughput;
       
-      // Calculate ETA if percent changed
       if (updates.percent !== undefined && updates.percent > prev.percent && updates.percent > 0) {
         const elapsed = (now - prev.startTime) / 1000;
         const rate = updates.percent / elapsed; // percent per second
@@ -401,7 +522,14 @@ export default function DatabaseExport() {
         eta = remaining / rate;
       }
 
-      return { ...prev, ...updates, estimatedTimeRemaining: eta };
+      if (updates.processedItems !== undefined && updates.processedItems > 0) {
+        const elapsed = (now - prev.startTime) / 1000;
+        if (elapsed > 0) {
+          throughput = updates.processedItems / elapsed;
+        }
+      }
+
+      return { ...prev, ...updates, estimatedTimeRemaining: eta, currentThroughput: throughput };
     });
   };
 
@@ -444,6 +572,9 @@ export default function DatabaseExport() {
       message: 'Starting export...',
       currentStep: 'Initialization',
       currentItem: '',
+      currentItemType: undefined,
+      currentItemSize: undefined,
+      currentThroughput: undefined,
       processedItems: 0,
       totalItems: 0,
       startTime: Date.now(),
@@ -495,6 +626,7 @@ export default function DatabaseExport() {
       };
 
       const validationErrors: string[] = [];
+      const phaseMetrics: { name: string; durationSeconds: number; items: number; throughput?: number }[] = [];
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const manifestTables: { name: string; rowCount: number; checksum: string; schemaSignature?: string }[] = [];
       const skippedTables: { name: string; reason: string }[] = [];
@@ -593,9 +725,15 @@ export default function DatabaseExport() {
 
       // 1. Enums / Types (001_enums.sql)
       if (exportOptions.enums) {
+        const phaseStart = Date.now();
         await checkStatus();
         updateStep('Exporting Enums', Math.round((currentWorkUnits / totalWorkUnits) * 100));
         addLog('Fetching database enums...');
+        updateProgress({
+          currentItemType: 'Enums',
+          currentItem: 'Database enums and types',
+          currentItemSize: undefined
+        });
         
         try {
           const { data: enumsData, error } = await scopedDb.rpc("get_database_enums");
@@ -635,14 +773,25 @@ END $$;\n\n`;
           validationErrors.push(`[Enums] Export failed: ${err.message}`);
           addLog(`Failed to export enums: ${err.message}`, 'error');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.enums > 0 ? counts.enums / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Enums', durationSeconds: phaseDuration, items: counts.enums, throughput: phaseThroughput });
         advanceProgress(100, 'Enums exported');
       }
 
       // 2. Schema / Tables (002_tables.sql)
+      let phaseStartSchema = 0;
       if (exportOptions.schema) {
+        phaseStartSchema = Date.now();
         await checkStatus();
         updateStep('Exporting Schema', Math.round((currentWorkUnits / totalWorkUnits) * 100));
         addLog('Fetching table schema...');
+        updateProgress({
+          currentItemType: 'Schema & Tables',
+          currentItem: 'Table definitions',
+          currentItemSize: undefined
+        });
 
         try {
           // Use new RPC that supports all schemas
@@ -802,6 +951,11 @@ END $$;\n\n`;
       if (exportOptions.constraints) {
         await checkStatus();
         advanceProgress(0, 'Starting Primary Keys export...', 'Exporting Primary Keys');
+        updateProgress({
+          currentItemType: 'Primary Keys',
+          currentItem: 'Primary and unique constraints',
+          currentItemSize: undefined
+        });
         
         try {
           const { data: constraintsData, error } = await scopedDb.rpc("get_table_constraints");
@@ -840,13 +994,24 @@ END $$;\n\n`;
           validationErrors.push(`[Primary Keys] Export failed: ${err.message}`);
           addLog(`Failed to export primary keys: ${err.message}`, 'error');
         }
+        const phaseEndSchema = Date.now();
+        const phaseDuration = (phaseEndSchema - phaseStartSchema) / 1000;
+        const totalSchemaObjects = counts.tables + counts.constraints;
+        const phaseThroughput = phaseDuration > 0 && totalSchemaObjects > 0 ? totalSchemaObjects / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Schema & Primary Keys', durationSeconds: phaseDuration, items: totalSchemaObjects, throughput: phaseThroughput });
         advanceProgress(100, 'Primary Keys exported');
       }
 
       // 3. Database Functions (003_functions.sql)
       if (exportOptions.dbFunctions) {
+        const phaseStart = Date.now();
         await checkStatus();
         advanceProgress(0, 'Starting Functions export...', 'Exporting Functions');
+        updateProgress({
+          currentItemType: 'Functions',
+          currentItem: 'Database functions',
+          currentItemSize: undefined
+        });
         
         try {
           let functionsData: any[] | null = null;
@@ -888,11 +1053,16 @@ END $$;\n\n`;
           validationErrors.push(`[Functions] Export failed: ${err.message}`);
           addLog(`Failed to export functions: ${err.message}`, 'error');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.functions > 0 ? counts.functions / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Functions', durationSeconds: phaseDuration, items: counts.functions, throughput: phaseThroughput });
         advanceProgress(100, 'Functions exported');
       }
 
       // 4. Data (004_data_{tablename}.sql)
       if (exportOptions.tableData) {
+        const phaseStart = Date.now();
         await checkStatus();
         advanceProgress(0, 'Starting Data export...', 'Exporting Data');
         
@@ -930,7 +1100,9 @@ END $$;\n\n`;
                   
                   updateProgress({ 
                       message: `Exporting data for ${table.table_name}...`, 
-                      currentItem: table.table_name,
+                      currentItem: `${table.schema_name}.${table.table_name}`,
+                      currentItemType: 'Table Data',
+                      currentItemSize: expectedCounts[`${table.schema_name}.${table.table_name}`] ?? undefined,
                       processedItems: processedRowsTotal
                   });
                   addLog(`Exporting table ${table.table_name}...`);
@@ -1065,12 +1237,22 @@ END $$;\n\n`;
           validationErrors.push(`[Data] Export failed: ${err.message}`);
           addLog(`Failed to export data: ${err.message}`, 'error');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.data_rows > 0 ? counts.data_rows / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Table Data', durationSeconds: phaseDuration, items: counts.data_rows, throughput: phaseThroughput });
       }
 
       // 5. Indexes (005_indexes.sql)
       if (exportOptions.indexes) {
+        const phaseStart = Date.now();
         await checkStatus();
         advanceProgress(0, 'Starting Indexes export...', 'Exporting Indexes');
+        updateProgress({
+          currentItemType: 'Indexes',
+          currentItem: 'Table indexes',
+          currentItemSize: undefined
+        });
         
         try {
           const { data: indexesData, error } = await scopedDb.rpc("get_table_indexes");
@@ -1102,13 +1284,23 @@ END $$;\n\n`;
           validationErrors.push(`[Indexes] Export failed: ${err.message}`);
           addLog(`Failed to export indexes: ${err.message}`, 'error');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.indexes > 0 ? counts.indexes / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Indexes', durationSeconds: phaseDuration, items: counts.indexes, throughput: phaseThroughput });
         advanceProgress(100, 'Indexes exported');
       }
 
       // 6. Foreign Keys & Checks (006_foreign_keys.sql)
       if (exportOptions.constraints) {
+        const phaseStart = Date.now();
         await checkStatus();
         advanceProgress(0, 'Starting Foreign Keys export...', 'Exporting Foreign Keys');
+        updateProgress({
+          currentItemType: 'Foreign Keys & Checks',
+          currentItem: 'Foreign keys and check constraints',
+          currentItemSize: undefined
+        });
         
         try {
           const { data: constraintsData, error } = await scopedDb.rpc("get_table_constraints");
@@ -1147,13 +1339,23 @@ END $$;\n\n`;
           validationErrors.push(`[Foreign Keys] Export failed: ${err.message}`);
           addLog(`Failed to export foreign keys: ${err.message}`, 'error');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.constraints > 0 ? counts.constraints / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Foreign Keys & Checks', durationSeconds: phaseDuration, items: counts.constraints, throughput: phaseThroughput });
         advanceProgress(100, 'Foreign Keys exported');
       }
 
       // 7. RLS Policies (007_rls_policies.sql)
       if (exportOptions.rlsPolicies) {
+        const phaseStart = Date.now();
         await checkStatus();
         advanceProgress(0, 'Starting RLS Policies export...', 'Exporting RLS Policies');
+        updateProgress({
+          currentItemType: 'RLS Policies',
+          currentItem: 'Row Level Security policies',
+          currentItemSize: undefined
+        });
         
         try {
           // Try new schema-aware RPC first
@@ -1237,13 +1439,23 @@ END $$;\n\n`;
           validationErrors.push(`[RLS Policies] Export failed: ${err.message}`);
           addLog(`Failed to export RLS policies: ${err.message}`, 'error');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.policies > 0 ? counts.policies / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'RLS Policies', durationSeconds: phaseDuration, items: counts.policies, throughput: phaseThroughput });
         advanceProgress(50, 'RLS Policies exported');
       }
 
       // 8. Edge Functions (008_edge_functions.json)
       if (exportOptions.edgeFunctions || exportOptions.secrets) {
+        const phaseStart = Date.now();
         await checkStatus();
         advanceProgress(0, 'Starting Edge Functions export...', 'Exporting Edge Functions');
+        updateProgress({
+          currentItemType: 'Edge Functions',
+          currentItem: 'Supabase Edge functions',
+          currentItemSize: undefined
+        });
         
         try {
           const { data, error } = await scopedDb.client.functions.invoke("list-edge-functions");
@@ -1267,6 +1479,10 @@ END $$;\n\n`;
           // Don't fail the whole export for this
           addLog(`Failed to export edge functions: ${err.message}`, 'warning');
         }
+        const phaseEnd = Date.now();
+        const phaseDuration = (phaseEnd - phaseStart) / 1000;
+        const phaseThroughput = phaseDuration > 0 && counts.edge_functions > 0 ? counts.edge_functions / phaseDuration : undefined;
+        phaseMetrics.push({ name: 'Edge Functions', durationSeconds: phaseDuration, items: counts.edge_functions, throughput: phaseThroughput });
         advanceProgress(100, 'Edge Functions exported');
       }
 
@@ -1363,6 +1579,24 @@ END $$;\n\n`;
         ""
       ];
 
+      const statisticsSectionWithPerformance: string[] = [
+        "=== Statistics ===",
+        ...Object.entries(objectsByType).map(
+          ([type, count]) => `- ${type}: ${count}`
+        ),
+        `- Total Objects Exported: ${totalObjects}`,
+        "",
+        "=== Performance Metrics ===",
+        ...phaseMetrics.map(m => {
+          const base = `- ${m.name}: ${m.items} items in ${m.durationSeconds.toFixed(2)}s`;
+          if (m.throughput && m.throughput > 0) {
+            return `${base} (${m.throughput.toFixed(2)} items/s)`;
+          }
+          return base;
+        }),
+        ""
+      ];
+
       const footerSection: string[] = [
         "=== Footer ===",
         `Export Completion Status: ${
@@ -1404,10 +1638,30 @@ END $$;\n\n`;
         );
       }
 
+      if (validationErrors.length > 0 || skippedTables.length > 0) {
+        footerSection.push(
+          "",
+          "Action Items:",
+          "============"
+        );
+        if (skippedTables.length > 0) {
+          footerSection.push(
+            "- Review skipped tables above and resolve the reported errors.",
+            "- Re-run export after addressing the issues."
+          );
+        }
+        if (validationErrors.length > 0) {
+          footerSection.push(
+            "- Inspect validation_warnings.txt for SQL issues and fix them before running restore.",
+            "- Verify that all critical tables have matching row counts and constraints."
+          );
+        }
+      }
+
       const structuredSummary = [
         ...headerSection,
         ...detailedListingSection,
-        ...statisticsSection,
+        ...statisticsSectionWithPerformance,
         ...footerSection,
       ];
 
@@ -1666,16 +1920,451 @@ END $$;\n\n`;
     }
   };
 
+  const runPreImportChecks = async (file: File) => {
+    const issues: string[] = [];
+    const warnings: string[] = [];
+    let backup: any | undefined;
+    let zipManifest: any | undefined;
+    let approximateRows = 0;
+
+    setPreImportIssues([]);
+    setPreImportWarnings([]);
+
+    const name = file.name.toLowerCase();
+
+    if (name.endsWith(".json")) {
+      try {
+        const text = await file.text();
+        backup = JSON.parse(text);
+      } catch (e: any) {
+        issues.push("File is not valid JSON.");
+        setPreImportIssues(issues);
+        setPreImportWarnings(warnings);
+        return { fatal: true, backup, zipManifest, issues, warnings };
+      }
+
+      if (!backup || typeof backup !== "object") {
+        issues.push("Backup payload must be a JSON object.");
+      }
+      if (!backup?.backup_type) {
+        issues.push("Missing backup_type in backup file.");
+      }
+      if (!backup?.tables || typeof backup.tables !== "object") {
+        issues.push("Missing tables map in backup file.");
+      }
+
+      const tableKeys = backup?.tables ? Object.keys(backup.tables) : [];
+      if (tableKeys.length === 0) {
+        warnings.push("Backup contains no tables.");
+      } else {
+        tableKeys.forEach((key) => {
+          const rows = Array.isArray(backup.tables[key]) ? backup.tables[key].length : 0;
+          approximateRows += rows;
+        });
+
+        try {
+          const { data: schemaData, error: schemaError } = await scopedDb.rpc("get_all_database_schema");
+          if (schemaError) {
+            issues.push(`Failed to read target schema for validation: ${schemaError.message}`);
+          } else if (schemaData) {
+            const existingTables = new Set<string>();
+            (schemaData as any[]).forEach((col: any) => {
+              existingTables.add(`${col.schema_name}.${col.table_name}`);
+            });
+            const missing = tableKeys.filter((k) => !existingTables.has(k));
+            if (missing.length > 0) {
+              warnings.push(
+                `Backup includes ${missing.length} tables that do not exist in the target database.`
+              );
+            }
+
+            if (tables.length > 0 && approximateRows > 0) {
+              const estimateByTable: Record<string, number> = {};
+              tables.forEach((t) => {
+                if (typeof t.row_estimate === "number") {
+                  estimateByTable[`${t.schema_name}.${t.table_name}`] = t.row_estimate;
+                }
+              });
+
+              let estimatedTotal = 0;
+              tableKeys.forEach((key) => {
+                const est = estimateByTable[key];
+                if (typeof est === "number") {
+                  estimatedTotal += est;
+                }
+              });
+
+              if (estimatedTotal > 0) {
+                const ratio = approximateRows / estimatedTotal;
+                if (ratio > 2) {
+                  warnings.push(
+                    `Backup rows (~${approximateRows}) are significantly higher than current table estimates (~${estimatedTotal}). Ensure the target database has enough capacity.`
+                  );
+                } else if (ratio < 0.5) {
+                  warnings.push(
+                    `Backup rows (~${approximateRows}) are much lower than current table estimates (~${estimatedTotal}). Confirm you are restoring to the correct environment.`
+                  );
+                }
+              }
+
+              let bigTableMismatches = 0;
+              let smallTableMismatches = 0;
+
+              tableKeys.forEach((key) => {
+                const backupRows = Array.isArray(backup.tables[key]) ? backup.tables[key].length : 0;
+                const est = estimateByTable[key];
+                if (typeof est === "number" && est > 0 && backupRows > 0) {
+                  const ratio = backupRows / est;
+                  if (ratio > 3) {
+                    bigTableMismatches++;
+                    warnings.push(
+                      `Backup table ${key} has significantly more rows (${backupRows}) than current estimate (${est}).`
+                    );
+                  } else if (ratio < 0.25) {
+                    smallTableMismatches++;
+                    warnings.push(
+                      `Backup table ${key} has far fewer rows (${backupRows}) than current estimate (${est}).`
+                    );
+                  }
+                }
+              });
+
+              if (bigTableMismatches > 0 || smallTableMismatches > 0) {
+                let summary = "Row volume summary:";
+                if (bigTableMismatches > 0) {
+                  summary += ` ${bigTableMismatches} table${bigTableMismatches === 1 ? "" : "s"} significantly larger`;
+                }
+                if (smallTableMismatches > 0) {
+                  summary += bigTableMismatches > 0 ? "," : "";
+                  summary += ` ${smallTableMismatches} table${smallTableMismatches === 1 ? "" : "s"} significantly smaller`;
+                }
+                summary += " than current estimates.";
+                warnings.push(summary);
+              }
+            }
+          }
+        } catch (err: any) {
+          issues.push(`Pre-import schema check failed: ${err.message || String(err)}`);
+        }
+      }
+    } else if (name.endsWith(".zip")) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const manifestFile = zip.file("manifest.json");
+        if (!manifestFile) {
+          issues.push("Invalid export package: manifest.json not found in zip.");
+        } else {
+          try {
+            const manifestText = await manifestFile.async("text");
+            zipManifest = JSON.parse(manifestText);
+          } catch (e: any) {
+            issues.push("Failed to parse manifest.json from zip.");
+          }
+        }
+
+        if (zipManifest) {
+          if (!zipManifest.version) {
+            warnings.push("Manifest is missing version information.");
+          }
+          if (!zipManifest.tables || typeof zipManifest.tables !== "object") {
+            issues.push("Manifest is missing tables map.");
+          }
+          if (!zipManifest.summary) {
+            warnings.push("Manifest is missing summary block.");
+          }
+          if (Array.isArray(zipManifest.errors) && zipManifest.errors.length > 0) {
+            warnings.push(`Manifest contains ${zipManifest.errors.length} validation error entries.`);
+          }
+
+          try {
+            const { data: schemaData, error: schemaError } = await scopedDb.rpc("get_all_database_schema");
+            if (schemaError) {
+              issues.push(`Failed to read target schema for validation: ${schemaError.message}`);
+            } else if (schemaData && zipManifest.tables) {
+              const grouped: Record<string, any[]> = {};
+              (schemaData as any[]).forEach((col: any) => {
+                const key = `${col.schema_name}.${col.table_name}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(col);
+              });
+              const signatureMap: Record<string, string> = {};
+              Object.entries(grouped).forEach(([key, cols]) => {
+                signatureMap[key] = calculateSchemaSignature(cols);
+              });
+
+              let mismatches = 0;
+              Object.entries(zipManifest.tables as Record<string, any>).forEach(([key, value]) => {
+                const expectedSig = (value as any)?.schema_signature;
+                if (expectedSig) {
+                  const currentSig = signatureMap[key];
+                  if (currentSig && currentSig !== expectedSig) {
+                    mismatches++;
+                  }
+                }
+              });
+              if (mismatches > 0) {
+                warnings.push(`Schema signature mismatches detected for ${mismatches} tables.`);
+              }
+            }
+          } catch (err: any) {
+            issues.push(`Pre-import schema compatibility check failed: ${err.message || String(err)}`);
+          }
+        }
+
+        const exportSummary = zip.file("export_summary.txt");
+        if (!exportSummary) {
+          warnings.push("export_summary.txt not found in zip.");
+        }
+      } catch (err: any) {
+        issues.push(`Failed to read zip package: ${err.message || String(err)}`);
+      }
+    } else {
+      issues.push("Unsupported file type. Only .json and .zip are supported.");
+    }
+
+    setPreImportIssues(issues);
+    setPreImportWarnings(warnings);
+
+    const fatal = issues.length > 0;
+    return { fatal, backup, zipManifest, issues, warnings };
+  };
+
   const restoreDatabase = async () => {
     if (!restoreFile) {
       toast.error("No file selected", { description: "Please select a backup file to restore." });
       return;
     }
 
+    const maxSizeBytes = 50 * 1024 * 1024;
+    if (restoreFile.size > maxSizeBytes) {
+      toast.error("Backup file too large", {
+        description: "Use server-side tools for files larger than 50 MB.",
+      });
+      return;
+    }
+
     setLoading(true);
+    setRestoreProgress(null);
     try {
-      const fileContent = await restoreFile.text();
-      const backup = JSON.parse(fileContent);
+      const preCheck = await runPreImportChecks(restoreFile);
+
+      const effectiveTenantId = context.isPlatformAdmin ? selectedTenantId || context.tenantId : context.tenantId;
+      const effectiveFranchiseId = context.isPlatformAdmin
+        ? selectedFranchiseId === "none"
+          ? null
+          : selectedFranchiseId || context.franchiseId
+        : context.franchiseId;
+
+      if (!effectiveTenantId) {
+        toast.error("No target tenant selected", {
+          description: "Set a tenant scope before restoring.",
+        });
+        return;
+      }
+
+      if (preCheck.issues.length > 0 || preCheck.warnings.length > 0) {
+        const summaryParts = [];
+        if (preCheck.issues.length > 0) {
+          summaryParts.push(`${preCheck.issues.length} issue${preCheck.issues.length === 1 ? "" : "s"}`);
+        }
+        if (preCheck.warnings.length > 0) {
+          summaryParts.push(`${preCheck.warnings.length} warning${preCheck.warnings.length === 1 ? "" : "s"}`);
+        }
+        const summaryText = summaryParts.join(", ");
+        toast.message("Pre-import checks completed", {
+          description: summaryText || "No issues detected.",
+        });
+      }
+
+      if (preCheck.fatal) {
+        toast.error("Pre-import validation failed", {
+          description: "Resolve the issues listed below before restoring.",
+        });
+        return;
+      }
+
+      if (restoreFile.name.toLowerCase().endsWith(".zip")) {
+        const zipBuffer = await restoreFile.arrayBuffer();
+        const zip = await JSZip.loadAsync(zipBuffer);
+        const allFiles = Object.keys(zip.files);
+        const dataSqlFiles = allFiles
+          .filter((name) => name.toLowerCase().endsWith(".sql"))
+          .sort()
+          .filter((name) => /^004_data_.+\.sql$/i.test(name));
+        const skippedSqlFiles = allFiles
+          .filter((name) => name.toLowerCase().endsWith(".sql"))
+          .sort()
+          .filter((name) => !/^004_data_.+\.sql$/i.test(name));
+
+        if (dataSqlFiles.length === 0) {
+          toast.error("No data SQL files found", {
+            description: "The package contains no 004_data_*.sql files to import.",
+          });
+          return;
+        }
+
+        let totalStatements = 0;
+        let processedStatements = 0;
+        let successStatements = 0;
+        let failedStatements = 0;
+        let totalBytes = 0;
+        let bytesProcessed = 0;
+        let restoreSession: any = null;
+        let firstError: string | null = null;
+
+        try {
+          const restoreContext = {
+            ...context,
+            tenantId: effectiveTenantId,
+            franchiseId: effectiveFranchiseId,
+            adminOverrideEnabled: context.isPlatformAdmin ? true : context.adminOverrideEnabled,
+          };
+          const restoreDb = (scopedDb as any).withContext(restoreContext);
+          restoreSession = await ImportHistoryService.createSession(restoreDb as any, {
+            entity_name: 'Database Restore (ZIP)',
+            table_name: 'database',
+            file_name: restoreFile.name
+          });
+        } catch (e) {
+          restoreSession = null;
+        }
+
+        const batchSize = 100;
+        const startedAt = Date.now();
+
+        for (const name of dataSqlFiles) {
+          const file = zip.file(name);
+          if (!file) continue;
+          const sqlText = await file.async("text");
+          totalBytes += sqlText.length;
+          const lines = sqlText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+          const insertStatements = lines.filter((l) => /^INSERT\s+INTO\s+"/i.test(l));
+          totalStatements += insertStatements.length;
+
+          // Execute in batches via RPC
+          for (let i = 0; i < insertStatements.length; i += batchSize) {
+            const batch = insertStatements.slice(i, i + batchSize);
+            try {
+              const { data: rpcData, error } = await scopedDb.rpc('execute_insert_batch', {
+                statements: batch
+              });
+              if (error) {
+                failedStatements += batch.length;
+                if (!firstError) firstError = error.message;
+                console.error("Batch execution error:", error);
+                if (restoreSession) {
+                  const errs = batch.map((stmt, idx) => ({
+                    rowNumber: i + idx + 1,
+                    field: 'statement',
+                    errorMessage: error.message || 'Unknown error',
+                    rawData: stmt
+                  }));
+                  await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errs);
+                }
+              } else {
+                const res = rpcData as any;
+                const s = typeof res?.success === 'number' ? res.success : 0;
+                const f = typeof res?.failed === 'number' ? res.failed : 0;
+                successStatements += s;
+                failedStatements += f;
+                if (res?.error_rows?.length > 0) {
+                    if (!firstError) firstError = typeof res.error_rows[0].error === 'string' ? res.error_rows[0].error : 'Unknown error';
+                    console.error("Batch partial errors:", res.error_rows);
+                }
+                if (restoreSession && Array.isArray(res?.error_rows)) {
+                  const errs = (res.error_rows as any[]).map((e: any, idx: number) => ({
+                    rowNumber: i + idx + 1,
+                    field: 'statement',
+                    errorMessage: typeof e.error === 'string' ? e.error : 'Unknown error',
+                    rawData: e.statement || null
+                  }));
+                  if (errs.length > 0) {
+                    await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errs);
+                  }
+                }
+              }
+            } catch (err: any) {
+              failedStatements += batch.length;
+              if (!firstError) firstError = err.message;
+              console.error("Batch exception:", err);
+              if (restoreSession) {
+                const errs = batch.map((stmt, idx) => ({
+                  rowNumber: i + idx + 1,
+                  field: 'statement',
+                  errorMessage: err.message || 'Unknown error',
+                  rawData: stmt
+                }));
+                await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errs);
+              }
+            }
+
+            processedStatements += batch.length;
+            bytesProcessed += batch.join("\n").length;
+            const elapsedMs = Date.now() - startedAt;
+            const bytesPerMs = elapsedMs > 0 ? bytesProcessed / elapsedMs : 0;
+            const remainingBytes = Math.max(totalBytes - bytesProcessed, 0);
+            const etaMs = bytesPerMs > 0 ? remainingBytes / bytesPerMs : 0;
+            const mbPerSecond = bytesPerMs > 0 ? (bytesPerMs * 1000) / (1024 * 1024) : 0;
+            const totalBatchesForFile = Math.ceil(insertStatements.length / batchSize);
+            const currentFileIndex = dataSqlFiles.indexOf(name) + 1;
+            setRestoreProgress({
+              table: name,
+              processedRows: processedStatements,
+              totalRows: totalStatements,
+              restoredRows: successStatements,
+              failedRows: failedStatements,
+              batchIndex: Math.floor(i / batchSize) + 1,
+              totalBatches: totalBatchesForFile,
+              currentTableIndex: currentFileIndex,
+              totalTableCount: dataSqlFiles.length,
+              elapsedMs,
+              etaMs,
+              stage: "Executing data statements",
+              bytesProcessed,
+              totalBytes,
+              mbPerSecond,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+        }
+
+        if (restoreSession) {
+          try {
+            const status = failedStatements === 0 ? 'success' : successStatements > 0 ? 'partial' : 'failed';
+            await ImportHistoryService.updateSession(scopedDb as any, restoreSession.id, {
+              status,
+              summary: {
+                success: successStatements,
+                failed: failedStatements,
+                inserted: successStatements,
+                skipped_ddl_files: skippedSqlFiles.length
+              }
+            });
+          } catch (e) {
+            console.error("Failed to update restore session", e);
+          }
+        }
+
+        const ddlInfo = skippedSqlFiles.length > 0
+          ? `Skipped ${skippedSqlFiles.length} non-data SQL files (schemas, enums, tables, functions, indexes, foreign keys, policies). Use migration tooling to apply them.`
+          : undefined;
+
+        if (failedStatements > 0) {
+          toast.warning("ZIP restore completed with errors", {
+            description: `Executed ${successStatements} statements, ${failedStatements} failed. ${firstError ? `Error: ${firstError}. ` : ''}${ddlInfo ? ` ${ddlInfo}` : ''}`,
+          });
+        } else {
+          toast.success("ZIP restore completed", {
+            description: `Executed ${successStatements} data statements.${ddlInfo ? ` ${ddlInfo}` : ''}`,
+          });
+        }
+
+        setRestoreFile(null);
+        return;
+      }
+
+      const backup = preCheck.backup;
 
       if (!backup.backup_type || !backup.tables) {
         throw new Error("Invalid backup file format");
@@ -1697,71 +2386,329 @@ END $$;\n\n`;
 
       let totalRestored = 0;
       let errors = 0;
+      let restoreSession: any = null;
+      const restoreBatchSize = 500;
 
-      for (const [key, records] of Object.entries(backup.tables)) {
+      const tableEntries = Object.entries(backup.tables);
+      const totalTableCount = tableEntries.length;
+      let currentTableIndex = 0;
+
+      const totalRows = tableEntries.reduce((sum, [, records]) => {
+        const arr = records as any[];
+        return sum + (Array.isArray(arr) ? arr.length : 0);
+      }, 0);
+      let processedRows = 0;
+      let totalBatches = 0;
+      const startedAt = Date.now();
+      const totalBytes = restoreFile.size;
+      let bytesProcessed = 0;
+
+      tableEntries.forEach(([, records]) => {
+        const arr = records as any[];
+        if (Array.isArray(arr) && arr.length > 0) {
+          totalBatches += Math.ceil(arr.length / restoreBatchSize);
+        }
+      });
+
+      try {
+        const restoreContext = {
+          ...context,
+          tenantId: effectiveTenantId,
+          franchiseId: effectiveFranchiseId,
+          adminOverrideEnabled: context.isPlatformAdmin ? true : context.adminOverrideEnabled,
+        };
+        const restoreDb = (scopedDb as any).withContext(restoreContext);
+
+        restoreSession = await ImportHistoryService.createSession(restoreDb as any, {
+          entity_name: 'Database Restore',
+          table_name: 'database',
+          file_name: restoreFile.name
+        });
+      } catch (e) {
+        restoreSession = null;
+      }
+
+      for (const [key, records] of tableEntries) {
+        currentTableIndex++;
         const recordsArray = records as any[];
-        // Parse key which is "schema.table" or just "table" (legacy)
+        if (!Array.isArray(recordsArray) || recordsArray.length === 0) {
+          continue;
+        }
+
         const parts = key.split('.');
         const schema = parts.length > 1 ? parts[0] : 'public';
         const table = parts.length > 1 ? parts[1] : parts[0];
         const fullKey = `${schema}.${table}`;
         
-        if (schema === 'public') {
-             // Use scopedDb for public tables to respect tenant isolation
-             const pks = pkMap[fullKey];
-             const onConflict = pks && pks.length > 0 ? pks.join(',') : undefined;
+        // Prepare primary keys for upsert conflict resolution
+        const pks = pkMap[fullKey];
+        const onConflict = pks && pks.length > 0 ? pks.join(',') : undefined;
 
-             for (const record of recordsArray) {
-               if (restoreMode === 'upsert') {
-                 // If no PK found, upsert might fail or fallback to insert depending on DB, 
-                 // but usually requires conflict target. If undefined, supabase-js might default or error.
-                 // Safer to use 'id' as fallback if map is empty? Or just let it be undefined if library handles it.
-                 // Actually, supabase-js upsert requires onConflict if not inferable?
-                 // Let's use 'id' as fallback if nothing found, for backward compatibility.
-                 const conflictTarget = onConflict || 'id';
+        for (let i = 0; i < recordsArray.length; i += restoreBatchSize) {
+            const rawBatch = recordsArray.slice(i, i + restoreBatchSize);
+            const batch = rawBatch.map((record: any) => {
+                const clean: any = {};
+                for (const [k, v] of Object.entries(record)) {
+                    clean[k] = sanitizeValue(v);
+                }
+                return clean;
+            });
+            const batchIndex = Math.floor(i / restoreBatchSize) + 1;
+            let attempt = 0;
+            let lastError: any = null;
+            let resultData: any[] | null = null;
+            let rpcResult: any = null;
+
+            if (isDryRun) {
+               // DRY RUN MODE: Use logic_nexus_import_dry_run RPC for all tables
+               while (attempt < 3) {
+                 attempt += 1;
+                 const { error } = await scopedDb.rpc('logic_nexus_import_dry_run', {
+                   p_tables: { [table]: batch },
+                   p_schema: schema
+                 });
                  
-                 const { error } = await (scopedDb
-                   .from(table as any)
-                   .upsert(record, { onConflict: conflictTarget }) as any);
-                 
-                 if (error) {
-                   console.error(`Error upserting to ${key}:`, error.message);
-                   errors++;
+                 // The RPC is designed to RAISE EXCEPTION 'DRY_RUN_OK' on success
+                 if (error && error.message && error.message.includes('DRY_RUN_OK')) {
+                    // Success case for dry run
+                    rpcResult = { success: batch.length };
+                    break;
+                 } else if (error) {
+                    lastError = error;
+                    console.error(`Dry run error for ${key} (attempt ${attempt}):`, error.message);
                  } else {
-                   totalRestored++;
+                    // Unexpected: RPC returned without error? 
+                    // This implies the RPC implementation might have changed to return JSON instead of raising exception.
+                    // If so, treat as success if no error.
+                    rpcResult = { success: batch.length };
+                    break;
                  }
-               } else {
-                 const { error } = await (scopedDb
-                   .from(table as any)
-                   .insert(record) as any);
-                 
-                 if (error) {
-                   console.error(`Error inserting to ${key}:`, error.message);
-                   errors++;
-                 } else {
-                   totalRestored++;
+
+                 if (attempt < 3) {
+                   await new Promise((resolve) => setTimeout(resolve, attempt * 500));
                  }
                }
-             }
-        } else {
-             // Use RPC for non-public tables (auth, storage, etc.)
-             // Batch process for efficiency
-             const { data: rpcResult, error } = await scopedDb.rpc('restore_table_data', {
-                 target_schema: schema,
-                 target_table: table,
-                 data: recordsArray,
-                 mode: restoreMode,
-                 conflict_target: pkMap[fullKey] || null
-             });
 
-             if (error) {
-                 console.error(`Error restoring ${key}:`, error.message);
-                 errors += recordsArray.length; // Count all as errors
-             } else if (rpcResult) {
-                 const res = rpcResult as any;
-                 totalRestored += (res.success || 0);
-                 errors += (res.failed || 0);
-             }
+               if (!rpcResult && lastError) {
+                 errors += batch.length;
+                 if (restoreSession) {
+                    const baseRowIndex = i;
+                    const errorEntries = batch.map((record, index) => ({
+                      rowNumber: baseRowIndex + index + 1,
+                      field: 'all',
+                      errorMessage: `Dry run error for ${fullKey}: ${lastError.message || 'Unknown error'}`,
+                      rawData: record,
+                    }));
+                    await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errorEntries);
+                 }
+               } else if (rpcResult) {
+                  // In dry run, we don't increment totalRestored, but we can track "validated" rows?
+                  // Let's count them as restored for progress purposes, but maybe clarify in UI?
+                  totalRestored += batch.length; 
+               }
+
+            } else if (schema === 'public') {
+              // ... existing logic for public schema ...
+              if (restoreMode === 'upsert') {
+                const conflictTarget = onConflict || 'id';
+                while (attempt < 3) {
+                  attempt += 1;
+                  const { data, error } = await ((scopedDb as any)
+                    .from(table as any)
+                    .upsert(batch, { onConflict: conflictTarget }) as any);
+                  if (!error) {
+                    resultData = Array.isArray(data) ? data : null;
+                    break;
+                  }
+                  lastError = error;
+                  console.error(`Error upserting batch to ${key} (attempt ${attempt}):`, error.message);
+                  if (attempt < 3) {
+                    await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+                  }
+                }
+  
+                if (!resultData && lastError) {
+                  errors += batch.length;
+                  if (restoreSession) {
+                    const baseRowIndex = i;
+                    const errorEntries = batch.map((record, index) => ({
+                      rowNumber: baseRowIndex + index + 1,
+                      field: 'all',
+                      errorMessage: `Restore upsert error for ${fullKey}: ${lastError.message || 'Unknown error'}`,
+                      rawData: record,
+                    }));
+                    await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errorEntries);
+                  }
+                } else if (resultData) {
+                  totalRestored += resultData.length;
+                  if (restoreSession && resultData.length > 0) {
+                    const detailsPayload = resultData.map((inserted: any) => ({
+                      record_id: inserted.id,
+                      operation_type: 'insert' as const,
+                      new_data: inserted,
+                    }));
+                    await ImportHistoryService.logDetails(scopedDb as any, restoreSession.id, detailsPayload);
+                  }
+                }
+              } else {
+                while (attempt < 3) {
+                  attempt += 1;
+                  const { data, error } = await ((scopedDb as any)
+                    .from(table as any)
+                    .insert(batch) as any);
+                  if (!error) {
+                    resultData = Array.isArray(data) ? data : null;
+                    break;
+                  }
+                  lastError = error;
+                  console.error(`Error inserting batch to ${key} (attempt ${attempt}):`, error.message);
+                  if (attempt < 3) {
+                    await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+                  }
+                }
+  
+                if (!resultData && lastError) {
+                  errors += batch.length;
+                  if (restoreSession) {
+                    const baseRowIndex = i;
+                    const errorEntries = batch.map((record, index) => ({
+                      rowNumber: baseRowIndex + index + 1,
+                      field: 'all',
+                      errorMessage: `Restore insert error for ${fullKey}: ${lastError.message || 'Unknown error'}`,
+                      rawData: record,
+                    }));
+                    await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, errorEntries);
+                  }
+                } else if (resultData) {
+                  totalRestored += resultData.length;
+                  if (restoreSession && resultData.length > 0) {
+                    const detailsPayload = resultData.map((inserted: any) => ({
+                      record_id: inserted.id,
+                      operation_type: 'insert' as const,
+                      new_data: inserted,
+                    }));
+                    await ImportHistoryService.logDetails(scopedDb as any, restoreSession.id, detailsPayload);
+                  }
+                }
+              }
+            } else {
+              // ... existing logic for non-public schema ...
+              while (attempt < 3) {
+                attempt += 1;
+                const { data: rpcData, error } = await scopedDb.rpc('restore_table_data', {
+                  target_schema: schema,
+                  target_table: table,
+                  data: batch,
+                  mode: restoreMode,
+                  conflict_target: pkMap[fullKey] || null,
+                });
+                if (!error) {
+                  rpcResult = rpcData;
+                  break;
+                }
+                lastError = error;
+                console.error(`Error restoring batch for ${key} via RPC (attempt ${attempt}):`, error.message);
+                if (attempt < 3) {
+                  await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+                }
+              }
+  
+              if (!rpcResult && lastError) {
+                errors += batch.length;
+                if (restoreSession) {
+                  const baseRowIndex = i;
+                  const batchErrors = batch.map((record, index) => ({
+                    rowNumber: baseRowIndex + index + 1,
+                    field: 'all',
+                    errorMessage: `Restore RPC error for ${fullKey}: ${lastError.message || 'Unknown error'}`,
+                    rawData: record,
+                  }));
+                  await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, batchErrors);
+                }
+              } else if (rpcResult) {
+                const res = rpcResult as any;
+                const successCount = res.success || 0;
+                const failedCount = res.failed || 0;
+                totalRestored += successCount;
+                errors += failedCount;
+                if (restoreSession && Array.isArray(res.error_rows)) {
+                    // ... existing error logging logic ...
+                    const batchErrors = (res.error_rows as any[]).map((err: any) => {
+                      const rowNumber = typeof err.row_number === 'number' ? err.row_number : 0;
+                      const message = typeof err.error === 'string' ? err.error : 'Unknown restore error';
+                      const code = typeof err.code === 'string' ? err.code : null;
+                      const constraintName = typeof err.constraint === 'string' ? err.constraint : null;
+                      const fieldKey = constraintName
+                        ? `constraint:${constraintName}`
+                        : code
+                          ? `code:${code}`
+                          : 'all';
+                      const globalRowIndex = rowNumber > 0 ? rowNumber - 1 : 0;
+                      const rawData = globalRowIndex >= 0 && globalRowIndex < recordsArray.length
+                        ? (recordsArray as any[])[globalRowIndex]
+                        : null;
+                      return {
+                        rowNumber,
+                        field: fieldKey,
+                        errorMessage: constraintName
+                          ? `Restore RPC error for ${fullKey} (constraint ${constraintName}): ${message}`
+                          : code
+                            ? `Restore RPC error for ${fullKey} (${code}): ${message}`
+                            : `Restore RPC error for ${fullKey}: ${message}`,
+                        rawData,
+                      };
+                    });
+                    if (batchErrors.length > 0) {
+                      await ImportHistoryService.logErrors(scopedDb as any, restoreSession.id, batchErrors);
+                    }
+                }
+              }
+            }
+  
+            processedRows += batch.length;
+            bytesProcessed = Math.min(totalBytes, Math.floor((processedRows / Math.max(totalRows, 1)) * totalBytes));
+            const elapsedMs = Date.now() - startedAt;
+            const rowsPerMs = processedRows > 0 && elapsedMs > 0 ? processedRows / elapsedMs : 0;
+            const remainingRows = totalRows - processedRows;
+            const etaMs = rowsPerMs > 0 ? remainingRows / rowsPerMs : 0;
+            const bytesPerMs = elapsedMs > 0 ? bytesProcessed / elapsedMs : 0;
+            const mbPerSecond = bytesPerMs > 0 ? (bytesPerMs * 1000) / (1024 * 1024) : 0;
+            setRestoreProgress({
+              table: fullKey,
+              processedRows,
+              totalRows,
+              restoredRows: totalRestored,
+              failedRows: errors,
+              batchIndex,
+              totalBatches,
+              currentTableIndex,
+              totalTableCount,
+              elapsedMs,
+              etaMs,
+              stage: "Restoring tables",
+              bytesProcessed,
+              totalBytes,
+              mbPerSecond,
+            });
+  
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+
+      if (restoreSession) {
+        try {
+          const status = errors === 0 ? 'success' : totalRestored > 0 ? 'partial' : 'failed';
+          await ImportHistoryService.updateSession(scopedDb as any, restoreSession.id, {
+            status,
+            summary: {
+              success: totalRestored,
+              failed: errors,
+              inserted: totalRestored,
+              updated: 0
+            }
+          });
+        } catch (e) {
+          console.error("Failed to update restore session", e);
         }
       }
 
@@ -1780,6 +2727,7 @@ END $$;\n\n`;
       toast.error("Restore failed", { description: e.message || String(e) });
     } finally {
       setLoading(false);
+      setRestoreProgress(null);
     }
   };
 
@@ -1887,6 +2835,14 @@ END $$;\n\n`;
         </CardContent>
       </Card>
 
+      {reportSession && (
+        <ImportReportDialog 
+          session={reportSession} 
+          open={isReportOpen} 
+          onOpenChange={setIsReportOpen} 
+        />
+      )}
+
       {pendingDownloads.length > 0 && (
         <Card>
           <CardHeader>
@@ -1953,22 +2909,131 @@ END $$;\n\n`;
           <CardTitle>Database Restore</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {context.isPlatformAdmin && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/20">
+              <div className="space-y-2">
+                <Label htmlFor="restore-tenant-select">Target Tenant (Required)</Label>
+                <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                  <SelectTrigger id="restore-tenant-select">
+                    <SelectValue placeholder="Select Tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span>{t.name}</span>
+                          <Badge variant="outline" className="text-[10px] font-mono">
+                            {String(t.id).slice(0, 8)}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="restore-franchise-select">Target Franchise (Optional)</Label>
+                <Select
+                  value={selectedFranchiseId}
+                  onValueChange={setSelectedFranchiseId}
+                  disabled={!selectedTenantId || franchises.length === 0}
+                >
+                  <SelectTrigger id="restore-franchise-select">
+                    <SelectValue
+                      placeholder={
+                        !selectedTenantId ? "Select Tenant First" : "Select Franchise (Optional)"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">-- None (Tenant Level) --</SelectItem>
+                    {franchises.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span>{f.name}</span>
+                          <Badge variant="outline" className="text-[10px] font-mono">
+                            {String(f.id).slice(0, 8)}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              Restoring to:{" "}
+              {context.isPlatformAdmin ? (
+                <>
+                  {(() => {
+                    const activeTenantId = selectedTenantId || context.tenantId;
+                    const tenant = tenants.find((t) => t.id === activeTenantId);
+                    return tenant?.name || activeTenantId || "No tenant selected";
+                  })()}
+                  {" / "}
+                  {selectedFranchiseId === "none"
+                    ? "Tenant level"
+                    : (() => {
+                        const activeFranchiseId = selectedFranchiseId || context.franchiseId;
+                        const franchise = franchises.find((f) => f.id === activeFranchiseId);
+                        return franchise?.name || activeFranchiseId || "All franchises";
+                      })()}
+                </>
+              ) : (
+                <>
+                  {context.tenantId || "No tenant"}
+                  {" / "}
+                  {context.franchiseId || "Tenant level"}
+                </>
+              )}
+            </div>
+
             <div>
               <label className="text-sm font-medium">Select Backup File</label>
               <input
                 type="file"
-                accept=".json"
-                onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+                accept=".json,.zip"
+                onChange={(e) => {
+                  setRestoreFile(e.target.files?.[0] || null);
+                  setPreImportIssues([]);
+                  setPreImportWarnings([]);
+                }}
                 className="mt-2 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               />
               {restoreFile && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Selected: {restoreFile.name}
-                </p>
+                <p className="text-sm text-muted-foreground mt-2">Selected: {restoreFile.name}</p>
               )}
             </div>
-            
+
+            {(preImportIssues.length > 0 || preImportWarnings.length > 0) && (
+              <div className="rounded-md border border-border/60 bg-muted/40 p-3 space-y-1">
+                {preImportIssues.length > 0 && (
+                  <div className="text-xs text-red-600">
+                    Issues:
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {preImportIssues.map((msg, idx) => (
+                        <li key={`issue-${idx}`}>{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {preImportWarnings.length > 0 && (
+                  <div className="text-xs text-amber-700">
+                    Warnings:
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {preImportWarnings.map((msg, idx) => (
+                        <li key={`warn-${idx}`}>{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium">Restore Mode</label>
               <div className="flex gap-4 mt-2">
@@ -1976,8 +3041,8 @@ END $$;\n\n`;
                   <input
                     type="radio"
                     value="upsert"
-                    checked={restoreMode === 'upsert'}
-                    onChange={(e) => setRestoreMode(e.target.value as 'upsert')}
+                    checked={restoreMode === "upsert"}
+                    onChange={(e) => setRestoreMode(e.target.value as "upsert")}
                   />
                   <span className="text-sm">Upsert (Update or Insert)</span>
                 </label>
@@ -1985,22 +3050,161 @@ END $$;\n\n`;
                   <input
                     type="radio"
                     value="insert"
-                    checked={restoreMode === 'insert'}
-                    onChange={(e) => setRestoreMode(e.target.value as 'insert')}
+                    checked={restoreMode === "insert"}
+                    onChange={(e) => setRestoreMode(e.target.value as "insert")}
                   />
                   <span className="text-sm">Insert Only</span>
                 </label>
               </div>
             </div>
 
-            <Button 
-              onClick={restoreDatabase} 
+            <div className="flex items-center space-x-2">
+               <Checkbox 
+                  id="dryRun" 
+                  checked={isDryRun} 
+                  onCheckedChange={(checked) => setIsDryRun(checked as boolean)} 
+               />
+               <label
+                  htmlFor="dryRun"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Dry Run (Validate only, no data changes)
+                </label>
+            </div>
+
+            {restoreProgress && (
+              <Card className="mt-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Restore Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{restoreProgress.stage}</span>
+                    <span>
+                      {restoreProgress.totalRows > 0
+                        ? `${Math.min(100, Math.round((restoreProgress.processedRows / restoreProgress.totalRows) * 100))}%`
+                        : "0%"}
+                    </span>
+                  </div>
+                  <Progress
+                    value={
+                      restoreProgress.totalRows > 0
+                        ? Math.min(100, (restoreProgress.processedRows / restoreProgress.totalRows) * 100)
+                        : 0
+                    }
+                  />
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div>
+                      Rows {restoreProgress.processedRows} / {restoreProgress.totalRows} · Restored{" "}
+                      {restoreProgress.restoredRows} · Failed {restoreProgress.failedRows}
+                    </div>
+                    <div>
+                      Batches {restoreProgress.batchIndex} / {restoreProgress.totalBatches} · Tables{" "}
+                      {restoreProgress.currentTableIndex} / {restoreProgress.totalTableCount}
+                    </div>
+                    <div>
+                      Elapsed {(restoreProgress.elapsedMs / 1000).toFixed(1)}s
+                      {restoreProgress.etaMs > 0 && (
+                        <> · ETA {(restoreProgress.etaMs / 1000).toFixed(1)}s</>
+                      )}
+                    </div>
+                    <div>
+                      Data{" "}
+                      {(restoreProgress.bytesProcessed / (1024 * 1024)).toFixed(2)} MB /{" "}
+                      {(restoreProgress.totalBytes / (1024 * 1024)).toFixed(2)} MB ·{" "}
+                      {restoreProgress.mbPerSecond > 0 &&
+                        `${restoreProgress.mbPerSecond.toFixed(2)} MB/s`}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Button
+              onClick={restoreDatabase}
               disabled={loading || !restoreFile}
               className="w-full"
             >
               Restore Database
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Restore History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>File</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Summary</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {restoreHistoryLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
+                </TableRow>
+              ) : restoreHistoryData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    No restore history found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                restoreHistoryData.map((session) => (
+                  <TableRow key={session.id}>
+                    <TableCell>{new Date(session.imported_at).toLocaleString()}</TableCell>
+                    <TableCell>{session.file_name}</TableCell>
+                    <TableCell>
+                      <Badge variant={session.status === 'success' ? 'default' : session.status === 'reverted' ? 'destructive' : 'secondary'}>
+                        {session.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {session.summary ? (
+                        <div className="flex gap-2">
+                          <span className="text-green-600">Success: {session.summary.success}</span>
+                          <span className="text-red-600">Failed: {session.summary.failed}</span>
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setReportSession(session);
+                            setIsReportOpen(true);
+                          }}
+                          title="View Report"
+                        >
+                          <Eye className="h-4 w-4 mr-2" /> View
+                        </Button>
+                        {session.status !== 'reverted' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleRestoreRevert(session.id)}
+                          >
+                            Revert
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

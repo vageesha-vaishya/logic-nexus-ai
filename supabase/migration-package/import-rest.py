@@ -132,6 +132,23 @@ def load_env():
     return base_url.rstrip('/'), anon_key, service_key, data_dir
 
 
+def sanitize_cell(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        v = value.strip()
+        if v == "":
+            return None
+        low = v.lower()
+        if low in ("true", "false"):
+            return low == "true"
+        max_len = 10000
+        if len(v) > max_len:
+            v = v[:max_len]
+        return v
+    return value
+
+
 def to_json_rows(csv_path):
     rows = []
     with open(csv_path, newline='') as f:
@@ -139,17 +156,7 @@ def to_json_rows(csv_path):
         for row in r:
             clean = {}
             for k, v in row.items():
-                if v is None:
-                    clean[k] = None
-                    continue
-                v = v.strip()
-                if v == "":
-                    clean[k] = None
-                elif v.lower() in ("true", "false"):
-                    clean[k] = (v.lower() == "true")
-                else:
-                    # Keep as string; PostgREST will cast when possible
-                    clean[k] = v
+                clean[k] = sanitize_cell(v)
             rows.append(clean)
     return rows
 
@@ -202,6 +209,24 @@ def post_rows(base_url, apikey, service_key, table, rows, on_conflict=None):
         return False, e.code, body
     except Exception as e:
         return False, None, str(e)
+
+
+def post_rows_with_retry(base_url, apikey, service_key, table, rows, on_conflict=None, max_retries=3):
+    attempt = 0
+    last_code = None
+    last_err = None
+    while attempt < max_retries:
+        ok, code, err = post_rows(base_url, apikey, service_key, table, rows, on_conflict=on_conflict)
+        if ok and code in (201, 204):
+            return True, code, err, attempt + 1
+        retryable = code is None or (isinstance(code, int) and code >= 500)
+        if not retryable:
+            return ok, code, err, attempt + 1
+        attempt += 1
+        last_code = code
+        last_err = err
+        time.sleep(min(5, attempt))
+    return False, last_code, last_err, max_retries
 
 
 def dedupe_rows(rows, key_fields=None):
@@ -344,14 +369,22 @@ def import_table(base_url, apikey, service_key, data_dir, table, table_columns, 
         print(f"[SKIP] {table}: empty CSV")
         return {"table": table, "found": True, "empty": True}
 
-    rows = to_json_rows(path)
-    total = len(rows)
+    rows = None
+    total = 0
+    with open(path, newline='') as f:
+        r = csv.DictReader(f)
+        for _ in r:
+            total += 1
     if total == 0:
         print(f"[SKIP] {table}: no data rows")
         return {"table": table, "found": True, "empty": True}
 
     print(f"[INFO] {table}: {total} rows to insert")
-    chunk_size = 500
+    chunk_size_env = os.environ.get("IMPORT_BATCH_SIZE")
+    try:
+        chunk_size = int(chunk_size_env) if chunk_size_env else 500
+    except Exception:
+        chunk_size = 500
     inserted = 0
     conflicts = 0
     errors = []
@@ -383,6 +416,8 @@ def import_table(base_url, apikey, service_key, data_dir, table, table_columns, 
     # If match_on provided, perform existence-aware upsert per-row
     match_on = cfg.get("match_on")
     if match_on:
+        rows = to_json_rows(path)
+        total = len(rows)
         # Validate match_on against allowed set
         allowed = allowed_final
         valid_match_on = [k for k in match_on if (not allowed or k in allowed)]
@@ -429,124 +464,207 @@ def import_table(base_url, apikey, service_key, data_dir, table, table_columns, 
                 "errors": errors,
             }
 
-    # Default bulk path
-    for i in range(0, total, chunk_size):
-        chunk_raw = rows[i:i+chunk_size]
-        # Filter to known columns for table to avoid schema cache errors
-        allowed = allowed_final
-        chunk = []
-        for r in chunk_raw:
-            tr = transform_row(table, r, mapping_cfg, lookups)
-            filtered = {k: v for k, v in tr.items() if (not allowed or k in allowed)}
-            if debug_trim:
-                for k in tr.keys():
-                    if (allowed and k not in allowed):
-                        trimmed_keys.add(k)
-            if filtered:
-                chunk.append(filtered)
-        # Dedupe within chunk to avoid self-conflicts
-        if chunk:
-            chunk = dedupe_rows(chunk, key_fields=dedupe_key)
-        if not chunk:
-            errors.append({"chunk": i//chunk_size+1, "code": 400, "error": "No matching columns in payload"})
-            print(f"[ERROR] {table}: chunk {i//chunk_size+1} has no matching columns; skipping")
-            continue
-        oc = None if disable_on_conflict else on_conflict
-        ok, code, err = post_rows(base_url, apikey, service_key, table, chunk, on_conflict=oc)
-        if ok and code in (201, 204):
-            inserted += len(chunk)
-        else:
-            # 409 often indicates unique conflicts; capture but continue
-            if code == 409:
-                print(f"[WARN] {table}: bulk conflict on chunk {i//chunk_size+1}. Retrying per-row...")
-                # Fallback to per-row insert to maximize successful inserts
-                for row in chunk:
-                    ok1, code1, err1 = post_rows(base_url, apikey, service_key, table, [row], on_conflict=None)
-                    if ok1 and code1 in (201, 204):
-                        inserted += 1
-                    elif code1 == 409:
-                        conflicts += 1
-                    else:
-                        errors.append({"chunk": i//chunk_size+1, "operation": "row", "row_id": row.get("id"), "code": code1, "error": err1})
-                print(f"[INFO] {table}: per-row retry completed for chunk {i//chunk_size+1}")
-            else:
-                # If ON CONFLICT invalid (42P10 or 42703), disable and retry bulk without it
-                if err and ("42P10" in str(err) or "42703" in str(err)) and not disable_on_conflict and on_conflict:
-                    print(f"[WARN] {table}: disabling on_conflict due to schema mismatch; retrying chunk bulk...")
-                    disable_on_conflict = True
-                    ok2, code2, err2 = post_rows(base_url, apikey, service_key, table, chunk, on_conflict=None)
-                    if ok2 and code2 in (201, 204):
+    processed = 0
+    total_batches = (total + chunk_size - 1) // chunk_size
+    batch_index = 0
+    start_table = time.monotonic()
+    with open(path, newline='') as f:
+        r = csv.DictReader(f)
+        chunk_raw = []
+        for raw_row in r:
+            norm_row = {k: sanitize_cell(v) for k, v in raw_row.items()}
+            chunk_raw.append(norm_row)
+            if len(chunk_raw) >= chunk_size:
+                batch_index += 1
+                batch_start = time.monotonic()
+                allowed = allowed_final
+                chunk = []
+                for row in chunk_raw:
+                    tr = transform_row(table, row, mapping_cfg, lookups)
+                    filtered = {k: v for k, v in tr.items() if (not allowed or k in allowed)}
+                    if debug_trim:
+                        for k in tr.keys():
+                            if (allowed and k not in allowed):
+                                trimmed_keys.add(k)
+                    if filtered:
+                        chunk.append(filtered)
+                if chunk:
+                    chunk = dedupe_rows(chunk, key_fields=dedupe_key)
+                if not chunk:
+                    errors.append({"chunk": batch_index, "code": 400, "error": "No matching columns in payload"})
+                    print(f"[ERROR] {table}: chunk {batch_index} has no matching columns; skipping")
+                else:
+                    oc = None if disable_on_conflict else on_conflict
+                    ok, code, err, _ = post_rows_with_retry(base_url, apikey, service_key, table, chunk, on_conflict=oc)
+                    if ok and code in (201, 204):
                         inserted += len(chunk)
-                    elif code2 == 409:
-                        # Final fallback to per-row
-                        print(f"[WARN] {table}: conflict persists; retrying per-row...")
+                    else:
+                        if code == 409:
+                            print(f"[WARN] {table}: bulk conflict on chunk {batch_index}. Retrying per-row...")
+                            for row in chunk:
+                                ok1, code1, err1 = post_rows(base_url, apikey, service_key, table, [row], on_conflict=None)
+                                if ok1 and code1 in (201, 204):
+                                    inserted += 1
+                                elif code1 == 409:
+                                    conflicts += 1
+                                else:
+                                    errors.append({"chunk": batch_index, "operation": "row", "row_id": row.get("id"), "code": code1, "error": err1})
+                            print(f"[INFO] {table}: per-row retry completed for chunk {batch_index}")
+                        else:
+                            if err and ("42P10" in str(err) or "42703" in str(err)) and not disable_on_conflict and on_conflict:
+                                print(f"[WARN] {table}: disabling on_conflict due to schema mismatch; retrying chunk bulk...")
+                                disable_on_conflict = True
+                                ok2, code2, err2, _ = post_rows_with_retry(base_url, apikey, service_key, table, chunk, on_conflict=None)
+                                if ok2 and code2 in (201, 204):
+                                    inserted += len(chunk)
+                                elif code2 == 409:
+                                    print(f"[WARN] {table}: conflict persists; retrying per-row...")
+                                    for row in chunk:
+                                        ok3, code3, err3 = post_rows(base_url, apikey, service_key, table, [row], on_conflict=None)
+                                        if ok3 and code3 in (201, 204):
+                                            inserted += 1
+                                        elif code3 == 409:
+                                            conflicts += 1
+                                        else:
+                                            errors.append({"chunk": batch_index, "code": code3, "error": err3})
+                                else:
+                                    sample_id = None
+                                    try:
+                                        sample_id = chunk[0].get("id")
+                                    except Exception:
+                                        pass
+                                    col_to_drop = None
+                                    try:
+                                        msg = str(err2 or "")
+                                        m = re.search(r"Could not find the '([^']+)' column", msg)
+                                        if m:
+                                            col_to_drop = m.group(1)
+                                    except Exception:
+                                        pass
+                                    if col_to_drop:
+                                        reduced_chunk = []
+                                        for row in chunk:
+                                            r2 = dict(row)
+                                            r2.pop(col_to_drop, None)
+                                            reduced_chunk.append(r2)
+                                        ok4, code4, err4, _ = post_rows_with_retry(base_url, apikey, service_key, table, reduced_chunk, on_conflict=oc)
+                                        if ok4 and code4 in (201, 204):
+                                            inserted += len(reduced_chunk)
+                                        else:
+                                            errors.append({"chunk": batch_index, "operation": "bulk", "row_id": sample_id, "code": code4, "error": err4})
+                                    else:
+                                        errors.append({"chunk": batch_index, "operation": "bulk", "row_id": sample_id, "code": code2, "error": err2})
+                            else:
+                                sample_id = None
+                                try:
+                                    sample_id = chunk[0].get("id")
+                                except Exception:
+                                    pass
+                                col_to_drop = None
+                                try:
+                                    msg = str(err or "")
+                                    m = re.search(r"Could not find the '([^']+)' column", msg)
+                                    if m:
+                                        col_to_drop = m.group(1)
+                                except Exception:
+                                    pass
+                                if col_to_drop:
+                                    reduced_chunk = []
+                                    for row in chunk:
+                                        r2 = dict(row)
+                                        r2.pop(col_to_drop, None)
+                                        reduced_chunk.append(r2)
+                                    ok5, code5, err5, _ = post_rows_with_retry(base_url, apikey, service_key, table, reduced_chunk, on_conflict=oc)
+                                    if ok5 and code5 in (201, 204):
+                                        inserted += len(reduced_chunk)
+                                    else:
+                                        errors.append({"chunk": batch_index, "operation": "bulk", "row_id": sample_id, "code": code5, "error": err5})
+                                        print(f"[ERROR] {table}: chunk {batch_index} failed code={code5} err={err5}")
+                                else:
+                                    errors.append({"chunk": batch_index, "operation": "bulk", "row_id": sample_id, "code": code, "error": err})
+                                    print(f"[ERROR] {table}: chunk {batch_index} failed code={code} err={err}")
+                processed += len(chunk_raw)
+                batch_duration = time.monotonic() - batch_start
+                if processed and total:
+                    remaining = max(total - processed, 0)
+                    elapsed = time.monotonic() - start_table
+                    per_row = elapsed / processed
+                    eta_seconds = remaining * per_row
+                    print(f"[INFO] {table}: chunk {batch_index}/{total_batches} duration={batch_duration:.2f}s eta={eta_seconds:.1f}s")
+                else:
+                    print(f"[INFO] {table}: chunk {batch_index} duration={batch_duration:.2f}s")
+                chunk_raw = []
+        if chunk_raw:
+            batch_index += 1
+            batch_start = time.monotonic()
+            allowed = allowed_final
+            chunk = []
+            for row in chunk_raw:
+                tr = transform_row(table, row, mapping_cfg, lookups)
+                filtered = {k: v for k, v in tr.items() if (not allowed or k in allowed)}
+                if debug_trim:
+                    for k in tr.keys():
+                        if (allowed and k not in allowed):
+                            trimmed_keys.add(k)
+                if filtered:
+                    chunk.append(filtered)
+            if chunk:
+                chunk = dedupe_rows(chunk, key_fields=dedupe_key)
+            if not chunk:
+                errors.append({"chunk": batch_index, "code": 400, "error": "No matching columns in payload"})
+                print(f"[ERROR] {table}: chunk {batch_index} has no matching columns; skipping")
+            else:
+                oc = None if disable_on_conflict else on_conflict
+                ok, code, err, _ = post_rows_with_retry(base_url, apikey, service_key, table, chunk, on_conflict=oc)
+                if ok and code in (201, 204):
+                    inserted += len(chunk)
+                else:
+                    if code == 409:
+                        print(f"[WARN] {table}: bulk conflict on chunk {batch_index}. Retrying per-row...")
                         for row in chunk:
-                            ok3, code3, err3 = post_rows(base_url, apikey, service_key, table, [row], on_conflict=None)
-                            if ok3 and code3 in (201, 204):
+                            ok1, code1, err1 = post_rows(base_url, apikey, service_key, table, [row], on_conflict=None)
+                            if ok1 and code1 in (201, 204):
                                 inserted += 1
-                            elif code3 == 409:
+                            elif code1 == 409:
                                 conflicts += 1
                             else:
-                                errors.append({"chunk": i//chunk_size+1, "code": code3, "error": err3})
+                                errors.append({"chunk": batch_index, "operation": "row", "row_id": row.get("id"), "code": code1, "error": err1})
+                        print(f"[INFO] {table}: per-row retry completed for chunk {batch_index}")
                     else:
-                        # Attempt adaptive retry: if unknown column error, drop it and retry once
-                        sample_id = None
-                        try:
-                            sample_id = chunk[0].get("id")
-                        except Exception:
-                            pass
-                        col_to_drop = None
-                        try:
-                            msg = str(err2 or "")
-                            m = re.search(r"Could not find the '([^']+)' column", msg)
-                            if m:
-                                col_to_drop = m.group(1)
-                        except Exception:
-                            pass
-                        if col_to_drop:
-                            reduced_chunk = []
-                            for row in chunk:
-                                r2 = dict(row)
-                                r2.pop(col_to_drop, None)
-                                reduced_chunk.append(r2)
-                            ok4, code4, err4 = post_rows(base_url, apikey, service_key, table, reduced_chunk, on_conflict=oc)
-                            if ok4 and code4 in (201, 204):
-                                inserted += len(reduced_chunk)
-                            else:
-                                errors.append({"chunk": i//chunk_size+1, "operation": "bulk", "row_id": sample_id, "code": code4, "error": err4})
+                        if err and ("42P10" in str(err) or "42703" in str(err)) and not disable_on_conflict and on_conflict:
+                            print(f"[WARN] {table}: disabling on_conflict due to schema mismatch; retrying chunk bulk...")
+                            disable_on_conflict = True
+                            ok2, code2, err2, _ = post_rows_with_retry(base_url, apikey, service_key, table, chunk, on_conflict=None)
+                            if ok2 and code2 in (201, 204):
+                                inserted += len(chunk)
+                            elif code2 == 409:
+                                print(f"[WARN] {table}: conflict persists; retrying per-row...")
+                                for row in chunk:
+                                    ok3, code3, err3 = post_rows(base_url, apikey, service_key, table, [row], on_conflict=None)
+                                    if ok3 and code3 in (201, 204):
+                                        inserted += 1
+                                    elif code3 == 409:
+                                        conflicts += 1
+                                    else:
+                                        errors.append({"chunk": batch_index, "code": code3, "error": err3})
                         else:
-                            errors.append({"chunk": i//chunk_size+1, "operation": "bulk", "row_id": sample_id, "code": code2, "error": err2})
-                else:
-                    sample_id = None
-                    try:
-                        sample_id = chunk[0].get("id")
-                    except Exception:
-                        pass
-                    # Attempt adaptive retry for unknown column errors even in initial bulk failure
-                    col_to_drop = None
-                    try:
-                        msg = str(err or "")
-                        m = re.search(r"Could not find the '([^']+)' column", msg)
-                        if m:
-                            col_to_drop = m.group(1)
-                    except Exception:
-                        pass
-                    if col_to_drop:
-                        reduced_chunk = []
-                        for row in chunk:
-                            r2 = dict(row)
-                            r2.pop(col_to_drop, None)
-                            reduced_chunk.append(r2)
-                        ok5, code5, err5 = post_rows(base_url, apikey, service_key, table, reduced_chunk, on_conflict=oc)
-                        if ok5 and code5 in (201, 204):
-                            inserted += len(reduced_chunk)
-                        else:
-                            errors.append({"chunk": i//chunk_size+1, "operation": "bulk", "row_id": sample_id, "code": code5, "error": err5})
-                            print(f"[ERROR] {table}: chunk {i//chunk_size+1} failed code={code5} err={err5}")
-                    else:
-                        errors.append({"chunk": i//chunk_size+1, "operation": "bulk", "row_id": sample_id, "code": code, "error": err})
-                        print(f"[ERROR] {table}: chunk {i//chunk_size+1} failed code={code} err={err}")
-        time.sleep(0.2)  # gentle pacing
+                            sample_id = None
+                            try:
+                                sample_id = chunk[0].get("id")
+                            except Exception:
+                                pass
+                            errors.append({"chunk": batch_index, "operation": "bulk", "row_id": sample_id, "code": code, "error": err})
+                            print(f"[ERROR] {table}: chunk {batch_index} failed code={code} err={err}")
+            processed += len(chunk_raw)
+            batch_duration = time.monotonic() - batch_start
+            if processed and total:
+                remaining = max(total - processed, 0)
+                elapsed = time.monotonic() - start_table
+                per_row = elapsed / processed
+                eta_seconds = remaining * per_row
+                print(f"[INFO] {table}: chunk {batch_index}/{total_batches} duration={batch_duration:.2f}s eta={eta_seconds:.1f}s")
+            else:
+                print(f"[INFO] {table}: chunk {batch_index} duration={batch_duration:.2f}s")
 
     print(f"[DONE] {table}: inserted={inserted} conflicts={conflicts} errors={len(errors)}")
     if debug_trim and trimmed_keys:

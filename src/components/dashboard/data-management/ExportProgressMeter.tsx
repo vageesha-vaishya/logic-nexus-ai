@@ -168,6 +168,37 @@ export function ExportProgressMeter({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="bg-muted/30 p-3 rounded-lg border">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <FileText className="h-3 w-3" /> Item Type
+            </div>
+            <div className="font-medium text-sm truncate" title={progress.currentItemType}>
+              {progress.currentItemType || '-'}
+            </div>
+          </div>
+
+          <div className="bg-muted/30 p-3 rounded-lg border">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <Activity className="h-3 w-3" /> Item Size
+            </div>
+            <div className="font-medium text-sm">
+              {progress.currentItemSize !== undefined ? progress.currentItemSize : '-'}
+            </div>
+          </div>
+
+          <div className="bg-muted/30 p-3 rounded-lg border">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <Activity className="h-3 w-3" /> Throughput
+            </div>
+            <div className="font-medium text-sm">
+              {progress.currentThroughput !== undefined
+                ? `${progress.currentThroughput.toFixed(1)} items/s`
+                : '-'}
+            </div>
+          </div>
+        </div>
+
         {/* Detailed Logs Toggle */}
         <div className="pt-2">
           <Button 

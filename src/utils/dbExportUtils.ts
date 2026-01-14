@@ -166,6 +166,9 @@ export interface DetailedProgress {
   message: string;
   currentStep: string;
   currentItem: string;
+  currentItemType?: string;
+  currentItemSize?: number;
+  currentThroughput?: number;
   processedItems: number;
   totalItems: number;
   startTime: number;
@@ -185,4 +188,34 @@ export const calculateSchemaSignature = (columns: any[]) => {
       `${c.column_name}:${c.data_type}:${c.is_nullable === true || c.is_nullable === 'YES'}:${c.is_primary_key}`
   ).join('|');
   return calculateChecksum(signatureString);
+};
+
+/**
+ * Sanitizes a cell value for import, mirroring the Python logic.
+ * - Trims strings
+ * - Converts empty strings to null
+ * - Converts "true"/"false" to booleans
+ * - Truncates strings to 10000 chars
+ * @param value The value to sanitize
+ */
+export const sanitizeValue = (value: any): any => {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value === 'string') {
+        const v = value.trim();
+        if (v === '') {
+            return null;
+        }
+        const low = v.toLowerCase();
+        if (low === 'true') return true;
+        if (low === 'false') return false;
+        
+        const maxLen = 10000;
+        if (v.length > maxLen) {
+            return v.slice(0, maxLen);
+        }
+        return v;
+    }
+    return value;
 };

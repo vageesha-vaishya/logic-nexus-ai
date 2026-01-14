@@ -94,6 +94,11 @@ export function ImportReportDialog({ session, open, onOpenChange }: ImportReport
   };
 
   const summary = session.summary || { success: 0, failed: 0, inserted: 0, updated: 0 };
+  const constraintStats = Object.entries(errorStats).filter(([field]) => field.startsWith('constraint:'));
+  const codeStats = Object.entries(errorStats).filter(([field]) => field.startsWith('code:'));
+  const fieldStats = Object.entries(errorStats).filter(
+    ([field]) => !field.startsWith('constraint:') && !field.startsWith('code:')
+  );
   const total = summary.success + summary.failed;
   const duration = session.imported_at ? 'N/A' : 'N/A'; // TODO: Calculate if completed_at is available
 
@@ -157,13 +162,50 @@ export function ImportReportDialog({ session, open, onOpenChange }: ImportReport
              )}
           </div>
           {Object.keys(errorStats).length > 0 && (
-             <div className="flex gap-2 flex-wrap">
-               {Object.entries(errorStats).map(([field, count]) => (
-                 <Badge key={field} variant="outline" className="text-xs">
-                   {field}: {count}
-                 </Badge>
-               ))}
-             </div>
+            <div className="space-y-2">
+              {constraintStats.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <div className="text-xs font-medium text-muted-foreground">By Constraint</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {constraintStats.map(([field, count]) => {
+                      const name = field.replace(/^constraint:/, '');
+                      return (
+                        <Badge key={field} variant="outline" className="text-xs">
+                          {name}: {count}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {codeStats.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <div className="text-xs font-medium text-muted-foreground">By Code</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {codeStats.map(([field, count]) => {
+                      const code = field.replace(/^code:/, '');
+                      return (
+                        <Badge key={field} variant="outline" className="text-xs">
+                          {code}: {count}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {fieldStats.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <div className="text-xs font-medium text-muted-foreground">By Field</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {fieldStats.map(([field, count]) => (
+                      <Badge key={field} variant="outline" className="text-xs">
+                        {field}: {count}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="border rounded-md flex-1 overflow-hidden">
@@ -172,7 +214,7 @@ export function ImportReportDialog({ session, open, onOpenChange }: ImportReport
                  <TableHeader>
                    <TableRow>
                      <TableHead className="w-[80px]">Row</TableHead>
-                     <TableHead className="w-[120px]">Field</TableHead>
+                                      <TableHead className="w-[120px]">Field / Type</TableHead>
                      <TableHead>Error Message</TableHead>
                      <TableHead className="w-[200px]">Raw Data</TableHead>
                    </TableRow>
@@ -192,7 +234,7 @@ export function ImportReportDialog({ session, open, onOpenChange }: ImportReport
                      errors.map((err) => (
                        <TableRow key={err.id}>
                          <TableCell>{err.row_number}</TableCell>
-                         <TableCell className="font-medium">{err.field}</TableCell>
+                                             <TableCell className="font-medium">{err.field}</TableCell>
                          <TableCell className="text-red-500">{err.error_message}</TableCell>
                          <TableCell className="text-xs text-muted-foreground font-mono truncate max-w-[200px]" title={JSON.stringify(err.raw_data)}>
                            {JSON.stringify(err.raw_data)}
