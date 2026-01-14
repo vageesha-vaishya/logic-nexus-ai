@@ -1,0 +1,262 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  AlertTriangle, 
+  Download,
+  RefreshCw,
+  Clock,
+  Database,
+  Table,
+  FileText
+} from 'lucide-react';
+import { ImportSummary, ImportError, ImportLog } from '@/hooks/usePgDumpImport';
+
+interface ImportVerificationPanelProps {
+  summary: ImportSummary;
+  errors: ImportError[];
+  logs: ImportLog[];
+  onRetry?: () => void;
+  onDownloadReport?: () => void;
+}
+
+export function ImportVerificationPanel({ 
+  summary, 
+  errors, 
+  logs,
+  onRetry,
+  onDownloadReport 
+}: ImportVerificationPanelProps) {
+  const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
+  const getStatusIcon = () => {
+    switch (summary.status) {
+      case 'success':
+        return <CheckCircle2 className="h-8 w-8 text-green-500" />;
+      case 'partial':
+        return <AlertTriangle className="h-8 w-8 text-warning" />;
+      case 'failed':
+        return <XCircle className="h-8 w-8 text-destructive" />;
+    }
+  };
+
+  const getStatusMessage = () => {
+    switch (summary.status) {
+      case 'success':
+        return 'Import completed successfully';
+      case 'partial':
+        return 'Import completed with some errors';
+      case 'failed':
+        return 'Import failed';
+    }
+  };
+
+  const successRate = summary.statementsExecuted / (summary.statementsExecuted + summary.statementsFailed) * 100;
+
+  const downloadReport = () => {
+    const report = {
+      summary: {
+        status: summary.status,
+        startTime: new Date(summary.startTime).toISOString(),
+        endTime: new Date(summary.endTime).toISOString(),
+        duration: formatDuration(summary.duration),
+        statementsExecuted: summary.statementsExecuted,
+        statementsFailed: summary.statementsFailed,
+        successRate: `${successRate.toFixed(1)}%`,
+      },
+      phases: summary.phases,
+      errors: errors.map(e => ({
+        phase: e.phase,
+        statement: e.statement,
+        error: e.error,
+        timestamp: new Date(e.timestamp).toISOString(),
+      })),
+      logs: logs.map(l => ({
+        level: l.level,
+        message: l.message,
+        details: l.details,
+        timestamp: new Date(l.timestamp).toISOString(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `import-report-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    onDownloadReport?.();
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {getStatusIcon()}
+            <div>
+              <CardTitle className="text-lg">{getStatusMessage()}</CardTitle>
+              <CardDescription>
+                Completed in {formatDuration(summary.duration)}
+              </CardDescription>
+            </div>
+          </div>
+          <Badge 
+            variant={summary.status === 'success' ? 'default' : summary.status === 'partial' ? 'secondary' : 'destructive'}
+            className="text-sm"
+          >
+            {successRate.toFixed(1)}% Success Rate
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Overall Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="p-4 bg-muted rounded-lg text-center">
+            <p className="text-3xl font-bold text-green-500">{summary.statementsExecuted}</p>
+            <p className="text-sm text-muted-foreground">Executed</p>
+          </div>
+          <div className="p-4 bg-muted rounded-lg text-center">
+            <p className="text-3xl font-bold text-destructive">{summary.statementsFailed}</p>
+            <p className="text-sm text-muted-foreground">Failed</p>
+          </div>
+          <div className="p-4 bg-muted rounded-lg text-center">
+            <p className="text-3xl font-bold">{formatDuration(summary.duration)}</p>
+            <p className="text-sm text-muted-foreground">Duration</p>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Overall Progress</span>
+            <span>{summary.statementsExecuted + summary.statementsFailed} / {summary.statementsExecuted + summary.statementsFailed} statements</span>
+          </div>
+          <Progress value={100} className="h-2" />
+        </div>
+
+        {/* Phase Breakdown */}
+        <div className="space-y-3">
+          <h4 className="font-medium flex items-center gap-2">
+            <Table className="h-4 w-4" />
+            Phase Breakdown
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {Object.entries(summary.phases).map(([phase, stats]) => (
+              stats.executed + stats.failed > 0 && (
+                <div key={phase} className="p-3 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium capitalize">{phase}</span>
+                    {stats.failed === 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                    )}
+                  </div>
+                  <div className="flex gap-2 text-xs">
+                    <span className="text-green-600">{stats.executed} ok</span>
+                    {stats.failed > 0 && (
+                      <span className="text-destructive">{stats.failed} failed</span>
+                    )}
+                  </div>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+
+        {/* Errors List */}
+        {errors.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="font-medium flex items-center gap-2 text-destructive">
+              <XCircle className="h-4 w-4" />
+              Errors ({errors.length})
+            </h4>
+            <ScrollArea className="h-48 rounded-md border">
+              <div className="p-4 space-y-3">
+                {errors.slice(0, 50).map((error, i) => (
+                  <div key={i} className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg text-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <Badge variant="outline" className="text-xs">{error.phase}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Statement #{error.index + 1}
+                      </span>
+                    </div>
+                    <p className="text-destructive font-medium">{error.error}</p>
+                    <pre className="mt-2 text-xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                      {error.statement}
+                    </pre>
+                  </div>
+                ))}
+                {errors.length > 50 && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    ... and {errors.length - 50} more errors
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* Execution Log */}
+        <div className="space-y-3">
+          <h4 className="font-medium flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Execution Log
+          </h4>
+          <ScrollArea className="h-48 rounded-md border bg-muted/50">
+            <div className="p-4 space-y-1 font-mono text-xs">
+              {logs.map((log, i) => (
+                <div key={i} className="flex gap-2">
+                  <span className="text-muted-foreground">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span className={
+                    log.level === 'error' ? 'text-destructive' :
+                    log.level === 'warn' ? 'text-warning' :
+                    log.level === 'success' ? 'text-green-500' :
+                    'text-foreground'
+                  }>
+                    [{log.level.toUpperCase()}]
+                  </span>
+                  <span>{log.message}</span>
+                  {log.details && (
+                    <span className="text-muted-foreground">- {log.details}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={downloadReport}>
+            <Download className="mr-2 h-4 w-4" />
+            Download Report
+          </Button>
+          {summary.status !== 'success' && onRetry && (
+            <Button className="flex-1" onClick={onRetry}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry Import
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
