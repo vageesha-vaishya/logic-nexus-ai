@@ -455,6 +455,7 @@ export default function DatabaseExport() {
     setShowProgressDetails(true);
 
     const summary: string[] = ["Database Export Summary", "=======================", `Date: ${new Date().toISOString()}`, ""];
+    const exportedObjects: { type: string; name: string }[] = [];
     
     // Helper to check pause/cancel
     const checkStatus = async () => {
@@ -621,6 +622,7 @@ export default function DatabaseExport() {
     END IF;
 END $$;\n\n`;
                   counts.enums++;
+                  exportedObjects.push({ type: 'Enum', name: enumType });
               });
               validationErrors.push(...validateSQL(sql, 'Enums', validateReservedWords));
               addFileToZip("001_enums.sql", sql);
@@ -718,6 +720,7 @@ END $$;\n\n`;
                       viewsSql += `-- View definition not available in standard schema export\n`; 
                       viewsSql += `-- Please ensure views are exported separately or use pg_dump.\n\n`;
                       viewCount++;
+                      exportedObjects.push({ type: 'View', name: `${schemaName}.${tableName}` });
                   } else {
                       tablesSql += `CREATE TABLE IF NOT EXISTS "${schemaName}"."${tableName}" (\n`;
                       const seen = new Set<string>();
@@ -741,6 +744,7 @@ END $$;\n\n`;
                       });
                       tablesSql += columnDefs.join(',\n') + '\n);\n\n';
                       tableCount++;
+                      exportedObjects.push({ type: 'Table', name: `${schemaName}.${tableName}` });
                       
                       // Calculate Schema Signature for manifest
                       const signature = calculateSchemaSignature(uniqueCols);
@@ -806,7 +810,7 @@ END $$;\n\n`;
           if (constraintsData && Array.isArray(constraintsData) && constraintsData.length > 0) {
             let sql = "-- 002b_primary_keys.sql\n-- Primary Keys and Unique Constraints\n\n";
             let count = 0;
-            constraintsData.forEach((constraint: any) => {
+              constraintsData.forEach((constraint: any) => {
               const type = (constraint.constraint_type || '').toUpperCase();
               const details = (constraint.constraint_details || '').toString();
               const isPkOrUnique = type === 'PRIMARY KEY' || type === 'UNIQUE' || 
@@ -816,6 +820,10 @@ END $$;\n\n`;
               if (isPkOrUnique && details.trim().length > 0) {
                 sql += `ALTER TABLE "${constraint.schema_name}"."${constraint.table_name}" ADD CONSTRAINT "${constraint.constraint_name}" ${details};\n`;
                 count++;
+                exportedObjects.push({
+                  type: 'Primary Key/Unique Constraint',
+                  name: `${constraint.schema_name}.${constraint.table_name}.${constraint.constraint_name}`
+                });
               }
             });
             if (count > 0) {
@@ -864,6 +872,7 @@ END $$;\n\n`;
                 sql += `-- Function: ${schema}.${name}\n`;
                 sql += `${trimmed}\n\n`;
                 counts.functions++;
+                exportedObjects.push({ type: 'Function', name: `${schema}.${name}` });
               } else if (name) {
                  sql += `-- Function metadata: ${schema}.${name} (definition unavailable)\n\n`;
               }
@@ -1074,6 +1083,12 @@ END $$;\n\n`;
               if (def.trim().length > 0) {
                 sql += `${def};\n`;
                 counts.indexes++;
+                if (index.index_name) {
+                  exportedObjects.push({
+                    type: 'Index',
+                    name: `${index.table_name}.${index.index_name}`
+                  });
+                }
               }
             });
             validationErrors.push(...validateSQL(sql, 'Indexes', validateReservedWords));
@@ -1112,6 +1127,10 @@ END $$;\n\n`;
               if (!isPkOrUnique && details.trim().length > 0) {
                 sql += `ALTER TABLE "${constraint.schema_name}"."${constraint.table_name}" ADD CONSTRAINT "${constraint.constraint_name}" ${details};\n`;
                 count++;
+                exportedObjects.push({
+                  type: 'Foreign Key/Check Constraint',
+                  name: `${constraint.schema_name}.${constraint.table_name}.${constraint.constraint_name}`
+                });
               }
             });
             if (count > 0) {
@@ -1137,15 +1156,26 @@ END $$;\n\n`;
         advanceProgress(0, 'Starting RLS Policies export...', 'Exporting RLS Policies');
         
         try {
-          const { data: policiesData, error } = await scopedDb.rpc("get_rls_policies");
+          // Try new schema-aware RPC first
+          let { data: policiesData, error } = await scopedDb.rpc("get_all_rls_policies");
+          
+          // Fallback to old RPC if new one not found
+          if (error && (error.message.includes("function") || error.message.includes("does not exist"))) {
+             console.warn("get_all_rls_policies not found, falling back to get_rls_policies");
+             const res = await scopedDb.rpc("get_rls_policies");
+             policiesData = res.data;
+             error = res.error;
+          }
+
           if (error) throw error;
           
           if (policiesData && Array.isArray(policiesData) && policiesData.length > 0) {
             let sql = "-- 007_rls_policies.sql\n-- Row Level Security Policies\n\n";
             const tableGroups = policiesData.reduce((acc: any, policy: any) => {
-              const key = `${policy.schema_name}.${policy.table_name}`;
+              const schema = policy.schema_name || 'public'; // Fallback for old RPC
+              const key = `${schema}.${policy.table_name}`;
               if (!acc[key]) {
-                acc[key] = { schema: policy.schema_name, table: policy.table_name, policies: [] };
+                acc[key] = { schema: schema, table: policy.table_name, policies: [] };
               }
               acc[key].policies.push(policy);
               return acc;
@@ -1190,6 +1220,10 @@ END $$;\n\n`;
                 }
                 sql += ';\n';
                 counts.policies++;
+                exportedObjects.push({
+                  type: 'RLS Policy',
+                  name: `${schema}.${table}.${policy.policy_name}`
+                });
               });
             });
             validationErrors.push(...validateSQL(sql, 'RLS Policies', validateReservedWords));
@@ -1219,6 +1253,13 @@ END $$;\n\n`;
               counts.edge_functions = funcCount;
               summary.push(`- Edge Functions: ${funcCount} exported`);
               addLog(`Exported ${funcCount} edge functions`, 'success');
+
+              if (Array.isArray((data as any).edge_functions)) {
+                (data as any).edge_functions.forEach((fn: any) => {
+                  const name = fn?.slug || fn?.name || fn?.id || 'edge_function';
+                  exportedObjects.push({ type: 'Edge Function', name });
+                });
+              }
           }
         } catch (err: any) {
           console.error("Error exporting edge functions:", err);
@@ -1295,8 +1336,82 @@ END $$;\n\n`;
           addLog('Validation passed', 'success');
       }
       
-      // Add Summary Report
-      addFileToZip("export_summary.txt", summary.join("\n"));
+      const totalObjects = exportedObjects.length;
+      const objectsByType = exportedObjects.reduce((acc: Record<string, number>, obj) => {
+        acc[obj.type] = (acc[obj.type] || 0) + 1;
+        return acc;
+      }, {});
+
+      const headerSection: string[] = [
+        "=== Database Export Summary ===",
+        `Export Date/Time: ${new Date().toISOString()}`,
+        ""
+      ];
+
+      const detailedListingSection: string[] = [
+        "=== Detailed Object Listing ===",
+        ...exportedObjects.map((obj) => `- [${obj.type}] ${obj.name}`),
+        ""
+      ];
+
+      const statisticsSection: string[] = [
+        "=== Statistics ===",
+        ...Object.entries(objectsByType).map(
+          ([type, count]) => `- ${type}: ${count}`
+        ),
+        `- Total Objects Exported: ${totalObjects}`,
+        ""
+      ];
+
+      const footerSection: string[] = [
+        "=== Footer ===",
+        `Export Completion Status: ${
+          validationErrors.length === 0 ? 'Success' : 'Partial Failure'
+        }`,
+        "",
+        `Tables: ${counts.tables}`,
+        `Enums: ${counts.enums}`,
+        `Functions: ${counts.functions}`,
+        `Indexes: ${counts.indexes}`,
+        `Constraints: ${counts.constraints}`,
+        `RLS Policies: ${counts.policies}`,
+        `Edge Functions: ${counts.edge_functions}`,
+        `Data Rows Exported: ${counts.data_rows}`,
+      ];
+
+      if (skippedTables.length > 0) {
+        footerSection.push(
+          "",
+          "Skipped Tables:",
+          "=============="
+        );
+        skippedTables.forEach((t) => {
+          footerSection.push(`- ${t.name}: ${t.reason}`);
+        });
+      }
+
+      if (validationErrors.length > 0) {
+        footerSection.push(
+          "",
+          "Validation: Completed with warnings. See validation_warnings.txt.",
+          `Manifest Generated: ${manifestTables.length} tables verified.`
+        );
+      } else {
+        footerSection.push(
+          "",
+          "Validation: Passed (No syntax issues detected)",
+          `Manifest Generated: ${manifestTables.length} tables verified.`
+        );
+      }
+
+      const structuredSummary = [
+        ...headerSection,
+        ...detailedListingSection,
+        ...statisticsSection,
+        ...footerSection,
+      ];
+
+      addFileToZip("export_summary.txt", structuredSummary.join("\n"));
 
       // Generate Zip
       updateStep('Finalizing Export', 99);

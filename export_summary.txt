@@ -1,0 +1,1826 @@
+=== Database Export Summary ===
+Export Date/Time: 2026-01-14T03:54:52.251Z
+
+=== Detailed Object Listing ===
+- [Table] auth.audit_log_entries
+- [Table] auth.flow_state
+- [Table] auth.identities
+- [Table] auth.instances
+- [Table] auth.mfa_amr_claims
+- [Table] auth.mfa_challenges
+- [Table] auth.mfa_factors
+- [Table] auth.oauth_authorizations
+- [Table] auth.oauth_client_states
+- [Table] auth.oauth_clients
+- [Table] auth.oauth_consents
+- [Table] auth.one_time_tokens
+- [Table] auth.refresh_tokens
+- [Table] auth.saml_providers
+- [Table] auth.saml_relay_states
+- [Table] auth.sessions
+- [Table] auth.sso_domains
+- [Table] auth.sso_providers
+- [Table] auth.users
+- [Table] extensions.pg_stat_statements
+- [Table] extensions.pg_stat_statements_info
+- [Table] public.accounts
+- [Table] public.activities
+- [Table] public.aes_hts_codes
+- [Table] public.audit_logs
+- [Table] public.auth_permissions
+- [Table] public.auth_role_permissions
+- [Table] public.auth_roles
+- [Table] public.cargo_details
+- [Table] public.cargo_types
+- [Table] public.carrier_rate_charges
+- [Table] public.carrier_rates
+- [Table] public.carrier_service_types
+- [Table] public.carriers
+- [Table] public.charge_bases
+- [Table] public.charge_categories
+- [Table] public.charge_sides
+- [Table] public.charge_tier_config
+- [Table] public.charge_tier_ranges
+- [Table] public.charge_weight_breaks
+- [Table] public.cities
+- [Table] public.compliance_checks
+- [Table] public.compliance_rules
+- [Table] public.consignees
+- [Table] public.contacts
+- [Table] public.container_sizes
+- [Table] public.container_types
+- [Table] public.continents
+- [Table] public.countries
+- [Table] public.currencies
+- [Table] public.custom_role_permissions
+- [Table] public.custom_roles
+- [Table] public.customer_selections
+- [Table] public.customs_documents
+- [Table] public.dashboard_preferences
+- [Table] public.document_templates
+- [Table] public.email_account_delegations
+- [Table] public.email_accounts
+- [Table] public.email_audit_log
+- [Table] public.email_filters
+- [Table] public.email_templates
+- [Table] public.emails
+- [Table] public.entity_transfer_items
+- [Table] public.entity_transfers
+- [Table] public.franchises
+- [Table] public.fx_rates
+- [Table] public.import_errors
+- [Table] public.import_history
+- [Table] public.import_history_details
+- [Table] public.incoterms
+- [Table] public.invitations
+- [Table] public.lead_activities
+- [Table] public.lead_assignment_history
+- [Table] public.lead_assignment_queue
+- [Table] public.lead_assignment_rules
+- [Table] public.lead_score_config
+- [Table] public.lead_score_logs
+- [Table] public.lead_scoring_rules
+- [Table] public.leads
+- [Table] public.margin_methods
+- [Table] public.margin_profiles
+- [Table] public.oauth_configurations
+- [Table] public.opportunities
+- [Table] public.package_categories
+- [Table] public.package_sizes
+- [Table] public.portal_tokens
+- [Table] public.ports_locations
+- [Table] public.profiles
+- [Table] public.provider_api_configs
+- [Table] public.provider_charge_mappings
+- [Table] public.provider_rate_rules
+- [Table] public.provider_rate_templates
+- [Table] public.provider_surcharges
+- [Table] public.provider_types
+- [Table] public.queue_members
+- [Table] public.queue_rules
+- [Table] public.queues
+- [Table] public.quotation_audit_log
+- [Table] public.quotation_packages
+- [Table] public.quotation_version_option_legs
+- [Table] public.quotation_version_options
+- [Table] public.quotation_versions
+- [Table] public.quote_access_logs
+- [Table] public.quote_charges
+- [Table] public.quote_comments
+- [Table] public.quote_documents
+- [Table] public.quote_email_history
+- [Table] public.quote_items
+- [Table] public.quote_legs
+- [Table] public.quote_number_config_franchise
+- [Table] public.quote_number_config_tenant
+- [Table] public.quote_number_sequences
+- [Table] public.quote_presentation_templates
+- [Table] public.quote_shares
+- [Table] public.quote_templates
+- [Table] public.quotes
+- [Table] public.rate_calculations
+- [Table] public.routes
+- [Table] public.scheduled_emails
+- [Table] public.service_leg_categories
+- [Table] public.service_modes
+- [Table] public.service_type_mappings
+- [Table] public.service_types
+- [Table] public.services
+- [Table] public.shipment_attachments
+- [Table] public.shipment_items
+- [Table] public.shipments
+- [Table] public.shipping_rates
+- [Table] public.states
+- [Table] public.subscription_features
+- [Table] public.subscription_invoices
+- [Table] public.subscription_plans
+- [Table] public.tenant_subscriptions
+- [Table] public.tenants
+- [Table] public.territories
+- [Table] public.territory_assignments
+- [Table] public.territory_geographies
+- [Table] public.themes
+- [Table] public.tracking_events
+- [Table] public.trade_directions
+- [Table] public.transport_modes
+- [Table] public.usage_records
+- [Table] public.user_capacity
+- [Table] public.user_custom_roles
+- [Table] public.user_preferences
+- [Table] public.user_roles
+- [Table] public.vehicles
+- [Table] public.warehouse_inventory
+- [Table] public.warehouses
+- [Table] storage.buckets
+- [Table] storage.buckets_analytics
+- [Table] storage.buckets_vectors
+- [Table] storage.migrations
+- [Table] storage.objects
+- [Table] storage.prefixes
+- [Table] storage.s3_multipart_uploads
+- [Table] storage.s3_multipart_uploads_parts
+- [Table] storage.vector_indexes
+- [Index] accounts.accounts_pkey
+- [Index] accounts.idx_accounts_franchise_id
+- [Index] accounts.idx_accounts_owner_id
+- [Index] accounts.idx_accounts_parent_id
+- [Index] accounts.idx_accounts_status
+- [Index] accounts.idx_accounts_tenant_id
+- [Index] accounts.idx_accounts_tenant_parent
+- [Index] activities.activities_pkey
+- [Index] activities.idx_activities_account_id
+- [Index] activities.idx_activities_assigned_to
+- [Index] activities.idx_activities_contact_id
+- [Index] activities.idx_activities_custom_fields
+- [Index] activities.idx_activities_due_date
+- [Index] activities.idx_activities_franchise_id
+- [Index] activities.idx_activities_lead_id
+- [Index] activities.idx_activities_status
+- [Index] activities.idx_activities_tenant_id
+- [Index] aes_hts_codes.aes_hts_codes_hts_code_unique
+- [Index] aes_hts_codes.aes_hts_codes_pkey
+- [Index] aes_hts_codes.idx_aes_hts_codes_category
+- [Index] aes_hts_codes.idx_aes_hts_codes_description_tsv
+- [Index] aes_hts_codes.idx_aes_hts_codes_hts_code
+- [Index] audit_logs.audit_logs_pkey
+- [Index] audit_logs.idx_audit_logs_created_at
+- [Index] audit_logs.idx_audit_logs_user_id
+- [Index] auth_permissions.auth_permissions_pkey
+- [Index] auth_role_permissions.auth_role_permissions_pkey
+- [Index] auth_role_permissions.auth_role_permissions_role_id_permission_id_key
+- [Index] auth_role_permissions.idx_auth_role_permissions_role
+- [Index] auth_roles.auth_roles_pkey
+- [Index] cargo_details.cargo_details_pkey
+- [Index] cargo_details.idx_cargo_details_tenant
+- [Index] cargo_types.cargo_types_pkey
+- [Index] carrier_rate_charges.carrier_rate_charges_pkey
+- [Index] carrier_rate_charges.idx_carrier_rate_charges_rate_id
+- [Index] carrier_rates.carrier_rates_pkey
+- [Index] carrier_rates.idx_carrier_rates_carrier_id
+- [Index] carrier_rates.idx_carrier_rates_dates
+- [Index] carrier_rates.idx_carrier_rates_destination_port
+- [Index] carrier_rates.idx_carrier_rates_origin_port
+- [Index] carrier_rates.idx_carrier_rates_reference
+- [Index] carrier_rates.idx_carrier_rates_service
+- [Index] carrier_rates.idx_carrier_rates_tenant
+- [Index] carrier_service_types.carrier_service_types_pkey
+- [Index] carrier_service_types.carrier_service_types_unique_pair
+- [Index] carrier_service_types.idx_cst_active
+- [Index] carrier_service_types.idx_cst_tenant
+- [Index] carrier_service_types.idx_cst_tenant_type
+- [Index] carriers.carriers_pkey
+- [Index] carriers.carriers_unique_name_per_tenant
+- [Index] carriers.idx_carriers_tenant
+- [Index] charge_bases.charge_bases_code_key
+- [Index] charge_bases.charge_bases_pkey
+- [Index] charge_categories.charge_categories_code_key
+- [Index] charge_categories.charge_categories_pkey
+- [Index] charge_sides.charge_sides_code_key
+- [Index] charge_sides.charge_sides_pkey
+- [Index] charge_tier_config.charge_tier_config_pkey
+- [Index] charge_tier_config.idx_charge_tier_config_basis
+- [Index] charge_tier_config.idx_charge_tier_config_carrier
+- [Index] charge_tier_config.idx_charge_tier_config_category
+- [Index] charge_tier_config.idx_charge_tier_config_service_type
+- [Index] charge_tier_config.idx_charge_tier_config_tenant
+- [Index] charge_tier_config.unique_tier_config_name
+- [Index] charge_tier_ranges.charge_tier_ranges_pkey
+- [Index] charge_tier_ranges.idx_charge_tier_ranges_config
+- [Index] charge_tier_ranges.idx_charge_tier_ranges_values
+- [Index] charge_weight_breaks.charge_weight_breaks_pkey
+- [Index] charge_weight_breaks.idx_charge_weight_breaks_carrier
+- [Index] charge_weight_breaks.idx_charge_weight_breaks_dates
+- [Index] charge_weight_breaks.idx_charge_weight_breaks_service_type
+- [Index] charge_weight_breaks.idx_charge_weight_breaks_tenant
+- [Index] charge_weight_breaks.idx_charge_weight_breaks_weight
+- [Index] cities.cities_country_state_name_key
+- [Index] cities.cities_pkey
+- [Index] cities.idx_cities_state_country
+- [Index] compliance_checks.compliance_checks_pkey
+- [Index] compliance_checks.idx_compliance_checks_quote
+- [Index] compliance_rules.compliance_rules_pkey
+- [Index] consignees.consignees_pkey
+- [Index] consignees.idx_consignees_tenant
+- [Index] contacts.contacts_pkey
+- [Index] contacts.idx_contacts_account_id
+- [Index] contacts.idx_contacts_franchise_id
+- [Index] contacts.idx_contacts_owner_id
+- [Index] contacts.idx_contacts_tenant_id
+- [Index] container_sizes.container_sizes_code_key
+- [Index] container_sizes.container_sizes_pkey
+- [Index] container_types.container_types_code_key
+- [Index] container_types.container_types_pkey
+- [Index] continents.continents_code_international_key
+- [Index] continents.continents_code_national_key
+- [Index] continents.continents_pkey
+- [Index] countries.countries_code_iso2_key
+- [Index] countries.countries_code_iso3_key
+- [Index] countries.countries_pkey
+- [Index] countries.idx_countries_continent
+- [Index] currencies.currencies_code_key
+- [Index] currencies.currencies_pkey
+- [Index] custom_role_permissions.custom_role_permissions_pkey
+- [Index] custom_role_permissions.custom_role_permissions_role_id_permission_key_key
+- [Index] custom_roles.custom_roles_pkey
+- [Index] custom_roles.custom_roles_tenant_id_name_key
+- [Index] customer_selections.customer_selections_pkey
+- [Index] customer_selections.idx_customer_selections_quote_id
+- [Index] customs_documents.customs_documents_pkey
+- [Index] dashboard_preferences.dashboard_preferences_pkey
+- [Index] dashboard_preferences.dashboard_preferences_user_id_key
+- [Index] dashboard_preferences.idx_dashboard_preferences_user_id
+- [Index] document_templates.document_templates_pkey
+- [Index] email_account_delegations.email_account_delegations_account_id_delegate_user_id_key
+- [Index] email_account_delegations.email_account_delegations_pkey
+- [Index] email_account_delegations.idx_email_delegations_account_id
+- [Index] email_account_delegations.idx_email_delegations_delegate_user_id
+- [Index] email_account_delegations.idx_email_delegations_is_active
+- [Index] email_accounts.email_accounts_pkey
+- [Index] email_accounts.email_accounts_user_id_email_address_key
+- [Index] email_accounts.idx_email_accounts_franchise_id
+- [Index] email_accounts.idx_email_accounts_tenant_id
+- [Index] email_accounts.idx_email_accounts_user_id
+- [Index] email_audit_log.email_audit_log_pkey
+- [Index] email_audit_log.idx_email_audit_log_created_at
+- [Index] email_audit_log.idx_email_audit_log_email_id
+- [Index] email_audit_log.idx_email_audit_log_event_type
+- [Index] email_audit_log.idx_email_audit_log_tenant_id
+- [Index] email_filters.email_filters_pkey
+- [Index] email_filters.idx_email_filters_account_id
+- [Index] email_filters.idx_email_filters_priority
+- [Index] email_filters.idx_email_filters_user_id
+- [Index] email_templates.email_templates_pkey
+- [Index] email_templates.idx_email_templates_franchise_id
+- [Index] email_templates.idx_email_templates_tenant_id
+- [Index] emails.emails_account_id_message_id_key
+- [Index] emails.emails_pkey
+- [Index] emails.idx_emails_account_id
+- [Index] emails.idx_emails_contact_id
+- [Index] emails.idx_emails_conversation_id
+- [Index] emails.idx_emails_direction
+- [Index] emails.idx_emails_folder
+- [Index] emails.idx_emails_franchise_id
+- [Index] emails.idx_emails_in_reply_to
+- [Index] emails.idx_emails_internet_message_id
+- [Index] emails.idx_emails_lead_id
+- [Index] emails.idx_emails_message_id
+- [Index] emails.idx_emails_queue
+- [Index] emails.idx_emails_queue_tenant
+- [Index] emails.idx_emails_received_at
+- [Index] emails.idx_emails_sync_error
+- [Index] emails.idx_emails_tenant_id
+- [Index] emails.idx_emails_thread_id
+- [Index] emails.idx_emails_user_id
+- [Index] entity_transfer_items.entity_transfer_items_pkey
+- [Index] entity_transfers.entity_transfers_pkey
+- [Index] franchises.franchises_code_key
+- [Index] franchises.franchises_pkey
+- [Index] franchises.idx_franchises_tenant_id
+- [Index] fx_rates.fx_rates_idx
+- [Index] fx_rates.fx_rates_pkey
+- [Index] import_errors.idx_import_errors_import_id
+- [Index] import_errors.import_errors_pkey
+- [Index] import_history.idx_import_history_table
+- [Index] import_history.idx_import_history_tenant
+- [Index] import_history.import_history_pkey
+- [Index] import_history_details.idx_import_history_details_import
+- [Index] import_history_details.import_history_details_pkey
+- [Index] incoterms.incoterms_pkey
+- [Index] invitations.idx_invitations_email
+- [Index] invitations.idx_invitations_token
+- [Index] invitations.invitations_pkey
+- [Index] invitations.invitations_token_key
+- [Index] lead_activities.idx_lead_activities_lead
+- [Index] lead_activities.lead_activities_pkey
+- [Index] lead_assignment_history.idx_assignment_history_assigned_to
+- [Index] lead_assignment_history.idx_assignment_history_lead
+- [Index] lead_assignment_history.lead_assignment_history_pkey
+- [Index] lead_assignment_queue.idx_assignment_queue_status
+- [Index] lead_assignment_queue.lead_assignment_queue_pkey
+- [Index] lead_assignment_rules.lead_assignment_rules_pkey
+- [Index] lead_score_config.lead_score_config_pkey
+- [Index] lead_score_config.lead_score_config_tenant_id_key
+- [Index] lead_score_logs.idx_lead_score_logs_lead
+- [Index] lead_score_logs.lead_score_logs_pkey
+- [Index] lead_scoring_rules.lead_scoring_rules_pkey
+- [Index] leads.idx_leads_custom_fields
+- [Index] leads.idx_leads_franchise_id
+- [Index] leads.idx_leads_owner_id
+- [Index] leads.idx_leads_status
+- [Index] leads.idx_leads_tenant_id
+- [Index] leads.leads_pkey
+- [Index] margin_methods.margin_methods_pkey
+- [Index] margin_profiles.margin_profiles_pkey
+- [Index] oauth_configurations.idx_oauth_configurations_user_provider
+- [Index] oauth_configurations.oauth_configurations_pkey
+- [Index] oauth_configurations.oauth_configurations_user_id_provider_key
+- [Index] opportunities.idx_opportunities_account
+- [Index] opportunities.idx_opportunities_close_date
+- [Index] opportunities.idx_opportunities_contact
+- [Index] opportunities.idx_opportunities_franchise
+- [Index] opportunities.idx_opportunities_owner
+- [Index] opportunities.idx_opportunities_stage
+- [Index] opportunities.idx_opportunities_tenant
+- [Index] opportunities.opportunities_pkey
+- [Index] package_categories.package_categories_pkey
+- [Index] package_sizes.package_sizes_pkey
+- [Index] portal_tokens.idx_portal_tokens_quote
+- [Index] portal_tokens.idx_portal_tokens_token
+- [Index] portal_tokens.portal_tokens_pkey
+- [Index] portal_tokens.portal_tokens_token_key
+- [Index] ports_locations.idx_ports_tenant
+- [Index] ports_locations.ports_locations_pkey
+- [Index] profiles.profiles_email_key
+- [Index] profiles.profiles_pkey
+- [Index] provider_api_configs.idx_provider_api_configs_active
+- [Index] provider_api_configs.idx_provider_api_configs_carrier
+- [Index] provider_api_configs.provider_api_configs_pkey
+- [Index] provider_api_configs.provider_api_configs_unique
+- [Index] provider_charge_mappings.idx_provider_charge_mappings_active
+- [Index] provider_charge_mappings.idx_provider_charge_mappings_carrier
+- [Index] provider_charge_mappings.idx_provider_charge_mappings_category
+- [Index] provider_charge_mappings.provider_charge_mappings_pkey
+- [Index] provider_charge_mappings.provider_charge_mappings_unique
+- [Index] provider_rate_rules.idx_provider_rate_rules_active
+- [Index] provider_rate_rules.idx_provider_rate_rules_carrier
+- [Index] provider_rate_rules.idx_provider_rate_rules_priority
+- [Index] provider_rate_rules.idx_provider_rate_rules_service_type
+- [Index] provider_rate_rules.provider_rate_rules_pkey
+- [Index] provider_rate_templates.idx_provider_rate_templates_active
+- [Index] provider_rate_templates.idx_provider_rate_templates_carrier
+- [Index] provider_rate_templates.idx_provider_rate_templates_service_type
+- [Index] provider_rate_templates.provider_rate_templates_pkey
+- [Index] provider_rate_templates.provider_rate_templates_unique
+- [Index] provider_surcharges.idx_provider_surcharges_active
+- [Index] provider_surcharges.idx_provider_surcharges_carrier
+- [Index] provider_surcharges.provider_surcharges_pkey
+- [Index] provider_surcharges.provider_surcharges_unique
+- [Index] provider_types.provider_types_pkey
+- [Index] queue_members.idx_queue_members_queue_id
+- [Index] queue_members.idx_queue_members_user_id
+- [Index] queue_members.queue_members_pkey
+- [Index] queue_members.queue_members_queue_id_user_id_key
+- [Index] queue_rules.idx_queue_rules_queue_id
+- [Index] queue_rules.idx_queue_rules_tenant_priority
+- [Index] queue_rules.queue_rules_pkey
+- [Index] queue_rules.queue_rules_tenant_id_name_key
+- [Index] queues.idx_queues_tenant_id
+- [Index] queues.queues_pkey
+- [Index] quotation_audit_log.idx_audit_created_at
+- [Index] quotation_audit_log.idx_audit_quote_id
+- [Index] quotation_audit_log.idx_audit_version_id
+- [Index] quotation_audit_log.quotation_audit_log_pkey
+- [Index] quotation_packages.idx_quotation_packages_quote_id
+- [Index] quotation_packages.idx_quotation_packages_tenant_id
+- [Index] quotation_packages.quotation_packages_pkey
+- [Index] quotation_version_option_legs.idx_quotation_version_option_legs_franchise
+- [Index] quotation_version_option_legs.idx_quotation_version_option_legs_leg_type
+- [Index] quotation_version_option_legs.idx_quotation_version_option_legs_option_id
+- [Index] quotation_version_option_legs.quotation_version_option_legs_option_order_idx
+- [Index] quotation_version_option_legs.quotation_version_option_legs_pkey
+- [Index] quotation_version_option_legs.quotation_version_option_legs_service_type_idx
+- [Index] quotation_version_options.idx_quotation_version_options_franchise
+- [Index] quotation_version_options.idx_quotation_version_options_version_id
+- [Index] quotation_version_options.quotation_version_options_pkey
+- [Index] quotation_versions.idx_active_version_per_quote
+- [Index] quotation_versions.idx_quotation_versions_current
+- [Index] quotation_versions.idx_quotation_versions_franchise
+- [Index] quotation_versions.idx_quotation_versions_quote_id
+- [Index] quotation_versions.idx_quotation_versions_version_number
+- [Index] quotation_versions.quotation_versions_pkey
+- [Index] quotation_versions.uq_quote_major_minor
+- [Index] quotation_versions.uq_quote_version_number
+- [Index] quote_access_logs.quote_access_logs_pkey
+- [Index] quote_charges.idx_quote_charges_franchise
+- [Index] quote_charges.idx_quote_charges_leg_id
+- [Index] quote_charges.idx_quote_charges_quote_option_id
+- [Index] quote_charges.quote_charges_pkey
+- [Index] quote_comments.idx_qc_q
+- [Index] quote_comments.quote_comments_pkey
+- [Index] quote_documents.idx_qd_q
+- [Index] quote_documents.quote_documents_pkey
+- [Index] quote_email_history.quote_email_history_pkey
+- [Index] quote_items.idx_quote_items_quote_id
+- [Index] quote_items.quote_items_pkey
+- [Index] quote_legs.idx_quote_legs_option
+- [Index] quote_legs.idx_quote_legs_service_type
+- [Index] quote_legs.idx_quote_legs_tenant
+- [Index] quote_legs.quote_legs_pkey
+- [Index] quote_number_config_franchise.quote_number_config_franchise_pkey
+- [Index] quote_number_config_franchise.quote_number_config_franchise_tenant_id_franchise_id_key
+- [Index] quote_number_config_tenant.quote_number_config_tenant_pkey
+- [Index] quote_number_config_tenant.quote_number_config_tenant_tenant_id_key
+- [Index] quote_number_sequences.quote_number_sequences_franchise_unique
+- [Index] quote_number_sequences.quote_number_sequences_pkey
+- [Index] quote_number_sequences.quote_number_sequences_tenant_unique
+- [Index] quote_presentation_templates.idx_qpt_t
+- [Index] quote_presentation_templates.quote_presentation_templates_pkey
+- [Index] quote_shares.idx_qs_q
+- [Index] quote_shares.quote_shares_pkey
+- [Index] quote_shares.quote_shares_share_token_key
+- [Index] quote_templates.idx_quote_templates_tenant
+- [Index] quote_templates.quote_templates_pkey
+- [Index] quotes.idx_quotes_account_id
+- [Index] quotes.idx_quotes_carrier
+- [Index] quotes.idx_quotes_consignee
+- [Index] quotes.idx_quotes_current_version
+- [Index] quotes.idx_quotes_destination_port
+- [Index] quotes.idx_quotes_franchise_id
+- [Index] quotes.idx_quotes_opportunity_id
+- [Index] quotes.idx_quotes_origin_port
+- [Index] quotes.idx_quotes_quote_number
+- [Index] quotes.idx_quotes_tenant_id
+- [Index] quotes.quotes_pkey
+- [Index] rate_calculations.idx_rate_calculations_quote
+- [Index] rate_calculations.rate_calculations_pkey
+- [Index] routes.routes_pkey
+- [Index] routes.routes_tenant_id_route_code_key
+- [Index] scheduled_emails.idx_scheduled_emails_scheduled_at
+- [Index] scheduled_emails.idx_scheduled_emails_status
+- [Index] scheduled_emails.idx_scheduled_emails_tenant_id
+- [Index] scheduled_emails.idx_scheduled_emails_user_id
+- [Index] scheduled_emails.scheduled_emails_pkey
+- [Index] service_leg_categories.service_leg_categories_code_key
+- [Index] service_leg_categories.service_leg_categories_pkey
+- [Index] service_modes.service_modes_pkey
+- [Index] service_type_mappings.idx_service_type_mappings_service_id
+- [Index] service_type_mappings.idx_service_type_mappings_tenant_id
+- [Index] service_type_mappings.service_type_mappings_pkey
+- [Index] service_type_mappings.service_type_mappings_service_type_id_idx
+- [Index] service_type_mappings.service_type_mappings_tenant_type_service_text_unique
+- [Index] service_types.idx_service_types_active
+- [Index] service_types.idx_service_types_mode_id
+- [Index] service_types.idx_service_types_name
+- [Index] service_types.service_types_code_key
+- [Index] service_types.service_types_code_unique
+- [Index] service_types.service_types_name_key
+- [Index] service_types.service_types_pkey
+- [Index] services.idx_services_service_type_id
+- [Index] services.idx_services_tenant
+- [Index] services.idx_services_type
+- [Index] services.services_pkey
+- [Index] services.services_tenant_id_service_code_key
+- [Index] shipment_attachments.idx_shipment_attachments_shipment
+- [Index] shipment_attachments.shipment_attachments_pkey
+- [Index] shipment_items.shipment_items_pkey
+- [Index] shipments.idx_shipments_account
+- [Index] shipments.idx_shipments_franchise
+- [Index] shipments.idx_shipments_pod_received_at
+- [Index] shipments.idx_shipments_pod_status
+- [Index] shipments.idx_shipments_shipment_number
+- [Index] shipments.idx_shipments_status
+- [Index] shipments.idx_shipments_tenant
+- [Index] shipments.shipments_pkey
+- [Index] shipments.shipments_tenant_id_shipment_number_key
+- [Index] shipping_rates.shipping_rates_pkey
+- [Index] states.idx_states_country
+- [Index] states.states_country_code_key
+- [Index] states.states_pkey
+- [Index] subscription_features.subscription_features_feature_key_key
+- [Index] subscription_features.subscription_features_pkey
+- [Index] subscription_invoices.idx_subscription_invoices_stripe
+- [Index] subscription_invoices.idx_subscription_invoices_tenant
+- [Index] subscription_invoices.subscription_invoices_invoice_number_key
+- [Index] subscription_invoices.subscription_invoices_pkey
+- [Index] subscription_invoices.subscription_invoices_stripe_invoice_id_key
+- [Index] subscription_plans.subscription_plans_pkey
+- [Index] subscription_plans.subscription_plans_slug_key
+- [Index] tenant_subscriptions.idx_tenant_subscriptions_status
+- [Index] tenant_subscriptions.idx_tenant_subscriptions_stripe
+- [Index] tenant_subscriptions.idx_tenant_subscriptions_tenant
+- [Index] tenant_subscriptions.tenant_subscriptions_pkey
+- [Index] tenant_subscriptions.tenant_subscriptions_stripe_subscription_id_key
+- [Index] tenant_subscriptions.tenant_subscriptions_tenant_id_plan_id_status_key
+- [Index] tenants.tenants_name_key
+- [Index] tenants.tenants_pkey
+- [Index] tenants.tenants_slug_key
+- [Index] tenants.tenants_stripe_customer_id_key
+- [Index] territories.idx_territories_tenant
+- [Index] territories.territories_pkey
+- [Index] territory_assignments.territory_assignments_pkey
+- [Index] territory_assignments.territory_assignments_territory_id_user_id_key
+- [Index] territory_geographies.idx_territory_geographies_city_id
+- [Index] territory_geographies.idx_territory_geographies_continent_id
+- [Index] territory_geographies.idx_territory_geographies_country_id
+- [Index] territory_geographies.idx_territory_geographies_state_id
+- [Index] territory_geographies.idx_territory_geographies_territory_id
+- [Index] territory_geographies.territory_geographies_pkey
+- [Index] themes.idx_themes_is_active
+- [Index] themes.idx_themes_is_default
+- [Index] themes.idx_themes_tenant_id
+- [Index] themes.themes_pkey
+- [Index] tracking_events.idx_tracking_events_date
+- [Index] tracking_events.idx_tracking_events_shipment
+- [Index] tracking_events.tracking_events_pkey
+- [Index] trade_directions.trade_directions_pkey
+- [Index] transport_modes.transport_modes_code_key
+- [Index] transport_modes.transport_modes_pkey
+- [Index] usage_records.idx_usage_records_period
+- [Index] usage_records.idx_usage_records_tenant_feature
+- [Index] usage_records.usage_records_pkey
+- [Index] user_capacity.idx_user_capacity_user
+- [Index] user_capacity.user_capacity_pkey
+- [Index] user_capacity.user_capacity_user_id_tenant_id_key
+- [Index] user_custom_roles.user_custom_roles_pkey
+- [Index] user_custom_roles.user_custom_roles_user_id_role_id_key
+- [Index] user_preferences.user_preferences_pkey
+- [Index] user_preferences.user_preferences_user_id_key
+- [Index] user_roles.idx_user_roles_franchise_id
+- [Index] user_roles.idx_user_roles_tenant_id
+- [Index] user_roles.idx_user_roles_user_id
+- [Index] user_roles.user_roles_pkey
+- [Index] user_roles.user_roles_user_id_role_tenant_id_franchise_id_key
+- [Index] user_roles.user_roles_user_role_unique
+- [Index] vehicles.idx_vehicles_tenant
+- [Index] vehicles.vehicles_pkey
+- [Index] vehicles.vehicles_tenant_id_vehicle_number_key
+- [Index] warehouse_inventory.warehouse_inventory_pkey
+- [Index] warehouses.idx_warehouses_tenant
+- [Index] warehouses.warehouses_pkey
+- [Index] warehouses.warehouses_tenant_id_code_key
+- [Foreign Key/Check Constraint] undefined.accounts.2200_17641_1_not_null
+- [Foreign Key/Check Constraint] undefined.accounts.2200_17641_2_not_null
+- [Foreign Key/Check Constraint] undefined.accounts.2200_17641_4_not_null
+- [Foreign Key/Check Constraint] undefined.accounts.accounts_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.accounts.accounts_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.accounts.accounts_owner_id_fkey
+- [Foreign Key/Check Constraint] undefined.accounts.accounts_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.accounts.chk_not_self_parent
+- [Foreign Key/Check Constraint] undefined.accounts.fk_parent_account
+- [Foreign Key/Check Constraint] undefined.activities.2200_17754_1_not_null
+- [Foreign Key/Check Constraint] undefined.activities.2200_17754_2_not_null
+- [Foreign Key/Check Constraint] undefined.activities.2200_17754_4_not_null
+- [Foreign Key/Check Constraint] undefined.activities.2200_17754_7_not_null
+- [Foreign Key/Check Constraint] undefined.activities.activities_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.activities.activities_assigned_to_fkey
+- [Foreign Key/Check Constraint] undefined.activities.activities_contact_id_fkey
+- [Foreign Key/Check Constraint] undefined.activities.activities_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.activities.activities_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.activities.activities_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.activities.activities_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.2200_58756_11_not_null
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.2200_58756_12_not_null
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.2200_58756_1_not_null
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.2200_58756_2_not_null
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.2200_58756_4_not_null
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.2200_58756_7_not_null
+- [Foreign Key/Check Constraint] undefined.aes_hts_codes.hts_code_format_check
+- [Foreign Key/Check Constraint] undefined.audit_logs.2200_17500_1_not_null
+- [Foreign Key/Check Constraint] undefined.audit_logs.2200_17500_3_not_null
+- [Foreign Key/Check Constraint] undefined.audit_logs.2200_17500_4_not_null
+- [Foreign Key/Check Constraint] undefined.audit_logs.audit_logs_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.auth_permissions.2200_123809_1_not_null
+- [Foreign Key/Check Constraint] undefined.auth_permissions.2200_123809_2_not_null
+- [Foreign Key/Check Constraint] undefined.auth_role_permissions.2200_123817_1_not_null
+- [Foreign Key/Check Constraint] undefined.auth_role_permissions.2200_123817_2_not_null
+- [Foreign Key/Check Constraint] undefined.auth_role_permissions.2200_123817_3_not_null
+- [Foreign Key/Check Constraint] undefined.auth_role_permissions.auth_role_permissions_permission_id_fkey
+- [Foreign Key/Check Constraint] undefined.auth_role_permissions.auth_role_permissions_role_id_fkey
+- [Foreign Key/Check Constraint] undefined.auth_roles.2200_123797_1_not_null
+- [Foreign Key/Check Constraint] undefined.auth_roles.2200_123797_2_not_null
+- [Foreign Key/Check Constraint] undefined.auth_roles.2200_123797_4_not_null
+- [Foreign Key/Check Constraint] undefined.cargo_details.2200_31907_1_not_null
+- [Foreign Key/Check Constraint] undefined.cargo_details.2200_31907_2_not_null
+- [Foreign Key/Check Constraint] undefined.cargo_details.cargo_details_actual_weight_kg_check
+- [Foreign Key/Check Constraint] undefined.cargo_details.cargo_details_chargeable_weight_kg_check
+- [Foreign Key/Check Constraint] undefined.cargo_details.cargo_details_volumetric_weight_kg_check
+- [Foreign Key/Check Constraint] undefined.cargo_types.2200_24905_1_not_null
+- [Foreign Key/Check Constraint] undefined.cargo_types.2200_24905_2_not_null
+- [Foreign Key/Check Constraint] undefined.cargo_types.2200_24905_3_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rate_charges.2200_31872_1_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rate_charges.2200_31872_2_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rate_charges.2200_31872_3_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rate_charges.2200_31872_4_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rate_charges.2200_31872_7_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rate_charges.carrier_rate_charges_carrier_rate_id_fkey
+- [Foreign Key/Check Constraint] undefined.carrier_rates.2200_23526_10_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rates.2200_23526_1_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rates.2200_23526_2_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rates.2200_23526_4_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rates.2200_23526_5_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rates.2200_23526_8_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_rates.carrier_rates_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.carrier_rates.carrier_rates_rate_type_check
+- [Foreign Key/Check Constraint] undefined.carrier_rates.carrier_rates_service_id_fkey
+- [Foreign Key/Check Constraint] undefined.carrier_rates.carrier_rates_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.carrier_service_types.2200_30657_1_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_service_types.2200_30657_2_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_service_types.2200_30657_3_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_service_types.2200_30657_4_not_null
+- [Foreign Key/Check Constraint] undefined.carrier_service_types.carrier_service_types_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.carrier_service_types.carrier_service_types_type_check
+- [Foreign Key/Check Constraint] undefined.carriers.2200_24811_1_not_null
+- [Foreign Key/Check Constraint] undefined.carriers.2200_24811_2_not_null
+- [Foreign Key/Check Constraint] undefined.carriers.2200_24811_3_not_null
+- [Foreign Key/Check Constraint] undefined.carriers.carriers_carrier_type_check
+- [Foreign Key/Check Constraint] undefined.charge_bases.2200_57765_1_not_null
+- [Foreign Key/Check Constraint] undefined.charge_bases.2200_57765_2_not_null
+- [Foreign Key/Check Constraint] undefined.charge_bases.2200_57765_3_not_null
+- [Foreign Key/Check Constraint] undefined.charge_categories.2200_57752_1_not_null
+- [Foreign Key/Check Constraint] undefined.charge_categories.2200_57752_2_not_null
+- [Foreign Key/Check Constraint] undefined.charge_categories.2200_57752_3_not_null
+- [Foreign Key/Check Constraint] undefined.charge_sides.2200_57739_1_not_null
+- [Foreign Key/Check Constraint] undefined.charge_sides.2200_57739_2_not_null
+- [Foreign Key/Check Constraint] undefined.charge_sides.2200_57739_3_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.2200_69169_1_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.2200_69169_2_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.2200_69169_3_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.charge_tier_config_basis_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.charge_tier_config_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.charge_tier_config_category_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.charge_tier_config_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_tier_config.charge_tier_config_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.2200_69207_1_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.2200_69207_2_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.2200_69207_3_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.2200_69207_5_not_null
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.charge_tier_ranges_check
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.charge_tier_ranges_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.charge_tier_ranges_min_value_check
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.charge_tier_ranges_rate_check
+- [Foreign Key/Check Constraint] undefined.charge_tier_ranges.charge_tier_ranges_tier_config_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.2200_69270_11_not_null
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.2200_69270_1_not_null
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.2200_69270_2_not_null
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.2200_69270_5_not_null
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.2200_69270_7_not_null
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.2200_69270_9_not_null
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_check
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_min_weight_kg_check
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_rate_per_kg_check
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.charge_weight_breaks_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.charge_weight_breaks.valid_effective_dates
+- [Foreign Key/Check Constraint] undefined.cities.2200_58721_1_not_null
+- [Foreign Key/Check Constraint] undefined.cities.2200_58721_5_not_null
+- [Foreign Key/Check Constraint] undefined.cities.cities_country_id_fkey
+- [Foreign Key/Check Constraint] undefined.cities.cities_state_id_fkey
+- [Foreign Key/Check Constraint] undefined.compliance_checks.2200_23649_1_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_checks.2200_23649_2_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_checks.2200_23649_4_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_checks.compliance_checks_check_status_check
+- [Foreign Key/Check Constraint] undefined.compliance_checks.compliance_checks_checked_by_fkey
+- [Foreign Key/Check Constraint] undefined.compliance_checks.compliance_checks_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.compliance_checks.compliance_checks_rule_id_fkey
+- [Foreign Key/Check Constraint] undefined.compliance_rules.2200_23551_1_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_rules.2200_23551_2_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_rules.2200_23551_3_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_rules.2200_23551_7_not_null
+- [Foreign Key/Check Constraint] undefined.compliance_rules.compliance_rules_service_type_check
+- [Foreign Key/Check Constraint] undefined.compliance_rules.compliance_rules_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.consignees.2200_24825_1_not_null
+- [Foreign Key/Check Constraint] undefined.consignees.2200_24825_2_not_null
+- [Foreign Key/Check Constraint] undefined.consignees.2200_24825_3_not_null
+- [Foreign Key/Check Constraint] undefined.contacts.2200_17675_1_not_null
+- [Foreign Key/Check Constraint] undefined.contacts.2200_17675_2_not_null
+- [Foreign Key/Check Constraint] undefined.contacts.2200_17675_5_not_null
+- [Foreign Key/Check Constraint] undefined.contacts.2200_17675_6_not_null
+- [Foreign Key/Check Constraint] undefined.contacts.contacts_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.contacts.contacts_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.contacts.contacts_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.contacts.contacts_owner_id_fkey
+- [Foreign Key/Check Constraint] undefined.contacts.contacts_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.container_sizes.2200_58615_1_not_null
+- [Foreign Key/Check Constraint] undefined.container_sizes.2200_58615_3_not_null
+- [Foreign Key/Check Constraint] undefined.container_types.2200_58604_1_not_null
+- [Foreign Key/Check Constraint] undefined.container_types.2200_58604_3_not_null
+- [Foreign Key/Check Constraint] undefined.container_types.container_types_ownership_type_check
+- [Foreign Key/Check Constraint] undefined.continents.2200_58673_1_not_null
+- [Foreign Key/Check Constraint] undefined.continents.2200_58673_3_not_null
+- [Foreign Key/Check Constraint] undefined.countries.2200_58687_1_not_null
+- [Foreign Key/Check Constraint] undefined.countries.2200_58687_4_not_null
+- [Foreign Key/Check Constraint] undefined.countries.countries_continent_id_fkey
+- [Foreign Key/Check Constraint] undefined.currencies.2200_57778_1_not_null
+- [Foreign Key/Check Constraint] undefined.currencies.2200_57778_2_not_null
+- [Foreign Key/Check Constraint] undefined.currencies.2200_57778_3_not_null
+- [Foreign Key/Check Constraint] undefined.custom_role_permissions.2200_20519_1_not_null
+- [Foreign Key/Check Constraint] undefined.custom_role_permissions.2200_20519_2_not_null
+- [Foreign Key/Check Constraint] undefined.custom_role_permissions.2200_20519_3_not_null
+- [Foreign Key/Check Constraint] undefined.custom_role_permissions.2200_20519_5_not_null
+- [Foreign Key/Check Constraint] undefined.custom_role_permissions.custom_role_permissions_access_type_check
+- [Foreign Key/Check Constraint] undefined.custom_role_permissions.custom_role_permissions_role_id_fkey
+- [Foreign Key/Check Constraint] undefined.custom_roles.2200_20500_1_not_null
+- [Foreign Key/Check Constraint] undefined.custom_roles.2200_20500_2_not_null
+- [Foreign Key/Check Constraint] undefined.custom_roles.2200_20500_3_not_null
+- [Foreign Key/Check Constraint] undefined.custom_roles.custom_roles_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.customer_selections.2200_31832_1_not_null
+- [Foreign Key/Check Constraint] undefined.customer_selections.2200_31832_2_not_null
+- [Foreign Key/Check Constraint] undefined.customer_selections.2200_31832_3_not_null
+- [Foreign Key/Check Constraint] undefined.customer_selections.2200_31832_4_not_null
+- [Foreign Key/Check Constraint] undefined.customer_selections.2200_31832_5_not_null
+- [Foreign Key/Check Constraint] undefined.customer_selections.customer_selections_quotation_version_id_fkey
+- [Foreign Key/Check Constraint] undefined.customer_selections.customer_selections_quotation_version_option_id_fkey
+- [Foreign Key/Check Constraint] undefined.customer_selections.customer_selections_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.customs_documents.2200_23357_1_not_null
+- [Foreign Key/Check Constraint] undefined.customs_documents.2200_23357_2_not_null
+- [Foreign Key/Check Constraint] undefined.customs_documents.2200_23357_3_not_null
+- [Foreign Key/Check Constraint] undefined.customs_documents.customs_documents_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.customs_documents.customs_documents_shipment_id_fkey
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.2200_129921_1_not_null
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.2200_129921_2_not_null
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.2200_129921_4_not_null
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.2200_129921_7_not_null
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.2200_129921_8_not_null
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.dashboard_preferences_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.dashboard_preferences.dashboard_preferences_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.document_templates.2200_23569_1_not_null
+- [Foreign Key/Check Constraint] undefined.document_templates.2200_23569_2_not_null
+- [Foreign Key/Check Constraint] undefined.document_templates.2200_23569_3_not_null
+- [Foreign Key/Check Constraint] undefined.document_templates.2200_23569_4_not_null
+- [Foreign Key/Check Constraint] undefined.document_templates.2200_23569_6_not_null
+- [Foreign Key/Check Constraint] undefined.document_templates.document_templates_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.2200_130039_1_not_null
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.2200_130039_2_not_null
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.2200_130039_3_not_null
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.2200_130039_4_not_null
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.email_account_delegations_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.email_account_delegations_delegate_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_account_delegations.email_account_delegations_granted_by_fkey
+- [Foreign Key/Check Constraint] undefined.email_accounts.2200_19178_1_not_null
+- [Foreign Key/Check Constraint] undefined.email_accounts.2200_19178_2_not_null
+- [Foreign Key/Check Constraint] undefined.email_accounts.2200_19178_5_not_null
+- [Foreign Key/Check Constraint] undefined.email_accounts.2200_19178_6_not_null
+- [Foreign Key/Check Constraint] undefined.email_accounts.email_accounts_provider_check
+- [Foreign Key/Check Constraint] undefined.email_audit_log.2200_129863_11_not_null
+- [Foreign Key/Check Constraint] undefined.email_audit_log.2200_129863_1_not_null
+- [Foreign Key/Check Constraint] undefined.email_audit_log.2200_129863_6_not_null
+- [Foreign Key/Check Constraint] undefined.email_audit_log.email_audit_log_email_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_audit_log.email_audit_log_event_type_check
+- [Foreign Key/Check Constraint] undefined.email_audit_log.email_audit_log_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_audit_log.email_audit_log_scheduled_email_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_audit_log.email_audit_log_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_audit_log.email_audit_log_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_filters.2200_19251_10_not_null
+- [Foreign Key/Check Constraint] undefined.email_filters.2200_19251_1_not_null
+- [Foreign Key/Check Constraint] undefined.email_filters.2200_19251_2_not_null
+- [Foreign Key/Check Constraint] undefined.email_filters.2200_19251_3_not_null
+- [Foreign Key/Check Constraint] undefined.email_filters.2200_19251_5_not_null
+- [Foreign Key/Check Constraint] undefined.email_filters.2200_19251_9_not_null
+- [Foreign Key/Check Constraint] undefined.email_filters.email_filters_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.email_templates.2200_19270_1_not_null
+- [Foreign Key/Check Constraint] undefined.email_templates.2200_19270_2_not_null
+- [Foreign Key/Check Constraint] undefined.email_templates.2200_19270_5_not_null
+- [Foreign Key/Check Constraint] undefined.email_templates.2200_19270_7_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_10_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_19_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_1_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_4_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_5_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_7_not_null
+- [Foreign Key/Check Constraint] undefined.emails.2200_19198_8_not_null
+- [Foreign Key/Check Constraint] undefined.emails.emails_account_id_crm_fkey
+- [Foreign Key/Check Constraint] undefined.emails.emails_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.emails.emails_ai_sentiment_check
+- [Foreign Key/Check Constraint] undefined.emails.emails_ai_urgency_check
+- [Foreign Key/Check Constraint] undefined.emails.emails_contact_id_fkey
+- [Foreign Key/Check Constraint] undefined.emails.emails_direction_check
+- [Foreign Key/Check Constraint] undefined.emails.emails_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.emails.emails_opportunity_id_fkey
+- [Foreign Key/Check Constraint] undefined.emails.emails_status_check
+- [Foreign Key/Check Constraint] undefined.emails.emails_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_1_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_2_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_3_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_4_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_5_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_7_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.2200_127510_8_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfer_items.entity_transfer_items_transfer_id_fkey
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_11_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_12_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_1_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_2_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_4_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_6_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_7_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.2200_127469_8_not_null
+- [Foreign Key/Check Constraint] undefined.entity_transfers.entity_transfers_approved_by_fkey_profiles
+- [Foreign Key/Check Constraint] undefined.entity_transfers.entity_transfers_requested_by_fkey_profiles
+- [Foreign Key/Check Constraint] undefined.entity_transfers.entity_transfers_source_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.entity_transfers.entity_transfers_source_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.entity_transfers.entity_transfers_target_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.entity_transfers.entity_transfers_target_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.franchises.2200_17403_1_not_null
+- [Foreign Key/Check Constraint] undefined.franchises.2200_17403_2_not_null
+- [Foreign Key/Check Constraint] undefined.franchises.2200_17403_3_not_null
+- [Foreign Key/Check Constraint] undefined.franchises.2200_17403_4_not_null
+- [Foreign Key/Check Constraint] undefined.franchises.franchises_manager_id_fkey
+- [Foreign Key/Check Constraint] undefined.franchises.franchises_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_1_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_2_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_3_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_4_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_5_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_6_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.2200_58489_8_not_null
+- [Foreign Key/Check Constraint] undefined.fx_rates.fx_rates_from_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.fx_rates.fx_rates_rate_check
+- [Foreign Key/Check Constraint] undefined.fx_rates.fx_rates_to_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.import_errors.2200_127415_1_not_null
+- [Foreign Key/Check Constraint] undefined.import_errors.2200_127415_2_not_null
+- [Foreign Key/Check Constraint] undefined.import_errors.2200_127415_7_not_null
+- [Foreign Key/Check Constraint] undefined.import_errors.import_errors_import_id_fkey
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_12_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_1_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_3_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_4_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_5_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_7_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.2200_127277_8_not_null
+- [Foreign Key/Check Constraint] undefined.import_history.import_history_imported_by_fkey
+- [Foreign Key/Check Constraint] undefined.import_history.import_history_reverted_by_fkey
+- [Foreign Key/Check Constraint] undefined.import_history.import_history_status_check
+- [Foreign Key/Check Constraint] undefined.import_history.import_history_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.import_history_details.2200_127305_1_not_null
+- [Foreign Key/Check Constraint] undefined.import_history_details.2200_127305_2_not_null
+- [Foreign Key/Check Constraint] undefined.import_history_details.2200_127305_3_not_null
+- [Foreign Key/Check Constraint] undefined.import_history_details.2200_127305_4_not_null
+- [Foreign Key/Check Constraint] undefined.import_history_details.2200_127305_7_not_null
+- [Foreign Key/Check Constraint] undefined.import_history_details.import_history_details_import_id_fkey
+- [Foreign Key/Check Constraint] undefined.import_history_details.import_history_details_operation_type_check
+- [Foreign Key/Check Constraint] undefined.incoterms.2200_24918_1_not_null
+- [Foreign Key/Check Constraint] undefined.incoterms.2200_24918_2_not_null
+- [Foreign Key/Check Constraint] undefined.incoterms.2200_24918_3_not_null
+- [Foreign Key/Check Constraint] undefined.incoterms.2200_24918_4_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.2200_17474_1_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.2200_17474_2_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.2200_17474_3_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.2200_17474_6_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.2200_17474_7_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.2200_17474_8_not_null
+- [Foreign Key/Check Constraint] undefined.invitations.invitations_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.invitations.invitations_invited_by_fkey
+- [Foreign Key/Check Constraint] undefined.invitations.invitations_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_activities.2200_123838_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_activities.2200_123838_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_activities.2200_123838_3_not_null
+- [Foreign Key/Check Constraint] undefined.lead_activities.lead_activities_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.2200_19050_10_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.2200_19050_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.2200_19050_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.2200_19050_4_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.2200_19050_5_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.lead_assignment_history_assigned_by_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.lead_assignment_history_assigned_from_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.lead_assignment_history_assigned_to_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.lead_assignment_history_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_history.lead_assignment_history_rule_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_queue.2200_19108_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_queue.2200_19108_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_queue.2200_19108_3_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_queue.lead_assignment_queue_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_assignment_rules.2200_19031_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_rules.2200_19031_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_rules.2200_19031_3_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_rules.2200_19031_5_not_null
+- [Foreign Key/Check Constraint] undefined.lead_assignment_rules.lead_assignment_rules_territory_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_score_config.2200_123853_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_score_config.2200_123853_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_score_config.2200_123853_3_not_null
+- [Foreign Key/Check Constraint] undefined.lead_score_config.lead_score_config_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_score_logs.2200_123872_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_score_logs.2200_123872_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_score_logs.lead_score_logs_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.lead_scoring_rules.2200_19018_1_not_null
+- [Foreign Key/Check Constraint] undefined.lead_scoring_rules.2200_19018_2_not_null
+- [Foreign Key/Check Constraint] undefined.lead_scoring_rules.2200_19018_3_not_null
+- [Foreign Key/Check Constraint] undefined.lead_scoring_rules.2200_19018_4_not_null
+- [Foreign Key/Check Constraint] undefined.lead_scoring_rules.2200_19018_5_not_null
+- [Foreign Key/Check Constraint] undefined.leads.2200_17712_1_not_null
+- [Foreign Key/Check Constraint] undefined.leads.2200_17712_2_not_null
+- [Foreign Key/Check Constraint] undefined.leads.2200_17712_4_not_null
+- [Foreign Key/Check Constraint] undefined.leads.2200_17712_5_not_null
+- [Foreign Key/Check Constraint] undefined.leads.leads_converted_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.leads.leads_converted_contact_id_fkey
+- [Foreign Key/Check Constraint] undefined.leads.leads_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.leads.leads_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.leads.leads_owner_id_fkey
+- [Foreign Key/Check Constraint] undefined.leads.leads_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.margin_methods.2200_58510_1_not_null
+- [Foreign Key/Check Constraint] undefined.margin_methods.2200_58510_2_not_null
+- [Foreign Key/Check Constraint] undefined.margin_methods.2200_58510_3_not_null
+- [Foreign Key/Check Constraint] undefined.margin_methods.2200_58510_4_not_null
+- [Foreign Key/Check Constraint] undefined.margin_methods.2200_58510_5_not_null
+- [Foreign Key/Check Constraint] undefined.margin_methods.2200_58510_6_not_null
+- [Foreign Key/Check Constraint] undefined.margin_methods.margin_methods_code_check
+- [Foreign Key/Check Constraint] undefined.margin_profiles.2200_58521_1_not_null
+- [Foreign Key/Check Constraint] undefined.margin_profiles.2200_58521_2_not_null
+- [Foreign Key/Check Constraint] undefined.margin_profiles.2200_58521_3_not_null
+- [Foreign Key/Check Constraint] undefined.margin_profiles.2200_58521_4_not_null
+- [Foreign Key/Check Constraint] undefined.margin_profiles.2200_58521_7_not_null
+- [Foreign Key/Check Constraint] undefined.margin_profiles.2200_58521_8_not_null
+- [Foreign Key/Check Constraint] undefined.margin_profiles.margin_profiles_default_method_id_fkey
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.2200_19325_1_not_null
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.2200_19325_2_not_null
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.2200_19325_4_not_null
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.2200_19325_5_not_null
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.2200_19325_6_not_null
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.2200_19325_8_not_null
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.oauth_configurations_provider_check
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.oauth_configurations_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.oauth_configurations.oauth_configurations_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.opportunities.2200_17869_1_not_null
+- [Foreign Key/Check Constraint] undefined.opportunities.2200_17869_2_not_null
+- [Foreign Key/Check Constraint] undefined.opportunities.2200_17869_4_not_null
+- [Foreign Key/Check Constraint] undefined.opportunities.2200_17869_6_not_null
+- [Foreign Key/Check Constraint] undefined.opportunities.opportunities_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.opportunities.opportunities_contact_id_fkey
+- [Foreign Key/Check Constraint] undefined.opportunities.opportunities_lead_id_fkey
+- [Foreign Key/Check Constraint] undefined.opportunities.opportunities_probability_check
+- [Foreign Key/Check Constraint] undefined.opportunities.valid_close_date
+- [Foreign Key/Check Constraint] undefined.package_categories.2200_24883_1_not_null
+- [Foreign Key/Check Constraint] undefined.package_categories.2200_24883_2_not_null
+- [Foreign Key/Check Constraint] undefined.package_categories.2200_24883_3_not_null
+- [Foreign Key/Check Constraint] undefined.package_sizes.2200_24894_1_not_null
+- [Foreign Key/Check Constraint] undefined.package_sizes.2200_24894_2_not_null
+- [Foreign Key/Check Constraint] undefined.package_sizes.2200_24894_3_not_null
+- [Foreign Key/Check Constraint] undefined.portal_tokens.2200_123776_1_not_null
+- [Foreign Key/Check Constraint] undefined.portal_tokens.2200_123776_3_not_null
+- [Foreign Key/Check Constraint] undefined.portal_tokens.2200_123776_4_not_null
+- [Foreign Key/Check Constraint] undefined.portal_tokens.2200_123776_5_not_null
+- [Foreign Key/Check Constraint] undefined.portal_tokens.portal_tokens_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.portal_tokens.portal_tokens_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.ports_locations.2200_24837_1_not_null
+- [Foreign Key/Check Constraint] undefined.ports_locations.2200_24837_3_not_null
+- [Foreign Key/Check Constraint] undefined.ports_locations.ports_locations_location_type_check
+- [Foreign Key/Check Constraint] undefined.profiles.2200_17427_1_not_null
+- [Foreign Key/Check Constraint] undefined.profiles.2200_17427_2_not_null
+- [Foreign Key/Check Constraint] undefined.profiles.profiles_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_10_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_11_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_1_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_2_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_3_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_4_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.2200_69401_6_not_null
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.provider_api_configs_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_api_configs.provider_api_configs_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.2200_69363_1_not_null
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.2200_69363_2_not_null
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.2200_69363_3_not_null
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.2200_69363_6_not_null
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.2200_69363_7_not_null
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.provider_charge_mappings_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.provider_charge_mappings_charge_basis_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.provider_charge_mappings_charge_category_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.provider_charge_mappings_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_charge_mappings.provider_charge_mappings_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_1_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_2_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_3_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_5_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_6_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_7_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.2200_69433_8_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.provider_rate_rules_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.provider_rate_rules_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_rate_rules.provider_rate_rules_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_13_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_1_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_2_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_3_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_5_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_6_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.2200_69331_7_not_null
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.provider_rate_templates_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.provider_rate_templates_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_rate_templates.provider_rate_templates_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_17_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_1_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_2_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_3_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_4_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_5_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.2200_69463_7_not_null
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.provider_surcharges_carrier_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.provider_surcharges_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_surcharges.provider_surcharges_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.provider_types.2200_58458_1_not_null
+- [Foreign Key/Check Constraint] undefined.provider_types.2200_58458_2_not_null
+- [Foreign Key/Check Constraint] undefined.provider_types.2200_58458_3_not_null
+- [Foreign Key/Check Constraint] undefined.provider_types.2200_58458_4_not_null
+- [Foreign Key/Check Constraint] undefined.provider_types.2200_58458_5_not_null
+- [Foreign Key/Check Constraint] undefined.provider_types.2200_58458_6_not_null
+- [Foreign Key/Check Constraint] undefined.queue_members.2200_122598_1_not_null
+- [Foreign Key/Check Constraint] undefined.queue_members.2200_122598_2_not_null
+- [Foreign Key/Check Constraint] undefined.queue_members.2200_122598_3_not_null
+- [Foreign Key/Check Constraint] undefined.queue_members.2200_122598_4_not_null
+- [Foreign Key/Check Constraint] undefined.queue_members.queue_members_queue_id_fkey
+- [Foreign Key/Check Constraint] undefined.queue_members.queue_members_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.queue_members.queue_members_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_10_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_1_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_2_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_3_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_4_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_6_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_7_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_8_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.2200_131411_9_not_null
+- [Foreign Key/Check Constraint] undefined.queue_rules.queue_rules_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.queue_rules.queue_rules_queue_id_fkey
+- [Foreign Key/Check Constraint] undefined.queue_rules.queue_rules_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_1_not_null
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_2_not_null
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_3_not_null
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_6_not_null
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_7_not_null
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_8_not_null
+- [Foreign Key/Check Constraint] undefined.queues.2200_122581_9_not_null
+- [Foreign Key/Check Constraint] undefined.queues.queues_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.2200_68995_1_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.2200_68995_2_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.2200_68995_6_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.2200_68995_7_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.quotation_audit_log_quotation_version_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.quotation_audit_log_quotation_version_option_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.quotation_audit_log_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.quotation_audit_log_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_audit_log.quotation_audit_log_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_packages.2200_31925_1_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_packages.2200_31925_2_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_packages.2200_31925_3_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_packages.2200_31925_4_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_packages.2200_31925_5_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.2200_58536_12_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.2200_58536_1_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.2200_58536_2_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.2200_58536_3_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.2200_58536_4_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_leg_type_check
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_mode_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_provider_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_quotation_version_option_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_service_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_option_legs.quotation_version_option_legs_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_14_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_17_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_18_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_19_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_1_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_20_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_2_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.2200_31815_3_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_margin_method_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_provider_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_quotation_version_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_quote_currency_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_version_options.quotation_version_options_trade_direction_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_versions.2200_31798_11_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_versions.2200_31798_1_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_versions.2200_31798_2_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_versions.2200_31798_3_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_versions.2200_31798_4_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_versions.2200_31798_5_not_null
+- [Foreign Key/Check Constraint] undefined.quotation_versions.quotation_versions_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_versions.quotation_versions_kind_check
+- [Foreign Key/Check Constraint] undefined.quotation_versions.quotation_versions_locked_by_fkey
+- [Foreign Key/Check Constraint] undefined.quotation_versions.quotation_versions_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_access_logs.2200_70273_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_access_logs.2200_70273_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_access_logs.quote_access_logs_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_access_logs.quote_access_logs_quote_share_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_charges.2200_58626_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_charges.2200_58626_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_charges.2200_58626_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_charges.2200_58626_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_charges.quote_charges_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_charges.quote_charges_leg_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_charges.quote_charges_quote_option_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_comments.2200_70292_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_comments.2200_70292_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_comments.2200_70292_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_comments.2200_70292_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_comments.2200_70292_5_not_null
+- [Foreign Key/Check Constraint] undefined.quote_comments.quote_comments_author_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_comments.quote_comments_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_comments.quote_comments_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_documents.2200_70318_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_documents.2200_70318_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_documents.2200_70318_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_documents.2200_70318_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_documents.2200_70318_5_not_null
+- [Foreign Key/Check Constraint] undefined.quote_documents.quote_documents_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_documents.quote_documents_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_email_history.2200_70338_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_email_history.2200_70338_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_email_history.2200_70338_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_email_history.2200_70338_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_email_history.2200_70338_5_not_null
+- [Foreign Key/Check Constraint] undefined.quote_email_history.2200_70338_6_not_null
+- [Foreign Key/Check Constraint] undefined.quote_email_history.quote_email_history_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_email_history.quote_email_history_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_12_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_6_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.2200_23469_7_not_null
+- [Foreign Key/Check Constraint] undefined.quote_items.quote_items_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_items.quote_items_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_legs.2200_65543_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_legs.2200_65543_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_legs.2200_65543_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_legs.2200_65543_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_legs.fk_quote_legs_option
+- [Foreign Key/Check Constraint] undefined.quote_legs.fk_quote_legs_tenant
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.2200_57810_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.2200_57810_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.2200_57810_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.2200_57810_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.2200_57810_5_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.quote_number_config_franchise_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_number_config_franchise.quote_number_config_franchise_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_number_config_tenant.2200_57791_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_tenant.2200_57791_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_tenant.2200_57791_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_tenant.2200_57791_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_config_tenant.quote_number_config_tenant_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_number_sequences.2200_57834_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_sequences.2200_57834_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_sequences.2200_57834_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_sequences.2200_57834_5_not_null
+- [Foreign Key/Check Constraint] undefined.quote_number_sequences.quote_number_sequences_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_number_sequences.quote_number_sequences_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_presentation_templates.2200_70217_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_presentation_templates.2200_70217_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_presentation_templates.2200_70217_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_presentation_templates.2200_70217_5_not_null
+- [Foreign Key/Check Constraint] undefined.quote_presentation_templates.quote_presentation_templates_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_presentation_templates.quote_presentation_templates_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_shares.2200_70244_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_shares.2200_70244_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_shares.2200_70244_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_shares.2200_70244_4_not_null
+- [Foreign Key/Check Constraint] undefined.quote_shares.quote_shares_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.quote_shares.quote_shares_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_shares.quote_shares_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quote_templates.2200_123754_1_not_null
+- [Foreign Key/Check Constraint] undefined.quote_templates.2200_123754_2_not_null
+- [Foreign Key/Check Constraint] undefined.quote_templates.2200_123754_3_not_null
+- [Foreign Key/Check Constraint] undefined.quote_templates.quote_templates_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.quote_templates.quote_templates_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.2200_23448_11_not_null
+- [Foreign Key/Check Constraint] undefined.quotes.2200_23448_1_not_null
+- [Foreign Key/Check Constraint] undefined.quotes.2200_23448_2_not_null
+- [Foreign Key/Check Constraint] undefined.quotes.2200_23448_4_not_null
+- [Foreign Key/Check Constraint] undefined.quotes.2200_23448_5_not_null
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_compliance_status_check
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_consignee_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_contact_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_current_version_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_destination_port_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_opportunity_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_origin_port_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_service_id_fkey
+- [Foreign Key/Check Constraint] undefined.quotes.quotes_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.rate_calculations.2200_23599_1_not_null
+- [Foreign Key/Check Constraint] undefined.rate_calculations.2200_23599_2_not_null
+- [Foreign Key/Check Constraint] undefined.rate_calculations.2200_23599_5_not_null
+- [Foreign Key/Check Constraint] undefined.rate_calculations.2200_23599_8_not_null
+- [Foreign Key/Check Constraint] undefined.rate_calculations.rate_calculations_calculated_by_fkey
+- [Foreign Key/Check Constraint] undefined.rate_calculations.rate_calculations_carrier_rate_id_fkey
+- [Foreign Key/Check Constraint] undefined.rate_calculations.rate_calculations_quote_id_fkey
+- [Foreign Key/Check Constraint] undefined.rate_calculations.rate_calculations_service_id_fkey
+- [Foreign Key/Check Constraint] undefined.routes.2200_23306_1_not_null
+- [Foreign Key/Check Constraint] undefined.routes.2200_23306_2_not_null
+- [Foreign Key/Check Constraint] undefined.routes.2200_23306_4_not_null
+- [Foreign Key/Check Constraint] undefined.routes.2200_23306_5_not_null
+- [Foreign Key/Check Constraint] undefined.routes.routes_destination_warehouse_id_fkey
+- [Foreign Key/Check Constraint] undefined.routes.routes_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.routes.routes_origin_warehouse_id_fkey
+- [Foreign Key/Check Constraint] undefined.routes.routes_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_14_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_16_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_1_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_22_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_23_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_2_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.2200_129817_6_not_null
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_priority_check
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_status_check
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_template_id_fkey
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.scheduled_emails.scheduled_emails_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.service_leg_categories.2200_69252_1_not_null
+- [Foreign Key/Check Constraint] undefined.service_leg_categories.2200_69252_2_not_null
+- [Foreign Key/Check Constraint] undefined.service_leg_categories.2200_69252_3_not_null
+- [Foreign Key/Check Constraint] undefined.service_modes.2200_58479_1_not_null
+- [Foreign Key/Check Constraint] undefined.service_modes.2200_58479_2_not_null
+- [Foreign Key/Check Constraint] undefined.service_modes.2200_58479_3_not_null
+- [Foreign Key/Check Constraint] undefined.service_modes.2200_58479_4_not_null
+- [Foreign Key/Check Constraint] undefined.service_modes.2200_58479_5_not_null
+- [Foreign Key/Check Constraint] undefined.service_modes.2200_58479_6_not_null
+- [Foreign Key/Check Constraint] undefined.service_type_mappings.2200_29517_1_not_null
+- [Foreign Key/Check Constraint] undefined.service_type_mappings.2200_29517_2_not_null
+- [Foreign Key/Check Constraint] undefined.service_type_mappings.2200_29517_8_not_null
+- [Foreign Key/Check Constraint] undefined.service_type_mappings.service_type_mappings_service_id_fkey
+- [Foreign Key/Check Constraint] undefined.service_type_mappings.service_type_mappings_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.service_types.2200_29504_1_not_null
+- [Foreign Key/Check Constraint] undefined.service_types.2200_29504_2_not_null
+- [Foreign Key/Check Constraint] undefined.service_types.2200_29504_7_not_null
+- [Foreign Key/Check Constraint] undefined.service_types.service_types_dim_divisor_check
+- [Foreign Key/Check Constraint] undefined.service_types.service_types_mode_id_fkey
+- [Foreign Key/Check Constraint] undefined.services.2200_23506_1_not_null
+- [Foreign Key/Check Constraint] undefined.services.2200_23506_2_not_null
+- [Foreign Key/Check Constraint] undefined.services.2200_23506_3_not_null
+- [Foreign Key/Check Constraint] undefined.services.2200_23506_4_not_null
+- [Foreign Key/Check Constraint] undefined.services.2200_23506_5_not_null
+- [Foreign Key/Check Constraint] undefined.services.services_service_type_check
+- [Foreign Key/Check Constraint] undefined.services.services_service_type_id_fkey
+- [Foreign Key/Check Constraint] undefined.services.services_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipment_attachments.2200_123886_1_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_attachments.2200_123886_2_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_attachments.2200_123886_3_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_attachments.2200_123886_4_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_attachments.shipment_attachments_shipment_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipment_attachments.shipment_attachments_uploaded_by_fkey
+- [Foreign Key/Check Constraint] undefined.shipment_items.2200_23267_1_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_items.2200_23267_2_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_items.2200_23267_3_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_items.2200_23267_4_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_items.2200_23267_5_not_null
+- [Foreign Key/Check Constraint] undefined.shipment_items.shipment_items_shipment_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.2200_23197_10_not_null
+- [Foreign Key/Check Constraint] undefined.shipments.2200_23197_1_not_null
+- [Foreign Key/Check Constraint] undefined.shipments.2200_23197_2_not_null
+- [Foreign Key/Check Constraint] undefined.shipments.2200_23197_4_not_null
+- [Foreign Key/Check Constraint] undefined.shipments.2200_23197_5_not_null
+- [Foreign Key/Check Constraint] undefined.shipments.2200_23197_9_not_null
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_account_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_assigned_to_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_contact_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_destination_warehouse_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_driver_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_franchise_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_origin_warehouse_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_pod_status_check
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipments.shipments_vehicle_id_fkey
+- [Foreign Key/Check Constraint] undefined.shipping_rates.2200_23340_14_not_null
+- [Foreign Key/Check Constraint] undefined.shipping_rates.2200_23340_1_not_null
+- [Foreign Key/Check Constraint] undefined.shipping_rates.2200_23340_2_not_null
+- [Foreign Key/Check Constraint] undefined.shipping_rates.2200_23340_3_not_null
+- [Foreign Key/Check Constraint] undefined.shipping_rates.shipping_rates_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.states.2200_58706_1_not_null
+- [Foreign Key/Check Constraint] undefined.states.2200_58706_4_not_null
+- [Foreign Key/Check Constraint] undefined.states.states_country_id_fkey
+- [Foreign Key/Check Constraint] undefined.subscription_features.2200_23008_1_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_features.2200_23008_2_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_features.2200_23008_3_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_features.2200_23008_4_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_features.2200_23008_6_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.2200_22980_1_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.2200_22980_2_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.2200_22980_6_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.2200_22980_8_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.2200_22980_9_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.subscription_invoices_subscription_id_fkey
+- [Foreign Key/Check Constraint] undefined.subscription_invoices.subscription_invoices_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_10_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_11_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_14_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_1_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_2_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_3_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_4_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_6_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_7_not_null
+- [Foreign Key/Check Constraint] undefined.subscription_plans.2200_22911_9_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_12_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_1_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_2_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_3_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_4_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_7_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.2200_22930_8_not_null
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.tenant_subscriptions_plan_id_fkey
+- [Foreign Key/Check Constraint] undefined.tenant_subscriptions.tenant_subscriptions_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.tenants.2200_17385_1_not_null
+- [Foreign Key/Check Constraint] undefined.tenants.2200_17385_2_not_null
+- [Foreign Key/Check Constraint] undefined.tenants.2200_17385_3_not_null
+- [Foreign Key/Check Constraint] undefined.tenants.tenants_subscription_tier_check
+- [Foreign Key/Check Constraint] undefined.territories.2200_19127_1_not_null
+- [Foreign Key/Check Constraint] undefined.territories.2200_19127_2_not_null
+- [Foreign Key/Check Constraint] undefined.territories.2200_19127_3_not_null
+- [Foreign Key/Check Constraint] undefined.territory_assignments.2200_19141_1_not_null
+- [Foreign Key/Check Constraint] undefined.territory_assignments.2200_19141_2_not_null
+- [Foreign Key/Check Constraint] undefined.territory_assignments.2200_19141_3_not_null
+- [Foreign Key/Check Constraint] undefined.territory_assignments.territory_assignments_territory_id_fkey
+- [Foreign Key/Check Constraint] undefined.territory_assignments.territory_assignments_user_id_fkey
+- [Foreign Key/Check Constraint] undefined.territory_geographies.2200_121422_1_not_null
+- [Foreign Key/Check Constraint] undefined.territory_geographies.2200_121422_2_not_null
+- [Foreign Key/Check Constraint] undefined.territory_geographies.2200_121422_7_not_null
+- [Foreign Key/Check Constraint] undefined.territory_geographies.territory_geographies_city_id_fkey
+- [Foreign Key/Check Constraint] undefined.territory_geographies.territory_geographies_continent_id_fkey
+- [Foreign Key/Check Constraint] undefined.territory_geographies.territory_geographies_country_id_fkey
+- [Foreign Key/Check Constraint] undefined.territory_geographies.territory_geographies_state_id_fkey
+- [Foreign Key/Check Constraint] undefined.territory_geographies.territory_geographies_territory_id_fkey
+- [Foreign Key/Check Constraint] undefined.themes.2200_65472_1_not_null
+- [Foreign Key/Check Constraint] undefined.themes.2200_65472_3_not_null
+- [Foreign Key/Check Constraint] undefined.themes.themes_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.themes.themes_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.tracking_events.2200_23285_1_not_null
+- [Foreign Key/Check Constraint] undefined.tracking_events.2200_23285_2_not_null
+- [Foreign Key/Check Constraint] undefined.tracking_events.2200_23285_3_not_null
+- [Foreign Key/Check Constraint] undefined.tracking_events.2200_23285_4_not_null
+- [Foreign Key/Check Constraint] undefined.tracking_events.tracking_events_created_by_fkey
+- [Foreign Key/Check Constraint] undefined.tracking_events.tracking_events_shipment_id_fkey
+- [Foreign Key/Check Constraint] undefined.trade_directions.2200_58468_1_not_null
+- [Foreign Key/Check Constraint] undefined.trade_directions.2200_58468_2_not_null
+- [Foreign Key/Check Constraint] undefined.trade_directions.2200_58468_3_not_null
+- [Foreign Key/Check Constraint] undefined.trade_directions.2200_58468_4_not_null
+- [Foreign Key/Check Constraint] undefined.trade_directions.2200_58468_5_not_null
+- [Foreign Key/Check Constraint] undefined.trade_directions.2200_58468_6_not_null
+- [Foreign Key/Check Constraint] undefined.trade_directions.trade_directions_code_check
+- [Foreign Key/Check Constraint] undefined.transport_modes.2200_69146_1_not_null
+- [Foreign Key/Check Constraint] undefined.transport_modes.2200_69146_2_not_null
+- [Foreign Key/Check Constraint] undefined.transport_modes.2200_69146_3_not_null
+- [Foreign Key/Check Constraint] undefined.transport_modes.2200_69146_4_not_null
+- [Foreign Key/Check Constraint] undefined.transport_modes.2200_69146_5_not_null
+- [Foreign Key/Check Constraint] undefined.transport_modes.2200_69146_6_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.2200_22958_1_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.2200_22958_2_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.2200_22958_4_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.2200_22958_5_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.2200_22958_7_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.2200_22958_8_not_null
+- [Foreign Key/Check Constraint] undefined.usage_records.usage_records_subscription_id_fkey
+- [Foreign Key/Check Constraint] undefined.usage_records.usage_records_tenant_id_fkey
+- [Foreign Key/Check Constraint] undefined.user_capacity.2200_19087_1_not_null
+- [Foreign Key/Check Constraint] undefined.user_capacity.2200_19087_2_not_null
+- [Foreign Key/Check Constraint] undefined.user_capacity.2200_19087_3_not_null
+- [RLS Policy] public.accounts.Franchise admins can manage franchise accounts
+- [RLS Policy] public.accounts.Platform admins can manage all accounts
+- [RLS Policy] public.accounts.Tenant admins can manage tenant accounts
+- [RLS Policy] public.accounts.Users can create franchise accounts
+- [RLS Policy] public.accounts.Users can view franchise accounts
+- [RLS Policy] public.activities.Franchise admins can manage franchise activities
+- [RLS Policy] public.activities.Platform admins can manage all activities
+- [RLS Policy] public.activities.Tenant admins can manage tenant activities
+- [RLS Policy] public.activities.Users can create activities
+- [RLS Policy] public.activities.Users can update own activities
+- [RLS Policy] public.activities.Users can view assigned activities
+- [RLS Policy] public.aes_hts_codes.Authenticated users can view HTS codes
+- [RLS Policy] public.aes_hts_codes.Platform admins can manage all HTS codes
+- [RLS Policy] public.audit_logs.Platform admins can view all audit logs
+- [RLS Policy] public.audit_logs.Tenant admins can view tenant audit logs
+- [RLS Policy] public.auth_permissions.All authenticated can read auth_permissions
+- [RLS Policy] public.auth_permissions.Platform admins can manage auth_permissions
+- [RLS Policy] public.auth_role_permissions.All authenticated can read auth_role_permissions
+- [RLS Policy] public.auth_role_permissions.Platform admins can manage auth_role_permissions
+- [RLS Policy] public.auth_roles.All authenticated can read auth_roles
+- [RLS Policy] public.auth_roles.Platform admins can manage auth_roles
+- [RLS Policy] public.cargo_details.Platform admins can manage all cargo details
+- [RLS Policy] public.cargo_details.Tenant admins can manage cargo details
+- [RLS Policy] public.cargo_details.Users can create cargo details
+- [RLS Policy] public.cargo_details.Users can view tenant cargo details
+- [RLS Policy] public.cargo_types.Platform admins can manage all cargo types
+- [RLS Policy] public.cargo_types.Tenant admins can manage cargo types
+- [RLS Policy] public.cargo_types.Users can view tenant cargo types
+- [RLS Policy] public.carrier_rate_charges.Platform admins can manage all carrier rate charges
+- [RLS Policy] public.carrier_rate_charges.Tenant admins can manage carrier rate charges
+- [RLS Policy] public.carrier_rate_charges.Users can view tenant carrier rate charges
+- [RLS Policy] public.carrier_rates.Platform admins can manage all rates
+- [RLS Policy] public.carrier_rates.Tenant admins can manage rates
+- [RLS Policy] public.carrier_rates.Tenant users can view rates
+- [RLS Policy] public.carrier_service_types.Platform admins can manage all carrier type mappings
+- [RLS Policy] public.carrier_service_types.Tenant admins can manage own carrier type mappings
+- [RLS Policy] public.carrier_service_types.Users can view global carrier type mappings
+- [RLS Policy] public.carrier_service_types.Users can view tenant carrier type mappings
+- [RLS Policy] public.carriers.Platform admins can manage all carriers
+- [RLS Policy] public.carriers.Tenant admins can manage carriers
+- [RLS Policy] public.carriers.Users can view global carriers
+- [RLS Policy] public.carriers.Users can view tenant carriers
+- [RLS Policy] public.charge_bases.Platform admins can manage all charge bases
+- [RLS Policy] public.charge_bases.Users can view charge bases
+- [RLS Policy] public.charge_categories.Platform admins can manage all charge categories
+- [RLS Policy] public.charge_categories.Users can view charge categories
+- [RLS Policy] public.charge_sides.Platform admins can manage all charge sides
+- [RLS Policy] public.charge_sides.Users can view charge sides
+- [RLS Policy] public.charge_tier_config.Platform admins can manage all tier configs
+- [RLS Policy] public.charge_tier_config.Tenant admins can manage tier configs
+- [RLS Policy] public.charge_tier_config.Users can view tenant tier configs
+- [RLS Policy] public.charge_tier_ranges.Platform admins can manage all tier ranges
+- [RLS Policy] public.charge_tier_ranges.Tenant admins can manage tier ranges
+- [RLS Policy] public.charge_tier_ranges.Users can view tenant tier ranges
+- [RLS Policy] public.charge_weight_breaks.Platform admins can manage all weight breaks
+- [RLS Policy] public.charge_weight_breaks.Tenant admins can manage weight breaks
+- [RLS Policy] public.charge_weight_breaks.Users can view tenant weight breaks
+- [RLS Policy] public.cities.cities_manage
+- [RLS Policy] public.cities.cities_read
+- [RLS Policy] public.compliance_checks.Users can create compliance checks
+- [RLS Policy] public.compliance_checks.Users can view compliance checks for accessible quotes
+- [RLS Policy] public.compliance_rules.Platform admins can manage all compliance rules
+- [RLS Policy] public.compliance_rules.Tenant admins can manage compliance rules
+- [RLS Policy] public.compliance_rules.Tenant users can view compliance rules
+- [RLS Policy] public.consignees.Platform admins can manage all consignees
+- [RLS Policy] public.consignees.Tenant admins can manage consignees
+- [RLS Policy] public.consignees.Users can view tenant consignees
+- [RLS Policy] public.contacts.Franchise admins can manage franchise contacts
+- [RLS Policy] public.contacts.Platform admins can manage all contacts
+- [RLS Policy] public.contacts.Tenant admins can manage tenant contacts
+- [RLS Policy] public.contacts.Users can create franchise contacts
+- [RLS Policy] public.contacts.Users can view franchise contacts
+- [RLS Policy] public.container_sizes.Platform admins can manage all container sizes
+- [RLS Policy] public.container_sizes.Tenant admins can manage container sizes
+- [RLS Policy] public.container_sizes.Tenant users can view container sizes
+- [RLS Policy] public.container_types.Platform admins can manage all container types
+- [RLS Policy] public.container_types.Tenant admins can manage container types
+- [RLS Policy] public.container_types.Tenant users can view container types
+- [RLS Policy] public.continents.continents_manage
+- [RLS Policy] public.continents.continents_read
+- [RLS Policy] public.countries.countries_manage
+- [RLS Policy] public.countries.countries_read
+- [RLS Policy] public.currencies.Platform admins can manage all currencies
+- [RLS Policy] public.currencies.Users can view currencies
+- [RLS Policy] public.custom_role_permissions.Platform admins can manage all custom role permissions
+- [RLS Policy] public.custom_role_permissions.Tenant admins can manage tenant custom role permissions
+- [RLS Policy] public.custom_role_permissions.Users can view custom role permissions
+- [RLS Policy] public.custom_roles.Platform admins can manage all custom roles
+- [RLS Policy] public.custom_roles.Tenant admins can manage tenant custom roles
+- [RLS Policy] public.custom_roles.Users can view tenant custom roles
+- [RLS Policy] public.customer_selections.Platform admins full access to customer selections
+- [RLS Policy] public.customer_selections.Users can create customer selections
+- [RLS Policy] public.customer_selections.Users can view franchise customer selections
+- [RLS Policy] public.customs_documents.Platform admins can manage all customs documents
+- [RLS Policy] public.customs_documents.Users can manage customs documents for accessible shipments
+- [RLS Policy] public.dashboard_preferences.Users can delete own dashboard preferences
+- [RLS Policy] public.dashboard_preferences.Users can insert own dashboard preferences
+- [RLS Policy] public.dashboard_preferences.Users can update own dashboard preferences
+- [RLS Policy] public.dashboard_preferences.Users can view own dashboard preferences
+- [RLS Policy] public.document_templates.Platform admins can manage all templates
+- [RLS Policy] public.document_templates.Tenant admins can manage templates
+- [RLS Policy] public.document_templates.Tenant users can view templates
+- [RLS Policy] public.email_account_delegations.Delegates can view their delegations
+- [RLS Policy] public.email_account_delegations.Delegation owners can manage
+- [RLS Policy] public.email_account_delegations.Franchise admins can view franchise delegations
+- [RLS Policy] public.email_account_delegations.Platform admins can manage all delegations
+- [RLS Policy] public.email_account_delegations.Tenant admins can view delegations
+- [RLS Policy] public.email_accounts.Email accounts scope matrix - DELETE
+- [RLS Policy] public.email_accounts.Email accounts scope matrix - INSERT
+- [RLS Policy] public.email_accounts.Email accounts scope matrix - SELECT
+- [RLS Policy] public.email_accounts.Email accounts scope matrix - UPDATE
+- [RLS Policy] public.email_audit_log.Authenticated users can insert audit logs for their actions
+- [RLS Policy] public.email_audit_log.Franchise admins can view franchise audit logs
+- [RLS Policy] public.email_audit_log.Super admins can view all audit logs
+- [RLS Policy] public.email_audit_log.Tenant admins can view tenant audit logs
+- [RLS Policy] public.email_audit_log.Users can view own audit logs
+- [RLS Policy] public.email_filters.Platform admins can manage all email filters
+- [RLS Policy] public.email_filters.Users can manage own email filters
+- [RLS Policy] public.email_templates.Platform admins can manage all templates
+- [RLS Policy] public.email_templates.Users can create templates
+- [RLS Policy] public.email_templates.Users can delete own templates
+- [RLS Policy] public.email_templates.Users can update own templates
+- [RLS Policy] public.email_templates.Users can view tenant templates
+- [RLS Policy] public.emails.Email scope matrix - DELETE
+- [RLS Policy] public.emails.Email scope matrix - INSERT
+- [RLS Policy] public.emails.Email scope matrix - SELECT
+- [RLS Policy] public.emails.Email scope matrix - UPDATE
+- [RLS Policy] public.emails.Users can view emails in their queues
+- [RLS Policy] public.entity_transfer_items.Entity transfer items: delete (platform admin)
+- [RLS Policy] public.entity_transfer_items.Entity transfer items: insert
+- [RLS Policy] public.entity_transfer_items.Entity transfer items: select
+- [RLS Policy] public.entity_transfer_items.Entity transfer items: update (platform admin)
+- [RLS Policy] public.entity_transfers.Entity transfers: delete (platform admin)
+- [RLS Policy] public.entity_transfers.Entity transfers: insert
+- [RLS Policy] public.entity_transfers.Entity transfers: select
+- [RLS Policy] public.entity_transfers.Entity transfers: update
+- [RLS Policy] public.franchises.Franchise admins can update own franchise
+- [RLS Policy] public.franchises.Franchise admins can view own franchise
+- [RLS Policy] public.franchises.Platform admins full access to franchises
+- [RLS Policy] public.franchises.Tenant admins can manage tenant franchises
+- [RLS Policy] public.franchises.Users can view own franchise
+- [RLS Policy] public.fx_rates.fx_rates_tenant_read
+- [RLS Policy] public.fx_rates.fx_rates_tenant_write
+- [RLS Policy] public.import_errors.Import errors: delete (platform admin)
+- [RLS Policy] public.import_errors.Import errors: insert
+- [RLS Policy] public.import_errors.Import errors: select
+- [RLS Policy] public.import_errors.Import errors: update (platform admin)
+- [RLS Policy] public.import_history.Import history: insert
+- [RLS Policy] public.import_history.Import history: select
+- [RLS Policy] public.import_history.Import history: update
+- [RLS Policy] public.import_history_details.Import details: insert
+- [RLS Policy] public.import_history_details.Import details: select
+- [RLS Policy] public.import_history_details.Import details: update
+- [RLS Policy] public.incoterms.Platform admins can manage all incoterms
+- [RLS Policy] public.incoterms.Tenant admins can manage incoterms
+- [RLS Policy] public.incoterms.Users can view tenant incoterms
+- [RLS Policy] public.invitations.Franchise admins can manage franchise invitations
+- [RLS Policy] public.invitations.Platform admins full access to invitations
+- [RLS Policy] public.invitations.Tenant admins can manage tenant invitations
+- [RLS Policy] public.lead_activities.Users can manage their tenant lead activities
+- [RLS Policy] public.lead_activities.Users can view their tenant lead activities
+- [RLS Policy] public.lead_assignment_history.Franchise admins can view franchise assignment history
+- [RLS Policy] public.lead_assignment_history.Platform admins can manage all assignment history
+- [RLS Policy] public.lead_assignment_history.Tenant admins can view tenant assignment history
+- [RLS Policy] public.lead_assignment_queue.Platform admins can manage all assignment queue
+- [RLS Policy] public.lead_assignment_queue.Tenant admins can view tenant assignment queue
+- [RLS Policy] public.lead_assignment_rules.Platform admins can manage all assignment rules
+- [RLS Policy] public.lead_assignment_rules.Tenant admins can manage tenant assignment rules
+- [RLS Policy] public.lead_score_config.Admins can manage score config
+- [RLS Policy] public.lead_score_config.Users can view their tenant score config
+- [RLS Policy] public.lead_score_logs.Users can view their tenant score logs
+- [RLS Policy] public.lead_scoring_rules.Platform admins can manage all scoring rules
+- [RLS Policy] public.lead_scoring_rules.Tenant admins can manage tenant scoring rules
+- [RLS Policy] public.leads.Franchise admins can manage franchise leads
+- [RLS Policy] public.leads.Platform admins can manage all leads
+- [RLS Policy] public.leads.Tenant admins can manage tenant leads
+- [RLS Policy] public.leads.Users can create franchise leads
+- [RLS Policy] public.leads.Users can view franchise leads
+- [RLS Policy] public.margin_methods.margin_methods_tenant_read
+- [RLS Policy] public.margin_methods.margin_methods_tenant_write
+- [RLS Policy] public.margin_profiles.margin_profiles_tenant_read
+- [RLS Policy] public.margin_profiles.margin_profiles_tenant_write
+- [RLS Policy] public.oauth_configurations.Platform admins can manage all OAuth configs
+- [RLS Policy] public.oauth_configurations.Users can manage own OAuth configs
+- [RLS Policy] public.opportunities.Franchise admins can manage franchise opportunities
+- [RLS Policy] public.opportunities.Platform admins can manage all opportunities
+- [RLS Policy] public.opportunities.Tenant admins can manage tenant opportunities
+- [RLS Policy] public.opportunities.Users can create franchise opportunities
+- [RLS Policy] public.opportunities.Users can update assigned opportunities
+- [RLS Policy] public.opportunities.Users can view franchise opportunities
+- [RLS Policy] public.package_categories.Platform admins can manage all package categories
+- [RLS Policy] public.package_categories.Tenant admins can manage package categories
+- [RLS Policy] public.package_categories.Users can view tenant package categories
+- [RLS Policy] public.package_sizes.Platform admins can manage all package sizes
+- [RLS Policy] public.package_sizes.Tenant admins can manage package sizes
+- [RLS Policy] public.package_sizes.Users can view tenant package sizes
+- [RLS Policy] public.portal_tokens.Users can manage their quote tokens
+- [RLS Policy] public.portal_tokens.Users can view their quote tokens
+- [RLS Policy] public.ports_locations.Platform admins can manage all ports
+- [RLS Policy] public.ports_locations.Tenant admins can manage ports
+- [RLS Policy] public.ports_locations.Users can view global ports
+- [RLS Policy] public.ports_locations.Users can view tenant ports
+- [RLS Policy] public.profiles.Franchise admins can view franchise profiles
+- [RLS Policy] public.profiles.Platform admins can insert profiles
+- [RLS Policy] public.profiles.Platform admins can update all profiles
+- [RLS Policy] public.profiles.Platform admins can view all profiles
+- [RLS Policy] public.profiles.Tenant admins can view tenant profiles
+- [RLS Policy] public.profiles.Users can update own profile
+- [RLS Policy] public.profiles.Users can view own profile
+- [RLS Policy] public.provider_api_configs.Platform admins full access to provider api configs
+- [RLS Policy] public.provider_api_configs.Tenant admins manage provider api configs
+- [RLS Policy] public.provider_charge_mappings.Platform admins full access to provider charge mappings
+- [RLS Policy] public.provider_charge_mappings.Tenant admins manage provider charge mappings
+- [RLS Policy] public.provider_charge_mappings.Users view tenant provider charge mappings
+- [RLS Policy] public.provider_rate_rules.Platform admins full access to provider rate rules
+- [RLS Policy] public.provider_rate_rules.Tenant admins manage provider rate rules
+- [RLS Policy] public.provider_rate_rules.Users view tenant provider rate rules
+- [RLS Policy] public.provider_rate_templates.Platform admins full access to provider rate templates
+- [RLS Policy] public.provider_rate_templates.Tenant admins manage provider rate templates
+- [RLS Policy] public.provider_rate_templates.Users view tenant provider rate templates
+- [RLS Policy] public.provider_surcharges.Platform admins full access to provider surcharges
+- [RLS Policy] public.provider_surcharges.Tenant admins manage provider surcharges
+- [RLS Policy] public.provider_surcharges.Users view tenant provider surcharges
+- [RLS Policy] public.provider_types.provider_types_tenant_read
+- [RLS Policy] public.provider_types.provider_types_tenant_write
+- [RLS Policy] public.queue_members.Platform admins can manage all queue members
+- [RLS Policy] public.queue_members.Tenant admins can manage members of their tenant queues
+- [RLS Policy] public.queue_members.Tenant admins can manage queue memberships
+- [RLS Policy] public.queue_members.Users can view their queue memberships
+- [RLS Policy] public.queue_rules.Tenant admins can manage queue rules
+- [RLS Policy] public.queues.Platform admins can manage all queues
+- [RLS Policy] public.queues.Tenant admins can manage queues
+- [RLS Policy] public.queues.Tenant admins can manage tenant queues
+- [RLS Policy] public.queues.Users can view queues in their tenant
+- [RLS Policy] public.quotation_audit_log.Platform admins can view all audit logs
+- [RLS Policy] public.quotation_audit_log.Tenant admins can view all audit logs
+- [RLS Policy] public.quotation_audit_log.Users can view franchise audit logs
+- [RLS Policy] public.quotation_packages.Platform admins can manage all quotation packages
+- [RLS Policy] public.quotation_packages.Tenant admins can manage tenant quotation packages
+- [RLS Policy] public.quotation_packages.Users can create quotation packages
+- [RLS Policy] public.quotation_packages.Users can update quotation packages
+- [RLS Policy] public.quotation_packages.Users can view franchise quotation packages
+- [RLS Policy] public.quotation_version_option_legs.Franchise admins manage franchise option legs
+- [RLS Policy] public.quotation_version_option_legs.Platform admins full access to option legs
+- [RLS Policy] public.quotation_version_option_legs.Tenant admins manage tenant option legs
+- [RLS Policy] public.quotation_version_option_legs.Users create franchise option legs
+- [RLS Policy] public.quotation_version_option_legs.Users view franchise option legs
+- [RLS Policy] public.quotation_version_option_legs.quotation_version_option_legs_manage_alignment
+- [RLS Policy] public.quotation_version_option_legs.quotation_version_option_legs_read
+- [RLS Policy] public.quotation_version_option_legs.quotation_version_option_legs_read_alignment
+- [RLS Policy] public.quotation_version_option_legs.quotation_version_option_legs_write
+- [RLS Policy] public.quotation_version_options.Franchise admins manage franchise quotation options
+- [RLS Policy] public.quotation_version_options.Platform admins can manage all quotation version options
+- [RLS Policy] public.quotation_version_options.Platform admins full access to quotation options
+- [RLS Policy] public.quotation_version_options.Platform admins full access to version options
+- [RLS Policy] public.quotation_version_options.Tenant admins manage tenant quotation options
+- [RLS Policy] public.quotation_version_options.Users can create version options
+- [RLS Policy] public.quotation_version_options.Users can manage options for accessible versions
+- [RLS Policy] public.quotation_version_options.Users can view franchise version options
+- [RLS Policy] public.quotation_version_options.Users create franchise quotation options
+- [RLS Policy] public.quotation_version_options.Users view franchise quotation options
+- [RLS Policy] public.quotation_versions.Franchise admins manage franchise quotation versions
+- [RLS Policy] public.quotation_versions.Platform admins full access to quotation versions
+- [RLS Policy] public.quotation_versions.Platform admins full access to quote versions
+- [RLS Policy] public.quotation_versions.Tenant admins manage tenant quotation versions
+- [RLS Policy] public.quotation_versions.Users can create quote versions
+- [RLS Policy] public.quotation_versions.Users can manage versions for accessible quotes
+- [RLS Policy] public.quotation_versions.Users can view franchise quote versions
+- [RLS Policy] public.quotation_versions.Users create franchise quotation versions
+- [RLS Policy] public.quotation_versions.Users view franchise quotation versions
+- [RLS Policy] public.quotation_versions.quotation_versions_manage
+- [RLS Policy] public.quotation_versions.quotation_versions_read
+- [RLS Policy] public.quote_access_logs.qal_insert
+- [RLS Policy] public.quote_access_logs.qal_view
+- [RLS Policy] public.quote_charges.Franchise admins manage franchise quote charges
+- [RLS Policy] public.quote_charges.Platform admins full access to quote charges
+- [RLS Policy] public.quote_charges.Tenant admins manage tenant quote charges
+- [RLS Policy] public.quote_charges.Users create franchise quote charges
+- [RLS Policy] public.quote_charges.Users view franchise quote charges
+- [RLS Policy] public.quote_comments.qc_admin
+- [RLS Policy] public.quote_comments.qc_public
+- [RLS Policy] public.quote_comments.qc_user
+- [RLS Policy] public.quote_documents.qd_admin
+- [RLS Policy] public.quote_documents.qd_public
+- [RLS Policy] public.quote_documents.qd_user
+- [RLS Policy] public.quote_email_history.qeh_insert
+- [RLS Policy] public.quote_email_history.qeh_view
+- [RLS Policy] public.quote_items.Platform admins can manage all quote items
+- [RLS Policy] public.quote_items.Users can manage items for accessible quotes
+- [RLS Policy] public.quote_legs.Platform admins can manage all quote legs
+- [RLS Policy] public.quote_legs.Tenant admins can manage tenant quote legs
+- [RLS Policy] public.quote_legs.Users can create franchise quote legs
+- [RLS Policy] public.quote_legs.Users can view franchise quote legs
+- [RLS Policy] public.quote_number_config_franchise.Franchise admins can manage franchise quote config
+- [RLS Policy] public.quote_number_config_franchise.Platform admins can manage all franchise quote configs
+- [RLS Policy] public.quote_number_config_franchise.Tenant admins can manage franchise quote configs
+- [RLS Policy] public.quote_number_config_franchise.Users can view franchise quote config
+- [RLS Policy] public.quote_number_config_tenant.Platform admins can manage all tenant quote configs
+- [RLS Policy] public.quote_number_config_tenant.Tenant admins can manage tenant quote config
+- [RLS Policy] public.quote_number_config_tenant.Users can view tenant quote config
+- [RLS Policy] public.quote_number_sequences.Platform admins can manage all quote sequences
+- [RLS Policy] public.quote_number_sequences.System can manage quote sequences
+- [RLS Policy] public.quote_presentation_templates.pt_admin
+- [RLS Policy] public.quote_presentation_templates.pt_tenant
+- [RLS Policy] public.quote_presentation_templates.pt_view
+- [RLS Policy] public.quote_shares.qs_admin
+- [RLS Policy] public.quote_shares.qs_public
+- [RLS Policy] public.quote_shares.qs_user
+- [RLS Policy] public.quote_templates.Users can manage their tenant templates
+- [RLS Policy] public.quote_templates.Users can view their tenant templates
+- [RLS Policy] public.quotes.Franchise admins can manage franchise quotes
+- [RLS Policy] public.quotes.Platform admins can manage all quotes
+- [RLS Policy] public.quotes.Tenant admins can manage tenant quotes
+- [RLS Policy] public.quotes.Users can create franchise quotes
+- [RLS Policy] public.quotes.Users can view franchise quotes
+- [RLS Policy] public.rate_calculations.Users can create calculations
+- [RLS Policy] public.rate_calculations.Users can view calculations for accessible quotes
+- [RLS Policy] public.routes.Platform admins can manage all routes
+- [RLS Policy] public.routes.Tenant admins can manage tenant routes
+- [RLS Policy] public.routes.Users can view tenant routes
+- [RLS Policy] public.scheduled_emails.Scheduled emails scope matrix
+- [RLS Policy] public.service_leg_categories.Anyone can view active service leg categories
+- [RLS Policy] public.service_leg_categories.Platform admins can manage service leg categories
+- [RLS Policy] public.service_modes.service_modes_tenant_read
+- [RLS Policy] public.service_modes.service_modes_tenant_write
+- [RLS Policy] public.service_type_mappings.Platform admins can manage all mappings
+- [RLS Policy] public.service_type_mappings.Tenant admins can manage tenant mappings
+- [RLS Policy] public.service_type_mappings.Users can view tenant mappings
+- [RLS Policy] public.service_types.Anyone can view service types
+- [RLS Policy] public.service_types.Platform admins can manage all service types
+- [RLS Policy] public.services.Platform admins can manage all services
+- [RLS Policy] public.services.Tenant admins can manage services
+- [RLS Policy] public.services.Tenant users can view services
+- [RLS Policy] public.shipment_attachments.Users can manage their shipment attachments
+- [RLS Policy] public.shipment_attachments.Users can view their shipment attachments
+- [RLS Policy] public.shipment_items.Platform admins can manage all shipment items
+- [RLS Policy] public.shipment_items.Users can manage items for accessible shipments
+- [RLS Policy] public.shipments.Franchise admins can manage franchise shipments
+- [RLS Policy] public.shipments.Platform admins can manage all shipments
+- [RLS Policy] public.shipments.Tenant admins can manage tenant shipments
+- [RLS Policy] public.shipments.Users can create franchise shipments
+- [RLS Policy] public.shipments.Users can view assigned shipments
+- [RLS Policy] public.shipping_rates.Platform admins can manage all shipping rates
+- [RLS Policy] public.shipping_rates.Tenant admins can manage tenant shipping rates
+- [RLS Policy] public.shipping_rates.Users can view tenant shipping rates
+- [RLS Policy] public.states.states_manage
+- [RLS Policy] public.states.states_read
+- [RLS Policy] public.subscription_features.Anyone can view subscription features
+- [RLS Policy] public.subscription_features.Platform admins can manage subscription features
+- [RLS Policy] public.subscription_invoices.Platform admins can manage all invoices
+- [RLS Policy] public.subscription_invoices.Tenant admins can view own invoices
+- [RLS Policy] public.subscription_plans.Anyone can view active subscription plans
+- [RLS Policy] public.subscription_plans.Platform admins can manage subscription plans
+- [RLS Policy] public.tenant_subscriptions.Platform admins can manage all subscriptions
+- [RLS Policy] public.tenant_subscriptions.Tenant admins can update own subscriptions
+- [RLS Policy] public.tenant_subscriptions.Tenant admins can view own subscriptions
+- [RLS Policy] public.tenants.Platform admins full access to tenants
+- [RLS Policy] public.tenants.Tenant admins can update own tenant
+- [RLS Policy] public.tenants.Tenant admins can view own tenant
+- [RLS Policy] public.territories.Platform admins can manage all territories
+- [RLS Policy] public.territories.Tenant admins can manage tenant territories
+- [RLS Policy] public.territory_assignments.Platform admins can manage all territory assignments
+- [RLS Policy] public.territory_assignments.Tenant admins can manage territory assignments
+- [RLS Policy] public.territory_geographies.Territory geographies deletable
+- [RLS Policy] public.territory_geographies.Territory geographies insertable
+- [RLS Policy] public.territory_geographies.Territory geographies readable
+- [RLS Policy] public.territory_geographies.Territory geographies updatable
+- [RLS Policy] public.themes.Tenant admins can manage themes
+- [RLS Policy] public.themes.Users can view themes in their tenant
+- [RLS Policy] public.tracking_events.Platform admins can manage all tracking events
+- [RLS Policy] public.tracking_events.Users can create tracking events for accessible shipments
+- [RLS Policy] public.tracking_events.Users can view tracking for accessible shipments
+- [RLS Policy] public.trade_directions.trade_directions_tenant_read
+- [RLS Policy] public.trade_directions.trade_directions_tenant_write
+- [RLS Policy] public.transport_modes.Anyone can view active transport modes
+- [RLS Policy] public.transport_modes.Platform admins can manage transport modes
+- [RLS Policy] public.usage_records.Platform admins can manage all usage records
+- [RLS Policy] public.usage_records.Tenant admins can view own usage records
+- [RLS Policy] public.user_capacity.Platform admins can manage all user capacity
+- [RLS Policy] public.user_capacity.Tenant admins can manage tenant user capacity
+- [RLS Policy] public.user_capacity.Users can view own capacity
+- [RLS Policy] public.user_custom_roles.Franchise admins can manage franchise user custom roles
+- [RLS Policy] public.user_custom_roles.Platform admins can manage all user custom roles
+- [RLS Policy] public.user_custom_roles.Tenant admins can manage tenant user custom roles
+- [RLS Policy] public.user_custom_roles.Users can view own custom roles
+- [RLS Policy] public.user_preferences.Users can delete their own preferences
+- [RLS Policy] public.user_preferences.Users can insert their own preferences
+- [RLS Policy] public.user_preferences.Users can update their own preferences
+- [RLS Policy] public.user_preferences.Users can view their own preferences
+- [RLS Policy] public.user_roles.Franchise admins can update franchise user roles
+- [RLS Policy] public.user_roles.Franchise admins can view franchise roles
+- [RLS Policy] public.user_roles.Platform admins can update user roles
+- [RLS Policy] public.user_roles.Platform admins full access to roles
+- [RLS Policy] public.user_roles.Tenant admins can manage tenant roles
+- [RLS Policy] public.user_roles.Tenant admins can update tenant user roles
+- [RLS Policy] public.user_roles.Users can view own roles
+- [RLS Policy] public.vehicles.Franchise users can view franchise vehicles
+- [RLS Policy] public.vehicles.Platform admins can manage all vehicles
+- [RLS Policy] public.vehicles.Tenant admins can manage tenant vehicles
+- [RLS Policy] public.warehouse_inventory.Platform admins can manage all warehouse inventory
+- [RLS Policy] public.warehouse_inventory.Tenant admins can manage tenant warehouse inventory
+- [RLS Policy] public.warehouse_inventory.Users can view franchise warehouse inventory
+- [RLS Policy] public.warehouses.Franchise users can view franchise warehouses
+- [RLS Policy] public.warehouses.Platform admins can manage all warehouses
+- [RLS Policy] public.warehouses.Tenant admins can manage tenant warehouses
+
+=== Statistics ===
+- Table: 158
+- Index: 418
+- Foreign Key/Check Constraint: 822
+- RLS Policy: 405
+- Total Objects Exported: 1803
+
+=== Footer ===
+Export Completion Status: Simulated Success
+
+Tables: 158
+Enums: 0 (Not fetched in simulation)
+Functions: 0 (Not fetched in simulation)
+Indexes: 418
+Constraints: 822
+RLS Policies: 405
+Edge Functions: 0
+Data Rows Exported: 0 (Not fetched in simulation)

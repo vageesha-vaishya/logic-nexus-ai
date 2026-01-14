@@ -62,7 +62,7 @@ AS $$
 $$;
 
 -- 3. Get RLS Policies (Schema-aware)
-CREATE OR REPLACE FUNCTION public.get_rls_policies()
+CREATE OR REPLACE FUNCTION public.get_all_rls_policies()
 RETURNS TABLE (
     schema_name text,
     table_name text,

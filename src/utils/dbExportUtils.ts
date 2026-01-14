@@ -30,8 +30,8 @@ export const validateSQL = (sql: string, context: string, validateReservedWords:
 
     // Reserved Word Check
     if (validateReservedWords && context === 'Tables') {
-        // Focus on identifiers commonly used as names, avoid core SQL keywords
-        const candidates = ['USER', 'ORDER', 'GROUP', 'LIMIT', 'OFFSET'];
+        // Focus on identifiers commonly used as names, avoid core SQL keywords and common role names like USER
+        const candidates = ['ORDER', 'GROUP', 'LIMIT', 'OFFSET'];
         const unquotedSql = sql.replace(/"[^"]*"/g, '""'); // remove double-quoted identifiers from consideration
         candidates.forEach(word => {
             let pattern: RegExp;
