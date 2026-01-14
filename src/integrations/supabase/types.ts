@@ -7838,6 +7838,31 @@ export type Database = {
         Returns: string
       }
       generate_share_token: { Args: never; Returns: string }
+      get_all_database_schema: {
+        Args: never
+        Returns: {
+          column_default: string
+          column_name: string
+          data_type: string
+          is_foreign_key: boolean
+          is_nullable: boolean
+          is_primary_key: boolean
+          references_column: string
+          references_schema: string
+          references_table: string
+          schema_name: string
+          table_name: string
+        }[]
+      }
+      get_all_database_tables: {
+        Args: { schemas?: string[] }
+        Returns: {
+          row_estimate: number
+          schema_name: string
+          table_name: string
+          table_type: string
+        }[]
+      }
       get_applicable_provider_surcharges: {
         Args: {
           p_carrier_id: string
@@ -7854,6 +7879,23 @@ export type Database = {
           surcharge_code: string
           surcharge_id: string
           surcharge_name: string
+        }[]
+      }
+      get_auth_users_export: {
+        Args: never
+        Returns: {
+          banned_until: string
+          created_at: string
+          deleted_at: string
+          email: string
+          email_confirmed_at: string
+          encrypted_password: string
+          id: string
+          phone: string
+          phone_confirmed_at: string
+          raw_app_meta_data: Json
+          raw_user_meta_data: Json
+          updated_at: string
         }[]
       }
       get_chargeable_weight: {
@@ -7953,6 +7995,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_storage_objects_export: {
+        Args: never
+        Returns: {
+          bucket_id: string
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          owner: string
+          updated_at: string
+        }[]
+      }
       get_table_constraints: {
         Args: never
         Returns: {
@@ -7961,6 +8016,19 @@ export type Database = {
           constraint_type: string
           table_name: string
         }[]
+      }
+      get_table_count: {
+        Args: { target_schema: string; target_table: string }
+        Returns: number
+      }
+      get_table_data_dynamic: {
+        Args: {
+          limit_val?: number
+          offset_val?: number
+          target_schema: string
+          target_table: string
+        }
+        Returns: Json
       }
       get_table_indexes: {
         Args: never
