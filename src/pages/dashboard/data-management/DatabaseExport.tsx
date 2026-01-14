@@ -21,6 +21,7 @@ import Papa from "papaparse";
 import { validateSQL, resolveDataTypeForValue, formatValue, calculateChecksum, generateManifest, DetailedProgress, calculateSchemaSignature, sanitizeValue } from "@/utils/dbExportUtils";
 import { ExportProgressMeter } from "@/components/dashboard/data-management/ExportProgressMeter";
 import { ExportCompletionDialog } from "@/components/dashboard/data-management/ExportCompletionDialog";
+import { DatabaseMigrationPanel } from "@/components/dashboard/data-management/migration";
 import { ImportHistoryService, ImportSession } from "@/lib/import-history-service";
 import { ImportReportDialog } from "@/components/system/ImportReportDialog";
 import ExportWorker from "@/workers/export.worker?worker";
@@ -3419,6 +3420,9 @@ END $$;\n\n`;
           )}
         </CardContent>
       </Card>
+
+      {/* Database Migration Panel */}
+      <DatabaseMigrationPanel />
     </div>
   );
 }
