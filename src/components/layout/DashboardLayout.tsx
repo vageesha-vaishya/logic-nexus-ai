@@ -35,9 +35,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
+              <ObjectMenu />
               <div className="flex-1" />
               <AdminScopeSwitcher />
-              <ObjectMenu />
             </header>
             <main className="flex-1 p-4 bg-muted/30 pb-24" style={{ backgroundImage: 'var(--app-background, none)' }}>
               {children}
