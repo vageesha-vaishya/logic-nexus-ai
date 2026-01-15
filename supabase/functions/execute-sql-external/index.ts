@@ -96,8 +96,8 @@ serve(async (req: Request): Promise<Response> => {
     try {
       if (action === 'test') {
         // Test connection by running a simple query
-        const result = await client.queryObject<{ version: string }>('SELECT version()');
-        const version = result.rows[0]?.version || 'Unknown';
+        const result = await client.queryObject('SELECT version()');
+        const version = (result.rows[0] as { version?: string })?.version || 'Unknown';
         
         console.log(`[execute-sql-external] Connection test successful: ${version.substring(0, 50)}...`);
         
