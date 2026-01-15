@@ -7954,6 +7954,19 @@ export type Database = {
         Args: { _user_id: string }
         Returns: string[]
       }
+      get_fk_orphans: {
+        Args: never
+        Returns: {
+          child_column: string
+          constraint_name: string
+          constraint_schema: string
+          orphan_count: number
+          parent_column: string
+          parent_schema: string
+          parent_table: string
+          table_name: string
+        }[]
+      }
       get_franchise_user_ids: {
         Args: { _franchise_id: string }
         Returns: {
