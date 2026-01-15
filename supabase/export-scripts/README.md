@@ -171,6 +171,7 @@ All counts should match!
 ### "Foreign key constraint violation"
 - Import tables in correct order (see above)
 - Check that referenced IDs exist in parent tables
+- If using the in-app pg_dump export, ensure the built-in foreign key validation passes without orphaned references before running the import; review the generated export log for any reported constraints or tables that need cleanup.
 
 ### "Sequence out of sync"
 - Reset sequences after import (see above)

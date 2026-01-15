@@ -14,6 +14,24 @@ export interface ImportOptions {
   dryRunFirst: boolean;
   executionOrder: 'schema-first' | 'file-order' | 'data-first';
   onConflict: 'error' | 'skip' | 'update';
+  postImportOwnershipEnabled?: boolean;
+  postImportOwnershipTables?: string[]; // 'schema.table' names to include for ownership-only step
+  disableConstraintsDuringData?: boolean;
+  dataReorderHeuristics?: boolean;
+  alignmentConfig?: {
+    allowedSchemas?: string[]; // names or patterns to include (default: ['public'])
+    allowedTables?: string[]; // 'schema.table' names to include
+    excludedSchemas?: string[];
+    excludedTables?: string[];
+    maxRowEstimateForAlter?: number; // skip alignment for very large tables
+    criticalTables?: string[]; // tables to avoid altering
+    requiredNotNullColumns?: string[]; // 'schema.table.column' to enforce NOT NULL when possible
+    heuristics?: {
+      allowNotNullWhenDefault?: boolean; // set NOT NULL if default exists and backfilled
+      allowNotNullWhenNoNulls?: boolean; // set NOT NULL if no NULLs present post-backfill
+      backfillWithDefault?: boolean; // run UPDATE to fill NULLs using default
+    };
+  };
 }
 
 export const DEFAULT_IMPORT_OPTIONS: ImportOptions = {
@@ -25,6 +43,24 @@ export const DEFAULT_IMPORT_OPTIONS: ImportOptions = {
   dryRunFirst: true,
   executionOrder: 'schema-first',
   onConflict: 'error',
+  postImportOwnershipEnabled: false,
+  postImportOwnershipTables: [],
+  disableConstraintsDuringData: false,
+  dataReorderHeuristics: true,
+  alignmentConfig: {
+    allowedSchemas: ['public'],
+    excludedSchemas: [],
+    allowedTables: [],
+    excludedTables: [],
+    maxRowEstimateForAlter: 10_000_000,
+    criticalTables: [],
+    requiredNotNullColumns: [],
+    heuristics: {
+      allowNotNullWhenDefault: true,
+      allowNotNullWhenNoNulls: true,
+      backfillWithDefault: true,
+    },
+  },
 };
 
 interface ImportOptionsPanelProps {
@@ -189,6 +225,81 @@ export function ImportOptionsPanel({ options, onChange, disabled = false }: Impo
             <Switch
               checked={options.skipExistingTables}
               onCheckedChange={(v) => updateOption('skipExistingTables', v)}
+              disabled={disabled}
+            />
+          </div>
+
+          {/* Post-Import Ownership */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Post-Import Ownership Changes
+            </Label>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Apply OWNER/GRANT statements with privileged credentials
+              </p>
+              <Switch
+                checked={options.postImportOwnershipEnabled ?? false}
+                onCheckedChange={(v) => updateOption('postImportOwnershipEnabled', v)}
+                disabled={disabled}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Tables (schema.table, comma-separated)</Label>
+              <input
+                type="text"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
+                placeholder="public.audit_log_entries, public.opportunities"
+                value={(options.postImportOwnershipTables ?? []).join(', ')}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const list = raw
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                  updateOption('postImportOwnershipTables', list);
+                }}
+                disabled={disabled || !(options.postImportOwnershipEnabled ?? false)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty to apply to all filtered ownership statements
+              </p>
+            </div>
+          </div>
+
+          {/* Disable Constraints During Data */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Disable Constraints During Data
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Temporarily defer FKs and disable triggers per batch
+              </p>
+            </div>
+            <Switch
+              checked={options.disableConstraintsDuringData ?? false}
+              onCheckedChange={(v) => updateOption('disableConstraintsDuringData', v)}
+              disabled={disabled}
+            />
+          </div>
+
+          {/* Heuristic Data Reordering */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Heuristic Data Reordering
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Order INSERTs by parent tables first (e.g. leads before activities)
+              </p>
+            </div>
+            <Switch
+              checked={options.dataReorderHeuristics ?? false}
+              onCheckedChange={(v) => updateOption('dataReorderHeuristics', v)}
               disabled={disabled}
             />
           </div>

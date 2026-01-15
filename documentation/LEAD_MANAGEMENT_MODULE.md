@@ -61,6 +61,23 @@ CREATE TABLE public.leads (
 *   **`profiles`**: Links to `owner_id` for user assignment.
 *   **`queues`**: Links to `owner_queue_id` for pool-based assignment.
 
+**Data Import Order (pg_dump-based migrations)**:
+*   Parent tables must be imported before children to satisfy foreign keys.
+*   For the Lead stack, the effective order is:
+    1. `public.tenants`
+    2. `public.profiles`
+    3. `public.accounts` / `public.contacts` (optional but recommended before leads)
+    4. `public.leads`
+    5. `public.queues` + `public.queue_members`
+    6. `public.email_accounts` + `public.emails`
+    7. `public.activities`
+*   The pg_dump import tooling enforces this order using foreign key topology, but exported data must still respect:
+    *   `leads.owner_id` → `profiles.id`
+    *   `activities.lead_id` → `leads.id`
+*   Before exporting, the Database Export pre-flight checks will warn if:
+    *   Any `leads.owner_id` values reference missing `profiles.id`.
+    *   Any `activities.lead_id` values reference missing `leads.id`.
+
 #### 1.3 User Permission Matrix & Security
 Configure Role-Based Access Control (RBAC) in `src/config/permissions.ts`.
 

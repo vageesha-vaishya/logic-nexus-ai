@@ -64,6 +64,21 @@ export interface SqlParseProgress {
   totalLines: number;
 }
 
+export interface TableColumnDefinition {
+  schema: string;
+  table: string;
+  column: string;
+  dataType: string;
+  isNullable: boolean;
+  defaultValue?: string;
+}
+
+export interface TableSchemaDefinition {
+  schema: string;
+  table: string;
+  columns: TableColumnDefinition[];
+}
+
 type StatementCategory = 
   | 'schema' 
   | 'table' 
@@ -373,6 +388,178 @@ export function parseSqlText(
   }
 
   return result;
+}
+
+export function extractTableSchemas(parsed: ParsedSqlFile): TableSchemaDefinition[] {
+  const schemas: TableSchemaDefinition[] = [];
+  const seen = new Map<string, TableSchemaDefinition>();
+
+  for (const stmt of parsed.tableStatements) {
+    const upper = stmt.toUpperCase();
+    if (!upper.includes('CREATE TABLE')) {
+      continue;
+    }
+
+    const tableMatch = stmt.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?/i);
+    if (!tableMatch) {
+      continue;
+    }
+
+    const schema = tableMatch[1] || 'public';
+    const table = tableMatch[2];
+    const key = `${schema}.${table}`;
+
+    const openParenIndex = stmt.indexOf('(', tableMatch.index ?? 0);
+    const closeParenIndex = stmt.lastIndexOf(')');
+    if (openParenIndex === -1 || closeParenIndex === -1 || closeParenIndex <= openParenIndex) {
+      continue;
+    }
+
+    const inside = stmt.slice(openParenIndex + 1, closeParenIndex);
+    const parts: string[] = [];
+    let current = '';
+    let depth = 0;
+
+    for (let i = 0; i < inside.length; i++) {
+      const ch = inside[i];
+      if (ch === '(') {
+        depth += 1;
+        current += ch;
+      } else if (ch === ')') {
+        depth = Math.max(0, depth - 1);
+        current += ch;
+      } else if (ch === ',' && depth === 0) {
+        const trimmed = current.trim();
+        if (trimmed.length > 0) {
+          parts.push(trimmed);
+        }
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+
+    const lastTrimmed = current.trim();
+    if (lastTrimmed.length > 0) {
+      parts.push(lastTrimmed);
+    }
+
+    const columns: TableColumnDefinition[] = [];
+
+    for (const part of parts) {
+      const trimmed = part.trim();
+      const upperPart = trimmed.toUpperCase();
+
+      if (
+        upperPart.startsWith('CONSTRAINT') ||
+        upperPart.startsWith('PRIMARY KEY') ||
+        upperPart.startsWith('FOREIGN KEY') ||
+        upperPart.startsWith('UNIQUE') ||
+        upperPart.startsWith('CHECK')
+      ) {
+        continue;
+      }
+
+      const nameMatch = trimmed.match(/^"?(?<name>[A-Za-z0-9_]+)"?\s+(?<rest>.+)$/s);
+      if (!nameMatch || !nameMatch.groups) {
+        continue;
+      }
+
+      const column = nameMatch.groups.name;
+      const rest = nameMatch.groups.rest.trim();
+
+      const keywordMatch = rest.match(/\s+(NOT\s+NULL|NULL|DEFAULT|CONSTRAINT|PRIMARY\s+KEY|REFERENCES|CHECK|UNIQUE|COLLATE|GENERATED)\b/i);
+      const typeEndIndex = keywordMatch ? keywordMatch.index ?? rest.length : rest.length;
+      const dataType = rest.slice(0, typeEndIndex).trim() || 'text';
+      const isNullable = !/NOT\s+NULL/i.test(rest);
+      let defaultValue: string | undefined;
+
+      const defaultMatch = rest.match(/\bDEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|NULL|CONSTRAINT|PRIMARY\s+KEY|REFERENCES|CHECK|UNIQUE|COLLATE|GENERATED)|\s*$)/i);
+      if (defaultMatch) {
+        defaultValue = defaultMatch[1].trim();
+      }
+
+      columns.push({
+        schema,
+        table,
+        column,
+        dataType,
+        isNullable,
+        defaultValue,
+      });
+    }
+
+    const existing = seen.get(key);
+    if (existing) {
+      existing.columns.push(...columns);
+    } else {
+      const schemaDef: TableSchemaDefinition = {
+        schema,
+        table,
+        columns,
+      };
+      seen.set(key, schemaDef);
+      schemas.push(schemaDef);
+    }
+  }
+
+  return schemas;
+}
+
+export interface TargetColumnInfo {
+  schema_name: string;
+  table_name: string;
+  column_name: string;
+}
+
+export interface MissingColumnAlterPlan {
+  statements: string[];
+  missingColumns: TableColumnDefinition[];
+}
+
+export function buildMissingColumnAlterStatements(
+  sourceSchemas: TableSchemaDefinition[],
+  targetColumns: TargetColumnInfo[]
+): MissingColumnAlterPlan {
+  const targetMap = new Map<string, Set<string>>();
+
+  for (const col of targetColumns) {
+    const schema = col.schema_name || 'public';
+    const table = col.table_name;
+    const column = col.column_name;
+    const key = `${schema}.${table}`;
+    let set = targetMap.get(key);
+    if (!set) {
+      set = new Set<string>();
+      targetMap.set(key, set);
+    }
+    set.add(column);
+  }
+
+  const statements: string[] = [];
+  const missingColumns: TableColumnDefinition[] = [];
+
+  for (const schemaDef of sourceSchemas) {
+    const key = `${schemaDef.schema}.${schemaDef.table}`;
+    const existingColumns = targetMap.get(key);
+    if (!existingColumns) {
+      continue;
+    }
+
+    for (const col of schemaDef.columns) {
+      if (!existingColumns.has(col.column)) {
+        const type = col.dataType || 'text';
+        const stmt = `ALTER TABLE "${schemaDef.schema}"."${schemaDef.table}" ADD COLUMN "${col.column}" ${type};`;
+        statements.push(stmt);
+        missingColumns.push(col);
+      }
+    }
+  }
+
+  return {
+    statements,
+    missingColumns,
+  };
 }
 
 /**

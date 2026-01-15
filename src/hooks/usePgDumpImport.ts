@@ -1,6 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ParsedSqlFile } from '@/utils/sqlFileParser';
+import {
+  ParsedSqlFile,
+  extractTableSchemas,
+  buildMissingColumnAlterStatements,
+  TargetColumnInfo,
+  TableSchemaDefinition,
+} from '@/utils/sqlFileParser';
 import { ExternalDbConnection, ConnectionTestResult } from '@/components/dashboard/data-management/migration/ExternalDbConnectionForm';
 import { ImportOptions } from '@/components/dashboard/data-management/migration/ImportOptionsPanel';
 
@@ -77,6 +83,7 @@ export interface UsePgDumpImportReturn {
   resumeImport: () => void;
   cancelImport: () => void;
   reset: () => void;
+  rollbackAlignment: (connection: ExternalDbConnection) => Promise<void>;
   
   canStart: boolean;
   canPause: boolean;
@@ -94,10 +101,312 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
   const startTimeRef = useRef<number>(0);
+  const appliedChangesRef = useRef<{ forward: string[]; rollback: string[]; summary: string; phase: string; timestamp: number }[]>([]);
 
   const addLog = useCallback((level: ImportLog['level'], message: string, details?: string) => {
     setLogs(prev => [...prev, { timestamp: Date.now(), level, message, details }]);
   }, []);
+
+  const validateAndPrepareSchema = useCallback(async (
+    parsed: ParsedSqlFile,
+    connection: ExternalDbConnection,
+    options?: ImportOptions
+  ) => {
+    addLog('info', 'Starting schema validation and alignment');
+
+    const cfg = options?.alignmentConfig;
+    const allowedSchemas = (cfg?.allowedSchemas && cfg.allowedSchemas.length > 0) ? cfg.allowedSchemas : ['public'];
+    const excludedSchemas = cfg?.excludedSchemas || [];
+    const allowedTables = cfg?.allowedTables || [];
+    const excludedTables = cfg?.excludedTables || [];
+    const maxRowEstimate = cfg?.maxRowEstimateForAlter ?? 10_000_000;
+    const criticalTables = new Set(cfg?.criticalTables || []);
+    const requiredNotNullSet = new Set(cfg?.requiredNotNullColumns || []);
+    const heuristics = cfg?.heuristics || {
+      allowNotNullWhenDefault: true,
+      allowNotNullWhenNoNulls: true,
+      backfillWithDefault: true,
+    };
+
+    const { data, error } = await supabase.functions.invoke('execute-sql-external', {
+      body: {
+        action: 'query',
+        connection: {
+          host: connection.host,
+          port: connection.port,
+          database: connection.database,
+          user: connection.user,
+          password: connection.password,
+          ssl: connection.ssl,
+        },
+        query: `
+          SELECT
+            table_schema AS schema_name,
+            table_name,
+            column_name,
+            data_type,
+            is_nullable
+          FROM information_schema.columns
+          WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+        `,
+      },
+    });
+
+    if (error) {
+      addLog('error', 'Schema introspection failed', error.message || String(error));
+      throw error;
+    }
+
+    const result = data as any;
+    if (!result?.success) {
+      const message = result?.message || 'Schema introspection failed';
+      addLog('error', 'Schema introspection failed', message);
+      throw new Error(message);
+    }
+
+    const rows = Array.isArray(result.data) ? result.data : [];
+
+    const targetColumns: TargetColumnInfo[] = rows.map((r: any) => ({
+      schema_name: r.schema_name || r.table_schema || 'public',
+      table_name: r.table_name,
+      column_name: r.column_name,
+    }));
+
+    let sourceSchemas = extractTableSchemas(parsed);
+
+    // Restrict by schema/table config
+    sourceSchemas = sourceSchemas.filter((def: TableSchemaDefinition) => {
+      const schemaOk =
+        (allowedSchemas.length === 0 || allowedSchemas.some(s => def.schema.match(new RegExp(`^${s.replace(/\*/g, '.*')}$`)))) &&
+        (excludedSchemas.length === 0 || !excludedSchemas.some(s => def.schema.match(new RegExp(`^${s.replace(/\*/g, '.*')}$`))));
+      const fullName = `${def.schema}.${def.table}`;
+      const tableOk =
+        (allowedTables.length === 0 || allowedTables.includes(fullName)) &&
+        (excludedTables.length === 0 || !excludedTables.includes(fullName)) &&
+        !criticalTables.has(fullName);
+      return schemaOk && tableOk;
+    });
+
+    // Fetch table row estimates to skip gigantic tables if configured
+    const { data: tblEstData, error: tblEstErr } = await supabase.functions.invoke('execute-sql-external', {
+      body: {
+        action: 'query',
+        connection: {
+          host: connection.host,
+          port: connection.port,
+          database: connection.database,
+          user: connection.user,
+          password: connection.password,
+          ssl: connection.ssl,
+        },
+        query: `
+          SELECT n.nspname AS schema_name, c.relname AS table_name, c.reltuples::bigint AS row_estimate
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+        `,
+      },
+    });
+    if (tblEstErr) {
+      addLog('warn', 'Failed to fetch table estimates', tblEstErr.message || String(tblEstErr));
+    }
+    const rowEstimateMap = new Map<string, number>();
+    if (tblEstData?.data && Array.isArray(tblEstData.data)) {
+      for (const r of tblEstData.data as any[]) {
+        rowEstimateMap.set(`${r.schema_name}.${r.table_name}`, Number(r.row_estimate || 0));
+      }
+    }
+    sourceSchemas = sourceSchemas.filter(def => {
+      const estimate = rowEstimateMap.get(`${def.schema}.${def.table}`) ?? 0;
+      return estimate <= maxRowEstimate;
+    });
+    const plan = buildMissingColumnAlterStatements(sourceSchemas, targetColumns);
+
+    if (plan.statements.length === 0) {
+      addLog('info', 'Schema validation completed', 'No missing columns detected');
+      return;
+    }
+
+    const tablesTouched = new Set(plan.missingColumns.map(c => `${c.schema}.${c.table}`));
+    addLog('info', 'Schema differences detected', `Adding ${plan.missingColumns.length} missing columns across ${tablesTouched.size} tables`);
+
+    // Build enhanced statements with defaults and optional backfill (Stage 1)
+    const stage1Statements: string[] = [];
+    const stage1Summary: string[] = [];
+    const stage1Rollback: string[] = [];
+    for (const col of plan.missingColumns) {
+      const fq = `${col.schema}.${col.table}.${col.column}`;
+      const normalizedType = typeof col.dataType === 'string' ? col.dataType.trim() : '';
+      const safeType = /^ARRAY$/i.test(normalizedType)
+        ? 'text[]'
+        : /^USER-DEFINED$/i.test(normalizedType)
+          ? 'text'
+          : (normalizedType || 'text');
+      const baseAdd = `ALTER TABLE "${col.schema}"."${col.table}" ADD COLUMN "${col.column}" ${safeType}`;
+      const hasArrayDefault =
+        typeof col.defaultValue === 'string' && /\bARRAY\b/i.test(col.defaultValue);
+
+      if (col.defaultValue && !hasArrayDefault) {
+        stage1Statements.push(`${baseAdd} DEFAULT ${col.defaultValue};`);
+        stage1Summary.push(`ADD COLUMN with DEFAULT: ${fq}`);
+        if (heuristics.backfillWithDefault) {
+          stage1Statements.push(
+            `UPDATE "${col.schema}"."${col.table}" SET "${col.column}" = ${col.defaultValue} WHERE "${col.column}" IS NULL;`
+          );
+          stage1Summary.push(`Backfill with DEFAULT: ${fq}`);
+        }
+      } else {
+        stage1Statements.push(`${baseAdd};`);
+        stage1Summary.push(
+          hasArrayDefault
+            ? `ADD COLUMN (array, default skipped): ${fq}`
+            : `ADD COLUMN (nullable): ${fq}`
+        );
+      }
+      stage1Rollback.push(`ALTER TABLE "${col.schema}"."${col.table}" DROP COLUMN "${col.column}";`);
+    }
+
+    addLog('info', 'Applying Stage 1 schema changes', stage1Summary.join('\n'));
+
+    const { data: execData1, error: execError1 } = await supabase.functions.invoke('execute-sql-external', {
+      body: {
+        action: 'execute',
+        connection: {
+          host: connection.host,
+          port: connection.port,
+          database: connection.database,
+          user: connection.user,
+          password: connection.password,
+          ssl: connection.ssl,
+        },
+        statements: stage1Statements,
+        options: {
+          stopOnError: true,
+          useTransaction: true,
+          timeoutMs: 60000,
+        },
+      },
+    });
+    if (execError1) {
+      addLog('error', 'Failed to apply Stage 1 schema changes', execError1.message || String(execError1));
+      throw execError1;
+    }
+    const execResult1 = execData1 as any;
+    if (!execResult1?.success) {
+      const message = execResult1?.message || 'Failed to apply Stage 1 schema changes';
+      addLog('error', 'Failed to apply Stage 1 schema changes', message);
+      if (execResult1?.details?.errors && Array.isArray(execResult1.details.errors) && execResult1.details.errors.length > 0) {
+        const first = execResult1.details.errors[0];
+        addLog('error', 'First schema change error', `${first.error}\nStatement: ${first.statement}`);
+      }
+      throw new Error(message);
+    }
+    appliedChangesRef.current.push({
+      forward: stage1Statements,
+      rollback: stage1Rollback,
+      summary: stage1Summary.join('\n'),
+      phase: 'schema-stage1',
+      timestamp: Date.now(),
+    });
+
+    // Monitoring: Check NULL counts post-backfill, then apply NOT NULL (Stage 2)
+    const stage2Statements: string[] = [];
+    const stage2Summary: string[] = [];
+    const stage2Applied: { schema: string; table: string; column: string }[] = [];
+    for (const col of plan.missingColumns) {
+      const fqCol = `${col.schema}.${col.table}.${col.column}`;
+      const requiresNotNull = requiredNotNullSet.has(fqCol);
+      const considerNotNull =
+        requiresNotNull ||
+        (heuristics.allowNotNullWhenDefault && !!col.defaultValue);
+
+      if (!considerNotNull) {
+        continue;
+      }
+
+      let nullCount = Number.NaN;
+      const { data: qData, error: qErr } = await supabase.functions.invoke('execute-sql-external', {
+        body: {
+          action: 'query',
+          connection: {
+            host: connection.host,
+            port: connection.port,
+            database: connection.database,
+            user: connection.user,
+            password: connection.password,
+            ssl: connection.ssl,
+          },
+          query: `SELECT COUNT(*)::bigint AS cnt FROM "${col.schema}"."${col.table}" WHERE "${col.column}" IS NULL`,
+        },
+      });
+      if (qErr) {
+        addLog('warn', `Heuristic check failed for ${fqCol}`, qErr.message || String(qErr));
+        continue;
+      }
+      const qRes = qData as any;
+      if (qRes?.success && Array.isArray(qRes?.data) && qRes.data.length > 0) {
+        nullCount = Number(qRes.data[0]?.cnt ?? 0);
+      } else {
+        addLog('warn', `Heuristic query returned no data for ${fqCol}`);
+        continue;
+      }
+
+      if (nullCount === 0 || (heuristics.allowNotNullWhenNoNulls && nullCount === 0)) {
+        stage2Statements.push(
+          `ALTER TABLE "${col.schema}"."${col.table}" ALTER COLUMN "${col.column}" SET NOT NULL;`
+        );
+        stage2Summary.push(`SET NOT NULL: ${fqCol} (nulls=${nullCount})`);
+        stage2Applied.push({ schema: col.schema, table: col.table, column: col.column });
+      } else if (requiresNotNull) {
+        addLog('warn', `Required NOT NULL skipped due to ${nullCount} NULLs in ${fqCol}`);
+      } else {
+        addLog('info', `NOT NULL not applied: ${fqCol} (nulls=${nullCount})`);
+      }
+    }
+
+    if (stage2Statements.length > 0) {
+      addLog('info', 'Applying Stage 2 constraints', stage2Summary.join('\n'));
+      const { data: execData2, error: execError2 } = await supabase.functions.invoke('execute-sql-external', {
+        body: {
+          action: 'execute',
+          connection: {
+            host: connection.host,
+            port: connection.port,
+            database: connection.database,
+            user: connection.user,
+            password: connection.password,
+            ssl: connection.ssl,
+          },
+          statements: stage2Statements,
+          options: {
+            stopOnError: true,
+            useTransaction: true,
+            timeoutMs: 60000,
+          },
+        },
+      });
+      if (execError2) {
+        addLog('error', 'Failed to apply Stage 2 constraints', execError2.message || String(execError2));
+        throw execError2;
+      }
+      const execResult2 = execData2 as any;
+      if (!execResult2?.success) {
+        const message = execResult2?.message || 'Failed to apply Stage 2 constraints';
+        addLog('error', 'Failed to apply Stage 2 constraints', message);
+        throw new Error(message);
+      }
+      const stage2Rollback = stage2Applied.map(c => `ALTER TABLE "${c.schema}"."${c.table}" ALTER COLUMN "${c.column}" DROP NOT NULL;`);
+      appliedChangesRef.current.push({
+        forward: stage2Statements,
+        rollback: stage2Rollback,
+        summary: stage2Summary.join('\n'),
+        phase: 'schema-stage2',
+        timestamp: Date.now(),
+      });
+    }
+
+    addLog('success', 'Schema alignment completed', `Applied ${stage1Statements.length} changes; ${stage2Statements.length} constraints`);
+  }, [addLog]);
 
   const testConnection = useCallback(async (connection: ExternalDbConnection): Promise<ConnectionTestResult> => {
     try {
@@ -127,7 +436,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     }
   }, []);
 
-  const executeStatements = useCallback(async (
+      const executeStatements = useCallback(async (
     statements: string[],
     connection: ExternalDbConnection,
     options: ImportOptions,
@@ -152,7 +461,18 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
       const start = batchIndex * batchSize;
       const end = Math.min(start + batchSize, statements.length);
-      const batch = statements.slice(start, end);
+        let batch = statements.slice(start, end);
+        if (phase === 'data' && (options.disableConstraintsDuringData ?? false)) {
+          const prep = [
+            'SET CONSTRAINTS ALL DEFERRED;',
+            'SET LOCAL session_replication_role = replica;',
+          ];
+          const post = [
+            'SET CONSTRAINTS ALL IMMEDIATE;',
+            'SET LOCAL session_replication_role = origin;',
+          ];
+          batch = [...prep, ...batch, ...post];
+        }
 
       try {
         const { data, error } = await supabase.functions.invoke('execute-sql-external', {
@@ -177,7 +497,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
         if (error) throw error;
 
-        const result = data;
+        const result = data as any;
 
         if (!result?.success) {
           const msg = result?.message || 'Remote execution failed';
@@ -197,36 +517,49 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         failed += result.details?.failed || 0;
 
         if (result.details?.errors) {
-          // Log specific errors from the batch
-          const errList = result.details.errors;
+          const errList = result.details.errors as Array<{ index: number; statement: string; error: string }>;
           if (errList.length > 0) {
-            // Group errors to identify cascading transaction failures
             const abortedErrors = errList.filter(e => e.error.includes('current transaction is aborted'));
-            const rootErrors = errList.filter(e => !e.error.includes('current transaction is aborted'));
-            
-            // Log root cause errors (usually the first one)
+            const fkErrors = errList.filter(e => /violates foreign key constraint/i.test(e.error));
+            const rootErrors = errList.filter(
+              e => !e.error.includes('current transaction is aborted')
+            );
             const limit = 3;
             rootErrors.slice(0, limit).forEach(err => {
-              addLog('error', `Stmt ${err.index + 1}: ${err.error}`);
+              addLog('error', `Stmt ${err.index + 1}: ${err.error}`, `Statement: ${err.statement}`);
             });
-
             if (rootErrors.length > limit) {
               addLog('error', `...and ${rootErrors.length - limit} more specific errors`);
             }
-            
-            if (abortedErrors.length > 0) {
-              addLog('warn', `${abortedErrors.length} statements failed because the transaction was aborted by a previous error.`);
+            if (fkErrors.length > 0) {
+              const sample = fkErrors[0];
+              addLog(
+                'error',
+                'Detected foreign key violations while inserting data',
+                sample.error
+              );
+              if (phase === 'data' && options.useTransactions) {
+                addLog(
+                  'warn',
+                  'Data batch rolled back due to foreign key violations',
+                  'Review parent/child table ordering and source data integrity, then re-run import'
+                );
+              }
             }
-            
-            // If we have errors but no root errors (weird case), just show the first few
+            if (abortedErrors.length > 0) {
+              addLog(
+                'warn',
+                `${abortedErrors.length} statements failed because the transaction was aborted by a previous error.`
+              );
+            }
             if (rootErrors.length === 0 && abortedErrors.length === 0) {
-                errList.slice(0, 3).forEach(err => {
-                    addLog('error', `Stmt ${err.index + 1}: ${err.error}`);
-                });
+              errList.slice(0, 3).forEach(err => {
+                addLog('error', `Stmt ${err.index + 1}: ${err.error}`);
+              });
             }
           }
 
-          for (const err of result.details.errors) {
+          for (const err of errList) {
             newErrors.push({
               index: start + err.index,
               statement: err.statement,
@@ -279,13 +612,23 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     connection: ExternalDbConnection,
     options: ImportOptions
   ) => {
-    setStatus('executing');
+    setStatus('validating');
     setErrors([]);
     setLogs([]);
     setSummary(null);
     pauseRef.current = false;
     cancelRef.current = false;
     startTimeRef.current = Date.now();
+
+    try {
+      await validateAndPrepareSchema(parsed, connection, options);
+    } catch (err: any) {
+      setStatus('failed');
+      addLog('error', 'Schema validation failed', err.message || String(err));
+      return;
+    }
+
+    setStatus('executing');
 
     const phaseStats = {
       schema: { executed: 0, failed: 0 },
@@ -327,10 +670,146 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       // Determine execution order
       let phases: Array<{ name: ImportProgress['currentPhase']; statements: string[] }> = [];
 
+      const reorderDataStatements = (stmts: string[]): string[] => {
+        const extractTarget = (s: string): string | null => {
+          const m = s.match(/INSERT\s+INTO\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"/i);
+          if (m) {
+            const schema = (m[1] || 'public').toLowerCase();
+            const table = (m[2] || '').toLowerCase();
+            return `${schema}.${table}`;
+          }
+          return null;
+        };
+        const priority: string[] = [
+          'public.tenants',
+          'public.profiles',
+          'public.accounts',
+          'public.contacts',
+          'public.leads',
+          'public.opportunities',
+          'public.queues',
+          'public.queue_members',
+          'public.email_accounts',
+          'public.emails',
+          'public.activities',
+          'public.segment_members',
+        ];
+        const buckets = new Map<string, string[]>();
+        const rest: string[] = [];
+        const tables = new Set<string>();
+        for (const s of stmts) {
+          const ref = extractTarget(s);
+          if (ref) {
+            tables.add(ref);
+            if (!buckets.has(ref)) buckets.set(ref, []);
+            buckets.get(ref)!.push(s);
+          } else {
+            rest.push(s);
+          }
+        }
+        const deps = new Map<string, Set<string>>();
+        const childrenByParent = new Map<string, Set<string>>();
+        const addEdge = (child: string, parent: string) => {
+          if (!tables.has(child) || !tables.has(parent)) return;
+          if (!deps.has(child)) deps.set(child, new Set());
+          deps.get(child)!.add(parent);
+          if (!childrenByParent.has(parent)) childrenByParent.set(parent, new Set());
+          childrenByParent.get(parent)!.add(child);
+        };
+        let edgeCount = 0;
+        const fkRegex =
+          /ALTER\s+TABLE\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?[\s\S]*?FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"/gi;
+        for (const stmt of parsed.constraintStatements) {
+          let m: RegExpExecArray | null;
+          while ((m = fkRegex.exec(stmt)) !== null) {
+            const childSchema = (m[1] || 'public').toLowerCase();
+            const childTable = (m[2] || '').toLowerCase();
+            const parentSchema = (m[3] || 'public').toLowerCase();
+            const parentTable = (m[4] || '').toLowerCase();
+            if (!childTable || !parentTable) continue;
+            const childRef = `${childSchema}.${childTable}`;
+            const parentRef = `${parentSchema}.${parentTable}`;
+            if (childRef !== parentRef) {
+              addEdge(childRef, parentRef);
+              edgeCount++;
+            }
+          }
+        }
+        const tableList = Array.from(tables);
+        const indegree = new Map<string, number>();
+        for (const t of tableList) {
+          indegree.set(t, 0);
+        }
+        for (const [child, parents] of deps) {
+          for (const parent of parents) {
+            if (!indegree.has(child)) continue;
+            indegree.set(child, (indegree.get(child) || 0) + 1);
+          }
+        }
+        const orderedTables: string[] = [];
+        if (edgeCount > 0) {
+          const priorityIndex = new Map<string, number>();
+          priority.forEach((name, idx) => {
+            priorityIndex.set(name, idx);
+          });
+          const queue: string[] = [];
+          for (const [t, deg] of indegree) {
+            if (deg === 0) {
+              queue.push(t);
+            }
+          }
+          queue.sort((a, b) => {
+            const pa = priorityIndex.has(a) ? priorityIndex.get(a)! : Number.MAX_SAFE_INTEGER;
+            const pb = priorityIndex.has(b) ? priorityIndex.get(b)! : Number.MAX_SAFE_INTEGER;
+            if (pa !== pb) return pa - pb;
+            return a.localeCompare(b);
+          });
+          const seen = new Set<string>();
+          while (queue.length > 0) {
+            const t = queue.shift()!;
+            if (seen.has(t)) continue;
+            seen.add(t);
+            orderedTables.push(t);
+            const children = childrenByParent.get(t);
+            if (children) {
+              for (const child of children) {
+                if (!indegree.has(child)) continue;
+                const d = (indegree.get(child) || 0) - 1;
+                indegree.set(child, d);
+                if (d === 0) {
+                  queue.push(child);
+                }
+              }
+              queue.sort((a, b) => {
+                const pa = priorityIndex.has(a) ? priorityIndex.get(a)! : Number.MAX_SAFE_INTEGER;
+                const pb = priorityIndex.has(b) ? priorityIndex.get(b)! : Number.MAX_SAFE_INTEGER;
+                if (pa !== pb) return pa - pb;
+                return a.localeCompare(b);
+              });
+            }
+          }
+          if (orderedTables.length !== tableList.length) {
+            orderedTables.length = 0;
+          }
+        }
+        if (orderedTables.length === 0) {
+          const presentPriority = priority.filter(ref => buckets.has(ref));
+          const remaining = tableList.filter(ref => !presentPriority.includes(ref));
+          orderedTables.push(...presentPriority, ...remaining);
+        }
+        const ordered: string[] = [];
+        for (const ref of orderedTables) {
+          const b = buckets.get(ref);
+          if (b && b.length > 0) ordered.push(...b);
+        }
+        ordered.push(...rest);
+        return ordered;
+      };
+
       if (options.executionOrder === 'schema-first') {
         phases = [
           { name: 'schema', statements: [...parsed.schemaStatements, ...parsed.tableStatements, ...parsed.sequenceStatements] },
-          { name: 'data', statements: parsed.dataStatements },
+          { name: 'data', statements: (options.dataReorderHeuristics ? reorderDataStatements(parsed.dataStatements) : parsed.dataStatements) },
           { name: 'constraints', statements: parsed.constraintStatements },
           { name: 'indexes', statements: parsed.indexStatements },
           { name: 'functions', statements: [...parsed.functionStatements, ...parsed.triggerStatements] },
@@ -339,7 +818,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       } else if (options.executionOrder === 'data-first') {
         phases = [
           { name: 'schema', statements: [...parsed.schemaStatements, ...parsed.tableStatements, ...parsed.sequenceStatements] },
-          { name: 'data', statements: parsed.dataStatements },
+          { name: 'data', statements: (options.dataReorderHeuristics ? reorderDataStatements(parsed.dataStatements) : parsed.dataStatements) },
           { name: 'indexes', statements: parsed.indexStatements },
           { name: 'constraints', statements: parsed.constraintStatements },
           { name: 'functions', statements: [...parsed.functionStatements, ...parsed.triggerStatements] },
@@ -352,12 +831,89 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         ];
       }
 
+      const ownershipStatements: string[] = [];
+      const filterOwnershipSensitive = (stmts: string[]) =>
+        stmts.filter(s => {
+          const referencesAudit = /(?:"audit_log_entries"|\baudit_log_entries\b)/i.test(s);
+          const isOwnership =
+            /\bALTER\s+TABLE\b[\s\S]*\bOWNER\s+TO\b/i.test(s) ||
+            /\bCOMMENT\s+ON\s+TABLE\b/i.test(s) ||
+            /\bGRANT\b/i.test(s) ||
+            /\bREVOKE\b/i.test(s) ||
+            /\bALTER\s+TABLE\b[\s\S]*\bENABLE\s+ROW\s+LEVEL\s+SECURITY\b/i.test(s) ||
+            /\bALTER\s+TABLE\b[\s\S]*\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b/i.test(s);
+          if (referencesAudit || isOwnership) {
+            ownershipStatements.push(s);
+            return false;
+          }
+          return true;
+        });
+      for (const phase of phases) {
+        const before = phase.statements.length;
+        phase.statements = filterOwnershipSensitive(phase.statements);
+        const after = phase.statements.length;
+        if (after < before) {
+          addLog('warn', `Filtered ownership-sensitive statements in phase ${phase.name}`, `${before - after} statements skipped`);
+        }
+      }
+
+      const restrictedSchemas = new Set(['auth']);
+      const filterRestrictedSchemas = (stmts: string[]) =>
+        stmts.filter(s => !/"auth"\./i.test(s));
+      const sanitizeTypes = (stmts: string[]) =>
+        stmts.map(s =>
+          s
+            .replace(/\bUSER-DEFINED\b/gi, 'text')
+            .replace(/\bARRAY\b(?!\[)/gi, 'text[]')
+        );
+      for (const phase of phases) {
+        const before = phase.statements.length;
+        phase.statements = filterRestrictedSchemas(phase.statements);
+        const after = phase.statements.length;
+        if (after < before) {
+          addLog('warn', `Filtered restricted schema statements in phase ${phase.name}`, `${before - after} statements skipped`);
+        }
+        const sanitized = sanitizeTypes(phase.statements);
+        if (sanitized.some((v, i) => v !== phase.statements[i])) {
+          addLog('info', `Sanitized type placeholders in phase ${phase.name}`);
+          phase.statements = sanitized;
+        }
+      }
+
+      const rewriteInsertOnConflict = (stmts: string[], mode: ImportOptions['onConflict']) => {
+        if (mode !== 'skip') return stmts;
+        const out: string[] = [];
+        for (let s of stmts) {
+          const upper = s.trim().toUpperCase();
+          if (upper.startsWith('INSERT') && !upper.includes('ON CONFLICT')) {
+            const hasSemicolon = /;\s*$/.test(s);
+            const base = hasSemicolon ? s.replace(/;\s*$/, '') : s;
+            s = `${base} ON CONFLICT DO NOTHING${hasSemicolon ? ';' : ''}`;
+          }
+          out.push(s);
+        }
+        return out;
+      };
+      for (const phase of phases) {
+        if (phase.name === 'data') {
+          const before = phase.statements.length;
+          const rewritten = rewriteInsertOnConflict(phase.statements, options.onConflict);
+          if (rewritten.some((v, i) => v !== phase.statements[i])) {
+            addLog('info', 'Applied ON CONFLICT DO NOTHING to INSERT statements', `Rewrote ${rewritten.filter((v, i) => v !== phase.statements[i]).length} statements`);
+            phase.statements = rewritten;
+          }
+        }
+      }
+
       const allErrors: ImportError[] = [];
 
       for (const phase of phases) {
         if (phase.statements.length === 0) continue;
 
         addLog('info', `Starting phase: ${phase.name}`, `${phase.statements.length} statements`);
+        if (phase.name === 'data' && options.dataReorderHeuristics) {
+          addLog('info', 'Data reordering applied', 'Heuristic ordering enabled (parents before children)');
+        }
 
         const result = await executeStatements(
           phase.statements,
@@ -379,6 +935,86 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         addLog(result.failed > 0 ? 'warn' : 'success', 
           `Phase ${phase.name} completed`,
           `${result.executed} executed, ${result.failed} failed`
+        );
+      }
+
+      try {
+        const { data: fkData, error: fkError } = await supabase.functions.invoke('execute-sql-external', {
+          body: {
+            action: 'query',
+            connection: {
+              host: connection.host,
+              port: connection.port,
+              database: connection.database,
+              user: connection.user,
+              password: connection.password,
+              ssl: connection.ssl,
+            },
+            query: `
+              SELECT
+                (SELECT COUNT(*)::bigint FROM public.leads l
+                  LEFT JOIN public.profiles p ON l.owner_id = p.id
+                  WHERE l.owner_id IS NOT NULL AND p.id IS NULL) AS leads_missing_owners,
+                (SELECT COUNT(*)::bigint FROM public.leads WHERE owner_id IS NOT NULL) AS total_leads_with_owner,
+                (SELECT COUNT(*)::bigint FROM public.activities a
+                  LEFT JOIN public.leads l2 ON a.lead_id = l2.id
+                  WHERE a.lead_id IS NOT NULL AND l2.id IS NULL) AS activities_missing_leads,
+                (SELECT COUNT(*)::bigint FROM public.activities WHERE lead_id IS NOT NULL) AS total_activities_with_lead
+            `,
+          },
+        });
+        if (fkError) {
+          addLog(
+            'warn',
+            'Post-import foreign key verification failed',
+            fkError.message || String(fkError)
+          );
+        } else {
+          type FkVerificationRow = {
+            leads_missing_owners?: number | string | null;
+            total_leads_with_owner?: number | string | null;
+            activities_missing_leads?: number | string | null;
+            total_activities_with_lead?: number | string | null;
+          };
+          type FkVerificationResult = {
+            success?: boolean;
+            message?: string;
+            data?: unknown;
+          };
+          const result = (fkData as FkVerificationResult) || {};
+          if (!result.success) {
+            addLog(
+              'warn',
+              'Post-import foreign key verification failed',
+              result.message || 'Unknown error'
+            );
+          } else {
+            const rows = Array.isArray(result.data) ? (result.data as FkVerificationRow[]) : [];
+            const row: FkVerificationRow = rows[0] || {};
+            const leadsMissingOwners = Number(row.leads_missing_owners ?? 0);
+            const totalLeadsWithOwner = Number(row.total_leads_with_owner ?? 0);
+            const activitiesMissingLeads = Number(row.activities_missing_leads ?? 0);
+            const totalActivitiesWithLead = Number(row.total_activities_with_lead ?? 0);
+            if (leadsMissingOwners > 0 || activitiesMissingLeads > 0) {
+              addLog(
+                'warn',
+                'Post-import FK verification found orphan references',
+                `leads.owner_id: ${leadsMissingOwners}/${totalLeadsWithOwner}; activities.lead_id: ${activitiesMissingLeads}/${totalActivitiesWithLead}`
+              );
+            } else {
+              addLog(
+                'success',
+                'Post-import FK verification passed for leads.owner_id and activities.lead_id'
+              );
+            }
+          }
+        }
+      } catch (fkCheckErr: unknown) {
+        const msg = fkCheckErr instanceof Error ? fkCheckErr.message : String(fkCheckErr);
+        addLog(
+          'warn',
+          'Post-import foreign key verification encountered an unexpected error',
+          msg
         );
       }
 
@@ -405,6 +1041,68 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         `${totalExecuted} statements executed, ${totalFailed} failed in ${Math.round((endTime - startTimeRef.current) / 1000)}s`
       );
 
+      if (ownershipStatements.length > 0 && (options.postImportOwnershipEnabled ?? false)) {
+        const subset = (options.postImportOwnershipTables ?? []).map(s => s.toLowerCase());
+        const extractTableRef = (s: string): string | null => {
+          const alterMatch = s.match(/ALTER\s+TABLE\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?/i);
+          const commentMatch = s.match(/COMMENT\s+ON\s+TABLE\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?/i);
+          const grantMatch = s.match(/\bON\s+TABLE\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?/i);
+          const m = alterMatch || commentMatch || grantMatch;
+          if (m) {
+            const schema = (m[1] || 'public').toLowerCase();
+            const table = (m[2] || '').toLowerCase();
+            return `${schema}.${table}`;
+          }
+          return null;
+        };
+        const selected = subset.length === 0
+          ? ownershipStatements
+          : ownershipStatements.filter(s => {
+              const ref = extractTableRef(s);
+              return ref ? subset.includes(ref) : false;
+            });
+
+        if (selected.length === 0) {
+          addLog('warn', 'Skipping post-import ownership changes', 'No statements matched selected tables');
+        } else {
+        const privUser = (import.meta as any).env?.VITE_POST_IMPORT_DB_USER;
+        const privPassword = (import.meta as any).env?.VITE_POST_IMPORT_DB_PASSWORD;
+        if (privUser && privPassword) {
+          addLog('info', 'Starting post-import ownership changes', `${selected.length} statements`);
+          const { data: ownData, error: ownErr } = await supabase.functions.invoke('execute-sql-external', {
+            body: {
+              action: 'execute',
+              connection: {
+                host: connection.host,
+                port: connection.port,
+                database: connection.database,
+                user: privUser,
+                password: privPassword,
+                ssl: connection.ssl,
+              },
+              statements: selected,
+              options: {
+                stopOnError: true,
+                useTransaction: true,
+                timeoutMs: 60000,
+              },
+            },
+          });
+          if (ownErr) {
+            addLog('error', 'Post-import ownership changes failed', ownErr.message || String(ownErr));
+          } else {
+            const ownResult = ownData as any;
+            if (ownResult?.success) {
+              addLog('success', 'Post-import ownership changes applied', `${selected.length} statements`);
+            } else {
+              addLog('error', 'Post-import ownership changes failed', ownResult?.message || 'Unknown error');
+            }
+          }
+        } else {
+          addLog('warn', 'Skipping post-import ownership changes', 'Privileged DB credentials not configured');
+        }
+        }
+      }
     } catch (err: any) {
       if (err.message === 'Import cancelled') {
         setStatus('cancelled');
@@ -433,6 +1131,48 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     addLog('warn', 'Cancelling import...');
   }, [addLog]);
 
+  const rollbackAlignment = useCallback(async (connection: ExternalDbConnection) => {
+    const changes = [...appliedChangesRef.current];
+    if (changes.length === 0) {
+      addLog('info', 'No alignment changes to rollback');
+      return;
+    }
+    const statements = changes.flatMap(c => c.rollback).reverse();
+    addLog('warn', 'Starting rollback of schema alignment', `${statements.length} statements`);
+    addLog('info', 'Rollback plan', statements.join('\n'));
+    const { data, error } = await supabase.functions.invoke('execute-sql-external', {
+      body: {
+        action: 'execute',
+        connection: {
+          host: connection.host,
+          port: connection.port,
+          database: connection.database,
+          user: connection.user,
+          password: connection.password,
+          ssl: connection.ssl,
+        },
+        statements,
+        options: {
+          stopOnError: true,
+          useTransaction: true,
+          timeoutMs: 60000,
+        },
+      },
+    });
+    if (error) {
+      addLog('error', 'Rollback failed', error.message || String(error));
+      throw error;
+    }
+    const result = data as any;
+    if (!result?.success) {
+      const message = result?.message || 'Rollback failed';
+      addLog('error', 'Rollback failed', message);
+      throw new Error(message);
+    }
+    appliedChangesRef.current = [];
+    addLog('success', 'Rollback completed');
+  }, [addLog]);
+
   const reset = useCallback(() => {
     setStatus('idle');
     setProgress(null);
@@ -454,6 +1194,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     pauseImport,
     resumeImport,
     cancelImport,
+    rollbackAlignment,
     reset,
     canStart: status === 'idle' || status === 'completed' || status === 'failed' || status === 'cancelled',
     canPause: status === 'executing',

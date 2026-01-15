@@ -10,10 +10,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { 
   Loader2, 
   Shield,
-  Eye
+  Eye,
+  Columns
 } from "lucide-react";
 import Papa from "papaparse";
  import { toast } from "sonner";
@@ -120,6 +122,17 @@ export default function DatabaseExport() {
   const [franchises, setFranchises] = useState<any[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>(context.tenantId || "");
   const [selectedFranchiseId, setSelectedFranchiseId] = useState<string>(context.franchiseId ?? "none");
+
+  const [columnSelection, setColumnSelection] = useState<Record<string, string[]>>({});
+  const [columnDialogOpen, setColumnDialogOpen] = useState(false);
+  const [columnDialogTable, setColumnDialogTable] = useState<TableInfo | null>(null);
+  const [columnDialogColumns, setColumnDialogColumns] = useState<string[]>([]);
+  const [autoIncludeDeps, setAutoIncludeDeps] = useState(true);
+  const [fkDeps, setFkDeps] = useState<Record<string, string[]>>({});
+  const [viewDeps, setViewDeps] = useState<Record<string, string[]>>({});
+  const [matViewDeps, setMatViewDeps] = useState<Record<string, string[]>>({});
+  const [snapshotDiff, setSnapshotDiff] = useState<string>('');
+  const [snapshotDialogOpen, setSnapshotDialogOpen] = useState(false);
 
   useEffect(() => {
     if (context.isPlatformAdmin) {
@@ -374,6 +387,91 @@ export default function DatabaseExport() {
     }
   }, []);
 
+  useEffect(() => {
+    const loadDependencyMaps = async () => {
+      try {
+        const fkSql = `
+          SELECT
+            tc.table_schema AS source_schema,
+            tc.table_name AS source_table,
+            ccu.table_schema AS target_schema,
+            ccu.table_name AS target_table
+          FROM information_schema.table_constraints AS tc
+          JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+          JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+          WHERE tc.constraint_type = 'FOREIGN KEY'
+            AND tc.table_schema IN ('public','auth','storage','extensions','vault')
+            AND ccu.table_schema IN ('public','auth','storage','extensions','vault')
+        `;
+        const fkRes = await scopedDb.rpc("execute_sql_query", { query_text: fkSql });
+        const fkMap: Record<string, string[]> = {};
+        const fkRows = (fkRes.data as any[]) || [];
+        fkRows.forEach((r: any) => {
+          const src = `${r.source_schema}.${r.source_table}`;
+          const tgt = `${r.target_schema}.${r.target_table}`;
+          if (!fkMap[src]) fkMap[src] = [];
+          if (!fkMap[src].includes(tgt)) fkMap[src].push(tgt);
+        });
+        setFkDeps(fkMap);
+
+        const viewSql = `
+          SELECT
+            view_schema,
+            view_name,
+            table_schema,
+            table_name
+          FROM information_schema.view_table_usage
+          WHERE view_schema IN ('public','auth','storage','extensions','vault')
+            AND table_schema IN ('public','auth','storage','extensions','vault')
+        `;
+        const vRes = await scopedDb.rpc("execute_sql_query", { query_text: viewSql });
+        const vMap: Record<string, string[]> = {};
+        const vRows = (vRes.data as any[]) || [];
+        vRows.forEach((r: any) => {
+          const v = `${r.view_schema}.${r.view_name}`;
+          const t = `${r.table_schema}.${r.table_name}`;
+          if (!vMap[v]) vMap[v] = [];
+          if (!vMap[v].includes(t)) vMap[v].push(t);
+        });
+        setViewDeps(vMap);
+
+        const mvSql = `
+          SELECT
+            n.nspname AS view_schema,
+            c.relname AS view_name,
+            n2.nspname AS table_schema,
+            c2.relname AS table_name
+          FROM pg_depend d
+          JOIN pg_rewrite r ON d.objid = r.oid
+          JOIN pg_class c ON r.ev_class = c.oid
+          JOIN pg_class c2 ON d.refobjid = c2.oid
+          JOIN pg_namespace n ON c.relnamespace = n.oid
+          JOIN pg_namespace n2 ON c2.relnamespace = n2.oid
+          WHERE c.relkind IN ('m','v')
+            AND n.nspname IN ('public','auth','storage','extensions','vault')
+            AND n2.nspname IN ('public','auth','storage','extensions','vault')
+        `;
+        const mvRes = await scopedDb.rpc("execute_sql_query", { query_text: mvSql });
+        const mvMap: Record<string, string[]> = {};
+        const mvRows = (mvRes.data as any[]) || [];
+        mvRows.forEach((r: any) => {
+          const v = `${r.view_schema}.${r.view_name}`;
+          const t = `${r.table_schema}.${r.table_name}`;
+          if (!mvMap[v]) mvMap[v] = [];
+          if (!mvMap[v].includes(t)) mvMap[v].push(t);
+        });
+        setMatViewDeps(mvMap);
+      } catch (e) {
+        console.warn("Dependency maps load failed", e);
+      }
+    };
+    if (tables.length > 0) {
+      loadDependencyMaps();
+    }
+  }, [tables, scopedDb]);
+
   const allSelected = useMemo(() => tables.length > 0 && tables.every(t => selected[`${t.schema_name}.${t.table_name}`]), [tables, selected]);
 
   const toggleAll = (checked: boolean) => {
@@ -384,6 +482,72 @@ export default function DatabaseExport() {
 
   const toggle = (name: string, checked: boolean) => {
     setSelected(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const openColumnDialog = async (t: TableInfo) => {
+    setColumnDialogTable(t);
+    setColumnDialogColumns([]);
+    setColumnDialogOpen(true);
+    try {
+      let cols: string[] = [];
+      if (t.schema_name === 'public') {
+        const res = await (scopedDb.from(t.table_name as any).select('*').limit(1) as any);
+        if (res.data && res.data.length > 0) {
+          cols = Object.keys(res.data[0]);
+        }
+      } else {
+        const res = await scopedDb.rpc('get_table_data_dynamic', { 
+          target_schema: t.schema_name, 
+          target_table: t.table_name,
+          offset_val: 0,
+          limit_val: 1
+        });
+        if (res.data && res.data.length > 0) {
+          cols = Object.keys(res.data[0] as any);
+        }
+      }
+      setColumnDialogColumns(cols);
+      const key = `${t.schema_name}.${t.table_name}`;
+      if (!columnSelection[key]) {
+        setColumnSelection(prev => ({ ...prev, [key]: cols }));
+      }
+    } catch (e: any) {
+      toast.message('Could not infer columns', { description: 'No sample data available to detect columns.' });
+    }
+  };
+
+  const toggleColumnSelected = (tableKey: string, col: string, checked: boolean) => {
+    setColumnSelection(prev => {
+      const existing = prev[tableKey] || [];
+      const next = checked ? Array.from(new Set([...existing, col])) : existing.filter(c => c !== col);
+      return { ...prev, [tableKey]: next };
+    });
+  };
+
+  const resolveDependencies = (initial: Record<string, boolean>, tablesList: TableInfo[]) => {
+    if (!autoIncludeDeps) return initial;
+    const validKeys = new Set(tablesList.map(t => `${t.schema_name}.${t.table_name}`));
+    const adj: Record<string, string[]> = {};
+    Object.entries(fkDeps).forEach(([k, v]) => { adj[k] = (adj[k] || []).concat(v); });
+    Object.entries(viewDeps).forEach(([k, v]) => { adj[k] = (adj[k] || []).concat(v); });
+    Object.entries(matViewDeps).forEach(([k, v]) => { adj[k] = (adj[k] || []).concat(v); });
+    const next: Record<string, boolean> = { ...initial };
+    const queue: string[] = Object.keys(initial).filter(k => initial[k]);
+    const seen = new Set(queue);
+    while (queue.length > 0) {
+      const cur = queue.shift() as string;
+      const deps = adj[cur] || [];
+      for (const d of deps) {
+        if (validKeys.has(d) && !next[d]) {
+          next[d] = true;
+          if (!seen.has(d)) {
+            seen.add(d);
+            queue.push(d);
+          }
+        }
+      }
+    }
+    return next;
   };
 
   const downloadFile = async (filename: string, content: string, type = "text/plain") => {
@@ -538,15 +702,16 @@ export default function DatabaseExport() {
   };
 
   const exportSelectedCSV = async () => {
-    const chosen = tables.filter(t => selected[`${t.schema_name}.${t.table_name}`]);
-    if (chosen.length === 0) {
+    const chosenKeys = Object.entries(selected).filter(([, v]) => v).map(([k]) => k);
+    if (chosenKeys.length === 0) {
       toast.message("No tables selected", { description: "Select at least one table to export." });
       return;
     }
     setLoading(true);
     try {
       const files: Array<{ name: string; content: string; type: string }> = [];
-      for (const t of chosen) {
+      const resolved = resolveDependencies(selected, tables);
+      for (const t of tables.filter(tt => resolved[`${tt.schema_name}.${tt.table_name}`])) {
         let data: any[] = [];
         let error: any = null;
 
@@ -578,7 +743,17 @@ export default function DatabaseExport() {
           toast.error(`Failed exporting ${t.schema_name}.${t.table_name}`, { description: error.message });
           continue;
         }
-        const csv = Papa.unparse(data || []);
+        const tableKey = `${t.schema_name}.${t.table_name}`;
+        const selectedCols = columnSelection[tableKey];
+        const rows = data || [];
+        const shaped = selectedCols && selectedCols.length > 0
+          ? rows.map((row: any) => {
+              const o: any = {};
+              for (const c of selectedCols) o[c] = row[c];
+              return o;
+            })
+          : rows;
+        const csv = Papa.unparse(shaped);
         files.push({ name: `${t.schema_name}_${t.table_name}.csv`, content: csv, type: "text/csv" });
       }
       await saveMultipleFiles(files);
@@ -750,15 +925,12 @@ export default function DatabaseExport() {
         addLog('Starting Pre-flight Verification...', 'info');
         let chosen = tables.filter(t => selected[`${t.schema_name}.${t.table_name}`]);
         
-        // Filter out secrets if not selected
         if (!exportOptions.secrets) {
             chosen = chosen.filter(t => t.schema_name !== 'vault');
         }
-        // Only base tables have data exports
         chosen = chosen.filter(t => t.table_type === 'BASE TABLE');
 
-        // Parallelize count checks for speed
-         for (let i = 0; i < chosen.length; i++) {
+        for (let i = 0; i < chosen.length; i++) {
             const t = chosen[i];
             let count = 0;
             let error: any = null;
@@ -788,6 +960,83 @@ export default function DatabaseExport() {
               }
             }
          }
+
+        const hasActivities = chosen.some(t => t.schema_name === 'public' && t.table_name === 'activities');
+        if (hasActivities) {
+          try {
+            const { data: fkData, error: fkError } = await scopedDb.rpc('execute_sql_query', {
+              query_text: `
+                SELECT
+                  (SELECT COUNT(*)::bigint FROM public.activities a
+                    LEFT JOIN public.leads l ON a.lead_id = l.id
+                    WHERE a.lead_id IS NOT NULL AND l.id IS NULL) AS missing_leads,
+                  (SELECT COUNT(*)::bigint FROM public.activities WHERE lead_id IS NOT NULL) AS total_activities_with_lead
+              `,
+            });
+            if (fkError) {
+              validationErrors.push(`[FK Validation] Failed to verify activities.lead_id -> leads.id: ${fkError.message}`);
+              addLog(`FK validation failed for activities.lead_id: ${fkError.message}`, 'warning');
+            } else {
+              type ActivitiesFkRow = {
+                missing_leads?: number | string | null;
+                total_activities_with_lead?: number | string | null;
+              };
+              const rows = Array.isArray(fkData) ? (fkData as ActivitiesFkRow[]) : [];
+              const row: ActivitiesFkRow = rows[0] || {};
+              const missing = Number(row.missing_leads ?? 0);
+              const total = Number(row.total_activities_with_lead ?? 0);
+              if (missing > 0) {
+                validationErrors.push(`[FK Validation] activities.lead_id has ${missing} orphan references out of ${total} activities with a lead_id.`);
+                addLog(`FK validation found ${missing} orphan activities referencing missing leads`, 'warning');
+              } else {
+                addLog('FK validation passed for activities.lead_id -> leads.id', 'success');
+              }
+            }
+          } catch (fkErr: unknown) {
+            const msg = fkErr instanceof Error ? fkErr.message : String(fkErr);
+            validationErrors.push(`[FK Validation] Unexpected error verifying activities.lead_id -> leads.id: ${msg}`);
+            addLog('FK validation encountered an unexpected error for activities.lead_id', 'warning');
+          }
+        }
+
+        const hasLeads = chosen.some(t => t.schema_name === 'public' && t.table_name === 'leads');
+        if (hasLeads) {
+          try {
+            const { data: fkData, error: fkError } = await scopedDb.rpc('execute_sql_query', {
+              query_text: `
+                SELECT
+                  (SELECT COUNT(*)::bigint FROM public.leads l
+                    LEFT JOIN public.profiles p ON l.owner_id = p.id
+                    WHERE l.owner_id IS NOT NULL AND p.id IS NULL) AS missing_owners,
+                  (SELECT COUNT(*)::bigint FROM public.leads WHERE owner_id IS NOT NULL) AS total_leads_with_owner
+              `,
+            });
+            if (fkError) {
+              validationErrors.push(`[FK Validation] Failed to verify leads.owner_id -> profiles.id: ${fkError.message}`);
+              addLog(`FK validation failed for leads.owner_id: ${fkError.message}`, 'warning');
+            } else {
+              type LeadsOwnerFkRow = {
+                missing_owners?: number | string | null;
+                total_leads_with_owner?: number | string | null;
+              };
+              const rows = Array.isArray(fkData) ? (fkData as LeadsOwnerFkRow[]) : [];
+              const row: LeadsOwnerFkRow = rows[0] || {};
+              const missing = Number(row.missing_owners ?? 0);
+              const total = Number(row.total_leads_with_owner ?? 0);
+              if (missing > 0) {
+                validationErrors.push(`[FK Validation] leads.owner_id has ${missing} orphan references out of ${total} leads with an owner_id.`);
+                addLog(`FK validation found ${missing} leads referencing missing profiles`, 'warning');
+              } else {
+                addLog('FK validation passed for leads.owner_id -> profiles.id', 'success');
+              }
+            }
+          } catch (fkErr: unknown) {
+            const msg = fkErr instanceof Error ? fkErr.message : String(fkErr);
+            validationErrors.push(`[FK Validation] Unexpected error verifying leads.owner_id -> profiles.id: ${msg}`);
+            addLog('FK validation encountered an unexpected error for leads.owner_id', 'warning');
+          }
+        }
+
         addLog('Pre-flight Verification Completed', 'success');
       }
 
@@ -3460,6 +3709,10 @@ END $$;\n\n`;
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="auto-include-deps" checked={autoIncludeDeps} onCheckedChange={(v: any) => setAutoIncludeDeps(Boolean(v))} />
+                    <label htmlFor="auto-include-deps" className="text-sm">Auto-include dependencies</label>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />
                     <label htmlFor="select-all-tables" className="text-sm">Select all tables</label>

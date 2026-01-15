@@ -22,7 +22,7 @@
 ### 4. Referential Integrity
 - **Constraint**: Circular dependencies or specific table ordering requirements.
 - **Impact**: Insert failures during data migration.
-- **Resolution**: Use `pg_dump --disable-triggers` (if superuser) or topological sort for application-level sync. For `public` schema, `pg_dump` handles ordering automatically.
+- **Resolution**: Use `pg_dump --disable-triggers` (if superuser) or topological sort for application-level sync. For `public` schema, `pg_dump` handles ordering automatically. The in-app pg_dump export panel now performs a pre-export foreign key validation using a catalog-driven helper function and refuses to generate an export when orphaned references are present, logging the exact constraints and tables involved.
 
 ### 5. Authentication & Users
 - **Constraint**: `auth.users` contains sensitive hashes. Migrating them requires bypassing standard Supabase Auth API limits or direct DB access.

@@ -1,15 +1,10 @@
-import { useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useCRM } from "@/hooks/useCRM";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
-  Download, 
   FileCode, 
   Loader2, 
   AlertTriangle,
@@ -36,6 +31,7 @@ import {
   repairSqlSyntax,
 } from "@/utils/pgDumpExport";
 import { resolveDataTypeForValue, validateSQL, calculateChecksum } from "@/utils/dbExportUtils";
+import { generateIndexStatements } from "@/utils/pgDumpExport";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PgDumpOptionsPanel, PgDumpCategoryOptions, PgDumpGeneralOptions } from "./PgDumpOptionsPanel";
 
 interface ExportProgress {
   phase: string;
@@ -54,10 +51,44 @@ export function PgDumpExportPanel() {
   const { scopedDb, context } = useCRM();
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState<ExportProgress | null>(null);
-  const [options, setOptions] = useState<PgDumpOptions>(defaultPgDumpOptions);
+  const [options] = useState<PgDumpOptions>(defaultPgDumpOptions);
   const [showInstructions, setShowInstructions] = useState(false);
   const [lastExportFilename, setLastExportFilename] = useState<string | null>(null);
   const cancelRef = useRef(false);
+  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
+  const [permissionOk, setPermissionOk] = useState<boolean>(false);
+  const [categories, setCategories] = useState<PgDumpCategoryOptions>(() => {
+    try {
+      const raw = localStorage.getItem("pgdump.categories");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      all: true,
+      schema: true,
+      constraints: true,
+      indexes: true,
+      dbFunctions: true,
+      rlsPolicies: true,
+      enums: true,
+      edgeFunctions: false,
+      secrets: false,
+      tableData: true,
+    };
+  });
+  const [general, setGeneral] = useState<PgDumpGeneralOptions>(() => {
+    try {
+      const raw = localStorage.getItem("pgdump.general");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      outputMode: "insert",
+      includeDropStatements: defaultPgDumpOptions.includeDropStatements,
+      excludeAuthSchema: defaultPgDumpOptions.excludeAuthSchema,
+      excludeStorageSchema: defaultPgDumpOptions.excludeStorageSchema,
+      customSchemas: "",
+      baseFilename: "database_export.sql",
+    };
+  });
 
   const updateProgress = (phase: string, percent: number, message: string) => {
     setProgress({ phase, percent, message });
@@ -106,10 +137,47 @@ export function PgDumpExportPanel() {
     URL.revokeObjectURL(url);
   };
 
+  useEffect(() => {
+    const ok = !!(context.isPlatformAdmin || context.isTenantAdmin);
+    setPermissionOk(ok);
+  }, [context.isPlatformAdmin, context.isTenantAdmin]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await scopedDb.rpc("execute_sql_query", { query_text: "SELECT 1" });
+        setConnectionOk(!res.error);
+      } catch {
+        setConnectionOk(false);
+      }
+    })();
+  }, [scopedDb]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pgdump.categories", JSON.stringify(categories));
+    } catch {}
+  }, [categories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pgdump.general", JSON.stringify(general));
+    } catch {}
+  }, [general]);
+
   const runExport = useCallback(async () => {
     cancelRef.current = false;
     setIsExporting(true);
     setProgress(null);
+    
+    const effectiveOptions: PgDumpOptions = {
+      ...options,
+      includeDropStatements: general.includeDropStatements,
+      excludeAuthSchema: general.excludeAuthSchema,
+      excludeStorageSchema: general.excludeStorageSchema,
+      useInsertFormat: general.outputMode === "insert",
+      includeRls: categories.rlsPolicies && options.includeRls,
+    };
     
     let sqlContent = '';
     let dataSql = '';
@@ -140,8 +208,8 @@ export function PgDumpExportPanel() {
       // Group by schema.table
       const tableGroups = (schemaData || []).reduce((acc: any, row: any) => {
         // Skip auth/storage if excluded
-        if (options.excludeAuthSchema && row.schema_name === 'auth') return acc;
-        if (options.excludeStorageSchema && row.schema_name === 'storage') return acc;
+        if (effectiveOptions.excludeAuthSchema && row.schema_name === 'auth') return acc;
+        if (effectiveOptions.excludeStorageSchema && row.schema_name === 'storage') return acc;
         
         const key = `${row.schema_name}.${row.table_name}`;
         if (!acc[key]) acc[key] = [];
@@ -153,90 +221,250 @@ export function PgDumpExportPanel() {
       const schemas = [...new Set(Object.keys(tableGroups).map(k => k.split('.')[0]))];
       
       // 3. Create schemas
-      updateProgress('Schema', 15, 'Creating schema statements...');
-      sqlContent += generateSchemaStatements(schemas.filter(s => s !== 'public'));
-      logLines.push(`Generated CREATE SCHEMA statements for ${schemas.filter(s => s !== "public").length} schemas`);
+      if (categories.schema) {
+        updateProgress('Schema', 15, 'Creating schema statements...');
+        sqlContent += generateSchemaStatements(schemas.filter(s => s !== 'public'));
+        logLines.push(`Generated CREATE SCHEMA statements for ${schemas.filter(s => s !== "public").length} schemas`);
+      }
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
       // 4. Enums
-      updateProgress('Enums', 20, 'Fetching enum types...');
-      try {
-        const { data: enumData } = await scopedDb.rpc("get_database_enums");
-        if (enumData && Array.isArray(enumData) && enumData.length > 0) {
-          const enums = enumData.map((e: any) => ({
-            name: e.enum_name || e.typname,
-            labels: (e.labels || e.enum_values || '').replace(/^{|}$/g, '').split(',').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
-          }));
-          sqlContent += generateEnumStatements(enums);
-          logLines.push(`Exported ${enums.length} enum types`);
+      if (categories.enums) {
+        updateProgress('Enums', 20, 'Fetching enum types...');
+        try {
+          const { data: enumData } = await scopedDb.rpc("get_database_enums");
+          if (enumData && Array.isArray(enumData) && enumData.length > 0) {
+            const enums = enumData.map((e: any) => ({
+              name: e.enum_name || e.typname,
+              labels: (e.labels || e.enum_values || '').replace(/^{|}$/g, '').split(',').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+            }));
+            sqlContent += generateEnumStatements(enums);
+            logLines.push(`Exported ${enums.length} enum types`);
+          }
+        } catch (err: any) {
+          warningMessages.push(`Enum metadata export skipped or failed: ${err?.message || String(err)}`);
         }
-      } catch (err: any) {
-        warningMessages.push(`Enum metadata export skipped or failed: ${err?.message || String(err)}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
       // 5. Tables
-      updateProgress('Tables', 30, 'Creating table definitions...');
-      const tableNames = Object.keys(tableGroups);
-      logLines.push(`Preparing CREATE TABLE statements for ${tableNames.length} tables`);
-      
-      for (const tableKey of tableNames) {
-        const columns = tableGroups[tableKey];
-        const [schemaName, tableName] = tableKey.split('.');
+      if (categories.schema) {
+        updateProgress('Tables', 30, 'Creating table definitions...');
+        const tableNames = Object.keys(tableGroups);
+        logLines.push(`Preparing CREATE TABLE statements for ${tableNames.length} tables`);
         
-        // Deduplicate columns
-        const seen = new Set<string>();
-        const uniqueCols = columns.filter((col: any) => {
-          if (seen.has(col.column_name)) return false;
-          seen.add(col.column_name);
-          return true;
-        });
-        
-        const tableSql = generateCreateTableStatement(
-          schemaName,
-          tableName,
-          uniqueCols,
-          options.includeDropStatements
-        );
-        sqlContent += tableSql;
-        objectSummaries.push(`TABLE ${schemaName}.${tableName}: definition bytes=${tableSql.length}`);
+        for (const tableKey of tableNames) {
+          const columns = tableGroups[tableKey];
+          const [schemaName, tableName] = tableKey.split('.');
+          const seen = new Set<string>();
+          const uniqueCols = columns.filter((col: any) => {
+            if (seen.has(col.column_name)) return false;
+            seen.add(col.column_name);
+            return true;
+          });
+          const tableSql = generateCreateTableStatement(
+            schemaName,
+            tableName,
+            uniqueCols,
+            effectiveOptions.includeDropStatements
+          );
+          sqlContent += tableSql;
+          objectSummaries.push(`TABLE ${schemaName}.${tableName}: definition bytes=${tableSql.length}`);
+        }
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
       // 6. Functions
-      updateProgress('Functions', 40, 'Fetching database functions...');
-      try {
-        let functionsData: any[] | null = null;
+      if (categories.dbFunctions) {
+        updateProgress('Functions', 40, 'Fetching database functions...');
         try {
-          const { data } = await (scopedDb.rpc as any)("get_database_functions_with_body");
-          functionsData = data;
-        } catch {
-          const { data } = await (scopedDb.rpc as any)("get_database_functions");
-          functionsData = data;
+          let functionsData: any[] | null = null;
+          try {
+            const { data } = await (scopedDb.rpc as any)("get_database_functions_with_body");
+            functionsData = data;
+          } catch {
+            const { data } = await (scopedDb.rpc as any)("get_database_functions");
+            functionsData = data;
+          }
+          
+          if (functionsData && functionsData.length > 0) {
+            sqlContent += generateFunctionStatements(functionsData);
+            logLines.push(`Exported ${functionsData.length} functions`);
+          }
+        } catch (err: any) {
+          warningMessages.push(`Function export skipped or failed: ${err?.message || String(err)}`);
         }
-        
-        if (functionsData && functionsData.length > 0) {
-          sqlContent += generateFunctionStatements(functionsData);
-          logLines.push(`Exported ${functionsData.length} functions`);
-        }
-      } catch (err: any) {
-        warningMessages.push(`Function export skipped or failed: ${err?.message || String(err)}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
       // 7. Table Data
-      updateProgress('Data', 50, 'Fetching table data...');
-      const { data: tablesData } = await scopedDb.rpc("get_all_database_tables");
-      const baseTables = (tablesData || []).filter((t: any) => {
-        if (options.excludeAuthSchema && t.schema_name === 'auth') return false;
-        if (options.excludeStorageSchema && t.schema_name === 'storage') return false;
-        return t.table_type === 'BASE TABLE';
-      });
-      logLines.push(`Preparing data export for ${baseTables.length} base tables`);
+      let baseTables: any[] = [];
+      if (categories.tableData) {
+        updateProgress('Data', 50, 'Fetching table data...');
+        const { data: tablesData } = await scopedDb.rpc("get_all_database_tables");
+        baseTables = (tablesData || []).filter((t: any) => {
+          if (effectiveOptions.excludeAuthSchema && t.schema_name === 'auth') return false;
+          if (effectiveOptions.excludeStorageSchema && t.schema_name === 'storage') return false;
+          return t.table_type === 'BASE TABLE';
+        });
+        logLines.push(`Preparing data export for ${baseTables.length} base tables`);
+
+        try {
+          const { data: constraintsData } = await scopedDb.rpc("get_table_constraints");
+          const tableByKey = new Map<string, any>();
+          baseTables.forEach((t: any) => {
+            const key = `${t.schema_name}.${t.table_name}`.toLowerCase();
+            tableByKey.set(key, t);
+          });
+          const priority: string[] = [
+            'public.tenants',
+            'public.profiles',
+            'public.accounts',
+            'public.contacts',
+            'public.leads',
+            'public.opportunities',
+            'public.queues',
+            'public.queue_members',
+            'public.email_accounts',
+            'public.emails',
+            'public.activities',
+            'public.segment_members',
+          ];
+          const deps = new Map<string, Set<string>>();
+          const childrenByParent = new Map<string, Set<string>>();
+          const addEdge = (child: string, parent: string) => {
+            if (!tableByKey.has(child) || !tableByKey.has(parent)) return;
+            if (!deps.has(child)) deps.set(child, new Set());
+            deps.get(child)!.add(parent);
+            if (!childrenByParent.has(parent)) childrenByParent.set(parent, new Set());
+            childrenByParent.get(parent)!.add(child);
+          };
+          let edgeCount = 0;
+          const fkPattern = /FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+"?([A-Za-z0-9_]+)"?\."?([A-Za-z0-9_]+)"?/i;
+          const rows = (constraintsData || []) as any[];
+          for (const c of rows) {
+            const childRef = `${c.schema_name}.${c.table_name}`.toLowerCase();
+            if (!tableByKey.has(childRef)) continue;
+            const details = String(c.constraint_details || '');
+            const m = details.match(fkPattern);
+            if (!m) continue;
+            const parentSchema = (m[1] || 'public').toLowerCase();
+            const parentTable = (m[2] || '').toLowerCase();
+            if (!parentTable) continue;
+            const parentRef = `${parentSchema}.${parentTable}`;
+            if (parentRef === childRef) continue;
+            addEdge(childRef, parentRef);
+            edgeCount++;
+          }
+          if (edgeCount > 0) {
+            const keys = Array.from(tableByKey.keys());
+            const indegree = new Map<string, number>();
+            keys.forEach(k => indegree.set(k, 0));
+            for (const [child, parents] of deps) {
+              for (const p of parents) {
+                if (!indegree.has(child)) continue;
+                indegree.set(child, (indegree.get(child) || 0) + 1);
+              }
+            }
+            const priorityIndex = new Map<string, number>();
+            priority.forEach((name, idx) => {
+              priorityIndex.set(name, idx);
+            });
+            const queue: string[] = [];
+            for (const [k, deg] of indegree) {
+              if (deg === 0) queue.push(k);
+            }
+            queue.sort((a, b) => {
+              const pa = priorityIndex.has(a) ? priorityIndex.get(a)! : Number.MAX_SAFE_INTEGER;
+              const pb = priorityIndex.has(b) ? priorityIndex.get(b)! : Number.MAX_SAFE_INTEGER;
+              if (pa !== pb) return pa - pb;
+              return a.localeCompare(b);
+            });
+            const orderedKeys: string[] = [];
+            const seen = new Set<string>();
+            while (queue.length > 0) {
+              const k = queue.shift()!;
+              if (seen.has(k)) continue;
+              seen.add(k);
+              orderedKeys.push(k);
+              const children = childrenByParent.get(k);
+              if (children) {
+                for (const child of children) {
+                  if (!indegree.has(child)) continue;
+                  const d = (indegree.get(child) || 0) - 1;
+                  indegree.set(child, d);
+                  if (d === 0) {
+                    queue.push(child);
+                  }
+                }
+                queue.sort((a, b) => {
+                  const pa = priorityIndex.has(a) ? priorityIndex.get(a)! : Number.MAX_SAFE_INTEGER;
+                  const pb = priorityIndex.has(b) ? priorityIndex.get(b)! : Number.MAX_SAFE_INTEGER;
+                  if (pa !== pb) return pa - pb;
+                  return a.localeCompare(b);
+                });
+              }
+            }
+            if (orderedKeys.length === keys.length) {
+              baseTables = orderedKeys.map(k => tableByKey.get(k));
+              logLines.push('Reordered table data export using foreign key dependencies');
+            } else {
+              warningMessages.push(
+                'Foreign key dependency graph could not be fully resolved; using default table order for data export'
+              );
+            }
+          }
+        } catch (err: any) {
+          warningMessages.push(
+            `Table data ordering by foreign keys skipped or failed: ${err?.message || String(err)}`
+          );
+        }
+      }
+      
+      updateProgress('Validation', 55, 'Validating foreign key relationships...');
+      try {
+        const { data: fkOrphans, error: fkError } = await scopedDb.rpc("get_fk_orphans");
+        if (fkError) {
+          warningMessages.push(`Foreign key validation skipped or failed: ${fkError.message || String(fkError)}`);
+        } else if (fkOrphans && Array.isArray(fkOrphans) && fkOrphans.length > 0) {
+          const filtered = (fkOrphans as any[]).filter(o => {
+            if (effectiveOptions.excludeAuthSchema && (o.constraint_schema === 'auth' || o.parent_schema === 'auth')) {
+              return false;
+            }
+            if (effectiveOptions.excludeStorageSchema && (o.constraint_schema === 'storage' || o.parent_schema === 'storage')) {
+              return false;
+            }
+            return true;
+          });
+          if (filtered.length > 0) {
+            logLines.push('');
+            logLines.push('Foreign key validation detected orphaned references:');
+            for (const o of filtered) {
+              const msg =
+                `Constraint ${o.constraint_schema}.${o.table_name}.${o.constraint_name}: ` +
+                `${o.orphan_count} orphan rows where ${o.table_name}.${o.child_column} ` +
+                `references missing ${o.parent_schema}.${o.parent_table}.${o.parent_column}`;
+              logLines.push(msg);
+              errorMessages.push(msg);
+            }
+            throw new Error(`Foreign key validation failed: ${filtered.length} constraint(s) with orphaned rows`);
+          } else {
+            logLines.push('Foreign key validation passed: no orphaned references detected');
+          }
+        } else {
+          logLines.push('Foreign key validation passed: no orphaned references detected');
+        }
+      } catch (err: any) {
+        if (err && typeof err.message === 'string' && err.message.startsWith('Foreign key validation failed')) {
+          throw err;
+        }
+        const msg = err instanceof Error ? err.message : String(err);
+        warningMessages.push(`Foreign key validation skipped or failed: ${msg}`);
+      }
       
       // Build type map
       const typeMapByTable: Record<string, Record<string, string>> = (schemaData || []).reduce(
@@ -319,26 +547,46 @@ export function PgDumpExportPanel() {
       sqlContent += dataSql;
       
       // 8. Constraints
-      updateProgress('Constraints', 88, 'Adding constraints...');
-      try {
-        const { data: constraintsData } = await scopedDb.rpc("get_table_constraints");
-        if (constraintsData && constraintsData.length > 0) {
-          const filtered = constraintsData.filter((c: any) => {
-            if (options.excludeAuthSchema && c.schema_name === 'auth') return false;
-            if (options.excludeStorageSchema && c.schema_name === 'storage') return false;
+      if (categories.constraints) {
+        updateProgress('Constraints', 88, 'Adding constraints...');
+        try {
+          const { data: constraintsData } = await scopedDb.rpc("get_table_constraints");
+          if (constraintsData && constraintsData.length > 0) {
+            const filtered = constraintsData.filter((c: any) => {
+              if (effectiveOptions.excludeAuthSchema && c.schema_name === 'auth') return false;
+              if (effectiveOptions.excludeStorageSchema && c.schema_name === 'storage') return false;
+              return true;
+            });
+            sqlContent += generateConstraintStatements(filtered);
+            logLines.push(`Exported ${filtered.length} table constraints`);
+          }
+        } catch (err: any) {
+          warningMessages.push(`Constraint export skipped or failed: ${err?.message || String(err)}`);
+        }
+      }
+
+      if (categories.indexes) {
+        updateProgress('Indexes', 90, 'Adding indexes...');
+        try {
+          const { data: indexData } = await scopedDb.rpc("get_table_indexes");
+          const filtered = (indexData || []).filter((idx: any) => {
+            if (effectiveOptions.excludeAuthSchema && idx.schema_name === 'auth') return false;
+            if (effectiveOptions.excludeStorageSchema && idx.schema_name === 'storage') return false;
             return true;
           });
-          sqlContent += generateConstraintStatements(filtered);
-          logLines.push(`Exported ${filtered.length} table constraints`);
+          if (filtered.length > 0) {
+            sqlContent += generateIndexStatements(filtered);
+            logLines.push(`Exported ${filtered.length} indexes`);
+          }
+        } catch (err: any) {
+          warningMessages.push(`Index export skipped or failed: ${err?.message || String(err)}`);
         }
-      } catch (err: any) {
-        warningMessages.push(`Constraint export skipped or failed: ${err?.message || String(err)}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
       // 9. RLS (optional)
-      if (options.includeRls) {
+      if (effectiveOptions.includeRls && categories.rlsPolicies) {
         updateProgress('RLS', 92, 'Adding RLS policies...');
         try {
           const { data: rlsData } = await scopedDb.rpc("get_table_rls_policies");
@@ -352,6 +600,12 @@ export function PgDumpExportPanel() {
         } catch (err: any) {
           warningMessages.push(`RLS export skipped or failed: ${err?.message || String(err)}`);
         }
+      }
+      if (categories.edgeFunctions) {
+        warningMessages.push("Edge functions are not included in pg_dump SQL; manage via Supabase CLI.");
+      }
+      if (categories.secrets) {
+        warningMessages.push("Secrets (Vault) are not included in pg_dump SQL; manage via Vault tooling.");
       }
       
       updateProgress('Validating', 96, 'Validating SQL syntax...');
@@ -491,7 +745,7 @@ export function PgDumpExportPanel() {
       setIsExporting(false);
       setProgress(null);
     }
-  }, [scopedDb, options]);
+  }, [scopedDb, options, categories, general]);
 
   const handleCancel = () => {
     cancelRef.current = true;
@@ -520,76 +774,34 @@ export function PgDumpExportPanel() {
             </AlertDescription>
           </Alert>
           
-          {/* Options */}
-          <div className="space-y-4">
-            <Label className="text-base font-medium">Export Options</Label>
-            
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="includeRls"
-                  checked={options.includeRls}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, includeRls: !!checked }))
-                  }
-                />
-                <Label htmlFor="includeRls" className="text-sm font-normal cursor-pointer">
-                  Include RLS Policies
-                  <span className="block text-xs text-muted-foreground">
-                    Row Level Security (Supabase-specific)
-                  </span>
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="includeDropStatements"
-                  checked={options.includeDropStatements}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, includeDropStatements: !!checked }))
-                  }
-                />
-                <Label htmlFor="includeDropStatements" className="text-sm font-normal cursor-pointer">
-                  Include DROP statements
-                  <span className="block text-xs text-muted-foreground">
-                    Drops existing tables before creating
-                  </span>
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="excludeAuthSchema"
-                  checked={options.excludeAuthSchema}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, excludeAuthSchema: !!checked }))
-                  }
-                />
-                <Label htmlFor="excludeAuthSchema" className="text-sm font-normal cursor-pointer">
-                  Exclude auth schema
-                  <span className="block text-xs text-muted-foreground">
-                    Skip Supabase auth tables
-                  </span>
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="excludeStorageSchema"
-                  checked={options.excludeStorageSchema}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, excludeStorageSchema: !!checked }))
-                  }
-                />
-                <Label htmlFor="excludeStorageSchema" className="text-sm font-normal cursor-pointer">
-                  Exclude storage schema
-                  <span className="block text-xs text-muted-foreground">
-                    Skip Supabase storage tables
-                  </span>
-                </Label>
-              </div>
-            </div>
-          </div>
+          {!permissionOk && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Insufficient Permissions</AlertTitle>
+              <AlertDescription>
+                You do not have permission to perform export operations.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {permissionOk && connectionOk === false && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Connection Error</AlertTitle>
+              <AlertDescription>
+                Could not verify database connection. Check environment and try again.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {permissionOk && connectionOk && (
+            <PgDumpOptionsPanel
+              categories={categories}
+              general={general}
+              onChangeCategories={setCategories}
+              onChangeGeneral={setGeneral}
+            />
+          )}
           
           {/* Progress */}
           {progress && (
@@ -610,7 +822,7 @@ export function PgDumpExportPanel() {
                 Cancel Export
               </Button>
             ) : (
-              <Button onClick={runExport} className="gap-2">
+              <Button onClick={runExport} className="gap-2" disabled={!permissionOk || !connectionOk}>
                 <FileCode className="h-4 w-4" />
                 Export SQL File
               </Button>

@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,7 +17,8 @@ import {
   Database,
   Settings,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { SqlFileUploadZone } from './SqlFileUploadZone';
 import { ExternalDbConnectionForm, ExternalDbConnection, ConnectionTestResult } from './ExternalDbConnectionForm';
@@ -25,6 +27,8 @@ import { ImportVerificationPanel } from './ImportVerificationPanel';
 import { usePgDumpImport } from '@/hooks/usePgDumpImport';
 import { ParsedSqlFile } from '@/utils/sqlFileParser';
 import { toast } from 'sonner';
+import { useCRM } from '@/hooks/useCRM';
+import { PgDumpOptionsPanel, PgDumpCategoryOptions, PgDumpGeneralOptions } from '@/components/dashboard/data-management/PgDumpOptionsPanel';
 
 type WizardStep = 'file' | 'connection' | 'options' | 'execute' | 'summary';
 
@@ -37,6 +41,7 @@ const STEPS: { id: WizardStep; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function PgDumpImportWizard() {
+  const { context } = useCRM();
   const [currentStep, setCurrentStep] = useState<WizardStep>('file');
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedSqlFile | null>(null);
@@ -50,6 +55,40 @@ export function PgDumpImportWizard() {
   });
   const [connectionTested, setConnectionTested] = useState(false);
   const [options, setOptions] = useState<ImportOptions>(DEFAULT_IMPORT_OPTIONS);
+  const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [permissionOk, setPermissionOk] = useState<boolean>(false);
+  const [categories, setCategories] = useState<PgDumpCategoryOptions>(() => {
+    try {
+      const raw = localStorage.getItem("pgdump.import.categories");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      all: true,
+      schema: true,
+      constraints: true,
+      indexes: true,
+      dbFunctions: true,
+      rlsPolicies: true,
+      enums: true,
+      edgeFunctions: false,
+      secrets: false,
+      tableData: true,
+    };
+  });
+  const [general, setGeneral] = useState<PgDumpGeneralOptions>(() => {
+    try {
+      const raw = localStorage.getItem("pgdump.import.general");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      outputMode: "insert",
+      includeDropStatements: false,
+      excludeAuthSchema: false,
+      excludeStorageSchema: false,
+      customSchemas: "",
+      baseFilename: "database_import.sql",
+    };
+  });
 
   const {
     status,
@@ -62,6 +101,7 @@ export function PgDumpImportWizard() {
     resumeImport,
     cancelImport,
     reset,
+    rollbackAlignment,
     canStart,
     canPause,
     canResume,
@@ -123,7 +163,34 @@ export function PgDumpImportWizard() {
     setConnectionTested(result.success);
   };
 
+  useEffect(() => {
+    const ok = !!(context.isPlatformAdmin || context.isTenantAdmin);
+    setPermissionOk(ok);
+  }, [context.isPlatformAdmin, context.isTenantAdmin]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pgdump.import.categories", JSON.stringify(categories));
+    } catch {}
+  }, [categories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pgdump.import.general", JSON.stringify(general));
+    } catch {}
+  }, [general]);
+
   const handleStartImport = async () => {
+    if (!permissionOk) {
+      toast.error('Insufficient permissions to start import');
+      return;
+    }
+
+    if (!connectionTested) {
+      toast.error('Please test the database connection before starting import');
+      return;
+    }
+
     if (!parsed) {
       toast.error('No file selected');
       return;
@@ -135,6 +202,15 @@ export function PgDumpImportWizard() {
   const handleRetry = () => {
     reset();
     setCurrentStep('execute');
+  };
+
+  const handleRollback = async () => {
+    try {
+      await rollbackAlignment(connection);
+      toast.success('Rollback completed');
+    } catch (err: any) {
+      toast.error('Rollback failed', { description: err.message || String(err) });
+    }
   };
 
   const formatProgress = () => {
@@ -164,10 +240,42 @@ export function PgDumpImportWizard() {
 
       case 'options':
         return (
-          <ImportOptionsPanel
-            options={options}
-            onChange={setOptions}
-          />
+          <div className="space-y-6">
+            {!permissionOk && (
+              <div className="rounded-md border p-4">
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">Insufficient Permissions</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  You do not have permission to perform import operations.
+                </p>
+              </div>
+            )}
+            {!connectionTested && (
+              <div className="rounded-md border p-4">
+                <div className="flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  <span className="font-medium">Connection Not Verified</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Test and verify the database connection before configuring options.
+                </p>
+              </div>
+            )}
+            <ImportOptionsPanel
+              options={options}
+              onChange={setOptions}
+              disabled={!permissionOk || !connectionTested}
+            />
+            <PgDumpOptionsPanel
+              categories={categories}
+              general={general}
+              onChangeCategories={setCategories}
+              onChangeGeneral={setGeneral}
+              disabled={!permissionOk || !connectionTested}
+            />
+          </div>
         );
 
       case 'execute':
@@ -266,19 +374,26 @@ export function PgDumpImportWizard() {
               )}
 
               {/* Live Logs */}
-              {(status === 'executing' || status === 'paused') && logs.length > 0 && (
+              {logs.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-sm font-medium">Live Log</span>
                   <ScrollArea className="h-32 rounded-md border bg-muted/50">
                     <div className="p-3 font-mono text-xs space-y-1">
                       {logs.slice(-20).map((log, i) => (
-                        <div key={i} className={
-                          log.level === 'error' ? 'text-destructive' :
-                          log.level === 'warn' ? 'text-warning' :
-                          log.level === 'success' ? 'text-green-500' :
-                          'text-foreground'
-                        }>
+                        <div
+                          key={i}
+                          className={
+                            log.level === 'error'
+                              ? 'text-destructive'
+                              : log.level === 'warn'
+                              ? 'text-warning'
+                              : log.level === 'success'
+                              ? 'text-green-500'
+                              : 'text-foreground'
+                          }
+                        >
                           [{log.level.toUpperCase()}] {log.message}
+                          {log.details ? `: ${log.details}` : ''}
                         </div>
                       ))}
                     </div>
@@ -312,7 +427,37 @@ export function PgDumpImportWizard() {
                     Cancel
                   </Button>
                 )}
+                {status !== 'idle' && (
+                  <Button onClick={() => setRollbackOpen(true)} variant="outline" className="flex-1">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Rollback Alignment
+                  </Button>
+                )}
               </div>
+              <Dialog open={rollbackOpen} onOpenChange={setRollbackOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Confirm Rollback</DialogTitle>
+                    <DialogDescription>
+                      This will revert recent alignment changes (column adds and NOT NULL constraints).
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setRollbackOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={async () => {
+                        await handleRollback();
+                        setRollbackOpen(false);
+                      }}
+                    >
+                      Confirm Rollback
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         );

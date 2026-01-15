@@ -102,6 +102,17 @@ export function ImportVerificationPanel({
     onDownloadReport?.();
   };
 
+  const stage1Log = logs.find(l => l.message === 'Applying Stage 1 schema changes');
+  const stage2Log = logs.find(l => l.message === 'Applying Stage 2 constraints');
+  const rollbackStartLog = logs.find(l => l.message === 'Starting rollback of schema alignment');
+  const rollbackPlanLog = logs.find(l => l.message === 'Rollback plan');
+  const stage1Applied = stage1Log?.details ? stage1Log.details.split('\n').filter(Boolean).length : 0;
+  const stage2Applied = stage2Log?.details ? stage2Log.details.split('\n').filter(Boolean).length : 0;
+  const rollbackCount = rollbackStartLog?.message ? (() => {
+    const m = rollbackStartLog.message.match(/(\d+)\s+statements/);
+    return m ? Number(m[1]) : 0;
+  })() : 0;
+
   return (
     <Card>
       <CardHeader>
@@ -178,6 +189,42 @@ export function ImportVerificationPanel({
             ))}
           </div>
         </div>
+
+        {/* Alignment Audit */}
+        {(stage1Applied > 0 || stage2Applied > 0 || rollbackCount > 0) && (
+          <div className="space-y-3">
+            <h4 className="font-medium flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Alignment Audit
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-3 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Stage 1: Columns Added/Backfilled</div>
+                <div className="text-2xl font-bold">{stage1Applied}</div>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Stage 2: NOT NULL Applied</div>
+                <div className="text-2xl font-bold">{stage2Applied}</div>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Rollback: Statements Executed</div>
+                <div className="text-2xl font-bold">{rollbackCount}</div>
+              </div>
+            </div>
+            {rollbackPlanLog?.details && (
+              <div className="text-xs text-muted-foreground">
+                Last rollback plan:
+                <ScrollArea className="h-24 rounded-md border bg-muted/50 mt-2">
+                  <div className="p-3 font-mono">
+                    {rollbackPlanLog.details.split('\n').slice(0, 20).map((line, i) => (
+                      <div key={i}>{line}</div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Errors List */}
         {errors.length > 0 && (
