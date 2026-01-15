@@ -63,6 +63,7 @@ export default function DatabaseExport() {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const [metadataSource, setMetadataSource] = useState<"full" | "legacy" | "fallback" | "unknown">("unknown");
   
   // Advanced Progress State
   const [progress, setProgress] = useState<DetailedProgress | null>(null);
@@ -240,36 +241,134 @@ export default function DatabaseExport() {
   };
   useEffect(() => {
     const loadTables = async () => {
-      // Try fetching from all schemas first
-      let { data, error } = await scopedDb.rpc("get_all_database_tables");
-      
-      // Fallback to old method if new RPC doesn't exist yet
-      if (error && (error.message.includes("function") || error.message.includes("does not exist"))) {
-          console.warn("Enhanced export RPC not found, falling back to public schema only.");
-          const res = await scopedDb.rpc("get_database_tables");
-          data = (res.data || []).map((t: any) => ({ ...t, schema_name: 'public' }));
-          error = res.error;
-      }
+      try {
+        let data: any[] | null = null;
+        let error: any = null;
 
-      if (error) {
-        toast.error("Failed to load tables", { description: error.message });
-        return;
-      }
-      
-      setTables(data || []);
-      
-      if (data) {
-          console.log(`[DatabaseExport] Loaded ${data.length} relations.`);
-      }
+        const primary = await scopedDb.rpc("get_all_database_tables");
+        data = (primary.data as any[]) || null;
+        error = primary.error;
+        if (!error && data) {
+          setMetadataSource("full");
+        }
 
-      const sel: Record<string, boolean> = {};
-      (data || []).forEach((t: TableInfo) => (sel[`${t.schema_name}.${t.table_name}`] = true));
-      setSelected(sel);
+        const message = error?.message || "";
+        const isMissingFunctionError =
+          !!message &&
+          (message.includes("function") ||
+            message.includes("does not exist") ||
+            message.includes("schema cache") ||
+            message.includes("Could not find the function"));
+
+        if (error && isMissingFunctionError) {
+          console.warn(
+            "[DatabaseExport] get_all_database_tables not available, falling back to get_database_tables"
+          );
+          const legacy = await scopedDb.rpc("get_database_tables");
+          const legacyData = (legacy.data || []) as any[];
+          data = legacyData.map((t: any) => ({
+            ...t,
+            schema_name: "public",
+          }));
+          error = legacy.error;
+          if (!error && data) {
+            setMetadataSource("legacy");
+          }
+
+          const legacyMessage = error?.message || "";
+          const isSchemaCacheErrorForLegacy =
+            !!legacyMessage &&
+            (legacyMessage.includes("schema cache") ||
+              legacyMessage.includes(
+                "Could not find the function public.get_database_tables"
+              ));
+
+          if (error && isSchemaCacheErrorForLegacy) {
+            console.warn(
+              "[DatabaseExport] get_database_tables missing from schema cache, attempting execute_sql_query fallback"
+            );
+            const fallbackSql = `
+              SELECT 
+                n.nspname::text AS schema_name,
+                c.relname::text AS table_name,
+                CASE 
+                  WHEN c.relkind = 'r' THEN 'BASE TABLE'
+                  WHEN c.relkind = 'v' THEN 'VIEW'
+                  WHEN c.relkind = 'm' THEN 'MATERIALIZED VIEW'
+                  WHEN c.relkind = 'p' THEN 'PARTITIONED TABLE'
+                  WHEN c.relkind = 'f' THEN 'FOREIGN TABLE'
+                  ELSE 'OTHER'
+                END::text AS table_type,
+                c.relrowsecurity AS rls_enabled,
+                (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policy_count,
+                (SELECT count(*) FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) AS column_count,
+                (SELECT count(*) FROM pg_index i WHERE i.indrelid = c.oid) AS index_count,
+                c.reltuples::bigint AS row_estimate
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname IN ('public', 'auth', 'storage', 'extensions', 'vault')
+                AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                AND c.relname NOT IN ('spatial_ref_sys')
+                AND c.relname NOT LIKE 'pg_%'
+              ORDER BY n.nspname, c.relname;
+            `;
+            const fallback = await scopedDb.rpc("execute_sql_query", {
+              query_text: fallbackSql,
+            });
+            if (!fallback.error) {
+              data = ((fallback.data as any) || []) as any[];
+              error = null;
+              setMetadataSource("fallback");
+            } else {
+              error = fallback.error;
+            }
+          }
+        }
+
+        if (error) {
+          console.error("[DatabaseExport] Failed to load tables", error);
+          let description =
+            error.message || "Unknown error while loading database tables.";
+          if (
+            description.includes("schema cache") ||
+            description.includes(
+              "Could not find the function public.get_database_tables"
+            )
+          ) {
+            description =
+              "Database export metadata is missing. Ensure migrations for get_database_tables and get_all_database_tables are applied to this Supabase project, reload the PostgREST schema cache, then reload this page.";
+          }
+          toast.error("Failed to load tables", { description });
+          return;
+        }
+
+        const safeData = data || [];
+        setTables(safeData);
+
+        console.log(
+          `[DatabaseExport] Loaded ${safeData.length} relations.`
+        );
+
+        const sel: Record<string, boolean> = {};
+        safeData.forEach((t: TableInfo) => {
+          sel[`${t.schema_name}.${t.table_name}`] = true;
+        });
+        setSelected(sel);
+      } catch (err: any) {
+        console.error(
+          "[DatabaseExport] Unexpected error while loading tables",
+          err
+        );
+        toast.error("Failed to load tables", {
+          description:
+            err?.message ||
+            "Unexpected error while loading database tables.",
+        });
+      }
     };
     loadTables();
-    
-    // Load last backup timestamp from localStorage
-    const lastBackup = localStorage.getItem('last_database_backup');
+
+    const lastBackup = localStorage.getItem("last_database_backup");
     if (lastBackup) {
       setLastBackupTime(lastBackup);
     }
@@ -3336,8 +3435,30 @@ END $$;\n\n`;
 
           {exportOptions.tableData && (
             <div className="mt-4 p-4 border rounded-lg bg-muted/20">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-medium">Select tables to export:</div>
+              <div className="flex items-center justify-between mb-3 gap-4">
+                <div>
+                  <div className="text-sm font-medium">Select tables to export:</div>
+                  {metadataSource !== "unknown" && (
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Metadata source:</span>
+                      {metadataSource === "full" && (
+                        <Badge variant="outline" className="text-xs">
+                          All schemas (get_all_database_tables)
+                        </Badge>
+                      )}
+                      {metadataSource === "legacy" && (
+                        <Badge variant="outline" className="text-xs">
+                          Public schema only (get_database_tables)
+                        </Badge>
+                      )}
+                      {metadataSource === "fallback" && (
+                        <Badge variant="destructive" className="text-xs">
+                          Fallback catalog query (degraded mode)
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     <Checkbox id="select-all-tables" checked={allSelected} onCheckedChange={(v: any) => toggleAll(Boolean(v))} />

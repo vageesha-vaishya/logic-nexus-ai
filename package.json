@@ -41,7 +41,9 @@
     "supabase:db:diff": "npx supabase db diff --schema public --use-mig-dir",
     "supabase:db:push": "npx supabase db push",
     "supabase:types:gen": "npx supabase gen types typescript --project-id ${VITE_SUPABASE_PROJECT_ID} > src/integrations/supabase/types.ts",
-    "supabase:functions:deploy": "npx supabase functions deploy --project-ref ${VITE_SUPABASE_PROJECT_ID}"
+    "supabase:functions:deploy": "npx supabase functions deploy --project-ref ${VITE_SUPABASE_PROJECT_ID}",
+    "test:edge": "node --env-file=.env scripts/test-edge-function.js",
+    "pgdump:export": "node scripts/pgdump-export.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

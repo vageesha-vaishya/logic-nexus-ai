@@ -18,7 +18,7 @@ export interface ImportOptions {
 
 export const DEFAULT_IMPORT_OPTIONS: ImportOptions = {
   executeSchemaFirst: true,
-  stopOnFirstError: false,
+  stopOnFirstError: true,
   useTransactions: true,
   batchSize: 100,
   skipExistingTables: false,

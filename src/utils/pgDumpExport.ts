@@ -870,7 +870,7 @@ export const validateAndRepairSql = (sql: string): SqlValidationResult => {
       type: 'fix_encoding',
       description: 'Remove null byte characters',
       automatable: true,
-      repair: () => sql.replace(/\u0000/g, '')
+      repair: () => sql.split('\u0000').join('')
     });
   }
   

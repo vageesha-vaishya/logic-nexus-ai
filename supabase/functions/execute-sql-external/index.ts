@@ -52,16 +52,25 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   let pool: Pool | null = null;
+  let client: any | null = null;
 
   try {
     const body: ExecuteRequest = await req.json();
     const { action, connection, statements, query, options } = body;
 
-    // Validate connection config
     if (!connection?.host || !connection?.database || !connection?.user) {
+      console.warn('[execute-sql-external] Missing connection parameters', {
+        hasHost: !!connection?.host,
+        hasDatabase: !!connection?.database,
+        hasUser: !!connection?.user,
+      });
       return new Response(
-        JSON.stringify({ success: false, message: 'Missing required connection parameters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: false,
+          message: 'Missing required connection parameters',
+          code: 'MISSING_CONNECTION_PARAMETERS',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -82,7 +91,7 @@ serve(async (req: Request): Promise<Response> => {
     console.log(`[execute-sql-external] Connecting to ${connection.host}:${connection.port}/${connection.database}`);
     
     pool = new Pool(poolConfig, 1);
-    const client = await pool.connect();
+    client = await pool.connect();
 
     try {
       if (action === 'test') {
@@ -152,7 +161,13 @@ serve(async (req: Request): Promise<Response> => {
               await client.queryObject(stmt);
               executed++;
             } catch (stmtError: any) {
-              const errorMsg = stmtError.message || String(stmtError);
+              const rawError = stmtError.message || String(stmtError);
+              let errorMsg = rawError;
+
+              if (rawError.includes('duplicate key value violates unique constraint "accounts_pkey"')) {
+                errorMsg = `${rawError} (duplicate primary key in accounts; ensure IDs are unique before import)`;
+              }
+
               errors.push({
                 index: i,
                 statement: stmt.substring(0, 200) + (stmt.length > 200 ? '...' : ''),
@@ -160,10 +175,11 @@ serve(async (req: Request): Promise<Response> => {
               });
               console.error(`[execute-sql-external] Statement ${i} failed: ${errorMsg}`);
 
-              if (stopOnError) {
+              if (stopOnError || useTransaction) {
                 if (useTransaction) {
                   await client.queryObject('ROLLBACK');
                 }
+                const duration = Date.now() - startTime;
                 return new Response(
                   JSON.stringify({
                     success: false,
@@ -172,7 +188,7 @@ serve(async (req: Request): Promise<Response> => {
                       executed,
                       failed: errors.length,
                       errors,
-                      duration: Date.now() - startTime,
+                      duration,
                     }
                   } as ExecuteResult),
                   { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -215,13 +231,24 @@ serve(async (req: Request): Promise<Response> => {
         }
       }
 
+      console.warn('[execute-sql-external] Invalid action or missing parameters', {
+        action,
+        hasStatements: !!statements && statements.length > 0,
+        hasQuery: !!query,
+      });
       return new Response(
-        JSON.stringify({ success: false, message: 'Invalid action or missing parameters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: false,
+          message: 'Invalid action or missing parameters',
+          code: 'INVALID_ACTION',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
     } finally {
-      client.release();
+      if (client) {
+        client.release();
+      }
     }
 
   } catch (error: any) {
@@ -229,32 +256,45 @@ serve(async (req: Request): Promise<Response> => {
     
     const errorMessage = error.message || String(error);
     let userMessage = 'Failed to execute SQL';
+    let code = 'UNKNOWN_ERROR';
     
-    // Provide more helpful error messages
     if (errorMessage.includes('connection refused') || errorMessage.includes('ECONNREFUSED')) {
       userMessage = 'Connection refused. Check that the host and port are correct and the database is accepting connections.';
+      code = 'CONNECTION_REFUSED';
+    } else if (errorMessage.includes('failed to lookup address information') || errorMessage.includes('Name or service not known')) {
+      userMessage = 'Hostname could not be resolved. Verify that the database host is correct and DNS is configured.';
+      code = 'DNS_LOOKUP_FAILED';
     } else if (errorMessage.includes('authentication') || errorMessage.includes('password')) {
       userMessage = 'Authentication failed. Check your username and password.';
+      code = 'AUTHENTICATION_FAILED';
     } else if (errorMessage.includes('database') && errorMessage.includes('does not exist')) {
       userMessage = 'Database does not exist. Check the database name.';
+      code = 'DATABASE_NOT_FOUND';
     } else if (errorMessage.includes('timeout')) {
       userMessage = 'Connection timeout. The server may be slow or unreachable.';
+      code = 'CONNECTION_TIMEOUT';
     } else if (errorMessage.includes('SSL') || errorMessage.includes('TLS')) {
       userMessage = 'SSL/TLS connection error. Try toggling the SSL option.';
+      code = 'SSL_ERROR';
     } else {
       userMessage = errorMessage;
     }
 
     return new Response(
-      JSON.stringify({ success: false, message: userMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: false,
+        message: userMessage,
+        error: errorMessage,
+        code,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } finally {
     if (pool) {
       try {
         await pool.end();
       } catch {
-        // Ignore pool cleanup errors
+        console.warn('[execute-sql-external] Failed to close connection pool');
       }
     }
   }

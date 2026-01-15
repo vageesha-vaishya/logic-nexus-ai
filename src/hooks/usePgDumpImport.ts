@@ -121,6 +121,8 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       return {
         success: false,
         message: err.message || 'Connection test failed',
+        code: 'CLIENT_ERROR',
+        error: err.message,
       };
     }
   }, []);
@@ -176,10 +178,54 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         if (error) throw error;
 
         const result = data;
+
+        if (!result?.success) {
+          const msg = result?.message || 'Remote execution failed';
+          addLog('error', `Batch ${batchIndex + 1} failed: ${msg}`);
+          
+          // If no details are available, it's a connection/system error
+          if (!result?.details) {
+            if (options.stopOnFirstError) {
+              throw new Error(msg);
+            }
+            failed += batch.length;
+            continue;
+          }
+        }
+
         executed += result.details?.executed || 0;
         failed += result.details?.failed || 0;
 
         if (result.details?.errors) {
+          // Log specific errors from the batch
+          const errList = result.details.errors;
+          if (errList.length > 0) {
+            // Group errors to identify cascading transaction failures
+            const abortedErrors = errList.filter(e => e.error.includes('current transaction is aborted'));
+            const rootErrors = errList.filter(e => !e.error.includes('current transaction is aborted'));
+            
+            // Log root cause errors (usually the first one)
+            const limit = 3;
+            rootErrors.slice(0, limit).forEach(err => {
+              addLog('error', `Stmt ${err.index + 1}: ${err.error}`);
+            });
+
+            if (rootErrors.length > limit) {
+              addLog('error', `...and ${rootErrors.length - limit} more specific errors`);
+            }
+            
+            if (abortedErrors.length > 0) {
+              addLog('warn', `${abortedErrors.length} statements failed because the transaction was aborted by a previous error.`);
+            }
+            
+            // If we have errors but no root errors (weird case), just show the first few
+            if (rootErrors.length === 0 && abortedErrors.length === 0) {
+                errList.slice(0, 3).forEach(err => {
+                    addLog('error', `Stmt ${err.index + 1}: ${err.error}`);
+                });
+            }
+          }
+
           for (const err of result.details.errors) {
             newErrors.push({
               index: start + err.index,
@@ -189,6 +235,10 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
               phase,
             });
           }
+        }
+
+        if (!result?.success && options.stopOnFirstError) {
+          throw new Error(result?.message || 'Remote execution failed');
         }
 
         // Update progress

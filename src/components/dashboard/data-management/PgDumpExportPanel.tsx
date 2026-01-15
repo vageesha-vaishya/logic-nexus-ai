@@ -35,7 +35,7 @@ import {
   validateAndRepairSql,
   repairSqlSyntax,
 } from "@/utils/pgDumpExport";
-import { resolveDataTypeForValue, validateSQL } from "@/utils/dbExportUtils";
+import { resolveDataTypeForValue, validateSQL, calculateChecksum } from "@/utils/dbExportUtils";
 import {
   Dialog,
   DialogContent,
@@ -96,6 +96,16 @@ export function PgDumpExportPanel() {
     return true;
   };
 
+  const downloadTextFile = async (content: string, filename: string) => {
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const runExport = useCallback(async () => {
     cancelRef.current = false;
     setIsExporting(true);
@@ -103,11 +113,19 @@ export function PgDumpExportPanel() {
     
     let sqlContent = '';
     let dataSql = '';
+    const logLines: string[] = [];
+    const objectSummaries: string[] = [];
+    const warningMessages: string[] = [];
+    const errorMessages: string[] = [];
+    let totalRowsExported = 0;
+    const startedAt = new Date();
+    logLines.push(`Export started at ${startedAt.toISOString()}`);
     
     try {
       // 1. Header
       updateProgress('Initializing', 5, 'Generating SQL header...');
       sqlContent += generatePgDumpHeader();
+      logLines.push('Generated pg_dump-compatible header');
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
@@ -115,6 +133,7 @@ export function PgDumpExportPanel() {
       updateProgress('Schema', 10, 'Fetching database schema...');
       const { data: schemaData, error: schemaError } = await scopedDb.rpc("get_all_database_schema");
       if (schemaError) throw schemaError;
+      logLines.push(`Fetched schema metadata for ${schemaData ? schemaData.length : 0} columns`);
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
@@ -136,6 +155,7 @@ export function PgDumpExportPanel() {
       // 3. Create schemas
       updateProgress('Schema', 15, 'Creating schema statements...');
       sqlContent += generateSchemaStatements(schemas.filter(s => s !== 'public'));
+      logLines.push(`Generated CREATE SCHEMA statements for ${schemas.filter(s => s !== "public").length} schemas`);
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
@@ -149,9 +169,10 @@ export function PgDumpExportPanel() {
             labels: (e.labels || e.enum_values || '').replace(/^{|}$/g, '').split(',').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
           }));
           sqlContent += generateEnumStatements(enums);
+          logLines.push(`Exported ${enums.length} enum types`);
         }
-      } catch {
-        // Enums RPC may not exist
+      } catch (err: any) {
+        warningMessages.push(`Enum metadata export skipped or failed: ${err?.message || String(err)}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
@@ -159,6 +180,7 @@ export function PgDumpExportPanel() {
       // 5. Tables
       updateProgress('Tables', 30, 'Creating table definitions...');
       const tableNames = Object.keys(tableGroups);
+      logLines.push(`Preparing CREATE TABLE statements for ${tableNames.length} tables`);
       
       for (const tableKey of tableNames) {
         const columns = tableGroups[tableKey];
@@ -172,12 +194,14 @@ export function PgDumpExportPanel() {
           return true;
         });
         
-        sqlContent += generateCreateTableStatement(
+        const tableSql = generateCreateTableStatement(
           schemaName,
           tableName,
           uniqueCols,
           options.includeDropStatements
         );
+        sqlContent += tableSql;
+        objectSummaries.push(`TABLE ${schemaName}.${tableName}: definition bytes=${tableSql.length}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
@@ -196,9 +220,10 @@ export function PgDumpExportPanel() {
         
         if (functionsData && functionsData.length > 0) {
           sqlContent += generateFunctionStatements(functionsData);
+          logLines.push(`Exported ${functionsData.length} functions`);
         }
-      } catch {
-        // Functions RPC may not exist
+      } catch (err: any) {
+        warningMessages.push(`Function export skipped or failed: ${err?.message || String(err)}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
@@ -211,6 +236,7 @@ export function PgDumpExportPanel() {
         if (options.excludeStorageSchema && t.schema_name === 'storage') return false;
         return t.table_type === 'BASE TABLE';
       });
+      logLines.push(`Preparing data export for ${baseTables.length} base tables`);
       
       // Build type map
       const typeMapByTable: Record<string, Record<string, string>> = (schemaData || []).reduce(
@@ -261,6 +287,7 @@ export function PgDumpExportPanel() {
           
           if (error) {
             console.warn(`Error fetching ${tableKey}:`, error);
+            warningMessages.push(`Error fetching data for ${tableKey}: ${error.message || String(error)}`);
             continue;
           }
           
@@ -268,16 +295,22 @@ export function PgDumpExportPanel() {
             const columns = Object.keys(data[0]);
             const typeMap = typeMapByTable[tableKey] || {};
             
-            dataSql += generateInsertStatements(
+            const insertSql = generateInsertStatements(
               table.schema_name,
               table.table_name,
               columns,
               data,
               typeMap
             );
+            dataSql += insertSql;
+            totalRowsExported += data.length;
+            objectSummaries.push(
+              `TABLE ${table.schema_name}.${table.table_name}: rows=${data.length}, data bytes=${insertSql.length}`
+            );
           }
         } catch (err) {
           console.warn(`Error exporting ${tableKey}:`, err);
+          warningMessages.push(`Error exporting data for ${tableKey}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
       
@@ -296,9 +329,10 @@ export function PgDumpExportPanel() {
             return true;
           });
           sqlContent += generateConstraintStatements(filtered);
+          logLines.push(`Exported ${filtered.length} table constraints`);
         }
-      } catch {
-        // Constraints RPC may not exist
+      } catch (err: any) {
+        warningMessages.push(`Constraint export skipped or failed: ${err?.message || String(err)}`);
       }
       
       if (cancelRef.current) throw new Error('Export cancelled');
@@ -311,14 +345,18 @@ export function PgDumpExportPanel() {
           const rlsTables = baseTables.filter((t: any) => t.rls_enabled);
           if ((rlsData && rlsData.length > 0) || rlsTables.length > 0) {
             sqlContent += generateRlsStatements(rlsTables, rlsData || []);
+            logLines.push(
+              `Exported RLS for ${rlsTables.length} tables and ${rlsData ? rlsData.length : 0} policies`
+            );
           }
-        } catch {
-          // RLS RPC may not exist
+        } catch (err: any) {
+          warningMessages.push(`RLS export skipped or failed: ${err?.message || String(err)}`);
         }
       }
       
       updateProgress('Validating', 96, 'Validating SQL syntax...');
       sqlContent += generatePgDumpFooter();
+      logLines.push('Appended pg_dump-compatible footer');
 
       // Comprehensive SQL validation with auto-repair
       const fullSql = sqlContent;
@@ -328,6 +366,9 @@ export function PgDumpExportPanel() {
       const dataValidation = validateSQL(dataSql, 'pg_dump_export_data', false);
       
       const allErrors = [...validationResult.errors, ...dataValidation];
+      if (allErrors.length > 0) {
+        allErrors.forEach(e => warningMessages.push(e));
+      }
       
       if (allErrors.length > 0) {
         console.warn('pg_dump export validation warnings:', allErrors);
@@ -344,6 +385,7 @@ export function PgDumpExportPanel() {
           const revalidation = validateAndRepairSql(sqlContent);
           if (revalidation.errors.length > 0) {
             console.error('Errors remain after repair:', revalidation.errors);
+            revalidation.errors.forEach(e => errorMessages.push(e));
             toast.warning('Export completed with warnings', {
               description: `${revalidation.errors.length} syntax issues could not be auto-repaired. The file may need manual review.`
             });
@@ -360,8 +402,36 @@ export function PgDumpExportPanel() {
         }
       }
 
+      const finalValidation = validateAndRepairSql(sqlContent);
+      finalValidation.warnings.forEach(w => {
+        if (!warningMessages.includes(w)) warningMessages.push(w);
+      });
+      finalValidation.errors.forEach(e => {
+        if (!errorMessages.includes(e)) errorMessages.push(e);
+      });
+
+      const hasHeaderMarker = sqlContent.includes('-- PostgreSQL database dump');
+      const hasFooterMarker = sqlContent.includes('-- PostgreSQL database dump complete');
+      const hasBeginBlock = sqlContent.includes('\nBEGIN;\n');
+      const hasCommitBlock = sqlContent.includes('\nCOMMIT;\n');
+
+      const structureIssues: string[] = [];
+      if (!hasHeaderMarker) structureIssues.push('Missing standard pg_dump header marker');
+      if (!hasBeginBlock) structureIssues.push('Missing BEGIN transaction block');
+      if (!hasCommitBlock) structureIssues.push('Missing COMMIT transaction block');
+      if (!hasFooterMarker) structureIssues.push('Missing standard pg_dump footer marker');
+
+      if (structureIssues.length > 0) {
+        structureIssues.forEach(m => warningMessages.push(m));
+      }
+
+      const isCompatible =
+        finalValidation.errors.length === 0 &&
+        structureIssues.length === 0;
+
       updateProgress('Complete', 100, 'Preparing download...');
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const finishedAt = new Date();
+      const timestamp = finishedAt.toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = `database_export_${timestamp}.sql`;
       
       const success = await downloadSqlFile(sqlContent, filename);
@@ -372,6 +442,42 @@ export function PgDumpExportPanel() {
         toast.success('Export complete!', {
           description: `Generated ${(sqlContent.length / 1024).toFixed(1)} KB SQL file`
         });
+
+        const checksum = calculateChecksum(sqlContent);
+        logLines.push(`Export finished at ${finishedAt.toISOString()}`);
+        logLines.push(`Output file: ${filename}`);
+        logLines.push(`Output size (bytes): ${sqlContent.length}`);
+        logLines.push(`Checksum: ${checksum}`);
+        logLines.push(`Total rows exported: ${totalRowsExported}`);
+
+        if (objectSummaries.length > 0) {
+          logLines.push('');
+          logLines.push('Exported objects:');
+          objectSummaries.forEach(line => logLines.push(line));
+        }
+
+        if (warningMessages.length > 0) {
+          logLines.push('');
+          logLines.push('Warnings:');
+          warningMessages.forEach(w => logLines.push(w));
+        }
+
+        if (errorMessages.length > 0) {
+          logLines.push('');
+          logLines.push('Errors:');
+          errorMessages.forEach(e => logLines.push(e));
+        }
+
+        logLines.push('');
+        logLines.push(
+          isCompatible
+            ? 'Compatibility test with psql -f: PASSED (no validation errors detected)'
+            : 'Compatibility test with psql -f: FAILED (validation errors detected; manual review recommended)'
+        );
+
+        const logFilename = `database_export_${timestamp}.log`;
+        const logContent = logLines.join('\n');
+        await downloadTextFile(logContent, logFilename);
       }
       
     } catch (err: any) {

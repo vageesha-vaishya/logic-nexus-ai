@@ -1,5 +1,7 @@
 // SQL File Parser for pg_dump files
 // Parses .sql files into categorized statements for import
+//
+import { findDollarQuoteBlocks } from "./pgDumpExport";
 
 export interface ParsedSqlFile {
   statements: string[];
@@ -143,11 +145,12 @@ export function parseSqlText(
   const lines = content.split('\n');
   const totalLines = lines.length;
   let currentStatement = '';
-  let inDollarQuote = false;
-  let dollarQuoteTag = '';
   let inCopyData = false;
   let lineNumber = 0;
   let bytesProcessed = 0;
+  let offset = 0;
+
+  const dollarBlocks = findDollarQuoteBlocks(content);
 
   // Track unique table and schema names
   const tableNames = new Set<string>();
@@ -156,6 +159,17 @@ export function parseSqlText(
   for (const line of lines) {
     lineNumber++;
     bytesProcessed += line.length + 1; // +1 for newline
+    const lineStart = offset;
+    const lineEnd = offset + line.length;
+    offset += line.length + 1;
+
+    const activeDollarBlock = dollarBlocks.find(
+      (b) =>
+        lineEnd > b.startIndex &&
+        lineStart >= b.startIndex &&
+        (b.endIndex ?? fileSizeBytes) >= lineStart
+    );
+    const inDollarBlock = !!activeDollarBlock;
 
     // Report progress every 1000 lines
     if (onProgress && lineNumber % 1000 === 0) {
@@ -198,23 +212,10 @@ export function parseSqlText(
       continue;
     }
 
-    // Handle dollar-quoted strings (for functions)
-    const dollarMatch = line.match(/\$([a-zA-Z_]*)\$/);
-    if (dollarMatch && !inDollarQuote) {
-      inDollarQuote = true;
-      dollarQuoteTag = dollarMatch[0];
-    } else if (inDollarQuote && line.includes(dollarQuoteTag)) {
-      // Count occurrences - if even, we're out of the quote
-      const count = (line.match(new RegExp(escapeRegex(dollarQuoteTag), 'g')) || []).length;
-      if (count % 2 === 1) {
-        inDollarQuote = !inDollarQuote;
-      }
-    }
-
     currentStatement += line + '\n';
 
     // Check if statement is complete
-    if (!inDollarQuote && line.trim().endsWith(';')) {
+    if (!inDollarBlock && line.trim().endsWith(';')) {
       const stmt = currentStatement.trim();
       
       // Handle COPY statement start
@@ -298,14 +299,15 @@ export function parseSqlText(
     };
     
     // Determine specific issue type and repair suggestions
-    if (inDollarQuote) {
+    const unclosedBlock = dollarBlocks.find(b => !b.isComplete);
+    if (unclosedBlock) {
       integrityIssue.type = 'unclosed_quote';
-      integrityIssue.description = `Unclosed dollar-quoted string (${dollarQuoteTag})`;
+      integrityIssue.description = `Unclosed dollar-quoted string (${unclosedBlock.tag})`;
       result.metadata.repairSuggestions.push({
         type: 'close_quote',
-        description: `Add closing ${dollarQuoteTag} and semicolon to complete the statement`,
+        description: `Add closing ${unclosedBlock.tag} and semicolon to complete the statement`,
         automatable: true,
-        repairFunction: () => trimmedStmt + `\n${dollarQuoteTag};`,
+        repairFunction: () => trimmedStmt + `\n${unclosedBlock.tag};`,
       });
     } else if (inCopyData) {
       integrityIssue.type = 'incomplete_copy';

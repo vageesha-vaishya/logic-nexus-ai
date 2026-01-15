@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Database, CheckCircle2, XCircle, Eye, EyeOff, Server } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Database, CheckCircle2, XCircle, Eye, EyeOff, Server, AlertCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { validateHostname, validatePort, parseHostPort } from '@/utils/validationUtils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface ExternalDbConnection {
   host: string;
@@ -22,6 +25,8 @@ export interface ExternalDbConnection {
 export interface ConnectionTestResult {
   success: boolean;
   message: string;
+  code?: string;
+  error?: string;
   connectionInfo?: {
     version: string;
     database: string;
@@ -54,10 +59,17 @@ export function ExternalDbConnectionForm({
   const [showPassword, setShowPassword] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [preset, setPreset] = useState<keyof typeof CONNECTION_PRESETS>('custom');
+  
+  // Validation state
+  const [hostError, setHostError] = useState<string | null>(null);
+  const [portError, setPortError] = useState<string | null>(null);
 
   const handlePresetChange = (value: keyof typeof CONNECTION_PRESETS) => {
     setPreset(value);
+    setHostError(null);
+    setPortError(null);
     const p = CONNECTION_PRESETS[value];
     onChange({
       ...connection,
@@ -68,6 +80,38 @@ export function ExternalDbConnectionForm({
 
   const handleChange = (field: keyof ExternalDbConnection, value: string | number | boolean) => {
     setTestResult(null); // Reset test result on change
+    
+    // Real-time validation and input masking
+    if (field === 'host' && typeof value === 'string') {
+      // Check for host:port paste/entry
+      const hostPort = parseHostPort(value);
+      if (hostPort) {
+        // Auto-split logic: update both host and port
+        onChange({ 
+          ...connection, 
+          host: hostPort.host, 
+          port: hostPort.port! 
+        });
+        
+        // Validate the split parts
+        const hVal = validateHostname(hostPort.host);
+        setHostError(hVal.isValid ? null : hVal.message || null);
+        setPortError(null); // Port from parseHostPort is pre-validated
+        
+        toast.info("Format detected: Automatically split host and port");
+        return;
+      }
+
+      // Normal host validation
+      const hVal = validateHostname(value);
+      setHostError(hVal.isValid ? null : hVal.message || null);
+    }
+
+    if (field === 'port') {
+      const pVal = validatePort(value as number | string);
+      setPortError(pVal.isValid ? null : pVal.message || null);
+    }
+
     onChange({ ...connection, [field]: value });
   };
 
@@ -108,9 +152,25 @@ export function ExternalDbConnectionForm({
       
       onConnectionTested?.(result);
     } catch (err: any) {
+      console.error('[ExternalDbConnectionForm] Connection test failed', err);
+      const rawMessage = err?.message as string | undefined;
+      let message = 'Connection test failed';
+
+      if (rawMessage?.includes('non-2xx')) {
+        message = 'Edge function call failed. Check that it is deployed and accessible.';
+      } else if (rawMessage?.includes('Failed to fetch')) {
+        message = 'Could not reach Supabase Edge Functions. Check network connection and project configuration.';
+      } else if (rawMessage?.includes('failed to lookup address information') || rawMessage?.includes('getaddrinfo EAI_AGAIN')) {
+        message = 'DNS Lookup Failed: The hostname could not be resolved. Please check the address and try again.';
+      } else if (rawMessage) {
+        message = rawMessage;
+      }
+
       const result: ConnectionTestResult = {
         success: false,
-        message: err.message || 'Connection test failed',
+        message,
+        code: 'CLIENT_ERROR',
+        error: rawMessage,
       };
       setTestResult(result);
       toast.error(result.message);
@@ -166,14 +226,29 @@ export function ExternalDbConnectionForm({
         {/* Host and Port */}
         <div className="grid grid-cols-3 gap-4">
           <div className="col-span-2 space-y-2">
-            <Label htmlFor="host">Host <span className="text-destructive">*</span></Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="host">Host <span className="text-destructive">*</span></Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enter a valid hostname (e.g. db.example.com) or IPv4 address.</p>
+                    <p>You can also paste "hostname:port" to auto-fill both.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <Input
               id="host"
-              placeholder="db.example.com"
+              placeholder="e.g. db.example.com or 192.168.1.1"
               value={connection.host}
               onChange={(e) => handleChange('host', e.target.value)}
               disabled={disabled}
+              className={hostError ? "border-destructive focus-visible:ring-destructive" : ""}
             />
+            {hostError && <p className="text-xs text-destructive mt-1">{hostError}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="port">Port</Label>
@@ -184,7 +259,9 @@ export function ExternalDbConnectionForm({
               value={connection.port}
               onChange={(e) => handleChange('port', parseInt(e.target.value) || 5432)}
               disabled={disabled}
+              className={portError ? "border-destructive focus-visible:ring-destructive" : ""}
             />
+            {portError && <p className="text-xs text-destructive mt-1">{portError}</p>}
           </div>
         </div>
 
@@ -258,6 +335,43 @@ export function ExternalDbConnectionForm({
             <p><span className="font-medium">Version:</span> {testResult.connectionInfo.version.substring(0, 60)}...</p>
             <p><span className="font-medium">Database:</span> {testResult.connectionInfo.database}</p>
             <p><span className="font-medium">User:</span> {testResult.connectionInfo.user}</p>
+          </div>
+        )}
+
+        {/* Diagnostics View */}
+        {testResult && !testResult.success && (testResult.code || testResult.error) && (
+          <div className="space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-between h-auto py-2 px-3 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setShowDiagnostics(!showDiagnostics)}
+              type="button"
+            >
+              <span>Technical Details</span>
+              {showDiagnostics ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+            
+            {showDiagnostics && (
+              <Alert variant="destructive" className="mt-2 text-xs">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error Details</AlertTitle>
+                <AlertDescription className="mt-2 space-y-1 font-mono">
+                  {testResult.code && (
+                    <div className="flex gap-2">
+                      <span className="font-semibold">Code:</span>
+                      <span>{testResult.code}</span>
+                    </div>
+                  )}
+                  {testResult.error && (
+                    <div className="flex gap-2">
+                      <span className="font-semibold">Error:</span>
+                      <span className="break-all">{testResult.error}</span>
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
 
