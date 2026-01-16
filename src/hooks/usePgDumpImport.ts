@@ -953,6 +953,14 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       parsed.triggerStatements.length +
       parsed.sequenceStatements.length;
 
+    if (parsed.dataStatements.length === 0 && parsed.metadata.estimatedRowCount > 0) {
+      addLog(
+        'warn',
+        'No data statements detected in parsed SQL',
+        `Estimated rows from file: ${parsed.metadata.estimatedRowCount}`
+      );
+    }
+
     setProgress({
       currentBatch: 0,
       totalBatches: Math.ceil(totalStatements / options.batchSize),
@@ -1284,14 +1292,14 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
             },
             query: `
               SELECT
-                (SELECT COUNT(*)::bigint FROM public.leads l
+                (SELECT COUNT(*)::numeric FROM public.leads l
                   LEFT JOIN public.profiles p ON l.owner_id = p.id
                   WHERE l.owner_id IS NOT NULL AND p.id IS NULL) AS leads_missing_owners,
-                (SELECT COUNT(*)::bigint FROM public.leads WHERE owner_id IS NOT NULL) AS total_leads_with_owner,
-                (SELECT COUNT(*)::bigint FROM public.activities a
+                (SELECT COUNT(*)::numeric FROM public.leads WHERE owner_id IS NOT NULL) AS total_leads_with_owner,
+                (SELECT COUNT(*)::numeric FROM public.activities a
                   LEFT JOIN public.leads l2 ON a.lead_id = l2.id
                   WHERE a.lead_id IS NOT NULL AND l2.id IS NULL) AS activities_missing_leads,
-                (SELECT COUNT(*)::bigint FROM public.activities WHERE lead_id IS NOT NULL) AS total_activities_with_lead
+                (SELECT COUNT(*)::numeric FROM public.activities WHERE lead_id IS NOT NULL) AS total_activities_with_lead
             `,
           },
         });

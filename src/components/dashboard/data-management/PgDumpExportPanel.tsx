@@ -112,13 +112,15 @@ export function PgDumpExportPanel() {
 
   const downloadSqlFile = async (content: string, filename: string) => {
     try {
-      if ('showSaveFilePicker' in window) {
+      if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
         const handle = await (window as any).showSaveFilePicker({
           suggestedName: filename,
-          types: [{
-            description: 'SQL File',
-            accept: { 'application/sql': ['.sql'] },
-          }],
+          types: [
+            {
+              description: "SQL File",
+              accept: { "application/sql": [".sql"] },
+            },
+          ],
         });
         const writable = await handle.createWritable();
         await writable.write(content);
@@ -126,21 +128,35 @@ export function PgDumpExportPanel() {
         return true;
       }
     } catch (e: any) {
-      if (e.name === 'AbortError') {
+      if (e?.name === "AbortError") {
         toast.message("Save cancelled");
         return false;
       }
+      console.warn("pg_dump export: File System Access API failed, falling back to download link", e);
     }
-    
-    // Fallback download
-    const blob = new Blob([content], { type: 'application/sql' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    return true;
+
+    try {
+      const blob = new Blob([content], { type: "application/sql" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 0);
+      return true;
+    } catch (e: any) {
+      console.error("pg_dump export: Failed to trigger browser download", e);
+      toast.error("Export failed", {
+        description: "The browser blocked the file download. Please check popup/download settings and try again.",
+      });
+      return false;
+    }
   };
 
   const downloadTextFile = async (content: string, filename: string) => {
@@ -793,13 +809,20 @@ export function PgDumpExportPanel() {
             allConstraints = constraintsData;
           }
           if (constraintsData && constraintsData.length > 0) {
+            const tableKeys = new Set(Object.keys(tableGroups).map(k => k.toLowerCase()));
             const filtered = constraintsData.filter((c: any) => {
               if (effectiveOptions.excludeAuthSchema && c.schema_name === 'auth') return false;
               if (effectiveOptions.excludeStorageSchema && c.schema_name === 'storage') return false;
+              const key = `${String(c.schema_name || '').toLowerCase()}.${String(c.table_name || '').toLowerCase()}`;
+              if (!tableKeys.has(key)) return false;
               return true;
             });
-            sqlContent += generateConstraintStatements(filtered);
-            logLines.push(`Exported ${filtered.length} table constraints`);
+            if (filtered.length > 0) {
+              sqlContent += generateConstraintStatements(filtered);
+              logLines.push(`Exported ${filtered.length} table constraints`);
+            } else {
+              logLines.push('No table constraints exported after filtering by schema and table set');
+            }
           }
         } catch (err: any) {
           warningMessages.push(`Constraint export skipped or failed: ${err?.message || String(err)}`);

@@ -569,6 +569,11 @@ function categorizeStatement(stmt: string): StatementCategory {
   const upper = stmt.toUpperCase();
   const firstWord = upper.split(/\s+/)[0];
 
+  // Treat DO blocks that contain INSERT statements as data
+  if (firstWord === 'DO' && /\bINSERT\s+INTO\b/.test(upper)) {
+    return 'data';
+  }
+
   // Schema statements
   if (upper.includes('CREATE SCHEMA') || upper.includes('CREATE TYPE') || upper.includes('CREATE EXTENSION')) {
     return 'schema';

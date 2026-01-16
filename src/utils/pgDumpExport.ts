@@ -159,14 +159,21 @@ const resolveColumnType = (col: any): string => {
   if ((rawType === 'character varying' || rawType === 'varchar') && col.character_maximum_length) {
     return `${rawType}(${col.character_maximum_length})`;
   }
-  if (dt === 'USER-DEFINED' && udt) {
-    const safeUdt = udt.replace(/"/g, '""');
-    return `"${safeUdt}"`;
+  if (dt === 'USER-DEFINED') {
+    if (udt) {
+      const base = udt.startsWith('_') ? udt.slice(1) : udt;
+      const safeBase = base.replace(/"/g, '""');
+      return `"${safeBase}"`;
+    }
+    return 'text';
   }
   if (dt === 'ARRAY' && udt) {
     const base = udt.startsWith('_') ? udt.slice(1) : udt;
     const safeBase = base.replace(/"/g, '""');
     return `"${safeBase}"[]`;
+  }
+  if (dt === 'ARRAY') {
+    return 'text[]';
   }
   return rawType || 'text';
 };
@@ -183,10 +190,15 @@ export const generateInsertStatements = (
 ): string => {
   if (rows.length === 0) return '';
   
+  const regclassId = `${schemaName}.${tableName}`.replace(/"/g, '');
+  
   let sql = `--
 -- Data for table ${schemaName}.${tableName}
 --
 
+DO $$
+BEGIN
+  IF to_regclass('${regclassId}') IS NOT NULL THEN
 `;
   
   rows.forEach(row => {
@@ -195,10 +207,16 @@ export const generateInsertStatements = (
       return formatValue(row[col], dataType);
     });
     
-    sql += `INSERT INTO "${schemaName}"."${tableName}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${values.join(', ')});\n`;
+    sql += `    INSERT INTO "${schemaName}"."${tableName}" (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${values.join(', ')});\n`;
   });
   
-  sql += '\n';
+  sql += `  ELSE
+    RAISE NOTICE 'Skipping data for missing table %', '${regclassId}';
+  END IF;
+END;
+$$;
+
+`;
   return sql;
 };
 
@@ -345,6 +363,18 @@ export const generateConstraintStatements = (
     c.constraint_details.toUpperCase().startsWith('UNIQUE')
   );
   
+  const wrapConstraintWithGuard = (c: {
+    schema_name: string;
+    table_name: string;
+    constraint_name: string;
+    constraint_details: string;
+  }): string => {
+    const details = c.constraint_details;
+    if (!details) return '';
+    const regclassId = `${c.schema_name}.${c.table_name}`.replace(/"/g, '');
+    return `DO $$\nBEGIN\n  IF to_regclass('${regclassId}') IS NOT NULL THEN\n    ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${details};\n  ELSE\n    RAISE NOTICE 'Skipping constraint % on missing table %', '${c.constraint_name}', '${regclassId}';\n  END IF;\nEND;\n$$;\n`;
+  };
+  
   let sql = '';
   
   if (primaryKeys.length > 0) {
@@ -354,10 +384,7 @@ export const generateConstraintStatements = (
 
 `;
     primaryKeys.forEach(c => {
-      const details = c.constraint_details;
-      if (details) {
-        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${details};\n`;
-      }
+      sql += wrapConstraintWithGuard(c);
     });
     sql += '\n';
   }
@@ -369,10 +396,7 @@ export const generateConstraintStatements = (
 
 `;
     uniqueConstraints.forEach(c => {
-      const details = c.constraint_details;
-      if (details) {
-        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${details};\n`;
-      }
+      sql += wrapConstraintWithGuard(c);
     });
     sql += '\n';
   }
@@ -384,9 +408,12 @@ export const generateConstraintStatements = (
 
 `;
     foreignKeys.forEach(c => {
-      if (c.constraint_details?.trim()) {
-        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${c.constraint_details};\n`;
-      }
+      sql += wrapConstraintWithGuard({
+        schema_name: c.schema_name,
+        table_name: c.table_name,
+        constraint_name: c.constraint_name,
+        constraint_details: c.constraint_details,
+      });
     });
     sql += '\n';
   }
@@ -407,15 +434,25 @@ export const generateIndexStatements = (
 ): string => {
   if (indexes.length === 0) return '';
   
+  const wrapIndexWithGuard = (idx: {
+    schema_name: string;
+    table_name: string;
+    index_name: string;
+    index_definition: string;
+  }): string => {
+    if (!idx.index_definition?.trim()) return '';
+    const regclassId = `${idx.schema_name}.${idx.table_name}`.replace(/"/g, '');
+    const stmt = idx.index_definition.trim().replace(/;+\s*$/, '');
+    return `DO $$\nBEGIN\n  IF to_regclass('${regclassId}') IS NOT NULL THEN\n    ${stmt};\n  ELSE\n    RAISE NOTICE 'Skipping index % on missing table %', '${idx.index_name}', '${regclassId}';\n  END IF;\nEND;\n$$;\n`;
+  };
+  
   let sql = `--
 -- Indexes
 --
 
 `;
   indexes.forEach(idx => {
-    if (idx.index_definition?.trim()) {
-      sql += `${idx.index_definition};\n`;
-    }
+    sql += wrapIndexWithGuard(idx);
   });
   sql += '\n';
   return sql;
@@ -546,6 +583,23 @@ export const generateRlsStatements = (
   let sql = '';
   
   // Enable RLS on tables
+  const wrapRlsEnableWithGuard = (t: { schema_name: string; table_name: string }): string => {
+    const regclassId = `${t.schema_name}.${t.table_name}`.replace(/"/g, '');
+    return `DO $$\nBEGIN\n  IF to_regclass('${regclassId}') IS NOT NULL THEN\n    ALTER TABLE "${t.schema_name}"."${t.table_name}" ENABLE ROW LEVEL SECURITY;\n  ELSE\n    RAISE NOTICE 'Skipping RLS enable on missing table %', '${regclassId}';\n  END IF;\nEND;\n$$;\n`;
+  };
+  
+  const wrapPolicyWithGuard = (p: {
+    schema_name: string;
+    table_name: string;
+    policy_name: string;
+    policy_definition: string;
+  }): string => {
+    if (!p.policy_definition?.trim()) return '';
+    const regclassId = `${p.schema_name}.${p.table_name}`.replace(/"/g, '');
+    const def = p.policy_definition.trim().replace(/;+\s*$/, '');
+    return `DO $$\nBEGIN\n  IF to_regclass('${regclassId}') IS NOT NULL THEN\n    ${def};\n  ELSE\n    RAISE NOTICE 'Skipping RLS policy % on missing table %', '${p.policy_name}', '${regclassId}';\n  END IF;\nEND;\n$$;\n`;
+  };
+  
   const rlsTables = tables.filter(t => t.rls_enabled);
   if (rlsTables.length > 0) {
     sql += `--
@@ -554,7 +608,7 @@ export const generateRlsStatements = (
 
 `;
     rlsTables.forEach(t => {
-      sql += `ALTER TABLE "${t.schema_name}"."${t.table_name}" ENABLE ROW LEVEL SECURITY;\n`;
+      sql += wrapRlsEnableWithGuard(t);
     });
     sql += '\n';
   }
@@ -567,9 +621,7 @@ export const generateRlsStatements = (
 
 `;
     policies.forEach(p => {
-      if (p.policy_definition?.trim()) {
-        sql += `${p.policy_definition};\n`;
-      }
+      sql += wrapPolicyWithGuard(p);
     });
     sql += '\n';
   }

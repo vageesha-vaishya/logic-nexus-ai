@@ -194,6 +194,89 @@ describe('pgDumpExport validation', () => {
     expect(result.errors.length).toBe(0);
   });
 
+  it('uses udt_name for USER-DEFINED column types', () => {
+    const tableSql = generateCreateTableStatement(
+      'public',
+      'accounts',
+      [
+        {
+          column_name: 'id',
+          data_type: 'uuid',
+          is_nullable: false,
+          column_default: 'gen_random_uuid()',
+          is_primary_key: true,
+        },
+        {
+          column_name: 'account_type',
+          data_type: 'USER-DEFINED',
+          is_nullable: false,
+          column_default: `'USER'::account_type`,
+          is_primary_key: false,
+          udt_name: 'account_type',
+        } as any,
+      ],
+      true
+    );
+    expect(tableSql).toContain('"account_type" "account_type" NOT NULL DEFAULT \'USER\'::account_type');
+    const result = validateAndRepairSql(tableSql);
+    expect(result.errors.length).toBe(0);
+  });
+
+  it('uses udt_name for ARRAY column types when available', () => {
+    const tableSql = generateCreateTableStatement(
+      'public',
+      'auth_roles',
+      [
+        {
+          column_name: 'id',
+          data_type: 'text',
+          is_nullable: false,
+          column_default: null,
+          is_primary_key: true,
+        },
+        {
+          column_name: 'can_manage_scopes',
+          data_type: 'ARRAY',
+          is_nullable: false,
+          column_default: null,
+          is_primary_key: false,
+          udt_name: '_text',
+        } as any,
+      ],
+      true
+    );
+    expect(tableSql).toContain('"can_manage_scopes" "text"[] NOT NULL');
+    const result = validateAndRepairSql(tableSql);
+    expect(result.errors.length).toBe(0);
+  });
+
+  it('falls back to text[] when ARRAY type has no udt_name', () => {
+    const tableSql = generateCreateTableStatement(
+      'public',
+      'auth_roles',
+      [
+        {
+          column_name: 'id',
+          data_type: 'text',
+          is_nullable: false,
+          column_default: null,
+          is_primary_key: true,
+        },
+        {
+          column_name: 'can_manage_scopes',
+          data_type: 'ARRAY',
+          is_nullable: true,
+          column_default: null,
+          is_primary_key: false,
+        } as any,
+      ],
+      false
+    );
+    expect(tableSql).toContain('"can_manage_scopes" text[]');
+    const result = validateAndRepairSql(tableSql);
+    expect(result.errors.length).toBe(0);
+  });
+
   it('fixes legacy RPC output with missing schema and incomplete constraint details', () => {
     const constraints = [
       {
