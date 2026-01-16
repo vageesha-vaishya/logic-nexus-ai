@@ -3,7 +3,7 @@ import { LeadForm, LeadFormData } from "@/components/crm/LeadForm";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
-import { sanitizeLeadDataForInsert } from "./email-to-lead-helpers";
+import { sanitizeLeadDataForInsert, extractEmailAddress } from "./email-to-lead-helpers";
 
 interface EmailForConversion {
   id: string;
@@ -46,12 +46,13 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
     return email.snippet || "";
   };
 
+  const extractedEmail = extractEmailAddress(email.from_email);
   const { first_name, last_name } = parseName(email.from_name || email.from_email);
 
   const initialData: Partial<LeadFormData> = {
     first_name,
     last_name: last_name || "Unknown", // Last name is often required
-    email: email.from_email,
+    email: extractedEmail || "",
     description: `Created from email: ${email.subject}\n\n${getBodyText(email)}`,
     source: "email",
     status: "new",
