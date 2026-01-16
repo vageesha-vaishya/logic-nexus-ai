@@ -87,6 +87,7 @@ export function PgDumpImportWizard() {
       excludeStorageSchema: false,
       customSchemas: "",
       baseFilename: "database_import.sql",
+      dataCompletenessThresholdRatio: 1.1,
     };
   });
 
@@ -223,10 +224,30 @@ export function PgDumpImportWizard() {
     switch (currentStep) {
       case 'file':
         return (
-          <SqlFileUploadZone
-            onFileSelected={handleFileSelected}
-            onFileClear={handleFileClear}
-          />
+          <div className="space-y-4">
+            <SqlFileUploadZone
+              onFileSelected={handleFileSelected}
+              onFileClear={handleFileClear}
+            />
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Import behavior</CardTitle>
+                <CardDescription className="text-xs">
+                  Tables referenced in the dump that do not exist in the target database will be
+                  created automatically from their CREATE TABLE definitions before data is inserted.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground">
+                  For non-plain dumps (custom, directory, compressed), first generate a plain SQL
+                  file with pg_restore and upload that here, for example:
+                  <span className="block font-mono mt-1">
+                    pg_restore -f dump.sql path/to/archive
+                  </span>
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         );
 
       case 'connection':

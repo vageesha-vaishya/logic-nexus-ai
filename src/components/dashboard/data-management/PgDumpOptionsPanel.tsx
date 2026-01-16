@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Shield, Settings, SlidersHorizontal, Search, HelpCircle } from "lucide-react";
 
 export type PgDumpCategoryOptions = {
@@ -29,6 +30,7 @@ export type PgDumpGeneralOptions = {
   excludeStorageSchema: boolean;
   customSchemas: string;
   baseFilename: string;
+  dataCompletenessThresholdRatio?: number;
 };
 
 type Props = {
@@ -83,10 +85,66 @@ export function PgDumpOptionsPanel({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">pg_dump Options</CardTitle>
-          <Badge variant="outline" className="ml-2">Compatible</Badge>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">pg_dump Options</CardTitle>
+            <Badge variant="outline" className="ml-2">Compatible</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              onClick={() => {
+                onChangeCategories({
+                  all: true,
+                  schema: true,
+                  constraints: true,
+                  indexes: true,
+                  dbFunctions: true,
+                  rlsPolicies: true,
+                  enums: true,
+                  edgeFunctions: true,
+                  secrets: true,
+                  tableData: true,
+                });
+                onChangeGeneral({
+                  ...general,
+                  excludeAuthSchema: false,
+                  excludeStorageSchema: false,
+                });
+              }}
+            >
+              Full schema including auth/storage
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              onClick={() => {
+                onChangeCategories({
+                  all: false,
+                  schema: true,
+                  constraints: true,
+                  indexes: true,
+                  dbFunctions: true,
+                  rlsPolicies: true,
+                  enums: true,
+                  edgeFunctions: false,
+                  secrets: false,
+                  tableData: false,
+                });
+                onChangeGeneral({
+                  ...general,
+                  excludeAuthSchema: false,
+                  excludeStorageSchema: false,
+                });
+              }}
+            >
+              Structure-only schema (no data, includes auth/storage)
+            </Button>
+          </div>
         </div>
         <CardDescription>Configure export/import settings and included components</CardDescription>
       </CardHeader>
@@ -257,6 +315,24 @@ export function PgDumpOptionsPanel({
                     value={general.baseFilename}
                     onChange={(e) => setGeneral("baseFilename", e.target.value)}
                     placeholder="database_export.sql"
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Data Completeness Warning Threshold</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={0.1}
+                    value={general.dataCompletenessThresholdRatio ?? 1.1}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      if (Number.isNaN(v) || v < 1) {
+                        setGeneral("dataCompletenessThresholdRatio", undefined);
+                      } else {
+                        setGeneral("dataCompletenessThresholdRatio", v);
+                      }
+                    }}
                     disabled={disabled}
                   />
                 </div>

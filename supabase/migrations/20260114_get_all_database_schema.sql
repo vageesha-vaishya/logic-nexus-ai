@@ -11,7 +11,10 @@ RETURNS TABLE (
   is_foreign_key boolean,
   references_schema text,
   references_table text,
-  references_column text
+  references_column text,
+  udt_schema text,
+  udt_name text,
+  character_maximum_length integer
 )
 AS $$
   SELECT 
@@ -25,7 +28,10 @@ AS $$
     CASE WHEN kcu2.table_name IS NOT NULL THEN true ELSE false END as is_foreign_key,
     kcu2.table_schema::text as references_schema,
     kcu2.table_name::text as references_table,
-    kcu2.column_name::text as references_column
+    kcu2.column_name::text as references_column,
+    c.udt_schema::text as udt_schema,
+    c.udt_name::text as udt_name,
+    c.character_maximum_length
   FROM information_schema.columns c
   LEFT JOIN information_schema.key_column_usage kcu 
     ON c.table_name = kcu.table_name 

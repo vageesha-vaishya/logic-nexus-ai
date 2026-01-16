@@ -111,6 +111,49 @@ function verifyFile(filePath) {
   });
 }
 
+function analyzeDumpContent(filePath, args) {
+  return new Promise((resolve) => {
+    fs.readFile(filePath, "utf8", (err, data) => {
+      if (err) {
+        logError(`Skipping dump content analysis: ${err.message}`);
+        return resolve();
+      }
+      if (!data || data.length === 0) {
+        logError("Dump file is empty during content analysis.");
+        return resolve();
+      }
+      if (data.length > 50 * 1024 * 1024) {
+        log("Dump file larger than 50MB; skipping deep content analysis.");
+        return resolve();
+      }
+      const hasCreateTable = /CREATE\s+TABLE\s+/i.test(data);
+      const hasFunctions = /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+/i.test(data);
+      const hasProcedures = /CREATE\s+(OR\s+REPLACE\s+)?PROCEDURE\s+/i.test(data);
+      const hasEnums = /CREATE\s+TYPE\s+[^;]+AS\s+ENUM\s*\(/i.test(data);
+      const hasPolicies = /CREATE\s+POLICY\s+/i.test(data);
+      const hasRlsEnable = /ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(data);
+      const excludedAuth = args.extra.some((a) => a === "--exclude-schema=auth" || a === "--schema=public");
+      log("pg_dump content summary:");
+      log(`  Tables present:          ${hasCreateTable ? "yes" : "no"}`);
+      log(`  Functions present:       ${hasFunctions ? "yes" : "no"}`);
+      log(`  Procedures present:      ${hasProcedures ? "yes" : "no"}`);
+      log(`  Enum types present:      ${hasEnums ? "yes" : "no"}`);
+      log(`  RLS policies present:    ${hasPolicies ? "yes" : "no"}`);
+      log(`  RLS enable statements:   ${hasRlsEnable ? "yes" : "no"}`);
+      if (!hasPolicies && !hasRlsEnable) {
+        log("Warning: No RLS policies or enable statements detected in dump.");
+      }
+      if (!hasEnums) {
+        log("Warning: No enum type definitions detected in dump.");
+      }
+      if (excludedAuth) {
+        log("Note: auth schema appears to be excluded by pg_dump arguments; auth.* objects will not be in this dump.");
+      }
+      resolve();
+    });
+  });
+}
+
 async function run() {
   const startedAt = Date.now();
   let args;
@@ -126,7 +169,7 @@ async function run() {
   const filePath = path.join(outDir, args.fileName);
 
   log(`Starting pg_dump export`);
-  log(`  Database URL: ${args.url}`);
+  log(`  Database host: ${args.url.replace(/:\/\/([^:@]+)(:[0-9]+)?@/, "://[redacted]@")}`);
   log(`  Output dir:   ${outDir}`);
   log(`  Output file:  ${filePath}`);
 
@@ -163,12 +206,24 @@ async function run() {
     }
   });
 
+  let stderrBuffer = "";
+
   child.stderr.on("data", (data) => {
     if (!data || data.length === 0) return;
     const text = data.toString();
+    stderrBuffer += text;
     logError(text.trimEnd());
     if (text.includes("No space left on device")) {
-      logError("Detected disk space issue while running pg_dump.");
+      logError("Detected disk space issue while running pg_dump. Free disk space and retry.");
+    }
+    if (/\bfatal:\s+password authentication failed\b/i.test(text)) {
+      logError("Authentication failed. Verify SUPABASE_DB_URL credentials or provided --url.");
+    }
+    if (/could not connect to server/i.test(text) || /could not translate host name/i.test(text)) {
+      logError("Connection failed. Check network connectivity, host, port, and firewall rules.");
+    }
+    if (/permission denied for (schema|table|database)/i.test(text)) {
+      logError("Permission issue detected. Ensure the database user has required privileges for pg_dump.");
     }
   });
 
@@ -185,6 +240,9 @@ async function run() {
   child.on("close", async (code) => {
     const durationMs = Date.now() - startedAt;
     if (code !== 0) {
+      if (/signal: terminated/i.test(stderrBuffer) || /terminated by signal/i.test(stderrBuffer)) {
+        logError("pg_dump terminated by signal. Possible causes: OOM, manual kill, or system limits.");
+      }
       logError(`pg_dump exited with code ${code} after ${durationMs}ms.`);
       process.exit(code || 1);
     }
@@ -193,6 +251,7 @@ async function run() {
       const stats = await verifyFile(filePath);
       log(`Export completed in ${durationMs}ms.`);
       log(`Dump file size: ${stats.size} bytes.`);
+      await analyzeDumpContent(filePath, args);
       process.exit(0);
     } catch (err) {
       logError(`Export finished but verification failed: ${err.message}`);

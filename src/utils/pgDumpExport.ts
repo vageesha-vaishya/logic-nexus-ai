@@ -120,12 +120,14 @@ export const generateCreateTableStatement = (
     column_default: string | null;
     is_primary_key: boolean;
   }>,
-  includeDropStatement: boolean = false
+  includeDropStatement: boolean = false,
+  hasChildTables: boolean = false
 ): string => {
   let sql = '';
   
   if (includeDropStatement) {
-    sql += `DROP TABLE IF EXISTS "${schemaName}"."${tableName}" CASCADE;\n`;
+    const cascade = hasChildTables ? ' CASCADE' : '';
+    sql += `DROP TABLE IF EXISTS "${schemaName}"."${tableName}"${cascade};\n`;
   }
   
   sql += `CREATE TABLE IF NOT EXISTS "${schemaName}"."${tableName}" (\n`;
@@ -151,11 +153,22 @@ export const generateCreateTableStatement = (
  * Resolves column type for CREATE TABLE statements
  */
 const resolveColumnType = (col: any): string => {
-  const dt = (col.data_type || '').toString();
-  if ((dt === 'character varying' || dt === 'varchar') && col.character_maximum_length) {
-    return `${dt}(${col.character_maximum_length})`;
+  const rawType = (col.data_type || '').toString();
+  const dt = rawType.toUpperCase();
+  const udt = (col.udt_name || '').toString();
+  if ((rawType === 'character varying' || rawType === 'varchar') && col.character_maximum_length) {
+    return `${rawType}(${col.character_maximum_length})`;
   }
-  return dt || 'text';
+  if (dt === 'USER-DEFINED' && udt) {
+    const safeUdt = udt.replace(/"/g, '""');
+    return `"${safeUdt}"`;
+  }
+  if (dt === 'ARRAY' && udt) {
+    const base = udt.startsWith('_') ? udt.slice(1) : udt;
+    const safeBase = base.replace(/"/g, '""');
+    return `"${safeBase}"[]`;
+  }
+  return rawType || 'text';
 };
 
 /**
@@ -236,20 +249,100 @@ export const generateConstraintStatements = (
 ): string => {
   if (constraints.length === 0) return '';
   
-  // Group constraints by type
-  const primaryKeys = constraints.filter(c => 
-    c.constraint_type?.toUpperCase() === 'PRIMARY KEY' || 
-    c.constraint_details?.toUpperCase().startsWith('PRIMARY KEY')
+  // Helper to resolve schema (fallback to public if missing/undefined)
+  const resolveSchema = (s: any) => {
+    const str = String(s || '').trim();
+    if (!str || str === 'undefined' || str === 'null') return 'public';
+    return str;
+  };
+
+  // Normalize and merge duplicate constraint rows, especially for legacy RPCs that
+  // return one row per constrained column. This also builds proper composite keys.
+  const byKey = new Map<
+    string,
+    {
+      schema_name: string;
+      table_name: string;
+      constraint_name: string;
+      constraint_type: string;
+      details: string[];
+    }
+  >();
+
+  constraints.forEach(c => {
+    const schema = resolveSchema(c.schema_name);
+    const type = (c.constraint_type || '').toUpperCase();
+    const key = `${schema}::${c.table_name}::${c.constraint_name}::${type}`;
+    const existing = byKey.get(key);
+    const detail = c.constraint_details != null ? String(c.constraint_details) : '';
+    if (existing) {
+      if (detail.trim()) existing.details.push(detail);
+    } else {
+      byKey.set(key, {
+        schema_name: schema,
+        table_name: c.table_name,
+        constraint_name: c.constraint_name,
+        constraint_type: type,
+        details: detail.trim() ? [detail] : [],
+      });
+    }
+  });
+
+  const mergedConstraints = Array.from(byKey.values()).map(group => {
+    const type = group.constraint_type;
+    if (type === 'PRIMARY KEY' || type === 'UNIQUE') {
+      const canonical = group.details.find(d =>
+        d.trim().toUpperCase().startsWith(type)
+      );
+      if (canonical) {
+        return {
+          ...group,
+          constraint_details: canonical.trim(),
+        };
+      }
+
+      const cols: string[] = [];
+      group.details.forEach(raw => {
+        const d = String(raw || '').trim();
+        if (!d) return;
+        if (/^[a-zA-Z0-9_,"' ]+$/.test(d)) {
+          d.split(',').forEach(part => {
+            const col = part.trim();
+            if (col) cols.push(col);
+          });
+        }
+      });
+      const uniqueCols = Array.from(new Set(cols));
+      const detail =
+        uniqueCols.length > 0 ? `${type} (${uniqueCols.join(', ')})` : '';
+      return {
+        ...group,
+        constraint_details: detail,
+      };
+    }
+
+    const canonical =
+      group.details.find(d => d.trim().length > 0) || '';
+    return {
+      ...group,
+      constraint_details: canonical.trim(),
+    };
+  });
+
+  // Group merged constraints by type
+  const primaryKeys = mergedConstraints.filter(c =>
+    c.constraint_type === 'PRIMARY KEY' ||
+    c.constraint_details.toUpperCase().startsWith('PRIMARY KEY')
   );
-  
-  const foreignKeys = constraints.filter(c => 
-    c.constraint_type?.toUpperCase() === 'FOREIGN KEY' || 
-    c.constraint_details?.toUpperCase().startsWith('FOREIGN KEY')
+
+  const foreignKeys = mergedConstraints.filter(c =>
+    c.constraint_type === 'FOREIGN KEY' ||
+    c.constraint_details.toUpperCase().startsWith('FOREIGN KEY')
   );
-  
-  const uniqueConstraints = constraints.filter(c => 
-    c.constraint_type?.toUpperCase() === 'UNIQUE' || 
-    c.constraint_details?.toUpperCase().startsWith('UNIQUE')
+
+  const uniqueConstraints = mergedConstraints.filter(c =>
+    c.constraint_type === 'UNIQUE' ||
+    c.constraint_details.toUpperCase().startsWith('UNIQUE')
   );
   
   let sql = '';
@@ -261,8 +354,9 @@ export const generateConstraintStatements = (
 
 `;
     primaryKeys.forEach(c => {
-      if (c.constraint_details?.trim()) {
-        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${c.constraint_details};\n`;
+      const details = c.constraint_details;
+      if (details) {
+        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${details};\n`;
       }
     });
     sql += '\n';
@@ -275,8 +369,9 @@ export const generateConstraintStatements = (
 
 `;
     uniqueConstraints.forEach(c => {
-      if (c.constraint_details?.trim()) {
-        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${c.constraint_details};\n`;
+      const details = c.constraint_details;
+      if (details) {
+        sql += `ALTER TABLE "${c.schema_name}"."${c.table_name}" ADD CONSTRAINT "${c.constraint_name}" ${details};\n`;
       }
     });
     sql += '\n';

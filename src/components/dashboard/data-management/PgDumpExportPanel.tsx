@@ -47,6 +47,13 @@ interface ExportProgress {
   message: string;
 }
 
+interface FkValidationDiagnostics {
+  status: "idle" | "running" | "passed" | "failed" | "skipped";
+  checkedConstraints: number;
+  orphanConstraints: number;
+  message: string | null;
+}
+
 export function PgDumpExportPanel() {
   const { scopedDb, context } = useCRM();
   const [isExporting, setIsExporting] = useState(false);
@@ -57,6 +64,14 @@ export function PgDumpExportPanel() {
   const cancelRef = useRef(false);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [permissionOk, setPermissionOk] = useState<boolean>(false);
+  const [lastCompletenessWarningCount, setLastCompletenessWarningCount] = useState<number | null>(null);
+  const [lastCompletenessThreshold, setLastCompletenessThreshold] = useState<number | null>(null);
+  const [fkDiagnostics, setFkDiagnostics] = useState<FkValidationDiagnostics>({
+    status: "idle",
+    checkedConstraints: 0,
+    orphanConstraints: 0,
+    message: null,
+  });
   const [categories, setCategories] = useState<PgDumpCategoryOptions>(() => {
     try {
       const raw = localStorage.getItem("pgdump.categories");
@@ -87,6 +102,7 @@ export function PgDumpExportPanel() {
       excludeStorageSchema: defaultPgDumpOptions.excludeStorageSchema,
       customSchemas: "",
       baseFilename: "database_export.sql",
+      dataCompletenessThresholdRatio: 1.1,
     };
   });
 
@@ -186,6 +202,7 @@ export function PgDumpExportPanel() {
     const warningMessages: string[] = [];
     const errorMessages: string[] = [];
     let totalRowsExported = 0;
+    let completenessWarnings = 0;
     const startedAt = new Date();
     logLines.push(`Export started at ${startedAt.toISOString()}`);
     
@@ -219,6 +236,73 @@ export function PgDumpExportPanel() {
       
       // Get unique schemas
       const schemas = [...new Set(Object.keys(tableGroups).map(k => k.split('.')[0]))];
+
+      const tablesWithChildren = new Set<string>();
+      let allConstraints: any[] | null = null;
+      let dropCascadeCount = 0;
+      let dropPlainCount = 0;
+
+      try {
+        updateProgress('Schema', 12, 'Analyzing foreign key relationships...');
+        const { data: constraintsRaw } = await scopedDb.rpc("get_table_constraints");
+        allConstraints = (constraintsRaw || []) as any[];
+        if (allConstraints.length > 0) {
+          const fkPattern = /FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+"?([A-Za-z0-9_]+)"?\."?([A-Za-z0-9_]+)"?/i;
+          const tableKeys = new Set(Object.keys(tableGroups).map(k => k.toLowerCase()));
+          let analyzed = 0;
+          let parentCount = 0;
+          const unparsable = new Set<string>();
+          const parents = new Set<string>();
+          for (const c of allConstraints) {
+            const type = (c.constraint_type || '').toString().toUpperCase();
+            if (type !== 'FOREIGN KEY') continue;
+            const childRef = `${c.schema_name}.${c.table_name}`.toLowerCase();
+            if (!tableKeys.has(childRef)) continue;
+            if (effectiveOptions.excludeAuthSchema && c.schema_name === 'auth') continue;
+            if (effectiveOptions.excludeStorageSchema && c.schema_name === 'storage') continue;
+            const details = String(c.constraint_details || '');
+            const m = details.match(fkPattern);
+            if (!m) {
+              if (c.constraint_name) {
+                unparsable.add(
+                  `${String(c.schema_name || '').toLowerCase()}.${String(c.table_name || '').toLowerCase()}.${String(
+                    c.constraint_name
+                  )}`
+                );
+              }
+              continue;
+            }
+            const parentSchema = (m[1] || 'public').toLowerCase();
+            const parentTable = (m[2] || '').toLowerCase();
+            if (!parentTable) continue;
+            const parentRef = `${parentSchema}.${parentTable}`;
+            if (!tableKeys.has(parentRef)) continue;
+            analyzed++;
+            if (!parents.has(parentRef)) {
+              parents.add(parentRef);
+              parentCount++;
+            }
+          }
+          parents.forEach(ref => tablesWithChildren.add(ref));
+          logLines.push(
+            `Analyzed ${analyzed} foreign key constraint(s) for structural dependencies; ${parentCount} parent table(s) will be dropped with CASCADE`
+          );
+          if (unparsable.size > 0) {
+            warningMessages.push(
+              `Detected ${unparsable.size} foreign key constraint(s) with unsupported definition format when analyzing dependencies; those relationships may require manual review`
+            );
+            unparsable.forEach(ref => {
+              logLines.push(
+                `Skipped foreign key during dependency analysis (unable to parse constraint definition): ${ref}`
+              );
+            });
+          }
+        }
+      } catch (err: any) {
+        warningMessages.push(
+          `Constraint metadata export skipped or failed during dependency analysis: ${err?.message || String(err)}`
+        );
+      }
       
       // 3. Create schemas
       if (categories.schema) {
@@ -264,11 +348,21 @@ export function PgDumpExportPanel() {
             seen.add(col.column_name);
             return true;
           });
+          const tableRef = `${schemaName}.${tableName}`.toLowerCase();
+          const hasChild = allConstraints === null ? true : tablesWithChildren.has(tableRef);
+          if (effectiveOptions.includeDropStatements) {
+            if (hasChild) {
+              dropCascadeCount++;
+            } else {
+              dropPlainCount++;
+            }
+          }
           const tableSql = generateCreateTableStatement(
             schemaName,
             tableName,
             uniqueCols,
-            effectiveOptions.includeDropStatements
+            effectiveOptions.includeDropStatements,
+            hasChild
           );
           sqlContent += tableSql;
           objectSummaries.push(`TABLE ${schemaName}.${tableName}: definition bytes=${tableSql.length}`);
@@ -301,7 +395,6 @@ export function PgDumpExportPanel() {
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
-      // 7. Table Data
       let baseTables: any[] = [];
       if (categories.tableData) {
         updateProgress('Data', 50, 'Fetching table data...');
@@ -314,7 +407,18 @@ export function PgDumpExportPanel() {
         logLines.push(`Preparing data export for ${baseTables.length} base tables`);
 
         try {
-          const { data: constraintsData } = await scopedDb.rpc("get_table_constraints");
+          setFkDiagnostics({
+            status: "running",
+            checkedConstraints: 0,
+            orphanConstraints: 0,
+            message: null,
+          });
+          let constraintsData = allConstraints;
+          if (!constraintsData) {
+            const { data } = await scopedDb.rpc("get_table_constraints");
+            constraintsData = data || [];
+            allConstraints = constraintsData;
+          }
           const tableByKey = new Map<string, any>();
           baseTables.forEach((t: any) => {
             const key = `${t.schema_name}.${t.table_name}`.toLowerCase();
@@ -336,6 +440,8 @@ export function PgDumpExportPanel() {
           ];
           const deps = new Map<string, Set<string>>();
           const childrenByParent = new Map<string, Set<string>>();
+          const missingParentRefs = new Set<string>();
+          const unparsableConstraints = new Set<string>();
           const addEdge = (child: string, parent: string) => {
             if (!tableByKey.has(child) || !tableByKey.has(parent)) return;
             if (!deps.has(child)) deps.set(child, new Set());
@@ -346,19 +452,66 @@ export function PgDumpExportPanel() {
           let edgeCount = 0;
           const fkPattern = /FOREIGN\s+KEY\s*\([^)]+\)\s+REFERENCES\s+"?([A-Za-z0-9_]+)"?\."?([A-Za-z0-9_]+)"?/i;
           const rows = (constraintsData || []) as any[];
+          let totalConstraints = 0;
+          let usedConstraints = 0;
           for (const c of rows) {
+            totalConstraints++;
             const childRef = `${c.schema_name}.${c.table_name}`.toLowerCase();
             if (!tableByKey.has(childRef)) continue;
             const details = String(c.constraint_details || '');
             const m = details.match(fkPattern);
-            if (!m) continue;
+            if (!m) {
+              if (c.constraint_name) {
+                unparsableConstraints.add(
+                  `${String(c.schema_name || '').toLowerCase()}.${String(c.table_name || '').toLowerCase()}.${String(
+                    c.constraint_name
+                  )}`
+                );
+              }
+              continue;
+            }
             const parentSchema = (m[1] || 'public').toLowerCase();
             const parentTable = (m[2] || '').toLowerCase();
             if (!parentTable) continue;
             const parentRef = `${parentSchema}.${parentTable}`;
             if (parentRef === childRef) continue;
+            if (!tableByKey.has(parentRef)) {
+              missingParentRefs.add(
+                `${String(c.schema_name || '').toLowerCase()}.${String(c.table_name || '').toLowerCase()}.${String(
+                  c.constraint_name
+                )} -> ${parentRef}`
+              );
+              continue;
+            }
             addEdge(childRef, parentRef);
             edgeCount++;
+            usedConstraints++;
+          }
+          if (totalConstraints > 0) {
+            logLines.push(
+              `Analyzed ${totalConstraints} foreign key constraint(s) for data export ordering; ` +
+                `${usedConstraints} applied, ${missingParentRefs.size} with missing parents, ${unparsableConstraints.size} unparsable`
+            );
+          }
+          if (missingParentRefs.size > 0) {
+            warningMessages.push(
+              `Detected ${missingParentRefs.size} foreign key constraint(s) referencing tables outside the export set; those relationships will not influence data ordering`
+            );
+            missingParentRefs.forEach(ref => {
+              logLines.push(
+                `Skipped foreign key for dependency ordering (missing parent table in export set): ${ref}`
+              );
+            });
+          }
+          if (unparsableConstraints.size > 0) {
+            warningMessages.push(
+              `Detected ${unparsableConstraints.size} foreign key constraint(s) with unsupported definition format; those relationships will not influence data ordering`
+            );
+            unparsableConstraints.forEach(ref => {
+              logLines.push(
+                `Skipped foreign key for dependency ordering (unable to parse constraint definition): ${ref}`
+              );
+            });
           }
           if (edgeCount > 0) {
             const keys = Array.from(tableByKey.keys());
@@ -409,12 +562,24 @@ export function PgDumpExportPanel() {
                 });
               }
             }
-            if (orderedKeys.length === keys.length) {
-              baseTables = orderedKeys.map(k => tableByKey.get(k));
-              logLines.push('Reordered table data export using foreign key dependencies');
+            if (orderedKeys.length > 0) {
+              const unresolved = keys.filter(k => !seen.has(k));
+              if (unresolved.length > 0) {
+                warningMessages.push(
+                  'Foreign key dependency graph contains cycles or unresolved dependencies; applied best-effort parent-first ordering, remaining tables kept in original order'
+                );
+                logLines.push('Foreign key dependency graph not fully resolved; unresolved tables may participate in cycles:');
+                unresolved.forEach(ref => {
+                  logLines.push(`  ${ref}`);
+                });
+              } else {
+                logLines.push('Reordered table data export using foreign key dependencies');
+              }
+              const combinedKeys = [...orderedKeys, ...unresolved];
+              baseTables = combinedKeys.map(k => tableByKey.get(k));
             } else {
               warningMessages.push(
-                'Foreign key dependency graph could not be fully resolved; using default table order for data export'
+                'Foreign key dependency graph could not be resolved; using default table order for data export'
               );
             }
           }
@@ -425,45 +590,86 @@ export function PgDumpExportPanel() {
         }
       }
       
-      updateProgress('Validation', 55, 'Validating foreign key relationships...');
-      try {
-        const { data: fkOrphans, error: fkError } = await scopedDb.rpc("get_fk_orphans");
-        if (fkError) {
-          warningMessages.push(`Foreign key validation skipped or failed: ${fkError.message || String(fkError)}`);
-        } else if (fkOrphans && Array.isArray(fkOrphans) && fkOrphans.length > 0) {
-          const filtered = (fkOrphans as any[]).filter(o => {
-            if (effectiveOptions.excludeAuthSchema && (o.constraint_schema === 'auth' || o.parent_schema === 'auth')) {
-              return false;
+      if (categories.tableData) {
+        updateProgress('Validation', 55, 'Validating foreign key relationships...');
+        try {
+          const { data: fkOrphans, error: fkError } = await scopedDb.rpc("get_fk_orphans");
+          if (fkError) {
+            warningMessages.push(`Foreign key validation skipped or failed: ${fkError.message || String(fkError)}`);
+            setFkDiagnostics({
+              status: "skipped",
+              checkedConstraints: 0,
+              orphanConstraints: 0,
+              message: fkError.message || String(fkError),
+            });
+          } else if (fkOrphans && Array.isArray(fkOrphans) && fkOrphans.length > 0) {
+            const filtered = (fkOrphans as any[]).filter(o => {
+              const constraintSchema = o.constraint_schema;
+              const parentSchema = o.parent_schema;
+              if (effectiveOptions.excludeAuthSchema && constraintSchema === 'auth' && parentSchema === 'auth') {
+                return false;
+              }
+              if (effectiveOptions.excludeStorageSchema && constraintSchema === 'storage' && parentSchema === 'storage') {
+                return false;
+              }
+              return true;
+            });
+            if (filtered.length > 0) {
+              setFkDiagnostics({
+                status: "failed",
+                checkedConstraints: Array.isArray(fkOrphans) ? fkOrphans.length : 0,
+                orphanConstraints: filtered.length,
+                message: `Detected ${filtered.length} foreign key constraint(s) with orphaned rows`,
+              });
+              logLines.push('');
+              logLines.push('Foreign key validation detected orphaned references:');
+              for (const o of filtered) {
+                const msg =
+                  `Constraint ${o.constraint_schema}.${o.table_name}.${o.constraint_name}: ` +
+                  `${o.orphan_count} orphan rows where ${o.table_name}.${o.child_column} ` +
+                  `references missing ${o.parent_schema}.${o.parent_table}.${o.parent_column}`;
+                logLines.push(msg);
+                errorMessages.push(msg);
+              }
+              throw new Error(`Foreign key validation failed: ${filtered.length} constraint(s) with orphaned rows`);
+            } else {
+              setFkDiagnostics({
+                status: "passed",
+                checkedConstraints: Array.isArray(fkOrphans) ? fkOrphans.length : 0,
+                orphanConstraints: 0,
+                message: null,
+              });
+              logLines.push('Foreign key validation passed: no orphaned references detected');
             }
-            if (effectiveOptions.excludeStorageSchema && (o.constraint_schema === 'storage' || o.parent_schema === 'storage')) {
-              return false;
-            }
-            return true;
-          });
-          if (filtered.length > 0) {
-            logLines.push('');
-            logLines.push('Foreign key validation detected orphaned references:');
-            for (const o of filtered) {
-              const msg =
-                `Constraint ${o.constraint_schema}.${o.table_name}.${o.constraint_name}: ` +
-                `${o.orphan_count} orphan rows where ${o.table_name}.${o.child_column} ` +
-                `references missing ${o.parent_schema}.${o.parent_table}.${o.parent_column}`;
-              logLines.push(msg);
-              errorMessages.push(msg);
-            }
-            throw new Error(`Foreign key validation failed: ${filtered.length} constraint(s) with orphaned rows`);
           } else {
+            setFkDiagnostics({
+              status: "passed",
+              checkedConstraints: 0,
+              orphanConstraints: 0,
+              message: null,
+            });
             logLines.push('Foreign key validation passed: no orphaned references detected');
           }
-        } else {
-          logLines.push('Foreign key validation passed: no orphaned references detected');
+        } catch (err: any) {
+          if (err && typeof err.message === 'string' && err.message.startsWith('Foreign key validation failed')) {
+            throw err;
+          }
+          const msg = err instanceof Error ? err.message : String(err);
+          warningMessages.push(`Foreign key validation skipped or failed: ${msg}`);
+          setFkDiagnostics({
+            status: "skipped",
+            checkedConstraints: 0,
+            orphanConstraints: 0,
+            message: msg,
+          });
         }
-      } catch (err: any) {
-        if (err && typeof err.message === 'string' && err.message.startsWith('Foreign key validation failed')) {
-          throw err;
-        }
-        const msg = err instanceof Error ? err.message : String(err);
-        warningMessages.push(`Foreign key validation skipped or failed: ${msg}`);
+      } else {
+        setFkDiagnostics({
+          status: "skipped",
+          checkedConstraints: 0,
+          orphanConstraints: 0,
+          message: null,
+        });
       }
       
       // Build type map
@@ -477,6 +683,12 @@ export function PgDumpExportPanel() {
         {}
       );
       
+      const thresholdRatio =
+        typeof general.dataCompletenessThresholdRatio === 'number' &&
+        general.dataCompletenessThresholdRatio > 1
+          ? general.dataCompletenessThresholdRatio
+          : 1.1;
+
       for (let i = 0; i < baseTables.length; i++) {
         const table = baseTables[i];
         const tableKey = `${table.schema_name}.${table.table_name}`;
@@ -522,6 +734,23 @@ export function PgDumpExportPanel() {
           if (data.length > 0) {
             const columns = Object.keys(data[0]);
             const typeMap = typeMapByTable[tableKey] || {};
+            const rowEstimateRaw = (table as any).row_estimate;
+            const rowEstimate =
+              typeof rowEstimateRaw === 'number'
+                ? rowEstimateRaw
+                : rowEstimateRaw != null && !Number.isNaN(Number(rowEstimateRaw))
+                  ? Number(rowEstimateRaw)
+                  : null;
+            if (
+              rowEstimate !== null &&
+              rowEstimate > data.length &&
+              rowEstimate >= data.length * thresholdRatio
+            ) {
+              const msg = `Table ${tableKey} export may be incomplete: exported ${data.length} row(s), estimated ${rowEstimate} row(s) in source`;
+              warningMessages.push(msg);
+              logLines.push(msg);
+              completenessWarnings++;
+            }
             
             const insertSql = generateInsertStatements(
               table.schema_name,
@@ -544,13 +773,25 @@ export function PgDumpExportPanel() {
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
+      // Snapshot SQL content for structural sanity check before data is appended
+      // This avoids false positives from string literals in data (e.g. INSERT statements containing SQL code)
+      // We use multiline anchor (^) to ensure we only match actual statements, not mentions in comments/strings
+      const structuralSql = sqlContent;
+      const sanityCreateCount = (structuralSql.match(/^CREATE\s+TABLE\s/gm) || []).length;
+      const sanityDropCount = (structuralSql.match(/^DROP\s+TABLE\s/gm) || []).length;
+      
       sqlContent += dataSql;
       
       // 8. Constraints
       if (categories.constraints) {
         updateProgress('Constraints', 88, 'Adding constraints...');
         try {
-          const { data: constraintsData } = await scopedDb.rpc("get_table_constraints");
+          let constraintsData = allConstraints;
+          if (!constraintsData) {
+            const { data } = await scopedDb.rpc("get_table_constraints");
+            constraintsData = data || [];
+            allConstraints = constraintsData;
+          }
           if (constraintsData && constraintsData.length > 0) {
             const filtered = constraintsData.filter((c: any) => {
               if (effectiveOptions.excludeAuthSchema && c.schema_name === 'auth') return false;
@@ -562,6 +803,20 @@ export function PgDumpExportPanel() {
           }
         } catch (err: any) {
           warningMessages.push(`Constraint export skipped or failed: ${err?.message || String(err)}`);
+        }
+      }
+
+      if (effectiveOptions.includeDropStatements) {
+        logLines.push(`Tables dropped with CASCADE: ${dropCascadeCount}`);
+        logLines.push(`Tables dropped without CASCADE: ${dropPlainCount}`);
+        
+        // Sanity check: Ensure DROP TABLE count matches CREATE TABLE count
+        if (sanityCreateCount === sanityDropCount) {
+          logLines.push(`Sanity Check: DROP/CREATE count match (${sanityCreateCount} tables)`);
+        } else {
+          const msg = `Sanity Check FAILED: Found ${sanityCreateCount} CREATE TABLE statements but ${sanityDropCount} DROP TABLE statements`;
+          logLines.push(msg);
+          warningMessages.push(msg);
         }
       }
 
@@ -585,16 +840,29 @@ export function PgDumpExportPanel() {
       
       if (cancelRef.current) throw new Error('Export cancelled');
       
-      // 9. RLS (optional)
       if (effectiveOptions.includeRls && categories.rlsPolicies) {
         updateProgress('RLS', 92, 'Adding RLS policies...');
         try {
           const { data: rlsData } = await scopedDb.rpc("get_table_rls_policies");
-          const rlsTables = baseTables.filter((t: any) => t.rls_enabled);
-          if ((rlsData && rlsData.length > 0) || rlsTables.length > 0) {
-            sqlContent += generateRlsStatements(rlsTables, rlsData || []);
+          let rlsTablesSource: any[] = baseTables;
+          if (!categories.tableData || !Array.isArray(rlsTablesSource) || rlsTablesSource.length === 0) {
+            const { data: rlsTableData } = await scopedDb.rpc("get_all_database_tables");
+            rlsTablesSource = (rlsTableData || []).filter((t: any) => {
+              if (effectiveOptions.excludeAuthSchema && t.schema_name === 'auth') return false;
+              if (effectiveOptions.excludeStorageSchema && t.schema_name === 'storage') return false;
+              return t.table_type === 'BASE TABLE';
+            });
+          }
+          const rlsTables = (rlsTablesSource || []).filter((t: any) => t.rls_enabled);
+          const filteredPolicies = (rlsData || []).filter((p: any) => {
+            if (effectiveOptions.excludeAuthSchema && p.schema_name === 'auth') return false;
+            if (effectiveOptions.excludeStorageSchema && p.schema_name === 'storage') return false;
+            return true;
+          });
+          if ((filteredPolicies && filteredPolicies.length > 0) || rlsTables.length > 0) {
+            sqlContent += generateRlsStatements(rlsTables, filteredPolicies || []);
             logLines.push(
-              `Exported RLS for ${rlsTables.length} tables and ${rlsData ? rlsData.length : 0} policies`
+              `Exported RLS for ${rlsTables.length} tables and ${filteredPolicies ? filteredPolicies.length : 0} policies`
             );
           }
         } catch (err: any) {
@@ -692,6 +960,13 @@ export function PgDumpExportPanel() {
       
       if (success) {
         setLastExportFilename(filename);
+        if (completenessWarnings > 0) {
+          setLastCompletenessWarningCount(completenessWarnings);
+          setLastCompletenessThreshold(thresholdRatio);
+        } else {
+          setLastCompletenessWarningCount(null);
+          setLastCompletenessThreshold(null);
+        }
         setShowInstructions(true);
         toast.success('Export complete!', {
           description: `Generated ${(sqlContent.length / 1024).toFixed(1)} KB SQL file`
@@ -795,12 +1070,61 @@ export function PgDumpExportPanel() {
           )}
           
           {permissionOk && connectionOk && (
-            <PgDumpOptionsPanel
-              categories={categories}
-              general={general}
-              onChangeCategories={setCategories}
-              onChangeGeneral={setGeneral}
-            />
+            <>
+              <PgDumpOptionsPanel
+                categories={categories}
+                general={general}
+                onChangeCategories={setCategories}
+                onChangeGeneral={setGeneral}
+              />
+              <div className="mt-4 rounded-lg border bg-muted/40 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    <span className="text-sm font-medium">Foreign Key Validation</span>
+                  </div>
+                  <span
+                    className={
+                      fkDiagnostics.status === "passed"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
+                        : fkDiagnostics.status === "failed"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700"
+                        : fkDiagnostics.status === "running"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                        : fkDiagnostics.status === "skipped"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                        : "text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                    }
+                  >
+                    {fkDiagnostics.status === "passed" && "No orphaned references detected"}
+                    {fkDiagnostics.status === "failed" &&
+                      `${fkDiagnostics.orphanConstraints} constraint(s) with orphaned rows`}
+                    {fkDiagnostics.status === "running" && "Validating..."}
+                    {fkDiagnostics.status === "skipped" && "Validation skipped"}
+                    {fkDiagnostics.status === "idle" && "Not yet validated"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The export runs a catalog-based foreign key check before generating data statements.
+                  Fix any reported orphaned references before importing the SQL file.
+                </p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div>
+                    <span className="font-medium">Checked constraints:</span>{" "}
+                    {fkDiagnostics.checkedConstraints}
+                  </div>
+                  <div>
+                    <span className="font-medium">Constraints with orphans:</span>{" "}
+                    {fkDiagnostics.orphanConstraints}
+                  </div>
+                </div>
+                {fkDiagnostics.message && (
+                  <div className="text-xs text-red-600">
+                    {fkDiagnostics.message}
+                  </div>
+                )}
+              </div>
+            </>
           )}
           
           {/* Progress */}
@@ -877,6 +1201,41 @@ export function PgDumpExportPanel() {
               </div>
             </div>
             
+            <Alert variant="default">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Important Notes</AlertTitle>
+              <AlertDescription className="text-xs space-y-1">
+                <p>• Ensure the target database is empty or use DROP statements option</p>
+                <p>• RLS policies are Supabase-specific and may not work in vanilla PostgreSQL</p>
+                <p>• Some functions may reference Supabase-specific extensions</p>
+              {lastCompletenessThreshold != null && lastCompletenessWarningCount && lastCompletenessWarningCount > 0 && (
+                <p>
+                  • Data completeness warnings were triggered for {lastCompletenessWarningCount} table
+                  {lastCompletenessWarningCount === 1 ? '' : 's'} using a{" "}
+                  {lastCompletenessThreshold.toFixed(2)}x row estimate threshold. Review the export log
+                  for details.
+                </p>
+              )}
+                <p>
+                  FK validation:{" "}
+                  {fkDiagnostics.status === "passed" && fkDiagnostics.checkedConstraints > 0
+                    ? `passed (0 of ${fkDiagnostics.checkedConstraints} constraints with orphans)`
+                    : fkDiagnostics.status === "passed"
+                    ? "passed"
+                    : fkDiagnostics.status === "skipped"
+                    ? "skipped"
+                    : fkDiagnostics.status === "running"
+                    ? "running"
+                    : fkDiagnostics.status === "failed"
+                    ? `${fkDiagnostics.orphanConstraints} constraint(s) with orphaned rows`
+                    : "not run"}
+                </p>
+                {fkDiagnostics.status === "skipped" && fkDiagnostics.message && (
+                  <p>FK validation note: {fkDiagnostics.message}</p>
+                )}
+              </AlertDescription>
+            </Alert>
+            
             <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
               <h4 className="font-medium">Or use a GUI tool</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
@@ -885,16 +1244,6 @@ export function PgDumpExportPanel() {
                 <li>• <strong>TablePlus</strong>: Import → From SQL file</li>
               </ul>
             </div>
-            
-            <Alert variant="default">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Important Notes</AlertTitle>
-              <AlertDescription className="text-xs space-y-1">
-                <p>• Ensure the target database is empty or use DROP statements option</p>
-                <p>• RLS policies are Supabase-specific and may not work in vanilla PostgreSQL</p>
-                <p>• Some functions may reference Supabase-specific extensions</p>
-              </AlertDescription>
-            </Alert>
           </div>
         </DialogContent>
       </Dialog>

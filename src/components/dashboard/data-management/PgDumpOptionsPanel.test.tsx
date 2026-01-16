@@ -122,6 +122,52 @@ describe("PgDumpOptionsPanel", () => {
     expect(input.value).toBe("backup.sql");
   });
 
+  it("applies full schema including auth/storage preset", () => {
+    render(<Harness />);
+    const presetButton = screen.getByText("Full schema including auth/storage");
+    fireEvent.click(presetButton);
+
+    fireEvent.click(screen.getByText("Components"));
+    expect(screen.getByLabelText("Schema (Tables/Columns)")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Constraints")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Indexes")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("DB Functions")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("RLS Policies")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Enums")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Edge Functions")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Secrets (Vault)")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Table Data")).toHaveAttribute("data-state", "checked");
+
+    fireEvent.click(screen.getByText("General"));
+    const excludeAuthSwitch = screen.getByText("Exclude Auth Schema").parentElement!.querySelector('[role="switch"]') as HTMLElement;
+    const excludeStorageSwitch = screen.getByText("Exclude Storage Schema").parentElement!.querySelector('[role="switch"]') as HTMLElement;
+    expect(excludeAuthSwitch).toHaveAttribute("data-state", "unchecked");
+    expect(excludeStorageSwitch).toHaveAttribute("data-state", "unchecked");
+  });
+
+  it("applies structure-only schema preset with auth/storage included", () => {
+    render(<Harness />);
+    const presetButton = screen.getByText("Structure-only schema (no data, includes auth/storage)");
+    fireEvent.click(presetButton);
+
+    fireEvent.click(screen.getByText("Components"));
+    expect(screen.getByLabelText("Schema (Tables/Columns)")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Constraints")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Indexes")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("DB Functions")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("RLS Policies")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Enums")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByLabelText("Edge Functions")).toHaveAttribute("data-state", "unchecked");
+    expect(screen.getByLabelText("Secrets (Vault)")).toHaveAttribute("data-state", "unchecked");
+    expect(screen.getByLabelText("Table Data")).toHaveAttribute("data-state", "unchecked");
+
+    fireEvent.click(screen.getByText("General"));
+    const excludeAuthSwitch = screen.getByText("Exclude Auth Schema").parentElement!.querySelector('[role="switch"]') as HTMLElement;
+    const excludeStorageSwitch = screen.getByText("Exclude Storage Schema").parentElement!.querySelector('[role="switch"]') as HTMLElement;
+    expect(excludeAuthSwitch).toHaveAttribute("data-state", "unchecked");
+    expect(excludeStorageSwitch).toHaveAttribute("data-state", "unchecked");
+  });
+
   it("respects disabled prop and prevents interaction", () => {
     const categories: PgDumpCategoryOptions = {
       all: false,
@@ -142,6 +188,7 @@ describe("PgDumpOptionsPanel", () => {
       excludeStorageSchema: true,
       customSchemas: "",
       baseFilename: "database_export.sql",
+      dataCompletenessThresholdRatio: 1.1,
     };
     const onCats = (_: PgDumpCategoryOptions) => {};
     const onGen = (_: PgDumpGeneralOptions) => {};
