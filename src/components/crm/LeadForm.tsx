@@ -17,7 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
-const leadSchema = z.object({
+export const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
   last_name: z.string().min(1, 'Last name is required').max(100),
   company: z.string().optional(),
@@ -27,7 +27,7 @@ const leadSchema = z.object({
   status: z.enum(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']),
   source: z.enum(['website', 'referral', 'email', 'phone', 'social', 'event', 'other']),
   estimated_value: z.string().optional(),
-  expected_close_date: z.string().optional(),
+  expected_close_date: z.string().min(1, 'Expected Close Date is required'),
   description: z.string().optional(),
   notes: z.string().optional(),
   tenant_id: z.string().optional(),
@@ -410,7 +410,7 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             name="expected_close_date"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Expected Close Date</FormLabel>
+                <FormLabel>Expected Close Date *</FormLabel>
                 <FormControl>
                   <Input type="date" {...field} />
                 </FormControl>

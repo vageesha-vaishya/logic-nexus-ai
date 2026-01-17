@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LeadForm, LeadFormData } from "@/components/crm/LeadForm";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
+import { sanitizeLeadDataForInsert, extractEmailAddress } from "./email-to-lead-helpers";
 
-// Local interface for email data needed for conversion
 interface EmailForConversion {
   id: string;
   subject: string;
@@ -47,12 +46,13 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
     return email.snippet || "";
   };
 
+  const extractedEmail = extractEmailAddress(email.from_email);
   const { first_name, last_name } = parseName(email.from_name || email.from_email);
 
   const initialData: Partial<LeadFormData> = {
     first_name,
     last_name: last_name || "Unknown", // Last name is often required
-    email: email.from_email,
+    email: extractedEmail || "",
     description: `Created from email: ${email.subject}\n\n${getBodyText(email)}`,
     source: "email",
     status: "new",
@@ -100,16 +100,29 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         }
       }
 
-      // 1. Create the lead
+      const { service_id, attachments } = data;
+      const attachmentNames = Array.isArray(attachments)
+        ? attachments.map((f: File) => f.name)
+        : [];
+      const customFields: Record<string, unknown> = {
+        service_id: service_id || undefined,
+        ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
+      };
+
       const { data: lead, error } = await supabase
         .from("leads")
         .insert({
-          ...data,
+          ...sanitizeLeadDataForInsert(data),
           email: data.email ? (cleanEmail(data.email).value || data.email.trim().toLowerCase()) : null,
           phone: data.phone ? (cleanPhone(data.phone).value || data.phone.trim()) : null,
           // Ensure tenant/franchise context is respected if not in data
           tenant_id: data.tenant_id || context.tenantId,
           franchise_id: data.franchise_id || context.franchiseId,
+          custom_fields: Object.keys(customFields).filter((k) => customFields[k] !== undefined).length
+            ? Object.fromEntries(
+                Object.entries(customFields).filter(([, v]) => v !== undefined),
+              )
+            : null,
           created_by: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
@@ -122,7 +135,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
       // Record automated activity for conversion
       try {
         await supabase
-          .from("lead_activities" as any)
+          .from("lead_activities")
           .insert({
             lead_id: lead.id,
             type: "email_converted",
@@ -134,7 +147,9 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
             },
             tenant_id: context.tenantId || null,
           });
-      } catch {}
+      } catch (err) {
+        console.error("Error recording lead email conversion activity", err);
+      }
       
       // 2. Optionally link the specific email to the lead if the schema supports it
       // But since we rely on email address matching, this might be implicit.
@@ -142,9 +157,13 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
       
       onOpenChange(false);
       onSuccess?.(lead.id);
-    } catch (error: any) {
-      console.error("Error creating lead:", error);
-      toast.error(error.message || "Failed to create lead");
+    } catch (error: unknown) {
+      let message = "Failed to create lead";
+      if (error && typeof error === "object" && "message" in error && typeof (error as { message: unknown }).message === "string") {
+        message = (error as { message: string }).message || message;
+      }
+      console.error("Error creating lead from email", error);
+      toast.error(message);
     }
   };
 
