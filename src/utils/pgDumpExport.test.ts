@@ -11,6 +11,8 @@ import {
   generateCreateTableStatement,
   generateInsertStatements,
 } from './pgDumpExport';
+import { parseSqlText } from './sqlFileParser';
+import { calculateChecksum } from './dbExportUtils';
 
 describe('pgDumpExport validation', () => {
   it('detects unclosed dollar-quoted blocks', () => {
@@ -327,5 +329,144 @@ describe('pgDumpExport validation', () => {
     const pkCount =
       (sql.match(/ADD CONSTRAINT "accounts_pkey" PRIMARY KEY/g) || []).length;
     expect(pkCount).toBe(1);
+  });
+
+  it('exports and parses parent-child tables with consistent row counts and ordering', () => {
+    const parentCols = [
+      {
+        column_name: 'id',
+        data_type: 'uuid',
+        is_nullable: false,
+        column_default: 'gen_random_uuid()',
+        is_primary_key: true,
+      },
+      {
+        column_name: 'name',
+        data_type: 'text',
+        is_nullable: false,
+        column_default: null,
+        is_primary_key: false,
+      },
+    ];
+    const childCols = [
+      {
+        column_name: 'id',
+        data_type: 'uuid',
+        is_nullable: false,
+        column_default: 'gen_random_uuid()',
+        is_primary_key: true,
+      },
+      {
+        column_name: 'parent_id',
+        data_type: 'uuid',
+        is_nullable: false,
+        column_default: null,
+        is_primary_key: false,
+      },
+      {
+        column_name: 'name',
+        data_type: 'text',
+        is_nullable: false,
+        column_default: null,
+        is_primary_key: false,
+      },
+    ];
+    const parentTableSql = generateCreateTableStatement(
+      'public',
+      'parents',
+      parentCols,
+      true
+    );
+    const childTableSql = generateCreateTableStatement(
+      'public',
+      'children',
+      childCols,
+      true
+    );
+    const fkSql =
+      'ALTER TABLE "public"."children" ADD CONSTRAINT "children_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "public"."parents"("id");\n';
+    const parentRows = [
+      { id: '00000000-0000-0000-0000-000000000001', name: 'Parent One' },
+      { id: '00000000-0000-0000-0000-000000000002', name: 'Parent Two' },
+    ];
+    const childRows = [
+      {
+        id: '00000000-0000-0000-0000-000000000101',
+        parent_id: '00000000-0000-0000-0000-000000000001',
+        name: 'Child A',
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000102',
+        parent_id: '00000000-0000-0000-0000-000000000002',
+        name: 'Child B',
+      },
+    ];
+    const parentDataSql = generateInsertStatements(
+      'public',
+      'parents',
+      ['id', 'name'],
+      parentRows,
+      {
+        id: 'uuid',
+        name: 'text',
+      }
+    );
+    const childDataSql = generateInsertStatements(
+      'public',
+      'children',
+      ['id', 'parent_id', 'name'],
+      childRows,
+      {
+        id: 'uuid',
+        parent_id: 'uuid',
+        name: 'text',
+      }
+    );
+    const fullSql = [
+      parentTableSql,
+      childTableSql,
+      fkSql,
+      parentDataSql,
+      childDataSql,
+    ].join('\n');
+    const parsed = parseSqlText(fullSql, fullSql.length);
+    const parentKey = 'public.parents';
+    const childKey = 'public.children';
+    expect(parsed.metadata.rowCountByTable[parentKey]).toBe(parentRows.length);
+    expect(parsed.metadata.rowCountByTable[childKey]).toBe(childRows.length);
+    const dataTargets = parsed.dataStatements.map(stmt => {
+      const m = stmt.match(
+        /INSERT\s+INTO\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"/i
+      );
+      if (!m) return null;
+      const schema = (m[1] || 'public').toLowerCase();
+      const table = m[2].toLowerCase();
+      return `${schema}.${table}`;
+    });
+    const parentBlockIndex = dataTargets.indexOf(parentKey);
+    const childBlockIndex = dataTargets.indexOf(childKey);
+    expect(parentBlockIndex).toBeGreaterThan(-1);
+    expect(childBlockIndex).toBeGreaterThan(-1);
+    expect(parentBlockIndex).toBeLessThan(childBlockIndex);
+    const parentChecksum = calculateChecksum(
+      parentRows
+        .map(r => `${r.id}:${r.name}`)
+        .join('|')
+    );
+    const childChecksum = calculateChecksum(
+      childRows
+        .map(r => `${r.id}:${r.parent_id}:${r.name}`)
+        .join('|')
+    );
+    const exportedParentChecksum = calculateChecksum(
+      parentDataSql.split('\n').filter(l => l.includes('INSERT')).join('\n')
+    );
+    const exportedChildChecksum = calculateChecksum(
+      childDataSql.split('\n').filter(l => l.includes('INSERT')).join('\n')
+    );
+    expect(parentChecksum).toBeTruthy();
+    expect(childChecksum).toBeTruthy();
+    expect(exportedParentChecksum).toBeTruthy();
+    expect(exportedChildChecksum).toBeTruthy();
   });
 });

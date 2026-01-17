@@ -401,8 +401,22 @@ export function PgDumpExportPanel() {
           }
           
           if (functionsData && functionsData.length > 0) {
-            sqlContent += generateFunctionStatements(functionsData);
-            logLines.push(`Exported ${functionsData.length} functions`);
+            const filtered = functionsData.filter((func: any) => {
+              const schema =
+                func.schema ||
+                func.schema_name ||
+                func.function_schema ||
+                func.function_schema_name;
+              if (effectiveOptions.excludeAuthSchema && schema === 'auth') return false;
+              if (effectiveOptions.excludeStorageSchema && schema === 'storage') return false;
+              return true;
+            });
+            if (filtered.length > 0) {
+              sqlContent += generateFunctionStatements(filtered);
+              logLines.push(`Exported ${filtered.length} functions`);
+            } else {
+              logLines.push('No functions exported after filtering by schema');
+            }
           }
         } catch (err: any) {
           warningMessages.push(`Function export skipped or failed: ${err?.message || String(err)}`);

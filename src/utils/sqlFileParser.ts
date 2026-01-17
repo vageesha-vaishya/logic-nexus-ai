@@ -38,6 +38,7 @@ export interface SqlFileMetadata {
   truncatedTableName?: string;
   integrityIssues: FileIntegrityIssue[];
   repairSuggestions: RepairSuggestion[];
+  rowCountByTable: Record<string, number>;
 }
 
 export interface FileIntegrityIssue {
@@ -136,6 +137,7 @@ export function parseSqlText(
       hasProperEnding: false,
       integrityIssues: [],
       repairSuggestions: [],
+      rowCountByTable: {},
     },
   };
 
@@ -209,7 +211,17 @@ export function parseSqlText(
         
         // Count rows in COPY block
         const copyLines = stmt.split('\n').length - 2; // Exclude COPY and \. lines
-        result.metadata.estimatedRowCount += Math.max(0, copyLines);
+        const count = Math.max(0, copyLines);
+        result.metadata.estimatedRowCount += count;
+        
+        // Extract table name for row counting
+        const copyMatch = stmt.match(/COPY\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?/i);
+        if (copyMatch) {
+          const schema = (copyMatch[1] || 'public').toLowerCase();
+          const table = (copyMatch[2] || '').toLowerCase();
+          const key = `${schema}.${table}`;
+          result.metadata.rowCountByTable[key] = (result.metadata.rowCountByTable[key] || 0) + count;
+        }
       } else {
         currentStatement += line + '\n';
       }
@@ -229,8 +241,12 @@ export function parseSqlText(
 
     currentStatement += line + '\n';
 
+    const trimmedLine = line.trim();
+    const closesDollarBlock =
+      inDollarBlock && /\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$\s*;$/i.test(trimmedLine);
+
     // Check if statement is complete
-    if (!inDollarBlock && line.trim().endsWith(';')) {
+    if ((!inDollarBlock && trimmedLine.endsWith(';')) || closesDollarBlock) {
       const stmt = currentStatement.trim();
       
       // Handle COPY statement start
@@ -253,10 +269,19 @@ export function parseSqlText(
           result.tableStatements.push(stmt);
           extractTableName(stmt, tableNames);
           break;
-        case 'data':
+        case 'data': {
           result.dataStatements.push(stmt);
-          result.metadata.estimatedRowCount += countInsertRows(stmt);
+          const count = countInsertRows(stmt);
+          result.metadata.estimatedRowCount += count;
+          const insertMatch = stmt.match(/INSERT\s+INTO\s+(?:"?([A-Za-z0-9_]+)"?\.)?"?([A-Za-z0-9_]+)"?/i);
+          if (insertMatch) {
+            const schema = (insertMatch[1] || 'public').toLowerCase();
+            const table = (insertMatch[2] || '').toLowerCase();
+            const key = `${schema}.${table}`;
+            result.metadata.rowCountByTable[key] = (result.metadata.rowCountByTable[key] || 0) + count;
+          }
           break;
+        }
         case 'constraint':
           result.constraintStatements.push(stmt);
           break;
@@ -683,15 +708,19 @@ function extractSchemaName(stmt: string, schemaNames: Set<string>): void {
 }
 
 /**
- * Count rows in an INSERT statement
+ * Count rows in an INSERT statement (including INSERTs inside DO blocks)
  */
 function countInsertRows(stmt: string): number {
   const upper = stmt.toUpperCase();
-  if (!upper.startsWith('INSERT')) return 0;
-  
-  // Count VALUES clauses
-  const valuesMatches = stmt.match(/\)\s*,\s*\(/g);
-  return (valuesMatches?.length || 0) + 1;
+  if (upper.startsWith('INSERT')) {
+    const valuesMatches = stmt.match(/\)\s*,\s*\(/g);
+    return (valuesMatches?.length || 0) + 1;
+  }
+  if (upper.startsWith('DO') && upper.includes('INSERT INTO')) {
+    const insertMatches = stmt.match(/\bINSERT\s+INTO\b/gi);
+    return insertMatches?.length || 0;
+  }
+  return 0;
 }
 
 /**

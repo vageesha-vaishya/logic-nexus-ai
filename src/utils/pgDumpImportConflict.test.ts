@@ -47,5 +47,20 @@ describe('rewriteInsertsWithOnConflict', () => {
     const result = rewriteInsertsWithOnConflict(stmts, 'update', map);
     expect(result[0]).toContain('ON CONFLICT ("Id") DO UPDATE SET "Value" = EXCLUDED."Value"');
   });
-});
 
+  it('respects per-table overrides', () => {
+    const stmts = [
+      'INSERT INTO public.test (id, value) VALUES (1, \'a\');',
+      'INSERT INTO public.audit_log_entries (id, payload) VALUES (1, \'x\');',
+    ];
+    const map = new Map<string, string[]>();
+    map.set('public.test', ['id']);
+    map.set('public.audit_log_entries', ['id']);
+    const overrides = {
+      'public.audit_log_entries': 'error' as const,
+    };
+    const result = rewriteInsertsWithOnConflict(stmts, 'update', map, overrides);
+    expect(result[0]).toContain('ON CONFLICT ("id") DO UPDATE');
+    expect(result[1]).toEqual(stmts[1]);
+  });
+});

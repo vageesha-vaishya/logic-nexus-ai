@@ -146,6 +146,61 @@ This guide covers common errors and recovery steps when using the pg_dump-compat
   - Ensure the dump contains all necessary parent rows.
   - If combining with pre-existing data, verify there are no conflicting constraints.
 
+## Table Data Present in Dump but Missing After Import (e.g. public.accounts)
+
+### Symptoms
+
+- The dump file clearly contains data for a table (for example `public.accounts`), but after import the target database has zero rows for that table.
+- The import completes without obvious errors in the UI.
+
+### Likely Causes
+
+- The data in the dump is wrapped in a guarded `DO $$` block such as:
+
+  ```sql
+  DO $$
+  BEGIN
+    IF to_regclass('public.accounts') IS NOT NULL THEN
+      INSERT INTO "public"."accounts" ("id", ...) VALUES (...);
+    ELSE
+      RAISE NOTICE 'Skipping data for missing table %', 'public.accounts';
+    END IF;
+  END;
+  $$;
+  ```
+
+  and the target database does not have a matching `public.accounts` table at import time.
+- The dump was generated with data-only options or against a different schema version, so the `CREATE TABLE public.accounts` definition is missing or incompatible.
+- The target project has not yet applied the schema migrations that create `public.accounts` (or the table was renamed or moved to another schema).
+
+### How the Tools Behave
+
+- The export tool intentionally wraps data in guard blocks using `to_regclass('<schema>.<table>')` to avoid hard failures when a table is missing.
+- When the table does not exist, PostgreSQL emits a `NOTICE 'Skipping data for missing table %'` and **no rows are inserted**. This does not surface as an error in the import logs, so it can look like a silent data loss.
+- The SQL parser records estimated row counts per table (including `INSERT` statements inside `DO $$` blocks), which you can use to compare expected vs. actual row counts.
+
+### Resolutions
+
+- Verify that the dump file contains both:
+  - A `CREATE TABLE` statement for `public.accounts`.
+  - Data statements (either plain `INSERT` or `DO $$` blocks) referencing `public.accounts`.
+- Ensure the target database schema matches the source:
+  - Apply the same migrations that created `public.accounts` in the source environment.
+  - If you rely on the dump to create tables, confirm that the importer’s schema phase executed the `CREATE TABLE public.accounts` statement successfully.
+- If the table was renamed or moved:
+  - Adjust the dump file (or re-export) so that the schema and table name in the data section match the target table.
+  - Alternatively, create a compatibility view or table in the target with the expected name `public.accounts` before running the import.
+
+### Verification Steps
+
+- Before import:
+  - Use the SQL parser metadata (row counts by table) or a simple `grep`/editor search to confirm how many rows are expected for `public.accounts`.
+  - Check that `CREATE TABLE public.accounts` exists in the dump or that the target schema provides an equivalent table.
+- After import:
+  - Run `SELECT COUNT(*) FROM public.accounts;` on the target database and compare with the expected row count from the dump.
+  - Spot-check a few sample rows if possible.
+  - If the count is zero, inspect the dump for guarded `DO $$` blocks and confirm that `public.accounts` actually exists in the target schema.
+
 ## On Conflict Import Options
 
 ### Overview

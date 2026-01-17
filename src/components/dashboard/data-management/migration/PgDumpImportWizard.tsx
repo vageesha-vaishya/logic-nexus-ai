@@ -24,13 +24,41 @@ import { SqlFileUploadZone } from './SqlFileUploadZone';
 import { ExternalDbConnectionForm, ExternalDbConnection, ConnectionTestResult } from './ExternalDbConnectionForm';
 import { ImportOptionsPanel, ImportOptions, DEFAULT_IMPORT_OPTIONS } from './ImportOptionsPanel';
 import { ImportVerificationPanel } from './ImportVerificationPanel';
+import { ImportHistoryService } from '@/lib/import-history-service';
 import { usePgDumpImport } from '@/hooks/usePgDumpImport';
 import { ParsedSqlFile } from '@/utils/sqlFileParser';
 import { toast } from 'sonner';
 import { useCRM } from '@/hooks/useCRM';
 import { PgDumpOptionsPanel, PgDumpCategoryOptions, PgDumpGeneralOptions } from '@/components/dashboard/data-management/PgDumpOptionsPanel';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type WizardStep = 'file' | 'connection' | 'options' | 'execute' | 'summary';
+
+type ImportPresetId = 'custom' | 'safe_audit' | 'prod_upsert' | 'dev_reset';
+
+const IMPORT_PRESETS: Array<{ id: ImportPresetId; label: string; description: string }> = [
+  {
+    id: 'safe_audit',
+    label: 'Safe Audit Import',
+    description: 'Append-only; never update or drop existing data.',
+  },
+  {
+    id: 'prod_upsert',
+    label: 'Conservative Production Import',
+    description: 'Schema alignment and upserts without destructive drops.',
+  },
+  {
+    id: 'dev_reset',
+    label: 'Developer Reset (Non-Production)',
+    description: 'Allow destructive drops and CASCADE in safe schemas.',
+  },
+];
+
+const getPresetLabel = (id: ImportPresetId) => {
+  if (id === 'custom') return 'Custom';
+  const found = IMPORT_PRESETS.find(p => p.id === id);
+  return found ? found.label : 'Custom';
+};
 
 const STEPS: { id: WizardStep; label: string; icon: React.ReactNode }[] = [
   { id: 'file', label: 'Select File', icon: <FileUp className="h-4 w-4" /> },
@@ -41,10 +69,14 @@ const STEPS: { id: WizardStep; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function PgDumpImportWizard() {
-  const { context } = useCRM();
+  const { context, scopedDb, user } = useCRM();
   const [currentStep, setCurrentStep] = useState<WizardStep>('file');
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<ParsedSqlFile | null>(null);
+  const [overrideValidation, setOverrideValidation] = useState(false);
+  const [resumePoint, setResumePoint] = useState<{ phase: 'schema' | 'data' | 'constraints' | 'indexes' | 'functions' | 'policies' | 'other'; batch: number; totalBatches: number; timestamp: number } | null>(null);
+  const [remoteCheckpoints, setRemoteCheckpoints] = useState<Array<{ phase: 'schema' | 'data' | 'constraints' | 'indexes' | 'functions' | 'policies' | 'other'; batch: number; total_batches?: number; timestamp?: string; created_at?: string }>>([]);
+  const [selectedCheckpointIndex, setSelectedCheckpointIndex] = useState<number>(-1);
   const [connection, setConnection] = useState<ExternalDbConnection>({
     host: '',
     port: 5432,
@@ -55,6 +87,16 @@ export function PgDumpImportWizard() {
   });
   const [connectionTested, setConnectionTested] = useState(false);
   const [options, setOptions] = useState<ImportOptions>(DEFAULT_IMPORT_OPTIONS);
+  const [preset, setPreset] = useState<ImportPresetId>(() => {
+    try {
+      const raw = localStorage.getItem('pgdump.import.preset');
+      if (raw === 'custom' || raw === 'safe_audit' || raw === 'prod_upsert' || raw === 'dev_reset') {
+        return raw;
+      }
+    } catch {}
+    return 'custom';
+  });
+  const [activePreset, setActivePreset] = useState<ImportPresetId | null>(null);
   const [rollbackOpen, setRollbackOpen] = useState(false);
   const [permissionOk, setPermissionOk] = useState<boolean>(false);
   const [categories, setCategories] = useState<PgDumpCategoryOptions>(() => {
@@ -103,10 +145,15 @@ export function PgDumpImportWizard() {
     cancelImport,
     reset,
     rollbackAlignment,
+    rerunFailedBatches,
+    clearCheckpoint,
     canStart,
     canPause,
     canResume,
     canCancel,
+    verifyIntegrity,
+    isVerifying,
+    verificationResults,
   } = usePgDumpImport();
 
   const getCurrentStepIndex = () => STEPS.findIndex(s => s.id === currentStep);
@@ -114,7 +161,7 @@ export function PgDumpImportWizard() {
   const canProceed = useCallback((): boolean => {
     switch (currentStep) {
       case 'file':
-        return file !== null && parsed !== null;
+        return file !== null && parsed !== null && (parsed.metadata.isComplete || overrideValidation);
       case 'connection':
         return connectionTested;
       case 'options':
@@ -153,15 +200,137 @@ export function PgDumpImportWizard() {
   const handleFileSelected = (selectedFile: File, parsedFile: ParsedSqlFile) => {
     setFile(selectedFile);
     setParsed(parsedFile);
+    setOverrideValidation(false);
   };
 
   const handleFileClear = () => {
     setFile(null);
     setParsed(null);
+    setOverrideValidation(false);
+  };
+
+  const handleOverrideChange = async (enabled: boolean) => {
+    setOverrideValidation(enabled);
+    
+    if (enabled && user && file) {
+      try {
+        await ImportHistoryService.logOverrideAction(
+          scopedDb, 
+          user.id, 
+          {
+            name: file.name,
+            size: file.size,
+            issues: parsed && !parsed.metadata.isComplete ? ['Incomplete file'] : []
+          }
+        );
+      } catch (err) {
+        console.error('Failed to log override', err);
+      }
+    }
+  };
+
+  const handleRepairApplied = (content: string, parsedFile: ParsedSqlFile) => {
+    // Create a virtual file for the repaired content
+    const virtualFile = new File([content], file?.name || 'repaired.sql', { type: 'text/plain' });
+    setFile(virtualFile);
+    setParsed(parsedFile);
+    setOverrideValidation(false);
   };
 
   const handleConnectionTested = (result: ConnectionTestResult) => {
     setConnectionTested(result.success);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pgdump.import.preset', preset);
+    } catch {}
+  }, [preset]);
+
+  const applyPreset = (id: ImportPresetId, base: ImportOptions): ImportOptions => {
+    if (id === 'safe_audit') {
+      return {
+        ...base,
+        executionOrder: 'schema-first',
+        useTransactions: true,
+        stopOnFirstError: true,
+        enableCheckpoint: true,
+        onConflict: 'skip',
+        onConflictOverrides: {
+          ...base.onConflictOverrides,
+          'public.audit_log_entries': 'error',
+          'public.activities_history': 'error',
+        },
+        disableConstraintsDuringData: false,
+        autoCreateMissingTables: false,
+        autoCreateMissingTablesSchemas: base.autoCreateMissingTablesSchemas ?? ['public'],
+        autoCreateMissingTablesTables: base.autoCreateMissingTablesTables ?? [],
+        alignmentConfig: {
+          ...base.alignmentConfig,
+          allowedSchemas: ['public'],
+          requiredNotNullColumns: base.alignmentConfig?.requiredNotNullColumns ?? [],
+        },
+        dropIfExistsConfig: {
+          allowSchemaDrop: false,
+          safeSchemas: ['public'],
+          cascade: false,
+        },
+      };
+    }
+    if (id === 'prod_upsert') {
+      return {
+        ...base,
+        executionOrder: 'schema-first',
+        useTransactions: true,
+        stopOnFirstError: true,
+        enableCheckpoint: true,
+        onConflict: 'update',
+        onConflictOverrides: {
+          ...base.onConflictOverrides,
+          'public.audit_log_entries': 'error',
+          'public.email_events': 'skip',
+        },
+        disableConstraintsDuringData: false,
+        autoCreateMissingTables: true,
+        autoCreateMissingTablesSchemas: ['public'],
+        autoCreateMissingTablesTables: base.autoCreateMissingTablesTables ?? [],
+        alignmentConfig: {
+          ...base.alignmentConfig,
+          allowedSchemas: ['public'],
+          requiredNotNullColumns: base.alignmentConfig?.requiredNotNullColumns ?? [],
+        },
+        dropIfExistsConfig: {
+          allowSchemaDrop: false,
+          safeSchemas: ['public'],
+          cascade: false,
+        },
+      };
+    }
+    if (id === 'dev_reset') {
+      return {
+        ...base,
+        executionOrder: base.executionOrder,
+        useTransactions: true,
+        stopOnFirstError: false,
+        enableCheckpoint: true,
+        onConflict: base.onConflict,
+        onConflictOverrides: base.onConflictOverrides,
+        disableConstraintsDuringData: true,
+        autoCreateMissingTables: true,
+        autoCreateMissingTablesSchemas: base.alignmentConfig?.allowedSchemas ?? ['public', 'extensions'],
+        autoCreateMissingTablesTables: base.autoCreateMissingTablesTables ?? [],
+        alignmentConfig: {
+          ...base.alignmentConfig,
+          allowedSchemas: base.alignmentConfig?.allowedSchemas ?? ['public', 'extensions'],
+        },
+        dropIfExistsConfig: {
+          allowSchemaDrop: true,
+          safeSchemas: ['public'],
+          cascade: true,
+        },
+      };
+    }
+    return base;
   };
 
   useEffect(() => {
@@ -181,6 +350,54 @@ export function PgDumpImportWizard() {
     } catch {}
   }, [general]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('pgdump.import.checkpoint');
+      if (raw) {
+        const cp = JSON.parse(raw);
+        if (cp && cp.phase && typeof cp.batch === 'number') {
+          setResumePoint({
+            phase: cp.phase,
+            batch: cp.batch,
+            totalBatches: cp.totalBatches ?? 0,
+            timestamp: cp.timestamp ?? Date.now(),
+          });
+        }
+      } else {
+        setResumePoint(null);
+      }
+    } catch {
+      setResumePoint(null);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!user) return;
+        const { data, error } = await (scopedDb.client as any)
+          .from('import_checkpoints')
+          .select('phase, batch, total_batches, timestamp, created_at, user_id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (error) {
+          setRemoteCheckpoints([]);
+          return;
+        }
+        const list = (data || []).map((row: any) => ({
+          phase: row.phase,
+          batch: row.batch,
+          total_batches: row.total_batches,
+          timestamp: row.timestamp,
+          created_at: row.created_at,
+        }));
+        setRemoteCheckpoints(list);
+      } catch {
+        setRemoteCheckpoints([]);
+      }
+    })();
+  }, [user?.id, status]);
+
   const handleStartImport = async () => {
     if (!permissionOk) {
       toast.error('Insufficient permissions to start import');
@@ -197,11 +414,61 @@ export function PgDumpImportWizard() {
       return;
     }
 
+    if (!parsed.metadata.isComplete && !overrideValidation) {
+      toast.error('Cannot start import with incomplete SQL file');
+      return;
+    }
+
+    console.log('[PgDumpImportWizard] Starting import with parsed file:', {
+      totalStatements: parsed.metadata.totalStatements,
+      dataStatementsCount: parsed.dataStatements.length,
+      tableStatementsCount: parsed.tableStatements.length,
+      schemaStatementsCount: parsed.schemaStatements.length,
+      firstDataStatement: parsed.dataStatements[0]?.substring(0, 100),
+      options
+    });
+
+    setActivePreset(preset);
     await startImport(parsed, connection, options);
+  };
+
+  const handleResumeFromCheckpoint = async () => {
+    if (!permissionOk) {
+      toast.error('Insufficient permissions to resume import');
+      return;
+    }
+    if (!connectionTested) {
+      toast.error('Please test the database connection before resuming import');
+      return;
+    }
+    if (!parsed) {
+      toast.error('No file selected');
+      return;
+    }
+    let usePhase: 'schema' | 'data' | 'constraints' | 'indexes' | 'functions' | 'policies' | 'other';
+    let useBatch: number;
+    if (selectedCheckpointIndex >= 0 && remoteCheckpoints[selectedCheckpointIndex]) {
+      const cp = remoteCheckpoints[selectedCheckpointIndex];
+      usePhase = cp.phase;
+      useBatch = Math.max(0, (cp.batch ?? 1) - 1);
+    } else if (resumePoint) {
+      usePhase = resumePoint.phase;
+      useBatch = Math.max(0, (resumePoint.batch ?? 1) - 1);
+    } else {
+      toast.error('No checkpoint available to resume from');
+      return;
+    }
+    const nextOptions = { 
+      ...options, 
+      resumeFrom: { phase: usePhase, batchIndex: useBatch }
+    };
+    setActivePreset(preset);
+    await startImport(parsed, connection, nextOptions);
   };
 
   const handleRetry = () => {
     reset();
+    setActivePreset(null);
     setCurrentStep('execute');
   };
 
@@ -212,6 +479,11 @@ export function PgDumpImportWizard() {
     } catch (err: any) {
       toast.error('Rollback failed', { description: err.message || String(err) });
     }
+  };
+
+  const handleVerify = async () => {
+    if (!parsed) return;
+    await verifyIntegrity(connection, parsed);
   };
 
   const formatProgress = () => {
@@ -228,6 +500,9 @@ export function PgDumpImportWizard() {
             <SqlFileUploadZone
               onFileSelected={handleFileSelected}
               onFileClear={handleFileClear}
+              onRepairApplied={handleRepairApplied}
+              overrideEnabled={overrideValidation}
+              onOverrideChange={handleOverrideChange}
             />
             <Card>
               <CardHeader className="pb-2">
@@ -284,6 +559,54 @@ export function PgDumpImportWizard() {
                 </p>
               </div>
             )}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Import Preset</CardTitle>
+                <CardDescription className="text-xs">
+                  Quickly apply recommended combinations of import options.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2">
+                <Select
+                  value={preset}
+                  onValueChange={value => {
+                    const id = value as ImportPresetId;
+                    setPreset(id);
+                    if (id === 'custom') return;
+                    setOptions(prev => applyPreset(id, prev));
+                  }}
+                  disabled={!permissionOk || !connectionTested}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a preset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">
+                      <div className="flex flex-col">
+                        <span>Custom</span>
+                        <span className="text-xs text-muted-foreground">
+                          Manually configure all options
+                        </span>
+                      </div>
+                    </SelectItem>
+                    {IMPORT_PRESETS.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="flex flex-col">
+                          <span>{p.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {p.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  In the Execute step, the Preset badge shows the preset that was active when you
+                  started or resumed this run.
+                </p>
+              </CardContent>
+            </Card>
             <ImportOptionsPanel
               options={options}
               onChange={setOptions}
@@ -308,15 +631,22 @@ export function PgDumpImportWizard() {
                   <Zap className="h-5 w-5 text-primary" />
                   <CardTitle className="text-lg">Execute Import</CardTitle>
                 </div>
-                <Badge variant={
-                  status === 'executing' ? 'default' :
-                  status === 'completed' ? 'secondary' :
-                  status === 'failed' ? 'destructive' :
-                  status === 'paused' ? 'outline' :
-                  'secondary'
-                }>
-                  {status}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {activePreset && (
+                    <Badge variant="outline" className="text-xs">
+                      Preset: {getPresetLabel(activePreset)}
+                    </Badge>
+                  )}
+                  <Badge variant={
+                    status === 'executing' ? 'default' :
+                    status === 'completed' ? 'secondary' :
+                    status === 'failed' ? 'destructive' :
+                    status === 'paused' ? 'outline' :
+                    'secondary'
+                  }>
+                    {status}
+                  </Badge>
+                </div>
               </div>
               <CardDescription>
                 {status === 'idle' && 'Ready to execute import'}
@@ -347,6 +677,47 @@ export function PgDumpImportWizard() {
                     <span className="font-medium">Est. Rows:</span>
                     <span>{parsed.metadata.estimatedRowCount.toLocaleString()}</span>
                   </div>
+                </div>
+              )}
+
+              {(remoteCheckpoints.length > 0 || resumePoint) && status === 'idle' && (
+                <div className="p-4 border rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Available Checkpoints</span>
+                    {resumePoint && !remoteCheckpoints.length && (
+                      <Badge variant="outline">Local</Badge>
+                    )}
+                  </div>
+                  {remoteCheckpoints.length > 0 ? (
+                    <div className="space-y-2">
+                      {remoteCheckpoints.slice(0, 5).map((cp, idx) => {
+                        const ts = cp.created_at || cp.timestamp || '';
+                        const readable = ts ? new Date(ts).toLocaleString() : '';
+                        const isSelected = selectedCheckpointIndex === idx;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedCheckpointIndex(idx)}
+                            className={`w-full text-left p-2 rounded border ${isSelected ? 'border-primary bg-primary/10' : 'border-muted'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm">Phase: <span className="font-medium capitalize">{cp.phase}</span></span>
+                              <span className="text-xs">{readable}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Batch {cp.batch}{cp.total_batches ? ` / ${cp.total_batches}` : ''}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    resumePoint && (
+                      <div className="text-sm">
+                        Phase: <span className="font-medium capitalize">{resumePoint.phase}</span> · Batch {resumePoint.batch} / {resumePoint.totalBatches}
+                      </div>
+                    )
+                  )}
                 </div>
               )}
 
@@ -430,6 +801,24 @@ export function PgDumpImportWizard() {
                     Start Import
                   </Button>
                 )}
+                {resumePoint && status === 'idle' && (
+                  <Button onClick={handleResumeFromCheckpoint} variant="default" className="flex-1">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Resume from checkpoint
+                  </Button>
+                )}
+                {status !== 'executing' && (
+                  <Button onClick={() => rerunFailedBatches(connection)} variant="outline" className="flex-1">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Re-run failed batches
+                  </Button>
+                )}
+                {status === 'idle' && (
+                  <Button onClick={() => clearCheckpoint()} variant="outline" className="flex-1">
+                    <Square className="mr-2 h-4 w-4" />
+                    Clear checkpoints
+                  </Button>
+                )}
                 {canPause && (
                   <Button onClick={pauseImport} variant="outline" className="flex-1">
                     <Pause className="mr-2 h-4 w-4" />
@@ -490,6 +879,9 @@ export function PgDumpImportWizard() {
             errors={errors}
             logs={logs}
             onRetry={handleRetry}
+            onVerify={handleVerify}
+            isVerifying={isVerifying}
+            verificationResults={verificationResults}
           />
         ) : (
           <Card>

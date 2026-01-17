@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -40,6 +42,9 @@ interface SqlFileUploadZoneProps {
   onRepairApplied?: (repairedContent: string, parsed: ParsedSqlFile) => void;
   disabled?: boolean;
   maxSizeMb?: number;
+
+  overrideEnabled?: boolean;
+  onOverrideChange?: (enabled: boolean) => void;
 }
 
 export function SqlFileUploadZone({ 
@@ -47,7 +52,9 @@ export function SqlFileUploadZone({
   onFileClear,
   onRepairApplied,
   disabled = false,
-  maxSizeMb = 100 
+  maxSizeMb = 100,
+  overrideEnabled = false,
+  onOverrideChange
 }: SqlFileUploadZoneProps) {
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
@@ -365,6 +372,35 @@ export function SqlFileUploadZone({
                           Try Auto-Repair
                         </Button>
                       </div>
+
+                        {/* Override Safety Control */}
+                        {onOverrideChange && (
+                          <div className="mt-4 flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/10">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-destructive" />
+                              <span className="text-sm font-medium">
+                                Override validation and import incomplete file
+                              </span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="max-w-xs text-xs">
+                                      Importing an incomplete file can cause data integrity issues and failures mid-import.
+                                      Use only if you understand the risks and have a recovery plan.
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <Checkbox
+                              checked={overrideEnabled}
+                              onCheckedChange={(v) => onOverrideChange?.(!!v)}
+                            />
+                          </div>
+                        )}
                     </AlertDescription>
                   </Alert>
                 )}

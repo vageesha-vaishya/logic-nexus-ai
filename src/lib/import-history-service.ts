@@ -122,6 +122,38 @@ export const ImportHistoryService = {
   },
 
   /**
+   * Logs an override action when a user bypasses validation
+   */
+  async logOverrideAction(
+    db: ScopedDataAccess,
+    userId: string,
+    fileInfo: { name: string; size: number; issues?: string[] }
+  ) {
+    try {
+      // Check if table exists first or just attempt insert
+      // We'll attempt to insert into import_overrides
+      // If it fails, we just log a warning to console to not block the UI
+      const { error } = await db
+        .from('import_overrides')
+        .insert({
+          user_id: userId,
+          file_name: fileInfo.name,
+          file_size: fileInfo.size,
+          issues: fileInfo.issues || [],
+          timestamp: new Date().toISOString(),
+          action: 'bypass_validation'
+        });
+
+      if (error) {
+        // If table doesn't exist, we might get a 404 or 42P01
+        console.warn('Failed to log override action:', error);
+      }
+    } catch (err) {
+      console.warn('Failed to log override action:', err);
+    }
+  },
+
+  /**
    * Performs the revert operation
    */
   async revertImport(

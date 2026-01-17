@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -12,9 +13,12 @@ import {
   Clock,
   Database,
   Table,
-  FileText
+  FileText,
+  Info,
+  ShieldCheck,
+  Loader2
 } from 'lucide-react';
-import { ImportSummary, ImportError, ImportLog } from '@/hooks/usePgDumpImport';
+import { ImportSummary, ImportError, ImportLog, ImportProgress, PgDumpErrorCategory, VerificationResult } from '@/hooks/usePgDumpImport';
 
 interface ImportVerificationPanelProps {
   summary: ImportSummary;
@@ -22,6 +26,9 @@ interface ImportVerificationPanelProps {
   logs: ImportLog[];
   onRetry?: () => void;
   onDownloadReport?: () => void;
+  onVerify?: () => void;
+  isVerifying?: boolean;
+  verificationResults?: VerificationResult[];
 }
 
 export function ImportVerificationPanel({ 
@@ -29,7 +36,10 @@ export function ImportVerificationPanel({
   errors, 
   logs,
   onRetry,
-  onDownloadReport 
+  onDownloadReport,
+  onVerify,
+  isVerifying,
+  verificationResults
 }: ImportVerificationPanelProps) {
   const formatDuration = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -64,6 +74,21 @@ export function ImportVerificationPanel({
   };
 
   const successRate = summary.statementsExecuted / (summary.statementsExecuted + summary.statementsFailed) * 100;
+
+  const codeCounts = (() => {
+    const map = new Map<number, number>();
+    for (const e of errors) {
+      if (typeof e.code === 'number') {
+        map.set(e.code, (map.get(e.code) || 0) + 1);
+      }
+    }
+    return map;
+  })();
+
+  const formatName = (name: string) => {
+    const spaced = name.replace(/_/g, ' ').toLowerCase();
+    return spaced.replace(/\b\w/g, s => s.toUpperCase());
+  };
 
   const downloadReport = () => {
     const report = {
@@ -133,6 +158,44 @@ export function ImportVerificationPanel({
             {successRate.toFixed(1)}% Success Rate
           </Badge>
         </div>
+        {codeCounts.size > 0 && (
+          <div className="mt-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Code Legend</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <div className="space-y-1">
+                      {Object.entries(PgDumpErrorCategory)
+                        .filter(([, v]) => typeof v === 'number')
+                        .map(([name, code]) => (
+                          <div key={name} className="flex items-center justify-between">
+                            <span className="text-xs">{formatName(name)}</span>
+                            <Badge variant="outline" className="text-xs">#{code as number}</Badge>
+                          </div>
+                        ))}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {Array.from(codeCounts.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8)
+                .map(([code, count]) => (
+                  <Badge key={code} variant="outline" className="text-xs">
+                    {code} {formatName(PgDumpErrorCategory[code] as unknown as string)} · {count}
+                  </Badge>
+                ))}
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Overall Stats */}
@@ -184,11 +247,37 @@ export function ImportVerificationPanel({
                       <span className="text-destructive">{stats.failed} failed</span>
                     )}
                   </div>
+                  {summary.metrics?.phases?.[(phase as ImportProgress['currentPhase'])] && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {formatDuration(summary.metrics!.phases![(phase as ImportProgress['currentPhase'])]!.duration)} 
+                    </div>
+                  )}
                 </div>
               )
             ))}
           </div>
         </div>
+
+        {summary.metrics && (
+          <div className="space-y-3">
+            <h4 className="font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Timing
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-3 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Total Runtime</div>
+                <div className="text-2xl font-bold">{formatDuration(summary.metrics.totalDuration)}</div>
+              </div>
+              {Object.entries(summary.metrics.phases).map(([name, timing]) => timing && (
+                <div key={name} className="p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground capitalize">{name} duration</div>
+                  <div className="text-2xl font-bold">{formatDuration(timing.duration)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Alignment Audit */}
         {(stage1Applied > 0 || stage2Applied > 0 || rollbackCount > 0) && (
@@ -226,6 +315,103 @@ export function ImportVerificationPanel({
           </div>
         )}
 
+        {/* Verification Section */}
+        {onVerify && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Post-Import Verification
+              </h4>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onVerify}
+                disabled={isVerifying}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Run Verification
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {verificationResults && verificationResults.length > 0 && (
+              <div className="rounded-md border">
+                <ScrollArea className="h-64">
+                  <div className="p-0">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="p-3 font-medium">Table</th>
+                          <th className="p-3 font-medium text-right">Expected</th>
+                          <th className="p-3 font-medium text-right">Actual</th>
+                          <th className="p-3 font-medium">Checksum</th>
+                          <th className="p-3 font-medium text-center">Status</th>
+                          <th className="p-3 font-medium">Integrity</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {verificationResults.map((res, i) => (
+                          <tr key={i} className="hover:bg-muted/50">
+                            <td className="p-3 font-mono text-xs">{res.table}</td>
+                            <td className="p-3 text-right font-mono text-xs text-muted-foreground">{res.expected.toLocaleString()}</td>
+                            <td className="p-3 text-right font-mono text-xs">{res.actual === -1 ? 'Error' : res.actual.toLocaleString()}</td>
+                            <td className="p-3 font-mono text-xs text-muted-foreground truncate max-w-[100px]" title={res.checksum || '-'}>
+                              {res.checksum ? res.checksum.slice(0, 8) + '...' : '-'}
+                            </td>
+                            <td className="p-3 text-center">
+                              {res.match ? (
+                                <Badge variant="outline" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
+                                  Match
+                                </Badge>
+                              ) : res.actual === -1 ? (
+                                <Badge variant="destructive">Error</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-warning border-warning/50">
+                                  Mismatch
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {res.orphanCheck?.hasOrphans ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex items-center gap-1 text-destructive text-xs font-medium cursor-help">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        {res.orphanCheck.orphanCount} Orphans
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Constraint: {res.orphanCheck.constraintName}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <span className="text-green-500 text-xs flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> OK
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Errors List */}
         {errors.length > 0 && (
           <div className="space-y-3">
@@ -238,10 +424,28 @@ export function ImportVerificationPanel({
                 {errors.slice(0, 50).map((error, i) => (
                   <div key={i} className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg text-sm">
                     <div className="flex items-center justify-between mb-1">
-                      <Badge variant="outline" className="text-xs">{error.phase}</Badge>
-                      <span className="text-xs text-muted-foreground">
-                        Statement #{error.index + 1}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">{error.phase}</Badge>
+                        {error.severity && (
+                          <Badge variant={error.severity === 'warning' ? 'secondary' : 'destructive'} className="text-xs">
+                            {error.severity.toUpperCase()}
+                          </Badge>
+                        )}
+                        {typeof error.category === 'number' && (
+                          <Badge variant="outline" className="text-xs">
+                            {formatName(PgDumpErrorCategory[error.category] as unknown as string)}
+                          </Badge>
+                        )}
+                        {typeof error.code === 'number' && (
+                          <Badge variant="outline" className="text-xs">Code {error.code}</Badge>
+                        )}
+                        {summary.metrics?.phases?.[(error.phase as ImportProgress['currentPhase'])] && (
+                          <Badge variant="outline" className="text-xs">
+                            {formatDuration(summary.metrics!.phases![(error.phase as ImportProgress['currentPhase'])]!.duration)}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">Statement #{error.index + 1}</span>
                     </div>
                     <p className="text-destructive font-medium">{error.error}</p>
                     <pre className="mt-2 text-xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">

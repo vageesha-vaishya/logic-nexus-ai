@@ -1791,6 +1791,340 @@ class TransactionGrouper {
 }
 ```
 
+### 4.5 Constraint and Data Integrity Handling
+
+#### Foreign Key Handling Design
+
+The importer handles foreign key constraints through a combination of dependency-aware ordering, configurable constraint evaluation and targeted validation of potential orphan rows.
+
+- All tables are ordered using the dependency graph described in section 2.2 so that parent tables are imported before child tables whenever possible.
+- For deferrable foreign keys, the importer can move validation to transaction commit by toggling `SET CONSTRAINTS ALL DEFERRED` based on configuration.
+- For non-deferrable constraints, the importer can temporarily disable triggers on specific tables, import data and then re-enable triggers once the import completes.
+
+```typescript
+type ForeignKeyMode =
+  | 'enforce'
+  | 'defer_constraints'
+  | 'disable_triggers';
+
+interface ForeignKeyConfig {
+  mode: ForeignKeyMode;
+  validateBeforeImport: boolean;
+  detectOrphans: boolean;
+  dependencyOrdering: boolean;
+  failOnOrphans: boolean;
+}
+
+interface ForeignKeyConstraintInfo {
+  name: string;
+  tableSchema: string;
+  tableName: string;
+  columnNames: string[];
+  referencedSchema: string;
+  referencedTable: string;
+  referencedColumns: string[];
+  deferrable: boolean;
+}
+
+async function buildForeignKeyImportPlan(
+  connection: DatabaseConnection,
+  config: ForeignKeyConfig
+): Promise<ForeignKeyConstraintInfo[]> {
+  const constraints = await connection.query<ForeignKeyConstraintInfo>(`
+    SELECT
+      con.conname AS name,
+      nsp.nspname AS "tableSchema",
+      rel.relname AS "tableName",
+      array_agg(att.attname ORDER BY att.attnum) AS "columnNames",
+      nsp_ref.nspname AS "referencedSchema",
+      rel_ref.relname AS "referencedTable",
+      array_agg(att_ref.attname ORDER BY att_ref.attnum) AS "referencedColumns",
+      con.deferrable
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+    JOIN pg_class rel_ref ON rel_ref.oid = con.confrelid
+    JOIN pg_namespace nsp_ref ON nsp_ref.oid = rel_ref.relnamespace
+    JOIN unnest(con.conkey) WITH ORDINALITY AS cols(attnum, ord) ON true
+    JOIN pg_attribute att ON att.attrelid = rel.oid AND att.attnum = cols.attnum
+    JOIN unnest(con.confkey) WITH ORDINALITY AS cols_ref(attnum, ord) ON cols_ref.ord = cols.ord
+    JOIN pg_attribute att_ref ON att_ref.attrelid = rel_ref.oid AND att_ref.attnum = cols_ref.attnum
+    WHERE con.contype = 'f'
+    GROUP BY con.conname, nsp.nspname, rel.relname, nsp_ref.nspname, rel_ref.relname, con.deferrable
+  `);
+
+  if (!config.detectOrphans || constraints.rows.length === 0) {
+    return constraints.rows;
+  }
+
+  return constraints.rows;
+}
+```
+
+When `validateBeforeImport` is enabled, the importer can run targeted checks for potential orphans by sampling child tables and verifying referential integrity against parent tables before the main import begins. This allows early detection of incompatible data-only imports.
+
+#### Nullability and NOT NULL Handling
+
+The importer validates and enforces nullability rules for each target column and provides configurable strategies for handling violations.
+
+```typescript
+type NullViolationStrategy =
+  | 'reject_row'
+  | 'use_default'
+  | 'use_custom';
+
+interface NullHandlingConfig {
+  strategy: NullViolationStrategy;
+  columnDefaults: Record<string, unknown>;
+}
+
+interface ColumnNullability {
+  schema: string;
+  table: string;
+  column: string;
+  isNullable: boolean;
+  hasDefault: boolean;
+}
+
+async function loadColumnNullability(
+  connection: DatabaseConnection
+): Promise<ColumnNullability[]> {
+  const result = await connection.query<ColumnNullability>(`
+    SELECT
+      nsp.nspname AS schema,
+      cls.relname AS table,
+      att.attname AS column,
+      NOT att.attnotnull AS "isNullable",
+      ad.adsrc IS NOT NULL AS "hasDefault"
+    FROM pg_attribute att
+    JOIN pg_class cls ON cls.oid = att.attrelid
+    JOIN pg_namespace nsp ON nsp.oid = cls.relnamespace
+    LEFT JOIN pg_attrdef ad ON ad.adrelid = att.attrelid AND ad.adnum = att.attnum
+    WHERE att.attnum > 0
+      AND NOT att.attisdropped
+      AND cls.relkind IN ('r', 'p')
+  `);
+
+  return result.rows;
+}
+
+function applyNullHandling(
+  row: Record<string, unknown>,
+  nullability: ColumnNullability[],
+  config: NullHandlingConfig
+): { keepRow: boolean; transformed: Record<string, unknown> } {
+  const updated = { ...row };
+  let keepRow = true;
+
+  for (const info of nullability) {
+    const key = `${info.schema}.${info.table}.${info.column}`;
+    const value = updated[info.column];
+
+    if (!info.isNullable && (value === null || value === undefined)) {
+      if (config.strategy === 'reject_row') {
+        keepRow = false;
+        break;
+      }
+
+      if (config.strategy === 'use_custom' && key in config.columnDefaults) {
+        updated[info.column] = config.columnDefaults[key];
+      }
+    }
+  }
+
+  return { keepRow, transformed: updated };
+}
+```
+
+This design ensures that imports into schemas with strict NOT NULL constraints either reject inconsistent rows deterministically or transform them according to explicitly configured defaults.
+
+#### Duplicate and Conflict Handling
+
+Duplicate key conflicts are handled through a per-table conflict policy that drives how INSERT statements are transformed during import.
+
+```typescript
+type ConflictStrategy =
+  | 'skip'
+  | 'upsert'
+  | 'fail';
+
+interface TableConflictPolicy {
+  table: string;
+  constraint?: string;
+  strategy: ConflictStrategy;
+  updateColumns?: string[];
+}
+
+interface ConflictPolicyConfig {
+  defaultStrategy: ConflictStrategy;
+  perTable: TableConflictPolicy[];
+}
+
+function buildInsertWithConflictHandling(
+  baseInsert: ParsedInsertStatement,
+  policy: TableConflictPolicy | null,
+  defaultStrategy: ConflictStrategy
+): string {
+  const strategy = policy?.strategy ?? defaultStrategy;
+
+  if (strategy === 'skip') {
+    return `${baseInsert.sql} ON CONFLICT DO NOTHING`;
+  }
+
+  if (strategy === 'upsert') {
+    const targetColumns = policy?.updateColumns ?? baseInsert.columns;
+    const updates = targetColumns
+      .map(col => `${col} = EXCLUDED.${col}`)
+      .join(', ');
+
+    const conflictTarget = policy?.constraint
+      ? `ON CONSTRAINT ${policy.constraint}`
+      : `(${baseInsert.conflictColumns.join(', ')})`;
+
+    return `${baseInsert.sql} ON CONFLICT ${conflictTarget} DO UPDATE SET ${updates}`;
+  }
+
+  return baseInsert.sql;
+}
+```
+
+This approach enables enterprise-grade control over how duplicates are handled, including mixed strategies such as skipping duplicates for audit tables while performing upserts for slowly changing dimension tables.
+
+#### DROP IF EXISTS and Destructive Operations
+
+Destructive operations are controlled by explicit configuration that governs when `DROP IF EXISTS` is issued and whether CASCADE semantics are permitted.
+
+```typescript
+interface DropIfExistsConfig {
+  allowSchemaDrop: boolean;
+  safeSchemas: string[];
+  requireExplicitApproval: boolean;
+  cascade: boolean;
+}
+
+function buildDropStatement(
+  objectType: 'table' | 'index' | 'sequence' | 'view',
+  schema: string,
+  name: string,
+  config: DropIfExistsConfig
+): string {
+  const qualified = `"${schema}"."${name}"`;
+
+  if (!config.allowSchemaDrop && !config.safeSchemas.includes(schema)) {
+    return '';
+  }
+
+  const base =
+    objectType === 'index'
+      ? `DROP INDEX IF EXISTS ${qualified}`
+      : `DROP ${objectType.toUpperCase()} IF EXISTS ${qualified}`;
+
+  return config.cascade ? `${base} CASCADE` : base;
+}
+```
+
+The importer uses these rules when it detects that a target object already exists and the import configuration specifies that existing objects should be replaced. Safe defaults can disallow destructive operations on system schemas and require explicit user confirmation before enabling cascading drops.
+
+#### Concrete Import Option Recipes
+
+This section maps the abstract configuration options to concrete `ImportOptions` combinations that can be surfaced in the UI as presets.
+
+##### Safe Audit Import (Production)
+
+Goal: import new data without touching existing rows or performing destructive operations. Suitable for audit and event tables or any environment where historical data must never be modified by imports.
+
+- Execution:
+  - `executionOrder`: `schema-first`
+  - `useTransactions`: `true`
+  - `stopOnFirstError`: `true`
+  - `enableCheckpoint`: `true`
+- Conflict handling:
+  - `onConflict`: `'skip'`
+  - `onConflictOverrides`:
+    - `public.audit_log_entries`: `'error'`
+    - `public.activities_history`: `'error'`
+- Constraints and nullability:
+  - `disableConstraintsDuringData`: `false` (always enforce FKs)
+  - `alignmentConfig.allowedSchemas`: `['public']`
+  - `alignmentConfig.requiredNotNullColumns`: empty or minimal list
+- Destructive operations:
+  - `dropIfExistsConfig.allowSchemaDrop`: `false`
+  - `dropIfExistsConfig.safeSchemas`: `['public']`
+  - `dropIfExistsConfig.cascade`: `false`
+
+Effect:
+
+- Existing rows are never updated; conflicts in audit tables cause hard failures for visibility.
+- No drops are executed, even if the dump contains `DROP` statements.
+- Foreign key and NOT NULL constraints are respected at all times.
+
+##### Conservative Production Import (Schema Alignment + Upserts)
+
+Goal: align schema to the dump, allow safe upserts for core business tables, but still avoid destructive drops.
+
+- Execution:
+  - `executionOrder`: `schema-first`
+  - `useTransactions`: `true`
+  - `stopOnFirstError`: `true`
+  - `enableCheckpoint`: `true`
+- Conflict handling:
+  - `onConflict`: `'update'`
+  - `onConflictOverrides`:
+    - `public.audit_log_entries`: `'error'`
+    - `public.email_events`: `'skip'`
+- Constraints and nullability:
+  - `disableConstraintsDuringData`: `false`
+  - `alignmentConfig.allowedSchemas`: `['public']`
+  - `alignmentConfig.requiredNotNullColumns`: key business columns (for example `public.accounts.id`, `public.contacts.id`)
+- Destructive operations:
+  - `dropIfExistsConfig.allowSchemaDrop`: `false`
+  - `dropIfExistsConfig.safeSchemas`: `['public']`
+  - `dropIfExistsConfig.cascade`: `false`
+
+Effect:
+
+- New and changed rows are upserted for most tables, preserving primary-key semantics.
+- Critical logging tables still fail loudly on duplicates.
+- Schema alignment adds missing columns and tightens nullability where safe, but never drops tables, indexes, or sequences.
+
+##### Developer Reset Import (Non‑Production Only)
+
+Goal: allow destructive operations to reset a non‑production database to match the dump, including dropping and recreating objects in safe schemas.
+
+- Execution:
+  - `executionOrder`: `'schema-first'` or `'file-order'` depending on dump
+  - `useTransactions`: `true`
+  - `stopOnFirstError`: `false` (continue to gather as many errors as possible)
+  - `enableCheckpoint`: `true`
+- Conflict handling:
+  - `onConflict`: `'update'` (or `'error'` if you want strictness)
+  - `onConflictOverrides`: usually empty
+- Constraints and nullability:
+  - `disableConstraintsDuringData`: `true` (allow bulk loads with deferred checks)
+  - `alignmentConfig.allowedSchemas`: `['public', 'extensions']` or other non‑system schemas
+  - `alignmentConfig.requiredNotNullColumns`: empty, or minimal for developer sanity
+- Destructive operations:
+  - `dropIfExistsConfig.allowSchemaDrop`: `true`
+  - `dropIfExistsConfig.safeSchemas`: `['public']`
+  - `dropIfExistsConfig.cascade`: `true`
+
+Effect:
+
+- DROP statements targeting `public` are rewritten to idempotent `DROP ... IF EXISTS ... CASCADE` forms.
+- Non‑public/system schemas remain protected unless explicitly added to `safeSchemas`.
+- Suitable for local or staging environments where automated reset is desirable and data loss is acceptable.
+
+These recipes can be encoded as named presets in the import wizard, allowing operators to choose an intent (“Safe Audit Import”, “Production Upsert”, “Dev Reset”) rather than configuring dozens of individual flags manually.
+
+#### Interaction With Transactions and Progress Tracking
+
+Constraint and integrity handling is integrated with the transaction management and progress tracking frameworks defined earlier in this document.
+
+- When foreign keys are deferred or triggers are disabled, the importer records this in the transaction configuration and tracks when constraints are re-enabled so that failures can be attributed to the correct phase.
+- When nullability violations cause row-level rejections, the progress tracker counts rejected rows separately from successfully imported rows and logs representative samples for audit purposes.
+- When duplicate handling uses upserts instead of plain inserts, the importer tracks the number of inserted vs updated rows per table to support reconciliation after import.
+- When DROP IF EXISTS is used, the audit trail records each destructive operation along with the configuration that authorized it, and the recovery log can reconstruct the previous state when combined with external backups.
+
 ---
 
 ## 5. Comprehensive Testing Framework
@@ -2401,6 +2735,95 @@ class BottleneckAnalyzer {
   }
 }
 ```
+
+### 5.5 Constraint and Data Integrity Test Scenarios
+
+#### Foreign Key Constraint Tests
+
+The test suite validates foreign key handling across a set of representative schemas and data volumes.
+
+- Single-level parent and child tables where all parent rows exist.
+- Single-level parent and child tables with missing parents to verify rejection or deferment.
+- Multi-level hierarchies with three or more dependency levels to validate import ordering.
+- Circular references using deferrable constraints to verify that commit-time checks succeed when data is consistent.
+- Mixed deferrable and non-deferrable constraints to confirm that trigger disabling and re-enabling behaves as expected.
+
+```typescript
+interface ForeignKeyTestCase {
+  name: string;
+  setupSql: string[];
+  initialDataSql: string[];
+  importDataSql: string[];
+  config: ForeignKeyConfig;
+  expectedViolations: number;
+}
+```
+
+Each case asserts the number of violations detected, the behavior of the importer under different `ForeignKeyConfig` modes and the ability to resume imports after fixing data.
+
+#### Nullability and NOT NULL Tests
+
+Null handling tests ensure that imports respect NOT NULL constraints and apply configured defaults deterministically.
+
+- Tables with a mix of nullable and non-nullable columns where data is fully valid.
+- Tables with missing values for non-nullable columns to verify `reject_row` semantics.
+- Tables where `use_custom` defaults are applied based on fully qualified column keys.
+- Tables where target columns have defaults defined at the database level and the importer leaves values unset so that database defaults apply.
+
+```typescript
+interface NullHandlingTestCase {
+  name: string;
+  nullConfig: NullHandlingConfig;
+  nullability: ColumnNullability[];
+  inputRows: Record<string, unknown>[];
+  expectedKeptRows: number;
+}
+```
+
+These tests assert that the number of kept rows, transformed values and rejected rows matches expectations and that no NOT NULL constraint violations are emitted during the import.
+
+#### Duplicate and Conflict Handling Tests
+
+Duplicate handling tests focus on upsert behavior, skip semantics and failure paths.
+
+- Import sequences where the same primary key appears multiple times in the dump.
+- Imports where the target already contains data and the conflict policy specifies `skip`.
+- Imports where the conflict policy specifies `upsert` and only selected columns are updated.
+- Imports where the policy specifies `fail` to ensure that the first duplicate terminates the operation.
+
+```typescript
+interface ConflictHandlingTestCase {
+  name: string;
+  baseInsert: ParsedInsertStatement;
+  policy: TableConflictPolicy | null;
+  defaultStrategy: ConflictStrategy;
+  expectedSql: string;
+}
+```
+
+These tests validate that generated SQL matches the expected pattern and that runtime behavior aligns with configured strategies across different tables and constraints.
+
+#### DROP IF EXISTS and Destructive Operation Tests
+
+Destructive operation tests guarantee that `DROP IF EXISTS` is only executed when configuration explicitly allows it and that system schemas remain protected by default.
+
+- Attempts to drop objects in protected schemas where `allowSchemaDrop` is false.
+- Drops in allowed schemas where `cascade` is both enabled and disabled.
+- Imports where the existing target schema is replaced, verifying that DROP statements are logged and audited.
+- Imports where `requireExplicitApproval` is enabled and destructive operations are blocked until approval is recorded.
+
+```typescript
+interface DropConfigTestCase {
+  name: string;
+  objectType: 'table' | 'index' | 'sequence' | 'view';
+  schema: string;
+  namePart: string;
+  config: DropIfExistsConfig;
+  expectDropSql: boolean;
+}
+```
+
+Assertions confirm that generated DROP statements match expectations, that no drops occur for disallowed schemas and that audit events are written for every destructive operation accepted by the configuration.
 
 ---
 
