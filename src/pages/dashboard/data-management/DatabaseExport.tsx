@@ -24,6 +24,7 @@ import { validateSQL, resolveDataTypeForValue, formatValue, calculateChecksum, g
 import { ExportProgressMeter } from "@/components/dashboard/data-management/ExportProgressMeter";
 import { ExportCompletionDialog } from "@/components/dashboard/data-management/ExportCompletionDialog";
 import { DatabaseMigrationPanel, PgDumpImportWizard } from "@/components/dashboard/data-management/migration";
+import MigrationPushPanel from "@/components/dashboard/data-management/MigrationPushPanel";
 import { PgDumpExportPanel } from "@/components/dashboard/data-management/PgDumpExportPanel";
 import { ImportHistoryService, ImportSession } from "@/lib/import-history-service";
 import { ImportReportDialog } from "@/components/system/ImportReportDialog";
@@ -3835,6 +3836,9 @@ END $$;\n\n`;
 
       {/* Database Migration Panel */}
       <DatabaseMigrationPanel />
+
+      {/* Migration Push Panel */}
+      <MigrationPushPanel />
     </div>
   );
 }
