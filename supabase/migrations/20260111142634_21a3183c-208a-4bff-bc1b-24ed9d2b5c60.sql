@@ -17,21 +17,25 @@ ALTER TABLE public.dashboard_preferences ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_dashboard_preferences_user_id ON public.dashboard_preferences(user_id);
 
 -- RLS Policies - Users can only manage their own preferences
+DROP POLICY IF EXISTS "Users can view own dashboard preferences" ON public.dashboard_preferences;
 CREATE POLICY "Users can view own dashboard preferences"
 ON public.dashboard_preferences FOR SELECT
 TO authenticated
 USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can insert own dashboard preferences" ON public.dashboard_preferences;
 CREATE POLICY "Users can insert own dashboard preferences"
 ON public.dashboard_preferences FOR INSERT
 TO authenticated
 WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update own dashboard preferences" ON public.dashboard_preferences;
 CREATE POLICY "Users can update own dashboard preferences"
 ON public.dashboard_preferences FOR UPDATE
 TO authenticated
 USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can delete own dashboard preferences" ON public.dashboard_preferences;
 CREATE POLICY "Users can delete own dashboard preferences"
 ON public.dashboard_preferences FOR DELETE
 TO authenticated

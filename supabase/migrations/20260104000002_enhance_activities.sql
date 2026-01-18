@@ -23,3 +23,4 @@ CREATE TRIGGER trigger_update_lead_last_activity
 AFTER INSERT OR UPDATE ON public.activities
 FOR EACH ROW
 EXECUTE FUNCTION public.update_lead_last_activity();
+

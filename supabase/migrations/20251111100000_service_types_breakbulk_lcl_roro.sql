@@ -42,7 +42,7 @@ END $$;
 DO $$
 DECLARE
   has_mode boolean;
-  has_name boolean;
+  has_service_name boolean;
   has_service_type_id boolean;
   has_service_type_text boolean;
   lcl_id uuid;
@@ -58,8 +58,8 @@ BEGIN
   ) INTO has_mode;
 
   SELECT EXISTS(
-    SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'services' AND column_name = 'name'
-  ) INTO has_name;
+    SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'services' AND column_name = 'service_name'
+  ) INTO has_service_name;
 
   SELECT EXISTS(
     SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'services' AND column_name = 'service_type_id'
@@ -69,33 +69,42 @@ BEGIN
     SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'services' AND column_name = 'service_type'
   ) INTO has_service_type_text;
 
-  IF has_service_type_id THEN
-    IF has_mode AND has_name THEN
+  IF has_service_type_id AND has_service_name THEN
+    IF has_mode THEN
       UPDATE public.services s SET service_type_id = lcl_id
-      WHERE s.service_type_id IS NULL AND s.mode::text = 'ocean' AND lower(s.name) LIKE '%lcl%';
+      WHERE s.service_type_id IS NULL
+        AND s.mode::text = 'ocean'
+        AND lower(coalesce(s.service_name, '')) LIKE '%lcl%';
 
       UPDATE public.services s SET service_type_id = roro_id
-      WHERE s.service_type_id IS NULL AND s.mode::text = 'ocean' AND lower(s.name) LIKE '%roro%';
+      WHERE s.service_type_id IS NULL
+        AND s.mode::text = 'ocean'
+        AND lower(coalesce(s.service_name, '')) LIKE '%roro%';
 
       UPDATE public.services s SET service_type_id = bb_id
-      WHERE s.service_type_id IS NULL AND s.mode::text = 'ocean' AND (
-        lower(s.name) LIKE '%break bulk%' OR lower(s.name) LIKE '%break-bulk%'
-      );
-    ELSIF has_service_type_text THEN
-      -- Fallback: text-based service_type + legacy name field(s)
-      UPDATE public.services s SET service_type_id = lcl_id
-      WHERE s.service_type_id IS NULL AND s.service_type = 'ocean'
-        AND lower(coalesce(s.name, s.service_name, '')) LIKE '%lcl%';
-
-      UPDATE public.services s SET service_type_id = roro_id
-      WHERE s.service_type_id IS NULL AND s.service_type = 'ocean'
-        AND lower(coalesce(s.name, s.service_name, '')) LIKE '%roro%';
-
-      UPDATE public.services s SET service_type_id = bb_id
-      WHERE s.service_type_id IS NULL AND s.service_type = 'ocean'
+      WHERE s.service_type_id IS NULL
+        AND s.mode::text = 'ocean'
         AND (
-          lower(coalesce(s.name, s.service_name, '')) LIKE '%break bulk%'
-          OR lower(coalesce(s.name, s.service_name, '')) LIKE '%break-bulk%'
+          lower(coalesce(s.service_name, '')) LIKE '%break bulk%'
+          OR lower(coalesce(s.service_name, '')) LIKE '%break-bulk%'
+        );
+    ELSIF has_service_type_text THEN
+      UPDATE public.services s SET service_type_id = lcl_id
+      WHERE s.service_type_id IS NULL
+        AND s.service_type = 'ocean'
+        AND lower(coalesce(s.service_name, '')) LIKE '%lcl%';
+
+      UPDATE public.services s SET service_type_id = roro_id
+      WHERE s.service_type_id IS NULL
+        AND s.service_type = 'ocean'
+        AND lower(coalesce(s.service_name, '')) LIKE '%roro%';
+
+      UPDATE public.services s SET service_type_id = bb_id
+      WHERE s.service_type_id IS NULL
+        AND s.service_type = 'ocean'
+        AND (
+          lower(coalesce(s.service_name, '')) LIKE '%break bulk%'
+          OR lower(coalesce(s.service_name, '')) LIKE '%break-bulk%'
         );
     END IF;
   END IF;

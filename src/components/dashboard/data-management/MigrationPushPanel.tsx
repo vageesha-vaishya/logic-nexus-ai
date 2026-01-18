@@ -216,9 +216,6 @@ export default function MigrationPushPanel() {
       }
 
       setActiveTab('results');
-    }
-
-      setActiveTab('results');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error pushing migrations:', error);

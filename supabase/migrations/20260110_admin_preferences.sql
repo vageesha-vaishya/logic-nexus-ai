@@ -25,6 +25,7 @@ CREATE POLICY "Users can insert own preferences" ON public.user_preferences
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- RPC: set_user_scope_preference
+DROP FUNCTION IF EXISTS public.set_user_scope_preference(UUID, UUID, BOOLEAN);
 CREATE OR REPLACE FUNCTION public.set_user_scope_preference(
     p_tenant_id UUID,
     p_franchise_id UUID,
@@ -47,6 +48,7 @@ END;
 $$;
 
 -- RPC: set_admin_override (Updated)
+DROP FUNCTION IF EXISTS public.set_admin_override(BOOLEAN, UUID, UUID);
 CREATE OR REPLACE FUNCTION public.set_admin_override(
     p_enabled BOOLEAN,
     p_tenant_id UUID DEFAULT NULL,
