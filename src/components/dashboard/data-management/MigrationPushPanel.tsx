@@ -77,6 +77,10 @@ export default function MigrationPushPanel() {
     password: ''
   });
 
+  // Check if connection is configured
+  const isConnectionValid = connectionParams.host && connectionParams.database && 
+    connectionParams.user && connectionParams.password;
+
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -224,16 +228,20 @@ export default function MigrationPushPanel() {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="upload">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="connect">
+              <Database className="h-4 w-4 mr-2" />
+              Connect
+            </TabsTrigger>
+            <TabsTrigger value="upload" disabled={!isConnectionValid}>
               <Upload className="h-4 w-4 mr-2" />
               Upload
             </TabsTrigger>
-            <TabsTrigger value="analyze" disabled={migrations.length === 0}>
+            <TabsTrigger value="analyze" disabled={!isConnectionValid || migrations.length === 0}>
               <Eye className="h-4 w-4 mr-2" />
               Analyze
             </TabsTrigger>
-            <TabsTrigger value="push" disabled={migrations.length === 0}>
+            <TabsTrigger value="push" disabled={!isConnectionValid || migrations.length === 0}>
               <Play className="h-4 w-4 mr-2" />
               Push
             </TabsTrigger>
@@ -242,6 +250,88 @@ export default function MigrationPushPanel() {
               Results
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="connect" className="space-y-4">
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="db-host">Host</Label>
+                  <Input
+                    id="db-host"
+                    value={connectionParams.host}
+                    onChange={(e) => setConnectionParams(prev => ({ ...prev, host: e.target.value }))}
+                    placeholder="db.xxxx.supabase.co"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="db-port">Port</Label>
+                  <Input
+                    id="db-port"
+                    type="number"
+                    value={connectionParams.port}
+                    onChange={(e) => setConnectionParams(prev => ({ ...prev, port: parseInt(e.target.value) || 5432 }))}
+                    placeholder="5432"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="db-database">Database</Label>
+                  <Input
+                    id="db-database"
+                    value={connectionParams.database}
+                    onChange={(e) => setConnectionParams(prev => ({ ...prev, database: e.target.value }))}
+                    placeholder="postgres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="db-user">User</Label>
+                  <Input
+                    id="db-user"
+                    value={connectionParams.user}
+                    onChange={(e) => setConnectionParams(prev => ({ ...prev, user: e.target.value }))}
+                    placeholder="postgres"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="db-password">Password</Label>
+                <Input
+                  id="db-password"
+                  type="password"
+                  value={connectionParams.password}
+                  onChange={(e) => setConnectionParams(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Enter database password"
+                />
+              </div>
+            </div>
+
+            {isConnectionValid ? (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertTitle>Connection Configured</AlertTitle>
+                <AlertDescription>
+                  Target: {connectionParams.user}@{connectionParams.host}:{connectionParams.port}/{connectionParams.database}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Connection Required</AlertTitle>
+                <AlertDescription>
+                  Fill in all connection parameters to continue
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button 
+              onClick={() => setActiveTab('upload')} 
+              disabled={!isConnectionValid}
+              className="w-full"
+            >
+              Continue to Upload
+            </Button>
+          </TabsContent>
 
           <TabsContent value="upload" className="space-y-4">
             <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
