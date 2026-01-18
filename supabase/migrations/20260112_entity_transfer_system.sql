@@ -2,9 +2,41 @@
 -- Description: Tables and functions for managing entity transfers between tenants and franchises
 
 -- 1. Create Enums
-CREATE TYPE transfer_status AS ENUM ('pending', 'approved', 'rejected', 'completed', 'failed');
-CREATE TYPE transfer_type AS ENUM ('tenant_to_tenant', 'tenant_to_franchise', 'franchise_to_franchise');
-CREATE TYPE transfer_entity_type AS ENUM ('lead', 'opportunity', 'quote', 'shipment', 'account', 'contact', 'activity');
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'transfer_status'
+          AND n.nspname = 'public'
+    ) THEN
+        CREATE TYPE public.transfer_status AS ENUM ('pending', 'approved', 'rejected', 'completed', 'failed');
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'transfer_type'
+          AND n.nspname = 'public'
+    ) THEN
+        CREATE TYPE public.transfer_type AS ENUM ('tenant_to_tenant', 'tenant_to_franchise', 'franchise_to_franchise');
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'transfer_entity_type'
+          AND n.nspname = 'public'
+    ) THEN
+        CREATE TYPE public.transfer_entity_type AS ENUM ('lead', 'opportunity', 'quote', 'shipment', 'account', 'contact', 'activity');
+    END IF;
+END $$;
 
 -- 2. Create Transfer Requests Table
 CREATE TABLE IF NOT EXISTS entity_transfers (
