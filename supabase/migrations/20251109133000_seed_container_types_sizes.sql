@@ -20,12 +20,12 @@ ON CONFLICT (code) DO UPDATE
 -- Container Sizes (global)
 INSERT INTO public.container_sizes (tenant_id, name, code, description, is_active)
 VALUES
-  (NULL, '20\' Standard', '20_std', '20-foot standard dry container', true),
-  (NULL, '40\' Standard', '40_std', '40-foot standard dry container', true),
-  (NULL, '40\' High Cube', '40_hc', '40-foot high cube dry container', true),
-  (NULL, '45\' High Cube', '45_hc', '45-foot high cube dry container', true),
-  (NULL, '20\' Reefer', '20_reefer', '20-foot refrigerated container', true),
-  (NULL, '40\' Reefer', '40_reefer', '40-foot refrigerated container', true)
+  (NULL, '20'' Standard', '20_std', '20-foot standard dry container', true),
+  (NULL, '40'' Standard', '40_std', '40-foot standard dry container', true),
+  (NULL, '40'' High Cube', '40_hc', '40-foot high cube dry container', true),
+  (NULL, '45'' High Cube', '45_hc', '45-foot high cube dry container', true),
+  (NULL, '20'' Reefer', '20_reefer', '20-foot refrigerated container', true),
+  (NULL, '40'' Reefer', '40_reefer', '40-foot refrigerated container', true)
 ON CONFLICT (code) DO UPDATE
   SET name = EXCLUDED.name,
       description = EXCLUDED.description,

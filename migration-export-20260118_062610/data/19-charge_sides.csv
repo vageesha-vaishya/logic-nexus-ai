@@ -1,0 +1,3 @@
+id,name,code,description,is_active,created_at,updated_at
+dca4c9ff-f10b-4de5-afdf-d15afbad38d3,Buy,buy,Costs incurred from carriers/suppliers,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00
+0e065e06-1e00-4aa2-8f83-9223abe18a05,Sell,sell,Charges to customers,true,2025-11-08T11:55:43.122485+00:00,2025-11-08T11:55:43.122485+00:00

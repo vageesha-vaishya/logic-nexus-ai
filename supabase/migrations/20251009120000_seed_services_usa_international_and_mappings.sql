@@ -125,10 +125,6 @@ WITH us AS (
   SELECT s.tenant_id, s.id
   FROM public.services s
   WHERE s.service_code = 'TRUCK_US_LTL'
-), intl AS (
-  SELECT s.tenant_id, s.id
-  FROM public.services s
-  WHERE s.service_code = 'TRUCK_INT_XB'
 )
 INSERT INTO public.service_type_mappings (
   tenant_id, service_type, service_id, is_default, priority, conditions, is_active
@@ -141,6 +137,11 @@ WHERE NOT EXISTS (
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
 
+WITH intl AS (
+  SELECT s.tenant_id, s.id
+  FROM public.services s
+  WHERE s.service_code = 'TRUCK_INT_XB'
+)
 INSERT INTO public.service_type_mappings (
   tenant_id, service_type, service_id, is_default, priority, conditions, is_active
 )
@@ -153,10 +154,6 @@ WITH us AS (
   SELECT s.tenant_id, s.id
   FROM public.services s
   WHERE s.service_code IN ('COURIER_US_STD','COURIER_STD') -- prefer explicit USA service, fallback to existing std
-), intl AS (
-  SELECT s.tenant_id, s.id
-  FROM public.services s
-  WHERE s.service_code = 'COURIER_INT_STD'
 )
 INSERT INTO public.service_type_mappings (
   tenant_id, service_type, service_id, is_default, priority, conditions, is_active
@@ -169,6 +166,11 @@ WHERE NOT EXISTS (
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
 
+WITH intl AS (
+  SELECT s.tenant_id, s.id
+  FROM public.services s
+  WHERE s.service_code = 'COURIER_INT_STD'
+)
 INSERT INTO public.service_type_mappings (
   tenant_id, service_type, service_id, is_default, priority, conditions, is_active
 )

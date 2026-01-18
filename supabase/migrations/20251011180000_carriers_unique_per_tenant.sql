@@ -1,5 +1,19 @@
 BEGIN;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'carriers'
+      AND column_name = 'carrier_code'
+  ) THEN
+    ALTER TABLE public.carriers
+      ADD COLUMN carrier_code TEXT;
+  END IF;
+END $$;
+
 -- Deduplicate by tenant + lower(name)
 WITH dupes AS (
   SELECT

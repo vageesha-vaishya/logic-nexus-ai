@@ -117,6 +117,21 @@ ALTER TABLE public.margin_methods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.margin_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_option_legs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS provider_types_tenant_read ON public.provider_types;
+DROP POLICY IF EXISTS provider_types_tenant_write ON public.provider_types;
+DROP POLICY IF EXISTS trade_directions_tenant_read ON public.trade_directions;
+DROP POLICY IF EXISTS trade_directions_tenant_write ON public.trade_directions;
+DROP POLICY IF EXISTS service_modes_tenant_read ON public.service_modes;
+DROP POLICY IF EXISTS service_modes_tenant_write ON public.service_modes;
+DROP POLICY IF EXISTS fx_rates_tenant_read ON public.fx_rates;
+DROP POLICY IF EXISTS fx_rates_tenant_write ON public.fx_rates;
+DROP POLICY IF EXISTS margin_methods_tenant_read ON public.margin_methods;
+DROP POLICY IF EXISTS margin_methods_tenant_write ON public.margin_methods;
+DROP POLICY IF EXISTS margin_profiles_tenant_read ON public.margin_profiles;
+DROP POLICY IF EXISTS margin_profiles_tenant_write ON public.margin_profiles;
+DROP POLICY IF EXISTS quote_option_legs_read ON public.quote_option_legs;
+DROP POLICY IF EXISTS quote_option_legs_write ON public.quote_option_legs;
+
 CREATE POLICY provider_types_tenant_read ON public.provider_types FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY provider_types_tenant_write ON public.provider_types FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
 

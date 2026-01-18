@@ -1,0 +1,7 @@
+id,tenant_id,name,code,description,length_ft,width_ft,height_ft,max_weight_kg,is_active,created_at,updated_at,has_ventilation,has_temperature_control,is_open_top,is_flat_rack
+bea1de30-9add-4112-b18f-3a5fd57bbf45,,20' Standard,20_std,20-foot standard dry container,,,,,true,2025-11-09T12:56:17.773109+00:00,2025-11-09T12:56:17.773109+00:00,false,false,false,false
+06a95f1c-afca-4b8d-9be5-7625c43d1d5b,,40' Standard,40_std,40-foot standard dry container,,,,,true,2025-11-09T12:56:17.773109+00:00,2025-11-09T12:56:17.773109+00:00,false,false,false,false
+253a71f8-2829-4cb1-b0e6-8e32cb836656,,40' High Cube,40_hc,40-foot high cube dry container,,,,,true,2025-11-09T12:56:17.773109+00:00,2025-11-09T12:56:17.773109+00:00,false,false,false,false
+c2909dd6-3631-4178-a9f9-8491839b41ad,,45' High Cube,45_hc,45-foot high cube dry container,,,,,true,2025-11-09T12:56:17.773109+00:00,2025-11-09T12:56:17.773109+00:00,false,false,false,false
+41360c85-3e2d-42fe-84fa-3b8d060dd5d5,,20' Reefer,20_reefer,20-foot refrigerated container,,,,,true,2025-11-09T12:56:17.773109+00:00,2025-11-09T12:56:17.773109+00:00,false,false,false,false
+136203a6-5085-4661-b765-edc401e27447,,40' Reefer,40_reefer,40-foot refrigerated container,,,,,true,2025-11-09T12:56:17.773109+00:00,2025-11-09T12:56:17.773109+00:00,false,false,false,false

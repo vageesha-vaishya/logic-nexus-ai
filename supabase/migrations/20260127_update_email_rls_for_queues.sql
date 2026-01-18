@@ -1,4 +1,5 @@
 -- Allow users to view emails assigned to queues they are members of
+DROP POLICY IF EXISTS "Users can view emails in their queues" ON public.emails;
 CREATE POLICY "Users can view emails in their queues"
 ON public.emails
 FOR SELECT

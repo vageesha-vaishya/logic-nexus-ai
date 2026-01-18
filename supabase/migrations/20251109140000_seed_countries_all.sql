@@ -175,10 +175,9 @@ WITH countries(name, iso2, iso3, phone, cont) AS (
 
   -- Antarctica (no sovereign states)
   ('Antarctica','AQ','ATA',NULL,'AN')
-)
-INSERT INTO public.countries (tenant_id, continent_id, name, code_iso2, code_iso3, code_national, phone_code, is_active)
-SELECT 
-  NULL,
+) 
+INSERT INTO public.countries (continent_id, name, code_iso2, code_iso3, code_national, phone_code, is_active)
+SELECT
   (SELECT id FROM public.continents WHERE code_international = countries.cont),
   countries.name,
   countries.iso2,

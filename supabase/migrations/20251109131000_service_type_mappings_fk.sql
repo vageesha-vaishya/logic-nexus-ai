@@ -35,6 +35,14 @@ END$$;
 DO $$
 BEGIN
   IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'service_type_mappings_unique_pair'
+      AND conrelid = 'public.service_type_mappings'::regclass
+  ) THEN
+    ALTER TABLE public.service_type_mappings
+      DROP CONSTRAINT service_type_mappings_unique_pair;
+  ELSIF EXISTS (
     SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'service_type_mappings_unique_pair'
   ) THEN
     DROP INDEX public.service_type_mappings_unique_pair;

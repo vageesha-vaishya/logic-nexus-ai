@@ -122,14 +122,14 @@ def topo_sort_tables(tables, dependencies):
 def load_env():
     base_url = os.environ.get("NEW_SUPABASE_URL")
     anon_key = os.environ.get("NEW_SUPABASE_ANON_KEY")
-    service_key = os.environ.get("NEW_SUPABASE_SERVICE_ROLE_KEY")
+    service_key = os.environ.get("NEW_SUPABASE_SERVICE_ROLE_KEY") or anon_key
     data_dir = os.path.join(os.getcwd(), "migration-data")
 
     if not base_url or not service_key:
-        print("[ERROR] Missing NEW_SUPABASE_URL or NEW_SUPABASE_SERVICE_ROLE_KEY in environment.")
+        print("[ERROR] Missing NEW_SUPABASE_URL or NEW_SUPABASE_SERVICE_ROLE_KEY/NEW_SUPABASE_ANON_KEY in environment.")
         sys.exit(1)
 
-    return base_url.rstrip('/'), anon_key, service_key, data_dir
+    return base_url.rstrip('/'), anon_key or service_key, service_key, data_dir
 
 
 def sanitize_cell(value):

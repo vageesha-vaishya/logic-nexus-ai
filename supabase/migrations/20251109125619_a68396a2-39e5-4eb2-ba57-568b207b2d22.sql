@@ -8,12 +8,29 @@ ALTER COLUMN tenant_id DROP NOT NULL;
 ALTER TABLE public.container_sizes 
 ALTER COLUMN tenant_id DROP NOT NULL;
 
--- Add unique constraints for code columns
-ALTER TABLE public.container_types 
-ADD CONSTRAINT container_types_code_key UNIQUE (code);
+-- Add unique constraints for code columns if they do not already exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'container_types_code_key'
+      AND conrelid = 'public.container_types'::regclass
+  ) THEN
+    ALTER TABLE public.container_types 
+    ADD CONSTRAINT container_types_code_key UNIQUE (code);
+  END IF;
 
-ALTER TABLE public.container_sizes 
-ADD CONSTRAINT container_sizes_code_key UNIQUE (code);
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'container_sizes_code_key'
+      AND conrelid = 'public.container_sizes'::regclass
+  ) THEN
+    ALTER TABLE public.container_sizes 
+    ADD CONSTRAINT container_sizes_code_key UNIQUE (code);
+  END IF;
+END $$;
 
 -- Update RLS policies for container_types to include global entries
 DROP POLICY IF EXISTS "Tenant users can view container types" ON public.container_types;

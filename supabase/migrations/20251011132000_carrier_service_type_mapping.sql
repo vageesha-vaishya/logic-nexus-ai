@@ -21,9 +21,18 @@ ALTER TABLE public.carrier_service_types
   ADD CONSTRAINT carrier_service_types_type_check
   CHECK (service_type IN ('ocean','air','trucking','courier','moving','railway_transport'));
 
--- Dedup per tenant + carrier + service_type
-ALTER TABLE public.carrier_service_types
-  ADD CONSTRAINT carrier_service_types_unique_pair UNIQUE (tenant_id, carrier_id, service_type);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'carrier_service_types_unique_pair'
+      AND conrelid = 'public.carrier_service_types'::regclass
+  ) THEN
+    ALTER TABLE public.carrier_service_types
+      ADD CONSTRAINT carrier_service_types_unique_pair UNIQUE (tenant_id, carrier_id, service_type);
+  END IF;
+END $$;
 
 -- Helpful indexes
 CREATE INDEX IF NOT EXISTS idx_cst_tenant ON public.carrier_service_types(tenant_id);

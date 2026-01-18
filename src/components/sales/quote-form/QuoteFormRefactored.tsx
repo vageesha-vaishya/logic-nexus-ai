@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { QuoteDataProvider, useQuoteContext } from './QuoteContext';
+import { QuoteDataProvider } from './QuoteContext';
 import { QuoteHeader } from './QuoteHeader';
 import { QuoteLogistics } from './QuoteLogistics';
 import { QuoteFinancials } from './QuoteFinancials';
@@ -12,7 +12,7 @@ import { QuoteErrorBoundary } from './QuoteErrorBoundary';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCRM } from '@/hooks/useCRM';
+import { useQuoteRepository } from './useQuoteRepository';
 
 interface QuoteFormProps {
   quoteId?: string;
@@ -22,10 +22,8 @@ interface QuoteFormProps {
 
 function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // We can access context data here if needed for submission logic
-  const { resolvedTenantId } = useQuoteContext();
-  const [composerVersionId, setComposerVersionId] = useState<string>(''); // Placeholder for logic
-  const { scopedDb } = useCRM();
+  const [composerVersionId] = useState<string>('');
+  const { saveQuote } = useQuoteRepository();
   
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema),
@@ -53,77 +51,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
   const onSubmit = async (data: QuoteFormValues) => {
     setIsSubmitting(true);
     try {
-      const finalTenantId = resolvedTenantId || null;
-
-      // Pre-save augmentation: ensure account/contact from opportunity if missing
-      let accountId = data.account_id || '';
-      let contactId = data.contact_id || '';
-      const opportunityId = data.opportunity_id || '';
-
-      if (opportunityId && (!accountId || !contactId)) {
-        const { data: opp, error: oppError } = await scopedDb
-          .from('opportunities')
-          .select('id, account_id, contact_id')
-          .eq('id', opportunityId)
-          .maybeSingle();
-        if (!oppError && opp) {
-          if (!accountId && opp.account_id) accountId = String(opp.account_id);
-          if (!contactId && opp.contact_id) contactId = String(opp.contact_id);
-        }
-      }
-
-      const payload: any = {
-        title: data.title,
-        description: data.description || null,
-        service_type_id: data.service_type_id || null,
-        service_id: data.service_id || null,
-        incoterms: data.incoterms || null,
-        carrier_id: data.carrier_id || null,
-        consignee_id: data.consignee_id || null,
-        origin_port_id: data.origin_port_id || null,
-        destination_port_id: data.destination_port_id || null,
-        account_id: accountId || null,
-        contact_id: contactId || null,
-        opportunity_id: opportunityId || null,
-        status: data.status || 'draft',
-        valid_until: data.valid_until || null,
-        tax_percent: data.tax_percent ? Number(data.tax_percent) : 0,
-        shipping_amount: data.shipping_amount ? Number(data.shipping_amount) : 0,
-        terms_conditions: data.terms_conditions || null,
-        notes: data.notes || null,
-        tenant_id: finalTenantId,
-        regulatory_data: {
-          trade_direction: data.trade_direction || null,
-        },
-      };
-
-      // Basic DB connectivity check
-      const { error: connectivityError } = await scopedDb.from('quotes').select('id').limit(1);
-      if (connectivityError) {
-        throw connectivityError;
-      }
-
-      let savedId = quoteId || '';
-      if (quoteId) {
-        const { error: updateError } = await scopedDb
-          .from('quotes')
-          .update(payload)
-          .eq('id', quoteId);
-        if (updateError) throw updateError;
-        savedId = quoteId;
-      } else {
-        const { data: inserted, error: insertError } = await scopedDb
-          .from('quotes')
-          .insert(payload)
-          .select('id')
-          .maybeSingle();
-        if (insertError) throw insertError;
-        savedId = String((inserted as any)?.id);
-      }
-
-      if (!savedId) {
-        throw new Error('Quote save did not return an id');
-      }
+      const savedId = await saveQuote({ quoteId, data });
 
       toast.success('Quote saved successfully');
       if (onSuccess) onSuccess(savedId);

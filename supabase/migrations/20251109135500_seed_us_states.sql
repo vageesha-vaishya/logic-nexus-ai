@@ -23,8 +23,8 @@ BEGIN
       ('Texas','TX'),('Utah','UT'),('Vermont','VT'),('Virginia','VA'),('Washington','WA'),('West Virginia','WV'),('Wisconsin','WI'),('Wyoming','WY'),
       ('District of Columbia','DC')
   )
-  INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-  SELECT NULL, v_us, v.name, v.code_iso, NULL, true
+  INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+  SELECT v_us, v.name, v.code_iso, NULL, true
   FROM vals v
   LEFT JOIN public.states s
     ON s.country_id = v_us AND s.code_iso = v.code_iso

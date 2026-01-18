@@ -3,7 +3,6 @@
 
 DO $$
 DECLARE
-  v_tenant uuid := '9e2686ba'::uuid;
   v_service_type_id uuid;
   v_service_intl_ocean_fcl uuid;
   v_service_fcl uuid;
@@ -24,23 +23,24 @@ BEGIN
   -- Resolve service ids by name (case-insensitive)
   SELECT s.id INTO v_service_intl_ocean_fcl
   FROM public.services s
-  WHERE lower(s.name) = 'international ocean fcl'
+  WHERE lower(s.service_name) = 'international ocean fcl'
   LIMIT 1;
 
   SELECT s.id INTO v_service_fcl
   FROM public.services s
-  WHERE lower(s.name) LIKE 'fcl%'
+  WHERE lower(s.service_name) LIKE 'fcl%'
   LIMIT 1;
 
   SELECT s.id INTO v_service_lcl
   FROM public.services s
-  WHERE lower(s.name) LIKE 'lcl%'
+  WHERE lower(s.service_name) LIKE 'lcl%'
   LIMIT 1;
 
   -- Insert mappings with priorities; prefer International Ocean FCL as default
   IF v_service_intl_ocean_fcl IS NOT NULL THEN
     INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
-    VALUES (v_tenant, v_service_type_id, v_service_intl_ocean_fcl, true, 1, true)
+    SELECT t.id, v_service_type_id, v_service_intl_ocean_fcl, true, 1, true
+    FROM public.tenants t
     ON CONFLICT (tenant_id, service_type_id, service_id) DO NOTHING;
   ELSE
     RAISE NOTICE 'Service International Ocean FCL not found.';
@@ -48,7 +48,8 @@ BEGIN
 
   IF v_service_fcl IS NOT NULL THEN
     INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
-    VALUES (v_tenant, v_service_type_id, v_service_fcl, false, 2, true)
+    SELECT t.id, v_service_type_id, v_service_fcl, false, 2, true
+    FROM public.tenants t
     ON CONFLICT (tenant_id, service_type_id, service_id) DO NOTHING;
   ELSE
     RAISE NOTICE 'Service FCL (Full Container Load) not found.';
@@ -56,7 +57,8 @@ BEGIN
 
   IF v_service_lcl IS NOT NULL THEN
     INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
-    VALUES (v_tenant, v_service_type_id, v_service_lcl, false, 0, true)
+    SELECT t.id, v_service_type_id, v_service_lcl, false, 0, true
+    FROM public.tenants t
     ON CONFLICT (tenant_id, service_type_id, service_id) DO NOTHING;
   ELSE
     RAISE NOTICE 'Service LCL (Less than Container Load) not found.';

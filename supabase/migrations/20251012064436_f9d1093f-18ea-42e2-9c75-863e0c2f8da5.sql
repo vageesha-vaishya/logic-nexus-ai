@@ -28,10 +28,12 @@ CREATE TABLE IF NOT EXISTS public.cargo_details (
 ALTER TABLE public.cargo_details ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for cargo_details
+DROP POLICY IF EXISTS "Platform admins can manage all cargo details" ON public.cargo_details;
 CREATE POLICY "Platform admins can manage all cargo details"
   ON public.cargo_details FOR ALL
   USING (is_platform_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Tenant admins can manage cargo details" ON public.cargo_details;
 CREATE POLICY "Tenant admins can manage cargo details"
   ON public.cargo_details FOR ALL
   USING (
@@ -39,10 +41,12 @@ CREATE POLICY "Tenant admins can manage cargo details"
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
 
+DROP POLICY IF EXISTS "Users can view tenant cargo details" ON public.cargo_details;
 CREATE POLICY "Users can view tenant cargo details"
   ON public.cargo_details FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
 
+DROP POLICY IF EXISTS "Users can create cargo details" ON public.cargo_details;
 CREATE POLICY "Users can create cargo details"
   ON public.cargo_details FOR INSERT
   WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));

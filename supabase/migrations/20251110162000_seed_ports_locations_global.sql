@@ -12,6 +12,7 @@ ALTER TABLE public.ports_locations
 
 -- 2) RLS: allow all authenticated users to view global ports
 -- Existing policies restrict SELECT to tenant rows; this adds visibility for global rows.
+DROP POLICY IF EXISTS "Users can view global ports" ON public.ports_locations;
 CREATE POLICY "Users can view global ports"
   ON public.ports_locations FOR SELECT
   USING (tenant_id IS NULL);

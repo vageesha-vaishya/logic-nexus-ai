@@ -1,6 +1,20 @@
 -- Seed carriers with SCAC/IATA codes and map to service types per tenant
 BEGIN;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'carriers'
+      AND column_name = 'carrier_name'
+  ) THEN
+    ALTER TABLE public.carriers
+      ADD COLUMN carrier_name TEXT;
+  END IF;
+END $$;
+
 -- Common tenants CTE for Ocean carriers (SCAC)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants

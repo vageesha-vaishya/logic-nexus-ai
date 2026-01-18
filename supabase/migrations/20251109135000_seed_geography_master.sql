@@ -3,26 +3,26 @@
 BEGIN;
 
 -- Continents (global)
-INSERT INTO public.continents (tenant_id, name, code_international, code_national, is_active)
+INSERT INTO public.continents (name, code_international, code_national, is_active)
 VALUES
-  (NULL, 'Africa', 'AF', NULL, true),
-  (NULL, 'Asia', 'AS', NULL, true),
-  (NULL, 'Europe', 'EU', NULL, true),
-  (NULL, 'North America', 'NA', NULL, true),
-  (NULL, 'South America', 'SA', NULL, true),
-  (NULL, 'Oceania', 'OC', NULL, true),
-  (NULL, 'Antarctica', 'AN', NULL, true)
+  ('Africa', 'AF', NULL, true),
+  ('Asia', 'AS', NULL, true),
+  ('Europe', 'EU', NULL, true),
+  ('North America', 'NA', NULL, true),
+  ('South America', 'SA', NULL, true),
+  ('Oceania', 'OC', NULL, true),
+  ('Antarctica', 'AN', NULL, true)
 ON CONFLICT (code_international) DO UPDATE SET name = EXCLUDED.name, is_active = EXCLUDED.is_active;
 
 -- Countries (global)
-INSERT INTO public.countries (tenant_id, continent_id, name, code_iso2, code_iso3, code_national, phone_code, is_active)
+INSERT INTO public.countries (continent_id, name, code_iso2, code_iso3, code_national, phone_code, is_active)
 VALUES
-  (NULL, (SELECT id FROM public.continents WHERE code_international = 'NA'), 'United States', 'US', 'USA', NULL, '+1', true),
-  (NULL, (SELECT id FROM public.continents WHERE code_international = 'NA'), 'Canada', 'CA', 'CAN', NULL, '+1', true),
-  (NULL, (SELECT id FROM public.continents WHERE code_international = 'EU'), 'United Kingdom', 'GB', 'GBR', NULL, '+44', true),
-  (NULL, (SELECT id FROM public.continents WHERE code_international = 'AS'), 'India', 'IN', 'IND', NULL, '+91', true),
-  (NULL, (SELECT id FROM public.continents WHERE code_international = 'AS'), 'China', 'CN', 'CHN', NULL, '+86', true),
-  (NULL, (SELECT id FROM public.continents WHERE code_international = 'OC'), 'Australia', 'AU', 'AUS', NULL, '+61', true)
+  ((SELECT id FROM public.continents WHERE code_international = 'NA'), 'United States', 'US', 'USA', NULL, '+1', true),
+  ((SELECT id FROM public.continents WHERE code_international = 'NA'), 'Canada', 'CA', 'CAN', NULL, '+1', true),
+  ((SELECT id FROM public.continents WHERE code_international = 'EU'), 'United Kingdom', 'GB', 'GBR', NULL, '+44', true),
+  ((SELECT id FROM public.continents WHERE code_international = 'AS'), 'India', 'IN', 'IND', NULL, '+91', true),
+  ((SELECT id FROM public.continents WHERE code_international = 'AS'), 'China', 'CN', 'CHN', NULL, '+86', true),
+  ((SELECT id FROM public.continents WHERE code_international = 'OC'), 'Australia', 'AU', 'AUS', NULL, '+61', true)
 ON CONFLICT (code_iso2) DO UPDATE SET name = EXCLUDED.name, continent_id = EXCLUDED.continent_id, is_active = EXCLUDED.is_active;
 
 -- States / Provinces (insert if not exists)
@@ -37,8 +37,8 @@ DECLARE
 BEGIN
   -- United States
   IF v_us IS NOT NULL THEN
-    INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-    SELECT NULL, v_us, s.name, s.code_iso, NULL, true FROM (VALUES
+    INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+    SELECT v_us, s.name, s.code_iso, NULL, true FROM (VALUES
       ('California','CA'),
       ('New York','NY'),
       ('Texas','TX')
@@ -48,8 +48,8 @@ BEGIN
 
   -- Canada
   IF v_ca IS NOT NULL THEN
-    INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-    SELECT NULL, v_ca, s.name, s.code_iso, NULL, true FROM (VALUES
+    INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+    SELECT v_ca, s.name, s.code_iso, NULL, true FROM (VALUES
       ('Ontario','ON'),
       ('British Columbia','BC'),
       ('Quebec','QC')
@@ -59,8 +59,8 @@ BEGIN
 
   -- United Kingdom
   IF v_gb IS NOT NULL THEN
-    INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-    SELECT NULL, v_gb, s.name, s.code_iso, NULL, true FROM (VALUES
+    INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+    SELECT v_gb, s.name, s.code_iso, NULL, true FROM (VALUES
       ('England','ENG'),
       ('Scotland','SCT'),
       ('Wales','WLS')
@@ -70,8 +70,8 @@ BEGIN
 
   -- India
   IF v_in IS NOT NULL THEN
-    INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-    SELECT NULL, v_in, s.name, s.code_iso, NULL, true FROM (VALUES
+    INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+    SELECT v_in, s.name, s.code_iso, NULL, true FROM (VALUES
       ('Maharashtra','MH'),
       ('Karnataka','KA'),
       ('Delhi','DL')
@@ -81,8 +81,8 @@ BEGIN
 
   -- China
   IF v_cn IS NOT NULL THEN
-    INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-    SELECT NULL, v_cn, s.name, s.code_iso, NULL, true FROM (VALUES
+    INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+    SELECT v_cn, s.name, s.code_iso, NULL, true FROM (VALUES
       ('Guangdong','GD'),
       ('Beijing','BJ'),
       ('Shanghai','SH')
@@ -92,8 +92,8 @@ BEGIN
 
   -- Australia
   IF v_au IS NOT NULL THEN
-    INSERT INTO public.states (tenant_id, country_id, name, code_iso, code_national, is_active)
-    SELECT NULL, v_au, s.name, s.code_iso, NULL, true FROM (VALUES
+    INSERT INTO public.states (country_id, name, code_iso, code_national, is_active)
+    SELECT v_au, s.name, s.code_iso, NULL, true FROM (VALUES
       ('New South Wales','NSW'),
       ('Victoria','VIC'),
       ('Queensland','QLD')
@@ -125,54 +125,54 @@ DECLARE
 BEGIN
   -- US
   IF c_us IS NOT NULL THEN
-    INSERT INTO public.cities (tenant_id, country_id, state_id, name, code_national, latitude, longitude, is_active)
+    INSERT INTO public.cities (country_id, state_id, name, code_national, latitude, longitude, is_active)
     VALUES
-      (NULL, c_us, s_ca, 'Los Angeles', NULL, 34.0522, -118.2437, true),
-      (NULL, c_us, s_ny, 'New York', NULL, 40.7128, -74.0060, true)
+      (c_us, s_ca, 'Los Angeles', NULL, 34.0522, -118.2437, true),
+      (c_us, s_ny, 'New York', NULL, 40.7128, -74.0060, true)
     ON CONFLICT DO NOTHING;
   END IF;
 
   -- Canada
   IF c_ca IS NOT NULL THEN
-    INSERT INTO public.cities (tenant_id, country_id, state_id, name, code_national, latitude, longitude, is_active)
+    INSERT INTO public.cities (country_id, state_id, name, code_national, latitude, longitude, is_active)
     VALUES
-      (NULL, c_ca, s_on, 'Toronto', NULL, 43.6532, -79.3832, true),
-      (NULL, c_ca, s_bc, 'Vancouver', NULL, 49.2827, -123.1207, true)
+      (c_ca, s_on, 'Toronto', NULL, 43.6532, -79.3832, true),
+      (c_ca, s_bc, 'Vancouver', NULL, 49.2827, -123.1207, true)
     ON CONFLICT DO NOTHING;
   END IF;
 
   -- UK
   IF c_gb IS NOT NULL THEN
-    INSERT INTO public.cities (tenant_id, country_id, state_id, name, code_national, latitude, longitude, is_active)
+    INSERT INTO public.cities (country_id, state_id, name, code_national, latitude, longitude, is_active)
     VALUES
-      (NULL, c_gb, s_eng, 'London', NULL, 51.5074, -0.1278, true)
+      (c_gb, s_eng, 'London', NULL, 51.5074, -0.1278, true)
     ON CONFLICT DO NOTHING;
   END IF;
 
   -- India
   IF c_in IS NOT NULL THEN
-    INSERT INTO public.cities (tenant_id, country_id, state_id, name, code_national, latitude, longitude, is_active)
+    INSERT INTO public.cities (country_id, state_id, name, code_national, latitude, longitude, is_active)
     VALUES
-      (NULL, c_in, s_mh, 'Mumbai', NULL, 19.0760, 72.8777, true),
-      (NULL, c_in, s_ka, 'Bengaluru', NULL, 12.9716, 77.5946, true)
+      (c_in, s_mh, 'Mumbai', NULL, 19.0760, 72.8777, true),
+      (c_in, s_ka, 'Bengaluru', NULL, 12.9716, 77.5946, true)
     ON CONFLICT DO NOTHING;
   END IF;
 
   -- China
   IF c_cn IS NOT NULL THEN
-    INSERT INTO public.cities (tenant_id, country_id, state_id, name, code_national, latitude, longitude, is_active)
+    INSERT INTO public.cities (country_id, state_id, name, code_national, latitude, longitude, is_active)
     VALUES
-      (NULL, c_cn, s_gd, 'Guangzhou', NULL, 23.1291, 113.2644, true),
-      (NULL, c_cn, s_bj, 'Beijing', NULL, 39.9042, 116.4074, true)
+      (c_cn, s_gd, 'Guangzhou', NULL, 23.1291, 113.2644, true),
+      (c_cn, s_bj, 'Beijing', NULL, 39.9042, 116.4074, true)
     ON CONFLICT DO NOTHING;
   END IF;
 
   -- Australia
   IF c_au IS NOT NULL THEN
-    INSERT INTO public.cities (tenant_id, country_id, state_id, name, code_national, latitude, longitude, is_active)
+    INSERT INTO public.cities (country_id, state_id, name, code_national, latitude, longitude, is_active)
     VALUES
-      (NULL, c_au, s_nsw, 'Sydney', NULL, -33.8688, 151.2093, true),
-      (NULL, c_au, s_vic, 'Melbourne', NULL, -37.8136, 144.9631, true)
+      (c_au, s_nsw, 'Sydney', NULL, -33.8688, 151.2093, true),
+      (c_au, s_vic, 'Melbourne', NULL, -37.8136, 144.9631, true)
     ON CONFLICT DO NOTHING;
   END IF;
 END$$;

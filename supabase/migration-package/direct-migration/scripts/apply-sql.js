@@ -23,12 +23,55 @@ const log = (msg, type = 'info') => {
     console.log(`${color}[${timestamp}] [${type.toUpperCase()}] ${msg}${colors.reset}`);
 };
 
+function loadNewSupabaseEnv() {
+    try {
+        const envPath = path.resolve(__dirname, '..', '..', 'new-supabase-config.env');
+        if (!fs.existsSync(envPath)) {
+            return;
+        }
+        const text = fs.readFileSync(envPath, 'utf8');
+        const lines = text.split(/\r?\n/);
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) {
+                continue;
+            }
+            const idx = trimmed.indexOf('=');
+            if (idx === -1) {
+                continue;
+            }
+            const key = trimmed.slice(0, idx).trim();
+            let value = trimmed.slice(idx + 1).trim();
+            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.slice(1, -1);
+            }
+            if (key && !(key in process.env)) {
+                process.env[key] = value;
+            }
+        }
+    } catch (err) {
+        log(`Could not load new-supabase-config.env: ${err.message}`, 'warn');
+    }
+}
+
 async function applySql() {
-    const targetUrl = process.argv[2];
+    loadNewSupabaseEnv();
+
+    let targetUrl = process.argv[2];
     const scriptPath = process.argv[3];
+
+    if (!targetUrl || targetUrl === 'NEW_DB_URL' || targetUrl === '$NEW_DB_URL') {
+        targetUrl = process.env.NEW_DB_URL;
+    }
 
     if (!targetUrl || !scriptPath) {
         log('Usage: node apply-sql.js <TARGET_DB_URL> <SCRIPT_PATH_OR_DIR>', 'error');
+        process.exit(1);
+    }
+
+    if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        log('TARGET_DB_URL must be a PostgreSQL connection string, not the Supabase REST URL.', 'error');
+        log('Use the connection string from Supabase: Settings → Database → Connection string (postgresql://...).', 'error');
         process.exit(1);
     }
 
