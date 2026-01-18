@@ -44,6 +44,50 @@ function fixMigrationSql(sql: string): string {
   return fixed.trim();
 }
 
+// Split SQL into individual statements for batch execution
+function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = '';
+  let inDollarQuote = false;
+  let dollarTag = '';
+  
+  const lines = sql.split('\n');
+  
+  for (const line of lines) {
+    // Check for dollar quote start/end
+    const dollarMatch = line.match(/(\$[a-zA-Z_]*\$)/g);
+    if (dollarMatch) {
+      for (const match of dollarMatch) {
+        if (!inDollarQuote) {
+          inDollarQuote = true;
+          dollarTag = match;
+        } else if (match === dollarTag) {
+          inDollarQuote = false;
+          dollarTag = '';
+        }
+      }
+    }
+    
+    current += line + '\n';
+    
+    // If not in dollar quote and line ends with semicolon, it's end of statement
+    if (!inDollarQuote && line.trim().endsWith(';')) {
+      const stmt = current.trim();
+      if (stmt && !stmt.match(/^--/) && stmt !== ';') {
+        statements.push(stmt);
+      }
+      current = '';
+    }
+  }
+  
+  // Handle any remaining content
+  if (current.trim()) {
+    statements.push(current.trim());
+  }
+  
+  return statements;
+}
+
 // Parse connection string into components
 function parseConnectionString(connectionString: string): {
   hostname: string;
@@ -213,10 +257,14 @@ serve(async (req) => {
 
       // Fix the SQL
       const fixedSql = fixMigrationSql(migration.sql);
+      
+      // Split into individual statements for large files
+      const statements = splitSqlStatements(fixedSql);
+      console.log(`[push-migrations-to-target] Migration ${migration.name} has ${statements.length} statements`);
 
       if (dryRun) {
         // In dry run mode, just validate the SQL syntax
-        console.log(`[push-migrations-to-target] DRY RUN: Would apply ${migration.name}`);
+        console.log(`[push-migrations-to-target] DRY RUN: Would apply ${migration.name} (${statements.length} statements)`);
         results.push({
           name: migration.name,
           success: true,
@@ -227,9 +275,27 @@ serve(async (req) => {
       }
 
       try {
-        // Execute the migration
+        // Execute statements one by one for large migrations
         console.log(`[push-migrations-to-target] Applying: ${migration.name}`);
-        await client.queryObject(fixedSql);
+        
+        let stmtIndex = 0;
+        for (const stmt of statements) {
+          if (stmt.trim()) {
+            try {
+              await client.queryObject(stmt);
+              stmtIndex++;
+              // Log progress every 50 statements
+              if (stmtIndex % 50 === 0) {
+                console.log(`[push-migrations-to-target] Progress: ${stmtIndex}/${statements.length} statements`);
+              }
+            } catch (stmtErr) {
+              // Log which statement failed
+              console.error(`[push-migrations-to-target] Failed at statement ${stmtIndex + 1}: ${stmt.substring(0, 100)}...`);
+              throw stmtErr;
+            }
+          }
+        }
+        
         const duration = Date.now() - startTime;
 
         // Record successful migration
@@ -249,7 +315,7 @@ serve(async (req) => {
           duration_ms: duration,
         });
         successCount++;
-        console.log(`[push-migrations-to-target] SUCCESS: ${migration.name} (${duration}ms)`);
+        console.log(`[push-migrations-to-target] SUCCESS: ${migration.name} (${duration}ms, ${statements.length} statements)`);
       } catch (err) {
         const duration = Date.now() - startTime;
         const errorMessage = err instanceof Error ? err.message : String(err);
