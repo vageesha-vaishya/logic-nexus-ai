@@ -2763,6 +2763,39 @@ export type Database = {
           },
         ]
       }
+      import_overrides: {
+        Row: {
+          action: string
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          id: string
+          issues: string[] | null
+          timestamp: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          id?: string
+          issues?: string[] | null
+          timestamp?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          issues?: string[] | null
+          timestamp?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       incoterms: {
         Row: {
           created_at: string | null
@@ -7757,6 +7790,17 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_lead_with_transaction: {
+        Args: {
+          p_assigned_to: string
+          p_assignment_method: string
+          p_franchise_id: string
+          p_lead_id: string
+          p_rule_id: string
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
       calculate_dimensional_weight: {
         Args: {
           p_divisor?: number
@@ -8133,6 +8177,10 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_admin: { Args: { _user_id: string }; Returns: boolean }
       is_viewer: { Args: { _user_id: string }; Returns: boolean }
+      logic_nexus_import_dry_run: {
+        Args: { p_schema?: string; p_tables: Json }
+        Returns: Json
+      }
       preview_next_quote_number: {
         Args: { p_franchise_id?: string; p_tenant_id: string }
         Returns: string
