@@ -179,8 +179,11 @@ export default function MigrationPushPanel() {
 
       setActiveTab('results');
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('Error pushing migrations:', error);
-      toast.error('Failed to push migrations');
+      toast.error('Failed to push migrations', {
+        description: msg,
+      });
       setPushResult({
         success: false,
         total: migrations.length,
@@ -189,7 +192,7 @@ export default function MigrationPushPanel() {
         failed: migrations.length,
         dryRun,
         results: [],
-        error: error instanceof Error ? error.message : String(error)
+        error: msg,
       });
     } finally {
       setIsPushing(false);
