@@ -100,24 +100,58 @@ serve(async (req) => {
   }
 
   try {
-    const targetDbUrl = Deno.env.get('TARGET_DB_URL');
-    if (!targetDbUrl) {
-      throw new Error('TARGET_DB_URL secret not configured');
-    }
-
-    const { migrations, dryRun = false } = await req.json() as { 
+    const body = await req.json() as { 
       migrations: MigrationFile[]; 
       dryRun?: boolean;
+      connectionString?: string;
+      host?: string;
+      port?: number;
+      database?: string;
+      user?: string;
+      password?: string;
     };
+    
+    const { migrations, dryRun = false } = body;
+
+    let connConfig: {
+      hostname: string;
+      port: number;
+      database: string;
+      user: string;
+      password: string;
+    };
+
+    // Priority 1: Explicit connection parameters
+    if (body.host && body.database && body.user && body.password) {
+      connConfig = {
+        hostname: body.host,
+        port: body.port || 5432,
+        database: body.database,
+        user: body.user,
+        password: body.password,
+      };
+      console.log(`[push-migrations-to-target] Using explicit connection params`);
+    } 
+    // Priority 2: Connection string from request
+    else if (body.connectionString) {
+      connConfig = parseConnectionString(body.connectionString);
+      console.log(`[push-migrations-to-target] Using connection string from request`);
+    }
+    // Priority 3: Environment variable
+    else {
+      const targetDbUrl = Deno.env.get('TARGET_DB_URL');
+      if (!targetDbUrl) {
+        throw new Error('No connection provided. Pass host/database/user/password params, connectionString, or configure TARGET_DB_URL secret');
+      }
+      connConfig = parseConnectionString(targetDbUrl);
+      console.log(`[push-migrations-to-target] Using TARGET_DB_URL from environment`);
+    }
 
     if (!migrations || !Array.isArray(migrations) || migrations.length === 0) {
       throw new Error('No migrations provided');
     }
 
     console.log(`[push-migrations-to-target] Processing ${migrations.length} migrations (dryRun: ${dryRun})`);
-
-    // Parse connection string properly
-    const connConfig = parseConnectionString(targetDbUrl);
     console.log(`[push-migrations-to-target] Connecting to ${connConfig.hostname}:${connConfig.port}/${connConfig.database}`);
 
     // Connect to target database with explicit options
