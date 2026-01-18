@@ -6,6 +6,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Database, 
   Upload, 
@@ -40,6 +42,14 @@ interface PushResponse {
   error?: string;
 }
 
+interface ConnectionParams {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+}
+
 // Hardcoded migration file list - in real implementation, this would be fetched from the repo
 const MIGRATION_FILES: MigrationFile[] = [];
 
@@ -56,7 +66,16 @@ export default function MigrationPushPanel() {
   } | null>(null);
   const [pushResult, setPushResult] = useState<PushResponse | null>(null);
   const [migrations, setMigrations] = useState<MigrationFile[]>([]);
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useState('connect');
+  
+  // Connection parameters
+  const [connectionParams, setConnectionParams] = useState<ConnectionParams>({
+    host: 'db.iutyqzjlpenfddqdwcsk.supabase.co',
+    port: 5432,
+    database: 'postgres',
+    user: 'postgres',
+    password: ''
+  });
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -131,11 +150,12 @@ export default function MigrationPushPanel() {
       
       console.log(`Pushing ${fixed.length} migrations (${issues.length} issues auto-fixed)`);
       
-      // Call edge function
+      // Call edge function with connection params
       const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
         body: {
           migrations: fixed,
-          dryRun
+          dryRun,
+          ...connectionParams
         }
       });
 
