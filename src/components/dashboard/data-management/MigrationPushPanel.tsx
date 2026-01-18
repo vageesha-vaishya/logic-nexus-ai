@@ -40,6 +40,13 @@ interface PushResponse {
   dryRun: boolean;
   results: MigrationResult[];
   error?: string;
+  in_progress?: boolean;
+  progress?: {
+    version: string;
+    statement_index: number;
+    statement_total: number;
+    percent: number;
+  };
 }
 
 interface ConnectionParams {
@@ -151,31 +158,65 @@ export default function MigrationPushPanel() {
     try {
       // Fix all migrations before pushing
       const { fixed, issues } = fixAllMigrations(migrations);
-      
+
       console.log(`Pushing ${fixed.length} migrations (${issues.length} issues auto-fixed)`);
-      
-      // Call edge function with connection params
-      const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
-        body: {
-          migrations: fixed,
-          dryRun,
-          ...connectionParams
-        }
-      });
 
-      if (error) throw error;
+      // Large exports can exceed backend CPU limits; push in chunks.
+      const batchSize = 50;
+      const maxCalls = 2000;
 
-      setPushResult(data as PushResponse);
-      
-      if (data.success) {
-        toast.success(
-          dryRun 
-            ? `Dry run complete: ${data.applied} migrations would be applied`
-            : `Successfully applied ${data.applied} migrations`
-        );
+      let lastData: PushResponse | null = null;
+
+      if (dryRun) {
+        const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
+          body: {
+            migrations: fixed,
+            dryRun,
+            batchSize,
+            ...connectionParams,
+          },
+        });
+        if (error) throw error;
+        lastData = data as PushResponse;
       } else {
-        toast.error(`Migration push failed: ${data.failed} errors`);
+        for (let call = 0; call < maxCalls; call++) {
+          const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
+            body: {
+              migrations: fixed,
+              dryRun,
+              batchSize,
+              ...connectionParams,
+            },
+          });
+
+          if (error) throw error;
+          lastData = data as PushResponse;
+
+          if (lastData.progress) {
+            setProgress(lastData.progress.percent);
+          }
+
+          // Stop when complete or failure
+          if (!lastData.in_progress || !lastData.success) {
+            break;
+          }
+
+          await new Promise((r) => setTimeout(r, 150));
+        }
       }
+
+      if (!lastData) throw new Error('No response from backend function');
+
+      setPushResult(lastData);
+
+      if (lastData.success) {
+        toast.success(dryRun ? 'Dry run complete' : `Migrations applied: ${lastData.applied}/${lastData.total}`);
+      } else {
+        toast.error('Migration push failed', { description: lastData.error ?? 'See results for details' });
+      }
+
+      setActiveTab('results');
+    }
 
       setActiveTab('results');
     } catch (error) {

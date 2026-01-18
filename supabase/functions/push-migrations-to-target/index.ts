@@ -239,141 +239,248 @@ serve(async (req) => {
         error_message TEXT
       )
     `);
-    console.log('[push-migrations-to-target] Ensured schema_migrations table exists');
 
-    // Get already applied migrations
-    const appliedResult = await client.queryObject<{ version: string }>(`
-      SELECT version FROM public.schema_migrations WHERE success = true
+    // Track resumable progress for large migrations
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS public.schema_migration_progress (
+        version TEXT PRIMARY KEY,
+        next_index INTEGER NOT NULL DEFAULT 0,
+        total_statements INTEGER,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
     `);
-    const appliedVersions = new Set(appliedResult.rows.map(r => r.version));
-    console.log(`[push-migrations-to-target] Found ${appliedVersions.size} already applied migrations`);
 
-    const results: MigrationResult[] = [];
-    let successCount = 0;
-    let skipCount = 0;
-    let errorCount = 0;
+    console.log('[push-migrations-to-target] Ensured migration tracking tables exist');
+
+    const batchSize = Math.max(1, Math.min(200, Number((body as any).batchSize ?? 50)));
 
     // Sort migrations by name (timestamp prefix)
     const sortedMigrations = [...migrations].sort((a, b) => a.name.localeCompare(b.name));
+    const versions = sortedMigrations.map((m) => m.name.replace(/\.sql$/i, ''));
 
-    for (const migration of sortedMigrations) {
-      const startTime = Date.now();
-      const version = migration.name.replace('.sql', '');
+    // Fetch state from target DB
+    const appliedResult = await client.queryObject<{ version: string }>(
+      `SELECT version FROM public.schema_migrations WHERE success = true AND version = ANY($1::text[])`,
+      [versions]
+    );
+    const appliedVersions = new Set(appliedResult.rows.map((r) => r.version));
 
-      // Skip if already applied
-      if (appliedVersions.has(version)) {
-        console.log(`[push-migrations-to-target] Skipping already applied: ${migration.name}`);
+    const failedResult = await client.queryObject<{ version: string; error_message: string | null }>(
+      `SELECT version, error_message FROM public.schema_migrations WHERE success = false AND version = ANY($1::text[])`,
+      [versions]
+    );
+    const failedMap = new Map(failedResult.rows.map((r) => [r.version, r.error_message ?? 'Migration failed']));
+
+    const progressResult = await client.queryObject<{ version: string; next_index: number; total_statements: number | null }>(
+      `SELECT version, next_index, total_statements FROM public.schema_migration_progress WHERE version = ANY($1::text[])`,
+      [versions]
+    );
+    const progressMap = new Map(progressResult.rows.map((r) => [r.version, r]));
+
+    console.log(
+      `[push-migrations-to-target] State: applied=${appliedVersions.size}, failed=${failedMap.size}, in_progress=${progressMap.size}`
+    );
+
+    // If any migration already failed, stop early (user needs to fix the SQL / state)
+    if (!dryRun && failedMap.size > 0) {
+      const results: MigrationResult[] = sortedMigrations.map((m) => {
+        const version = m.name.replace(/\.sql$/i, '');
+        if (appliedVersions.has(version)) {
+          return { name: m.name, success: true, duration_ms: 0, error: 'Already applied' };
+        }
+        if (failedMap.has(version)) {
+          return { name: m.name, success: false, duration_ms: 0, error: failedMap.get(version) };
+        }
+        if (progressMap.has(version)) {
+          return { name: m.name, success: true, duration_ms: 0, error: 'In progress' };
+        }
+        return { name: m.name, success: true, duration_ms: 0, error: 'Pending' };
+      });
+
+      await client.end();
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          total: migrations.length,
+          applied: appliedVersions.size,
+          skipped: 0,
+          failed: failedMap.size,
+          dryRun,
+          results,
+          error: 'At least one migration previously failed. Fix it (or reset the target DB) before continuing.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    // DRY RUN: only report status and statement counts for each migration (no execution)
+    if (dryRun) {
+      const results: MigrationResult[] = [];
+      for (const migration of sortedMigrations) {
+        const version = migration.name.replace(/\.sql$/i, '');
+
+        if (appliedVersions.has(version)) {
+          results.push({ name: migration.name, success: true, duration_ms: 0, error: 'Already applied' });
+          continue;
+        }
+
+        const fixedSql = fixMigrationSql(migration.sql);
+        const statements = splitSqlStatements(fixedSql);
         results.push({
           name: migration.name,
           success: true,
           duration_ms: 0,
-          error: 'Already applied'
+          error: `Would apply (${statements.length} statements)`,
         });
-        skipCount++;
-        continue;
       }
 
-      // Fix the SQL
-      const fixedSql = fixMigrationSql(migration.sql);
-      
-      // Split into individual statements for large files
-      const statements = splitSqlStatements(fixedSql);
-      console.log(`[push-migrations-to-target] Migration ${migration.name} has ${statements.length} statements`);
+      await client.end();
 
-      if (dryRun) {
-        // In dry run mode, just validate the SQL syntax
-        console.log(`[push-migrations-to-target] DRY RUN: Would apply ${migration.name} (${statements.length} statements)`);
-        results.push({
-          name: migration.name,
+      return new Response(
+        JSON.stringify({
           success: true,
-          duration_ms: Date.now() - startTime,
-        });
-        successCount++;
-        continue;
-      }
+          total: migrations.length,
+          applied: appliedVersions.size,
+          skipped: 0,
+          failed: 0,
+          dryRun,
+          results,
+          in_progress: false,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // EXECUTION MODE: apply at most ONE migration chunk per invocation (prevents WORKER_LIMIT)
+    let progress:
+      | { version: string; statement_index: number; statement_total: number; percent: number }
+      | undefined;
+
+    let worked = false;
+
+    for (const migration of sortedMigrations) {
+      const startTime = Date.now();
+      const version = migration.name.replace(/\.sql$/i, '');
+
+      if (appliedVersions.has(version)) continue;
+      if (failedMap.has(version)) continue;
+
+      const fixedSql = fixMigrationSql(migration.sql);
+      const statements = splitSqlStatements(fixedSql);
+
+      const existingProgress = progressMap.get(version);
+      const startIndex = Math.max(0, existingProgress?.next_index ?? 0);
+      const totalStatements = statements.length;
+      const endIndex = Math.min(totalStatements, startIndex + batchSize);
+
+      console.log(
+        `[push-migrations-to-target] Applying chunk: ${migration.name} statements ${startIndex + 1}-${endIndex}/${totalStatements} (batchSize=${batchSize})`
+      );
 
       try {
-        // Execute statements one by one for large migrations
-        console.log(`[push-migrations-to-target] Applying: ${migration.name}`);
-        
-        let stmtIndex = 0;
-        for (const stmt of statements) {
-          if (stmt.trim()) {
-            try {
-              await client.queryObject(stmt);
-              stmtIndex++;
-              // Log progress every 50 statements
-              if (stmtIndex % 50 === 0) {
-                console.log(`[push-migrations-to-target] Progress: ${stmtIndex}/${statements.length} statements`);
-              }
-            } catch (stmtErr) {
-              // Log which statement failed
-              console.error(`[push-migrations-to-target] Failed at statement ${stmtIndex + 1}: ${stmt.substring(0, 100)}...`);
-              throw stmtErr;
-            }
-          }
+        for (let i = startIndex; i < endIndex; i++) {
+          const stmt = statements[i];
+          if (!stmt || !stmt.trim()) continue;
+          await client.queryObject(stmt);
         }
-        
+
         const duration = Date.now() - startTime;
 
-        // Record successful migration
-        await client.queryObject(`
-          INSERT INTO public.schema_migrations (version, execution_time_ms, success)
-          VALUES ($1, $2, true)
-          ON CONFLICT (version) DO UPDATE SET 
-            applied_at = NOW(), 
-            execution_time_ms = $2, 
-            success = true,
-            error_message = NULL
-        `, [version, duration]);
+        // Update progress
+        await client.queryObject(
+          `
+          INSERT INTO public.schema_migration_progress (version, next_index, total_statements, updated_at)
+          VALUES ($1, $2, $3, NOW())
+          ON CONFLICT (version) DO UPDATE SET
+            next_index = EXCLUDED.next_index,
+            total_statements = COALESCE(public.schema_migration_progress.total_statements, EXCLUDED.total_statements),
+            updated_at = NOW()
+        `,
+          [version, endIndex, totalStatements]
+        );
 
-        results.push({
-          name: migration.name,
-          success: true,
-          duration_ms: duration,
-        });
-        successCount++;
-        console.log(`[push-migrations-to-target] SUCCESS: ${migration.name} (${duration}ms, ${statements.length} statements)`);
+        if (endIndex >= totalStatements) {
+          // Mark migration complete
+          await client.queryObject(`DELETE FROM public.schema_migration_progress WHERE version = $1`, [version]);
+
+          await client.queryObject(
+            `
+            INSERT INTO public.schema_migrations (version, execution_time_ms, success)
+            VALUES ($1, $2, true)
+            ON CONFLICT (version) DO UPDATE SET
+              applied_at = NOW(),
+              execution_time_ms = $2,
+              success = true,
+              error_message = NULL
+          `,
+            [version, duration]
+          );
+
+          appliedVersions.add(version);
+          console.log(`[push-migrations-to-target] COMPLETE: ${migration.name} (${totalStatements} statements)`);
+        }
+
+        progress = {
+          version,
+          statement_index: endIndex,
+          statement_total: totalStatements,
+          percent: totalStatements === 0 ? 100 : Math.round((endIndex / totalStatements) * 100),
+        };
+
+        worked = true;
       } catch (err) {
         const duration = Date.now() - startTime;
         const errorMessage = err instanceof Error ? err.message : String(err);
 
-        // Record failed migration
-        await client.queryObject(`
+        await client.queryObject(
+          `
           INSERT INTO public.schema_migrations (version, execution_time_ms, success, error_message)
           VALUES ($1, $2, false, $3)
-          ON CONFLICT (version) DO UPDATE SET 
-            applied_at = NOW(), 
-            execution_time_ms = $2, 
+          ON CONFLICT (version) DO UPDATE SET
+            applied_at = NOW(),
+            execution_time_ms = $2,
             success = false,
             error_message = $3
-        `, [version, duration, errorMessage]);
+        `,
+          [version, duration, errorMessage]
+        );
 
-        results.push({
-          name: migration.name,
-          success: false,
-          error: errorMessage,
-          duration_ms: duration,
-        });
-        errorCount++;
+        failedMap.set(version, errorMessage);
+
         console.error(`[push-migrations-to-target] FAILED: ${migration.name} - ${errorMessage}`);
+        break;
       }
+
+      // only one chunk per call
+      break;
     }
+
+    // Recompute final status after this chunk
+    const stillPending = versions.some((v) => !appliedVersions.has(v) && !failedMap.has(v));
+    const results: MigrationResult[] = sortedMigrations.map((m) => {
+      const version = m.name.replace(/\.sql$/i, '');
+      if (appliedVersions.has(version)) return { name: m.name, success: true, duration_ms: 0, error: 'Applied' };
+      if (failedMap.has(version)) return { name: m.name, success: false, duration_ms: 0, error: failedMap.get(version) };
+      if (progressMap.has(version) || (progress && progress.version === version)) return { name: m.name, success: true, duration_ms: 0, error: 'In progress' };
+      return { name: m.name, success: true, duration_ms: 0, error: 'Pending' };
+    });
 
     await client.end();
     console.log('[push-migrations-to-target] Disconnected from target database');
 
     const response = {
-      success: errorCount === 0,
+      success: failedMap.size === 0 && !stillPending,
       total: migrations.length,
-      applied: successCount,
-      skipped: skipCount,
-      failed: errorCount,
+      applied: appliedVersions.size,
+      skipped: 0,
+      failed: failedMap.size,
       dryRun,
       results,
+      in_progress: stillPending && failedMap.size === 0,
+      progress,
+      worked,
     };
-
-    console.log(`[push-migrations-to-target] Complete: ${successCount} applied, ${skipCount} skipped, ${errorCount} failed`);
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
