@@ -1,7 +1,7 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import PostalMime from "npm:postal-mime@2.2.0";
+import PostalMime from "https://esm.sh/postal-mime@2.2.0";
 import { Logger } from '../_shared/logger.ts';
 
 console.log("Sync-emails function loaded");
@@ -278,7 +278,10 @@ serve(async (req: any) => {
             console.log("Inbox is empty, nothing to sync.");
             await sendCommand("A99", "LOGOUT");
             conn.close();
-            return;
+            return new Response(
+              JSON.stringify({ success: true, synced: 0, message: "Inbox is empty" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+            );
         }
 
         // Fetch recent messages (last 20) using sequence numbers
