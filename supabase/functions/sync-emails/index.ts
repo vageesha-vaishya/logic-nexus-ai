@@ -1,8 +1,10 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { simpleParser } from "npm:mailparser@3.6.4";
+import PostalMime from "npm:postal-mime@2.2.0";
 import { Logger } from '../_shared/logger.ts';
+
+console.log("Sync-emails function loaded");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -317,10 +319,11 @@ serve(async (req: any) => {
             const rawMessage = `${headers}\r\n\r\n${bodyText}`;
             let parsed: any = null;
             try {
-              parsed = await simpleParser(rawMessage);
+              const parser = new PostalMime();
+              parsed = await parser.parse(rawMessage);
             } catch (e) {
               console.error(`IMAP mailparser error for message ${seq}:`, e);
-              // Fallback: continue with regex-extracted data if simpleParser fails
+              // Fallback: continue with regex-extracted data if parser fails
             }
 
             const messageIdHeader = parsed?.messageId
@@ -328,17 +331,19 @@ serve(async (req: any) => {
               : (headers.match(/^Message-ID:\s*<(.+)>$/mi)?.[1] || `imap-${seq}-${Date.now()}`);
 
             const subject = parsed?.subject || headers.match(/^Subject:\s*(.+)$/mi)?.[1] || "(No Subject)";
-            const parsedFrom = parsed?.from?.value?.[0];
+            
+            // postal-mime 'from' is a single address object or undefined
+            const parsedFrom = parsed?.from; 
             const fromEmail = normalizeEmail(parsedFrom?.address || (headers.match(/^From:\s*(.+)$/mi)?.[1] || ""));
             const fromName = (parsedFrom?.name || "").trim() || (headers.match(/^From:\s*(.+)$/mi)?.[1] || "").replace(/<.+>/, "").trim();
 
-            const toEmails = (parsed?.to?.value || [])
+            const toEmails = (parsed?.to || [])
               .map((v: any) => ({ email: normalizeEmail(v.address || ""), name: (v.name || "").trim() || undefined }))
               .filter((v: any) => v.email);
-            const ccEmails = (parsed?.cc?.value || [])
+            const ccEmails = (parsed?.cc || [])
               .map((v: any) => ({ email: normalizeEmail(v.address || ""), name: (v.name || "").trim() || undefined }))
               .filter((v: any) => v.email);
-            const bccEmails = (parsed?.bcc?.value || [])
+            const bccEmails = (parsed?.bcc || [])
               .map((v: any) => ({ email: normalizeEmail(v.address || ""), name: (v.name || "").trim() || undefined }))
               .filter((v: any) => v.email);
 
@@ -356,7 +361,8 @@ serve(async (req: any) => {
             for (const att of parsedAttachments) {
               try {
                 const filename = String(att?.filename || "attachment");
-                const content = att?.content instanceof Uint8Array ? att.content : null;
+                // postal-mime content is Uint8Array
+                const content = att?.content; 
                 if (!content) continue;
                 const uploadedPath = await uploadAttachment(encodeBase64(content), filename, messageIdHeader);
                 if (uploadedPath) {
@@ -364,8 +370,8 @@ serve(async (req: any) => {
                     filename,
                     path: uploadedPath,
                     size: content.length,
-                    type: String(att?.contentType || "application/octet-stream"),
-                    content_id: att?.cid || null,
+                    type: String(att?.mimeType || "application/octet-stream"),
+                    content_id: att?.contentId || null,
                   });
                 }
               } catch (e) {
@@ -373,7 +379,10 @@ serve(async (req: any) => {
               }
             }
             const internetHeaders = Array.isArray(parsed?.headers)
-              ? Object.fromEntries(parsed.headers)
+              ? parsed.headers.reduce((acc: any, h: any) => {
+                  if (h?.key && h?.value) acc[h.key] = h.value;
+                  return acc;
+                }, {})
               : (parsed?.headerLines || []).reduce((acc: Record<string, string>, h: any) => {
                   if (h?.key && h?.line) acc[h.key] = h.line;
                   return acc;
@@ -853,21 +862,42 @@ serve(async (req: any) => {
             const messageRaw = raw.replace(/\r\n\.\r\n$/, "");
             let parsed: any = null;
             try {
-              parsed = await simpleParser(messageRaw);
+              const parser = new PostalMime();
+              parsed = await parser.parse(messageRaw);
             } catch { parsed = null; }
+            
             const messageId = parsed?.messageId ? String(parsed.messageId).replace(/[<>]/g, "") : `pop3-${id}-${Date.now()}`;
             const subject = parsed?.subject || "(No Subject)";
-            const from = parsed?.from?.value?.[0];
-            const fromEmail = String(from?.address || "").toLowerCase();
-            const fromName = (from?.name || "").trim() || fromEmail;
-            const toEmails = (parsed?.to?.value || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
-            const ccEmails = (parsed?.cc?.value || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
-            const bccEmails = (parsed?.bcc?.value || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            
+            const parsedFrom = parsed?.from;
+            const fromEmail = String(parsedFrom?.address || "").toLowerCase();
+            const fromName = (parsedFrom?.name || "").trim() || fromEmail;
+            
+            const toEmails = (parsed?.to || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            const ccEmails = (parsed?.cc || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            const bccEmails = (parsed?.bcc || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
+            
             const bodyText = (parsed?.text || "").trim();
             const bodyHtml = typeof parsed?.html === "string" ? parsed.html : "";
             const receivedAt = parsed?.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
-            const inReplyTo = parsed?.inReplyTo ? String(parsed.inReplyTo).replace(/[<>]/g, "") : null;
-            const references = Array.isArray(parsed?.references) ? parsed.references.map((r: string) => r.replace(/[<>]/g, "")).filter(Boolean) : [];
+            
+            const getHeader = (key: string) => {
+               if (Array.isArray(parsed?.headers)) {
+                 return parsed.headers.find((h: any) => h.key.toLowerCase() === key.toLowerCase())?.value;
+               }
+               return null;
+            };
+
+            const inReplyTo = parsed?.inReplyTo 
+              ? String(parsed.inReplyTo).replace(/[<>]/g, "") 
+              : (getHeader("in-reply-to") ? String(getHeader("in-reply-to")).replace(/[<>]/g, "") : null);
+            
+            const referencesHeader = parsed?.references || getHeader("references");
+            const references = Array.isArray(referencesHeader) 
+              ? referencesHeader.map((r: string) => r.replace(/[<>]/g, "")).filter(Boolean)
+              : (typeof referencesHeader === "string" 
+                  ? referencesHeader.split(/\s+/).map((s: string) => s.replace(/[<>]/g, "")).filter(Boolean)
+                  : []);
             const conversationId = references.length ? references[0] : (inReplyTo || messageId);
             const { data: existing } = await supabase
               .from("emails")
