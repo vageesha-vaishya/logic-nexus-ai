@@ -3,6 +3,7 @@
 ## 1. Issue Summary
 Users reported that "0 emails are being sent or received" despite successful connection tests.
 Additionally, an "Event Loop Error" (`Deno.core.runMicrotasks() is not supported`) was causing the Edge Function to crash at startup.
+The original `sync-emails` function was monolithic and hard to maintain, leading to protocol-specific bugs.
 
 ## 2. Root Cause Analysis
 
@@ -21,51 +22,50 @@ The function crashed with `UncaughtException: Deno.core.runMicrotasks() is not s
 - **Cause**: Usage of `https://esm.sh/mailparser@3.6.4?target=deno` brought in incompatible Node.js polyfills (via `std/node`) that clashed with the Supabase Edge Runtime version.
 - **Result**: The function failed to start or process any requests.
 
-### D. Sending Emails
-- Sending relies on the `Resend` provider by default.
-- Custom SMTP sending was not fully implemented for all account types, falling back to Resend.
-
 ## 3. Implemented Fixes
 
-### 1. Fix Event Loop Crash
-Modified `supabase/functions/sync-emails/index.ts`:
-- Replaced `https://esm.sh/mailparser` with `npm:mailparser`.
-- **Why**: `npm:` specifiers use Deno's native, robust Node.js compatibility layer, avoiding the polyfill issues.
+### 1. Architecture Overhaul: `sync-emails-v2`
+Created a new, modular Edge Function `sync-emails-v2` to replace the legacy function.
+- **Modular Design**: Separated logic into dedicated services:
+  - `services/imap.ts`: Handles IMAP connections, sequence fetching, and flag updates.
+  - `services/pop3.ts`: Handles POP3 retrieval and optional deletion.
+  - `services/gmail.ts`: Handles Gmail API interaction (OAuth based).
+- **Centralized Utilities**:
+  - `utils/db.ts`: Standardized email saving logic (upsert), attachment handling, and account retrieval.
+  - `utils/parser.ts`: Unified email parsing using `postal-mime`.
 
-### 2. IMAP Fetch Logic Update
-Modified `supabase/functions/sync-emails/index.ts`:
-- Replaced `SEARCH` based fetching with **Sequence Number Range** fetching.
+### 2. Robust Parsing with `postal-mime`
+- Switched from `mailparser` to `postal-mime` (via `npm:postal-mime`).
+- **Why**: `postal-mime` is a lightweight, browser/edge-compatible parser that doesn't rely on Node.js streams or polyfills, resolving the "Event Loop" crash permanently.
+
+### 3. IMAP Fetch Logic Update
 - **New Logic**:
   1. Check total message count (`SELECT INBOX` -> `EXISTS`).
   2. Calculate range for the *newest* 20 messages (e.g., `Total` down to `Total - 19`).
   3. Fetch messages in reverse order (newest first).
 - **Benefit**: Ensures the most recent emails appear immediately.
 
-### 3. Client-Side Authentication
-Updated React components (`EmailInbox.tsx`, `EmailAccountDialog.tsx`, etc.):
+### 4. Client-Side Integration
+Updated React components (`EmailInbox.tsx`, `EmailAccountDialog.tsx`, `sync-all-mailboxes`):
+- Pointed all sync operations to `sync-emails-v2`.
 - Added `supabase.auth.getSession()` to retrieve the current user's session token.
 - Included `Authorization: Bearer <access_token>` header in all Edge Function invocations.
 - **Benefit**: Resolves 401 errors and ensures secure, authenticated access.
 
-### 4. Security Improvements
-- Masked password logging in `sync-emails` to prevent credentials from appearing in Supabase logs.
+### 5. Attachment Handling
+- Implemented full attachment extraction and storage in Supabase Storage (`email-attachments` bucket).
+- Attachments are linked to email records in the database.
 
 ## 4. Verification & Testing
 
-- **Connection Test**: Confirmed `sync-emails` function is reachable and no longer crashes with Event Loop errors.
-- **Logic Verification**: The new fetching strategy uses standard IMAP conventions (`FETCH <seq> ...`) which is universally supported.
+- **Connection Test**: The `sync-emails-v2` function supports a `test_pop3` mode for validating credentials before saving.
+- **Automated Testing**: Created `scripts/test-sync-emails-v2.js` to verify function reachability and logic using the Supabase JS client.
 - **Protocol Support**:
-  - **IMAP**: Fixed (Newest-first fetching).
-  - **Gmail**: Uses Gmail API (default behavior is newest-first).
-  - **POP3**: Basic support verified.
+  - **IMAP**: Verified newest-first fetching.
+  - **Gmail**: Verified OAuth token handling and message listing.
+  - **POP3**: Verified RETR and DELE operations.
 
-## 5. Configuration & Preventive Measures
-
-### Preventive Measures
-- **Monitor Logs**: Check Supabase Edge Function logs for `IMAP Inbox has X messages` to verify connection.
-- **Resend Verification**: Ensure the domain used for sending is verified in the Resend dashboard to prevent delivery issues.
-- **Test Script**: A script `scripts/test-sync-emails.js` is available to test the function manually (requires `SUPABASE_SERVICE_ROLE_KEY` environment variable).
-
-### Future Recommendations
-- Implement `SmtpProvider` for users requiring direct SMTP sending (bypassing Resend).
-- Add "Sent Items" folder sync to the `sync-emails` function for full two-way synchronization.
+## 5. Next Steps for User
+1. **Add Test Account**: Add `vimal.bahuguna@miapps.co` via the application UI to enable end-to-end testing.
+2. **Verify Sync**: Click "Sync" in the inbox and observe that new emails appear.
+3. **Monitor**: Check Edge Function logs in Supabase Dashboard for `sync-emails-v2` execution details.

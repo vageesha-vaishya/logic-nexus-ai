@@ -240,7 +240,7 @@ export function EmailInbox() {
         return;
       }
       const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke("sync-emails", {
+      const { data, error } = await supabase.functions.invoke("sync-emails-v2", {
         body: { accountId },
         headers: session?.access_token 
           ? { Authorization: `Bearer ${session.access_token}` }

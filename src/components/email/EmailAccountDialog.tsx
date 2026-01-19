@@ -559,7 +559,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                     try {
                       setTestingPop3(true);
                       const { data: { session } } = await supabase.auth.getSession();
-                      const { data, error } = await supabase.functions.invoke("sync-emails", {
+                      const { data, error } = await supabase.functions.invoke("sync-emails-v2", {
                         body: {
                           mode: "test_pop3",
                           pop3: {

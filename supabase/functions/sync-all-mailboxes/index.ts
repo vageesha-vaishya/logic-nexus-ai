@@ -59,7 +59,7 @@ serve(async (req) => {
     const { data: accounts, error } = await q;
     if (error) throw error;
 
-    const syncUrl = `${baseUrl}/functions/v1/sync-emails`;
+    const syncUrl = `${baseUrl}/functions/v1/sync-emails-v2`;
     const authHeader = req.headers.get("Authorization") || `Bearer ${serviceKey}`;
 
     let synced = 0;
