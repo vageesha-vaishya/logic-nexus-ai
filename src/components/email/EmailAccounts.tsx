@@ -98,6 +98,14 @@ export function EmailAccounts() {
            const status = (error as any)?.context?.status;
            if (status === 504) {
               msg = "Sync service timed out. Please try again later.";
+           } else if (status === 401) {
+              toast({
+                 title: "Sync Unauthorized",
+                 description: "The server rejected your request (401). Please try refreshing the page manually.",
+                 variant: "destructive"
+              });
+              // Removed auto-logout to prevent loop
+              return;
            } else {
               msg = `Sync service unavailable (Status: ${status || 'Unknown'}).`;
            }

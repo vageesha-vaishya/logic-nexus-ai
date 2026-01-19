@@ -259,6 +259,11 @@ export function EmailInbox() {
         const rawMessage = error?.message as string | undefined;
         let message = rawMessage || "Email sync failed";
         if (rawMessage?.includes("non-2xx")) {
+          const status = (error as any)?.context?.status;
+          if (status === 401) {
+              toast({ title: "Sync Unauthorized", description: "Server rejected credentials (401).", variant: "destructive" });
+              return;
+           }
           message = "Email sync service is not reachable. Check that the sync-emails Edge Function is deployed and accessible.";
         } else if (rawMessage?.includes("Failed to fetch")) {
           message = "Could not reach Supabase Edge Functions. Check network connection and project configuration.";

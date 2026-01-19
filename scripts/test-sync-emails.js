@@ -55,9 +55,34 @@ async function testFunction() {
 
   // Method 2: Supabase Client Invoke
   console.log('\n--- Supabase Client Invoke Test ---');
+  
+  // Fetch a valid account ID first
+  console.log('Fetching a valid email account...');
+  const { data: accounts, error: accError } = await supabase
+    .from('email_accounts')
+    .select('id, email_address')
+    .limit(1);
+
+  if (accError) {
+    console.error('❌ Error fetching accounts:', accError);
+    return;
+  }
+
+  if (!accounts || accounts.length === 0) {
+    console.log('⚠️ No email accounts found in database. Testing with dummy ID.');
+    await invokeSync('dummy-account-id');
+  } else {
+    const account = accounts[0];
+    console.log(`✅ Found account: ${account.email_address} (${account.id})`);
+    await invokeSync(account.id);
+  }
+}
+
+async function invokeSync(accountId) {
+  console.log(`Invoking sync-emails for accountId: ${accountId}`);
   const { data, error } = await supabase.functions.invoke('sync-emails', {
     body: {
-        accountId: 'dummy-account-id'
+        accountId: accountId
     }
   });
 
