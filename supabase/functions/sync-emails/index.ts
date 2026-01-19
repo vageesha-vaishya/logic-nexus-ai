@@ -1,7 +1,7 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { simpleParser } from "https://esm.sh/mailparser@3.6.4";
+import { simpleParser } from "https://esm.sh/mailparser@3.6.4?target=deno";
 import { Logger } from '../_shared/logger.ts';
 
 const corsHeaders = {
@@ -28,6 +28,8 @@ serve(async (req: any) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const logger = new Logger({ function: "sync-emails" });
+
   try {
     const requireEnv = (name: string) => {
       const v = Deno.env.get(name);
@@ -49,6 +51,8 @@ serve(async (req: any) => {
       );
     }
     const { accountId, mode } = (payload || {}) as { accountId?: string; mode?: string };
+
+    logger.info("Sync request received", { accountId, mode });
 
     if (mode === "test_pop3") {
       try {
@@ -1217,7 +1221,9 @@ serve(async (req: any) => {
       }
     );
   } catch (error: unknown) {
-    console.error("Error syncing emails:", error);
+    const logger = new Logger({ function: "sync-emails" }); // Re-instantiate if needed or just use console
+    logger.error("Error syncing emails:", { error });
+    
     return new Response(
       JSON.stringify({
         success: false,
