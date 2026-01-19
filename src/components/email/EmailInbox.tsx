@@ -45,7 +45,7 @@ export function EmailInbox() {
   const [showDetail, setShowDetail] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [sortField, setSortField] = useState<"received_at" | "from_email" | "subject" | "priority">("received_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [conversationView, setConversationView] = useState(false);
