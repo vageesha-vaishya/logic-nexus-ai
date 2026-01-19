@@ -119,10 +119,15 @@ export function useQueueManagement() {
 
   const assignEmailToQueue = useCallback(async (emailId: string, queueName: string) => {
     try {
-      const { data, error } = await supabase.rpc('assign_email_to_queue', {
-        p_email_id: emailId,
-        p_queue_name: queueName,
-      });
+      // Use direct update instead of RPC since function may not be in types
+      const tenantId = getTenantId();
+      if (!tenantId) throw new Error('No tenant context');
+
+      const { error } = await supabase
+        .from('emails')
+        .update({ queue: queueName, updated_at: new Date().toISOString() })
+        .eq('id', emailId)
+        .eq('tenant_id', tenantId);
 
       if (error) throw error;
 
@@ -141,21 +146,28 @@ export function useQueueManagement() {
       });
       return false;
     }
-  }, [toast]);
+  }, [toast, getTenantId]);
 
   const createRule = useCallback(async (rule: Omit<QueueRule, 'id' | 'created_at' | 'updated_at'>) => {
     try {
+      // Build insert payload matching actual table schema
+      const insertPayload: Record<string, unknown> = {
+        tenant_id: rule.tenant_id,
+        name: rule.name,
+        description: rule.description,
+        criteria: JSON.parse(JSON.stringify(rule.criteria)),
+        priority: rule.priority,
+        is_active: rule.is_active,
+      };
+      
+      // The table has queue_id column (UUID)
+      if (rule.queue_id) {
+        insertPayload.queue_id = rule.queue_id;
+      }
+
       const { data, error } = await supabase
         .from('queue_rules')
-        .insert([{
-          tenant_id: rule.tenant_id,
-          queue_id: rule.queue_id,
-          name: rule.name,
-          description: rule.description,
-          criteria: JSON.parse(JSON.stringify(rule.criteria)),
-          priority: rule.priority,
-          is_active: rule.is_active,
-        }])
+        .insert([insertPayload as any])
         .select()
         .single();
 
