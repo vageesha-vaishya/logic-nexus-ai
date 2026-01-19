@@ -331,6 +331,21 @@ deno_version = 2
 [functions.push-migrations-to-target]
 verify_jwt = false
 
+[functions.sync-emails-v2]
+verify_jwt = false
+
+[functions.sync-emails]
+verify_jwt = false
+
+[functions.sync-all-mailboxes]
+verify_jwt = false
+
+[functions.search-emails]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
