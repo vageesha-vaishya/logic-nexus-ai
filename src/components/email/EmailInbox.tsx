@@ -56,7 +56,8 @@ export function EmailInbox() {
   const autoSyncedRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (selectedAccountId && !autoSyncedRef.current[selectedAccountId]) {
+    // Only auto-sync if we have a valid (non-empty) account selected
+    if (selectedAccountId && selectedAccountId !== "" && !autoSyncedRef.current[selectedAccountId]) {
       autoSyncedRef.current[selectedAccountId] = true;
       syncEmails({ silent: true });
     }
@@ -120,7 +121,7 @@ export function EmailInbox() {
           .order(sortField, { ascending: sortDirection === "asc" })
           .limit(50);
 
-        if (selectedAccountId) {
+        if (selectedAccountId && selectedAccountId !== "") {
           query = query.eq("account_id", selectedAccountId);
         }
         if (searchQuery) {
@@ -234,9 +235,10 @@ export function EmailInbox() {
       if (authErr) throw authErr;
       const userId = authData.user?.id;
       if (!userId) throw new Error("Not authenticated");
-      const accountId = selectedAccountId as string | null;
-      if (!accountId) {
+      const accountId = selectedAccountId;
+      if (!accountId || accountId === "") {
         toast({ title: "Select a mailbox", description: "Please choose a mailbox from the selector before syncing.", variant: "destructive" });
+        setSyncing(false);
         return;
       }
       const { data: { session } } = await supabase.auth.getSession();
@@ -398,7 +400,7 @@ export function EmailInbox() {
           />
         </div>
         <div className="w-full lg:w-[280px]">
-          <Select onValueChange={(v) => setSelectedAccountId(v)} value={selectedAccountId ?? undefined}>
+          <Select onValueChange={(v) => setSelectedAccountId(v)} value={selectedAccountId || undefined}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select mailbox" />
             </SelectTrigger>
