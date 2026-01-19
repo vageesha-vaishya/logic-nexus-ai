@@ -33,7 +33,7 @@ CREATE POLICY "Platform admins can view all scheduled emails"
   USING (
     EXISTS (
       SELECT 1 FROM public.user_roles ur
-      WHERE ur.user_id = auth.uid() AND ur.role IN ('platform_admin', 'super_admin')
+      WHERE ur.user_id = auth.uid() AND ur.role IN ('platform_admin')
     )
   );
 
@@ -60,7 +60,7 @@ CREATE POLICY "Platform admins view all email logs"
   USING (
     EXISTS (
       SELECT 1 FROM public.user_roles ur
-      WHERE ur.user_id = auth.uid() AND ur.role IN ('platform_admin', 'super_admin')
+      WHERE ur.user_id = auth.uid() AND ur.role IN ('platform_admin')
     )
   );
 

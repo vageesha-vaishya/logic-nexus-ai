@@ -58,8 +58,7 @@ export function EmailInbox() {
   useEffect(() => {
     if (selectedAccountId && !autoSyncedRef.current[selectedAccountId]) {
       autoSyncedRef.current[selectedAccountId] = true;
-      // Trigger a one-time auto sync when an account is selected
-      syncEmails();
+      syncEmails({ silent: true });
     }
   }, [selectedAccountId]);
 
@@ -228,7 +227,7 @@ export function EmailInbox() {
     }
   };
 
-  const syncEmails = async () => {
+  const syncEmails = async (options?: { silent?: boolean }) => {
     try {
       setSyncing(true);
       const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -244,13 +243,24 @@ export function EmailInbox() {
         body: { accountId },
       });
       if (error) throw error as any;
-      toast({
-        title: "Synced",
-        description: data?.message || "Email sync complete.",
-      });
+      if (!options?.silent) {
+        toast({
+          title: "Synced",
+          description: data?.message || "Email sync complete.",
+        });
+      }
       await fetchEmails();
     } catch (error: any) {
-      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+      if (!options?.silent) {
+        const rawMessage = error?.message as string | undefined;
+        let message = rawMessage || "Email sync failed";
+        if (rawMessage?.includes("non-2xx")) {
+          message = "Email sync service is not reachable. Check that the sync-emails Edge Function is deployed and accessible.";
+        } else if (rawMessage?.includes("Failed to fetch")) {
+          message = "Could not reach Supabase Edge Functions. Check network connection and project configuration.";
+        }
+        toast({ title: "Sync failed", description: message, variant: "destructive" });
+      }
     } finally {
       setSyncing(false);
     }
@@ -345,7 +355,7 @@ export function EmailInbox() {
             <RefreshCw className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={syncEmails} disabled={syncing}>
+          <Button variant="outline" size="sm" onClick={() => syncEmails()} disabled={syncing}>
             <RefreshCw className={`w-4 h-4 sm:mr-2 ${syncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Sync</span>
           </Button>

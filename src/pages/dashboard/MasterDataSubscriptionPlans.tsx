@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import ActionsToolbar from '@/components/ui/ActionsToolbar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, Calculator, Loader2 } from 'lucide-react';
@@ -159,7 +159,7 @@ export default function MasterDataSubscriptionPlans() {
     try {
       if (editingPlan) {
         const { error } = await scopedDb
-          .from('subscription_plans')
+          .from('subscription_plans', true)
           .update(payload)
           .eq('id', editingPlan.id);
         if (error) throw error;
@@ -172,7 +172,7 @@ export default function MasterDataSubscriptionPlans() {
         toast({ title: 'Plan updated' });
       } else {
         const { data, error } = await scopedDb
-          .from('subscription_plans')
+          .from('subscription_plans', true)
           .insert(payload)
           .select('id')
           .single();
@@ -200,7 +200,7 @@ export default function MasterDataSubscriptionPlans() {
   const handleDelete = async (plan: SubscriptionPlan) => {
     try {
       const { error } = await scopedDb
-        .from('subscription_plans')
+        .from('subscription_plans', true)
         .delete()
         .eq('id', plan.id);
       if (error) throw error;
@@ -359,6 +359,9 @@ export default function MasterDataSubscriptionPlans() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingPlan ? 'Edit Subscription Plan' : 'New Subscription Plan'}</DialogTitle>
+            <DialogDescription>
+              {editingPlan ? 'Modify the details of the existing subscription plan.' : 'Enter the details for the new subscription plan.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto pr-1">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
@@ -452,15 +455,26 @@ export default function MasterDataSubscriptionPlans() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="md:col-span-2 mt-4">
+                <h3 className="text-sm font-semibold">Pricing</h3>
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="plan-currency">
                   Currency
                 </label>
-                <Input
-                  id="plan-currency"
+                <Select
                   value={planForm.currency || 'USD'}
-                  onChange={(e) => setPlanForm({ ...planForm, currency: e.target.value.toUpperCase() })}
-                />
+                  onValueChange={(v) => setPlanForm({ ...planForm, currency: v })}
+                >
+                  <SelectTrigger id="plan-currency">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="plan-price-monthly">
