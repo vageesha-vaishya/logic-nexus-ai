@@ -1,7 +1,7 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { simpleParser } from "https://esm.sh/mailparser@3.6.4?target=deno";
+import { simpleParser } from "npm:mailparser@3.6.4";
 import { Logger } from '../_shared/logger.ts';
 
 const corsHeaders = {
@@ -156,7 +156,8 @@ serve(async (req: any) => {
         ssl: account.imap_use_ssl,
       };
 
-      console.log(`Syncing via IMAP for ${account.email_address}:`, imapConfig);
+      const imapConfigSafe = { ...imapConfig, password: "***" };
+      console.log(`Syncing via IMAP for ${account.email_address}:`, imapConfigSafe);
 
       try {
         const encoder = new TextEncoder();
@@ -264,26 +265,39 @@ serve(async (req: any) => {
           throw new Error(`IMAP login failed: ${loginResp}`);
         }
 
-        // Select INBOX
-        await sendCommand("A2", "SELECT INBOX");
+        // Select INBOX and get message count
+        const selectResp = await sendCommand("A2", "SELECT INBOX");
+        const existsMatch = selectResp.match(/\* (\d+) EXISTS/i);
+        const totalMessages = existsMatch ? parseInt(existsMatch[1], 10) : 0;
+        
+        console.log(`IMAP Inbox has ${totalMessages} messages`);
 
-        // Search for recent messages (last 20)
-        const searchResp = await sendCommand("A3", "SEARCH 1:20");
-        const messageIds = searchResp.match(/\* SEARCH (.+)/)?.[1]?.split(" ").filter(id => id && id !== "A3") || [];
+        if (totalMessages === 0) {
+            console.log("Inbox is empty, nothing to sync.");
+            await sendCommand("A99", "LOGOUT");
+            conn.close();
+            return;
+        }
 
-        console.log(`Found ${messageIds.length} messages in IMAP inbox`);
+        // Fetch recent messages (last 20) using sequence numbers
+        // We fetch from totalMessages down to (totalMessages - 19)
+        const startSeq = Math.max(1, totalMessages - 19);
+        const endSeq = totalMessages;
+        
+        console.log(`Fetching messages from sequence ${startSeq} to ${endSeq}`);
 
-        // Fetch each message
-        for (const msgId of messageIds.slice(0, 20)) {
+        // Fetch each message in the range (reverse order to get newest first)
+        for (let seq = endSeq; seq >= startSeq; seq--) {
           try {
-            const fetchResp = await sendCommand("A4", `FETCH ${msgId} (FLAGS BODY[HEADER] BODY[TEXT])`);
+            // Use sequence number directly
+            const fetchResp = await sendCommand(`A4-${seq}`, `FETCH ${seq} (FLAGS BODY[HEADER] BODY[TEXT])`);
             
             // Parse email headers and body (basic parsing)
             const headerMatch = fetchResp.match(/BODY\[HEADER\] \{[\d]+\}\r\n([\s\S]+?)\r\n\r\n/);
             const bodyMatch = fetchResp.match(/BODY\[TEXT\] \{[\d]+\}\r\n([\s\S]+?)\r\n\)/);
             
             if (!headerMatch) {
-                console.warn(`Could not parse headers for message ${msgId}. Response snippet: ${fetchResp.substring(0, 100)}...`);
+                console.warn(`Could not parse headers for message ${seq}. Response snippet: ${fetchResp.substring(0, 100)}...`);
                 continue;
             }
 
@@ -305,13 +319,13 @@ serve(async (req: any) => {
             try {
               parsed = await simpleParser(rawMessage);
             } catch (e) {
-              console.error(`IMAP mailparser error for message ${msgId}:`, e);
+              console.error(`IMAP mailparser error for message ${seq}:`, e);
               // Fallback: continue with regex-extracted data if simpleParser fails
             }
 
             const messageIdHeader = parsed?.messageId
               ? String(parsed.messageId).replace(/[<>]/g, "")
-              : (headers.match(/^Message-ID:\s*<(.+)>$/mi)?.[1] || `imap-${msgId}-${Date.now()}`);
+              : (headers.match(/^Message-ID:\s*<(.+)>$/mi)?.[1] || `imap-${seq}-${Date.now()}`);
 
             const subject = parsed?.subject || headers.match(/^Subject:\s*(.+)$/mi)?.[1] || "(No Subject)";
             const parsedFrom = parsed?.from?.value?.[0];
@@ -450,13 +464,13 @@ serve(async (req: any) => {
               console.log(`Synced email: ${subject}`);
             }
           } catch (msgError: unknown) {
-            console.error(`Error processing IMAP message ${msgId}:`, msgError instanceof Error ? msgError.message : String(msgError));
+            console.error(`Error processing IMAP message ${seq}:`, msgError instanceof Error ? msgError.message : String(msgError));
             try {
               await supabase.from("emails").insert({
                 account_id: account.id,
                 tenant_id: account.tenant_id ?? null,
                 franchise_id: account.franchise_id ?? null,
-                message_id: `imap-${msgId}-${Date.now()}`,
+                message_id: `imap-${seq}-${Date.now()}`,
                 subject: "(Error Processing)",
                 from_email: "error@sync.local",
                 from_name: "Sync Error",

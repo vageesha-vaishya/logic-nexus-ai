@@ -58,23 +58,42 @@ async function testFunction() {
   
   // Fetch a valid account ID first
   console.log('Fetching a valid email account...');
-  const { data: accounts, error: accError } = await supabase
+  
+  let targetAccount = null;
+  const targetEmail = 'vimal.bahuguna@miapps.co';
+  
+  // Try to find the specific test account first
+  const { data: specificAccounts, error: specificError } = await supabase
     .from('email_accounts')
     .select('id, email_address')
+    .eq('email_address', targetEmail)
     .limit(1);
 
-  if (accError) {
-    console.error('❌ Error fetching accounts:', accError);
-    return;
+  if (specificAccounts && specificAccounts.length > 0) {
+      targetAccount = specificAccounts[0];
+      console.log(`✅ Found target account: ${targetAccount.email_address} (${targetAccount.id})`);
+  } else {
+      console.log(`⚠️ Target account ${targetEmail} not found, falling back to any account.`);
+      const { data: accounts, error: accError } = await supabase
+        .from('email_accounts')
+        .select('id, email_address')
+        .limit(1);
+        
+      if (accError) {
+        console.error('❌ Error fetching accounts:', accError);
+        return;
+      }
+      if (accounts && accounts.length > 0) {
+          targetAccount = accounts[0];
+          console.log(`✅ Found fallback account: ${targetAccount.email_address} (${targetAccount.id})`);
+      }
   }
 
-  if (!accounts || accounts.length === 0) {
+  if (!targetAccount) {
     console.log('⚠️ No email accounts found in database. Testing with dummy ID.');
     await invokeSync('dummy-account-id');
   } else {
-    const account = accounts[0];
-    console.log(`✅ Found account: ${account.email_address} (${account.id})`);
-    await invokeSync(account.id);
+    await invokeSync(targetAccount.id);
   }
 }
 
