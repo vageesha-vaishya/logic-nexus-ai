@@ -1,6 +1,7 @@
 -- Enhanced export helpers with cross-schema support
 
 -- 1. Get Table Constraints (Schema-aware)
+DROP FUNCTION IF EXISTS public.get_table_constraints();
 CREATE OR REPLACE FUNCTION public.get_table_constraints()
 RETURNS TABLE (
     schema_name text,
@@ -34,6 +35,7 @@ AS $$
 $$;
 
 -- 2. Get Table Indexes (Schema-aware)
+DROP FUNCTION IF EXISTS public.get_table_indexes();
 CREATE OR REPLACE FUNCTION public.get_table_indexes()
 RETURNS TABLE (
     schema_name text,
@@ -62,6 +64,7 @@ AS $$
 $$;
 
 -- 3. Get RLS Policies (Schema-aware)
+DROP FUNCTION IF EXISTS public.get_all_rls_policies();
 CREATE OR REPLACE FUNCTION public.get_all_rls_policies()
 RETURNS TABLE (
     schema_name text,

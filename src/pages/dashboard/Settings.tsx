@@ -184,6 +184,9 @@ export default function Settings() {
                     <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/master-data-hts')}>
                       Master Data (HTS Codes)
                     </Button>
+                    <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/master-data-subscription-plans')}>
+                      Master Data (Subscription Plans)
+                    </Button>
                     <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/database-export')}>
                       Database Export
                     </Button>

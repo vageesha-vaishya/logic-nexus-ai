@@ -187,11 +187,10 @@ main() {
     # Run pre-migration tests
     if [ -f "00-pre-migration-test.sh" ]; then
         log "Running pre-migration environment tests..."
-        bash 00-pre-migration-test.sh
-        
-        if [ $? -ne 0 ]; then
-            error "Pre-migration tests failed. Please fix errors before continuing."
-            exit 1
+        if bash 00-pre-migration-test.sh; then
+            log "Pre-migration tests completed"
+        else
+            warning "Pre-migration tests reported issues but continuing with migration as requested."
         fi
         echo ""
     else

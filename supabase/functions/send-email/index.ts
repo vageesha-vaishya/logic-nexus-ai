@@ -633,7 +633,7 @@ serve(async (req: Request) => {
     if (requestedProvider === 'resend' || (!accountId && !requestedProvider)) {
       // System Email Strategy - Support Failover in future by adding more providers to this array
       providers.push(new ResendProvider({
-        apiKey: Deno.env.get("RESEND_API_KEY"),
+        apiKey: Deno.env.get("RESEND_API_KEY") || "re_4TnzzRmZ_LFWwtAYSVC1sf468r7JUYNW9",
         supabase
       }));
     } else if (accountId) {

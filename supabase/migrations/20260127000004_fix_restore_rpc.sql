@@ -1,5 +1,8 @@
--- Function to restore table data to any schema with dynamic conflict target
--- WARNING: This bypasses RLS if used with SECURITY DEFINER. Ensure proper access control.
+-- Fix restore_table_data function by dropping it first to allow return type changes
+-- and ensuring idempotent creation.
+
+DROP FUNCTION IF EXISTS public.restore_table_data(text, text, jsonb, text, text[]);
+
 CREATE OR REPLACE FUNCTION public.restore_table_data(
     target_schema text,
     target_table text,
@@ -91,7 +94,7 @@ BEGIN
             inserted_count := inserted_count + 1;
         EXCEPTION WHEN OTHERS THEN
             error_count := error_count + 1;
-            GET STACK DIAGNOSTICS err_code = RETURNED_SQLSTATE,
+            GET STACKED DIAGNOSTICS err_code = RETURNED_SQLSTATE,
                                    err_constraint = CONSTRAINT_NAME;
             errors := array_append(errors, SQLERRM);
             error_rows := error_rows || jsonb_build_array(

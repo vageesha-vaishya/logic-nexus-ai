@@ -187,10 +187,23 @@ FOR EACH ROW EXECUTE FUNCTION audit_transfer_change();
 
 -- 4. Add Foreign Keys to Profiles for Querying
 -- This allows referencing profiles!requested_by(email) in PostgREST
-ALTER TABLE entity_transfers
-ADD CONSTRAINT entity_transfers_requested_by_fkey_profiles
-FOREIGN KEY (requested_by) REFERENCES profiles(id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'entity_transfers_requested_by_fkey_profiles'
+  ) THEN
+    ALTER TABLE entity_transfers
+    ADD CONSTRAINT entity_transfers_requested_by_fkey_profiles
+    FOREIGN KEY (requested_by) REFERENCES profiles(id);
+  END IF;
 
-ALTER TABLE entity_transfers
-ADD CONSTRAINT entity_transfers_approved_by_fkey_profiles
-FOREIGN KEY (approved_by) REFERENCES profiles(id);
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'entity_transfers_approved_by_fkey_profiles'
+  ) THEN
+    ALTER TABLE entity_transfers
+    ADD CONSTRAINT entity_transfers_approved_by_fkey_profiles
+    FOREIGN KEY (approved_by) REFERENCES profiles(id);
+  END IF;
+END $$;

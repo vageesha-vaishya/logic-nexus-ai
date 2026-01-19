@@ -106,6 +106,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Data Management', path: '/dashboard/settings/data-management', icon: Cog, description: 'Database options and quote numbering' },
       { name: 'Database Export', path: '/dashboard/settings/database-export', icon: Database, description: 'Export tables and backups' },
       { name: 'Master Data (Geography)', path: '/dashboard/settings/master-data', icon: Globe, description: 'Continents, countries, states, cities' },
+      { name: 'Master Data (Subscription Plans)', path: '/dashboard/settings/master-data-subscription-plans', icon: DollarSign, description: 'Subscription plan catalog and metadata' },
       { name: 'Master Data (HTS Codes)', path: '/dashboard/settings/master-data-hts', icon: FileText, description: 'HTS/Schedule B codes manager' },
       { name: 'Quote Numbering', path: '/dashboard/settings/quote-numbers', icon: FileCheck, description: 'Prefixes and reset policy' },
       { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns' },

@@ -103,6 +103,7 @@ import MasterDataHTS from "./pages/dashboard/MasterDataHTS";
 import MasterDataGeography from "./pages/dashboard/MasterDataGeography";
 import CustomsClearancePipeline from "./pages/dashboard/CustomsClearancePipeline";
 import DatabaseExport from "./pages/dashboard/data-management/DatabaseExport";
+import MasterDataSubscriptionPlans from "./pages/dashboard/MasterDataSubscriptionPlans";
 import AccountsPipeline from "./pages/dashboard/AccountsPipeline";
 import ContactsPipeline from "./pages/dashboard/ContactsPipeline";
 import QuotationTests from "./pages/testing/QuotationTests";
@@ -564,6 +565,10 @@ const App = () => (
             />
             <Route path="/dashboard/settings/master-data-hts" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataHTS /></ProtectedRoute>} 
+            />
+            <Route 
+              path="/dashboard/settings/master-data-subscription-plans" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataSubscriptionPlans /></ProtectedRoute>} 
             />
             {/* Public customer portal */}
             <Route path="/portal/quote/:token" element={<QuotePortal />} />

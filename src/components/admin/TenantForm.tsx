@@ -21,7 +21,6 @@ const tenantSchema = z.object({
   slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   domain: z.string().optional(),
   logo_url: z.string().url().optional().or(z.literal('')),
-  subscription_tier: z.string().optional(),
   is_active: z.boolean().default(true),
   settings: z.string().optional(),
   demographics_age_group: z.string().optional(),
@@ -64,7 +63,6 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       slug: tenant?.slug || '',
       domain: tenant?.domain || '',
       logo_url: tenant?.logo_url || '',
-      subscription_tier: tenant?.subscription_tier || '',
       is_active: tenant?.is_active ?? true,
       settings: tenant?.settings ? JSON.stringify(tenant.settings, null, 2) : '',
       demographics_age_group: tenant?.settings?.demographics?.age_group || '',
@@ -152,7 +150,6 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         slug: values.slug,
         domain: values.domain || null,
         logo_url: values.logo_url || null,
-        subscription_tier: values.subscription_tier || null,
         is_active: values.is_active,
         settings: nextSettings,
       };
@@ -288,20 +285,6 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               <FormLabel>Logo URL</FormLabel>
               <FormControl>
                 <Input placeholder="https://example.com/logo.png" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="subscription_tier"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Subscription Tier</FormLabel>
-              <FormControl>
-                <Input placeholder="Enterprise" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

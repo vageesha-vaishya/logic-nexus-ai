@@ -138,7 +138,7 @@ BEGIN
             AND (
                 EXISTS (
                     SELECT 1 FROM public.queue_members qm 
-                    WHERE qm.queue_id = q.id AND qm.user_id = auth.uid()
+                    WHERE qm.queue_id::uuid = q.id::uuid AND qm.user_id::uuid = auth.uid()
                 )
                 OR public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
             )
@@ -197,7 +197,7 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.queue_members qm
-    WHERE qm.queue_id = id AND qm.user_id = auth.uid()
+    WHERE qm.queue_id::uuid = id::uuid AND qm.user_id::uuid = auth.uid()
   )
   OR public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
 );
