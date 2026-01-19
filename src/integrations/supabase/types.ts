@@ -9763,6 +9763,10 @@ export type Database = {
         }[]
       }
       get_queue_counts: { Args: never; Returns: Json }
+      get_queue_tenant_id_secure: {
+        Args: { p_queue_id: string }
+        Returns: string
+      }
       get_quote_by_token: { Args: { p_token: string }; Returns: Json }
       get_rls_policies: {
         Args: never
@@ -9915,9 +9919,17 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
+      is_actual_platform_admin: {
+        Args: { check_user_id: string }
+        Returns: boolean
+      }
       is_current_user_platform_admin: { Args: never; Returns: boolean }
       is_franchise_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_queue_member_secure: {
+        Args: { p_queue_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_sales_manager: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_admin: { Args: { _user_id: string }; Returns: boolean }

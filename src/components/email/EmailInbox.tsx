@@ -239,8 +239,12 @@ export function EmailInbox() {
         toast({ title: "Select a mailbox", description: "Please choose a mailbox from the selector before syncing.", variant: "destructive" });
         return;
       }
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke("sync-emails", {
         body: { accountId },
+        headers: session?.access_token 
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
       if (error) throw error as any;
       if (!options?.silent) {
@@ -272,8 +276,12 @@ export function EmailInbox() {
       const tenantId = getTenantId();
 
       if (tenantId) {
+        const { data: { session } } = await supabase.auth.getSession();
         const { data, error } = await supabase.functions.invoke("sync-all-mailboxes", {
           body: { tenantId, limit: 100 },
+          headers: session?.access_token 
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : undefined,
         });
         if (error) throw error as any;
         toast({ title: "Sync triggered", description: `Processed ${data?.accountsProcessed || 0} accounts` });
@@ -299,9 +307,13 @@ export function EmailInbox() {
       }
 
       let totalSynced = 0;
+      const { data: { session } } = await supabase.auth.getSession();
       for (const acc of userAccounts) {
         const { data, error } = await supabase.functions.invoke("sync-emails", {
           body: { accountId: acc.id },
+          headers: session?.access_token 
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : undefined,
         });
         if (error) {
           console.error("Sync error for account", acc.id, error);

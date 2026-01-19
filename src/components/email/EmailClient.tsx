@@ -331,8 +331,12 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   const handleSync = async () => {
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
       const { error } = await supabase.functions.invoke("sync-emails", {
-        body: { accountId: null }
+        body: { accountId: null },
+        headers: session?.access_token 
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
       if (error) throw error;
       toast({ title: "Sync started", description: "Email synchronization has started in the background." });

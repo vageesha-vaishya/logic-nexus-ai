@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const projectUrl = process.env.VITE_SUPABASE_URL;
 const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!projectUrl || !anonKey) {
   console.error('Error: VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY not found in environment');
@@ -10,20 +11,23 @@ if (!projectUrl || !anonKey) {
 
 console.log(`Testing connection to Supabase project: ${projectUrl}`);
 
-const supabase = createClient(projectUrl, anonKey);
+const supabase = createClient(projectUrl, serviceKey || anonKey);
 
 async function testFunction() {
   console.log('Invoking sync-emails function...');
   
   const functionUrl = `${projectUrl}/functions/v1/sync-emails`;
+  const authKey = serviceKey || anonKey;
   
   try {
     // Method 1: Direct fetch
     console.log(`\n--- Direct Fetch Test (${functionUrl}) ---`);
+    console.log(`Using key: ${authKey.substring(0, 10)}... (Service Role: ${!!serviceKey})`);
+    
     const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${anonKey}`,
+        'Authorization': `Bearer ${authKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

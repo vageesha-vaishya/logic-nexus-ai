@@ -558,6 +558,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                     }
                     try {
                       setTestingPop3(true);
+                      const { data: { session } } = await supabase.auth.getSession();
                       const { data, error } = await supabase.functions.invoke("sync-emails", {
                         body: {
                           mode: "test_pop3",
@@ -568,7 +569,10 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                             password: pop3Password,
                             ssl: pop3UseSsl,
                           }
-                        }
+                        },
+                        headers: session?.access_token 
+                          ? { Authorization: `Bearer ${session.access_token}` }
+                          : undefined,
                       });
                       if (error) throw error;
                       const ok = (data as any)?.success;

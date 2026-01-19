@@ -83,8 +83,12 @@ export function EmailAccounts() {
 
   const syncAccount = async (accountId: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke("sync-emails", {
         body: { accountId },
+        headers: session?.access_token 
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
 
       // If edge function returned non-2xx, error is set

@@ -60,6 +60,7 @@ serve(async (req) => {
     if (error) throw error;
 
     const syncUrl = `${baseUrl}/functions/v1/sync-emails`;
+    const authHeader = req.headers.get("Authorization") || `Bearer ${serviceKey}`;
 
     let synced = 0;
     for (const acc of accounts || []) {
@@ -67,7 +68,7 @@ serve(async (req) => {
         const res = await fetch(syncUrl, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${serviceKey}`,
+            "Authorization": authHeader,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ accountId: acc.id }),
