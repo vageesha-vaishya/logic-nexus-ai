@@ -56,29 +56,41 @@ export class ResendProvider extends EmailProvider {
 
     console.log("Sending via Resend API (System)");
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from: req.from || "SOS Logistics <notifications@soslogistics.pro>",
-        to: req.to,
-        cc: req.cc,
-        bcc: req.bcc,
-        subject: req.subject,
-        html: req.body,
-        text: req.text,
-        reply_to: req.replyTo,
-        attachments: req.attachments?.map(a => ({
-          filename: a.filename,
-          content: a.content,
-        })),
-      }),
-    });
+    const sendEmail = async (fromEmail: string) => {
+        const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            from: fromEmail,
+            to: req.to,
+            cc: req.cc,
+            bcc: req.bcc,
+            subject: req.subject,
+            html: req.body,
+            text: req.text,
+            reply_to: req.replyTo,
+            attachments: req.attachments?.map(a => ({
+            filename: a.filename,
+            content: a.content,
+            })),
+        }),
+        });
+        return res;
+    };
 
-    const data = await res.json();
+    let res = await sendEmail(req.from || "SOS Logistics <notifications@soslogistics.pro>");
+    let data = await res.json();
+
+    // Fallback for unverified domains: Try onboarding@resend.dev
+    if (!res.ok && data.message?.includes("domain is not verified")) {
+        console.warn("Domain not verified. Retrying with onboarding@resend.dev");
+        res = await sendEmail("SOS Logistics <onboarding@resend.dev>");
+        data = await res.json();
+    }
+
     if (!res.ok) {
       throw new Error(data.message || "Failed to send via Resend");
     }
@@ -629,11 +641,12 @@ serve(async (req: Request) => {
     // 2. Determine Provider Strategy
     const providers: EmailProvider[] = [];
     let account = null;
+    let finalReplyTo = reply_to;
 
     if (requestedProvider === 'resend' || (!accountId && !requestedProvider)) {
       // System Email Strategy - Support Failover in future by adding more providers to this array
       providers.push(new ResendProvider({
-        apiKey: Deno.env.get("RESEND_API_KEY") || "re_4TnzzRmZ_LFWwtAYSVC1sf468r7JUYNW9",
+        apiKey: Deno.env.get("RESEND_API_KEY") || "re_HE1deVM5_NuVR5nihEuzSf3cMZP4n5U1R",
         supabase
       }));
     } else if (accountId) {
@@ -647,12 +660,22 @@ serve(async (req: Request) => {
       if (error || !data) throw new Error("Email account not found");
       account = data;
 
+      // Set Reply-To to account email if not specified
+      if (!finalReplyTo && account.email_address) {
+        finalReplyTo = account.email_address;
+      }
+
       if (account.provider === "gmail") {
         providers.push(new GmailProvider({ supabase, account }));
       } else if (account.provider === "office365") {
         providers.push(new Office365Provider({ supabase, account }));
       } else if (account.provider === "smtp_imap") {
-         throw new Error("Direct SMTP not supported in Edge Runtime. Use Resend or OAuth.");
+         // Fallback to Resend for SMTP accounts in Edge Runtime (with Reply-To set to user email)
+          console.log("SMTP account selected. Falling back to Resend Provider.");
+          providers.push(new ResendProvider({
+             apiKey: Deno.env.get("RESEND_API_KEY") || "re_HE1deVM5_NuVR5nihEuzSf3cMZP4n5U1R",
+             supabase
+          }));
       } else {
         throw new Error(`Unknown provider: ${account.provider}`);
       }
@@ -674,7 +697,7 @@ serve(async (req: Request) => {
           body: renderedHtml,
           text: renderedText,
           from,
-          replyTo: reply_to,
+          replyTo: finalReplyTo,
           variables,
           attachments: processedAttachments
         });
