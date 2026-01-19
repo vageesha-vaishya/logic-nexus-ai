@@ -1,6 +1,6 @@
 Migration Verification Report
-Generated: Fri Nov 14 17:48:55 IST 2025
-Database: postgresql://postgres:%23%21%23Vimal%402025@db.pqulscbawoqzhqobwupu.supabase.co:5432/postgres?sslmode=require
+Generated: Sun Jan 18 22:36:08 IST 2026
+Database: postgresql://postgres:%23%40January%402026%21@db.iutyqzjlpenfddqdwcsk.supabase.co:5432/postgres?sslmode=require
 REST Fallback: true
 
 Tables Verified: 11

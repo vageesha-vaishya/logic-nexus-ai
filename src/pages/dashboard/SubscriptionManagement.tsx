@@ -155,6 +155,19 @@ export default function SubscriptionManagement() {
 
       if (error) throw error;
 
+      const allowedTiers = ['free', 'basic', 'professional', 'enterprise'];
+      const planTier = selectedPlan.tier || null;
+      const derivedTier = planTier && allowedTiers.includes(planTier) ? planTier : null;
+
+      try {
+        await scopedDb
+          .from('tenants')
+          .update({ subscription_tier: derivedTier })
+          .eq('id', effectiveTenantId);
+      } catch (tierError) {
+        console.warn('Failed to sync tenant subscription_tier from plan:', tierError);
+      }
+
       toast.success(`Successfully subscribed to ${selectedPlan.name}`);
       fetchData();
     } catch (error: any) {

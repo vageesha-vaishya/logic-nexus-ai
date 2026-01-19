@@ -1,11 +1,32 @@
 
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 
-const projectUrl = process.env.VITE_SUPABASE_URL;
-const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+function loadEnvFromConfig() {
+  const configPath = path.join(process.cwd(), 'supabase', 'migration-package', 'new-supabase-config.env');
+  if (!fs.existsSync(configPath)) return {};
+  const result = {};
+  const lines = fs.readFileSync(configPath, 'utf-8')
+    .split('\n')
+    .filter(line => line && !line.trim().startsWith('#') && line.includes('='));
+  for (const line of lines) {
+    const [key, ...rest] = line.split('=');
+    result[key.trim()] = rest.join('=').trim().replace(/^["']|["']$/g, '');
+  }
+  return {
+    VITE_SUPABASE_URL: result.NEW_SUPABASE_URL,
+    VITE_SUPABASE_PUBLISHABLE_KEY: result.VITE_SUPABASE_PUBLISHABLE_KEY || result.NEW_SUPABASE_ANON_KEY,
+  };
+}
+
+const envFromConfig = loadEnvFromConfig();
+
+const projectUrl = process.env.VITE_SUPABASE_URL || envFromConfig.VITE_SUPABASE_URL;
+const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || envFromConfig.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!projectUrl || !anonKey) {
-  console.error('Error: VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY not found in environment');
+  console.error('Error: Supabase URL or anon key not found. Configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY or new-supabase-config.env');
   process.exit(1);
 }
 

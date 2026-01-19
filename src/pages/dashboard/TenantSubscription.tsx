@@ -94,7 +94,7 @@ export default function TenantSubscription() {
         .eq('status', 'active');
 
       // Create new subscription
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from('tenant_subscriptions')
         .insert([{
           tenant_id: tenantId,
@@ -105,6 +105,20 @@ export default function TenantSubscription() {
         }]);
 
       if (error) throw error;
+
+      const selected = plans.find(p => p.id === planId);
+      const allowedTiers = ['free', 'basic', 'professional', 'enterprise'];
+      const planTier = selected?.tier || null;
+      const derivedTier = planTier && allowedTiers.includes(planTier) ? planTier : null;
+
+      try {
+        await supabase
+          .from('tenants')
+          .update({ subscription_tier: derivedTier })
+          .eq('id', tenantId);
+      } catch (tierError) {
+        console.warn('Failed to sync tenant subscription_tier from plan:', tierError);
+      }
 
       toast.success('Plan assigned successfully');
       fetchData();
