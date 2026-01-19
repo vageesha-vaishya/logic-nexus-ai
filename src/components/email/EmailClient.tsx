@@ -14,6 +14,7 @@ import { EmailSidebar } from "./EmailSidebar";
 import { EmailList, AdvancedSearchFilters, EmailSortDirection, EmailSortField } from "./EmailList";
 import { cn } from "@/lib/utils";
 import { Email } from "@/types/email";
+import { invokeFunction } from "@/lib/supabase-functions";
 
 interface EmailClientProps {
   entityType?: string;
@@ -151,7 +152,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
         query = query.limit(50);
 
         if (conversationView && useServerGrouping) {
-          const { data, error } = await supabase.functions.invoke("search-emails", {
+        const { data, error } = await invokeFunction("search-emails", {
             body: {
               folder: selectedFolder,
               groupBy: "conversation",
@@ -328,21 +329,62 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
     toast({ title: "Folder deleted", description: `Folder "${name}" deleted.` });
   };
 
-  const handleSync = async () => {
+const handleSync = async () => {
     try {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      const { error } = await supabase.functions.invoke("sync-emails", {
-        body: { accountId: null },
-        headers: session?.access_token 
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
-      });
-      if (error) throw error;
-      toast({ title: "Sync started", description: "Email synchronization has started in the background." });
-    } catch (error) {
+      const user = session?.user;
+      
+      if (!user) {
+         toast({ title: "Not authenticated", variant: "destructive" });
+         return;
+      }
+
+      // 1. Get user's active accounts
+      const { data: accounts, error: accErr } = await supabase
+        .from("email_accounts")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true);
+        
+      if (accErr) throw accErr;
+      
+      if (!accounts || accounts.length === 0) {
+        toast({ title: "No accounts", description: "No active email accounts found.", variant: "default" });
+        return;
+      }
+      
+      toast({ title: "Sync started", description: `Syncing ${accounts.length} accounts...` });
+      
+      let syncedCount = 0;
+      let errorCount = 0;
+
+      // 2. Sync each account
+      for (const acc of accounts) {
+         const { data, error } = await invokeFunction("sync-emails-v2", {
+            body: { accountId: acc.id },
+          });
+          
+          if (error || (data && data.success === false)) {
+              console.error(`Sync failed for account ${acc.id}:`, error || data?.error);
+              errorCount++;
+          } else {
+              syncedCount++;
+          }
+      }
+      
+      if (errorCount > 0 && syncedCount === 0) {
+          toast({ title: "Sync failed", description: "Could not sync any accounts.", variant: "destructive" });
+      } else if (errorCount > 0) {
+          toast({ title: "Sync partial", description: `Synced ${syncedCount} accounts, ${errorCount} failed.`, variant: "default" });
+      } else {
+          toast({ title: "Sync complete", description: `Successfully synced ${syncedCount} accounts.` });
+      }
+      
+      await fetchEmails();
+    } catch (error: any) {
       console.error("Sync error:", error);
-      toast({ title: "Sync failed", variant: "destructive" });
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -441,7 +483,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("email-stats", {
+        const { data, error } = await invokeFunction("email-stats", {
           body: { folder: selectedFolder },
         });
         if (!error && data?.success) {

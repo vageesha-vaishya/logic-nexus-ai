@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { handleOAuthCallback } from "@/lib/oauth";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,7 +30,7 @@ export default function OAuthCallback() {
         const accountIdHint = sessionStorage.getItem("oauth_account_id") || undefined;
 
         // Exchange code for tokens
-        const { data, error } = await supabase.functions.invoke("exchange-oauth-token", {
+        const { data, error } = await invokeFunction("exchange-oauth-token", {
           body: {
             code,
             provider,

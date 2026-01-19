@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { useCRM } from "@/hooks/useCRM";
 import { initiateGoogleOAuth, initiateMicrosoftOAuth, handleOAuthCallback } from "@/lib/oauth";
 
@@ -57,7 +58,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
       const { code, provider } = await handleOAuthCallback();
       
       // Exchange code for tokens via edge function
-      const { data, error } = await supabase.functions.invoke("exchange-oauth-token", {
+      const { data, error } = await invokeFunction("exchange-oauth-token", {
         body: {
           code,
           provider,

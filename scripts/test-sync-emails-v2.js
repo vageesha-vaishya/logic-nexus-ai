@@ -2,9 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Load env vars
-const projectUrl = process.env.VITE_SUPABASE_URL;
-const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const projectUrl = "https://iutyqzjlpenfddqdwcsk.supabase.co";
+const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dHlxempscGVuZmRkcWR3Y3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NjQ4MjMsImV4cCI6MjA4NDI0MDgyM30.90USeHOMTy-Nz7AFZIwZ3s75AO5ch9uFgSHTDbmbWQw";
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 if (!projectUrl || !anonKey) {
   console.error('❌ Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY in .env');
@@ -17,43 +17,67 @@ async function testFunction() {
   console.log('Invoking sync-emails-v2 function...');
   
   const functionUrl = `${projectUrl}/functions/v1/sync-emails-v2`;
+
+  // --- CONFIGURATION ---
+  // 1. Get your Access Token from Browser DevTools -> Application -> Local Storage -> sb-*-auth-token
+  // 2. Paste it below to test with REAL user permissions
+  const USER_TOKEN = ""; 
+  // ---------------------
+
   const authKey = serviceKey || anonKey;
   
   try {
-    // Method 1: Direct fetch
-    console.log(`\n--- Direct Fetch Test (${functionUrl}) ---`);
-    console.log(`Using key: ${authKey.substring(0, 10)}... (Service Role: ${!!serviceKey})`);
-    
-    const response = await fetch(functionUrl, {
+    // Method 1: Direct fetch with INVALID TOKEN
+    console.log(`\n--- Direct Fetch Test (Invalid Token) ---`);
+    const responseInvalid = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer invalid-token-123`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ accountId: 'dummy' })
+    });
+    console.log(`Status (Invalid): ${responseInvalid.status} ${responseInvalid.statusText}`);
+
+    // Method 2: Direct fetch with VALID KEY
+    console.log(`\n--- Direct Fetch Test (Valid Key) ---`);
+    const responseValid = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        accountId: 'dummy-account-id'
-      })
+      body: JSON.stringify({ accountId: 'dummy-account-id' })
     });
-    
-    console.log(`Status: ${response.status} ${response.statusText}`);
-    try {
-        const text = await response.text();
-        console.log('Response body:', text);
-    } catch (e) {
-        console.log('Could not read response body');
+    console.log(`Status (Valid Service/Anon Key): ${responseValid.status} ${responseValid.statusText}`);
+
+    if (USER_TOKEN) {
+        console.log(`\n--- Direct Fetch Test (USER TOKEN) ---`);
+        const responseUser = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${USER_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ accountId: 'dummy-account-id' })
+        });
+        console.log(`Status (User Token): ${responseUser.status} ${responseUser.statusText}`);
+        if (responseUser.status === 401) {
+            console.error("❌ Your USER TOKEN is Invalid or Expired!");
+        } else if (responseUser.status === 404) {
+            console.log("✅ Token accepted! (404 is expected for dummy account)");
+        }
+    } else {
+        console.log(`\n--- Direct Fetch Test (USER TOKEN) ---`);
+        console.log("⚠️  Skipping: No USER_TOKEN provided in script.");
     }
 
-    if (response.ok || response.status === 404) { // 404 is expected for dummy account
-        console.log('✅ Direct fetch successful (Function is reachable)');
-    } else {
-        console.log('❌ Direct fetch failed');
-    }
 
   } catch (err) {
-    console.error('❌ Direct fetch error:', err.message);
+    console.error('❌ Fetch error:', err.message);
   }
 
-  // Method 2: Supabase Client Invoke
+  // Method 3: Supabase Client Invoke
   console.log('\n--- Supabase Client Invoke Test ---');
   
   // Fetch a valid account ID first

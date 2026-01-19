@@ -273,7 +273,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
       }
 
       // Call edge function to send email
-      const { data, error } = await supabase.functions.invoke("send-email", {
+      const { data, error } = await invokeFunction("send-email", {
         body: {
           accountId: selectedAccount,
           to: to.split(",").map(e => e.trim()),

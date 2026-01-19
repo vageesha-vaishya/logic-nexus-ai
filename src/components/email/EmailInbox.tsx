@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRad
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
 import { format } from "date-fns";
@@ -97,7 +98,7 @@ export function EmailInbox() {
 
       if (searchQuery && looksLikeEmail) {
         const direction = selectedFolder === "inbox" ? "inbound" : selectedFolder === "sent" ? "outbound" : undefined;
-        const { data, error } = await supabase.functions.invoke("search-emails", {
+        const { data, error } = await invokeFunction("search-emails", {
           body: { email: searchQuery.trim(), tenantId, accountId: selectedAccountId || undefined, direction, page: 1, pageSize: 50 },
         });
         if (error) throw error as any;
@@ -241,13 +242,12 @@ export function EmailInbox() {
         setSyncing(false);
         return;
       }
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke("sync-emails-v2", {
+
+      // invokeFunction handles 401 retries automatically
+      const { data, error } = await invokeFunction("sync-emails-v2", {
         body: { accountId },
-        headers: session?.access_token 
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
       });
+
       if (error) throw error as any;
       if (!options?.silent) {
         toast({
@@ -260,14 +260,17 @@ export function EmailInbox() {
       if (!options?.silent) {
         const rawMessage = error?.message as string | undefined;
         let message = rawMessage || "Email sync failed";
+        
         if (rawMessage?.includes("non-2xx")) {
-          const status = (error as any)?.context?.status;
-          if (status === 401) {
-              toast({ title: "Sync Unauthorized", description: "Server rejected credentials (401).", variant: "destructive" });
+           const status = (error as any)?.context?.status;
+           if (status === 401) {
+              // If we get here, the retry logic in invokeFunction also failed
+              toast({ title: "Sync Unauthorized", description: "Session expired. Please log out and log in again.", variant: "destructive" });
               return;
            }
-          message = "Email sync service is not reachable. Check that the sync-emails Edge Function is deployed and accessible.";
-        } else if (rawMessage?.includes("Failed to fetch")) {
+        }
+        
+        if (rawMessage?.includes("Failed to fetch")) {
           message = "Could not reach Supabase Edge Functions. Check network connection and project configuration.";
         }
         toast({ title: "Sync failed", description: message, variant: "destructive" });
@@ -283,12 +286,9 @@ export function EmailInbox() {
       const tenantId = getTenantId();
 
       if (tenantId) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const { data, error } = await supabase.functions.invoke("sync-all-mailboxes", {
+        // invokeFunction handles session and headers automatically
+        const { data, error } = await invokeFunction("sync-all-mailboxes", {
           body: { tenantId, limit: 100 },
-          headers: session?.access_token 
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : undefined,
         });
         if (error) throw error as any;
         toast({ title: "Sync triggered", description: `Processed ${data?.accountsProcessed || 0} accounts` });
@@ -314,13 +314,9 @@ export function EmailInbox() {
       }
 
       let totalSynced = 0;
-      const { data: { session } } = await supabase.auth.getSession();
       for (const acc of userAccounts) {
-        const { data, error } = await supabase.functions.invoke("sync-emails", {
+        const { data, error } = await invokeFunction("sync-emails-v2", {
           body: { accountId: acc.id },
-          headers: session?.access_token 
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : undefined,
         });
         if (error) {
           console.error("Sync error for account", acc.id, error);

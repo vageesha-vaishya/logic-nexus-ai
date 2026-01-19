@@ -1,0 +1,90 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { invokeFunction } from '../supabase-functions';
+import { supabase } from '@/integrations/supabase/client';
+
+// Mock the Supabase client
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    functions: {
+      invoke: vi.fn(),
+    },
+    auth: {
+      refreshSession: vi.fn(),
+    },
+  },
+}));
+
+describe('invokeFunction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return data on successful first attempt', async () => {
+    const mockData = { success: true };
+    (supabase.functions.invoke as any).mockResolvedValueOnce({ data: mockData, error: null });
+
+    const result = await invokeFunction('test-func', { body: { foo: 'bar' } });
+
+    expect(result.data).toEqual(mockData);
+    expect(result.error).toBeNull();
+    expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('test-func', { body: { foo: 'bar' } });
+  });
+
+  it('should retry on 401 error and succeed if refresh works', async () => {
+    const error401 = { context: { status: 401 }, message: 'Unauthorized' };
+    const mockData = { success: true };
+
+    // First call fails with 401
+    (supabase.functions.invoke as any)
+      .mockResolvedValueOnce({ data: null, error: error401 })
+      // Second call succeeds
+      .mockResolvedValueOnce({ data: mockData, error: null });
+
+    // Refresh succeeds
+    (supabase.auth.refreshSession as any).mockResolvedValueOnce({
+      data: { session: { access_token: 'new-token' } },
+      error: null,
+    });
+
+    const result = await invokeFunction('test-func');
+
+    expect(supabase.functions.invoke).toHaveBeenCalledTimes(2);
+    expect(supabase.auth.refreshSession).toHaveBeenCalledTimes(1);
+    expect(result.data).toEqual(mockData);
+    expect(result.error).toBeNull();
+  });
+
+  it('should return session expired error if refresh fails', async () => {
+    const error401 = { context: { status: 401 }, message: 'Unauthorized' };
+
+    // First call fails with 401
+    (supabase.functions.invoke as any).mockResolvedValueOnce({ data: null, error: error401 });
+
+    // Refresh fails
+    (supabase.auth.refreshSession as any).mockResolvedValueOnce({
+      data: { session: null },
+      error: { message: 'Refresh failed' },
+    });
+
+    const result = await invokeFunction('test-func');
+
+    expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
+    expect(supabase.auth.refreshSession).toHaveBeenCalledTimes(1);
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error.message).toContain('Session expired');
+  });
+
+  it('should return original error if not 401', async () => {
+    const error500 = { context: { status: 500 }, message: 'Server Error' };
+
+    (supabase.functions.invoke as any).mockResolvedValueOnce({ data: null, error: error500 });
+
+    const result = await invokeFunction('test-func');
+
+    expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
+    expect(supabase.auth.refreshSession).not.toHaveBeenCalled();
+    expect(result.error).toEqual(error500);
+  });
+});

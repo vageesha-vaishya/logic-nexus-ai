@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RoleService } from '@/lib/api/roles';
+import { invokeFunction } from '@/lib/supabase-functions';
 
 export default function Users() {
   const navigate = useNavigate();
@@ -370,7 +371,7 @@ export default function Users() {
                         return;
                       }
                     }
-                    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                    const { data, error } = await invokeFunction('admin-reset-password', {
                       body: resetMode === 'set'
                         ? { target_user_id: resetUserId, new_password: newPassword }
                         : { target_user_id: resetUserId, send_reset_link: true, redirect_url: window.location.origin + '/' },

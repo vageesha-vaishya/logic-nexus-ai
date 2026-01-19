@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Mail, Settings, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { EmailAccountDialog } from "./EmailAccountDialog";
 import { EmailDelegationDialog } from "./EmailDelegationDialog";
 import { format } from "date-fns";
@@ -83,12 +84,9 @@ export function EmailAccounts() {
 
   const syncAccount = async (accountId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke("sync-emails", {
+      // invokeFunction handles Authorization header and 401 retries automatically
+      const { data, error } = await invokeFunction("sync-emails-v2", {
         body: { accountId },
-        headers: session?.access_token 
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
       });
 
       // If edge function returned non-2xx, error is set
@@ -96,16 +94,10 @@ export function EmailAccounts() {
         let msg = error.message;
         if (msg.includes("non-2xx")) {
            const status = (error as any)?.context?.status;
-           if (status === 504) {
+           if (status === 401) {
+             msg = "Session expired. Please log out and log in again.";
+           } else if (status === 504) {
               msg = "Sync service timed out. Please try again later.";
-           } else if (status === 401) {
-              toast({
-                 title: "Sync Unauthorized",
-                 description: "The server rejected your request (401). Please try refreshing the page manually.",
-                 variant: "destructive"
-              });
-              // Removed auto-logout to prevent loop
-              return;
            } else {
               msg = `Sync service unavailable (Status: ${status || 'Unknown'}).`;
            }

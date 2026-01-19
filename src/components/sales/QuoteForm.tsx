@@ -16,6 +16,7 @@ import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { invokeFunction } from '@/lib/supabase-functions';
 import OpportunitySelectDialogList from '@/components/crm/OpportunitySelectDialogList';
 import AccountSelectDialogList from '@/components/crm/AccountSelectDialogList';
 import ContactSelectDialogList from '@/components/crm/ContactSelectDialogList';
@@ -1722,7 +1723,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       form.setValue('opportunity_id', String(opp.id), { shouldDirty: true });
       
       // Fetch full opportunity data including account and contact
-      const { data: fullOpp, error } = await supabase.functions.invoke('get-opportunity-full', {
+      const { data: fullOpp, error } = await invokeFunction('get-opportunity-full', {
         body: { id: opp.id }
       });
 
