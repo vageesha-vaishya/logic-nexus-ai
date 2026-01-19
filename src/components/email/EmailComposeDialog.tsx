@@ -165,6 +165,16 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
       const files = Array.from(e.target.files);
       
       for (const file of files) {
+        // Limit file size to 4MB to prevent Edge Function timeouts/memory issues
+        if (file.size > 4 * 1024 * 1024) {
+          toast({
+            title: "File too large",
+            description: `${file.name} exceeds the 4MB limit. Please reduce its size.`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
         try {
           const fileExt = file.name.split('.').pop();
           const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
@@ -203,6 +213,17 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      
+      if (file.size > 4 * 1024 * 1024) {
+        toast({
+          title: "Image too large",
+          description: "Inline images must be under 4MB.",
+          variant: "destructive",
+        });
+        if (imageInputRef.current) imageInputRef.current.value = '';
+        return;
+      }
+
       try {
           const fileExt = file.name.split('.').pop();
           const fileName = `inline_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
@@ -278,6 +299,20 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
             // ignore
           }
         }
+        
+        if (description.includes("non-2xx")) {
+          const status = (error as any)?.context?.status;
+          if (status === 504) {
+             description = "Email service timed out. The provider (Gmail/Office365) took too long to respond. Please try again later.";
+          } else if (status === 413) {
+             description = "Email content too large. Please reduce attachment size or avoid pasting large images directly.";
+          } else if (status === 500) {
+             description = "Email service error. Please try again later.";
+          } else {
+             description = `Email service unavailable (Status: ${status || 'Unknown'}). Please check your connection.`;
+          }
+        }
+        
         throw new Error(description);
       }
       if (data && (data as any).success === false) {

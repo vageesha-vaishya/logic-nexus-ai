@@ -89,7 +89,16 @@ export function EmailAccounts() {
 
       // If edge function returned non-2xx, error is set
       if (error) {
-        throw new Error(error.message);
+        let msg = error.message;
+        if (msg.includes("non-2xx")) {
+           const status = (error as any)?.context?.status;
+           if (status === 504) {
+              msg = "Sync service timed out. Please try again later.";
+           } else {
+              msg = `Sync service unavailable (Status: ${status || 'Unknown'}).`;
+           }
+        }
+        throw new Error(msg);
       }
 
       // If function handled errors itself with success=false
