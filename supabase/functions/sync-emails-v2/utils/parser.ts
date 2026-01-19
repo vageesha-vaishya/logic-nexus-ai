@@ -1,5 +1,5 @@
 
-import PostalMime from "npm:postal-mime@2.2.0";
+import PostalMime from "https://esm.sh/postal-mime@2.2.0";
 
 export interface ParsedEmail {
   messageId: string;
@@ -61,9 +61,9 @@ export async function parseEmail(raw: string | Uint8Array, fallbackId?: string):
     .filter((v: any) => v.email)
     .map((v: any) => ({ email: v.email, name: v.name || v.email }));
 
-  const to = mapRecipients(parsed.to);
-  const cc = mapRecipients(parsed.cc);
-  const bcc = mapRecipients(parsed.bcc);
+  const to = mapRecipients(parsed.to || []);
+  const cc = mapRecipients(parsed.cc || []);
+  const bcc = mapRecipients(parsed.bcc || []);
 
   const bodyText = (parsed.text || "").trim();
   const bodyHtml = typeof parsed.html === "string" ? parsed.html : "";
