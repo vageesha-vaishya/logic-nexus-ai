@@ -1,6 +1,6 @@
 # Quotation Module Design Specification: "Hybrid" Architecture
-**Document ID:** SPEC-QUO-2026-003
-**Version:** 2.1.0 (Implementation Ready)
+**Document ID:** SPEC-QUO-2026-004
+**Version:** 2.2.0 (Enterprise Enhanced)
 **Date:** January 20, 2026
 **Status:** APPROVED FOR IMPLEMENTATION
 **Author:** Trae AI (Senior Systems Architect)
@@ -11,10 +11,10 @@
 ## 1. Executive Summary
 This document outlines the architectural and design specifications for the **Next-Generation Quotation Module** within SOS Logistics Pro. The initiative aims to bridge the gap between "Speed" (Quick Quote) and "Precision" (Multi-Modal Composer) while introducing AI-driven intelligence (Smart Quote).
 
-**v2.1.0 Update**: This final pre-implementation revision adds comprehensive **Use Case Definitions**, a **Requirements Traceability Matrix (RTM)**, and an **Implementation Readiness Checklist**. It incorporates "Enterprise-Grade" requirements identified through competitive benchmarking against market leaders (Flexport, Freightos, WiseTech).
+**v2.2.0 Update**: This revision integrates **Enterprise-Grade Quick Quote** standards, including Multi-Currency logic, Hazardous Cargo validation, detailed Incoterm handling, and stricter performance/security benchmarks (Sub-second latency, Audit logging).
 
 The core philosophy is **"Hybrid Entry, Unified Pipeline"**:
-1.  **Quick Quote**: A sub-30-second workflow for rapid estimations.
+1.  **Quick Quote**: A sub-second, enterprise-ready workflow for rapid estimations.
 2.  **Smart Quote**: RAG-based intelligence providing "Win Probability" and "Price Guidance".
 3.  **Unified Pipeline**: A visual control tower with both **Kanban** and **List** views.
 4.  **Trade-Aware Intelligence**: Explicit handling of Import/Export/Cross-Trade workflows.
@@ -46,26 +46,53 @@ A comprehensive gap analysis against world-class platforms (Flexport, Magaya, Ca
 ## 3. Feature Specifications
 
 ### 3.1 Feature A: Quick Quote (Rapid Estimator)
-**Objective**: Generate a valid quote in < 30 seconds.
-*   **UX Design**: Single-screen "Flight Search" interface.
-*   **Inputs**: Origin, Destination, Weight/Dims, Commodity, Mode.
-*   **Output**: 3 Tiered Options (Economy, Standard, Express).
-*   **Technical Logic**: `rate_cards` + External Spot API + Redis Caching.
+**Objective**: Generate a valid quote in < **1.0 second** (Sub-second response).
+*   **UX Design**: Single-screen "Flight Search" interface; Mobile-Responsive (Stackable layout).
+*   **Technical Logic**: `rate_cards` + External Spot API + Redis Caching (Smart Keys).
 
-#### Use Case: Create Spot Quote
-*   **Actor**: Sales Representative
-*   **Pre-conditions**: User is logged in; Tenant has valid Rate Cards or API keys.
+#### 3.1.1 Required Parameters (Enterprise Standard)
+The following inputs are mandatory for an accurate "Enterprise-Grade" quote:
+1.  **Origin/Destination**: UN/LOCODE (e.g., CNSHA -> USLAX) or City/Zip.
+2.  **Mode**: Ocean (FCL/LCL), Air, Road (FTL/LTL), Rail.
+3.  **Cargo Details**:
+    *   Weight (kg), Volume (cbm).
+    *   **Dynamic**: If Air, prompt for Dimensions (LxWxH) to calc Volumetric Weight (1:167).
+    *   **Dynamic**: If FCL, prompt for Container Type (20GP, 40HC) & Quantity.
+4.  **Incoterms**: (Dropdown) FOB, CIF, EXW, DDP, DAP. *Critical for liability split.*
+5.  **Service Level**: Door-to-Door, Port-to-Port, Door-to-Port.
+6.  **Commodity**: HS Code or Description (Auto-suggest).
+7.  **Target Date**: "Ready to Load" date (Impacts Spot Rates).
+
+#### 3.1.2 Optional & Enterprise Parameters
+1.  **Hazardous Cargo**: Boolean toggle. If True -> Show Class (1-9) & UN Number input.
+2.  **Insurance**: Value of Goods + Currency (for Premium calc).
+3.  **Target Currency**: User's preferred currency (e.g., EUR) vs Carrier currency (USD).
+4.  **Customer Reference**: Link to CRM Account (Auto-pulls Negotiated Rates).
+
+#### 3.1.3 Enterprise Features Logic
+*   **Multi-Tier Pricing**:
+    *   **Tier 1**: Contract Rates (Customer Specific).
+    *   **Tier 2**: Internal Spot Matrix (General Tariff).
+    *   **Tier 3**: External API (Market Spot).
+    *   *Logic*: Display "Best Contract" vs "Best Spot" side-by-side.
+*   **Volume Discounts**:
+    *   Apply "Density Breaks" for LTL/Air (e.g., >1000kg rate vs >100kg rate).
+    *   Apply "Quantity Breaks" for FCL (e.g., >10 Containers = 5% discount).
+*   **Currency & Tax**:
+    *   Fetch Live Exchange Rates (Daily Cache).
+    *   **Landed Cost**: Estimate Duty/Tax based on HS Code + Destination Country (Optional Phase 4).
+
+#### 3.1.4 Use Case: Create Spot Quote (Enhanced)
+*   **Actor**: Sales Representative (Mobile/Desktop).
+*   **Pre-conditions**: Authenticated; Rate Cards active.
 *   **Flow**:
-    1.  User enters "Shanghai" (Origin) and "Los Angeles" (Dest).
-    2.  System resolves to UN/LOCODEs (CNSHA, USLAX).
-    3.  User selects Mode "Ocean" and enters Weight "5000kg".
-    4.  System queries Redis Cache -> Database -> External API (parallel).
-    5.  System returns 3 options with Price + Transit Time.
-*   **Success Criteria**: Results displayed within 1.5 seconds.
-*   **Edge Cases**:
-    *   *API Failure*: Fallback to "Historical Average" with "Est." flag.
-    *   *No Rates*: Display "Manual Quote Required" form.
-*   **Error Conditions**: Invalid UN/LOCODE (User Alert: "Port not found").
+    1.  User selects "Ocean FCL", "FOB", "Shanghai" -> "Hamburg".
+    2.  User enters "2x 40HC", Commodity "Electronics".
+    3.  System checks **Contract Rates** for Client X (Tier 1).
+    4.  System checks **Spot Rates** (Tier 3) via API.
+    5.  System converts all to **EUR** (Client pref).
+    6.  System displays 3 cards: "Contract (Best Value)", "Spot Standard", "Spot Express".
+*   **Success Criteria**: < 1.0s response; Audit Log created.
 
 ### 3.2 Feature B: Smart Quote (Intelligence Layer)
 **Objective**: Increase "Win Rate" by 15% through data-driven pricing.
@@ -177,6 +204,13 @@ This section consolidates all schema requirements from v1.2, v1.3, and v2.0 to p
 -- 1. Core Quote Enhancements (Trade & Compliance)
 alter table quotes
 add column if not exists trade_direction text check (trade_direction in ('export', 'import', 'cross_trade', 'domestic')),
+add column if not exists incoterms text check (incoterms in ('EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP')),
+add column if not exists service_level text default 'door_to_door', -- 'port_to_port', 'door_to_port', 'port_to_door'
+add column if not exists is_hazmat boolean default false,
+add column if not exists hazmat_class text, -- '3', '8', '9' etc.
+add column if not exists hazmat_un_number text, -- 'UN1263'
+add column if not exists cargo_ready_date date,
+add column if not exists target_currency text default 'USD', -- 'EUR', 'GBP'
 add column if not exists compliance_status text default 'pending_check', -- 'pass', 'blocked', 'manual_review'
 add column if not exists mode_specific_data jsonb default '{}'::jsonb, -- Stores RORO (VIN) / Breakbulk (Dims) data
 add column if not exists stage_entered_at timestamptz default now(),
@@ -310,6 +344,10 @@ Detailed structure for the JSONB column to support specialized modes.
 | **REQ-006** | System must alert on Allocation thresholds (80%). | `MultiModalComposer`, `AllocFunc` | Integration Test | Backend Lead |
 | **REQ-007** | System must enforce RLS on Tenant Data. | PostgreSQL Policies | Security Audit Script | DevOps |
 | **REQ-008** | System must support RORO specific fields (VIN). | `mode_specific_data` JSONB | Schema Validation Test | DB Admin |
+| **REQ-009** | System must handle Multi-Currency conversion (Spot -> Quote). | `rate-engine` | Unit Test (Mock Rates) | Backend Lead |
+| **REQ-010** | System must validate HazMat Class/UN compatibility. | `QuickQuoteModal` | Integration Test | Frontend Lead |
+| **REQ-011** | System must audit log all quote requests (even abandoned). | `audit_logs` table | Security Scan | Security Lead |
+| **REQ-012** | Quick Quote UI must be fully mobile-responsive. | `QuickQuoteModal` | Mobile Device Lab | Frontend Lead |
 
 ---
 
