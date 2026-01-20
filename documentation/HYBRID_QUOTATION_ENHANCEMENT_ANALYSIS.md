@@ -17,6 +17,7 @@
 | 5.1 | 2026-01-20 | Trae AI | Initial analysis and landscape benchmarking. |
 | 6.0 | 2026-01-20 | Trae AI | Comprehensive technical specification enhancement for Multi-Modal Hybrid Quotation support. |
 | 6.1 | 2026-01-20 | Trae AI | Added Breakbulk & RORO specifications; Defined detailed charge types for all modes. |
+| 6.2 | 2026-01-20 | Trae AI | Added Service Relationship Definitions (SD/Port, Port/Port, etc.) with operational flows and rules. |
 
 ### Approval Workflow
 | Role | Name | Signature | Date |
@@ -171,6 +172,16 @@ The system must support distinct parameter sets for each transportation mode, st
     *   *Cheapest:* Sort options by `Total Cost`.
     *   *Fastest:* Sort options by `Total Transit Time`.
     *   *Greenest:* Sort by `CO2 Emissions` (calculated via distance/mode).
+
+### 3.5 Service Relationship Definitions
+| Relationship Type | Description | Operational Flow | Key Parameters | Business Rules |
+| :--- | :--- | :--- | :--- | :--- |
+| **SD/Port** (Store Door to Port) | Carrier manages pre-carriage from shipper's facility to the export port. | 1. Empty container pickup from depot.<br>2. Loading at Shipper (SD).<br>3. Drayage to Port Terminal. | • Pickup Date/Time<br>• Loading Time (Free time)<br>• Distance to Port | • Requires specific equipment (chassis).<br>• Strict cut-off times at port gate. |
+| **Port/Port** (Port to Port) | Pure ocean freight leg between origin and destination ports. | 1. Container gated in at Origin Port.<br>2. Loaded on Vessel.<br>3. Discharged at Destination Port. | • Vessel/Voyage No.<br>• ETD / ETA<br>• Cut-off dates (CY, Doc) | • Core component of most international moves.<br>• Subject to General Rate Increases (GRI). |
+| **Door/Door** (Door to Door) | End-to-end logistics managed by a single entity (or linked legs). | 1. Pickup at Origin Door.<br>2. Main Leg (Air/Ocean/Rail).<br>3. Delivery to Destination Door. | • All-in Rate<br>• Incoterms (DDP/DAP)<br>• Full address details | • Highest liability for the forwarder.<br>• Requires seamless "handshakes" between legs. |
+| **CFS/CFS** (Container Freight Station) | LCL movement where cargo is consolidated and deconsolidated at warehouses. | 1. Loose cargo drop-off at Origin CFS.<br>2. Consolidation into container.<br>3. Ocean Leg.<br>4. Deconsolidation at Dest CFS.<br>5. Pickup by Consignee. | • Weight/Measure (w/m)<br>• Cubic Meters (CBM)<br>• Marks & Numbers | • Minimum chargeable volume (usually 1 CBM).<br>• Hazardous cargo restrictions apply. |
+| **RAILRAMP/PORT** (Rail Ramp to Port) | Intermodal connection linking inland rail hubs to ocean ports. | 1. Container loaded on train at Inland Ramp.<br>2. Rail transit to Port.<br>3. Drayage (if not on-dock) to Terminal. | • Rail Cut-off<br>• Train Schedule<br>• Flip Charges | • "Steel wheel" vs "Rubber tire" interchange.<br>• Rail billing must match Ocean booking. |
+| **SD/CFS** (Store Door to CFS) | Pickup of LCL cargo from shipper's door for delivery to consolidation warehouse. | 1. Truck pickup at Shipper.<br>2. Delivery to CFS.<br>3. Handover for consolidation. | • Weight/Dims per piece<br>• Stackability<br>• Liftgate requirement | • Cargo must be packaged for handling (palletized).<br>• Delivery appointment at CFS usually required. |
 
 ---
 
