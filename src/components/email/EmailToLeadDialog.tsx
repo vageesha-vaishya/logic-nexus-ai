@@ -3,9 +3,23 @@ import { LeadForm, LeadFormData } from "@/components/crm/LeadForm";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import config from "@/config/Interested_Transport_Mode_checker_config.json";
+import optionsConfig from "@/config/Options_Transport_Mode.json";
+import interestedConfig from "@/config/Interested_Transport_Mode_checker_config.json";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
-import { sanitizeLeadDataForInsert, extractEmailAddress } from "./email-to-lead-helpers";
+import { sanitizeLeadDataForInsert, extractEmailAddress, parseTransportOptionsJSON, type TransportOption } from "./email-to-lead-helpers";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface EmailForConversion {
   id: string;
@@ -28,7 +42,10 @@ interface EmailToLeadDialogProps {
 export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: EmailToLeadDialogProps) {
   const { supabase, context } = useCRM();
   const [suggestedService, setSuggestedService] = useState<string>("");
-  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isSuggestingService, setIsSuggestingService] = useState(false);
+  const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const parseName = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
@@ -55,118 +72,142 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
   const initialData: Partial<LeadFormData> & { custom_fields?: any } = {
     first_name,
-    last_name: last_name || "Unknown", // Last name is often required
+    last_name: last_name || "Unknown",
     email: extractedEmail || "",
     description: `Created from email: ${email.subject}\n\n${getBodyText(email)}`,
     source: "email",
     status: "new",
     tenant_id: context.tenantId || undefined,
     franchise_id: context.franchiseId || undefined,
-    // Pass the suggested service so it persists even if LeadForm remounts
     custom_fields: suggestedService ? { service_id: suggestedService } : undefined,
   };
 
-  useEffect(() => {
-    // Reset suggestion when email changes or dialog closes to prevent stale data
-    setSuggestedService("");
-    setIsSuggesting(false);
-  }, [email.id, open]);
+  // 1. Interested Service (Plain Text)
+  const fetchInterestedService = async (forceRefresh = false) => {
+    if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
+    
+    const CACHE_KEY = `interested_service_${email.id}`;
+    if (!forceRefresh) {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+            console.log("Using cached interested service");
+            setSuggestedService(cached);
+            return;
+        }
+    }
 
-  useEffect(() => {
-    let abortController = new AbortController();
+    setIsSuggestingService(true);
+    if (forceRefresh) setSuggestedService("");
 
-    const fetchSuggestion = async () => {
-      // Use email.id to avoid unnecessary re-runs if the object reference changes but content is same
-      if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
-      
-      setIsSuggesting(true);
-      // Do NOT clear suggestedService here to avoid flashing empty state if we have one
-      // setSuggestedService(""); 
-      
-      try {
+    try {
         const subject = email.subject || "";
         const content = getBodyText(email);
         
-        let prompt = config.system_prompt;
-        // Replace placeholders - handle potential missing subject/content gracefully
+        let prompt = interestedConfig.system_prompt;
         prompt = prompt.replace("<subject>", subject).replace("<content>", content);
-        
-        // Generate Request ID for tracing
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        const requestTimestamp = new Date().toISOString();
-        
-        console.log(`[EmailToLeadDialog] [INFO] [${requestTimestamp}] Request initiated: ${requestId}`);
-        console.log(`[EmailToLeadDialog] [DEBUG] [${requestTimestamp}] Request Payload:`, { prompt });
 
-        const startTime = Date.now();
-
+        const requestId = `req_interested_${Date.now()}`;
         const { data, error } = await supabase.functions.invoke('suggest-transport-mode', {
-          body: { prompt, requestId }, // Pass requestId if server wants to log it too
-          headers: { 'x-client-info': 'email-to-lead' }
+            body: { prompt, requestId },
+            headers: { 'x-client-info': 'email-to-lead-interested' }
         });
 
-        if (abortController.signal.aborted) return;
-        
-        if (error) {
-            console.error(`[EmailToLeadDialog] [ERROR] [${new Date().toISOString()}] API Error for ${requestId}:`, error);
-            throw error;
-        }
-        
-        // Handle application-level errors returned with 200 OK
-        if (data?.error) {
-          console.error(`[EmailToLeadDialog] [ERROR] [${new Date().toISOString()}] Application Error for ${requestId}:`, data.error);
-          throw new Error(data.error);
-        }
-        
-        const text = data?.text || "";
-        const meta = data?.meta || {};
-        const service = meta.service || "UnknownService";
-        const model = meta.model || "UnknownModel";
-        const duration = meta.duration_ms || (Date.now() - startTime);
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
 
-        // Structured Logging as requested
-        console.log(`[${service}] [${model}] [${requestId}] Prompt: ${prompt}`);
-        console.log(`[${service}] [${model}] [${requestId}] ResponseTime: ${duration} ms`);
-        console.log(`[${service}] [${model}] [${requestId}] Response: ${text}`);
+        const text = (data?.text || "").trim();
+        console.log(`[InterestedService] Response: ${text}`);
         
-        // Extract content within brackets if present
-        const match = text.match(/\[(.*?)\]/);
-        let recommendation = match ? match[1] : text;
-        
-        // Cleanup if it still has "Recommended Transport:" prefix
-        if (recommendation.includes("Recommended Transport:")) {
-            recommendation = recommendation.replace("Recommended Transport:", "").trim();
-        }
-        
-        if (recommendation) {
-            console.log(`[EmailToLeadDialog] [INFO] [${new Date().toISOString()}] Setting suggested service for ${requestId}:`, recommendation);
-            setSuggestedService(recommendation);
+        // Simple validation: ensure it's not too long
+        if (text && text.length < 100) {
+            setSuggestedService(text);
+            sessionStorage.setItem(CACHE_KEY, text);
         } else {
-            console.warn(`[EmailToLeadDialog] [WARNING] [${new Date().toISOString()}] No recommendation found in response for ${requestId}`);
+            console.warn("[InterestedService] Response too long or empty, ignoring.");
         }
-      } catch (err) {
-        if (!abortController.signal.aborted) {
-          console.error(`[EmailToLeadDialog] [ERROR] [${new Date().toISOString()}] Error getting transport suggestion:`, err);
+
+    } catch (err) {
+        console.error(`[InterestedService] Error:`, err);
+    } finally {
+        setIsSuggestingService(false);
+    }
+  };
+
+  // 2. Recommended Options (JSON)
+  const fetchRecommendedOptions = async (forceRefresh = false) => {
+    if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
+
+    const CACHE_KEY = `transport_options_${email.id}`;
+    if (!forceRefresh) {
+        try {
+            const cached = sessionStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed)) {
+                    console.log("Using cached transport options");
+                    setTransportOptions(parsed);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn("Error reading transport options cache:", e);
         }
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsSuggesting(false);
-        }
-      }
-    };
-    
-    if (open) {
-      fetchSuggestion();
     }
 
-    return () => {
-      abortController.abort();
-    };
-  }, [open, email.id, supabase]);
+    setLoadingOptions(true);
+    setSuggestionError(null);
+    if (forceRefresh) setTransportOptions([]);
+
+    try {
+        const subject = email.subject || "";
+        const content = getBodyText(email);
+        
+        let prompt = optionsConfig.system_prompt;
+        prompt = prompt.replace("<subject>", subject).replace("<content>", content);
+
+        const requestId = `req_options_${Date.now()}`;
+        const { data, error } = await supabase.functions.invoke('suggest-transport-mode', {
+            body: { prompt, requestId, responseFormat: 'json' },
+            headers: { 'x-client-info': 'email-to-lead-options' }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const text = (data?.text || "").trim();
+        console.log(`[RecommendedOptions] Raw Response: ${text}`);
+
+        const options = parseTransportOptionsJSON(text);
+        
+        setTransportOptions(options);
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(options));
+
+    } catch (err) {
+        console.error(`[RecommendedOptions] Error:`, err);
+        setSuggestionError("Failed to load detailed recommendations.");
+    } finally {
+        setLoadingOptions(false);
+    }
+  };
+
+  useEffect(() => {
+    setSuggestedService("");
+    setTransportOptions([]);
+    setIsSuggestingService(false);
+    setLoadingOptions(false);
+    setSuggestionError(null);
+  }, [email.id, open]);
+
+  useEffect(() => {
+    if (open) {
+        // Run both services in parallel
+        fetchInterestedService();
+        fetchRecommendedOptions();
+    }
+  }, [open, email.id]);
 
   const handleSubmit = async (data: LeadFormData) => {
     try {
-      // Check for existing lead by email
       if (data.email) {
         const normalizedEmail = cleanEmail(data.email).value || data.email.trim().toLowerCase();
         let query = supabase
@@ -185,7 +226,6 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         }
       }
 
-      // Check for existing lead by phone
       if (data.phone) {
         const normalizedPhone = cleanPhone(data.phone).value || data.phone.trim();
         let query = supabase
@@ -219,7 +259,6 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
           ...sanitizeLeadDataForInsert(data),
           email: data.email ? (cleanEmail(data.email).value || data.email.trim().toLowerCase()) : null,
           phone: data.phone ? (cleanPhone(data.phone).value || data.phone.trim()) : null,
-          // Ensure tenant/franchise context is respected if not in data
           tenant_id: data.tenant_id || context.tenantId,
           franchise_id: data.franchise_id || context.franchiseId,
           custom_fields: Object.keys(customFields).filter((k) => customFields[k] !== undefined).length
@@ -236,7 +275,6 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
       toast.success("Lead created successfully");
       
-      // Record automated activity for conversion
       try {
         await supabase
           .from("lead_activities")
@@ -255,10 +293,6 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         console.error("Error recording lead email conversion activity", err);
       }
       
-      // 2. Optionally link the specific email to the lead if the schema supports it
-      // But since we rely on email address matching, this might be implicit.
-      // If there was an explicit link table, we'd update it here.
-      
       onOpenChange(false);
       onSuccess?.(lead.id);
     } catch (error: unknown) {
@@ -273,21 +307,92 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Convert Email to Lead</DialogTitle>
           <DialogDescription>
             Review the email details and confirm the lead information below.
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
-          <LeadForm
-            initialData={initialData}
-            onSubmit={handleSubmit}
-            onCancel={() => onOpenChange(false)}
-            suggestedService={suggestedService}
-            isSuggestingService={isSuggesting}
-          />
+        
+        <div className="space-y-6 py-4">
+            {/* Recommended Options Section */}
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            Recommended Options
+                            {loadingOptions && <Loader2 className="h-4 w-4 animate-spin" />}
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => fetchRecommendedOptions(true)} 
+                            disabled={loadingOptions}
+                            title="Regenerate Recommendations"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${loadingOptions ? 'animate-spin' : ''}`} />
+                        </Button>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {suggestionError ? (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{suggestionError}</AlertDescription>
+                        </Alert>
+                    ) : loadingOptions ? (
+                        <div className="flex items-center justify-center py-8 text-muted-foreground">
+                            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                            Analyzing transport options...
+                        </div>
+                    ) : transportOptions.length > 0 ? (
+                        <ScrollArea className="h-[300px] w-full rounded-md border">
+                            <div className="min-w-[800px]">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[60px]">Seq</TableHead>
+                                        <TableHead className="w-[200px]">Transport Mode</TableHead>
+                                        <TableHead className="w-[120px]">Est. Price</TableHead>
+                                        <TableHead className="w-[120px]">Transit Time</TableHead>
+                                        <TableHead className="w-[150px]">Best For</TableHead>
+                                        <TableHead className="w-[200px]">Interchange Points</TableHead>
+                                        <TableHead className="min-w-[200px]">Logic</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transportOptions.map((option, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell className="font-medium">{option.seqNo}</TableCell>
+                                            <TableCell>{option.mode}</TableCell>
+                                            <TableCell>{option.price}</TableCell>
+                                            <TableCell>{option.transitTime}</TableCell>
+                                            <TableCell>{option.bestFor}</TableCell>
+                                            <TableCell>{option.interchangePoints}</TableCell>
+                                            <TableCell className="text-muted-foreground text-xs">{option.logic}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            </div>
+                        </ScrollArea>
+                    ) : (
+                        <div className="text-center py-4 text-muted-foreground text-sm">
+                            No detailed recommendations available.
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <LeadForm
+                initialData={initialData}
+                onSubmit={handleSubmit}
+                onCancel={() => onOpenChange(false)}
+                suggestedService={suggestedService}
+                isSuggestingService={isSuggestingService}
+            />
         </div>
       </DialogContent>
     </Dialog>

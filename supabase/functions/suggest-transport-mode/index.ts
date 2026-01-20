@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { prompt, model } = await req.json();
+    const { prompt, model, responseFormat } = await req.json();
     
     // Check for available API keys
     const geminiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY');
@@ -30,10 +30,18 @@ Deno.serve(async (req) => {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
 
         try {
+          const bodyPayload: any = {
+              contents: [{ parts: [{ text: prompt }] }]
+          };
+          
+          if (responseFormat === 'json') {
+              bodyPayload.generationConfig = { responseMimeType: "application/json" };
+          }
+
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            body: JSON.stringify(bodyPayload),
           });
 
           if (response.ok) {
@@ -41,7 +49,6 @@ Deno.serve(async (req) => {
               text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
           } else {
               console.error("Gemini API failed with status:", response.status);
-              // Store error for debugging if needed, or just continue to fallback
           }
         } catch (e) {
           console.error("Gemini API error:", e);
@@ -54,16 +61,22 @@ Deno.serve(async (req) => {
         const targetModel = 'gpt-4o-mini';
         usedModel = targetModel;
         try {
+          const bodyPayload: any = {
+              model: targetModel,
+              messages: [{ role: 'user', content: prompt }],
+          };
+
+          if (responseFormat === 'json') {
+              bodyPayload.response_format = { type: "json_object" };
+          }
+
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
                   'Authorization': `Bearer ${openAiKey}`,
                   'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                  model: targetModel,
-                  messages: [{ role: 'user', content: prompt }],
-              }),
+              body: JSON.stringify(bodyPayload),
           });
 
           if (response.ok) {
