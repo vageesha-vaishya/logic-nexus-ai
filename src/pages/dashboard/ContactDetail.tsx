@@ -34,21 +34,28 @@ export default function ContactDetail() {
 
   const fetchContact = async () => {
     try {
+      console.log('Fetching contact with ID:', id);
+      console.log('Current context:', context);
+      
       const { data, error } = await scopedDb
         .from('contacts')
         .select(`
           *,
-          accounts (name),
-          reports_to_contact:reports_to (first_name, last_name)
+          accounts (name)
         `)
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching contact:', error);
+        throw error;
+      }
+      
+      console.log('Contact data fetched:', data);
       setContact(data);
     } catch (error: any) {
       toast.error('Failed to load contact');
-      console.error('Error:', error);
+      console.error('Error in fetchContact:', error);
     } finally {
       setLoading(false);
     }
@@ -93,7 +100,6 @@ export default function ContactDetail() {
         .update({
           ...formData,
           account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
-          reports_to: formData.reports_to === 'none' || formData.reports_to === '' ? null : formData.reports_to,
         })
         .eq('id', id);
 
@@ -219,18 +225,7 @@ export default function ContactDetail() {
                     </div>
                   </div>
                 )}
-                {contact.reports_to_contact && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Reports To</p>
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto text-primary"
-                      onClick={() => navigate(`/dashboard/contacts/${contact.reports_to}`)}
-                    >
-                      {contact.reports_to_contact.first_name} {contact.reports_to_contact.last_name}
-                    </Button>
-                  </div>
-                )}
+
                 <div className="flex gap-2 flex-wrap">
                   {contact.is_primary && (
                     <Badge variant="outline">Primary Contact</Badge>

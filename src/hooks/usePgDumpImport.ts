@@ -885,7 +885,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
           `Creating ${missingTableStatements.length} tables: ${Array.from(missingTableNames).join(', ')}`
         );
 
-        const { data: createData, error: createError } = await invokeFunction('execute-sql-external', {
+        const { data: createData, error: createError } = await supabase.functions.invoke('execute-sql-external', {
           body: {
             action: 'execute',
             connection: {
@@ -943,7 +943,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     });
 
     // Fetch table row estimates to skip gigantic tables if configured
-    const { data: tblEstData, error: tblEstErr } = await invokeFunction('execute-sql-external', {
+    const { data: tblEstData, error: tblEstErr } = await supabase.functions.invoke('execute-sql-external', {
       body: {
         action: 'query',
         connection: {
@@ -1015,7 +1015,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
     if (relaxNotNullStatements.length > 0) {
       addLog('info', 'Relaxing NOT NULL on extra columns', relaxNotNullSummary.join('\n'));
-      const { data: relaxData, error: relaxError } = await invokeFunction('execute-sql-external', {
+      const { data: relaxData, error: relaxError } = await supabase.functions.invoke('execute-sql-external', {
         body: {
           action: 'execute',
           connection: {
@@ -1066,7 +1066,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     }
 
     try {
-      const { data: pkData, error: pkError } = await invokeFunction('execute-sql-external', {
+      const { data: pkData, error: pkError } = await supabase.functions.invoke('execute-sql-external', {
         body: {
           action: 'query',
           connection: {
@@ -1158,7 +1158,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
     addLog('info', 'Applying Stage 1 schema changes', stage1Summary.join('\n'));
 
-    const { data: execData1, error: execError1 } = await invokeFunction('execute-sql-external', {
+    const { data: execData1, error: execError1 } = await supabase.functions.invoke('execute-sql-external', {
       body: {
         action: 'execute',
         connection: {
@@ -1215,7 +1215,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       }
 
       let nullCount = Number.NaN;
-      const { data: qData, error: qErr } = await invokeFunction('execute-sql-external', {
+      const { data: qData, error: qErr } = await supabase.functions.invoke('execute-sql-external', {
         body: {
           action: 'query',
           connection: {
@@ -1256,7 +1256,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
     if (stage2Statements.length > 0) {
       addLog('info', 'Applying Stage 2 constraints', stage2Summary.join('\n'));
-      const { data: execData2, error: execError2 } = await invokeFunction('execute-sql-external', {
+      const { data: execData2, error: execError2 } = await supabase.functions.invoke('execute-sql-external', {
         body: {
           action: 'execute',
           connection: {
@@ -1297,7 +1297,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
     addLog('info', 'Schema alignment completed', `Applied ${stage1Statements.length} changes; ${stage2Statements.length} constraints`);
 
-    const { data: verifyData, error: verifyError } = await invokeFunction('execute-sql-external', {
+    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('execute-sql-external', {
       body: {
         action: 'query',
         connection: {
@@ -1355,7 +1355,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
   const testConnection = useCallback(async (connection: ExternalDbConnection): Promise<ConnectionTestResult> => {
     try {
-      const { data, error } = await invokeFunction('execute-sql-external', {
+      const { data, error } = await supabase.functions.invoke('execute-sql-external', {
         body: {
           action: 'test',
           connection: {
@@ -1438,7 +1438,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         let lastResult: any = null;
         do {
           const t0 = Date.now();
-        const { data, error } = await invokeFunction('execute-sql-external', {
+        const { data, error } = await supabase.functions.invoke('execute-sql-external', {
           body: {
             action: 'execute',
             connection: {
@@ -1690,7 +1690,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
                 (SELECT md5(string_agg(row_text, '')) FROM sample) as chk
             `;
 
-            const { data, error } = await invokeFunction('execute-sql-external', {
+            const { data, error } = await supabase.functions.invoke('execute-sql-external', {
               body: {
                 action: 'query',
                 connection: {
@@ -1760,7 +1760,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
           AND tc.table_schema IN (${schemaList})
         `;
 
-        const { data: fks, error: fkError } = await invokeFunction('execute-sql-external', {
+        const { data: fks, error: fkError } = await supabase.functions.invoke('execute-sql-external', {
           body: {
             action: 'query',
             connection: {
@@ -1801,7 +1801,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
              `;
              
              try {
-               const { data: orphanData, error: orphanError } = await invokeFunction('execute-sql-external', {
+               const { data: orphanData, error: orphanError } = await supabase.functions.invoke('execute-sql-external', {
                  body: {
                    action: 'query',
                    connection: {
@@ -2337,7 +2337,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       }
 
       try {
-        const { data: fkData, error: fkError } = await invokeFunction('execute-sql-external', {
+        const { data: fkData, error: fkError } = await supabase.functions.invoke('execute-sql-external', {
           body: {
             action: 'query',
             connection: {
@@ -2469,7 +2469,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         const privPassword = (import.meta as any).env?.VITE_POST_IMPORT_DB_PASSWORD;
         if (privUser && privPassword) {
           addLog('info', 'Starting post-import ownership changes', `${selected.length} statements`);
-          const { data: ownData, error: ownErr } = await invokeFunction('execute-sql-external', {
+          const { data: ownData, error: ownErr } = await supabase.functions.invoke('execute-sql-external', {
             body: {
               action: 'execute',
               connection: {
@@ -2547,7 +2547,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
 
     for (const fb of failed) {
       try {
-        const { data, error } = await invokeFunction('execute-sql-external', {
+        const { data, error } = await supabase.functions.invoke('execute-sql-external', {
           body: {
             action: 'execute',
             connection: {
@@ -2658,7 +2658,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
     const statements = changes.flatMap(c => c.rollback).reverse();
     addLog('warn', 'Starting rollback of schema alignment', `${statements.length} statements`);
     addLog('info', 'Rollback plan', statements.join('\n'));
-    const { data, error } = await invokeFunction('execute-sql-external', {
+    const { data, error } = await supabase.functions.invoke('execute-sql-external', {
       body: {
         action: 'execute',
         connection: {

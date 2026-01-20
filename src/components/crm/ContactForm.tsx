@@ -21,7 +21,6 @@ const contactSchema = z.object({
   mobile: z.string().optional(),
   linkedin_url: z.string().url('Invalid URL').optional().or(z.literal('')),
   department: z.string().optional(),
-  reports_to: z.string().optional(),
   lifecycle_stage: z.enum(['subscriber', 'lead', 'mql', 'sql', 'customer', 'evangelist', 'other']).optional(),
   lead_source: z.string().optional(),
   social_profiles: z.string().optional(),
@@ -44,7 +43,6 @@ interface ContactFormProps {
 export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProps) {
   const { supabase, context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [contacts, setContacts] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -82,22 +80,8 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
     if (data) setAccounts(data as any[]);
   };
 
-  const fetchContacts = async () => {
-    let query = scopedDb
-      .from('contacts')
-      .select('id, first_name, last_name');
-
-    if (initialData?.id) {
-      query = query.neq('id', initialData.id);
-    }
-
-    const { data } = await query.order('last_name');
-    if (data) setContacts(data as any[]);
-  };
-
   useEffect(() => {
     fetchAccounts();
-    fetchContacts();
     if (context.isPlatformAdmin) {
       fetchTenants();
     }
@@ -218,32 +202,6 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="reports_to"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Reports To</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select manager" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {contacts.map((contact) => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.first_name} {contact.last_name}
                       </SelectItem>
                     ))}
                   </SelectContent>

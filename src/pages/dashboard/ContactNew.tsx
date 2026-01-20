@@ -26,7 +26,6 @@ export default function ContactNew() {
           // ScopedDataAccess will automatically inject tenant_id and franchise_id from context
           // for non-platform admins. Platform admins must provide them in formData.
           account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
-          reports_to: formData.reports_to === 'none' || formData.reports_to === '' ? null : formData.reports_to,
         })
         .select()
         .single();

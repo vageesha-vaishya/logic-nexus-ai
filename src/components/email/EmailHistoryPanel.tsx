@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Mail, RefreshCw, Search, Plus, ArrowUpRight, ArrowDownLeft, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
-import { useCRM } from "@/hooks/useCRM";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { toast } from "sonner";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
@@ -44,7 +44,6 @@ interface EmailHistoryPanelProps {
 }
 
 export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId, accountId, className }: EmailHistoryPanelProps) {
-  const { supabase } = useCRM();
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

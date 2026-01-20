@@ -133,6 +133,7 @@ export default function AccountDetail() {
         .eq('account_id', accountId)
         .limit(5);
       if (error) throw error;
+      console.log('Related contacts fetched:', data);
       setRelatedContacts(data || []);
     } catch (err) {
       console.error('Failed to load related contacts', err);

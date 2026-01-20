@@ -105,7 +105,8 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
     // If not platform admin, we don't need to fetch tenants as we use the context one
     if (!context.isPlatformAdmin) return;
     
-    const { data } = await scopedDb.from('tenants').select('id, name').eq('is_active', true);
+    // Use isGlobal=true to bypass scoping, as tenants table doesn't have tenant_id
+    const { data } = await scopedDb.from('tenants', true).select('id, name').eq('is_active', true);
     setTenants(data || []);
   };
 

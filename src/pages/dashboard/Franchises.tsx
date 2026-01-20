@@ -16,6 +16,9 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { EntityCard } from '@/components/system/EntityCard';
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TenantFranchiseMappingList } from "@/components/franchise/TenantFranchiseMappingList";
+
 export default function Franchises() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -118,85 +121,98 @@ export default function Franchises() {
           onImportComplete={fetchFranchises}
         />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Store className="h-5 w-5" />
-              All Franchises
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
-            ) : franchises.length === 0 ? (
-              <EmptyState
-                title="No franchises found"
-                description="Create your first franchise to get started."
-                actionLabel="New Franchise"
-                onAction={() => navigate('/dashboard/franchises/new')}
-              />
-            ) : viewMode === 'list' ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Tenant</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {franchises.map((franchise) => (
-                    <TableRow
-                      key={franchise.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/dashboard/franchises/${franchise.id}`)}
-                    >
-                      <TableCell className="font-medium">{franchise.name}</TableCell>
-                      <TableCell>{franchise.code}</TableCell>
-                      <TableCell>{franchise.tenants?.name || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={franchise.is_active ? 'default' : 'secondary'}>
-                          {franchise.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(franchise.created_at).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {franchises.map((f) => (
-                  <EntityCard
-                    key={f.id}
-                    title={f.name}
-                    subtitle={`${f.code} • ${f.tenants?.name || '—'}`}
-                    meta={`Created ${new Date(f.created_at).toLocaleDateString()}`}
-                    tags={[f.is_active ? 'Active' : 'Inactive']}
-                    onClick={() => navigate(`/dashboard/franchises/${f.id}`)}
+        <Tabs defaultValue="franchises" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="franchises">Franchises</TabsTrigger>
+            <TabsTrigger value="mappings">Tenant Mappings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="franchises">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Store className="h-5 w-5" />
+                  All Franchises
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : franchises.length === 0 ? (
+                  <EmptyState
+                    title="No franchises found"
+                    description="Create your first franchise to get started."
+                    actionLabel="New Franchise"
+                    onAction={() => navigate('/dashboard/franchises/new')}
                   />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {franchises.map((f) => (
-                  <EntityCard
-                    key={f.id}
-                    title={f.name}
-                    subtitle={`${f.code} • ${f.tenants?.name || '—'}`}
-                    meta={`Created ${new Date(f.created_at).toLocaleDateString()}`}
-                    tags={[f.is_active ? 'Active' : 'Inactive']}
-                    onClick={() => navigate(`/dashboard/franchises/${f.id}`)}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                ) : viewMode === 'list' ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {franchises.map((franchise) => (
+                        <TableRow
+                          key={franchise.id}
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/dashboard/franchises/${franchise.id}`)}
+                        >
+                          <TableCell className="font-medium">{franchise.name}</TableCell>
+                          <TableCell>{franchise.code}</TableCell>
+                          <TableCell>{franchise.tenants?.name || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant={franchise.is_active ? 'default' : 'secondary'}>
+                              {franchise.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(franchise.created_at).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {franchises.map((f) => (
+                      <EntityCard
+                        key={f.id}
+                        title={f.name}
+                        subtitle={`${f.code} • ${f.tenants?.name || '—'}`}
+                        meta={`Created ${new Date(f.created_at).toLocaleDateString()}`}
+                        tags={[f.is_active ? 'Active' : 'Inactive']}
+                        onClick={() => navigate(`/dashboard/franchises/${f.id}`)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {franchises.map((f) => (
+                      <EntityCard
+                        key={f.id}
+                        title={f.name}
+                        subtitle={`${f.code} • ${f.tenants?.name || '—'}`}
+                        meta={`Created ${new Date(f.created_at).toLocaleDateString()}`}
+                        tags={[f.is_active ? 'Active' : 'Inactive']}
+                        onClick={() => navigate(`/dashboard/franchises/${f.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="mappings">
+            <TenantFranchiseMappingList data={franchises} loading={loading} />
+          </TabsContent>
+        </Tabs>
       </FirstScreenTemplate>
     </DashboardLayout>
   );
