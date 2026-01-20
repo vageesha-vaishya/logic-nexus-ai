@@ -2,111 +2,189 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
-console.log("Hello from Rate Engine!")
+console.log("Rate Engine v2 Initialized")
 
 interface RateRequest {
-  origin: string
-  destination: string
+  origin: string // Code (e.g., "LAX") or UUID
+  destination: string // Code (e.g., "PVG") or UUID
   weight: number
   mode: 'air' | 'ocean' | 'road'
-  commodity: string
+  commodity?: string
   unit: 'kg' | 'lbs'
+  customer_id?: string
+}
+
+interface RateOption {
+  id: string
+  tier: 'contract' | 'spot' | 'market'
+  name: string
+  carrier: string
+  price: number
+  currency: string
+  transitTime: string
+  validUntil?: string
 }
 
 serve(async (req) => {
+  // 1. CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    // 2. Auth & Client Setup
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    const { origin, destination, weight, mode, unit } = await req.json() as RateRequest
+    // 3. Parse Request
+    const { origin, destination, weight, mode, unit, customer_id } = await req.json() as RateRequest
+
+    if (!origin || !destination || !weight || !mode) {
+      throw new Error("Missing required fields: origin, destination, weight, mode")
+    }
 
     // Normalize weight to KG
     const weightKg = unit === 'lbs' ? weight * 0.453592 : weight
 
-    // 1. Lookup Contracted Rates (Priority)
-    // Note: In a production app, we would use a more sophisticated location matching (PostGIS)
-    const { data: rates, error } = await supabase
-      .from('carrier_rates')
-      .select(`
-        id,
-        base_rate,
-        transit_time_days,
-        carrier:carrier_id(name),
-        service:service_id(service_name)
-      `)
-      .eq('origin_location', origin) 
-      .eq('destination_location', destination)
-      .eq('mode', mode)
-      .eq('is_active', true)
-      // .gte('valid_until', new Date().toISOString()) // Uncomment if data exists
-      .limit(5)
+    // 4. Resolve Locations (Code -> UUID)
+    // Helper to resolve location
+    const resolveLocation = async (loc: string): Promise<string | null> => {
+      // If it looks like a UUID, return it
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(loc)) return loc;
 
-    let options = []
+      // Otherwise lookup by code
+      const { data } = await supabase
+        .from('ports_locations')
+        .select('id')
+        .eq('location_code', loc)
+        .single();
+      return data?.id || null;
+    }
 
-    if (rates && rates.length > 0) {
-        // Transform DB rates to options
-        options = rates.map((r: any) => ({
-            id: r.id,
-            name: `${r.carrier?.name || 'Standard'} - ${r.service?.service_name || mode}`,
-            price: Number(r.base_rate) * Number(weightKg),
-            transitTime: r.transit_time_days ? `${r.transit_time_days} Days` : '3-5 Days',
-            carrier: r.carrier?.name || 'Unknown',
-            type: 'standard' 
-        }))
-    } 
-    
-    // If no exact matches or few matches, fill with Spot Market Estimates
+    const [originId, destId] = await Promise.all([
+      resolveLocation(origin),
+      resolveLocation(destination)
+    ])
+
+    if (!originId || !destId) {
+      // If locations not found in DB, we can't query exact routes. 
+      // Proceed to fallback logic immediately or throw.
+      // For Phase 1, we'll try to find rates, if not, use fallback.
+      console.warn(`Locations not found for codes: ${origin}, ${destination}`)
+    }
+
+    const options: RateOption[] = []
+
+    // 5. Query 3-Tier Rates from DB
+    if (originId && destId) {
+        const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Build query
+        let query = supabase
+            .from('carrier_rates')
+            .select(`
+                id,
+                tier,
+                carrier:carrier_id(name),
+                total_amount,
+                transit_days,
+                valid_to,
+                customer_id
+            `)
+            .eq('origin_port_id', originId)
+            .eq('destination_port_id', destId)
+            .eq('mode', mode)
+            .eq('status', 'active')
+            .or(`valid_to.is.null,valid_to.gte.${now}`) // Valid or indefinite
+        
+        // Fetch rates
+        const { data: rates, error } = await query;
+
+        if (!error && rates) {
+            rates.forEach((r: any) => {
+                const isContract = r.tier === 'contract';
+                const isSpot = r.tier === 'spot';
+                
+                // Filter Contract rates: must match customer_id
+                if (isContract && r.customer_id !== customer_id) return;
+
+                // Calculate total price (Simplified: Rate * Weight)
+                // In production, check charge structure (flat vs per_kg)
+                // Assuming 'total_amount' is per unit (kg) for now
+                const price = Number(r.total_amount) * weightKg;
+
+                options.push({
+                    id: r.id,
+                    tier: r.tier as any,
+                    name: isContract ? 'Contract Rate' : (isSpot ? 'Spot Rate' : 'Market Rate'),
+                    carrier: r.carrier?.name || 'Unknown',
+                    price: Math.round(price * 100) / 100,
+                    currency: 'USD',
+                    transitTime: r.transit_days ? `${r.transit_days} Days` : '3-5 Days',
+                    validUntil: r.valid_to
+                });
+            });
+        }
+    }
+
+    // 6. Fallback / Market Estimates (if no DB rates found)
     if (options.length === 0) {
-        // 2. Fallback: Spot Market Algorithm (Mock for now, but logical)
-        // Base Rates per KG
+        // Mock Market Rates
         const baseRates: Record<string, number> = {
             'air': 4.50,
             'ocean': 0.85,
             'road': 1.20
         }
-        
-        const baseRate = baseRates[mode] || 2.00
-        const estimatedPrice = Number(weightKg) * baseRate
+        const baseRate = baseRates[mode] || 2.00;
+        const estimatedPrice = weightKg * baseRate;
 
-        options = [
-            {
-                id: 'spot_eco',
-                name: 'Economy Saver',
-                type: 'economy',
-                price: Math.round(estimatedPrice * 0.85) + 50,
-                transitTime: mode === 'air' ? '5-7 Days' : '30-40 Days',
-                carrier: 'Spot Market (Eco)',
-            },
-            {
-                id: 'spot_std',
-                name: 'Standard Service',
-                type: 'standard',
-                price: Math.round(estimatedPrice * 1.0) + 75,
-                transitTime: mode === 'air' ? '3-5 Days' : '20-25 Days',
-                carrier: 'Spot Market (Std)',
-            },
-            {
-                id: 'spot_exp',
-                name: 'Express Priority',
-                type: 'express',
-                price: Math.round(estimatedPrice * 1.4) + 120,
-                transitTime: mode === 'air' ? '1-2 Days' : '15-18 Days',
-                carrier: 'Spot Market (Exp)',
-            }
-        ]
+        options.push({
+            id: 'mkt_std',
+            tier: 'market',
+            name: 'Standard Market Rate',
+            carrier: 'Market Avg',
+            price: Math.round(estimatedPrice * 100) / 100,
+            currency: 'USD',
+            transitTime: mode === 'air' ? '3-5 Days' : '20-30 Days',
+        });
+        
+        options.push({
+            id: 'mkt_exp',
+            tier: 'market',
+            name: 'Express Market Rate',
+            carrier: 'Market Avg',
+            price: Math.round(estimatedPrice * 1.3 * 100) / 100,
+            currency: 'USD',
+            transitTime: mode === 'air' ? '1-2 Days' : '15-20 Days',
+        });
     }
 
+    // 7. Sort: Contract first, then Price
+    options.sort((a, b) => {
+        const tierOrder = { 'contract': 0, 'spot': 1, 'market': 2 };
+        if (tierOrder[a.tier] !== tierOrder[b.tier]) {
+            return tierOrder[a.tier] - tierOrder[b.tier];
+        }
+        return a.price - b.price;
+    });
+
+    // 8. Return Response
+    // Cache for 60 seconds
     return new Response(
       JSON.stringify({ options }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { 
+        headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30"
+        } 
+      },
     )
+
   } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),

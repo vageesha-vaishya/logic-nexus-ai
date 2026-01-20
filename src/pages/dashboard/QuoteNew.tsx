@@ -29,8 +29,16 @@ export default function QuoteNew() {
         ...prev,
         total_weight: state.weight?.toString(),
         commodity: state.commodity,
+        valid_until: state.selectedRate?.validUntil ? new Date(state.selectedRate.validUntil).toISOString().split('T')[0] : undefined,
         // Map loose text fields to notes since form expects IDs for ports
-        notes: `Quick Quote Conversion:\nOrigin: ${state.origin}\nDestination: ${state.destination}\nMode: ${state.mode}\nSelected Rate: ${state.selectedRate?.name} ($${state.selectedRate?.price})`,
+        notes: `Quick Quote Conversion:
+Origin: ${state.origin}
+Destination: ${state.destination}
+Mode: ${state.mode}
+Selected Rate: ${state.selectedRate?.name} (${state.selectedRate?.carrier})
+Price: $${state.selectedRate?.price}
+Tier: ${state.selectedRate?.tier?.toUpperCase() || 'N/A'}
+Valid Until: ${state.selectedRate?.validUntil ? new Date(state.selectedRate.validUntil).toLocaleDateString() : 'N/A'}`,
         title: `Quote for ${state.commodity} (${state.origin} -> ${state.destination})`,
       }));
     }

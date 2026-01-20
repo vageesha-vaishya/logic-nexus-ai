@@ -20,6 +20,7 @@ import { Quote, QuoteStatus, statusConfig } from '@/pages/dashboard/quotes-data'
 import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
+import { QuickQuoteModal } from '@/components/sales/quick-quote/QuickQuoteModal';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function Quotes() {
@@ -215,6 +216,7 @@ export default function Quotes() {
             <Button variant="outline" onClick={() => navigate('/dashboard/quotes/templates')}>
                 <FileText className="mr-2 h-4 w-4" /> Templates
             </Button>
+            <QuickQuoteModal />
             <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20">
                 <Plus className="mr-2 h-4 w-4" /> New Quote
             </Button>
