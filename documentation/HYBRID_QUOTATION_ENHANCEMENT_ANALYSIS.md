@@ -18,6 +18,7 @@
 | 6.0 | 2026-01-20 | Trae AI | Comprehensive technical specification enhancement for Multi-Modal Hybrid Quotation support. |
 | 6.1 | 2026-01-20 | Trae AI | Added Breakbulk & RORO specifications; Defined detailed charge types for all modes. |
 | 6.2 | 2026-01-20 | Trae AI | Added Service Relationship Definitions (SD/Port, Port/Port, etc.) with operational flows and rules. |
+| 6.3 | 2026-01-20 | Trae AI | Added International Trade Direction architecture and Top 10 Platform competitive analysis. |
 
 ### Approval Workflow
 | Role | Name | Signature | Date |
@@ -312,6 +313,41 @@ We will extend the existing `quotation_version_option_legs` and related tables r
 
 ---
 
+## 8. International Trade & Trade Direction Architecture
+
+### 8.1 Trade Direction Definitions
+The system must explicitly categorize quotes based on trade direction to trigger correct workflows, document requirements, and compliance checks. This is derived from comparing the Tenant's domicile against the Origin and Destination countries.
+
+| Direction | Definition | Key Characteristics | System Logic |
+| :--- | :--- | :--- | :--- |
+| **Export** | Outbound movement from Tenant's country to a foreign country. | Shipper is usually the local client. Requires Export Declaration (AES/EEI). Zero-rated VAT in many jurisdictions. | `Origin.Country == Tenant.Country` AND `Dest.Country != Tenant.Country` |
+| **Import** | Inbound movement to Tenant's country from a foreign country. | Consignee is usually the local client. Requires Import Entry (ISF, Customs Clearance). Duty/Tax applicability. | `Origin.Country != Tenant.Country` AND `Dest.Country == Tenant.Country` |
+| **Cross-Trade** (Triangle) | Movement between two foreign countries, managed by Tenant. | Third-party billing. Complex agent coordination. Often involves "Switch Bills of Lading" to hide supplier. | `Origin.Country != Tenant.Country` AND `Dest.Country != Tenant.Country` |
+| **Domestic** | Movement within Tenant's country. | Simplified tax (Standard VAT/GST applies). No customs formalities. Ground/Rail dominant. | `Origin.Country == Dest.Country` |
+
+### 8.2 Operational Workflows & Compliance
+*   **Import Workflow:**
+    *   **Pre-Alert:** Must receive docs from Origin Agent 48h prior to arrival.
+    *   **ISF Filing (US):** Trigger "10+2" filing task 24h prior to vessel loading.
+    *   **Arrival Notice:** Automated generation sending to Consignee and Broker.
+*   **Export Workflow:**
+    *   **Booking:** Carrier confirmation required before container release.
+    *   **AES/EEI Filing:** Mandatory before departure.
+    *   **Bill of Lading:** Draft approval loop with Shipper.
+*   **Cross-Trade Workflow:**
+    *   **Blind Shipment:** System must flag to suppress "Shipper" details on Consignee-facing documents.
+    *   **Split Billing:** Freight Invoice to Booking Party (3rd Country), Duty/Tax Invoice to Consignee (if DDP).
+
+### 8.3 Risk Assessment for International Trade
+| Risk Category | Description | System Mitigation |
+| :--- | :--- | :--- |
+| **Sanctions & Embargoes** | Shipping to/from restricted countries (e.g., OFAC list). | **Denied Party Screening (DPS)** integration at Quote creation. Block quotes involving sanctioned entities/countries. |
+| **Incoterm Mismatch** | quoting "EXW" for an Export where Shipper expects to control freight. | **Logic Validation:** Warn if `Direction=Export` and `Incoterm=EXW` (Buyer controls freight). |
+| **Currency Fluctuation** | Exchange rates changing between Quote and Invoice. | **Currency Buffer:** Option to add `Risk %` to ROE or fix ROE for validity period. |
+| **Cabotage** | Foreign carrier performing domestic transport. | **Carrier Selection:** Filter valid carriers based on `Domestic` flag and carrier nationality rules. |
+
+---
+
 ## Appendix A: Landscape Analysis (Reference)
 
 ### Comparative Benchmarking
@@ -320,3 +356,26 @@ We will extend the existing `quotation_version_option_legs` and related tables r
 | **Visual Workflow** | **Kanban (Drag-and-Drop)** | Kanban (Opportunity Board) | Legacy Lists |
 | **Hybrid Routing** | **Native Multi-Modal Support** | Custom Implementation | Native (Strong) |
 | **AI Pricing** | **RAG-based Recommendation** | Einstein GPT | Limited |
+
+## Appendix B: Top 10 Global Logistics & CRM Platform Analysis
+
+A comparative analysis of market leaders to benchmark Logic Nexus AI's roadmap.
+
+| Platform | Primary Focus | Trade Direction Capability | Compliance & Global Trade | Scalability | Pricing Model |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Salesforce Revenue Cloud** | CRM / CPQ | **Moderate:** Requires heavy customization for logistics-specific logic (Import vs Export). | Dependent on 3rd party AppExchange partners (e.g., Zenkraft). | Enterprise | High (User/Month) |
+| **Microsoft Dynamics 365** | ERP / SCM | **High:** Native Landed Cost module; Strong multi-currency and tax engine. | Built-in Global Trade Management. | Enterprise | High (User/Month) |
+| **SAP S/4HANA TM** | Logistics ERP | **Very High:** Granular import/export processes; Integrated with Global Trade Services (GTS). | Gold Standard for compliance/risk. | Enterprise | Very High (Core based) |
+| **Oracle OTM** | Transportation | **Very High:** Global logistics network design; Complex cross-trade logic. | Strong GTM integration. | Enterprise | High (Transaction/User) |
+| **CargoWise One** | Freight Forwarding | **Native:** Industry standard for Forwarders. Purpose-built Import/Export modules. | Native Customs integration in 30+ countries. | High | Transaction-based |
+| **Magaya Supply Chain** | Freight Forwarding | **Native:** Strong for SME Forwarders; Excellent Warehouse/Bonded Zone support. | Integrated Customs compliance (US-centric). | Medium/High | Subscription |
+| **Descartes** | Logistics Network | **High:** Focus on connectivity and messaging (EDI/API). | Leader in Denied Party Screening & Compliance content. | High | Transaction-based |
+| **Flexport** | Digital Forwarder | **Native:** Modern UI for Import/Export visibility; "Track & Trace" focus. | Digital-first compliance; Automated ISF. | High | Service-based |
+| **Freightos** | Marketplace | **Moderate:** Focus on Rate Management and instant booking. | Carrier-dependent. | Medium | Marketplace Fee |
+| **Zoho CRM** | SME CRM | **Low:** Generic CRM; requires significant custom development for trade logic. | Minimal native support. | Medium | Low (User/Month) |
+
+### Strategic Recommendation for Logic Nexus AI
+To compete with **CargoWise** (Operational Depth) and **Salesforce** (Sales Workflow), Logic Nexus AI must:
+1.  **Adopt "Trade Direction" as a First-Class Citizen:** Do not treat it as a generic text field. It must drive validation logic (as defined in Section 8).
+2.  **Integrate Compliance Early:** Partner with a provider like **Descartes** or **Descartes Visual Compliance** API for background screening, rather than building from scratch.
+3.  **Hybrid Architecture:** Use the flexibility of a modern stack (Supabase/React) to offer the UI speed of **Flexport** with the depth of **Magaya/CargoWise**.
