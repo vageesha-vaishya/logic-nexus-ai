@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useQuoteContext } from './QuoteContext';
-import { FileText, Building2, User, Briefcase, Info, X } from 'lucide-react';
+import { FileText, Building2, User, Briefcase, Info, X, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 export function QuoteHeader() {
   const { control, setValue } = useFormContext();
-  const { opportunities, accounts, contacts } = useQuoteContext();
+  const { opportunities, accounts, contacts, isLoadingOpportunities } = useQuoteContext();
+  const [open, setOpen] = useState(false);
 
   const opportunityId = useWatch({ control, name: 'opportunity_id' });
   const accountId = useWatch({ control, name: 'account_id' });
@@ -149,20 +164,73 @@ export function QuoteHeader() {
                     Opportunity
                 </FormLabel>
                 <div className="flex gap-2">
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="bg-muted/5">
-                        <SelectValue placeholder="Link Opportunity" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredOpportunities.map((opp: any) => (
-                        <SelectItem key={opp.id} value={String(opp.id)}>
-                          {opp.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={open}
+                          className={cn(
+                            "w-full justify-between bg-muted/5 font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value
+                            ? filteredOpportunities.find((opp: any) => String(opp.id) === field.value)?.name || "Opportunity not found"
+                            : "Link Opportunity"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search opportunities..." />
+                        <CommandList>
+                          {isLoadingOpportunities ? (
+                            <div className="py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading opportunities...
+                            </div>
+                          ) : (
+                            <>
+                              <CommandEmpty>No opportunity found.</CommandEmpty>
+                              <CommandGroup>
+                                {filteredOpportunities.map((opp: any) => (
+                                  <CommandItem
+                                    key={opp.id}
+                                    value={opp.name}
+                                    onSelect={() => {
+                                      setValue('opportunity_id', String(opp.id), { shouldValidate: true });
+                                      setOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === String(opp.id) ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                        <span>{opp.name}</span>
+                                        {opp.stage && (
+                                            <span className="text-xs text-muted-foreground">Stage: {opp.stage}</span>
+                                        )}
+                                    </div>
+                                    {opp.amount && (
+                                        <span className="ml-auto text-sm font-medium">
+                                            ${opp.amount.toLocaleString()}
+                                        </span>
+                                    )}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {field.value && (
                     <Button
                       type="button"

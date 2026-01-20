@@ -11,14 +11,30 @@ import { QuoteTemplate } from '@/components/sales/templates/types';
 import { FileText } from 'lucide-react';
 import { QuoteFormValues } from '@/components/sales/quote-form/types';
 import { toast } from 'sonner';
+import { useLocation } from 'react-router-dom';
 
 export default function QuoteNew() {
   const { supabase, context, scopedDb } = useCRM();
+  const location = useLocation();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateData, setTemplateData] = useState<Partial<QuoteFormValues> | undefined>(undefined);
+
+  useEffect(() => {
+    if (location.state) {
+      const state = location.state as any;
+      setTemplateData(prev => ({
+        ...prev,
+        total_weight: state.weight?.toString(),
+        commodity: state.commodity,
+        // Map loose text fields to notes since form expects IDs for ports
+        notes: `Quick Quote Conversion:\nOrigin: ${state.origin}\nDestination: ${state.destination}\nMode: ${state.mode}\nSelected Rate: ${state.selectedRate?.name} ($${state.selectedRate?.price})`,
+        title: `Quote for ${state.commodity} (${state.origin} -> ${state.destination})`,
+      }));
+    }
+  }, [location.state]);
 
   const handleTemplateSelect = (template: QuoteTemplate) => {
     try {

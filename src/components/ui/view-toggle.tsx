@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
-export type ViewMode = 'pipeline' | 'card' | 'grid' | 'list' | 'board';
+export type ViewMode = 'pipeline' | 'card' | 'grid' | 'list' | 'board' | 'analytics';
 
 interface ViewToggleProps {
   value: ViewMode;
@@ -27,6 +27,8 @@ export function ViewToggle({ value, onChange, className, modes }: ViewToggleProp
         return t('views.grid', 'Grid');
       case 'list':
         return t('views.list', 'List');
+      case 'analytics':
+        return t('views.analytics', 'Analytics');
       default:
         return String(mode);
     }

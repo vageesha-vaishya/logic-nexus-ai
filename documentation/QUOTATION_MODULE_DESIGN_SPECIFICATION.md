@@ -1,8 +1,8 @@
 # Quotation Module Design Specification: "Hybrid" Architecture
 **Document ID:** SPEC-QUO-2026-001
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Date:** January 20, 2026
-**Status:** DRAFT
+**Status:** PHASE 1 COMPLETE - VERIFIED
 **Author:** Trae AI (Senior Systems Architect)
 
 ---
@@ -13,7 +13,7 @@ This document outlines the architectural and design specifications for the **Nex
 The core philosophy is **"Hybrid Entry, Unified Pipeline"**:
 1.  **Quick Quote**: A sub-30-second workflow for rapid estimations.
 2.  **Smart Quote**: RAG-based intelligence providing "Win Probability" and "Price Guidance".
-3.  **Unified Kanban**: A visual control tower for managing the entire lifecycle.
+3.  **Unified Pipeline**: A visual control tower with both **Kanban** and **List** views for managing the entire lifecycle.
 
 ---
 
@@ -62,17 +62,20 @@ The core philosophy is **"Hybrid Entry, Unified Pipeline"**:
     *   **Embeddings**: Vectors derived from `[Origin, Dest, Commodity, Month, Weight]`.
     *   **Query**: `SELECT * FROM quote_vectors ORDER BY embedding <-> current_quote_embedding LIMIT 20`.
 
-### 3.3 Feature C: Visual Workflow (Kanban)
+### 3.3 Feature C: Visual Workflow (Kanban & List)
 **Objective**: Pipeline visibility and rapid status management.
 
 *   **UX Design**:
+    *   **Views**: Toggle between "Board" (Kanban) and "List" (Table).
     *   **Columns**: Draft -> Internal Review -> Client Review -> Negotiation -> Approved -> Booked.
     *   **Card Anatomy**: Client Name, Port Pair (NYC->LON), Revenue, "Stale" Indicator (Red border if > 48h).
     *   **Interaction**: Drag-and-drop to move columns (triggers API status update).
+    *   **Bulk Actions**: Select multiple quotes for batch Status Update or Delete.
 
 *   **Technical Logic**:
-    *   **Library**: `@dnd-kit/core` (accessible, lightweight).
+    *   **Library**: `@dnd-kit/core` (accessible, lightweight) for Board.
     *   **Optimistic UI**: UI updates immediately; background API call syncs state. Reverts on error.
+    *   **View Persistence**: Preference saved in local state/session.
 
 ---
 
@@ -184,3 +187,22 @@ add column win_probability float check (win_probability between 0 and 1);
 *   **Email**: SendGrid/Resend template for "Quick Quote" HTML output.
 *   **CRM**: Bi-directional sync with Salesforce (if applicable) for Opportunity Stages.
 *   **Carriers**: API keys for Spot Rate aggregators (e.g., Freightos, Chain.io) stored in Vault.
+
+---
+
+## 9. Change Log
+
+### Phase 1: Foundation & Visuals (Completed Jan 20, 2026)
+*   **Visual Pipeline**:
+    *   Implemented `QuotesPipeline.tsx` with `ViewToggle` (Board/List).
+    *   Created `QuotesKanbanBoard` using `@dnd-kit` with optimistic UI and backend sync.
+    *   Added `QuotesList` for table view with bulk actions.
+    *   Integrated "Swimlanes" for grouping by Account, Value, or Margin.
+*   **Quick Quote**:
+    *   Built `QuickQuoteModal` with `zod` validation.
+    *   Implemented `rate-engine` Supabase Edge Function (Lookups `carrier_rates` + Fallback Algorithm).
+    *   Enabled "Convert to Full Quote" data propagation.
+*   **Architecture**:
+    *   Centralized `Quote` type definition in `quotes-data.ts`.
+    *   Added "Stale" quote detection (>48h).
+

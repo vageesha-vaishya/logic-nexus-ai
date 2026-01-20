@@ -31,6 +31,8 @@ export interface Quote {
   contacts?: { first_name: string; last_name: string } | null;
   carriers?: { carrier_name: string } | null;
   service_types?: { name: string } | null;
+  franchises?: { name: string } | null;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export const statusConfig: Record<QuoteStatus, { label: string; color: string }> = {

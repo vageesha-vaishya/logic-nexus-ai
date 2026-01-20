@@ -76,15 +76,14 @@ export function useQuoteData() {
   });
 
   // 4. Fetch Opportunities
-  const { data: opportunities = [] } = useQuery({
+  const { data: opportunities = [], isLoading: isLoadingOpportunities } = useQuery({
     queryKey: quoteKeys.reference.opportunities(tenantId),
     queryFn: async () => {
       if (!tenantId) return [];
       const { data, error } = await (supabase as any)
         .from('opportunities')
-        .select('id, name, account_id, contact_id')
+        .select('id, name, account_id, contact_id, stage, amount, probability')
         .eq('tenant_id', tenantId)
-        .neq('status', 'closed')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -198,6 +197,7 @@ export function useQuoteData() {
     accounts: [...injectedAccounts, ...accounts].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
     contacts: [...injectedContacts, ...contacts].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
     opportunities: [...injectedOpportunities, ...opportunities].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
+    isLoadingOpportunities,
     setResolvedTenantId,
     resolvedTenantId,
     setAccounts: (updater?: (prev: any[]) => any[]) => {

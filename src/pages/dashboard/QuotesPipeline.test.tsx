@@ -76,7 +76,19 @@ describe('QuotesPipeline', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useCRM as any).mockReturnValue({ context: mockContext });
+    
+    const mockScopedDb = {
+      from: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      limit: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: null }),
+      in: vi.fn().mockResolvedValue({ error: null }),
+    };
+
+    (useCRM as any).mockReturnValue({ context: mockContext, scopedDb: mockScopedDb });
     
     // Mock supabase chain
     const mockSelect = vi.fn().mockReturnThis();
@@ -98,6 +110,16 @@ describe('QuotesPipeline', () => {
     );
     
     expect(screen.getByText('Quotes Pipeline')).toBeInTheDocument();
+  });
+
+  it('renders quick quote button', async () => {
+    render(
+      <BrowserRouter>
+        <QuotesPipeline />
+      </BrowserRouter>
+    );
+    
+    expect(screen.getByText('Quick Quote')).toBeInTheDocument();
   });
 
   it('fetches quotes on mount', async () => {
