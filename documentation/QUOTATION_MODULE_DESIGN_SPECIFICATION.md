@@ -279,56 +279,121 @@ Detailed structure for the JSONB column to support specialized modes.
 
 ---
 
-## 6. Implementation Roadmap
+## 6. Detailed Implementation & Rollout Plan
 
-### Phase 1: Speed & Foundation (Completed)
-*   Quick Quote Modal, Rate Engine, Kanban View.
+This section details the phase-wise execution strategy to deliver the "Enterprise Enhanced" Quotation Module.
 
-### Phase 2: Intelligence & Hardening (Weeks 5-8)
-*   **Week 5**: `pgvector` integration for Smart Quote.
-*   **Week 6**: Redis Caching for Rate Engine (<200ms).
-*   **Week 7**: Trade Direction Logic & Compliance Triggers.
-*   **Week 8**: Testing & Optimization.
+### Phase 1: Foundation & Quick Quote (Weeks 1-4)
+**Focus**: Speed, Core Data Model, and Basic Rate Engine.
 
-### Phase 3: Enterprise Features (Weeks 9-12) - NEW
-*   **Week 9: Sustainability**
-    *   Impl: `emission_factors` table and `calculate-co2` Edge Function.
-    *   UI: Display CO2 estimates on Quote Cards.
-*   **Week 10: Allocation Management**
-    *   Impl: `carrier_allocations` schema and tracking logic.
-    *   UI: Allocation progress bars in Composer.
-*   **Week 11: Dynamic Surcharges**
-    *   Impl: Surcharge Rules Engine (Rule-based adjustment).
-*   **Week 12: Negotiation Portal**
-    *   Impl: "Chat" feature on QuotePortal.
+*   **Objectives**:
+    *   Deliver sub-second "Quick Quote" interface.
+    *   Establish "3-Tier" Rate Engine (Contract/Spot/Market).
+    *   Implement Redis Caching for rate lookups.
+*   **Technical Requirements**:
+    *   *Frontend*: `QuickQuoteModal` (React/Shadcn) with Mobile-Responsive layout.
+    *   *Backend*: `rate-engine` Edge Function with Multi-Currency support.
+    *   *Database*: Schema updates (`incoterms`, `service_level`, `hazmat_class`).
+*   **Resources**:
+    *   1x Frontend Engineer (UI/UX).
+    *   1x Backend Engineer (Edge Functions/Redis).
+*   **Risk Mitigation**:
+    *   *Risk*: Rate API latency. *Mitigation*: Aggressive caching (TTL 1h) + Stale-While-Revalidate.
+*   **Deliverables**:
+    *   Working "Spot Quote" creation flow.
+    *   `rate_cards` table populated with sample data.
+    *   Performance Report (Latency < 1s).
 
-### Phase 4: Scale & Integration (Weeks 13-16)
-*   **Geocoding**: Google Places API integration.
-*   **Security**: RLS Audit, Rate Limiting, Blue/Green Deployment.
+### Phase 2: Intelligence & Hybrid Workflow (Weeks 5-8)
+**Focus**: Smart Pricing (AI), Visual Pipeline, and Trade Compliance.
+
+*   **Objectives**:
+    *   Launch "Smart Quote" with Win Probability.
+    *   Deploy Kanban Board for Quote Management.
+    *   Enforce Import/Export Compliance checks.
+*   **Technical Requirements**:
+    *   *AI*: `pgvector` store setup; Embedding generation trigger.
+    *   *Frontend*: `QuotesKanbanBoard` using `@dnd-kit/core`.
+    *   *Compliance*: Logic to auto-flag "Requires AES" based on Trade Direction.
+*   **Resources**:
+    *   1x Full Stack Engineer (Kanban + Logic).
+    *   1x AI Engineer (Vector Store + RAG).
+*   **Risk Mitigation**:
+    *   *Risk*: "Cold Start" for AI. *Mitigation*: Hide "Win Probability" until >50 quotes exist.
+*   **Deliverables**:
+    *   Kanban view with Drag-and-Drop.
+    *   "Copilot Sidebar" in Quote Details.
+    *   Compliance Validation Logic (AES/ISF).
+
+### Phase 3: Enterprise Features (Weeks 9-12)
+**Focus**: Sustainability, Allocations, and Advanced Logic.
+
+*   **Objectives**:
+    *   Calculate Scope 3 CO2 Emissions.
+    *   Track Carrier Allocations (MQC).
+    *   Handle Specialized Modes (RORO, Breakbulk).
+*   **Technical Requirements**:
+    *   *Sustainability*: `calculate-co2` Edge Function (GLEC Formula).
+    *   *Allocations*: `carrier_allocations` table & tracking logic.
+    *   *Frontend*: `mode_specific_data` dynamic forms (VIN, Lifting Points).
+*   **Resources**:
+    *   1x Backend Engineer (Complex Logic).
+    *   1x Data Engineer (Emission Factors).
+*   **Risk Mitigation**:
+    *   *Risk*: Inaccurate CO2 data. *Mitigation*: Use standard GLEC factors; add "Est." disclaimer.
+*   **Deliverables**:
+    *   CO2 Badge on Quote Cards.
+    *   Allocation Utilization Bar.
+    *   RORO/Breakbulk specialized input forms.
+
+### Phase 4: Scale, Security & Integration (Weeks 13-16)
+**Focus**: Production Hardening, Security, and Final Polish.
+
+*   **Objectives**:
+    *   Audit Log implementation for all actions.
+    *   RLS Security Review & Pen Testing.
+    *   Google Places API Integration (Geocoding).
+*   **Technical Requirements**:
+    *   *Security*: Comprehensive RLS policies for `quotes`, `rates`, `allocations`.
+    *   *Integration*: Geocoding API for City/Port resolution.
+    *   *QA*: End-to-End Regression Testing (Playwright).
+*   **Resources**:
+    *   1x DevOps/Security Engineer.
+    *   1x QA Engineer.
+*   **Risk Mitigation**:
+    *   *Risk*: Data Leakage. *Mitigation*: Strict RLS policies + Row-Level Audit Logs.
+*   **Deliverables**:
+    *   Security Audit Report (Pass).
+    *   Geocoded Locations.
+    *   Final "Gold" Release Candidate.
 
 ---
 
-## 7. Comparative Analysis (Benchmark)
+## 7. Quality Assurance & Success Metrics
 
-| Feature | **SOS Logistics Pro** | **Flexport** | **Freightos** | **Magaya** |
+### 7.1 Testing Strategy per Phase
+*   **Phase 1 (Speed)**: Load Testing (k6) to verify <1s latency at 50 concurrent users.
+*   **Phase 2 (Workflow)**: Usability Testing (Sales Team) for Kanban drag-and-drop interactions.
+*   **Phase 3 (Enterprise)**: Data Accuracy Audit for CO2 & Allocation calculations.
+*   **Phase 4 (Security)**: Penetration Testing & RLS Verification.
+
+### 7.2 Success Criteria (Acceptance Metrics)
+1.  **Performance**: Quick Quote generation < 1.0s (P95).
+2.  **Adoption**: > 50% of new quotes initiated via Quick Quote (vs Composer).
+3.  **Intelligence**: Win Probability prediction accuracy > 70% (Backtested).
+4.  **Stability**: Zero "Critical" bugs in UAT; 99.9% Uptime for Rate Engine.
+
+---
+
+## 8. Risk Assessment & Mitigation Matrix
+
+| Risk Category | Risk Description | Probability | Impact | Mitigation Strategy |
 | :--- | :--- | :--- | :--- | :--- |
-| **Instant Quoting** | ✅ Hybrid (Quick/Full) | ✅ Full | ✅ Full | ❌ Manual-Heavy |
-| **AI Pricing** | ✅ RAG-based Smart Quote | ❌ Rule-based | ❌ Market Index | ❌ Manual |
-| **Sustainability** | ✅ v2.0 (Scope 3) | ✅ Advanced | ✅ Basic | ❌ |
-| **Allocations** | ✅ v2.0 (MQC Tracking) | ✅ Advanced | ✅ Advanced | ❌ |
-| **Visual Pipeline** | ✅ Kanban Board | ❌ List View | ❌ List View | ❌ List View |
-
-**Conclusion**: SOS Logistics Pro outperforms legacy incumbents (Magaya) in UX/AI and matches modern digital forwarders (Flexport) in core capabilities with the v2.0 roadmap.
-
----
-
-## 8. Risk Assessment
-
-| Risk | Impact | Mitigation |
-| :--- | :--- | :--- |
-| **Data Quality (Carbon)** | Medium | Use standard GLEC factors initially; disclaimer on estimates. |
-| **Complexity Overload** | High | Keep "Quick Quote" simple; hide Enterprise features (Allocations) behind flags. |
-| **Cache Invalidation** | High | Implement strict TTL (1h) and Webhook-based invalidation for Rate updates. |
+| **Technical** | Rate Engine API Latency > 2s | Medium | High | Implement Redis "Stale-While-Revalidate" caching; Fallback to historical average rates. |
+| **Data** | Inaccurate CO2 Emission factors | Medium | Medium | Use certified GLEC framework defaults; Allow manual override by sustainability officer. |
+| **Adoption** | Sales team resists new UI | High | High | "Shadow" rollout to power users first; maintain legacy "Composer" link as backup. |
+| **Security** | Tenant Data Leakage (RLS Failure) | Low | Critical | Automated RLS testing suite (pgTAP); "Tenant Isolation" architectural review. |
+| **AI/ML** | "Win Probability" hallucinations | Medium | Low | Display confidence score; Hide predictions if confidence < 50%. |
 
 ---
 
