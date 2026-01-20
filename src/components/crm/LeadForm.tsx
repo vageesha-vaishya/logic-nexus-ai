@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useState, useEffect } from 'react';
+import { toast } from "sonner";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { FormSection, FormGrid } from '@/components/forms/FormLayout';
-import { AsyncComboboxField, FileUploadField } from '@/components/forms/AdvancedFields';
+import { FileUploadField } from '@/components/forms/AdvancedFields';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +33,7 @@ export const leadSchema = z.object({
   notes: z.string().optional(),
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
-  service_id: z.string().optional(),
+  service_id: z.string().min(1, 'Interested Service is required'),
   attachments: z.array(z.any()).default([]),
 }).refine((data) => {
   const hasEmail = !!(data.email && data.email.trim());
@@ -50,9 +51,11 @@ interface LeadFormProps {
   initialData?: Partial<LeadFormData> & { id?: string };
   onSubmit: (data: LeadFormData) => Promise<void>;
   onCancel: () => void;
+  suggestedService?: string;
+  isSuggestingService?: boolean;
 }
 
-export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
+export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, isSuggestingService }: LeadFormProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<LeadFormData | null>(null);
   const { supabase, context, scopedDb } = useCRM();
@@ -98,6 +101,57 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
       fetchCurrentFranchise();
     }
   }, [context.isPlatformAdmin, context.isTenantAdmin, context.franchiseId, watchedTenantId]);
+
+  // Debug: Log when LeadForm mounts/unmounts or receives new props
+  useEffect(() => {
+    console.log("LeadForm Mounted. Initial Service:", (initialData as any)?.custom_fields?.service_id);
+    return () => console.log("LeadForm Unmounted");
+  }, []);
+
+  useEffect(() => {
+    if (suggestedService) {
+      console.log("LeadForm received suggestedService update:", suggestedService);
+      // Clean the suggestion (remove brackets if present)
+      const term = suggestedService.replace(/[\[\]]/g, '').trim();
+      
+      // Set the free-text value directly
+      if (term) {
+        console.log("Setting service_id to:", term);
+        // Use setValue with options to ensure it sticks
+        form.setValue('service_id', term, { 
+          shouldValidate: true, 
+          shouldDirty: true, 
+          shouldTouch: true 
+        });
+
+        // Also populate Notes field with the same value
+        const currentNotes = form.getValues('notes') || '';
+        // Avoid duplicating if already present
+        if (!currentNotes.includes(term)) {
+          const newNotes = currentNotes ? `${currentNotes}\n\nSuggested Service: ${term}` : `Suggested Service: ${term}`;
+          form.setValue('notes', newNotes, {
+            shouldValidate: true,
+            shouldDirty: true,
+            shouldTouch: true
+          });
+        }
+        
+        // Double check the value was set
+        const currentVal = form.getValues('service_id');
+        if (currentVal !== term) {
+            console.warn("Warning: service_id mismatch after setValue!", { expected: term, actual: currentVal });
+        } else {
+            toast.success(`AI suggested service: ${term}`);
+        }
+      }
+    }
+  }, [suggestedService, form]);
+
+  // Debug: Monitor service_id changes
+  const currentServiceId = form.watch('service_id');
+  useEffect(() => {
+    console.log("Current service_id value:", currentServiceId);
+  }, [currentServiceId]);
 
   const fetchTenants = async () => {
     // Pass true for isGlobal to avoid filtering tenants table by tenant_id (which doesn't exist)
@@ -383,12 +437,27 @@ export function LeadForm({ initialData, onSubmit, onCancel }: LeadFormProps) {
             )}
           />
 
-          <AsyncComboboxField
+          <FormField
             control={form.control}
             name="service_id"
-            label="Interested Service"
-            placeholder="Search services..."
-            className="col-span-2"
+            render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>
+                  {isSuggestingService ? (
+                    <span className="flex items-center gap-2">
+                      Interested Service
+                      <span className="text-xs text-muted-foreground animate-pulse">(AI Analyzing...)</span>
+                    </span>
+                  ) : (
+                    "Interested Service *"
+                  )}
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g. Sea Freight" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
 
           <FormField

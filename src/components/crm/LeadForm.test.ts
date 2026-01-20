@@ -15,7 +15,7 @@ const baseLead = {
   notes: "",
   tenant_id: "tenant-1",
   franchise_id: "",
-  service_id: "",
+  service_id: "Sea Freight",
   attachments: [] as any[],
 };
 
