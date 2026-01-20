@@ -14,6 +14,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { ROLE_MATRIX, UserRole, canManageRole, validateHierarchy } from '@/lib/auth/RoleMatrix';
 import { RoleService } from '@/lib/api/roles';
 import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+import { invokeFunction } from '@/lib/supabase-functions';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),

@@ -21,43 +21,99 @@ export async function invokeFunction<T = any>(
   options: InvokeOptions = {}
 ): Promise<{ data: T | null; error: any }> {
   try {
-    // 1. Initial attempt
-    // Note: We intentionally DO NOT manually set the Authorization header here unless explicitly provided.
-    // The Supabase client automatically attaches the current session's token.
-    
-    // Explicitly remove Authorization header from options if it exists to prevent stale tokens
-    const cleanOptions = { ...options };
-    if (cleanOptions.headers) {
-      // Case-insensitive removal
-      const authKey = Object.keys(cleanOptions.headers).find(k => k.toLowerCase() === 'authorization');
-      if (authKey) {
-        console.warn(`[Supabase Function] Removed manual Authorization header from ${functionName} invocation to ensure fresh token usage.`);
-        delete cleanOptions.headers[authKey];
+    // 1. Initial attempt using direct fetch to ensure we can parse errors correctly
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (!token) {
+      console.warn(`[Supabase Function] No active session found for ${functionName}. Invoking without Authorization header.`);
+    }
+
+    const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = (supabase as any).supabaseKey || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+    // Extract headers from options but exclude Authorization to prevent conflicts
+    // We want to strictly control the Authorization header based on the current session
+    const { Authorization, authorization, ...customHeaders } = options.headers || {};
+
+    const headers: Record<string, string> = {
+      "apikey": supabaseKey,
+      ...customHeaders
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    // Ensure Content-Type is set if body is present
+    if (options.body && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    try {
+      const response = await fetch(functionUrl, {
+        method: options.method || 'POST',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      });
+
+      if (!response.ok) {
+        // Handle non-2xx responses
+        
+        // Try to parse error body first to check for specific error messages
+        let errorMsg = `Edge Function returned a non-2xx status code: ${response.status}`;
+        let errorBody: any = null;
+        try {
+          errorBody = await response.json();
+          if (errorBody && typeof errorBody === 'object') {
+            if (errorBody.error) errorMsg = errorBody.error;
+            else if (errorBody.message) errorMsg = errorBody.message;
+            else errorMsg = JSON.stringify(errorBody);
+          }
+        } catch {
+          // Fallback to text if JSON parse fails
+          const textBody = await response.text();
+          if (textBody) errorMsg = textBody;
+        }
+
+        // Check for 401 Unauthorized or "Invalid JWT" in the response
+        const is401 = response.status === 401 || 
+                      errorMsg.includes('Invalid JWT') || 
+                      errorMsg.includes('Unauthorized') ||
+                      errorMsg.includes('jwt expired');
+
+        if (is401) {
+          // Throw specific error to trigger retry logic
+          throw new Error('401 Unauthorized');
+        }
+        
+        return { data: null, error: new Error(errorMsg) };
       }
-    }
 
-    const { data, error } = await supabase.functions.invoke(functionName, cleanOptions);
-
-    if (!error) {
+      // Success
+      const data = await response.json();
       return { data, error: null };
-    }
 
-    // 2. Check for 401 Unauthorized
-    // The error object from supabase-js functions invoke usually contains context about the status
-    const is401 = (error as any)?.context?.status === 401 || 
-                  (error as any)?.status === 401 ||
-                  error.message?.includes('401') ||
-                  error.message?.includes('Unauthorized');
+    } catch (err: any) {
+      // Check for 401 to trigger retry
+      const is401 = err.message?.includes('401') || 
+                    err.message?.includes('Unauthorized') ||
+                    err.message?.includes('Invalid JWT') ||
+                    err.message?.includes('jwt expired');
 
-    if (is401) {
-      console.warn(`[Supabase Function] 401 Unauthorized for ${functionName}. Attempting session refresh...`);
+      if (!is401) {
+        return { data: null, error: err };
+      }
+      
+      console.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Attempting session refresh...`);
+
       
       // 3. Refresh session
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       
       if (refreshError || !refreshData.session) {
         console.error('[Supabase Function] Session refresh failed:', refreshError);
-        // Return a clearer error message for the UI to consume
         return { 
           data: null, 
           error: new Error('Session expired. Please log out and log in again.') 
@@ -67,92 +123,34 @@ export async function invokeFunction<T = any>(
       console.log('[Supabase Function] Session refreshed successfully. Retrying invocation...');
 
       // 4. Retry invocation
-      // Explicitly pass the new token to ensure it's used immediately
       const freshToken = refreshData.session.access_token;
-      console.log(`[Supabase Function] Fresh token obtained: ...${freshToken.slice(-5)}`);
-      
-      // 4. Retry invocation using direct fetch to bypass potential Supabase client header caching
-      // We extract the URL and Key from the client instance
-      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = (supabase as any).supabaseKey || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
-      const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
-      
-      // Construct headers from scratch to avoid any pollution
-      const retryHeaders: Record<string, string> = {
-        "Authorization": `Bearer ${freshToken}`,
-        "apikey": supabaseKey,
-      };
+      headers["Authorization"] = `Bearer ${freshToken}`;
 
-      // Add custom headers from options if they exist, but skip Authorization
-      if (options.headers) {
-          Object.entries(options.headers).forEach(([key, value]) => {
-              if (key.toLowerCase() !== 'authorization') {
-                  retryHeaders[key] = value;
-              }
-          });
-      }
-      
-      // Ensure Content-Type is set if body is present
-      if (options.body && !retryHeaders["Content-Type"]) {
-        retryHeaders["Content-Type"] = "application/json";
-      }
-
-      console.log(`[Supabase Function] Retrying fetch to ${functionUrl} with headers:`, {
-          ...retryHeaders,
-          Authorization: `Bearer ...${freshToken.slice(-5)}` // Log safe snippet
+      const retryResponse = await fetch(functionUrl, {
+        method: options.method || 'POST',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
       });
-      
-      try {
-        const response = await fetch(functionUrl, {
-            method: options.method || 'POST',
-            headers: retryHeaders,
-            body: options.body ? JSON.stringify(options.body) : undefined,
-            cache: 'no-store' // Prevent caching
-        });
 
-        // Parse response
-        const isJson = response.headers.get('content-type')?.includes('application/json');
-        let data = null;
-        let error = null;
-
-        if (isJson) {
-            data = await response.json();
-        } else {
-            data = await response.text();
+      if (!retryResponse.ok) {
+        let errorMsg = `Edge Function returned a non-2xx status code: ${retryResponse.status}`;
+        try {
+          const errorBody = await retryResponse.json();
+           if (errorBody && typeof errorBody === 'object') {
+            if (errorBody.error) errorMsg = errorBody.error;
+            else if (errorBody.message) errorMsg = errorBody.message;
+            else errorMsg = JSON.stringify(errorBody);
+          }
+        } catch {
+           const textBody = await retryResponse.text();
+           if (textBody) errorMsg = textBody;
         }
-
-        if (!response.ok) {
-            // Reconstruct an error object similar to what supabase-js returns
-            error = {
-                message: isJson && data.error ? data.error : "Edge Function returned a non-2xx status code",
-                status: response.status,
-                details: isJson ? data.details : undefined,
-                context: response, // Keep context for debug compatibility
-                debug: isJson ? data.debug : undefined
-            };
-            
-            // Log the error using our existing logic
-            console.error(`[Supabase Function] Retry failed for ${functionName}:`, error);
-            if (error.details) {
-                 console.error('[Supabase Function] Error Details:', error.details);
-            }
-            if (error.debug) {
-                 console.error('[Supabase Function] Server Debug Info:', error.debug);
-            }
-            
-            return { data: null, error };
-        }
-
-        return { data, error: null };
-
-      } catch (fetchError) {
-          console.error(`[Supabase Function] Retry fetch failed:`, fetchError);
-          return { data: null, error: fetchError };
+        return { data: null, error: new Error(errorMsg) };
       }
-    }
 
-    return { data, error };
+      const retryData = await retryResponse.json();
+      return { data: retryData, error: null };
+    }
   } catch (err) {
     return { data: null, error: err };
   }
