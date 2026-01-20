@@ -8,6 +8,7 @@ export interface EmailAccount {
   id: string;
   email_address: string;
   provider: string;
+  password?: string; // Decrypted password for IMAP/POP3
   imap_host?: string;
   imap_port?: number;
   imap_username?: string;
@@ -27,11 +28,42 @@ export interface EmailAccount {
   franchise_id?: string;
 }
 
-export function getSupabaseClient(): SupabaseClient {
+export interface EmailSyncLog {
+    account_id: string;
+    status: string;
+    emails_synced: number;
+    details?: any;
+}
+
+export function getSupabaseClient(req?: Request): SupabaseClient {
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key);
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  
+  if (!url || !serviceKey || !anonKey) throw new Error("Missing Supabase env vars");
+
+  const authHeader = req?.headers.get('Authorization');
+
+  // If the caller provides the Service Role Key in the header, use it (System Context)
+  if (authHeader && authHeader.includes(serviceKey)) {
+     return createClient(url, serviceKey);
+  }
+  
+  // Otherwise, use Anon Key + Auth Header (User Context)
+  return createClient(url, anonKey, {
+    global: {
+      headers: { Authorization: authHeader || '' },
+    },
+  });
+}
+
+export function getAdminSupabaseClient(): SupabaseClient {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!url || !serviceKey) throw new Error("Missing Supabase env vars");
+
+  return createClient(url, serviceKey);
 }
 
 export async function uploadAttachments(
@@ -71,6 +103,17 @@ export async function uploadAttachments(
     }
   }
   return uploaded;
+}
+
+export async function saveSyncLog(supabase: SupabaseClient, log: EmailSyncLog) {
+    await supabase.from("email_sync_logs").insert({
+        account_id: log.account_id,
+        status: log.status,
+        emails_synced: log.emails_synced,
+        details: log.details,
+        started_at: new Date().toISOString(), // Assuming structure
+        completed_at: new Date().toISOString()
+    });
 }
 
 export async function saveEmailToDb(

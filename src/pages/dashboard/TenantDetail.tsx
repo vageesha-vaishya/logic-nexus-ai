@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Building2, Trash2, ArrowLeft, Upload, FileText, Check, Clock, RefreshCcw, Download } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -189,7 +190,7 @@ export default function TenantDetail() {
     }
     try {
       setSendingIdx({ c: cIdx, v: vIdx });
-      const { data, error } = await supabase.functions.invoke('opensign-create-envelope', {
+      const { data, error } = await invokeFunction('opensign-create-envelope', {
         body: {
           tenantId: tenant.id,
           title: contract.title,
@@ -235,8 +236,8 @@ export default function TenantDetail() {
       return;
     }
     try {
-      const { data, error } = await supabase.functions.invoke('opensign-get-envelope-status', {
-        body: { envelopeId: envId }
+      const { data, error } = await invokeFunction('opensign-get-envelope-status', {
+        body: { envelopeId: settings.contracts.envelope_id }
       });
       if (error) throw error;
       const status = data?.status || 'unknown';
@@ -401,7 +402,7 @@ export default function TenantDetail() {
       let refined = rows;
       if (useLLMRefine) {
         try {
-          const { data, error } = await supabase.functions.invoke('llm-refine-tenants', { body: { rows } });
+          const { data, error } = await invokeFunction('llm-refine-tenants', { body: { rows } });
           if (error) {
             throw error;
           }

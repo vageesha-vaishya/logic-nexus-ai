@@ -79,7 +79,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
           filterDateFrom: advancedFilters.dateFrom ? advancedFilters.dateFrom.toISOString() : undefined,
           filterDateTo: advancedFilters.dateTo ? advancedFilters.dateTo.toISOString() : undefined,
         };
-        const { data, error } = await supabase.functions.invoke("search-emails", {
+        const { data, error } = await invokeFunction("search-emails", {
           body: { 
             email: emailAddress, 
             query: searchQuery,

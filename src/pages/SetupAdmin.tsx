@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeFunction } from '@/lib/supabase-functions';
 
 export default function SetupAdmin() {
   const [loading, setLoading] = useState(false);
@@ -15,7 +16,7 @@ export default function SetupAdmin() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('seed-platform-admin', {
+      const { data, error } = await invokeFunction('seed-platform-admin', {
         body: {
           email: 'Bahuguna.vimal@gmail.com',
           password: 'Vimal@1234'

@@ -1,22 +1,27 @@
 
 import { EmailAccount, saveEmailToDb, SupabaseClient, uploadAttachments } from "../utils/db.ts";
-import { ParsedEmail, ParsedAttachment } from "../utils/parser.ts";
+import { ParsedEmail, parseEmail } from "../utils/parser.ts";
 
 export class GmailService {
   private account: EmailAccount;
   private supabase: SupabaseClient;
+  private adminSupabase?: SupabaseClient;
 
-  constructor(account: EmailAccount, supabase: SupabaseClient) {
+  constructor(account: EmailAccount, supabase: SupabaseClient, adminSupabase?: SupabaseClient) {
     this.account = account;
     this.supabase = supabase;
+    this.adminSupabase = adminSupabase;
   }
 
-  async sync() {
+  async syncEmails(forceFullSync: boolean = false): Promise<{ syncedCount: number }> {
     console.log(`Starting Gmail sync for ${this.account.email_address}`);
     await this.refreshAccessTokenIfNeeded();
     
-    await this.syncLabel("INBOX", "inbox", "inbound");
-    await this.syncLabel("SENT", "sent", "outbound");
+    let count = 0;
+    count += await this.syncLabel("INBOX", "inbox", "inbound");
+    count += await this.syncLabel("SENT", "sent", "outbound");
+
+    return { syncedCount: count };
   }
 
   private async refreshAccessTokenIfNeeded() {
@@ -28,7 +33,10 @@ export class GmailService {
     console.log("Refreshing Gmail access token...");
     
     // Get OAuth config
-    const { data: oauthCfg } = await this.supabase
+    // Use admin client if available to ensure we can read secrets
+    const dbClient = this.adminSupabase || this.supabase;
+
+    const { data: oauthCfg } = await dbClient
         .from("oauth_configurations")
         .select("client_id, client_secret")
         .eq("provider", "gmail")
@@ -60,7 +68,7 @@ export class GmailService {
     const expiresIn = data.expires_in || 3600;
     const expiryIso = new Date(Date.now() + expiresIn * 1000).toISOString();
     
-    await this.supabase
+    await dbClient
         .from("email_accounts")
         .update({ access_token: newAccess, token_expires_at: expiryIso })
         .eq("id", this.account.id);
@@ -69,7 +77,7 @@ export class GmailService {
     this.account.token_expires_at = expiryIso;
   }
 
-  private async syncLabel(labelId: string, folder: string, direction: "inbound" | "outbound") {
+  private async syncLabel(labelId: string, folder: string, direction: "inbound" | "outbound"): Promise<number> {
     // Max 20 messages for now
     const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=${labelId}`;
     const resp = await fetch(url, {
@@ -86,24 +94,26 @@ export class GmailService {
             if (!retryResp.ok) throw new Error(`Gmail API error: ${await retryResp.text()}`);
              // Process retryResp
              const data = await retryResp.json();
-             await this.processMessageList(data.messages, folder, direction);
-             return;
+             return await this.processMessageList(data.messages, folder, direction);
         }
         throw new Error(`Gmail API error: ${await resp.text()}`);
     }
     
     const data = await resp.json();
-    await this.processMessageList(data.messages, folder, direction);
+    return await this.processMessageList(data.messages, folder, direction);
   }
 
-  private async processMessageList(messages: any[], folder: string, direction: "inbound" | "outbound") {
-    if (!messages || messages.length === 0) return;
+  private async processMessageList(messages: any[], folder: string, direction: "inbound" | "outbound"): Promise<number> {
+    if (!messages || messages.length === 0) return 0;
     
     console.log(`Processing ${messages.length} messages for ${folder}`);
     
+    let savedCount = 0;
+    let skippedCount = 0;
+
     for (const msgStub of messages) {
         try {
-             // Check if exists first to save API calls
+            // Check if exists first to save API calls
             const { data: existing } = await this.supabase
                 .from("emails")
                 .select("id")
@@ -111,10 +121,13 @@ export class GmailService {
                 .eq("account_id", this.account.id)
                 .single();
                 
-            if (existing) continue;
+            if (existing) {
+                skippedCount++;
+                continue;
+            }
 
             const resp = await fetch(
-                `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgStub.id}?format=full`,
+                `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgStub.id}?format=raw`,
                 { headers: { Authorization: `Bearer ${this.account.access_token}` } }
             );
             
@@ -122,129 +135,40 @@ export class GmailService {
             
             const msgData = await resp.json();
             await this.saveGmailMessage(msgData, folder, direction);
+            savedCount++;
         } catch (e) {
             console.error(`Error processing Gmail message ${msgStub.id}:`, e);
         }
     }
+    
+    if (skippedCount > 0) {
+        console.log(`Skipped ${skippedCount} existing messages for ${folder}`);
+    }
+    
+    return savedCount;
   }
 
   private async saveGmailMessage(msgData: any, folder: string, direction: "inbound" | "outbound") {
-     const headers = (msgData.payload.headers as any[]).reduce((acc, h) => {
-         acc[h.name.toLowerCase()] = h.value;
-         return acc;
-     }, {} as Record<string, string>);
+     // msgData.raw is base64url encoded
+     const rawBase64 = msgData.raw.replace(/-/g, '+').replace(/_/g, '/');
+     const binaryString = atob(rawBase64);
+     const bytes = new Uint8Array(binaryString.length);
+     for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+     }
+
+     const parsedEmail: ParsedEmail = await parseEmail(bytes);
      
-     const messageId = headers["message-id"] || msgData.id;
-     const subject = headers.subject || "(No Subject)";
-     const date = headers.date || new Date().toISOString();
-     const fromStr = headers.from || "";
-     const from = {
-         email: fromStr.match(/<(.+)>/)?.[1] || fromStr,
-         name: fromStr.replace(/<.+>/, "").trim()
-     };
-     
-     // Helper to parse recipients
-     const parseRecipients = (str: string) => {
-         if (!str) return [];
-         return str.split(',').map(s => {
-             const email = s.match(/<(.+)>/)?.[1] || s.trim();
-             const name = s.replace(/<.+>/, "").trim();
-             return { email, name };
-         });
-     };
-     
-     const to = parseRecipients(headers.to);
-     const cc = parseRecipients(headers.cc);
-     const bcc = parseRecipients(headers.bcc);
-     
-     const references = headers.references ? headers.references.split(/\s+/).map((r: string) => r.replace(/[<>]/g, "")) : [];
-     const inReplyTo = headers["in-reply-to"] ? headers["in-reply-to"].replace(/[<>]/g, "") : null;
-     
-     // Extract body and attachments
-     let bodyText = "";
-     let bodyHtml = "";
-     const attachments: ParsedAttachment[] = [];
-     
-     const processPart = async (part: any) => {
-         if (part.mimeType === "text/plain" && part.body.data) {
-             bodyText += this.decodeBase64(part.body.data);
-         } else if (part.mimeType === "text/html" && part.body.data) {
-             bodyHtml += this.decodeBase64(part.body.data);
-         } else if (part.filename && part.body.attachmentId) {
-             // Fetch attachment
-             const attContent = await this.fetchAttachment(msgData.id, part.body.attachmentId);
-             if (attContent) {
-                 attachments.push({
-                     filename: part.filename,
-                     content: attContent,
-                     mimeType: part.mimeType,
-                     contentId: part.headers?.find((h: any) => h.name.toLowerCase() === "content-id")?.value || null,
-                     size: part.body.size
-                 });
-             }
-         }
-         
-         if (part.parts) {
-             for (const subPart of part.parts) {
-                 await processPart(subPart);
-             }
-         }
-     };
-     
-     if (msgData.payload) {
-         await processPart(msgData.payload);
+     // Override messageId if needed (Gmail provides a stable ID)
+     if (!parsedEmail.messageId || parsedEmail.messageId.trim() === "") {
+        parsedEmail.messageId = msgData.id;
+     }
+
+     // Ensure snippet is present if parser missed it
+     if (!parsedEmail.snippet && msgData.snippet) {
+        parsedEmail.snippet = msgData.snippet;
      }
      
-     const parsedEmail: ParsedEmail = {
-         messageId,
-         subject,
-         from,
-         to,
-         cc,
-         bcc,
-         bodyText,
-         bodyHtml,
-         receivedAt: new Date(date).toISOString(),
-         inReplyTo,
-         references,
-         attachments,
-         headers,
-         snippet: msgData.snippet || "",
-         hasInlineImages: bodyHtml.includes("cid:") || bodyHtml.includes("data:image/")
-     };
-     
      await saveEmailToDb(this.supabase, this.account, parsedEmail, folder, direction);
-  }
-  
-  private decodeBase64(data: string): string {
-      // Gmail uses URL-safe base64
-      const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
-      return atob(base64);
-  }
-  
-  private async fetchAttachment(messageId: string, attachmentId: string): Promise<Uint8Array | null> {
-      try {
-          const resp = await fetch(
-              `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
-              { headers: { Authorization: `Bearer ${this.account.access_token}` } }
-          );
-          
-          if (!resp.ok) return null;
-          
-          const data = await resp.json();
-          if (data.data) {
-              const base64 = data.data.replace(/-/g, '+').replace(/_/g, '/');
-              const binaryString = atob(base64);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                  bytes[i] = binaryString.charCodeAt(i);
-              }
-              return bytes;
-          }
-          return null;
-      } catch (e) {
-          console.error("Error fetching attachment:", e);
-          return null;
-      }
   }
 }

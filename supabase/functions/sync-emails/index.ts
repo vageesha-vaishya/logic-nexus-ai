@@ -38,10 +38,22 @@ serve(async (req: any) => {
       if (!v) throw new Error(`Missing environment variable: ${name}`);
       return v;
     };
-    const supabase = createClient(
-      requireEnv("SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
-    );
+    
+    const supabaseUrl = requireEnv("SUPABASE_URL");
+    const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = requireEnv("SUPABASE_ANON_KEY");
+
+    // Create Supabase client with Auth context (User or Service Role)
+    const authHeader = req.headers.get('Authorization');
+    let supabase: any;
+
+    if (authHeader && authHeader.includes(serviceKey)) {
+      supabase = createClient(supabaseUrl, serviceKey);
+    } else {
+      supabase = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader || '' } },
+      });
+    }
 
     let payload: any;
     try {

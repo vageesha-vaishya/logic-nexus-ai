@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { invokeFunction } from "@/lib/supabase-functions";
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 
@@ -154,7 +155,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
               <p><a href="${baseUrl}/dashboard/leads/${lead.id}">View Lead</a></p>
             `;
 
-            await supabase.functions.invoke('send-email', {
+            await invokeFunction('send-email', {
               body: {
                 accountId: emailAccount.id,
                 to: [assignee.email],

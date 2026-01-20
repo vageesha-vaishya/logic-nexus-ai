@@ -3,7 +3,22 @@ import { cleanEmail } from "@/lib/data-cleaning";
 
 export function sanitizeLeadDataForInsert(data: LeadFormData) {
   const { attachments, service_id, ...rest } = data;
-  return rest;
+  
+  // Handle numeric fields that might be empty strings
+  // Convert empty string to null, otherwise parse as float (removing commas)
+  let estimated_value = null;
+  if (rest.estimated_value !== "" && rest.estimated_value !== undefined && rest.estimated_value !== null) {
+    const valStr = String(rest.estimated_value).replace(/,/g, '');
+    const parsed = parseFloat(valStr);
+    if (!isNaN(parsed)) {
+      estimated_value = parsed;
+    }
+  }
+
+  return {
+    ...rest,
+    estimated_value,
+  };
 }
 
 export function extractEmailAddress(raw: string | null | undefined): string | null {

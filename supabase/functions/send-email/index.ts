@@ -4,6 +4,7 @@ declare const Deno: {
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,6 +41,7 @@ export interface EmailResponse {
 export interface ProviderConfig {
   apiKey?: string;
   supabase: SupabaseClient;
+  adminSupabase?: SupabaseClient; // Added for privileged operations like token refresh
   account?: any; // DB row for email_accounts
 }
 
@@ -109,7 +111,7 @@ export class GmailProvider extends EmailProvider {
   async send(req: EmailRequest): Promise<EmailResponse> {
     console.log("Sending via Gmail API");
     const account = this.config.account;
-    const supabase = this.config.supabase;
+    const supabase = this.config.adminSupabase || this.config.supabase;
 
     if (!account.access_token) {
       throw new Error("Gmail account not connected.");
@@ -264,12 +266,72 @@ export class GmailProvider extends EmailProvider {
   }
 }
 
+// --- SMTP Provider (User/Credentials) ---
+export class SMTPProvider extends EmailProvider {
+  async send(req: EmailRequest): Promise<EmailResponse> {
+    console.log("Sending via SMTP");
+    const account = this.config.account;
+
+    if (!account.smtp_host || !account.smtp_username || !account.smtp_password) {
+      throw new Error("SMTP settings incomplete.");
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: account.smtp_host,
+      port: account.smtp_port || 587,
+      secure: account.smtp_port === 465, // true for 465, false for other ports
+      auth: {
+        user: account.smtp_username,
+        pass: account.smtp_password,
+      },
+      tls: {
+          rejectUnauthorized: false // Often needed for self-signed certs or some providers
+      }
+    });
+
+    // Resolve Sender
+    const senderEmail = account.email_address || account.smtp_username;
+    const from = req.from || (account.display_name ? `"${account.display_name}" <${senderEmail}>` : senderEmail);
+
+    try {
+      const info = await transporter.sendMail({
+        from: from,
+        to: req.to,
+        cc: req.cc,
+        bcc: req.bcc,
+        replyTo: req.replyTo,
+        subject: req.subject,
+        text: req.text,
+        html: req.body,
+        attachments: req.attachments?.map(a => ({
+          filename: a.filename,
+          content: a.content,
+          encoding: 'base64',
+          contentType: a.contentType
+        }))
+      });
+
+      console.log("SMTP sent:", info.messageId);
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        verified: true,
+        verificationMethod: "smtp"
+      };
+    } catch (error: any) {
+      console.error("SMTP Error:", error);
+      throw new Error(`SMTP Error: ${error.message}`);
+    }
+  }
+}
+
 // --- Office 365 Provider (User/OAuth) ---
 export class Office365Provider extends EmailProvider {
   async send(req: EmailRequest): Promise<EmailResponse> {
     console.log("Sending via Microsoft Graph API");
     const account = this.config.account;
-    const supabase = this.config.supabase;
+    const supabase = this.config.adminSupabase || this.config.supabase;
 
     if (!account.access_token) throw new Error("Office 365 account not connected.");
 
@@ -575,8 +637,25 @@ serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Create Supabase client with Auth context (User or Service Role)
+    const authHeader = req.headers.get('Authorization');
+    let supabase: SupabaseClient;
+
+    // Always create admin client for privileged operations (fetching secrets, updating tokens)
+    const adminSupabase = createClient(supabaseUrl, serviceKey);
+
+    if (authHeader && authHeader.includes(serviceKey)) {
+      // System/Admin call (e.g. from scheduler)
+      supabase = createClient(supabaseUrl, serviceKey);
+    } else {
+      // User call (RLS enforced)
+      supabase = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader || '' } },
+      });
+    }
 
     const payload = await req.json();
     const { 
@@ -647,7 +726,8 @@ serve(async (req: Request) => {
       // System Email Strategy - Support Failover in future by adding more providers to this array
       providers.push(new ResendProvider({
         apiKey: Deno.env.get("RESEND_API_KEY") || "re_HE1deVM5_NuVR5nihEuzSf3cMZP4n5U1R",
-        supabase
+        supabase,
+        adminSupabase
       }));
     } else if (accountId) {
       // User Account Strategy
@@ -666,16 +746,12 @@ serve(async (req: Request) => {
       }
 
       if (account.provider === "gmail") {
-        providers.push(new GmailProvider({ supabase, account }));
+        providers.push(new GmailProvider({ supabase, account, adminSupabase }));
       } else if (account.provider === "office365") {
-        providers.push(new Office365Provider({ supabase, account }));
+        providers.push(new Office365Provider({ supabase, account, adminSupabase }));
       } else if (account.provider === "smtp_imap") {
-         // Fallback to Resend for SMTP accounts in Edge Runtime (with Reply-To set to user email)
-          console.log("SMTP account selected. Falling back to Resend Provider.");
-          providers.push(new ResendProvider({
-             apiKey: Deno.env.get("RESEND_API_KEY") || "re_HE1deVM5_NuVR5nihEuzSf3cMZP4n5U1R",
-             supabase
-          }));
+          console.log("SMTP account selected. Using SMTP Provider.");
+          providers.push(new SMTPProvider({ supabase, account, adminSupabase }));
       } else {
         throw new Error(`Unknown provider: ${account.provider}`);
       }

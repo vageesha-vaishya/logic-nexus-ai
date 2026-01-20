@@ -452,7 +452,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         // Fetch opportunity data with full details
         if (selOppId) {
           try {
-            const { data: fullOpp, error: oppError } = await (supabase as any).functions.invoke('get-opportunity-full', {
+            const { data: fullOpp, error: oppError } = await invokeFunction('get-opportunity-full', {
               body: { id: selOppId },
             });
             if (!oppError && fullOpp) {
@@ -1148,7 +1148,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           } else {
             // Resolve account label via Edge Function when direct fetch is blocked by RLS
             try {
-              const { data: labelData, error: fnError } = await supabase.functions.invoke('get-account-label', {
+              const { data: labelData, error: fnError } = await invokeFunction('get-account-label', {
                 body: { id: curAccountId },
               });
               if (!fnError && (labelData as any)?.name) {
@@ -1187,7 +1187,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           } else {
             // Resolve contact label via Edge Function when direct fetch is blocked by RLS
             try {
-              const { data: labelData, error: fnError } = await supabase.functions.invoke('get-contact-label', {
+              const { data: labelData, error: fnError } = await invokeFunction('get-contact-label', {
                 body: { id: curContactId },
               });
               const first = (labelData as any)?.first_name;
@@ -1243,7 +1243,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           } else {
             // Fallback: resolve label via Edge Function when direct fetch is blocked by RLS
             try {
-              const { data: labelData, error: fnError } = await supabase.functions.invoke('get-opportunity-label', {
+              const { data: labelData, error: fnError } = await invokeFunction('get-opportunity-label', {
                 body: { id: curOppId },
               });
               if (!fnError && (labelData as any)?.name) {

@@ -95,7 +95,12 @@ export function EmailAccounts() {
         if (msg.includes("non-2xx")) {
            const status = (error as any)?.context?.status;
            if (status === 401) {
-             msg = "Session expired. Please log out and log in again.";
+              console.error("Sync Unauthorized after retry. Full error:", error);
+              if ((error as any)?.context) {
+                 console.error("Error context:", (error as any).context);
+              }
+              toast({ title: "Sync Unauthorized", description: "Session expired. Please log out and log in again.", variant: "destructive" });
+              return;
            } else if (status === 504) {
               msg = "Sync service timed out. Please try again later.";
            } else {

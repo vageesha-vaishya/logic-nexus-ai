@@ -21,6 +21,7 @@ import {
   Eye
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { fixAllMigrations, analyzeMigrations, type MigrationFile, type MigrationIssue } from '@/utils/migrationFixer';
 
@@ -168,7 +169,7 @@ export default function MigrationPushPanel() {
       let lastData: PushResponse | null = null;
 
       if (dryRun) {
-        const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
+        const { data, error } = await invokeFunction('push-migrations-to-target', {
           body: {
             migrations: fixed,
             dryRun,
@@ -180,7 +181,7 @@ export default function MigrationPushPanel() {
         lastData = data as PushResponse;
       } else {
         for (let call = 0; call < maxCalls; call++) {
-          const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
+          const { data, error } = await invokeFunction('push-migrations-to-target', {
             body: {
               migrations: fixed,
               dryRun,

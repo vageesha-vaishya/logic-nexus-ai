@@ -37,6 +37,7 @@ interface ImportData {
 }
 
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
 
 export function ImportFranchiseModal({
   open,
@@ -108,7 +109,7 @@ export function ImportFranchiseModal({
     setProgress(10);
 
     try {
-      const { data: result, error: invokeError } = await supabase.functions.invoke('process-franchise-import', {
+      const { data: result, error: invokeError } = await invokeFunction('process-franchise-import', {
         body: { data },
       });
 

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { invokeFunction } from "@/lib/supabase-functions";
+import { Loader2, Mail, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCRM } from "@/hooks/useCRM";
 import { initiateGoogleOAuth, initiateMicrosoftOAuth, handleOAuthCallback } from "@/lib/oauth";
 
@@ -559,8 +560,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                     }
                     try {
                       setTestingPop3(true);
-                      const { data: { session } } = await supabase.auth.getSession();
-                      const { data, error } = await supabase.functions.invoke("sync-emails-v2", {
+                      // invokeFunction handles Authorization header automatically
+                      const { data, error } = await invokeFunction("sync-emails-v2", {
                         body: {
                           mode: "test_pop3",
                           pop3: {
@@ -570,10 +571,7 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
                             password: pop3Password,
                             ssl: pop3UseSsl,
                           }
-                        },
-                        headers: session?.access_token 
-                          ? { Authorization: `Bearer ${session.access_token}` }
-                          : undefined,
+                        }
                       });
                       if (error) throw error;
                       const ok = (data as any)?.success;

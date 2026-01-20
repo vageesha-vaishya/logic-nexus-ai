@@ -202,7 +202,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
           throw new Error('Password is required for new users');
         }
 
-        const { data, error } = await supabase.functions.invoke('create-user', {
+        const { data, error } = await invokeFunction('create-user', {
           body: {
             email: values.email,
             password: values.password,

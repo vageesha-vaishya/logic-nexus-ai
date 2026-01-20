@@ -77,7 +77,7 @@ export function EmailInbox() {
       const tenantId = getTenantId();
 
       if (conversationView) {
-        const { data, error } = await supabase.functions.invoke("search-emails", {
+        const { data, error } = await invokeFunction("search-emails", {
           body: {
             tenantId,
             accountId: selectedAccountId || undefined,
@@ -134,11 +134,16 @@ export function EmailInbox() {
         setEmails(data || []);
       }
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error.message?.includes("non-2xx") && (error as any)?.context?.status === 401) {
+          console.error("Fetch Emails Unauthorized. Full error:", error);
+          toast({ title: "Session Expired", description: "Please log out and log in again to view emails.", variant: "destructive" });
+      } else {
+          toast({
+            title: "Error fetching emails",
+            description: error.message,
+            variant: "destructive",
+          });
+      }
     } finally {
       setLoading(false);
     }
@@ -265,6 +270,10 @@ export function EmailInbox() {
            const status = (error as any)?.context?.status;
            if (status === 401) {
               // If we get here, the retry logic in invokeFunction also failed
+              console.error("Sync Unauthorized after retry. Full error:", error);
+              if ((error as any)?.context) {
+                  console.error("Debug info (context):", (error as any).context);
+              }
               toast({ title: "Sync Unauthorized", description: "Session expired. Please log out and log in again.", variant: "destructive" });
               return;
            }
@@ -320,6 +329,9 @@ export function EmailInbox() {
         });
         if (error) {
           console.error("Sync error for account", acc.id, error);
+          if ((error as any)?.context) {
+             console.error("Sync error context:", (error as any).context);
+          }
           continue;
         }
         totalSynced += data?.syncedCount || 0;

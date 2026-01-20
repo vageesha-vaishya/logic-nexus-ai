@@ -11,6 +11,7 @@ import { matchText, TextOp } from '@/lib/utils';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -183,8 +184,9 @@ export default function OpportunityDetail() {
   const syncSalesforce = async () => {
     try {
       setSyncing(true);
-      const { data, error } = await supabase.functions.invoke('salesforce-sync-opportunity', {
-        body: { opportunity_id: id },
+      // Trigger Salesforce sync via Edge Function
+      const { data, error } = await invokeFunction('salesforce-sync-opportunity', {
+        body: { opportunity_id: id }
       });
       if (error) throw error;
       toast.success('SOS sync completed');

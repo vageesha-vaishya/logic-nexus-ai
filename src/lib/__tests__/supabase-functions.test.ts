@@ -76,6 +76,28 @@ describe('invokeFunction', () => {
     expect(result.error.message).toContain('Session expired');
   });
 
+  it('should remove manual Authorization header to prevent stale tokens', async () => {
+    const mockData = { success: true };
+    (supabase.functions.invoke as any).mockResolvedValueOnce({ data: mockData, error: null });
+
+    const options = { 
+      headers: { 
+        'Authorization': 'Bearer old-token',
+        'Content-Type': 'application/json'
+      },
+      body: { foo: 'bar' }
+    };
+
+    await invokeFunction('test-func', options);
+
+    expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
+    const callArgs = (supabase.functions.invoke as any).mock.calls[0];
+    const calledOptions = callArgs[1];
+    
+    expect(calledOptions.headers['Authorization']).toBeUndefined();
+    expect(calledOptions.headers['Content-Type']).toBe('application/json');
+  });
+
   it('should return original error if not 401', async () => {
     const error500 = { context: { status: 500 }, message: 'Server Error' };
 

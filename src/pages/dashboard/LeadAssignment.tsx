@@ -10,6 +10,7 @@ import {
   Play, Pause, RefreshCw, UserPlus 
 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { AssignmentRules } from '@/components/assignment/AssignmentRules';
 import { TerritoryManagement } from '@/components/assignment/TerritoryManagement';
@@ -117,7 +118,7 @@ export default function LeadAssignment() {
     try {
       toast.info('Processing assignment queue...');
       // Trigger edge function to process queue
-      const { error } = await supabase.functions.invoke('process-lead-assignments');
+      const { error } = await invokeFunction('process-lead-assignments');
       
       if (error) throw error;
       

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityForm } from '@/components/crm/ActivityForm';
 import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from "@/lib/supabase-functions";
 import { toast } from 'sonner';
 
 export default function ActivityNew() {
@@ -129,10 +130,10 @@ export default function ActivityNew() {
               .filter((a: any) => a.filename && a.path)
           : [];
 
-        const { data: sendData, error: sendError } = await supabase.functions.invoke("send-email", {
+        const { data: sendData, error: sendError } = await invokeFunction("send-email", {
           body: {
             accountId,
-            to: [String(formData.to).trim()],
+            to: [formData.to],
             cc: [],
             subject,
             body: emailHtmlBody,

@@ -17,7 +17,8 @@ interface ConnectionConfig {
 
 interface ExecuteRequest {
   action: 'test' | 'execute' | 'query';
-  connection: ConnectionConfig;
+  connection?: ConnectionConfig;
+  useLocalDb?: boolean;
   statements?: string[];
   query?: string;
   options?: {
@@ -51,6 +52,18 @@ serve(async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Security Check: Only allow requests with Service Role Key
+  const serviceRoleKey = Deno.env.get("PRIVATE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const authHeader = req.headers.get("Authorization");
+  const isServiceRole = authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey);
+
+  if (!isServiceRole) {
+    return new Response(JSON.stringify({ error: "Unauthorized: Service Role Key required" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   let pool: Pool | null = null;
   let client: any | null = null;
 
@@ -58,37 +71,49 @@ serve(async (req: Request): Promise<Response> => {
     const body: ExecuteRequest = await req.json();
     const { action, connection, statements, query, options } = body;
 
-    if (!connection?.host || !connection?.database || !connection?.user) {
-      console.warn('[execute-sql-external] Missing connection parameters', {
-        hasHost: !!connection?.host,
-        hasDatabase: !!connection?.database,
-        hasUser: !!connection?.user,
-      });
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Missing required connection parameters',
-          code: 'MISSING_CONNECTION_PARAMETERS',
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+
 
     // Build connection options
-    const poolConfig = {
-      hostname: connection.host,
-      port: connection.port || 5432,
-      database: connection.database,
-      user: connection.user,
-      password: connection.password || '',
-      tls: connection.ssl === true || connection.ssl === 'require' ? { enabled: true } : { enabled: false },
-      connection: {
-        attempts: 3,
-        interval: 500,
-      },
-    };
+    let poolConfig: any;
+    if (body.useLocalDb) {
+        // Use SUPABASE_DB_URL from environment
+        const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+        if (!dbUrl) {
+             throw new Error("SUPABASE_DB_URL not found in environment");
+        }
+        poolConfig = dbUrl;
+        console.log(`[execute-sql-external] Connecting to local DB`);
+    } else {
+        if (!connection?.host || !connection?.database || !connection?.user) {
+          console.warn('[execute-sql-external] Missing connection parameters', {
+            hasHost: !!connection?.host,
+            hasDatabase: !!connection?.database,
+            hasUser: !!connection?.user,
+          });
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'Missing required connection parameters',
+              code: 'MISSING_CONNECTION_PARAMETERS',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-    console.log(`[execute-sql-external] Connecting to ${connection.host}:${connection.port}/${connection.database}`);
+        poolConfig = {
+          hostname: connection.host,
+          port: connection.port || 5432,
+          database: connection.database,
+          user: connection.user,
+          password: connection.password || '',
+          tls: connection.ssl === true || connection.ssl === 'require' ? { enabled: true } : { enabled: false },
+          connection: {
+            attempts: 3,
+            interval: 500,
+          },
+        };
+        console.log(`[execute-sql-external] Connecting to ${connection.host}:${connection.port}/${connection.database}`);
+    }
     
     pool = new Pool(poolConfig, 1);
     client = await pool.connect();
@@ -107,8 +132,8 @@ serve(async (req: Request): Promise<Response> => {
             message: 'Connection successful',
             connectionInfo: {
               version: version,
-              database: connection.database,
-              user: connection.user,
+              database: connection?.database || 'local',
+              user: connection?.user || 'service_role',
             }
           } as ExecuteResult),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

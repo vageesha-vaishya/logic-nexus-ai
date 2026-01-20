@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { invokeFunction } from "@/lib/supabase-functions";
 
 export interface MigrationFile {
   name: string;
@@ -33,7 +34,7 @@ export async function pushMigrationsToTarget(
 ): Promise<PushResponse> {
   console.log(`[pushMigrationsToTarget] Pushing ${migrations.length} migrations (dryRun: ${dryRun})`);
   
-  const { data, error } = await supabase.functions.invoke('push-migrations-to-target', {
+  const { data, error } = await invokeFunction('push-migrations-to-target', {
     body: {
       migrations,
       dryRun

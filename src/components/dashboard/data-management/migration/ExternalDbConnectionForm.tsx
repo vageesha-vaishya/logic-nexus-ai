@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Database, CheckCircle2, XCircle, Eye, EyeOff, Server, AlertCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { validateHostname, validatePort, parseHostPort } from '@/utils/validationUtils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -125,7 +126,7 @@ export function ExternalDbConnectionForm({
     setTestResult(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('execute-sql-external', {
+      const { data, error } = await invokeFunction('execute-sql-external', {
         body: {
           action: 'test',
           connection: {

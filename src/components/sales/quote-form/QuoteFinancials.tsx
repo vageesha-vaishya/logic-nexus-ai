@@ -8,6 +8,7 @@ import { DollarSign, Percent, FileText, Lock, Info, Receipt, Server, CheckCircle
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 
 export function QuoteFinancials() {
@@ -29,7 +30,7 @@ export function QuoteFinancials() {
     setIsVerifying(true);
     setServerVerification(null);
     try {
-      const { data, error } = await supabase.functions.invoke('calculate-quote-financials', {
+      const { data, error } = await invokeFunction('calculate-quote-financials', {
         body: { shipping_amount: subtotal, tax_percent: parseFloat(taxPercent || '0') }
       });
 

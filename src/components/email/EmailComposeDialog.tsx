@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Send, Paperclip, X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link as LinkIcon, Eraser, Loader2, Trash2, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { useCRM } from "@/hooks/useCRM";
 import { useRef } from "react";
 
@@ -308,7 +309,13 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
              description = "Email content too large. Please reduce attachment size or avoid pasting large images directly.";
           } else if (status === 500) {
              description = "Email service error. Please try again later.";
-          } else {
+          } else if (status === 401) {
+              console.error("Email send Unauthorized. Full error:", error);
+              if ((error as any)?.context) {
+                  console.error("Debug info (context):", (error as any).context);
+              }
+              description = "Session expired. Please log out and log in again.";
+           } else {
              description = `Email service unavailable (Status: ${status || 'Unknown'}). Please check your connection.`;
           }
         }

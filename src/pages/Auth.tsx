@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +54,7 @@ export default function Auth() {
       const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
       if (error.message.includes('Invalid login credentials') && isAdminEmail) {
         try {
-          const { data, error: seedError } = await supabase.functions.invoke('seed-platform-admin', {
+          const { data, error: seedError } = await invokeFunction('seed-platform-admin', {
             body: { email, password }
           });
 
