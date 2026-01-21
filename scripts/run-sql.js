@@ -2,29 +2,34 @@ import { Client } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const projectRoot = path.join(__dirname, '..');
+
+// Load environment variables from .env first, then .env.migration as fallback
+dotenv.config({ path: path.join(projectRoot, '.env') });
 
 function loadEnvMigration(projectRoot) {
   const envPath = path.join(projectRoot, '.env.migration');
-  if (!fs.existsSync(envPath)) {
-    throw new Error(`.env.migration not found at ${envPath}`);
-  }
-  const content = fs.readFileSync(envPath, 'utf-8');
-  const map = {};
-  content.split(/\r?\n/).forEach((line) => {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m) {
-      const key = m[1];
-      let val = m[2];
-      if (val.startsWith('"') && val.endsWith('"')) {
-        val = val.slice(1, -1);
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf-8');
+    const map = {};
+    content.split(/\r?\n/).forEach((line) => {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+      if (m) {
+        const key = m[1];
+        let val = m[2];
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.slice(1, -1);
+        }
+        map[key] = val;
       }
-      map[key] = val;
-    }
-  });
-  return map;
+    });
+    return map;
+  }
+  return {};
 }
 
 async function main() {
@@ -33,11 +38,18 @@ async function main() {
     console.error('Usage: node scripts/run-sql.js /path/to/file.sql');
     process.exit(1);
   }
-  const projectRoot = path.join(__dirname, '..');
-  const env = loadEnvMigration(projectRoot);
-  let dbUrl = env.SUPABASE_DB_URL;
-  if (env.SUPABASE_POOLER_URL) {
-    dbUrl = env.SUPABASE_POOLER_URL;
+
+  // Try process.env first (from .env), then .env.migration
+  const migrationEnv = loadEnvMigration(projectRoot);
+  let dbUrl = process.env.SUPABASE_DB_URL || migrationEnv.SUPABASE_DB_URL;
+  
+  if (process.env.SUPABASE_POOLER_URL || migrationEnv.SUPABASE_POOLER_URL) {
+    dbUrl = process.env.SUPABASE_POOLER_URL || migrationEnv.SUPABASE_POOLER_URL;
+    // Attempt to fix region if incorrect (Sydney vs Singapore)
+    if (dbUrl.includes('aws-0-ap-southeast-1.pooler.supabase.com')) {
+      console.log('Switching pooler region from southeast-1 to southeast-2 (Sydney attempt)...');
+      dbUrl = dbUrl.replace('aws-0-ap-southeast-1.pooler.supabase.com', 'aws-0-ap-southeast-2.pooler.supabase.com');
+    }
   }
   if (!dbUrl) {
     console.error('Error: SUPABASE_DB_URL not found in .env.migration');

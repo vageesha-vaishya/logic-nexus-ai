@@ -29,6 +29,7 @@ export default function QuoteNew() {
         ...prev,
         total_weight: state.weight?.toString(),
         commodity: state.commodity,
+        account_id: state.accountId,
         valid_until: state.selectedRate?.validUntil ? new Date(state.selectedRate.validUntil).toISOString().split('T')[0] : undefined,
         // Map loose text fields to notes since form expects IDs for ports
         notes: `Quick Quote Conversion:

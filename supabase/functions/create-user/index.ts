@@ -13,9 +13,25 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      const missing = [];
+      if (!supabaseUrl) missing.push('SUPABASE_URL');
+      if (!serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+      
+      const errorMsg = `Critical Configuration Error: Missing environment variables: ${missing.join(', ')}`;
+      logger.error(errorMsg);
+      return new Response(
+        JSON.stringify({ error: errorMsg, code: 'CONFIG_ERROR' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY')) ?? '',
+      supabaseUrl,
+      serviceRoleKey,
       {
         auth: {
           autoRefreshToken: false,
@@ -23,6 +39,35 @@ Deno.serve(async (req: Request) => {
         }
       }
     );
+
+    // Manual Auth Verification (to bypass Gateway 401 issues)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+       logger.warn('Missing Authorization header');
+       return new Response(
+         JSON.stringify({ error: 'Unauthorized: Missing Authorization header' }),
+         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // 1. Check if it's the Service Role Key (Admin Scripts)
+    if (token === serviceRoleKey) {
+        logger.info('Authenticated via Service Role Key');
+    } else {
+        // 2. Check if it's a valid User Token
+        const { data: { user }, error: userVerifyError } = await supabaseAdmin.auth.getUser(token);
+        
+        if (userVerifyError || !user) {
+            logger.error('Manual Auth Verification Failed', { error: userVerifyError });
+            return new Response(
+                JSON.stringify({ error: 'Unauthorized', details: userVerifyError?.message || 'Invalid Token' }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+        logger.info('Authenticated via User Token', { userId: user.id });
+    }
 
     const body = await req.json();
     const { email, password, first_name, last_name, phone, avatar_url, is_active, must_change_password, email_verified, role, tenant_id, franchise_id } = body;
@@ -38,7 +83,13 @@ Deno.serve(async (req: Request) => {
     });
 
     if (authError) {
-      logger.error('Failed to create auth user', { error: authError });
+      logger.error('Failed to create auth user', { error: authError, code: authError.status });
+      
+      // Check for JWT/Auth specific errors
+      if (authError.message?.includes('JWT') || authError.status === 401) {
+         logger.error('JWT/Auth Error detected during user creation. Check Service Role Key.');
+      }
+
       throw authError;
     }
 
@@ -87,11 +138,15 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    logger.error('Unhandled error in create-user', { error: errorMessage });
+  } catch (error: any) {
+    // Improved error handling to capture non-Error objects (like Supabase Auth errors)
+    const errorMessage = error?.message || error?.toString() || 'An unknown error occurred';
+    const errorContext = error?.context || {};
+    
+    logger.error('Unhandled error in create-user', { error: errorMessage, context: errorContext });
+    
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: errorMessage, details: errorContext }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,

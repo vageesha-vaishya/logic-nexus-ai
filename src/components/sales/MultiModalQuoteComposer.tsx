@@ -236,7 +236,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string) => {
           try {
             const { data, error } = await (scopedDb
-              .from(table as any)
+              .from(table as any, true)
               .select('*')
               .eq('is_active', true) as any);
             

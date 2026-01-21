@@ -220,8 +220,17 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
           },
         });
 
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+        if (error) {
+          console.error('Create User Error Details:', error);
+          // If the error object has details/context, try to show it
+          const detailMsg = error.context?.error || error.message || JSON.stringify(error);
+          throw new Error(`Edge Function Error: ${detailMsg}`);
+        }
+        
+        if (data?.error) {
+           console.error('Create User Data Error:', data);
+           throw new Error(data.error);
+        }
 
         const messages = [];
         if (values.must_change_password) {

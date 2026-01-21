@@ -2,16 +2,23 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
-console.log("Rate Engine v2 Initialized")
+console.log("Rate Engine v2.1 Initialized")
 
 interface RateRequest {
   origin: string // Code (e.g., "LAX") or UUID
   destination: string // Code (e.g., "PVG") or UUID
-  weight: number
+  weight: number | string
   mode: 'air' | 'ocean' | 'road'
   commodity?: string
-  unit: 'kg' | 'lbs'
-  customer_id?: string
+  unit?: string
+  account_id?: string
+  // Extended Fields
+  containerType?: string
+  containerSize?: string
+  containerQty?: string | number
+  dims?: string
+  vehicleType?: string
+  dangerousGoods?: boolean
 }
 
 interface RateOption {
@@ -33,30 +40,41 @@ serve(async (req) => {
 
   try {
     // 2. Auth & Client Setup
+    const authHeader = req.headers.get('Authorization')
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      { global: { headers: { Authorization: authHeader ?? '' } } }
     )
 
     // 3. Parse Request
-    const { origin, destination, weight, mode, unit, customer_id } = await req.json() as RateRequest
+    let body: RateRequest;
+    try {
+        body = await req.json() as RateRequest;
+    } catch (e) {
+        throw new Error("Invalid JSON body");
+    }
+    const { 
+        origin, destination, weight, mode, unit, account_id,
+        containerQty, containerSize, vehicleType 
+    } = body;
 
-    if (!origin || !destination || !weight || !mode) {
-      throw new Error("Missing required fields: origin, destination, weight, mode")
+    if (!origin || !destination || !mode) {
+      throw new Error("Missing required fields: origin, destination, mode")
     }
 
     // Normalize weight to KG
-    const weightKg = unit === 'lbs' ? weight * 0.453592 : weight
+    let weightKg = 0;
+    if (weight) {
+        weightKg = Number(weight);
+        if (unit === 'lbs') weightKg = weightKg * 0.453592;
+    }
 
     // 4. Resolve Locations (Code -> UUID)
-    // Helper to resolve location
     const resolveLocation = async (loc: string): Promise<string | null> => {
-      // If it looks like a UUID, return it
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(loc)) return loc;
 
-      // Otherwise lookup by code
       const { data } = await supabase
         .from('ports_locations')
         .select('id')
@@ -70,57 +88,48 @@ serve(async (req) => {
       resolveLocation(destination)
     ])
 
-    if (!originId || !destId) {
-      // If locations not found in DB, we can't query exact routes. 
-      // Proceed to fallback logic immediately or throw.
-      // For Phase 1, we'll try to find rates, if not, use fallback.
-      console.warn(`Locations not found for codes: ${origin}, ${destination}`)
-    }
-
     const options: RateOption[] = []
 
     // 5. Query 3-Tier Rates from DB
     if (originId && destId) {
-        const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const now = new Date().toISOString().split('T')[0]; 
 
-        // Build query
         let query = supabase
             .from('carrier_rates')
             .select(`
-                id,
-                tier,
-                carrier:carrier_id(name),
-                total_amount,
-                transit_days,
-                valid_to,
-                customer_id
+                id, tier, carrier:carrier_id(name),
+                total_amount, transit_days, valid_to, account_id
             `)
             .eq('origin_port_id', originId)
             .eq('destination_port_id', destId)
             .eq('mode', mode)
             .eq('status', 'active')
-            .or(`valid_to.is.null,valid_to.gte.${now}`) // Valid or indefinite
+            .or(`valid_to.is.null,valid_to.gte.${now}`)
         
-        // Fetch rates
         const { data: rates, error } = await query;
 
         if (!error && rates) {
             rates.forEach((r: any) => {
                 const isContract = r.tier === 'contract';
-                const isSpot = r.tier === 'spot';
                 
-                // Filter Contract rates: must match customer_id
-                if (isContract && r.customer_id !== customer_id) return;
+                if (isContract && r.account_id !== account_id) return;
 
-                // Calculate total price (Simplified: Rate * Weight)
-                // In production, check charge structure (flat vs per_kg)
-                // Assuming 'total_amount' is per unit (kg) for now
-                const price = Number(r.total_amount) * weightKg;
+                // Simple Price Calc
+                let price = Number(r.total_amount);
+                
+                // Adjust for quantity/weight
+                if (mode === 'ocean' && containerQty) {
+                    price = price * Number(containerQty);
+                } else if (weightKg > 0) {
+                    // Assume rate is per kg for Air/Road unless specified otherwise
+                    // In real app, check rate unit (per kg, per shipment)
+                    price = price * weightKg; 
+                }
 
                 options.push({
                     id: r.id,
                     tier: r.tier as any,
-                    name: isContract ? 'Contract Rate' : (isSpot ? 'Spot Rate' : 'Market Rate'),
+                    name: isContract ? 'Contract Rate' : (r.tier === 'spot' ? 'Spot Rate' : 'Market Rate'),
                     carrier: r.carrier?.name || 'Unknown',
                     price: Math.round(price * 100) / 100,
                     currency: 'USD',
@@ -131,16 +140,27 @@ serve(async (req) => {
         }
     }
 
-    // 6. Fallback / Market Estimates (if no DB rates found)
+    // 6. Fallback / Market Estimates
     if (options.length === 0) {
-        // Mock Market Rates
-        const baseRates: Record<string, number> = {
-            'air': 4.50,
-            'ocean': 0.85,
-            'road': 1.20
+        // Dynamic Base Rates
+        let estimatedPrice = 0;
+
+        if (mode === 'ocean') {
+            const baseRate20 = 1500;
+            const baseRate40 = 2800;
+            const qty = Number(containerQty) || 1;
+            const size = containerSize || '20ft';
+            const base = size.includes('40') ? baseRate40 : baseRate20;
+            estimatedPrice = base * qty;
+        } else if (mode === 'air') {
+            const ratePerKg = 4.50;
+            estimatedPrice = (weightKg || 100) * ratePerKg;
+        } else if (mode === 'road') {
+            const ratePerKm = 2.50; // Mock distance based
+            const mockDistance = 500; // km
+            estimatedPrice = mockDistance * ratePerKm;
+            if (vehicleType === 'reefer') estimatedPrice *= 1.2;
         }
-        const baseRate = baseRates[mode] || 2.00;
-        const estimatedPrice = weightKg * baseRate;
 
         options.push({
             id: 'mkt_std',
@@ -149,7 +169,7 @@ serve(async (req) => {
             carrier: 'Market Avg',
             price: Math.round(estimatedPrice * 100) / 100,
             currency: 'USD',
-            transitTime: mode === 'air' ? '3-5 Days' : '20-30 Days',
+            transitTime: mode === 'air' ? '3-5 Days' : (mode === 'ocean' ? '25-30 Days' : '2 Days'),
         });
         
         options.push({
@@ -159,11 +179,11 @@ serve(async (req) => {
             carrier: 'Market Avg',
             price: Math.round(estimatedPrice * 1.3 * 100) / 100,
             currency: 'USD',
-            transitTime: mode === 'air' ? '1-2 Days' : '15-20 Days',
+            transitTime: mode === 'air' ? '1-2 Days' : (mode === 'ocean' ? '20 Days' : '1 Day'),
         });
     }
 
-    // 7. Sort: Contract first, then Price
+    // 7. Sort
     options.sort((a, b) => {
         const tierOrder = { 'contract': 0, 'spot': 1, 'market': 2 };
         if (tierOrder[a.tier] !== tierOrder[b.tier]) {
@@ -172,8 +192,6 @@ serve(async (req) => {
         return a.price - b.price;
     });
 
-    // 8. Return Response
-    // Cache for 60 seconds
     return new Response(
       JSON.stringify({ options }),
       { 

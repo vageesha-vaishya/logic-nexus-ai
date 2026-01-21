@@ -50,7 +50,7 @@ export default function ServiceTypes() {
   const fetchTypes = async () => {
     try {
       const { data, error } = await scopedDb
-        .from('service_types')
+        .from('service_types', true)
         .select('*')
         .order('name');
       if (error) throw error;

@@ -293,7 +293,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         try {
           // Fetch active service types globally
           const { data: fallbackTypes } = await scopedDb
-            .from('service_types')
+            .from('service_types', true)
             .select('id, name, code')
             .eq('is_active', true)
             .order('name');

@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor } from 'lucide-react';
 import type { Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -72,6 +72,11 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Ports & Locations', path: '/dashboard/ports-locations', icon: MapPin, description: 'Ports and facilities' },
       { name: 'Package Categories', path: '/dashboard/package-categories', icon: Box, description: 'Container types' },
       { name: 'Package Sizes', path: '/dashboard/package-sizes', icon: Ruler, description: 'Container dimensions' },
+      { name: 'Container Tracking', path: '/dashboard/container-tracking', icon: Box, description: 'Container inventory & location' },
+      { name: 'Container Analytics', path: '/dashboard/container-analytics', icon: BarChart3, description: 'Container inventory & utilization' },
+      { name: 'Vessel Types', path: '/dashboard/vessel-types', icon: Ship, description: 'Vessel type definitions' },
+      { name: 'Vessel Classes', path: '/dashboard/vessel-classes', icon: Ship, description: 'Vessel class definitions' },
+      { name: 'Vessels', path: '/dashboard/vessels', icon: Anchor, description: 'Fleet management' },
       { name: 'Cargo Types', path: '/dashboard/cargo-types', icon: PackageCheck, description: 'Cargo classifications' },
       { name: 'Cargo Details', path: '/dashboard/cargo-details', icon: Package, description: 'Configure cargo details per service' },
       { name: 'Incoterms', path: '/dashboard/incoterms', icon: Globe, description: 'Trade terms' },

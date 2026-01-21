@@ -28,7 +28,11 @@ describe('invokeFunction', () => {
     expect(result.data).toEqual(mockData);
     expect(result.error).toBeNull();
     expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('test-func', { body: { foo: 'bar' } });
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('test-func', { 
+      body: { foo: 'bar' },
+      headers: {},
+      method: 'POST'
+    });
   });
 
   it('should retry on 401 error and succeed if refresh works', async () => {
@@ -51,6 +55,14 @@ describe('invokeFunction', () => {
 
     expect(supabase.functions.invoke).toHaveBeenCalledTimes(2);
     expect(supabase.auth.refreshSession).toHaveBeenCalledTimes(1);
+    
+    // Check second call arguments
+    const secondCallArgs = (supabase.functions.invoke as any).mock.calls[1];
+    expect(secondCallArgs[0]).toBe('test-func');
+    expect(secondCallArgs[1].headers).toEqual({
+      Authorization: 'Bearer new-token'
+    });
+    
     expect(result.data).toEqual(mockData);
     expect(result.error).toBeNull();
   });
@@ -72,8 +84,7 @@ describe('invokeFunction', () => {
     expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
     expect(supabase.auth.refreshSession).toHaveBeenCalledTimes(1);
     expect(result.data).toBeNull();
-    expect(result.error).toBeInstanceOf(Error);
-    expect(result.error.message).toContain('Session expired');
+    expect(result.error).toEqual(error401);
   });
 
   it('should remove manual Authorization header to prevent stale tokens', async () => {
