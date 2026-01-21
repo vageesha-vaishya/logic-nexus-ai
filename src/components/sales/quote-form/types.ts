@@ -23,6 +23,8 @@ export const quoteSchema = z.object({
   shipping_amount: z.string().optional(),
   terms_conditions: z.string().optional(),
   notes: z.string().optional(),
+  billing_address: z.any().optional(),
+  shipping_address: z.any().optional(),
 });
 
 export type QuoteFormValues = z.infer<typeof quoteSchema>;

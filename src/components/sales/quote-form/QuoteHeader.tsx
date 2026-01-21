@@ -23,15 +23,43 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export function QuoteHeader() {
-  const { control, setValue } = useFormContext();
+  const { control, setValue, register, watch } = useFormContext();
   const { opportunities, accounts, contacts, isLoadingOpportunities } = useQuoteContext();
   const [open, setOpen] = useState(false);
 
   const opportunityId = useWatch({ control, name: 'opportunity_id' });
   const accountId = useWatch({ control, name: 'account_id' });
   const contactId = useWatch({ control, name: 'contact_id' });
+  
+  // Standalone Mode State
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  // Initialize Standalone state based on existing data
+  useEffect(() => {
+    // Only set if explicitly not set yet (to avoid overriding user toggle during session)
+    // But logically, if there is an accountId, it is NOT standalone.
+    if (accountId || opportunityId) {
+        setIsStandalone(false);
+    }
+  }, []); // Run once on mount
+
+  const handleStandaloneToggle = (checked: boolean) => {
+      setIsStandalone(checked);
+      if (checked) {
+          setValue('account_id', '');
+          setValue('opportunity_id', '');
+          setValue('contact_id', '');
+          // Optional: Initialize billing address for guest info if empty
+          const currentBilling = watch('billing_address');
+          if (!currentBilling) {
+              setValue('billing_address', { company: '', name: '', email: '' });
+          }
+      }
+  };
 
   // Filter contacts based on selected account
   const filteredContacts = useMemo(() => {
@@ -152,7 +180,35 @@ export function QuoteHeader() {
 
         <Separator className="my-2" />
 
-        {/* CRM Context Row */}
+        {/* CRM Context / Standalone Toggle */}
+        <div className="flex items-center justify-between mb-4 bg-muted/20 p-3 rounded-md border border-dashed">
+            <div className="flex items-center space-x-2">
+                <Switch id="standalone-mode" checked={isStandalone} onCheckedChange={handleStandaloneToggle} />
+                <Label htmlFor="standalone-mode" className="font-medium cursor-pointer">
+                    Standalone Quote (No CRM Link)
+                </Label>
+            </div>
+            {isStandalone && <span className="text-xs text-muted-foreground flex items-center gap-1"><Info className="w-3 h-3"/> Quote will be created without linking to Account/Opportunity</span>}
+        </div>
+
+        {isStandalone ? (
+             /* Guest Fields */
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2">
+                 <div className="space-y-2">
+                    <Label>Guest Company / Name</Label>
+                    <Input placeholder="Enter customer name..." {...register('billing_address.company')} />
+                 </div>
+                 <div className="space-y-2">
+                    <Label>Contact Name</Label>
+                    <Input placeholder="Enter contact person..." {...register('billing_address.name')} />
+                 </div>
+                 <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input placeholder="customer@example.com" {...register('billing_address.email')} />
+                 </div>
+             </div>
+        ) : (
+        /* CRM Context Row */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             control={control}
@@ -322,6 +378,7 @@ export function QuoteHeader() {
             )}
           />
         </div>
+        )}
       </CardContent>
     </Card>
   );

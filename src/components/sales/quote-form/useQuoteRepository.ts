@@ -49,6 +49,8 @@ export function useQuoteRepository() {
       shipping_amount: data.shipping_amount ? Number(data.shipping_amount) : 0,
       terms_conditions: data.terms_conditions || null,
       notes: data.notes || null,
+      billing_address: data.billing_address || {},
+      shipping_address: data.shipping_address || {},
       tenant_id: finalTenantId,
       regulatory_data: {
         trade_direction: data.trade_direction || null,
