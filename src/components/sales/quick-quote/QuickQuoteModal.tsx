@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plane, Ship, Truck, Package, ArrowRight, Timer, AlertCircle, Sparkles, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
 // --- Zod Schemas ---
 
@@ -61,13 +62,19 @@ type QuickQuoteValues = z.infer<typeof baseSchema> & {
 
 interface RateOption {
   id: string;
-  tier: 'contract' | 'spot' | 'market';
+  tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable';
   name: string;
   price: number;
   currency: string;
   transitTime: string;
   carrier: string;
   validUntil?: string;
+  // Extended AI Fields
+  legs?: any[];
+  price_breakdown?: any;
+  reliability?: any;
+  environmental?: any;
+  source_attribution?: string;
 }
 
 interface QuickQuoteModalProps {
@@ -79,12 +86,18 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<RateOption[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [smartMode, setSmartMode] = useState(false);
   
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{ unit: string; confidence: number } | null>(null);
   const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
   const [codeSuggestions, setCodeSuggestions] = useState<any[]>([]);
+  
+  // AI Analysis State
+  const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
+  const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
+  const [anomalies, setAnomalies] = useState<string[]>([]);
 
   // Extended Form State
   const [extendedData, setExtendedData] = useState({
@@ -97,6 +110,8 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     dangerousGoods: false,
     specialHandling: '',
     vehicleType: 'van',
+    pickupDate: '',
+    deliveryDeadline: '',
     originDetails: null as any,
     destinationDetails: null as any,
   });
@@ -227,29 +242,103 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
     setLoading(true);
     setResults(null);
+    setMarketAnalysis(null);
+    setAnomalies([]);
+    setConfidenceScore(null);
+
     try {
-      // 2. Call Rate Engine
       const payload = {
         ...data,
         ...extendedData, // Include our new fields
         account_id: accountId
       };
 
-      const { data: responseData, error } = await supabase.functions.invoke('rate-engine', {
-        body: payload
-      });
+      console.log("[QuickQuote] Submitting Payload:", payload);
 
-      if (error) throw error;
-      
-      if (responseData?.options && Array.isArray(responseData.options)) {
-        setResults(responseData.options);
-        if (responseData.options.length === 0) {
-            toast({ title: "No Rates Found", description: "Try adjusting your search criteria." });
-        }
+      if (smartMode) {
+          console.log("[QuickQuote] Invoking Smart Mode...");
+          const { data: aiData, error } = await supabase.functions.invoke('ai-advisor', {
+              body: { 
+                  action: 'generate_smart_quotes',
+                  payload: payload 
+              }
+          });
+
+          if (error) {
+              console.error("[QuickQuote] Smart Mode Error:", error);
+              throw error;
+          }
+          
+          console.log("[QuickQuote] Smart Mode Data:", aiData);
+
+          if (aiData?.options) {
+              const mappedOptions = aiData.options.map((opt: any) => ({
+                  id: opt.id,
+                  tier: opt.tier,
+                  name: opt.transport_mode || opt.carrier?.name,
+                  price: opt.price_breakdown?.total || 0,
+                  currency: opt.price_breakdown?.currency || 'USD',
+                  transitTime: opt.transit_time?.details || (opt.transit_time?.total_days + " days"),
+                  carrier: opt.carrier?.name || 'Unknown',
+                  legs: opt.legs,
+                  price_breakdown: opt.price_breakdown,
+                  reliability: opt.reliability,
+                  environmental: opt.environmental,
+                  source_attribution: opt.source_attribution
+              }));
+              setResults(mappedOptions);
+              setMarketAnalysis(aiData.market_analysis);
+              setConfidenceScore(aiData.confidence_score);
+              setAnomalies(aiData.anomalies || []);
+          }
+      } else {
+          // 2. Call Rate Engine (Legacy)
+          console.log("[QuickQuote] Invoking Legacy Rate Engine...");
+          const { data: responseData, error } = await supabase.functions.invoke('rate-engine', {
+            body: payload
+          });
+
+          if (error) {
+              console.error("[QuickQuote] Legacy Rate Engine Error:", error);
+              throw error;
+          }
+          
+          console.log("[QuickQuote] Legacy Rate Engine Data:", responseData);
+          
+          if (responseData?.options && Array.isArray(responseData.options)) {
+            setResults(responseData.options);
+            if (responseData.options.length === 0) {
+                toast({ title: "No Rates Found", description: "Try adjusting your search criteria." });
+            }
+          }
       }
     } catch (error: any) {
       console.error('Rate calculation error:', error);
-      toast({ title: "Error", description: error.message || "Failed to calculate rates.", variant: "destructive" });
+      
+      let description = error.message || "Failed to calculate rates.";
+      
+      // Attempt to extract detailed error from Edge Function response
+      if (error && error.context) {
+        try {
+             // Clone response to avoid body used error if already read
+             const res = error.context.clone ? error.context.clone() : error.context;
+             const errorBody = await res.json();
+             if (errorBody && errorBody.error) {
+                 description = `Server Error: ${errorBody.error}`;
+             }
+        } catch (e) {
+             console.warn("Could not parse error response JSON", e);
+             try {
+                // Fallback to text
+                const text = await error.context.text();
+                if (text) description = `Server Error: ${text.slice(0, 100)}`;
+             } catch (textErr) {
+                // Ignore
+             }
+        }
+      }
+
+      toast({ title: "Error", description, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -274,10 +363,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         containerType: 'dry', containerSize: '20ft', containerQty: '1',
         htsCode: '', scheduleB: '', dims: '', dangerousGoods: false,
         specialHandling: '', vehicleType: 'van',
+        pickupDate: '', deliveryDeadline: '',
         originDetails: null, destinationDetails: null
     });
     setAiSuggestion(null);
     setComplianceCheck(null);
+    setMarketAnalysis(null);
+    setAnomalies([]);
   };
 
   return (
@@ -296,7 +388,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         <div className="flex flex-1 overflow-hidden">
           {/* Input Section - Left Side */}
           <div className="w-5/12 bg-muted/30 p-6 border-r overflow-y-auto">
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={form.handleSubmit(onSubmit, (e) => console.error("Form Errors:", e))} className="space-y-5">
               
               {/* Mode Selection */}
               <div className="space-y-2">
@@ -317,7 +409,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               {/* Origin / Destination */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{mode === 'ocean' ? 'Origin Port' : mode === 'air' ? 'Origin Airport' : 'Origin City'}</Label>
+                  <Label className="flex justify-between">
+                    {mode === 'ocean' ? 'Origin Port' : mode === 'air' ? 'Origin Airport' : 'Origin City'}
+                    {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
+                  </Label>
                   <Input placeholder={mode === 'ocean' ? 'e.g. USLAX' : 'e.g. JFK'} {...form.register("origin")} className="bg-background"/>
                   {codeSuggestions.length > 0 && origin && (
                     <div className="text-[10px] text-muted-foreground truncate">
@@ -326,7 +421,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>{mode === 'ocean' ? 'Dest Port' : mode === 'air' ? 'Dest Airport' : 'Dest City'}</Label>
+                  <Label className="flex justify-between">
+                    {mode === 'ocean' ? 'Dest Port' : mode === 'air' ? 'Dest Airport' : 'Dest City'}
+                    {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
+                  </Label>
                   <Input placeholder={mode === 'ocean' ? 'e.g. CNSHA' : 'e.g. LHR'} {...form.register("destination")} className="bg-background"/>
                 </div>
               </div>
@@ -334,7 +432,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               {/* Commodity & AI */}
               <div className="space-y-2">
                  <Label className="flex justify-between">
-                    Commodity
+                    <span>Commodity {form.formState.errors.commodity && <span className="text-destructive text-xs ml-2">{form.formState.errors.commodity.message}</span>}</span>
                     <button type="button" onClick={handleAiSuggest} className="text-xs text-primary flex items-center gap-1 hover:underline">
                         <Sparkles className="w-3 h-3" /> AI Analyze
                     </button>
@@ -379,7 +477,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                             <Input type="number" value={extendedData.containerQty} onChange={(e) => setExtendedData({...extendedData, containerQty: e.target.value})} className="h-8" />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-xs">Weight (Total kg)</Label>
+                            <Label className="text-xs flex justify-between">
+                                Weight (Total kg)
+                                {form.formState.errors.weight && <span className="text-destructive text-[10px]">{form.formState.errors.weight.message}</span>}
+                            </Label>
                             <Input {...form.register("weight")} className="h-8" />
                         </div>
                       </div>
@@ -392,7 +493,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                       <h4 className="text-sm font-medium flex items-center gap-2"><Plane className="w-3 h-3"/> Air Cargo Details</h4>
                       <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                              <Label className="text-xs">Total Weight (kg)</Label>
+                              <Label className="text-xs flex justify-between">
+                                  Total Weight (kg)
+                                  {form.formState.errors.weight && <span className="text-destructive text-[10px]">{form.formState.errors.weight.message}</span>}
+                              </Label>
                               <Input {...form.register("weight")} className="h-8" />
                           </div>
                           <div className="space-y-1">
@@ -439,6 +543,21 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   </div>
               )}
 
+              {/* Timing Requirements */}
+              <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase">Timing Requirements</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                          <Label className="text-xs">Pickup Date</Label>
+                          <Input type="date" value={extendedData.pickupDate} onChange={(e) => setExtendedData({...extendedData, pickupDate: e.target.value})} className="h-8 text-xs" />
+                      </div>
+                      <div className="space-y-1">
+                          <Label className="text-xs">Delivery Deadline</Label>
+                          <Input type="date" value={extendedData.deliveryDeadline} onChange={(e) => setExtendedData({...extendedData, deliveryDeadline: e.target.value})} className="h-8 text-xs" />
+                      </div>
+                  </div>
+              </div>
+
               {/* Classification Codes (AI Populated) */}
               <div className="space-y-3 pt-2">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase">Customs & Compliance</h4>
@@ -459,8 +578,16 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     <>
                         <Timer className="w-4 h-4 mr-2 animate-spin"/> Calculating...
                     </>
-                ) : "Get Comprehensive Quote"}
+                ) : (smartMode ? "Generate AI Smart Quotes" : "Get Comprehensive Quote")}
               </Button>
+              
+              <div className="flex items-center space-x-2 mt-2 justify-center">
+                  <Switch id="smart-mode" checked={smartMode} onCheckedChange={setSmartMode} />
+                  <Label htmlFor="smart-mode" className="text-xs cursor-pointer flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-purple-500" /> 
+                      Enable AI Smart Generation
+                  </Label>
+              </div>
             </form>
           </div>
 
@@ -495,6 +622,26 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               </div>
             ) : (
               <div className="space-y-4">
+                {marketAnalysis && (
+                    <Card className="bg-purple-50 border-purple-200">
+                        <CardContent className="p-4">
+                            <h4 className="text-sm font-semibold text-purple-900 flex items-center gap-2 mb-2">
+                                <Sparkles className="w-4 h-4"/> Market Analysis
+                                {confidenceScore && <Badge variant="secondary" className="ml-auto bg-purple-100 text-purple-700">Confidence: {(confidenceScore * 100).toFixed(0)}%</Badge>}
+                            </h4>
+                            <p className="text-xs text-purple-800 leading-relaxed">{marketAnalysis}</p>
+                            {anomalies.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-purple-200">
+                                    <p className="text-xs font-medium text-purple-900">Anomalies Detected:</p>
+                                    <ul className="list-disc list-inside text-xs text-purple-800">
+                                        {anomalies.map((a, i) => <li key={i}>{a}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-semibold text-lg">Rate Options</h3>
                     <Badge variant="outline" className="text-xs">{results.length} Options</Badge>
@@ -509,8 +656,16 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                                 <span className="font-semibold text-lg">{option.carrier}</span>
                                 {option.tier === 'contract' && <Badge className="bg-green-600">Contract</Badge>}
                                 {option.tier === 'spot' && <Badge className="bg-blue-600">Spot</Badge>}
+                                {option.tier === 'best_value' && <Badge className="bg-purple-600">Best Value</Badge>}
+                                {option.tier === 'cheapest' && <Badge className="bg-emerald-600">Cheapest</Badge>}
+                                {option.tier === 'fastest' && <Badge className="bg-amber-600">Fastest</Badge>}
+                                {option.tier === 'greenest' && <Badge className="bg-green-500">Eco-Friendly</Badge>}
+                                {option.tier === 'reliable' && <Badge className="bg-blue-500">Most Reliable</Badge>}
                             </div>
                             <div className="text-sm text-muted-foreground">{option.name}</div>
+                            {option.source_attribution && (
+                                <div className="text-[10px] text-muted-foreground italic">Source: {option.source_attribution}</div>
+                            )}
                         </div>
                         <div className="text-right">
                             <div className="text-2xl font-bold text-primary">
@@ -521,6 +676,30 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                             </div>
                         </div>
                       </div>
+
+                      {/* Extended Details for AI Quotes */}
+                      {(option.reliability || option.environmental) && (
+                          <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-muted/30 rounded-md text-xs">
+                              {option.reliability && (
+                                  <div>
+                                      <span className="font-semibold block mb-1">Reliability</span>
+                                      <div className="flex justify-between text-muted-foreground">
+                                          <span>Score: {option.reliability.score}/10</span>
+                                          <span>On-Time: {option.reliability.on_time_performance}</span>
+                                      </div>
+                                  </div>
+                              )}
+                              {option.environmental && (
+                                  <div>
+                                      <span className="font-semibold block mb-1">Environmental</span>
+                                      <div className="flex justify-between text-muted-foreground">
+                                          <span>CO2: {option.environmental.co2_emissions}</span>
+                                          <span>Rating: {option.environmental.rating}</span>
+                                      </div>
+                                  </div>
+                              )}
+                          </div>
+                      )}
 
                       <div className="flex items-center gap-3 pt-2">
                         <Button className="flex-1" onClick={() => handleConvertToQuote(option)}>

@@ -57,7 +57,11 @@ export default function Users() {
       // First, get the user IDs based on role context
       let userIds: string[] | null = null;
 
-      if (!context.isPlatformAdmin || context.adminOverrideEnabled) {
+      // Only filter by user_roles if we are restricted (non-platform admin) 
+      // OR if we are a platform admin with a SPECIFIC tenant override active.
+      // If platform admin has override enabled but no tenant selected (Global View), 
+      // we should show all users (skipping this filter).
+      if (!context.isPlatformAdmin || (context.adminOverrideEnabled && context.tenantId)) {
         const { data: roles } = await scopedDb
           .from('user_roles')
           .select('user_id');

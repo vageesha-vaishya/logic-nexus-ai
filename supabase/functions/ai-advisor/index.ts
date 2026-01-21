@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 
 console.log("AI Advisor v2 Initialized")
@@ -27,7 +28,7 @@ const KNOWLEDGE_BASE = {
   ]
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -51,6 +52,9 @@ serve(async (req) => {
       case 'predict_price':
         result = await predictPrice(payload, openAiKey);
         break;
+      case 'generate_smart_quotes':
+        result = await generateSmartQuotes(payload, openAiKey);
+        break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode);
         break;
@@ -72,7 +76,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400 
@@ -183,4 +187,169 @@ async function validateCompliance(payload: any) {
         compliant: issues.length === 0 || issues.every(i => i.level === 'info'),
         issues
     };
+}
+
+async function generateSmartQuotes(payload: any, apiKey?: string) {
+    if (!apiKey) {
+        throw new Error("OpenAI API Key is required for Smart Quotes");
+    }
+
+    const requiredFields = ['origin', 'destination', 'mode', 'commodity'];
+    const missingFields = requiredFields.filter(field => !payload[field]);
+    if (missingFields.length > 0) {
+        throw new Error(`Missing required fields for Smart Quote: ${missingFields.join(', ')}`);
+    }
+
+    const { 
+        origin, destination, mode, commodity, weight, volume, 
+        containerType, containerSize, containerQty,
+        dangerousGoods, specialHandling, pickupDate, deliveryDeadline
+    } = payload;
+
+    // 1. Fetch Historical Data for Cross-Validation
+    let historicalContext = "No specific historical rates found for this route.";
+    let historicalAvg = 0;
+
+    try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        // Use a custom env var for service role key to avoid reserved prefix issues
+        const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        
+        if (supabaseUrl && supabaseKey) {
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            
+            // Query rates table for similar routes
+            const { data: rates } = await supabase
+                .from('rates')
+                .select('base_price, currency')
+                .eq('mode', mode)
+                .ilike('origin', `%${origin}%`) // Loose match as input might be city vs port
+                .ilike('destination', `%${destination}%`)
+                .limit(5);
+
+            if (rates && rates.length > 0) {
+                const prices = rates.map((r: any) => Number(r.base_price));
+                historicalAvg = prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
+                historicalContext = `Internal Historical Data: Found ${rates.length} past rates. Average base price: $${historicalAvg.toFixed(2)}. Use this as a benchmark for "Reliable" and "Best Value" tiers.`;
+            }
+        }
+    } catch (err) {
+        console.warn("Failed to fetch historical data:", err);
+    }
+
+    const systemPrompt = `
+You are an Expert Logistics Rate Analyst and Supply Chain Architect.
+Your task is to generate exactly 5 distinct, optimal freight quotation options for a shipment request.
+You must analyze the route, mode, and cargo to provide realistic market-based estimates.
+
+Input Parameters:
+- Mode: ${mode}
+- Origin: ${origin}
+- Destination: ${destination}
+- Commodity: ${commodity}
+- Cargo Details: Weight: ${weight}kg, Volume: ${volume}cbm
+- Equipment: ${containerQty || 1}x ${containerSize || 'Standard'} ${containerType || ''}
+- Timing: Pickup: ${pickupDate || 'ASAP'}, Deadline: ${deliveryDeadline || 'None'}
+- Special Requirements: ${dangerousGoods ? 'Dangerous Goods (DGR)' : 'None'}, ${specialHandling || 'None'}
+
+Context & Benchmarks:
+${historicalContext}
+
+Requirements:
+1. Generate 5 options covering these strategies:
+   - "Best Value" (Balanced cost/speed)
+   - "Cheapest" (Lowest cost, longer transit)
+   - "Fastest" (Priority service)
+   - "Greenest" (Lowest carbon footprint)
+   - "Most Reliable" (Top tier carrier)
+
+2. Weighted Scoring Algorithm:
+   Evaluate and rank options based on:
+   - Cost (60% weight)
+   - Speed (25% weight)
+   - Reliability (15% weight)
+
+3. Detailed Output Structure:
+   For each option, provide a complete breakdown including legs (multimodal if applicable), cost components (base, surcharges), and reliability metrics.
+
+4. Validation & Anomaly Detection:
+   - Ensure transit times are realistic for the specific route (e.g. Trans-Pacific Eastbound takes ~14-25 days).
+   - Compare generated prices against the Historical Average ($${historicalAvg || 'Unknown'}).
+   - If a price deviates by >20% from the average (if available) or market norms, flag it in "anomalies".
+   - Flag any potential risks (weather, congestion) in "market_analysis".
+
+Output JSON Format:
+{
+  "options": [
+    {
+      "id": "generated_1",
+      "tier": "best_value",
+      "transport_mode": "Ocean - FCL",
+      "legs": [
+        {
+          "from": "Shanghai Port",
+          "to": "Los Angeles Port",
+          "mode": "ocean",
+          "carrier": "Maersk",
+          "transit_time": "18 days"
+        }
+      ],
+      "carrier": {
+        "name": "Maersk Line",
+        "service_level": "Standard"
+      },
+      "price_breakdown": {
+        "base_fare": 2000,
+        "surcharges": 350,
+        "taxes": 50,
+        "currency": "USD",
+        "total": 2400
+      },
+      "transit_time": {
+        "total_days": 18,
+        "details": "18 days port-to-port"
+      },
+      "reliability": {
+        "score": 8.5,
+        "on_time_performance": "92%"
+      },
+      "environmental": {
+        "co2_emissions": "1200 kg",
+        "rating": "B"
+      },
+      "source_attribution": "Market Average (Q1 2024)"
+    }
+  ],
+  "market_analysis": "Detailed analysis of the trade lane, potential risks (weather, congestion), and pricing trends.",
+  "confidence_score": 0.9,
+  "anomalies": ["Price is 10% higher than historical average due to peak season."]
+}
+`;
+
+    const completion = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: "gpt-4o", // Using a capable model for reasoning
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: "Generate the quotation options now." }
+            ],
+            temperature: 0.7,
+            response_format: { type: "json_object" }
+        })
+    });
+
+    const data = await completion.json();
+    
+    if (data.error) {
+        console.error("OpenAI Error:", data.error);
+        throw new Error(data.error.message);
+    }
+
+    const content = data.choices[0].message.content;
+    return JSON.parse(content);
 }

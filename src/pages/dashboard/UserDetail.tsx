@@ -65,7 +65,8 @@ export default function UserDetail() {
   const handleDelete = async () => {
     try {
       // Verify access before delete
-      if (!context.isPlatformAdmin || context.adminOverrideEnabled) {
+      // Only verify via user_roles if we are restricted or have a specific tenant override
+      if (!context.isPlatformAdmin || (context.adminOverrideEnabled && context.tenantId)) {
         const { data: roles } = await (scopedDb as any)
           .from('user_roles')
           .select('user_id')
@@ -76,22 +77,18 @@ export default function UserDetail() {
         }
       }
 
-      // Use ScopedDataAccess for delete to ensure audit logging
-      // TODO: For tenant admins, this should probably only remove the tenant role, not delete the profile?
-      // For now, we allow delete if they have access, but strictly strictly speaking, 
-      // deleting a global profile should probably be restricted to Platform Admins, 
-      // or we should only delete the roles associated with this tenant.
-      
-      // If Tenant Admin, maybe just remove roles?
-      // But the current requirement seems to be "Delete User".
-      // We will proceed with delete but with the access check above.
-      
-      const { error } = await scopedDb
-        .from('profiles')
-        .delete()
-        .eq('id', id);
+      // Use Edge Function to delete user (handles both Auth and Profile)
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: id }
+      });
 
-      if (error) throw error;
+      if (error) {
+        // Enhance error for missing function
+        if (error.context?.response?.status === 404) {
+          throw new Error('Function not deployed. Run: npx supabase functions deploy delete-user');
+        }
+        throw error;
+      }
 
       toast({
         title: 'Success',
