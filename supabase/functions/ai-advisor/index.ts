@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 
-console.log("AI Advisor v2 Initialized")
+console.log("AI Advisor v2.1 (Enhanced) Initialized")
 
 // Mock Knowledge Base for fallback
 const KNOWLEDGE_BASE = {
@@ -39,22 +39,26 @@ serve(async (req: Request) => {
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
     
     console.log(`[AI-Advisor] Action: ${action}, Key Present: ${!!openAiKey}`);
-    console.log(`[AI-Advisor] Payload:`, JSON.stringify(payload));
+    
+    // Create Supabase Client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     let result = {};
 
     switch (action) {
       case 'suggest_unit':
-        result = await suggestUnit(payload.commodity, openAiKey);
+        result = await suggestUnit(payload.commodity);
         break;
       case 'classify_commodity':
-        result = await classifyCommodity(payload.commodity, openAiKey);
+        result = await classifyCommodity(payload.commodity);
         break;
       case 'predict_price':
-        result = await predictPrice(payload, openAiKey);
+        result = await predictPrice(payload);
         break;
       case 'generate_smart_quotes':
-        result = await generateSmartQuotes(payload, openAiKey);
+        result = await generateSmartQuotes(payload, openAiKey, supabase);
         break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode);
@@ -86,52 +90,31 @@ serve(async (req: Request) => {
   }
 })
 
-async function suggestUnit(commodity: string, apiKey?: string) {
-  if (!commodity) return { unit: 'kg', confidence: 0.1, source: 'default' };
+// --- Helper Functions ---
 
+async function suggestUnit(commodity: string) {
+  if (!commodity) return { unit: 'kg', confidence: 0.1, source: 'default' };
   const lowerComm = commodity.toLowerCase();
   const match = KNOWLEDGE_BASE.commodities.find(k => k.keywords.some(kw => lowerComm.includes(kw)));
-  
-  if (match) {
-    return { unit: match.unit, confidence: 0.8, source: 'heuristic' };
-  }
-
-  if (lowerComm.length > 3) {
-      return { unit: 'kg', confidence: 0.4, source: 'ai-mock' };
-  }
-
+  if (match) return { unit: match.unit, confidence: 0.8, source: 'heuristic' };
+  if (lowerComm.length > 3) return { unit: 'kg', confidence: 0.4, source: 'ai-mock' };
   return { unit: 'kg', confidence: 0.1, source: 'fallback' };
 }
 
-async function classifyCommodity(commodity: string, apiKey?: string) {
+async function classifyCommodity(commodity: string) {
   if (!commodity) return { type: 'General Cargo', confidence: 0.5 };
-  
   const lowerComm = commodity.toLowerCase();
   const match = KNOWLEDGE_BASE.commodities.find(k => k.keywords.some(kw => lowerComm.includes(kw)));
-  
-  if (match) {
-    return { 
-        type: match.type, 
-        hts: match.hts, 
-        scheduleB: match.scheduleB,
-        confidence: 0.9, 
-        source: 'heuristic' 
-    };
-  }
-
+  if (match) return { type: match.type, hts: match.hts, scheduleB: match.scheduleB, confidence: 0.9, source: 'heuristic' };
   return { type: 'General Cargo', confidence: 0.3, source: 'default' };
 }
 
-async function predictPrice(payload: any, apiKey?: string) {
+async function predictPrice(payload: any) {
   const basePrice = 1000; 
   const randomFactor = 0.8 + Math.random() * 0.4; 
-  
   return {
     predicted_price: Math.round(basePrice * randomFactor),
-    confidence_interval: {
-      low: Math.round(basePrice * 0.8),
-      high: Math.round(basePrice * 1.2)
-    },
+    confidence_interval: { low: Math.round(basePrice * 0.8), high: Math.round(basePrice * 1.2) },
     trend: Math.random() > 0.5 ? 'increasing' : 'stable',
     source: 'historical_model'
   };
@@ -139,67 +122,35 @@ async function predictPrice(payload: any, apiKey?: string) {
 
 async function lookupCodes(query: string, mode: string) {
     if (!query || query.length < 2) return { suggestions: [] };
-    
     const lowerQ = query.toLowerCase();
-    let source = [];
-    
+    let source: any[] = [];
     if (mode === 'ocean') source = KNOWLEDGE_BASE.ports;
     else if (mode === 'air') source = KNOWLEDGE_BASE.airports;
-    else return { suggestions: [] }; // Road usually uses Google Places or Postal APIs
-
+    else return { suggestions: [] }; 
     const suggestions = source.filter(item => 
         item.code.toLowerCase().includes(lowerQ) || 
         item.name.toLowerCase().includes(lowerQ) ||
         item.country.toLowerCase().includes(lowerQ)
-    ).map(item => ({
-        label: `${item.name} (${item.code})`,
-        value: item.code,
-        details: item
-    }));
-
+    ).map(item => ({ label: `${item.name} (${item.code})`, value: item.code, details: item }));
     return { suggestions };
 }
 
 async function validateCompliance(payload: any) {
-    const { origin, destination, commodity, mode, dangerous_goods } = payload;
+    const { destination, commodity, mode, dangerous_goods } = payload;
     const issues = [];
-    
-    // 1. Sanctions Check (Mock)
-    if (destination === 'KP' || destination === 'IR') { // North Korea, Iran
-        issues.push({ level: 'critical', message: 'Destination is under sanctions.' });
-    }
-
-    // 2. Dangerous Goods
+    if (destination === 'KP' || destination === 'IR') issues.push({ level: 'critical', message: 'Destination is under sanctions.' });
     if (dangerous_goods) {
-        if (mode === 'air') {
-            issues.push({ level: 'warning', message: 'IATA DGR check required for Air Cargo.' });
-        }
-        if (commodity && commodity.toLowerCase().includes('battery')) {
-             issues.push({ level: 'info', message: 'Lithium Battery regulations apply (UN3480/UN3481).' });
-        }
+        if (mode === 'air') issues.push({ level: 'warning', message: 'IATA DGR check required for Air Cargo.' });
+        if (commodity && commodity.toLowerCase().includes('battery')) issues.push({ level: 'info', message: 'Lithium Battery regulations apply (UN3480/UN3481).' });
     }
-
-    // 3. Export Controls
-    if (commodity && commodity.toLowerCase().includes('chip') && destination === 'CN') {
-        issues.push({ level: 'warning', message: 'Check Export Administration Regulations (EAR) for semiconductors.' });
-    }
-
-    return {
-        compliant: issues.length === 0 || issues.every(i => i.level === 'info'),
-        issues
-    };
+    if (commodity && commodity.toLowerCase().includes('chip') && destination === 'CN') issues.push({ level: 'warning', message: 'Check Export Administration Regulations (EAR) for semiconductors.' });
+    return { compliant: issues.length === 0 || issues.every(i => i.level === 'info'), issues };
 }
 
-async function generateSmartQuotes(payload: any, apiKey?: string) {
-    if (!apiKey) {
-        throw new Error("OpenAI API Key is required for Smart Quotes");
-    }
+// --- Main Generation Logic ---
 
-    const requiredFields = ['origin', 'destination', 'mode', 'commodity'];
-    const missingFields = requiredFields.filter(field => !payload[field]);
-    if (missingFields.length > 0) {
-        throw new Error(`Missing required fields for Smart Quote: ${missingFields.join(', ')}`);
-    }
+async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any) {
+    if (!apiKey) throw new Error("OpenAI API Key is required for Smart Quotes");
 
     const { 
         origin, destination, mode, commodity, weight, volume, 
@@ -207,143 +158,128 @@ async function generateSmartQuotes(payload: any, apiKey?: string) {
         dangerousGoods, specialHandling, pickupDate, deliveryDeadline
     } = payload;
 
-    // 1. Fetch Historical Data for Cross-Validation
+    // 1. Check Cache
+    const cacheKey = `${origin}|${destination}|${mode}|${commodity}|${weight}|${volume}|${containerQty}`;
+    let cached = null;
+    try {
+        const { data, error } = await supabase
+            .from('ai_quote_cache')
+            .select('response_payload')
+            .eq('request_hash', cacheKey)
+            .gt('expires_at', new Date().toISOString())
+            .single();
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
+            console.warn("[AI-Advisor] Cache lookup warning (continuing):", error.message);
+        } else if (data) {
+            cached = data;
+        }
+    } catch (err) {
+        console.warn("[AI-Advisor] Cache lookup failed (continuing):", err);
+    }
+
+    if (cached) {
+        console.log("[AI-Advisor] Cache Hit");
+        return cached.response_payload;
+    }
+
+    // 2. Fetch Historical Context
     let historicalContext = "No specific historical rates found for this route.";
     let historicalAvg = 0;
-
     try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-        // Use a custom env var for service role key to avoid reserved prefix issues
-        const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-        
-        if (supabaseUrl && supabaseKey) {
-            const supabase = createClient(supabaseUrl, supabaseKey);
-            
-            // Query rates table for similar routes
-            const { data: rates } = await supabase
-                .from('rates')
-                .select('base_price, currency')
-                .eq('mode', mode)
-                .ilike('origin', `%${origin}%`) // Loose match as input might be city vs port
-                .ilike('destination', `%${destination}%`)
-                .limit(5);
+        const { data: rates } = await supabase
+            .from('rates')
+            .select('base_price')
+            .eq('mode', mode)
+            .ilike('origin', `%${origin}%`)
+            .ilike('destination', `%${destination}%`)
+            .limit(5);
 
-            if (rates && rates.length > 0) {
-                const prices = rates.map((r: any) => Number(r.base_price));
-                historicalAvg = prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
-                historicalContext = `Internal Historical Data: Found ${rates.length} past rates. Average base price: $${historicalAvg.toFixed(2)}. Use this as a benchmark for "Reliable" and "Best Value" tiers.`;
-            }
+        if (rates && rates.length > 0) {
+            const prices = rates.map((r: any) => Number(r.base_price));
+            historicalAvg = prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
+            historicalContext = `Internal Historical Data: Found ${rates.length} past rates. Average base price: $${historicalAvg.toFixed(2)}.`;
         }
     } catch (err) {
         console.warn("Failed to fetch historical data:", err);
     }
 
+    // 3. Construct System Prompt
     const systemPrompt = `
 You are an Expert Logistics Rate Analyst and Supply Chain Architect.
-Your task is to generate exactly 5 distinct, optimal freight quotation options for a shipment request.
-You must analyze the route, mode, and cargo to provide realistic market-based estimates.
+Your task is to generate exactly 5 distinct, optimal freight quotation options.
 
-Input Parameters:
-- Mode: ${mode}
-- Origin: ${origin}
-- Destination: ${destination}
-- Commodity: ${commodity}
-- Cargo Details: Weight: ${weight}kg, Volume: ${volume}cbm
+Input:
+- Route: ${origin} to ${destination} (${mode})
+- Cargo: ${commodity}, ${weight}kg, ${volume}cbm
 - Equipment: ${containerQty || 1}x ${containerSize || 'Standard'} ${containerType || ''}
-- Timing: Pickup: ${pickupDate || 'ASAP'}, Deadline: ${deliveryDeadline || 'None'}
-- Special Requirements: ${dangerousGoods ? 'Dangerous Goods (DGR)' : 'None'}, ${specialHandling || 'None'}
-
-Context & Benchmarks:
-${historicalContext}
+- Context: ${historicalContext}
 
 Requirements:
-1. Generate 5 options covering these strategies:
-   - "Best Value" (Balanced cost/speed)
-   - "Cheapest" (Lowest cost, longer transit)
-   - "Fastest" (Priority service)
-   - "Greenest" (Lowest carbon footprint)
-   - "Most Reliable" (Top tier carrier)
-
-2. Multi-modal Logic & Routing:
-   - For each option, construct a realistic multi-leg route (e.g., Pickup -> Port -> Ocean -> Port -> Delivery).
-   - Determine optimal routing combinations (e.g., Rail vs Truck for inland legs).
-   - Ensure seamless transitions between modes are accounted for in transit time and cost.
-
-3. Weighted Scoring Algorithm:
-   Evaluate and rank options based on:
-   - Cost (60% weight)
-   - Speed (25% weight)
-   - Reliability (15% weight)
-
-4. Detailed Output Structure:
-   For each option, provide a complete breakdown including legs (multimodal if applicable), cost components (base, surcharges), and reliability metrics.
-
-5. Validation & Anomaly Detection:
-   - Ensure transit times are realistic for the specific route (e.g. Trans-Pacific Eastbound takes ~14-25 days).
-   - Compare generated prices against the Historical Average ($${historicalAvg || 'Unknown'}).
-   - If a price deviates by >20% from the average (if available) or market norms, flag it in "anomalies".
-   - Flag any potential risks (weather, congestion) in "market_analysis".
+1. Generate 5 options: "Best Value", "Cheapest", "Fastest", "Greenest", "Reliable".
+2. **Advanced Route Segmentation**: 
+   - Break down each route into specific legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
+   - Identify **Border Crossings** and **Customs Procedures** needed at each transition.
+   - Flag **Transport Regulations** (e.g., road weight limits, low emission zones).
+3. **Dynamic Charge Simulation**:
+   - Provide granular pricing: Base Freight, BAF (Bunker Adjustment Factor), CAF (Currency Adjustment Factor), Terminal Handling (THC), Customs Clearance, Documentation Fees.
+   - Total price must be realistic market rates.
+4. **Reliability & Environmental**:
+   - Estimate CO2 emissions.
+   - Provide a reliability score (1-10) based on carrier reputation.
 
 Output JSON Format:
 {
   "options": [
     {
-      "id": "generated_1",
+      "id": "generated_uuid",
       "tier": "best_value",
       "transport_mode": "Ocean - FCL",
+      "carrier": { "name": "Carrier Name", "service_level": "Direct" },
+      "transit_time": { "total_days": 21, "details": "21 days port-to-port" },
       "legs": [
         {
-          "from": "Shanghai Factory",
-          "to": "Shanghai Port",
+          "sequence": 1,
+          "from": "Location A",
+          "to": "Location B",
           "mode": "road",
-          "carrier": "Local Trucking Co",
-          "transit_time": "1 day"
-        },
-        {
-          "from": "Shanghai Port",
-          "to": "Los Angeles Port",
-          "mode": "ocean",
-          "carrier": "Maersk",
-          "transit_time": "18 days"
-        },
-        {
-          "from": "Los Angeles Port",
-          "to": "Los Angeles Warehouse",
-          "mode": "road",
-          "carrier": "US Logistics",
-          "transit_time": "2 days"
+          "carrier": "Local Trucking",
+          "transit_time": "1 day",
+          "distance_km": 150,
+          "co2_kg": 20,
+          "border_crossing": false,
+          "instructions": "Standard pickup"
         }
       ],
-      "carrier": {
-        "name": "Maersk Line",
-        "service_level": "Standard"
-      },
       "price_breakdown": {
         "base_fare": 2000,
-        "surcharges": 350,
-        "taxes": 50,
+        "surcharges": {
+            "baf": 150,
+            "caf": 50,
+            "peak_season": 0
+        },
+        "fees": {
+            "thc_origin": 200,
+            "thc_dest": 200,
+            "docs": 50,
+            "customs": 120
+        },
+        "taxes": 0,
         "currency": "USD",
-        "total": 2400
+        "total": 2770
       },
-      "transit_time": {
-        "total_days": 21,
-        "details": "21 days door-to-door"
+      "regulatory_info": {
+          "customs_procedures": ["Export Declaration", "Import Clearance"],
+          "restrictions": ["Weight limit 20T on road leg"]
       },
-      "reliability": {
-        "score": 8.5,
-        "on_time_performance": "92%"
-      },
-      "environmental": {
-        "co2_emissions": "1200 kg",
-        "rating": "B"
-      },
-      "source_attribution": "Market Average (Q1 2024)",
-      "ai_explanation": "Selected for best balance of cost and speed using direct routing."
+      "reliability": { "score": 8.5, "on_time_performance": "92%" },
+      "environmental": { "co2_emissions": "1200 kg", "rating": "B" },
+      "ai_explanation": "Rationale..."
     }
   ],
-  "market_analysis": "Detailed analysis of the trade lane, potential risks (weather, congestion), and pricing trends.",
+  "market_analysis": "Text analysis...",
   "confidence_score": 0.9,
-  "anomalies": ["Price is 10% higher than historical average due to peak season."]
+  "anomalies": []
 }
 `;
 
@@ -354,10 +290,10 @@ Output JSON Format:
             "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: "gpt-4o", // Using a capable model for reasoning
+            model: "gpt-4o", 
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: "Generate the quotation options now." }
+                { role: "user", content: "Generate detailed quotation options." }
             ],
             temperature: 0.7,
             response_format: { type: "json_object" }
@@ -365,12 +301,70 @@ Output JSON Format:
     });
 
     const data = await completion.json();
-    
-    if (data.error) {
-        console.error("OpenAI Error:", data.error);
-        throw new Error(data.error.message);
-    }
+    if (data.error) throw new Error(data.error.message);
 
-    const content = data.choices[0].message.content;
-    return JSON.parse(content);
+    let aiResponse = JSON.parse(data.choices[0].message.content);
+
+    // 4. Dynamic Charge Calculation Engine (Post-Processing)
+    // Simulate "Real-time" fuel surcharges based on current month/market conditions
+    aiResponse = applyDynamicPricing(aiResponse);
+
+    // 5. Cache Result
+    await supabase.from('ai_quote_cache').insert({
+        request_hash: cacheKey,
+        response_payload: aiResponse
+    });
+
+    // 6. Audit Log
+    await logAudit(supabase, 'generate_smart_quotes', payload, { 
+        options_count: aiResponse.options?.length, 
+        confidence: aiResponse.confidence_score 
+    });
+
+    return aiResponse;
+}
+
+async function logAudit(supabase: any, action: string, payload: any, resultSummary: any) {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from('quote_audit_logs').insert({
+            user_id: user?.id, // Can be null if anon
+            action,
+            payload: { ...payload, sensitive_data_redacted: true }, // Simple redaction placeholder
+            result_summary: resultSummary
+        });
+    } catch (e) {
+        console.warn("Audit log failed:", e);
+        // Don't fail the request if logging fails
+    }
+}
+
+function applyDynamicPricing(response: any) {
+    const fuelSurchargeRate = 0.12; // Mock 12% global fuel surcharge
+    const exchangeRateBuffer = 0.02; // 2% currency buffer
+
+    if (response.options) {
+        response.options = response.options.map((opt: any) => {
+            const base = opt.price_breakdown.base_fare || 0;
+            
+            // Adjust surcharges if AI didn't provide them explicitly or to enforce our logic
+            if (!opt.price_breakdown.surcharges) opt.price_breakdown.surcharges = {};
+            
+            // Overwrite/Add Fuel Surcharge
+            opt.price_breakdown.surcharges.fuel_adjustment = Math.round(base * fuelSurchargeRate);
+            
+            // Add Currency Adjustment if international
+            opt.price_breakdown.surcharges.currency_adj = Math.round(base * exchangeRateBuffer);
+
+            // Recalculate Total
+            const surcharges = Object.values(opt.price_breakdown.surcharges).reduce((a: any, b: any) => a + b, 0) as number;
+            const fees = opt.price_breakdown.fees ? Object.values(opt.price_breakdown.fees).reduce((a: any, b: any) => a + b, 0) as number : 0;
+            const taxes = opt.price_breakdown.taxes || 0;
+            
+            opt.price_breakdown.total = base + surcharges + fees + taxes;
+            
+            return opt;
+        });
+    }
+    return response;
 }

@@ -427,6 +427,18 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
           <div className="w-5/12 bg-muted/30 p-6 border-r overflow-y-auto">
             <form onSubmit={form.handleSubmit(onSubmit, (e) => console.error("Form Errors:", e))} className="space-y-5">
               
+              {/* Smart Mode Toggle */}
+              <div className="flex items-center justify-between bg-purple-50 p-3 rounded-md border border-purple-100">
+                  <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <div className="flex flex-col">
+                          <span className="text-sm font-medium text-purple-900">Smart Quote Mode</span>
+                          <span className="text-[10px] text-purple-600">AI-optimized routes & pricing</span>
+                      </div>
+                  </div>
+                  <Switch checked={smartMode} onCheckedChange={setSmartMode} />
+              </div>
+
               {/* Mode Selection */}
               <div className="space-y-2">
                 <Label>Transport Mode</Label>

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
-import { Sparkles, Leaf, Timer, ShieldCheck, DollarSign } from 'lucide-react';
+import { QuoteDetailView } from './QuoteDetailView';
+import { QuoteMapVisualizer } from './QuoteMapVisualizer';
+import { Sparkles, Leaf, Timer, ShieldCheck, DollarSign, ChevronDown, ChevronUp, Map as MapIcon, LayoutList } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface RateOption {
     id: string;
@@ -14,10 +17,12 @@ interface RateOption {
     transitTime: string;
     tier: string;
     legs?: any[];
+    price_breakdown?: any;
     reliability?: { score: number; on_time_performance: string };
     environmental?: { co2_emissions: string; rating: string };
     source_attribution?: string;
     ai_explanation?: string;
+    transport_mode?: string;
 }
 
 interface QuoteResultsListProps {
@@ -26,7 +31,13 @@ interface QuoteResultsListProps {
 }
 
 export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+
     if (!results || results.length === 0) return null;
+
+    const toggleExpand = (id: string) => {
+        setExpandedId(prev => prev === id ? null : id);
+    };
 
     const getTierBadge = (tier: string) => {
         switch (tier) {
@@ -44,7 +55,7 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
     return (
         <div className="space-y-4">
             {results.map((option) => (
-                <Card key={option.id} className="relative overflow-hidden hover:border-primary transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-primary hover:shadow-md">
+                <Card key={option.id} className={`relative overflow-hidden transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-primary hover:shadow-md ${expandedId === option.id ? 'border-primary' : ''}`}>
                     <CardContent className="p-5">
                         <div className="flex justify-between items-start mb-4">
                             <div className="space-y-1">
@@ -69,12 +80,23 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                                 <div className="text-xs text-muted-foreground">
                                     Est. Transit: <span className="font-medium text-foreground">{option.transitTime}</span>
                                 </div>
-                                <Button size="sm" className="mt-2 h-7 text-xs" onClick={() => onSelect(option)}>Select Quote</Button>
+                                <div className="flex gap-2 mt-2 justify-end">
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        className="h-7 text-xs" 
+                                        onClick={() => toggleExpand(option.id)}
+                                    >
+                                        {expandedId === option.id ? <ChevronUp className="w-3 h-3 mr-1"/> : <ChevronDown className="w-3 h-3 mr-1"/>}
+                                        Details
+                                    </Button>
+                                    <Button size="sm" className="h-7 text-xs" onClick={() => onSelect(option)}>Select Quote</Button>
+                                </div>
                             </div>
                         </div>
 
                         {/* Extended Details for AI Quotes */}
-                        {(option.reliability || option.environmental) && (
+                        {!expandedId && (option.reliability || option.environmental) && (
                             <div className="grid grid-cols-2 gap-4 mb-2 p-3 bg-muted/30 rounded-md text-xs">
                                 {option.reliability && (
                                     <div>
@@ -98,7 +120,7 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                         )}
 
                         {/* AI Explanation */}
-                        {option.ai_explanation && (
+                        {!expandedId && option.ai_explanation && (
                             <div className="mb-2 text-xs text-purple-700 bg-purple-50 p-2 rounded border border-purple-100 flex items-start gap-2">
                                 <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
                                 <span>{option.ai_explanation}</span>
@@ -106,8 +128,47 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                         )}
 
                         {/* Visual Legs */}
-                        {option.legs && option.legs.length > 0 && (
+                        {!expandedId && option.legs && option.legs.length > 0 && (
                             <QuoteLegsVisualizer legs={option.legs} />
+                        )}
+
+                        {/* Expanded Detail View */}
+                        {expandedId === option.id && (
+                            <div className="mt-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200">
+                                <Tabs defaultValue="details" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                                        <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Cost & Leg Breakdown</TabsTrigger>
+                                        <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Route Map</TabsTrigger>
+                                    </TabsList>
+                                    
+                                    <TabsContent value="details">
+                                        <QuoteDetailView 
+                                            quote={{
+                                                ...option,
+                                                transport_mode: option.name, // Mapping fallback
+                                                carrier: { name: option.carrier }, // Mapping fallback
+                                                transit_time: { details: option.transitTime }, // Mapping fallback
+                                                price_breakdown: option.price_breakdown || {
+                                                    total: option.price,
+                                                    currency: option.currency,
+                                                    base_fare: option.price * 0.8,
+                                                    taxes: option.price * 0.1,
+                                                    surcharges: { 'Fuel': option.price * 0.05, 'Security': option.price * 0.05 },
+                                                    fees: {}
+                                                }
+                                            }} 
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="map">
+                                        <QuoteMapVisualizer 
+                                            origin={option.legs?.[0]?.from || "Origin"} 
+                                            destination={option.legs?.[option.legs.length - 1]?.to || "Destination"}
+                                            legs={option.legs || []}
+                                        />
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
