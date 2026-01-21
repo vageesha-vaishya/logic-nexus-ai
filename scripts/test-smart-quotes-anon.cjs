@@ -52,7 +52,17 @@ async function testSmartQuotesAnon() {
         }
       } else {
         console.log('✅ Success! Data received.');
-        console.log('Sample Option:', data.options?.[0]?.tier);
+        console.log('Options Count:', data.options?.length);
+        if (data.options?.length > 0) {
+            const firstOpt = data.options[0];
+            console.log('Sample Option:', firstOpt.tier, firstOpt.transport_mode);
+            console.log('Price:', firstOpt.price_breakdown?.total);
+            console.log('Legs:', JSON.stringify(firstOpt.legs, null, 2));
+            console.log('AI Explanation:', firstOpt.ai_explanation);
+        }
+        if (data.market_analysis) {
+            console.log('Market Analysis Preview:', data.market_analysis.substring(0, 100) + '...');
+        }
       }
   } catch (e) {
       console.error("Invocation failed:", e);

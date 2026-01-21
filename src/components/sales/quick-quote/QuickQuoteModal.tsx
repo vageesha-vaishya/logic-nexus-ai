@@ -18,6 +18,9 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { QuoteResultsList } from './QuoteResultsList';
+import { QuoteComparisonView } from './QuoteComparisonView';
+import { LayoutList, Columns } from 'lucide-react';
 
 // --- Zod Schemas ---
 
@@ -85,8 +88,9 @@ interface QuickQuoteModalProps {
 export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<RateOption[] | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
   const [loading, setLoading] = useState(false);
-  const [smartMode, setSmartMode] = useState(false);
+  const [smartMode, setSmartMode] = useState(true); // Default to true for "Enhanced" experience
   
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
@@ -245,73 +249,106 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     setMarketAnalysis(null);
     setAnomalies([]);
     setConfidenceScore(null);
+    setComplianceCheck(null);
 
     try {
+      console.log('Form Submitted:', data);
+      console.log('Extended Data:', extendedData);
+
       const payload = {
         ...data,
-        ...extendedData, // Include our new fields
+        ...extendedData,
         account_id: accountId
       };
 
-      console.log("[QuickQuote] Submitting Payload:", payload);
+      console.log('Invoking Edge Functions with payload:', payload);
 
+      // Define promises for parallel execution
+      const legacyPromise = supabase.functions.invoke('rate-engine', { body: payload });
+      const aiPromise = smartMode 
+        ? supabase.functions.invoke('ai-advisor', { body: { action: 'generate_smart_quotes', payload: payload } })
+        : Promise.resolve({ data: null, error: null });
+
+      const [legacyRes, aiRes] = await Promise.all([legacyPromise, aiPromise]);
+
+      let combinedOptions: RateOption[] = [];
+
+      // 1. Process Legacy Results
+      if (legacyRes.error) {
+          console.error("[QuickQuote] Legacy Rate Engine Error:", legacyRes.error);
+          // Don't throw yet, see if AI succeeded
+      } else if (legacyRes.data?.options) {
+          console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
+          const legacyOptions = legacyRes.data.options.map((opt: any) => ({
+              ...opt,
+              source_attribution: 'Standard Rate Engine',
+              tier: opt.tier || 'standard'
+          }));
+          combinedOptions = [...combinedOptions, ...legacyOptions];
+      }
+
+      // 2. Process AI Results
       if (smartMode) {
-          console.log("[QuickQuote] Invoking Smart Mode...");
-          const { data: aiData, error } = await supabase.functions.invoke('ai-advisor', {
-              body: { 
-                  action: 'generate_smart_quotes',
-                  payload: payload 
+          if (aiRes.error) {
+              console.error("[QuickQuote] AI Advisor Error:", aiRes.error);
+              
+              let errorMsg = "Could not generate smart quotes, showing standard rates only.";
+              
+              // Try to extract specific error message from the Edge Function response
+              try {
+                  if (aiRes.error.context && typeof aiRes.error.context.json === 'function') {
+                      const errBody = await aiRes.error.context.json();
+                      if (errBody && errBody.error) {
+                          errorMsg = `AI Error: ${errBody.error}`;
+                      }
+                  } else if (aiRes.error.message) {
+                      errorMsg = `AI Error: ${aiRes.error.message}`;
+                  }
+              } catch (e) {
+                  console.warn("Failed to parse AI error response", e);
+                  if (aiRes.error.message) errorMsg = `AI Error: ${aiRes.error.message}`;
               }
-          });
 
-          if (error) {
-              console.error("[QuickQuote] Smart Mode Error:", error);
-              throw error;
-          }
-          
-          console.log("[QuickQuote] Smart Mode Data:", aiData);
-
-          if (aiData?.options) {
-              const mappedOptions = aiData.options.map((opt: any) => ({
-                  id: opt.id,
-                  tier: opt.tier,
-                  name: opt.transport_mode || opt.carrier?.name,
-                  price: opt.price_breakdown?.total || 0,
-                  currency: opt.price_breakdown?.currency || 'USD',
-                  transitTime: opt.transit_time?.details || (opt.transit_time?.total_days + " days"),
-                  carrier: opt.carrier?.name || 'Unknown',
-                  legs: opt.legs,
-                  price_breakdown: opt.price_breakdown,
-                  reliability: opt.reliability,
-                  environmental: opt.environmental,
-                  source_attribution: opt.source_attribution
-              }));
-              setResults(mappedOptions);
-              setMarketAnalysis(aiData.market_analysis);
-              setConfidenceScore(aiData.confidence_score);
-              setAnomalies(aiData.anomalies || []);
-          }
-      } else {
-          // 2. Call Rate Engine (Legacy)
-          console.log("[QuickQuote] Invoking Legacy Rate Engine...");
-          const { data: responseData, error } = await supabase.functions.invoke('rate-engine', {
-            body: payload
-          });
-
-          if (error) {
-              console.error("[QuickQuote] Legacy Rate Engine Error:", error);
-              throw error;
-          }
-          
-          console.log("[QuickQuote] Legacy Rate Engine Data:", responseData);
-          
-          if (responseData?.options && Array.isArray(responseData.options)) {
-            setResults(responseData.options);
-            if (responseData.options.length === 0) {
-                toast({ title: "No Rates Found", description: "Try adjusting your search criteria." });
-            }
+              toast({ 
+                  title: "AI Generation Failed", 
+                  description: errorMsg, 
+                  variant: "destructive" 
+              });
+          } else if (aiRes.data) {
+              console.log("[QuickQuote] AI Advisor Data:", aiRes.data);
+              const aiData = aiRes.data;
+              
+              if (aiData.options) {
+                  const aiOptions = aiData.options.map((opt: any) => ({
+                      id: opt.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
+                      tier: opt.tier,
+                      name: opt.transport_mode || opt.carrier?.name,
+                      carrier: opt.carrier?.name || 'AI Selected Carrier',
+                      price: opt.price_breakdown?.total || 0,
+                      currency: opt.price_breakdown?.currency || 'USD',
+                      transitTime: opt.transit_time?.details || (opt.transit_time?.total_days + " days"),
+                      legs: opt.legs,
+                      price_breakdown: opt.price_breakdown,
+                      reliability: opt.reliability,
+                      environmental: opt.environmental,
+                      source_attribution: 'AI Smart Engine',
+                      ai_explanation: opt.ai_explanation
+                  }));
+                  
+                  combinedOptions = [...combinedOptions, ...aiOptions];
+                  setMarketAnalysis(aiData.market_analysis);
+                  setConfidenceScore(aiData.confidence_score);
+                  setAnomalies(aiData.anomalies || []);
+              }
           }
       }
+
+      if (combinedOptions.length === 0) {
+          throw new Error("No quotes available from any source.");
+      }
+
+      setResults(combinedOptions);
+
     } catch (error: any) {
       console.error('Rate calculation error:', error);
       
@@ -578,14 +615,14 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     <>
                         <Timer className="w-4 h-4 mr-2 animate-spin"/> Calculating...
                     </>
-                ) : (smartMode ? "Generate AI Smart Quotes" : "Get Comprehensive Quote")}
+                ) : (smartMode ? "Generate Comprehensive Quotes" : "Get Standard Quotes")}
               </Button>
               
               <div className="flex items-center space-x-2 mt-2 justify-center">
                   <Switch id="smart-mode" checked={smartMode} onCheckedChange={setSmartMode} />
                   <Label htmlFor="smart-mode" className="text-xs cursor-pointer flex items-center gap-1">
                       <Sparkles className="w-3 h-3 text-purple-500" /> 
-                      Enable AI Smart Generation
+                      Include AI Market Analysis
                   </Label>
               </div>
             </form>
@@ -612,104 +649,66 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
             {!results ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                <div className="bg-muted p-6 rounded-full mb-4">
-                    <Package className="w-12 h-12 opacity-50" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">Ready to Quote</h3>
-                <p className="text-sm text-center max-w-xs">
-                    Select mode and enter details to get accurate multi-modal estimates.
-                </p>
+                <Package className="w-12 h-12 mb-4 opacity-20" />
+                <p>Fill out the form to generate quotes</p>
+                {smartMode && (
+                    <div className="mt-4 p-3 bg-purple-50 text-purple-700 rounded-md text-xs max-w-xs text-center border border-purple-100">
+                        <Sparkles className="w-4 h-4 mx-auto mb-1" />
+                        AI Enhanced mode is active. System will generate multi-modal options and market analysis.
+                    </div>
+                )}
               </div>
             ) : (
-              <div className="space-y-4">
-                {marketAnalysis && (
-                    <Card className="bg-purple-50 border-purple-200">
-                        <CardContent className="p-4">
-                            <h4 className="text-sm font-semibold text-purple-900 flex items-center gap-2 mb-2">
-                                <Sparkles className="w-4 h-4"/> Market Analysis
-                                {confidenceScore && <Badge variant="secondary" className="ml-auto bg-purple-100 text-purple-700">Confidence: {(confidenceScore * 100).toFixed(0)}%</Badge>}
-                            </h4>
-                            <p className="text-xs text-purple-800 leading-relaxed">{marketAnalysis}</p>
-                            {anomalies.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-purple-200">
-                                    <p className="text-xs font-medium text-purple-900">Anomalies Detected:</p>
-                                    <ul className="list-disc list-inside text-xs text-purple-800">
-                                        {anomalies.map((a, i) => <li key={i}>{a}</li>)}
-                                    </ul>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
+                <div className="space-y-4">
+                    {marketAnalysis && (
+                        <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-100">
+                            <CardContent className="p-4">
+                                <h4 className="text-sm font-semibold text-indigo-800 mb-2 flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4"/> AI Market Analysis
+                                </h4>
+                                <p className="text-xs text-indigo-700 leading-relaxed">
+                                    {marketAnalysis}
+                                </p>
+                                {confidenceScore && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="text-xs font-medium text-indigo-800">Confidence Score:</span>
+                                        <div className="h-2 w-24 bg-indigo-200 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-600" style={{ width: `${confidenceScore * 100}%` }}></div>
+                                        </div>
+                                        <span className="text-xs text-indigo-600">{Math.round(confidenceScore * 100)}%</span>
+                                    </div>
+                                )}
+                                {anomalies.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-indigo-200/50">
+                                        <span className="text-xs font-semibold text-red-600 block mb-1">Detected Anomalies:</span>
+                                        <ul className="list-disc list-inside text-xs text-red-700/80">
+                                            {anomalies.map((a, i) => <li key={i}>{a}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-semibold text-lg">Rate Options</h3>
-                    <Badge variant="outline" className="text-xs">{results.length} Options</Badge>
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-lg">Rate Options</h3>
+                            <Badge variant="outline" className="text-xs">{results.length} Options</Badge>
+                        </div>
+                        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'compare')} className="w-auto">
+                            <TabsList className="h-8">
+                                <TabsTrigger value="list" className="text-xs h-7 px-2"><LayoutList className="w-3 h-3 mr-1"/> List</TabsTrigger>
+                                <TabsTrigger value="compare" className="text-xs h-7 px-2"><Columns className="w-3 h-3 mr-1"/> Compare</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
+                    
+                    {viewMode === 'list' ? (
+                        <QuoteResultsList results={results} onSelect={handleConvertToQuote} />
+                    ) : (
+                        <QuoteComparisonView options={results} onSelect={handleConvertToQuote} />
+                    )}
                 </div>
-                
-                {results.map((option) => (
-                  <Card key={option.id} className="relative overflow-hidden hover:border-primary transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-primary hover:shadow-md">
-                    <CardContent className="p-5">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold text-lg">{option.carrier}</span>
-                                {option.tier === 'contract' && <Badge className="bg-green-600">Contract</Badge>}
-                                {option.tier === 'spot' && <Badge className="bg-blue-600">Spot</Badge>}
-                                {option.tier === 'best_value' && <Badge className="bg-purple-600">Best Value</Badge>}
-                                {option.tier === 'cheapest' && <Badge className="bg-emerald-600">Cheapest</Badge>}
-                                {option.tier === 'fastest' && <Badge className="bg-amber-600">Fastest</Badge>}
-                                {option.tier === 'greenest' && <Badge className="bg-green-500">Eco-Friendly</Badge>}
-                                {option.tier === 'reliable' && <Badge className="bg-blue-500">Most Reliable</Badge>}
-                            </div>
-                            <div className="text-sm text-muted-foreground">{option.name}</div>
-                            {option.source_attribution && (
-                                <div className="text-[10px] text-muted-foreground italic">Source: {option.source_attribution}</div>
-                            )}
-                        </div>
-                        <div className="text-right">
-                            <div className="text-2xl font-bold text-primary">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: option.currency }).format(option.price)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Est. Transit: <span className="font-medium text-foreground">{option.transitTime}</span>
-                            </div>
-                        </div>
-                      </div>
-
-                      {/* Extended Details for AI Quotes */}
-                      {(option.reliability || option.environmental) && (
-                          <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-muted/30 rounded-md text-xs">
-                              {option.reliability && (
-                                  <div>
-                                      <span className="font-semibold block mb-1">Reliability</span>
-                                      <div className="flex justify-between text-muted-foreground">
-                                          <span>Score: {option.reliability.score}/10</span>
-                                          <span>On-Time: {option.reliability.on_time_performance}</span>
-                                      </div>
-                                  </div>
-                              )}
-                              {option.environmental && (
-                                  <div>
-                                      <span className="font-semibold block mb-1">Environmental</span>
-                                      <div className="flex justify-between text-muted-foreground">
-                                          <span>CO2: {option.environmental.co2_emissions}</span>
-                                          <span>Rating: {option.environmental.rating}</span>
-                                      </div>
-                                  </div>
-                              )}
-                          </div>
-                      )}
-
-                      <div className="flex items-center gap-3 pt-2">
-                        <Button className="flex-1" onClick={() => handleConvertToQuote(option)}>
-                          Convert to Quote <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
             )}
           </div>
         </div>

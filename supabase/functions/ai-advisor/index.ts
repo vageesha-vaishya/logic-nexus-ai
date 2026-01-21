@@ -38,7 +38,8 @@ serve(async (req: Request) => {
     const { action, payload } = await req.json()
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
     
-    console.log(`[AI-Advisor] Action: ${action}`, payload);
+    console.log(`[AI-Advisor] Action: ${action}, Key Present: ${!!openAiKey}`);
+    console.log(`[AI-Advisor] Payload:`, JSON.stringify(payload));
 
     let result = {};
 
@@ -263,16 +264,21 @@ Requirements:
    - "Greenest" (Lowest carbon footprint)
    - "Most Reliable" (Top tier carrier)
 
-2. Weighted Scoring Algorithm:
+2. Multi-modal Logic & Routing:
+   - For each option, construct a realistic multi-leg route (e.g., Pickup -> Port -> Ocean -> Port -> Delivery).
+   - Determine optimal routing combinations (e.g., Rail vs Truck for inland legs).
+   - Ensure seamless transitions between modes are accounted for in transit time and cost.
+
+3. Weighted Scoring Algorithm:
    Evaluate and rank options based on:
    - Cost (60% weight)
    - Speed (25% weight)
    - Reliability (15% weight)
 
-3. Detailed Output Structure:
+4. Detailed Output Structure:
    For each option, provide a complete breakdown including legs (multimodal if applicable), cost components (base, surcharges), and reliability metrics.
 
-4. Validation & Anomaly Detection:
+5. Validation & Anomaly Detection:
    - Ensure transit times are realistic for the specific route (e.g. Trans-Pacific Eastbound takes ~14-25 days).
    - Compare generated prices against the Historical Average ($${historicalAvg || 'Unknown'}).
    - If a price deviates by >20% from the average (if available) or market norms, flag it in "anomalies".
@@ -287,11 +293,25 @@ Output JSON Format:
       "transport_mode": "Ocean - FCL",
       "legs": [
         {
+          "from": "Shanghai Factory",
+          "to": "Shanghai Port",
+          "mode": "road",
+          "carrier": "Local Trucking Co",
+          "transit_time": "1 day"
+        },
+        {
           "from": "Shanghai Port",
           "to": "Los Angeles Port",
           "mode": "ocean",
           "carrier": "Maersk",
           "transit_time": "18 days"
+        },
+        {
+          "from": "Los Angeles Port",
+          "to": "Los Angeles Warehouse",
+          "mode": "road",
+          "carrier": "US Logistics",
+          "transit_time": "2 days"
         }
       ],
       "carrier": {
@@ -306,8 +326,8 @@ Output JSON Format:
         "total": 2400
       },
       "transit_time": {
-        "total_days": 18,
-        "details": "18 days port-to-port"
+        "total_days": 21,
+        "details": "21 days door-to-door"
       },
       "reliability": {
         "score": 8.5,
@@ -317,7 +337,8 @@ Output JSON Format:
         "co2_emissions": "1200 kg",
         "rating": "B"
       },
-      "source_attribution": "Market Average (Q1 2024)"
+      "source_attribution": "Market Average (Q1 2024)",
+      "ai_explanation": "Selected for best balance of cost and speed using direct routing."
     }
   ],
   "market_analysis": "Detailed analysis of the trade lane, potential risks (weather, congestion), and pricing trends.",
