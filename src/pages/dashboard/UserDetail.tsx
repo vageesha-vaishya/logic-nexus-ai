@@ -165,7 +165,7 @@ export default function UserDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <UserForm user={user} onSuccess={fetchUser} />
+              <UserForm user={user} onSuccess={() => { fetchUser(); }} />
             </CardContent>
           </Card>
 
