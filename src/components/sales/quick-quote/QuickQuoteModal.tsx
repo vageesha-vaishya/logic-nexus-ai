@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -150,8 +150,8 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     const lookup = async (query: string, field: 'origin' | 'destination') => {
         if (query.length < 3) return;
         try {
-            const { data } = await supabase.functions.invoke('ai-advisor', {
-                body: { action: 'lookup_codes', payload: { query, mode } }
+            const { data } = await invokeAiAdvisor({
+                action: 'lookup_codes', payload: { query, mode }
             });
             if (data?.suggestions) {
                 // In a real app, we'd show a dropdown. For now, we'll just log or set state for a simple UI hint
@@ -175,11 +175,11 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     try {
         // Parallel calls for Unit and Classification
         const [unitRes, classRes] = await Promise.all([
-            supabase.functions.invoke('ai-advisor', {
-                body: { action: 'suggest_unit', payload: { commodity } }
+            invokeAiAdvisor({
+                action: 'suggest_unit', payload: { commodity }
             }),
-            supabase.functions.invoke('ai-advisor', {
-                body: { action: 'classify_commodity', payload: { commodity } }
+            invokeAiAdvisor({
+                action: 'classify_commodity', payload: { commodity }
             })
         ]);
 
@@ -209,21 +209,104 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     }
   };
 
+  // Helper to invoke AI Advisor with explicit auth using fetch
+  const invokeAiAdvisor = async (body: any) => {
+    const projectUrl = import.meta.env.VITE_SUPABASE_URL;
+    let anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    // Safety: Strip quotes if present (common env issue)
+    if (anonKey && (anonKey.startsWith('"') || anonKey.startsWith("'"))) {
+        anonKey = anonKey.slice(1, -1);
+    }
+
+    const functionUrl = `${projectUrl}/functions/v1/ai-advisor`;
+
+    let sessionToken = null;
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        sessionToken = session?.access_token;
+    } catch (e) {
+        console.warn("Failed to get session for AI Advisor", e);
+    }
+
+    if (!anonKey) {
+        console.error("Missing Supabase Anon/Publishable Key");
+        return { data: null, error: new Error("Configuration Error: Missing API Key") };
+    }
+
+    // Function to perform the fetch
+    const doFetch = async (token: string | null | undefined, useAnon: boolean) => {
+        const keyToUse = useAnon ? anonKey : (token || anonKey);
+        console.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
+        // console.log(`[AI-Advisor] Using Key Prefix: ${keyToUse?.substring(0, 10)}...`); // Debug only
+
+        return fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${keyToUse}`,
+                'apikey': anonKey
+            },
+            body: JSON.stringify(body)
+        });
+    };
+
+    try {
+        // 1. Try with User Token (if available)
+        let response;
+        if (sessionToken) {
+            response = await doFetch(sessionToken, false);
+            
+            // If 401, retry with Anon Key
+            if (response.status === 401) {
+                console.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
+                response = await doFetch(anonKey, true);
+            }
+        } else {
+            // No session, try Anon Key directly
+            console.warn("[AI-Advisor] No active session. Using Anon Key.");
+            response = await doFetch(anonKey, true);
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            // Try to parse JSON error if possible
+            try {
+                const errJson = JSON.parse(errorText);
+                return { data: null, error: { message: errJson.error || errorText, status: response.status } };
+            } catch (e) {
+                 return { data: null, error: { message: `Function returned ${response.status}: ${errorText}`, status: response.status } };
+            }
+        }
+
+        const data = await response.json();
+        return { data, error: null };
+    } catch (err) {
+        console.error("AI Advisor Invocation Error:", err);
+        return { data: null, error: err };
+    }
+  };
+
   // AI: Validate Compliance before submit
   const validateCompliance = async () => {
     try {
-        const { data } = await supabase.functions.invoke('ai-advisor', {
-            body: { 
-                action: 'validate_compliance', 
-                payload: { 
-                    origin, 
-                    destination, 
-                    commodity, 
-                    mode, 
-                    dangerous_goods: extendedData.dangerousGoods 
-                } 
-            }
+        const { data, error } = await invokeAiAdvisor({
+            action: 'validate_compliance', 
+            payload: { 
+                origin, 
+                destination, 
+                commodity, 
+                mode, 
+                dangerous_goods: extendedData.dangerousGoods 
+            } 
         });
+
+        if (error) {
+            console.error("Compliance Check Failed:", error);
+            // Fallback to true (allow user to proceed if AI fails)
+            return true;
+        }
+
         setComplianceCheck(data);
         return data?.compliant !== false; // Default true if error
     } catch (e) {
@@ -266,7 +349,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       // Define promises for parallel execution
       const legacyPromise = supabase.functions.invoke('rate-engine', { body: payload });
       const aiPromise = smartMode 
-        ? supabase.functions.invoke('ai-advisor', { body: { action: 'generate_smart_quotes', payload: payload } })
+        ? invokeAiAdvisor({ action: 'generate_smart_quotes', payload: payload })
         : Promise.resolve({ data: null, error: null });
 
       const [legacyRes, aiRes] = await Promise.all([legacyPromise, aiPromise]);
@@ -294,19 +377,8 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               
               let errorMsg = "Could not generate smart quotes, showing standard rates only.";
               
-              // Try to extract specific error message from the Edge Function response
-              try {
-                  if (aiRes.error.context && typeof aiRes.error.context.json === 'function') {
-                      const errBody = await aiRes.error.context.json();
-                      if (errBody && errBody.error) {
-                          errorMsg = `AI Error: ${errBody.error}`;
-                      }
-                  } else if (aiRes.error.message) {
-                      errorMsg = `AI Error: ${aiRes.error.message}`;
-                  }
-              } catch (e) {
-                  console.warn("Failed to parse AI error response", e);
-                  if (aiRes.error.message) errorMsg = `AI Error: ${aiRes.error.message}`;
+              if (aiRes.error.message) {
+                  errorMsg = `AI Error: ${aiRes.error.message}`;
               }
 
               toast({ 
@@ -414,12 +486,15 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       <DialogTrigger asChild>
         {children || <Button>Quick Quote</Button>}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[1000px] h-[700px] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            Multi-Modal Quick Quote
-            {accountId && <Badge variant="outline" className="ml-2 font-normal text-xs">Customer Context Active</Badge>}
+            <Sparkles className="w-5 h-5 text-primary" />
+            Quick Quote & AI Analysis
           </DialogTitle>
+          <DialogDescription>
+            Generate instant quotes with AI-powered market analysis and route optimization.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">

@@ -27,7 +27,7 @@ create policy "Admins can view all audit logs"
         exists (
             select 1 from public.user_roles ur
             where ur.user_id = auth.uid()
-            and ur.role = 'platform_admin'
+            and ur.role::text = 'platform_admin'
         )
     );
 

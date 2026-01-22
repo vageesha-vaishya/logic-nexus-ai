@@ -45,6 +45,10 @@ serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Get User Token
+    const authHeader = req.headers.get('Authorization');
+    const userToken = authHeader ? authHeader.replace('Bearer ', '') : undefined;
+
     let result = {};
 
     switch (action) {
@@ -58,7 +62,7 @@ serve(async (req: Request) => {
         result = await predictPrice(payload);
         break;
       case 'generate_smart_quotes':
-        result = await generateSmartQuotes(payload, openAiKey, supabase);
+        result = await generateSmartQuotes(payload, openAiKey, supabase, userToken);
         break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode);
@@ -149,7 +153,7 @@ async function validateCompliance(payload: any) {
 
 // --- Main Generation Logic ---
 
-async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any) {
+async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, userToken?: string) {
     if (!apiKey) throw new Error("OpenAI API Key is required for Smart Quotes");
 
     const { 
@@ -319,16 +323,20 @@ Output JSON Format:
     await logAudit(supabase, 'generate_smart_quotes', payload, { 
         options_count: aiResponse.options?.length, 
         confidence: aiResponse.confidence_score 
-    });
+    }, userToken);
 
     return aiResponse;
 }
 
-async function logAudit(supabase: any, action: string, payload: any, resultSummary: any) {
+async function logAudit(supabase: any, action: string, payload: any, resultSummary: any, userToken?: string) {
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        let userId = null;
+        if (userToken) {
+             const { data: { user } } = await supabase.auth.getUser(userToken);
+             userId = user?.id;
+        }
         await supabase.from('quote_audit_logs').insert({
-            user_id: user?.id, // Can be null if anon
+            user_id: userId, // Can be null if anon
             action,
             payload: { ...payload, sensitive_data_redacted: true }, // Simple redaction placeholder
             result_summary: resultSummary
