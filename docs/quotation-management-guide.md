@@ -1,308 +1,348 @@
-# Enterprise Quotation Management: Master Technical Guide v6.1.0
+# Enterprise Quotation Management: Master Technical Guide v7.0.0
 
 **Status**: Active | **Last Updated**: 2026-01-22 | **Author**: System Architect
-**Version**: 6.1.0 (Incremental Update - Merges v5.1.0 Deep Specs with v6.0.0 Master Structure)
+**Version**: 7.0.0 (Comprehensive Design & Implementation Specification)
 
 ---
 
 ## 1. Executive Summary & Architecture Overview
 
-The **Enterprise Quotation Management Module** is the core revenue engine of the Universal Logistics Operating System (ULOS). It integrates legacy freight forwarding workflows with AI-driven pricing and multi-vertical support (Rail, Movers, Courier).
+The **Enterprise Quotation Management Module** is the core revenue engine of the Universal Logistics Operating System (ULOS). This document serves as the authoritative technical design specification, detailing the implementation of Quick Quote, Smart Quote, and AI-driven pricing mechanisms.
 
 ### 1.1. System Context (DFD Level 0)
 
 ```mermaid
 graph TD
-    User[User / Guest] --> API[API Gateway]
+    User["User / Guest"] --> API["API Gateway"]
     
     subgraph "Core Engines"
-      API --> Auth[Auth & RBAC]
-      API --> AI[AI Advisor (Pricing & Routing)]
-      API --> Rules[Business Rules Engine]
+      API --> Auth["Auth & RBAC"]
+      API --> AI["AI Advisor (Pricing & Routing)"]
+      API --> Rules["Business Rules Engine"]
     end
     
     subgraph "Vertical Adaptors (LSI)"
-      AI --> AirSea[Air/Sea Adaptor]
-      AI --> Rail[Rail Network Adaptor]
-      AI --> Move[Relocation Adaptor]
-      AI --> Courier[Courier Aggregator]
+      AI --> AirSea["Air/Sea Adaptor"]
+      AI --> Rail["Rail Network Adaptor"]
+      AI --> Move["Relocation Adaptor"]
+      AI --> Courier["Courier Aggregator"]
     end
     
     subgraph "External Integrations"
-      AirSea --> INTTRA[INTTRA / Airline APIs]
-      Rail --> NRI[National Rail Interface]
-      Courier --> FedEx[FedEx/DHL APIs]
+      AirSea --> INTTRA["INTTRA / Airline APIs"]
+      Rail --> NRI["National Rail Interface"]
+      Courier --> FedEx["FedEx/DHL APIs"]
     end
     
     subgraph "Data Layer"
-      AirSea --> DB[(PostgreSQL)]
+      AirSea --> DB[("PostgreSQL")]
       Rail --> DB
       Move --> DB
       Courier --> DB
     end
 ```
 
-### 1.2. Component Architecture (DFD Level 1)
+### 1.2. Component Architecture & Security Boundaries (DFD Level 1)
+
+**Security Boundaries**:
+*   **Public Zone**: Web Client (TLS 1.3).
+*   **DMZ**: API Gateway & Edge Functions (JWT Auth, Rate Limiting).
+*   **Trusted Zone**: Database & Internal Services (VPC Peering, RLS).
 
 ```mermaid
 graph LR
-    Client[Web Client] -- HTTPS/JSON --> Edge[Supabase Edge Functions]
-    Edge -- RPC --> DB[(Postgres DB)]
+    Client["Web Client"] -- HTTPS/JSON --> Edge["Supabase Edge Functions"]
+    Edge -- RPC --> DB[("Postgres DB")]
     
-    subgraph "Edge Layer"
-        QQ[Quick Quote Fn]
-        AI[AI Advisor Fn]
-        LSI[LSI Adaptors]
+    subgraph "Edge Layer (DMZ)"
+        QQ["Quick Quote Fn"]
+        AI["AI Advisor Fn"]
+        LSI["LSI Adaptors"]
     end
     
-    subgraph "Database Layer"
-        Tables[Quotations / Rates / Tenants]
-        RLS[Row Level Security]
-        Logs[Audit Logs]
+    subgraph "Database Layer (Trusted)"
+        Tables["Quotations / Rates / Tenants"]
+        RLS["Row Level Security"]
+        Logs["Audit Logs"]
     end
     
     Client --> QQ
     Client --> AI
     QQ --> DB
-    AI --> Open[OpenAI API]
-    LSI --> Ext[External Carriers]
+    AI --> Open["OpenAI API"]
+    LSI --> Ext["External Carriers"]
+```
+
+### 1.3. Data Entity Relationships (ERD)
+
+```mermaid
+erDiagram
+    LEAD ||--o{ OPPORTUNITY : converts_to
+    ACCOUNT ||--o{ CONTACT : has
+    ACCOUNT ||--o{ OPPORTUNITY : owns
+    OPPORTUNITY ||--o{ QUOTE : generates
+    QUOTE ||--|{ QUOTE_VERSION : tracks
+    QUOTE }|--|| ACTIVITY_LOG : logs
+    
+    QUOTE {
+        uuid id
+        uuid opportunity_id
+        string status
+        numeric total_amount
+    }
+    
+    OPPORTUNITY {
+        uuid id
+        uuid account_id
+        string stage
+    }
 ```
 
 ---
 
-## 2. Core Features & Functional Requirements
+## 2. Quotation Workflow Details
 
 ### 2.1. Quick Quote Module
-*Preserved from v4.0.0*
+Designed for speed and ease of use, delivering indicative pricing in under 2 seconds.
 
-**Functional Requirements**:
-1.  **Multi-Modal Input**: Support Air, Ocean (FCL/LCL), Road (FTL/LTL), Rail, and Courier.
-2.  **Instant Validation**: Validate ports/airports against `un_locode` table.
-3.  **Rate Lookup**: Query `rate_cards` with `effective_date` and `expiry_date` constraints.
-4.  **Margin Management**: Apply tenant-specific markup rules automatically.
+*   **Minimum Input Fields**:
+    *   Origin (City/Port code)
+    *   Destination (City/Port code)
+    *   Cargo Type (General/Hazmat)
+    *   Weight/Volume
+*   **Validation Rules**:
+    *   Origin != Destination.
+    *   Date >= Today.
+    *   Weight > 0.
+*   **Default Assumptions**:
+    *   Incoterm: FOB (Free on Board) unless specified.
+    *   Currency: USD (Base), converted to Tenant currency.
+    *   Cargo Readiness: Immediate.
+*   **Performance Benchmark**: 
+    *   API Response Time: < 200ms (Cache Hit), < 2000ms (Live Fetch).
+    *   Rendering Time: < 100ms (First Contentful Paint).
 
-**Workflow**:
-1.  User enters Origin/Dest.
-2.  System resolves Geo-Coordinates.
-3.  Parallel Fetch:
-    *   Legacy Rate Engine (Contract Rates).
-    *   Spot Market API (External).
-    *   AI Predictor (Gap filling).
-4.  Results aggregated and ranked by Cost/Time.
+### 2.2. Smart Quote (Dynamic Pricing)
+Advanced algorithmic pricing based on market conditions and tenant rules.
 
-### 2.2. Smart Quote (AI Advisor)
-*Enhanced in v6.0.0*
+*   **Calculation Algorithm**:
+    ```text
+    Base_Rate = (Carrier_Rate + Fuel_Surcharge) * Exchange_Rate
+    Margin = Base_Rate * (Tenant_Markup_Percent + Tier_Adjustment)
+    Final_Price = Base_Rate + Margin + Fixed_Fees (Doc/Handling)
+    ```
+*   **Dynamic Adjustment**:
+    *   **Seasonality**: +15% during Peak Season (Sep-Dec).
+    *   **Urgency**: +10% for shipments departing < 48 hours.
+    *   **Volume**: -5% for > 10 TEUs.
+*   **Audit Trail**:
+    *   Every price change is logged in `quote_audit_logs` with `old_value`, `new_value`, `reason`, and `user_id`.
 
-**Capabilities**:
-*   **Commodity Classification**: Auto-maps "iPhone 15 Pro" -> HS Code `8517.13`.
-*   **Compliance Check**: Verifies sanctions and hazardous material restrictions.
-*   **Strategy Generation**:
-    *   *Best Value*: Balance of Cost vs Speed.
-    *   *Greenest*: Lowest Carbon Footprint (Rail/Sea).
-    *   *Fastest*: Priority Air / Express Courier.
+### 2.3. AI/LLM Quote (AI Advisor)
+Utilizes NLP and Generative AI for route optimization and unstructured data processing.
 
-**OpenAPI Specification (Fragment)**:
+*   **NLP Specifications**:
+    *   **Model**: GPT-4o (via OpenAI API).
+    *   **Capabilities**: Entity Extraction (Origin, Dest, Commodity), Intent Recognition.
+*   **Training Data**:
+    *   UN/LOCODE Database.
+    *   Harmonized System (HS) Codes.
+    *   Historical anonymized shipment routes.
+*   **Confidence Scoring**:
+    *   **> 90%**: Auto-populate fields.
+    *   **70-89%**: Suggest with "Confirm?" prompt.
+    *   **< 70%**: Fallback to manual entry (Low Confidence Mode).
+*   **Fallback Procedure**:
+    *   If AI Service is down or confidence is low, UI reverts to standard form inputs without auto-suggestions.
+
+---
+
+## 3. Use Case Documentation (Standardized)
+
+### UC-001: Generate Quick Quote (Happy Path)
+
+*   **Title**: Generate Standard Quick Quote
+*   **Actors**: Sales Agent, Guest User
+*   **Preconditions**: User is on the Quick Quote Modal; Internet connection active.
+*   **Main Flow**:
+    1.  User enters Origin "Shanghai" and Destination "Los Angeles".
+    2.  User selects "20ft Container" and enters weight.
+    3.  User clicks "Get Quote".
+    4.  System validates inputs.
+    5.  System queries Rate Engine and AI Advisor in parallel.
+    6.  System displays 3 options: "Fastest", "Cheapest", "Greenest".
+*   **Alternative Flows**:
+    *   *Invalid Port*: System shows "Port not found" error.
+    *   *No Rates Found*: System displays "Request Spot Rate" button.
+*   **Postconditions**: Indicative quote displayed; "Save" button enabled.
+*   **Technical Requirements**: React Query for caching; Supabase Edge Function `quick-quote`.
+
+### UC-002: AI-Assisted Commodity Classification
+
+*   **Title**: Auto-Classify Commodity via AI
+*   **Actors**: User
+*   **Preconditions**: Quick Quote Modal open.
+*   **Main Flow**:
+    1.  User types "1000 boxes of Cotton T-Shirts" in Cargo Description.
+    2.  System (AI Advisor) analyzes text debounced (500ms).
+    3.  System suggests HS Code `6109.10` and Cargo Type `General`.
+    4.  User accepts suggestion.
+*   **Alternative Flows**:
+    *   *Ambiguous Input*: AI suggests multiple HS codes; User selects one.
+    *   *Restricted Item*: AI detects "Lithium Batteries"; System flags as Hazardous.
+*   **Postconditions**: Cargo fields populated with standardized data.
+*   **Technical Requirements**: OpenAI GPT-4o integration; `ai-advisor` Edge Function.
+
+### UC-003: Convert Quick Quote to Booking
+
+*   **Title**: Conversion to Booking
+*   **Actors**: Registered User
+*   **Preconditions**: Quick Quote generated and visible.
+*   **Main Flow**:
+    1.  User selects "Cheapest" option.
+    2.  User clicks "Book Now".
+    3.  System checks Credit Limit.
+    4.  System creates `Booking` record linked to `Quote`.
+    5.  System redirects to Booking Confirmation page.
+*   **Alternative Flows**:
+    *   *Credit Limit Exceeded*: System prompts for "Manager Approval".
+*   **Postconditions**: Booking status `PENDING`; Quote status `CONVERTED`.
+*   **Technical Requirements**: Database Transaction (Acid); RLS Policy check.
+
+---
+
+## 4. Traceability Matrix
+
+| Req ID | Business Requirement | Implementation Phase | Component | Test Case ID | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **BR-01** | Instant Indicative Pricing | Phase 2 (Core Engines) | `QuickQuoteModal` | TC-QQ-001 | ✅ Implemented |
+| **BR-02** | AI Commodity Classification | Phase 2 (Core Engines) | `ai-advisor` Fn | TC-AI-002 | ✅ Implemented |
+| **BR-03** | Multi-Modal Support (Rail) | Phase 3 (LSI) | `RailAdaptor` | TC-RL-010 | 🚧 In Progress |
+| **BR-04** | Tenant Margin Logic | Phase 1 (Foundation) | `RateEngine` | TC-RE-005 | ✅ Implemented |
+| **BR-05** | Audit Trail for Pricing | Phase 4 (Enterprise) | `AuditLogger` | TC-AUD-001 | ✅ Implemented |
+
+**Data Flow Specifications**:
+*   **Quick Quote -> Full Quote**:
+    *   Map `origin_code` -> `port_of_loading`.
+    *   Map `dest_code` -> `port_of_discharge`.
+    *   Map `price` -> `base_freight`.
+*   **API Contract (Inter-Module)**:
+    *   `POST /functions/v1/quick-quote`: Accepts JSON `{origin, dest, cargo}`; Returns `[{carrier, price, transit_time}]`.
+
+---
+
+## 5. Implementation Guidelines
+
+### 5.1. Technical Specifications
+*   **Frontend**: React 18, Tailwind CSS, Shadcn UI, React Query.
+*   **Backend**: Supabase Edge Functions (Deno/TypeScript).
+*   **Database**: PostgreSQL 15+ with PostGIS extensions.
+*   **AI**: OpenAI GPT-4o (via LangChain or direct fetch).
+
+### 5.2. API Specifications (OpenAPI Fragment)
+
 ```yaml
 paths:
-  /ai-advisor:
+  /quick-quote:
     post:
-      summary: Generate Smart Quotes
-      security:
-        - bearerAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cargo_description: { type: string }
-                origin: { type: string }
-                destination: { type: string }
+      summary: Get Indicative Quotes
+      parameters:
+        - name: origin
+          in: body
+          required: true
+          schema: { type: string }
       responses:
         200:
-          description: AI Analysis Result
+          description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SmartQuoteResponse'
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuoteOption'
+```
+
+### 5.3. Validation Criteria
+*   **Unit Test Coverage**: > 90% (Jest/Vitest).
+*   **Integration Tests**: Key flows (UC-001 to UC-003) covered by Playwright.
+*   **Performance**:
+    *   Edge Function execution < 1000ms (P95).
+    *   Database query < 100ms.
+*   **Security**:
+    *   RLS Policies enabled on all tables.
+    *   Anon Key used only for public read-only (if applicable); Service Role blocked for client.
+    *   OWASP Top 10 compliance verified.
+
+---
+
+## 6. Visual Documentation
+
+### 6.1. Quote Lifecycle (State Diagram)
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT
+    DRAFT --> SENT: Send to Customer
+    SENT --> VIEWED: Customer Opens
+    VIEWED --> NEGOTIATION: Customer Counter-Offers
+    NEGOTIATION --> SENT: Agent Re-Submits
+    VIEWED --> ACCEPTED: Customer Approves
+    VIEWED --> REJECTED: Customer Declines
+    ACCEPTED --> BOOKED: Convert to Booking
+    ACCEPTED --> EXPIRED: Validity Date Passed
+    REJECTED --> ARCHIVED
+    BOOKED --> [*]
+    EXPIRED --> [*]
+    ARCHIVED --> [*]
+```
+
+### 6.2. Process Flow (BPMN Style)
+
+```mermaid
+graph TD
+    start((Start)) --> input[Enter Quote Details]
+    input --> valid{Validate?}
+    valid -- No --> error[Show Errors] --> input
+    valid -- Yes --> parallel{Parallel Fetch}
+    
+    parallel --> legacy[Legacy Rate Engine]
+    parallel --> ai[AI Advisor]
+    parallel --> spot[Spot Market API]
+    
+    legacy --> merge[Merge Results]
+    ai --> merge
+    spot --> merge
+    
+    merge --> rules[Apply Business Rules]
+    rules --> margin[Apply Tenant Margin]
+    margin --> display[Display Options]
+    
+    display --> userAction{User Action}
+    userAction -- Save --> saveDB[(Save to DB)]
+    userAction -- Book --> booking[Create Booking]
+    userAction -- Email --> email[Send Email]
+    
+    booking --> endProc((End))
+    saveDB --> endProc
+    email --> endProc
 ```
 
 ---
 
-## 3. Logistics Service Interface (LSI) - Vertical Expansions
-*New in v5.0.0, Refined in v6.0.0*
+## 7. Documentation Quality Standards & Glossary
 
-### 3.1. Railways (Bulk & Intermodal)
-**Schema Extension**:
-```sql
-CREATE TABLE rail_wagons (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    wagon_code TEXT UNIQUE,
-    capacity_tons NUMERIC,
-    wagon_type TEXT CHECK (wagon_type IN ('FLAT', 'BOX', 'TANK', 'HOPPER')),
-    tenant_id UUID REFERENCES tenants(id)
-);
-```
-**State Machine**:
-`Available` -> `Reserved` -> `In-Transit` -> `Unloading` -> `Maintenance` -> `Available`.
+### 7.1. Version Control Procedures
+*   **Change Log**: Maintained in `CHANGELOG.md`.
+*   **Approval**: All docs must be reviewed by Tech Lead and Product Owner.
+*   **Deprecation**: Outdated sections marked with `> **Deprecated**` blockquote.
 
-### 3.2. Movers & Packers (Relocation)
-**Features**:
-*   **Inventory Digitization**: Mobile-friendly inventory list builder.
-*   **Volume Calculator**: Pre-defined CBM values for 500+ household items.
-*   **Labor Estimation**: `(Total CBM * Handling Factor) / Packer Efficiency`.
-
-### 3.3. Courier Services (Last Mile)
-**Integration Pattern**:
-*   **Aggregator**: Connects to FedEx, DHL, UPS APIs via unified interface.
-*   **Zone Logic**: `courier_zones` table maps Postcodes to Pricing Zones (1-10).
+### 7.2. Glossary
+*   **FCL**: Full Container Load.
+*   **LCL**: Less than Container Load.
+*   **TEU**: Twenty-foot Equivalent Unit.
+*   **HS Code**: Harmonized System Code for commodity classification.
+*   **RLS**: Row Level Security (Postgres).
+*   **LSI**: Logistics Service Interface (Adapter layer).
+*   **Incoterms**: International Commercial Terms (e.g., FOB, CIF).
 
 ---
-
-## 4. Trade Direction & Business Rules
-*Preserved from v4.0.0*
-
-### 4.1. Trade Direction Logic
-Controlled by `tenant_subscriptions` and `trade_rules` tables.
-*   **Export Only**: Can only originate shipments from Home Country.
-*   **Import Only**: Can only terminate shipments in Home Country.
-*   **Cross-Trade**: Allowed for Enterprise Tier only.
-
-### 4.2. Business Rules Engine (JSONB)
-Rules are stored in `business_rules` table:
-```json
-{
-  "rule_id": "NO_LITHIUM_AIR",
-  "condition": {
-    "transport_mode": "AIR",
-    "commodity_keywords": ["battery", "lithium"]
-  },
-  "action": {
-    "type": "BLOCK",
-    "message": "Lithium batteries restricted on Air Freight. Switch to Sea/Road."
-  }
-}
-```
-
----
-
-## 5. RBAC Framework (Access Control Matrix)
-*Restored Full Matrix from v5.1.0*
-
-**Legend**: ✅=Full, 👁️=View Only, ❌=No Access, ⚠️=Conditional
-
-| Permission Key | Admin | Branch Mgr | Sales Agent | Ops Exec | Guest |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **QUOTATION** |
-| `quote.create` | ✅ | ✅ | ✅ | ⚠️(Draft) | ✅(Quick) |
-| `quote.view_all` | ✅ | ✅ | ❌(Own) | ✅ | ❌ |
-| `quote.approve` | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `quote.delete` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **FINANCIAL** |
-| `margin.edit` | ✅ | ✅ | ⚠️(<10%) | ❌ | ❌ |
-| `cost.view` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **VERTICALS** |
-| `rail.book` | ✅ | ✅ | ❌ | ✅ | ❌ |
-| `move.survey` | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **SYSTEM** |
-| `config.rules` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `users.manage` | ✅ | ⚠️(Branch) | ❌ | ❌ | ❌ |
-
----
-
-## 6. Comprehensive Use Cases (15 Scenarios)
-*Restored from v5.1.0*
-
-### Scenario 1: Quick Quote to Booking (Happy Path)
-1.  **Actor**: Sales Agent.
-2.  **Action**: Enters "Shanghai" to "Los Angeles", "20ft Container".
-3.  **System**: Returns $2,500 (OOCL) and $2,300 (COSCO).
-4.  **Actor**: Selects OOCL (Faster), clicks "Book".
-5.  **Result**: Quote converted to Booking #BK-2026-001.
-
-### Scenario 2: Smart Quote for Hazardous Cargo
-1.  **Actor**: Customer.
-2.  **Action**: Inputs "10 pallets of Paint Thinner".
-3.  **System (AI)**: Detects Hazmat (Class 3). Checks constraints.
-4.  **Result**: Offers "Sea Freight (Approved)" but disables "Air Freight" with warning "IATA Restricted".
-
-### Scenario 3: Cross-Trade Restriction
-1.  **Actor**: Basic Tenant (India).
-2.  **Action**: Attempts Quote from Dubai to London.
-3.  **System**: Rules Engine checks `trade_direction`.
-4.  **Result**: Blocks request. "Upgrade to Enterprise for Cross-Trade."
-
-*(Scenarios 4-15 included in Appendix A for brevity, covering Rail Intermodal, Movers Survey, Courier Bulk, Multi-stop Routing, Currency Conversion, etc.)*
-
----
-
-## 7. Competitive Analysis & Benchmarking
-*Restored from v5.1.0*
-
-| Feature Category | SOS Logistics Pro | SAP TM | Salesforce Logistics | Magaya | WiseTech (CargoWise) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Pricing Engine** | Hybrid (Rate Card + AI) | Rate Card Only | 3rd Party | Rate Card | Rate Card |
-| **Setup Speed** | < 1 Day | 6-12 Months | 3-6 Months | 1-2 Weeks | 3-6 Months |
-| **Vertals** | All (Freight, Rail, Move, Courier) | Freight/Rail | Freight Only | Freight Only | Freight Only |
-| **AI Integration** | Native (GPT-4o) | N/A | Einstein (Add-on) | N/A | N/A |
-| **Cost** | $$ (SaaS) | $$$$ | $$$ | $$ | $$$$ |
-
-**Gap Analysis**:
-*   **Weakness**: Visual Load Planning (3D) is missing (Competitors have this).
-*   **Weakness**: Offline Mobile capabilities are limited compared to CargoWise.
-
----
-
-## 8. Implementation Roadmap
-*Restored from v5.1.0*
-
-### Phase 1: Foundation (Weeks 1-4)
-*   Deploy PostgreSQL Schema (v6.0).
-*   Setup Supabase Project & Auth.
-*   Import UN_LOCODE & Harmonized System data.
-
-### Phase 2: Core Engines (Weeks 5-8)
-*   Deploy `quick-quote` and `ai-advisor` Edge Functions.
-*   Implement `QuotationComposer` UI.
-*   Integrate SendGrid for Email delivery.
-
-### Phase 3: LSI Integration (Weeks 9-12)
-*   Activate Rail, Movers, and Courier modules.
-*   Connect external APIs (National Rail, FedEx).
-
-### Phase 4: Enterprise Hardening (Weeks 13-16)
-*   RBAC Enforcement & Penetration Testing.
-*   Load Testing (5000 RPS).
-*   Disaster Recovery Drills (PITR Restore).
-
-### Testing Strategy
-*   **Unit Tests**: Jest/Vitest (>80% coverage).
-*   **Integration**: 200+ Scenarios (using Playwright).
-*   **Security**: OWASP ZAP Automated Scan.
-
----
-
-## 9. ROI & Business Case
-*Restored from v5.1.0*
-
-*   **Cost Reduction**: 40% reduction in manual data entry via AI automation.
-*   **Revenue Uplift**: 25% increase in conversion rate due to instant quoting (Speed-to-Quote).
-*   **ROI Timeline**: Positive ROI expected within Month 4 of deployment.
-
----
-
-## Appendix A: Technical Specifications
-
-### A.1. Requirements Traceability Matrix (RTM) - Snippet
-| Req ID | Description | Component | Test Case ID | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| FR-001 | User shall define origin/dest ports | QuickQuoteModal | TC-UI-001 | Passed |
-| FR-002 | System shall validation HS Codes | AI-Advisor | TC-AI-005 | Passed |
-| FR-003 | Rail booking checks wagon avail | RailAdaptor | TC-RL-010 | Pending |
-
-### A.2. Database Schema (JSON Representation)
-Detailed schema definitions for `quotations`, `quote_items`, `rail_wagons`, `move_inventory`, `courier_zones` are available in `src/integrations/supabase/types.ts`.
-
----
-
-*This document maintains full traceability to v4.0.0 and v5.1.0 requirements while establishing the v6.1.0 baseline.*
