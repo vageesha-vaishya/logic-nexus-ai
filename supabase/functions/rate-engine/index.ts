@@ -30,6 +30,7 @@ interface RateOption {
   currency: string
   transitTime: string
   validUntil?: string
+  margin_applied?: string[]
 }
 
 serve(async (req) => {
@@ -180,6 +181,55 @@ serve(async (req) => {
             price: Math.round(estimatedPrice * 1.3 * 100) / 100,
             currency: 'USD',
             transitTime: mode === 'air' ? '1-2 Days' : (mode === 'ocean' ? '20 Days' : '1 Day'),
+        });
+    }
+
+    // 6.5 Apply Tenant Margins
+    const { data: marginRules } = await supabase
+        .from('margin_rules')
+        .select('*')
+        .order('priority', { ascending: false });
+
+    if (marginRules && marginRules.length > 0) {
+        options.forEach(opt => {
+            let price = opt.price;
+            const appliedMargins: string[] = [];
+
+            for (const rule of marginRules) {
+                // Check conditions
+                let match = true;
+                const conditions = rule.condition_json;
+                
+                for (const [key, value] of Object.entries(conditions)) {
+                    // Check against request body or option details
+                    // Priority: Option -> Request
+                    const optValue = (opt as any)[key];
+                    const reqValue = (body as any)[key];
+                    const targetValue = optValue !== undefined ? optValue : reqValue;
+
+                    // Simple equality check (can be expanded to support operators like 'gt', 'lt')
+                    if (targetValue != value) { 
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) {
+                    if (rule.adjustment_type === 'percent') {
+                        price += price * (Number(rule.adjustment_value) / 100);
+                    } else if (rule.adjustment_type === 'fixed') {
+                        price += Number(rule.adjustment_value);
+                    }
+                    appliedMargins.push(rule.name);
+                }
+            }
+            
+            // Update price
+            if (appliedMargins.length > 0) {
+                // (opt as any).original_price = opt.price; // Optional: Keep original
+                opt.price = Math.round(price * 100) / 100;
+                opt.margin_applied = appliedMargins;
+            }
         });
     }
 
