@@ -23,10 +23,12 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
   const [roles, setRoles] = useState<DbRole[]>([]);
   const [permissions, setPermissions] = useState<DbPermission[]>([]);
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  const [originalRolePermissions, setOriginalRolePermissions] = useState<Record<string, string[]>>({});
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [modified, setModified] = useState(false);
+  // Remove manual modified state in favor of calculated isModified
+  // const [modified, setModified] = useState(false);
   const [hierarchyParents, setHierarchyParents] = useState<Record<string, string[]>>({});
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -60,6 +62,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
       setRoles(rolesData);
       setPermissions(permsData);
       setRolePermissions(rolePermsMap);
+      setOriginalRolePermissions(rolePermsMap);
       setHierarchyParents(hierarchy.childrenToParents || {});
       setInheritanceAvailable((hierarchy as any).available !== false);
       if (rolesData.length > 0 && !selectedRole) {
@@ -100,7 +103,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
       
       return { ...prev, [selectedRole]: updated };
     });
-    setModified(true);
+    // setModified(true); // Calculated dynamically
   };
 
   const handleSave = async () => {
@@ -110,7 +113,11 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
     try {
       await roleService.updateRolePermissions(selectedRole, rolePermissions[selectedRole] || [], justification || undefined);
       toast.success('Permissions updated successfully');
-      setModified(false);
+      // Update original permissions to match current
+      setOriginalRolePermissions(prev => ({
+        ...prev,
+        [selectedRole]: rolePermissions[selectedRole] || []
+      }));
       setJustification('');
     } catch (error) {
       console.error('Save failed:', error);
@@ -121,9 +128,24 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
   };
 
   const handleReset = () => {
-    loadData();
-    setModified(false);
+    // Revert current role to original
+    if (selectedRole) {
+      setRolePermissions(prev => ({
+        ...prev,
+        [selectedRole]: originalRolePermissions[selectedRole] || []
+      }));
+    } else {
+      loadData();
+    }
   };
+
+  const modified = useMemo(() => {
+    if (!selectedRole) return false;
+    const current = rolePermissions[selectedRole] || [];
+    const original = originalRolePermissions[selectedRole] || [];
+    if (current.length !== original.length) return true;
+    return !current.every(p => original.includes(p));
+  }, [selectedRole, rolePermissions, originalRolePermissions]);
 
   // Group permissions by category
   const filteredPermissions = permQuery
@@ -214,8 +236,11 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
                           if (modified) {
                             if (confirm('You have unsaved changes. Discard them?')) {
                               setSelectedRole(role.id);
-                              setModified(false);
-                              loadData(); // Reload to reset pending changes
+                              // Reset current changes for the *previous* role? 
+                              // Actually loadData() reloads everything, so it resets everything.
+                              // But if we just switch roles, we might want to keep the changes or discard them.
+                              // The logic here reloads data, so it discards changes.
+                              loadData(); 
                             }
                           } else {
                             setSelectedRole(role.id);
@@ -295,6 +320,21 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
               </CardHeader>
               <Separator />
               <CardContent className="flex-1 overflow-hidden p-0">
+                {conflicts.length > 0 && (
+                  <div className="m-4 p-3 rounded-md border border-destructive/40 bg-destructive/10">
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                      Validation Issues
+                    </p>
+                    <ul className="mt-2 text-sm list-disc list-inside">
+                      {conflicts.map(c => <li key={c.code}>{c.message}</li>)}
+                    </ul>
+                    <div className="mt-3 grid gap-2">
+                      <label className="text-sm font-medium">Justification (Required to Save)</label>
+                      <Input value={justification} onChange={e => setJustification(e.target.value)} placeholder="Provide justification for overriding warnings" />
+                    </div>
+                  </div>
+                )}
                 <Tabs defaultValue="all" className="h-full flex flex-col">
                   <div className="px-6 py-2 border-b bg-muted/40">
                     <div className="flex items-center gap-3 mb-2">
@@ -441,18 +481,6 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
                       </div>
                     </div>
                   </div>
-                  {conflicts.length > 0 && (
-                    <div className="p-3 rounded-md border border-destructive/40 bg-destructive/10">
-                      <p className="text-sm font-semibold">Validation Issues</p>
-                      <ul className="mt-2 text-sm">
-                        {conflicts.map(c => <li key={c.code}>{c.message}</li>)}
-                      </ul>
-                      <div className="mt-3 grid gap-2">
-                        <label className="text-sm font-medium">Justification</label>
-                        <Input value={justification} onChange={e => setJustification(e.target.value)} placeholder="Provide justification for overriding warnings" />
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <Separator className="mt-2" />
                 <div className="p-6 space-y-4">
