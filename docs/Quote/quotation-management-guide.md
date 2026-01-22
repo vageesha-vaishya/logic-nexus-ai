@@ -100,24 +100,24 @@ The system follows a **Micro-Kernel Architecture** with a core orchestrator and 
 #### Component Diagram
 ```mermaid
 graph TD
-    Client[Web Client (React)] -->|HTTPS| Edge[Supabase Edge Functions]
+    Client["Web Client (React)"] -->|HTTPS| Edge["Supabase Edge Functions"]
     
     subgraph "Core Services"
-        Edge -->|Invoke| RE[Rate Engine]
-        Edge -->|Invoke| AI[AI Advisor]
-        Edge -->|Invoke| ME[Margin Engine]
+        Edge -->|Invoke| RE["Rate Engine"]
+        Edge -->|Invoke| AI["AI Advisor"]
+        Edge -->|Invoke| ME["Margin Engine"]
     end
     
     subgraph "Data Layer"
-        RE -->|Read| DB[(Postgres DB)]
+        RE -->|Read| DB[("Postgres DB")]
         ME -->|Read| DB
-        AI -->|Cache| Redis[(Redis Cache)]
+        AI -->|Cache| Redis[("Redis Cache")]
     end
     
     subgraph "External Integrations"
-        AI -->|API| OpenAI[OpenAI GPT-4o]
-        RE -->|API| Maersk[Maersk API]
-        RE -->|API| Freightos[Freightos API]
+        AI -->|API| OpenAI["OpenAI GPT-4o"]
+        RE -->|API| Maersk["Maersk API"]
+        RE -->|API| Freightos["Freightos API"]
     end
 ```
 
