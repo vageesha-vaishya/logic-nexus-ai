@@ -18,7 +18,7 @@ import { invokeFunction } from '@/lib/supabase-functions';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   first_name: z.string().min(2, 'First name must be at least 2 characters'),
   last_name: z.string().min(2, 'Last name must be at least 2 characters'),
   phone: z.string().optional(),
@@ -51,6 +51,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   const [assignedRoles, setAssignedRoles] = useState<Array<{ role: UserRole; tenant_id?: string | null; franchise_id?: string | null }>>(
     (user?.user_roles || []).map((r: any) => ({ role: r.role, tenant_id: r.tenant_id || null, franchise_id: r.franchise_id || null })) || []
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Determine current user's role for permission checks
   const currentUserRole: UserRole = context.isPlatformAdmin ? 'platform_admin' 
@@ -75,6 +76,18 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       franchise_id: user?.user_roles?.[0]?.franchise_id || context.franchiseId || '',
     },
   });
+
+  // Debug: Log validation errors whenever they change
+  useEffect(() => {
+    if (Object.keys(form.formState.errors).length > 0) {
+      console.error('[UserForm] Form Validation Errors:', form.formState.errors);
+      toast({
+        title: 'Validation Error',
+        description: 'Please check the form fields for errors.',
+        variant: 'destructive',
+      });
+    }
+  }, [form.formState.errors, toast]);
 
   useEffect(() => {
     fetchTenants();
@@ -624,8 +637,12 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         </div>
 
         <div className="flex gap-4">
-          <Button type="submit" className="flex-1">
-            {user ? 'Update' : 'Create'} User
+          <Button 
+            type="submit" 
+            className="flex-1"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Processing...' : (user ? 'Update' : 'Create') + ' User'}
           </Button>
           <Button
             type="button"
