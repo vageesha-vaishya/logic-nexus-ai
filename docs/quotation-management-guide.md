@@ -39,29 +39,29 @@ Version 5.1.0 represents the definitive "Universal Logistics Operating System" s
 #### 2.1.1. High-Level Architecture
 ```mermaid
 graph TD
-    User[User / Guest] --> API[API Gateway]
+    User["User / Guest"] --> API["API Gateway"]
     
     subgraph "Core Engines"
-        API --> Auth[Auth & RBAC]
-        API --> AI[AI Advisor (Pricing & Routing)]
-        API --> Rules[Business Rules Engine]
+        API --> Auth["Auth & RBAC"]
+        API --> AI["AI Advisor (Pricing & Routing)"]
+        API --> Rules["Business Rules Engine"]
     end
     
     subgraph "Vertical Adaptors (LSI)"
-        AI --> AirSea[Air/Sea Adaptor]
-        AI --> Rail[Rail Network Adaptor]
-        AI --> Move[Relocation Adaptor]
-        AI --> Courier[Courier Aggregator]
+        AI --> AirSea["Air/Sea Adaptor"]
+        AI --> Rail["Rail Network Adaptor"]
+        AI --> Move["Relocation Adaptor"]
+        AI --> Courier["Courier Aggregator"]
     end
     
     subgraph "External Integrations"
-        AirSea --> INTTRA[INTTRA / Airline APIs]
-        Rail --> NRI[National Rail Interface]
-        Courier --> FedEx[FedEx/DHL APIs]
+        AirSea --> INTTRA["INTTRA / Airline APIs"]
+        Rail --> NRI["National Rail Interface"]
+        Courier --> FedEx["FedEx/DHL APIs"]
     end
     
     subgraph "Data Layer"
-        AirSea --> DB[(PostgreSQL)]
+        AirSea --> DB[("PostgreSQL")]
         Rail --> DB
         Move --> DB
         Courier --> DB
