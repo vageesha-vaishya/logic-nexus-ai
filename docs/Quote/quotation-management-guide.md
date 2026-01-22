@@ -67,27 +67,27 @@ The following use cases define the core interactions for the Quotation Module.
 
 ### 1.2. UML Use Case Diagram
 ```mermaid
-usecaseDiagram
-    actor "Sales Agent" as SA
-    actor "Guest User" as GU
-    actor "AI Advisor" as AI
-    actor "Rate Engine" as RE
+graph TD
+    SA[Sales Agent]
+    GU[Guest User]
+    AI[AI Advisor]
+    RE[Rate Engine]
 
-    package "Quotation System" {
-        usecase "Generate Quick Quote" as UC1
-        usecase "Compare Options" as UC2
-        usecase "Download PDF" as UC3
-        usecase "Book Shipment" as UC4
-    }
+    subgraph "Quotation System"
+        UC1([Generate Quick Quote])
+        UC2([Compare Options])
+        UC3([Download PDF])
+        UC4([Book Shipment])
+    end
 
     SA --> UC1
     GU --> UC1
     SA --> UC3
     SA --> UC4
     
-    UC1 ..> AI : <<include>>
-    UC1 ..> RE : <<include>>
-    UC1 --> UC2 : <<extends>>
+    UC1 -.->|&lt;&lt;include&gt;&gt;| AI
+    UC1 -.->|&lt;&lt;include&gt;&gt;| RE
+    UC1 -->|&lt;&lt;extends&gt;&gt;| UC2
 ```
 
 ---
