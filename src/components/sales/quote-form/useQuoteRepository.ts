@@ -66,14 +66,56 @@ export function useQuoteRepository() {
     }
 
     let savedId = quoteId || '';
-    if (quoteId) {
+
+    // Check for existing draft if creating new
+    if (!savedId) {
+       try {
+         // Look for a recent draft (last 1 hour) with same key details
+         let query = scopedDb
+            .from('quotes')
+            .select('id')
+            .eq('tenant_id', finalTenantId)
+            .eq('status', 'draft')
+            .gt('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+         if (payload.title) query = query.eq('title', payload.title);
+         
+         // Match key fields to ensure it's the "same" quote
+         if (payload.account_id) query = query.eq('account_id', payload.account_id);
+         else query = query.is('account_id', null);
+
+         if (payload.origin_port_id) query = query.eq('origin_port_id', payload.origin_port_id);
+         else query = query.is('origin_port_id', null);
+
+         if (payload.destination_port_id) query = query.eq('destination_port_id', payload.destination_port_id);
+         else query = query.is('destination_port_id', null);
+
+         const { data: existing } = await query;
+         
+         if (existing && existing.length > 0) {
+            savedId = existing[0].id;
+            console.log(`[QuoteRepository] Found existing draft ${savedId}, updating instead of creating new.`);
+         }
+       } catch (checkError) {
+         console.warn('[QuoteRepository] Error checking for existing drafts:', checkError);
+         // Proceed to insert if check fails, better to duplicate than fail
+       }
+    }
+
+    if (savedId) {
+      console.log(`[QuoteRepository] Updating quote ${savedId}`);
       const { error: updateError } = await scopedDb
         .from('quotes')
-        .update(payload)
-        .eq('id', quoteId);
+        .update({
+            ...payload,
+            updated_at: new Date().toISOString() // Ensure timestamp update
+        })
+        .eq('id', savedId);
       if (updateError) throw updateError;
-      savedId = quoteId;
     } else {
+      console.log(`[QuoteRepository] Creating new quote`);
       const { data: inserted, error: insertError } = await scopedDb
         .from('quotes')
         .insert(payload)

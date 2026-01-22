@@ -12,19 +12,26 @@ interface RateOption {
     price: number;
     currency: string;
     transitTime: string;
-    tier: string;
+    tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
     reliability?: { score: number; on_time_performance: string };
     environmental?: { co2_emissions: string; rating: string };
     ai_explanation?: string;
     source_attribution?: string;
+    co2_kg?: number;
+    route_type?: 'Direct' | 'Transshipment';
+    stops?: number;
 }
+
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface QuoteComparisonViewProps {
     options: RateOption[];
     onSelect: (option: RateOption) => void;
+    selectedIds?: string[];
+    onToggleSelection?: (id: string) => void;
 }
 
-export function QuoteComparisonView({ options, onSelect }: QuoteComparisonViewProps) {
+export function QuoteComparisonView({ options, onSelect, selectedIds = [], onToggleSelection }: QuoteComparisonViewProps) {
     if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
 
     return (
@@ -33,10 +40,20 @@ export function QuoteComparisonView({ options, onSelect }: QuoteComparisonViewPr
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[150px]">Feature</TableHead>
-                        {options.map(opt => (
-                            <TableHead key={opt.id} className="min-w-[180px] text-center bg-muted/20">
-                                <div className="flex flex-col items-center gap-1 py-2">
-                                    <span className="font-bold text-foreground">{opt.carrier}</span>
+                        {options.map(opt => {
+                            const isSelected = selectedIds.includes(opt.id);
+                            return (
+                                <TableHead key={opt.id} className={`min-w-[180px] text-center ${isSelected ? 'bg-primary/5' : 'bg-muted/20'}`}>
+                                    <div className="flex flex-col items-center gap-1 py-2 relative">
+                                        {onToggleSelection && (
+                                            <div className="absolute top-1 right-1">
+                                                <Checkbox 
+                                                    checked={isSelected}
+                                                    onCheckedChange={() => onToggleSelection(opt.id)}
+                                                />
+                                            </div>
+                                        )}
+                                        <span className="font-bold text-foreground mt-2">{opt.carrier}</span>
                                     <span className="text-xs font-normal text-muted-foreground">{opt.name}</span>
                                     {opt.tier && (
                                         <Badge variant="secondary" className="text-[10px] capitalize">
@@ -45,7 +62,8 @@ export function QuoteComparisonView({ options, onSelect }: QuoteComparisonViewPr
                                     )}
                                 </div>
                             </TableHead>
-                        ))}
+                            );
+                        })}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -66,6 +84,25 @@ export function QuoteComparisonView({ options, onSelect }: QuoteComparisonViewPr
                         ))}
                     </TableRow>
                     <TableRow>
+                        <TableCell className="font-medium">Route Details</TableCell>
+                        {options.map(opt => (
+                            <TableCell key={opt.id} className="text-center">
+                                <div className="flex flex-col items-center gap-1">
+                                    {opt.route_type && (
+                                        <Badge variant="outline" className="text-[10px]">
+                                            {opt.route_type}
+                                        </Badge>
+                                    )}
+                                    {opt.stops !== undefined && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {opt.stops === 0 ? 'Direct' : `${opt.stops} Stop${opt.stops > 1 ? 's' : ''}`}
+                                        </span>
+                                    )}
+                                </div>
+                            </TableCell>
+                        ))}
+                    </TableRow>
+                    <TableRow>
                         <TableCell className="font-medium">Reliability</TableCell>
                         {options.map(opt => (
                             <TableCell key={opt.id} className="text-center">
@@ -82,10 +119,14 @@ export function QuoteComparisonView({ options, onSelect }: QuoteComparisonViewPr
                         <TableCell className="font-medium">Eco Rating</TableCell>
                         {options.map(opt => (
                             <TableCell key={opt.id} className="text-center">
-                                {opt.environmental ? (
+                                {(opt.environmental || opt.co2_kg) ? (
                                     <div className="flex flex-col items-center">
-                                        <span className="font-semibold text-green-600">{opt.environmental.rating}</span>
-                                        <span className="text-[10px] text-muted-foreground">{opt.environmental.co2_emissions}</span>
+                                        <span className="font-semibold text-green-600">
+                                            {opt.environmental?.rating || (opt.co2_kg ? (opt.co2_kg < 1000 ? 'A' : 'B') : 'N/A')}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                            {opt.co2_kg ? `${opt.co2_kg} kg` : opt.environmental?.co2_emissions}
+                                        </span>
                                     </div>
                                 ) : <span className="text-muted-foreground">-</span>}
                             </TableCell>

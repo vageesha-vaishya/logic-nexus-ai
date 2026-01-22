@@ -24,6 +24,8 @@ interface Option {
   margin_amount?: number;
   margin_percentage?: number;
   transit_time_days: number | null;
+  transit_time?: string | null;
+  service_type?: string | null;
 }
 
 interface VersionComparisonProps {
@@ -79,27 +81,31 @@ export function VersionComparison({ open, onClose, version1Id, version2Id }: Ver
       setOptions1(opts1?.map((o: any) => ({
         id: o.id,
         option_name: o.option_name,
-        carrier_name: o.carrier_rates?.carrier_name || 'Unknown',
+        carrier_name: o.carrier_name || o.carrier_rates?.carrier_name || 'Unknown',
         total_amount: o.total_amount,
-        currency: o.carrier_rates?.currency || 'USD',
+        currency: o.currency || o.carrier_rates?.currency || 'USD',
         total_buy: o.total_buy,
         total_sell: o.total_sell,
         margin_amount: o.margin_amount,
         margin_percentage: o.margin_percentage,
         transit_time_days: o.transit_time_days,
+        transit_time: o.transit_time,
+        service_type: o.service_type
       })) || []);
 
       setOptions2(opts2?.map((o: any) => ({
         id: o.id,
         option_name: o.option_name,
-        carrier_name: o.carrier_rates?.carrier_name || 'Unknown',
+        carrier_name: o.carrier_name || o.carrier_rates?.carrier_name || 'Unknown',
         total_amount: o.total_amount,
-        currency: o.carrier_rates?.currency || 'USD',
+        currency: o.currency || o.carrier_rates?.currency || 'USD',
         total_buy: o.total_buy,
         total_sell: o.total_sell,
         margin_amount: o.margin_amount,
         margin_percentage: o.margin_percentage,
         transit_time_days: o.transit_time_days,
+        transit_time: o.transit_time,
+        service_type: o.service_type
       })) || []);
     } catch (error) {
       console.error('Failed to load comparison data:', error);
@@ -134,13 +140,20 @@ export function VersionComparison({ open, onClose, version1Id, version2Id }: Ver
             <CardContent className="p-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="font-medium">
-                    {option.option_name || option.carrier_name}
-                  </Badge>
-                  {option.transit_time_days && (
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="outline" className="font-medium self-start">
+                      {option.option_name || option.carrier_name}
+                    </Badge>
+                    {option.service_type && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {option.service_type.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  {(option.transit_time || option.transit_time_days) && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {option.transit_time_days} days
+                      {option.transit_time || `${option.transit_time_days} days`}
                     </span>
                   )}
                 </div>

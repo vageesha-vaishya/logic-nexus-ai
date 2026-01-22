@@ -199,7 +199,7 @@ export function useQuoteData() {
     opportunities: [...injectedOpportunities, ...opportunities].filter((v, i, arr) => arr.findIndex((x: any) => String(x.id) === String(v.id)) === i),
     isLoadingOpportunities,
     setResolvedTenantId,
-    resolvedTenantId,
+    resolvedTenantId: tenantId,
     setAccounts: (updater?: (prev: any[]) => any[]) => {
       setInjectedAccounts((prev) => (updater ? updater(prev) : prev));
     },

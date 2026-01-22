@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle } from 'lucide-react';
+import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
@@ -18,9 +18,16 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { QuoteResultsList } from './QuoteResultsList';
 import { QuoteComparisonView } from './QuoteComparisonView';
-import { LayoutList, Columns } from 'lucide-react';
+import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
+import { logger } from '@/lib/logger';
+
+const CARRIER_OPTIONS = [
+  "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
+  "ONE", "Evergreen", "HMM", "Yang Ming", "ZIM"
+];
 
 // --- Zod Schemas ---
 
@@ -29,6 +36,7 @@ const baseSchema = z.object({
   origin: z.string().min(2, "Origin is required"), // Store Code or Name
   destination: z.string().min(2, "Destination is required"), // Store Code or Name
   commodity: z.string().min(2, "Commodity is required"),
+  preferredCarriers: z.array(z.string()).optional(),
   // Common
   weight: z.string().optional(),
   volume: z.string().optional(),
@@ -65,19 +73,24 @@ type QuickQuoteValues = z.infer<typeof baseSchema> & {
 
 interface RateOption {
   id: string;
-  tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable';
-  name: string;
+  carrier: string; // carrier name
+  name: string; // option name
   price: number;
   currency: string;
   transitTime: string;
-  carrier: string;
-  validUntil?: string;
-  // Extended AI Fields
-  legs?: any[];
-  price_breakdown?: any;
-  reliability?: any;
-  environmental?: any;
+  tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
+  reliability?: { score: number; on_time_performance: string };
+  environmental?: { co2_emissions: string; rating: string };
+  ai_explanation?: string;
   source_attribution?: string;
+  co2_kg?: number;
+  route_type?: 'Direct' | 'Transshipment';
+  stops?: number;
+  legs?: any[]; 
+  charges?: any[];
+  price_breakdown?: any;
+  validUntil?: string | null;
+  service_type?: string;
 }
 
 interface QuickQuoteModalProps {
@@ -102,6 +115,9 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [anomalies, setAnomalies] = useState<string[]>([]);
+
+  // Multi-Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Extended Form State
   const [extendedData, setExtendedData] = useState({
@@ -153,18 +169,29 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
             const { data } = await invokeAiAdvisor({
                 action: 'lookup_codes', payload: { query, mode }
             });
-            if (data?.suggestions) {
-                // In a real app, we'd show a dropdown. For now, we'll just log or set state for a simple UI hint
+            if (data?.suggestions && data.suggestions.length > 0) {
                 setCodeSuggestions(data.suggestions);
+                
+                // Auto-populate details from best match to ensure QuoteNew has full address
+                const bestMatch = data.suggestions[0];
+                setExtendedData(prev => ({
+                    ...prev,
+                    [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
+                        name: bestMatch.label,
+                        formatted_address: bestMatch.details || bestMatch.label, // Ensure formatted_address exists
+                        ...bestMatch
+                    }
+                }));
             }
         } catch (e) { console.error(e); }
     };
 
     const timer = setTimeout(() => {
         if (origin) lookup(origin, 'origin');
+        if (destination) lookup(destination, 'destination');
     }, 800);
     return () => clearTimeout(timer);
-  }, [origin, mode]);
+  }, [origin, destination, mode]);
 
 
   // AI: Classify Commodity & Suggest HTS
@@ -365,7 +392,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
           const legacyOptions = legacyRes.data.options.map((opt: any) => ({
               ...opt,
               source_attribution: 'Standard Rate Engine',
-              tier: opt.tier || 'standard'
+              tier: opt.tier || 'standard',
+              co2_kg: opt.co2_kg,
+              route_type: opt.route_type,
+              stops: opt.stops
           }));
           combinedOptions = [...combinedOptions, ...legacyOptions];
       }
@@ -453,21 +483,80 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     }
   };
 
-  const handleConvertToQuote = (option: RateOption) => {
-    setIsOpen(false);
-    navigate('/dashboard/quotes/new', { 
-      state: { 
-        ...form.getValues(),
-        ...extendedData,
-        selectedRate: option,
-        accountId: accountId
-      } 
-    });
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+        prev.includes(id) 
+            ? prev.filter(x => x !== id) 
+            : [...prev, id]
+    );
+  };
+
+  const handleConvertToQuote = (option: RateOption | RateOption[]) => {
+    const selectedOptions = Array.isArray(option) ? option : [option];
+    
+    // Construct the transfer payload
+    const transferPayload = { 
+      ...form.getValues(),
+      ...extendedData,
+      selectedRates: selectedOptions,
+      accountId: accountId
+    };
+
+    // 1. Validation
+    try {
+        // Use safeParse to allow handling errors gracefully without crashing if needed, 
+        // but here we want to block invalid data.
+        const validatedData = QuoteTransferSchema.parse(transferPayload);
+        
+        // 2. Logging
+        logger.info('Initiating Quick Quote to New Quote Transfer', {
+            origin: validatedData.origin,
+            destination: validatedData.destination,
+            mode: validatedData.mode,
+            optionsCount: validatedData.selectedRates.length,
+            timestamp: new Date().toISOString()
+        });
+
+        setIsOpen(false);
+        navigate('/dashboard/quotes/new', { 
+            state: {
+                ...validatedData,
+                selectedRate: selectedOptions[0] // Maintain backward compatibility if needed
+            }
+        });
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            logger.error('Quote Transfer Validation Failed', { errors: error.errors });
+            toast({
+                title: "Data Validation Error",
+                description: "Cannot proceed: Missing required fields for quote generation.",
+                variant: "destructive"
+            });
+            // Detailed log for debugging
+            console.error("Validation details:", error.errors);
+        } else {
+            logger.error('Unexpected Transfer Error', { error });
+            toast({
+                title: "Transfer Error",
+                description: "An unexpected error occurred preparing the quote.",
+                variant: "destructive"
+            });
+        }
+    }
+  };
+
+  const handleConvertSelected = () => {
+    if (!results) return;
+    const selectedOptions = results.filter(r => selectedIds.includes(r.id));
+    if (selectedOptions.length > 0) {
+        handleConvertToQuote(selectedOptions);
+    }
   };
 
   const reset = () => {
     setResults(null);
     form.reset();
+    setSelectedIds([]);
     setExtendedData({
         containerType: 'dry', containerSize: '20ft', containerQty: '1',
         htsCode: '', scheduleB: '', dims: '', dangerousGoods: false,
@@ -562,6 +651,46 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     </button>
                  </Label>
                  <Input {...form.register("commodity")} onBlur={handleAiSuggest} className="bg-background" />
+              </div>
+
+              {/* Preferred Carriers */}
+              <div className="space-y-2">
+                 <Label>Preferred Carriers (Optional)</Label>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between text-left font-normal h-9 bg-background">
+                            <span className="truncate">
+                                {(form.watch("preferredCarriers")?.length ?? 0) > 0
+                                    ? `${form.watch("preferredCarriers")?.length} Selected` 
+                                    : "Any Carrier"}
+                            </span>
+                            <ChevronDown className="w-4 h-4 opacity-50" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="start">
+                        <DropdownMenuLabel>Select Carriers</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {CARRIER_OPTIONS.map((carrier) => {
+                            const current = form.watch("preferredCarriers") || [];
+                            const isSelected = current.includes(carrier);
+                            return (
+                                <DropdownMenuCheckboxItem
+                                    key={carrier}
+                                    checked={isSelected}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) {
+                                            form.setValue("preferredCarriers", [...current, carrier]);
+                                        } else {
+                                            form.setValue("preferredCarriers", current.filter(c => c !== carrier));
+                                        }
+                                    }}
+                                >
+                                    {carrier}
+                                </DropdownMenuCheckboxItem>
+                            );
+                        })}
+                    </DropdownMenuContent>
+                 </DropdownMenu>
               </div>
 
               {/* Dynamic Fields based on Mode */}
@@ -791,9 +920,32 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     </div>
                     
                     {viewMode === 'list' ? (
-                        <QuoteResultsList results={results} onSelect={handleConvertToQuote} />
+                        <QuoteResultsList 
+                            results={results} 
+                            onSelect={(opt) => handleConvertToQuote(opt)} 
+                            selectedIds={selectedIds}
+                            onToggleSelection={toggleSelection}
+                        />
                     ) : (
-                        <QuoteComparisonView options={results} onSelect={handleConvertToQuote} />
+                        <QuoteComparisonView 
+                            options={results} 
+                            onSelect={(opt) => handleConvertToQuote(opt)}
+                            selectedIds={selectedIds}
+                            onToggleSelection={toggleSelection}
+                        />
+                    )}
+
+                    {/* Floating Selection Footer */}
+                    {selectedIds.length > 0 && (
+                        <div className="sticky bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg flex justify-between items-center animate-in slide-in-from-bottom-5">
+                            <div className="text-sm font-medium">
+                                <Badge variant="secondary" className="mr-2">{selectedIds.length}</Badge>
+                                options selected
+                            </div>
+                            <Button onClick={handleConvertSelected} className="gap-2">
+                                Create Quote with Selected <ArrowRight className="w-4 h-4"/>
+                            </Button>
+                        </div>
                     )}
                 </div>
             )}

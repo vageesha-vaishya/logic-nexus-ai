@@ -19,6 +19,7 @@ interface Leg {
   charges: any[];
   legType?: 'transport' | 'service';
   serviceOnlyCategory?: string;
+  carrierName?: string;
 }
 
 interface LegsConfigurationStepProps {
@@ -87,7 +88,7 @@ export function LegsConfigurationStep({
                           {isServiceLeg ? 'Service' : 'Leg'} {index + 1} - {
                             isServiceLeg 
                               ? (serviceCategories?.find((c) => c.code === leg.serviceOnlyCategory)?.name || 'Service')
-                              : (serviceTypes.find((st) => st.id === leg.serviceTypeId)?.name || leg.mode.toUpperCase())
+                              : (serviceTypes.find((st) => st.id === leg.serviceTypeId)?.name || leg.carrierName || leg.mode.toUpperCase())
                           }
                         </CardTitle>
                       </div>

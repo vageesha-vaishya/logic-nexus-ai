@@ -31,7 +31,27 @@ interface RateOption {
   transitTime: string
   validUntil?: string
   margin_applied?: string[]
+  co2_kg?: number
+  route_type?: 'Direct' | 'Transshipment'
+  stops?: number
 }
+
+// Global Carrier List for AI Simulation / Market Estimates
+const CARRIERS = {
+    ocean: [
+        'COSCO Shipping', 'ONE (Ocean Network Express)', 'Hapag-Lloyd', 
+        'Maersk', 'MSC', 'CMA CGM', 'Evergreen', 'Yang Ming', 'HMM', 'ZIM', 'Wan Hai', 'PIL'
+    ],
+    air: [
+        'Emirates SkyCargo', 'Cathay Pacific Cargo', 'Korean Air Cargo', 
+        'Lufthansa Cargo', 'FedEx', 'UPS', 'Qatar Airways Cargo', 
+        'China Airlines Cargo', 'Singapore Airlines Cargo', 'DHL Aviation'
+    ],
+    road: [
+        'JB Hunt', 'XPO Logistics', 'Old Dominion', 'YRC Freight', 
+        'Estes Express', 'TForce Freight', 'ABF Freight', 'R+L Carriers', 'Saia', 'Southeastern'
+    ]
+};
 
 serve(async (req) => {
   // 1. CORS
@@ -141,10 +161,11 @@ serve(async (req) => {
         }
     }
 
-    // 6. Fallback / Market Estimates
-    if (options.length === 0) {
-        // Dynamic Base Rates
-        let estimatedPrice = 0;
+    // 6. Fallback / 10+ Options Guarantee Strategy
+    if (options.length < 10) {
+        // Dynamic Base Rates Calculation
+        let basePrice = 0;
+        let baseTransitDays = 0;
 
         if (mode === 'ocean') {
             const baseRate20 = 1500;
@@ -152,35 +173,61 @@ serve(async (req) => {
             const qty = Number(containerQty) || 1;
             const size = containerSize || '20ft';
             const base = size.includes('40') ? baseRate40 : baseRate20;
-            estimatedPrice = base * qty;
+            basePrice = base * qty;
+            baseTransitDays = 25;
         } else if (mode === 'air') {
             const ratePerKg = 4.50;
-            estimatedPrice = (weightKg || 100) * ratePerKg;
+            basePrice = (weightKg || 100) * ratePerKg;
+            baseTransitDays = 3;
         } else if (mode === 'road') {
-            const ratePerKm = 2.50; // Mock distance based
+            const ratePerKm = 2.50; 
             const mockDistance = 500; // km
-            estimatedPrice = mockDistance * ratePerKm;
-            if (vehicleType === 'reefer') estimatedPrice *= 1.2;
+            basePrice = mockDistance * ratePerKm;
+            if (vehicleType === 'reefer') basePrice *= 1.2;
+            baseTransitDays = 1;
         }
 
-        options.push({
-            id: 'mkt_std',
-            tier: 'market',
-            name: 'Standard Market Rate',
-            carrier: 'Market Avg',
-            price: Math.round(estimatedPrice * 100) / 100,
-            currency: 'USD',
-            transitTime: mode === 'air' ? '3-5 Days' : (mode === 'ocean' ? '25-30 Days' : '2 Days'),
-        });
+        // Generate Simulated Options for Target Carriers
+        const targetCarriers = CARRIERS[mode] || CARRIERS.ocean; // Default to ocean if unknown
         
-        options.push({
-            id: 'mkt_exp',
-            tier: 'market',
-            name: 'Express Market Rate',
-            carrier: 'Market Avg',
-            price: Math.round(estimatedPrice * 1.3 * 100) / 100,
-            currency: 'USD',
-            transitTime: mode === 'air' ? '1-2 Days' : (mode === 'ocean' ? '20 Days' : '1 Day'),
+        targetCarriers.forEach((carrierName, index) => {
+            // Skip if we already have a real contract/spot rate for this carrier
+            if (options.some(o => o.carrier === carrierName)) return;
+
+            // Stop if we have enough options (though we want to provide variety)
+            // if (options.length >= 15) return; 
+
+            // Simulation Factors
+            // Price Variance: +/- 15% based on carrier index to ensure spread
+            const priceVariance = 0.85 + (Math.random() * 0.3); 
+            // Transit Variance: +/- 20%
+            const transitVariance = 0.8 + (Math.random() * 0.4);
+            
+            const simulatedPrice = basePrice * priceVariance;
+            const simulatedTransit = Math.round(baseTransitDays * transitVariance);
+            
+            // Determine Service Level
+            const isExpress = simulatedTransit < baseTransitDays;
+            const routeType = isExpress ? 'Direct' : 'Transshipment';
+            const stops = isExpress ? 0 : 1 + Math.floor(Math.random() * 2);
+
+            // CO2 Estimate (Simple Factor)
+            const co2Factor = mode === 'air' ? 0.6 : (mode === 'ocean' ? 0.03 : 0.1); // kg CO2 per kg cargo
+            const estimatedCo2 = Math.round((weightKg || 1000) * co2Factor * (1 + (stops * 0.1)));
+
+            options.push({
+                id: `sim_${mode}_${index}_${Date.now()}`,
+                tier: 'market',
+                name: `${carrierName} ${isExpress ? 'Express' : 'Standard'}`,
+                carrier: carrierName,
+                price: Math.round(simulatedPrice * 100) / 100,
+                currency: 'USD',
+                transitTime: `${simulatedTransit} Days`,
+                route_type: routeType,
+                stops: stops,
+                co2_kg: estimatedCo2,
+                validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Valid for 7 days
+            });
         });
     }
 

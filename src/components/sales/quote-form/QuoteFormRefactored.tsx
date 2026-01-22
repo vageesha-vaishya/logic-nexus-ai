@@ -18,10 +18,12 @@ interface QuoteFormProps {
   quoteId?: string;
   onSuccess?: (quoteId: string) => void;
   initialData?: Partial<QuoteFormValues>;
+  autoSave?: boolean;
 }
 
-function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
+function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const [composerVersionId] = useState<string>('');
   const { saveQuote } = useQuoteRepository();
   
@@ -45,6 +47,18 @@ function QuoteFormContent({ quoteId, onSuccess, initialData }: QuoteFormProps) {
       });
     }
   }, [initialData, form]);
+
+  // Auto-save logic for Quick Quote conversion
+  useEffect(() => {
+    if (autoSave && !hasAutoSaved && !quoteId && initialData && !isSubmitting) {
+      console.log('[QuoteForm] Triggering auto-save from Quick Quote data...');
+      const timer = setTimeout(() => {
+        form.handleSubmit(onSubmit)();
+        setHasAutoSaved(true);
+      }, 500); // Small delay to ensure form state is settled
+      return () => clearTimeout(timer);
+    }
+  }, [autoSave, hasAutoSaved, quoteId, initialData, form]);
 
   const { isHydrating } = useQuoteHydration(form, quoteId);
 

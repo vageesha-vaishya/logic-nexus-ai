@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
 import { QuoteDetailView } from './QuoteDetailView';
 import { QuoteMapVisualizer } from './QuoteMapVisualizer';
@@ -15,7 +16,7 @@ interface RateOption {
     price: number;
     currency: string;
     transitTime: string;
-    tier: string;
+    tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
     legs?: any[];
     price_breakdown?: any;
     reliability?: { score: number; on_time_performance: string };
@@ -23,14 +24,19 @@ interface RateOption {
     source_attribution?: string;
     ai_explanation?: string;
     transport_mode?: string;
+    co2_kg?: number;
+    route_type?: 'Direct' | 'Transshipment';
+    stops?: number;
 }
 
 interface QuoteResultsListProps {
     results: RateOption[];
     onSelect: (option: RateOption) => void;
+    selectedIds?: string[];
+    onToggleSelection?: (id: string) => void;
 }
 
-export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
+export function QuoteResultsList({ results, onSelect, selectedIds = [], onToggleSelection }: QuoteResultsListProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     if (!results || results.length === 0) return null;
@@ -54,13 +60,28 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
 
     return (
         <div className="space-y-4">
-            {results.map((option) => (
-                <Card key={option.id} className={`relative overflow-hidden transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-primary hover:shadow-md ${expandedId === option.id ? 'border-primary' : ''}`}>
+            {results.map((option) => {
+                const isSelected = selectedIds.includes(option.id);
+                return (
+                <Card 
+                    key={option.id} 
+                    className={`relative overflow-hidden transition-all duration-200 group border-l-4 hover:shadow-md 
+                        ${isSelected ? 'border-l-primary ring-2 ring-primary/20' : 'border-l-transparent hover:border-l-primary'}
+                        ${expandedId === option.id ? 'border-primary' : ''}`}
+                >
                     <CardContent className="p-5">
                         <div className="flex justify-between items-start mb-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-semibold text-lg">{option.carrier}</span>
+                            <div className="flex items-start gap-3">
+                                {onToggleSelection && (
+                                    <Checkbox 
+                                        checked={isSelected}
+                                        onCheckedChange={() => onToggleSelection(option.id)}
+                                        className="mt-1"
+                                    />
+                                )}
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-semibold text-lg">{option.carrier}</span>
                                     {getTierBadge(option.tier)}
                                     {option.source_attribution && option.source_attribution.includes("AI") && (
                                         <Badge variant="secondary" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
@@ -72,13 +93,22 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                                 {option.source_attribution && (
                                     <div className="text-[10px] text-muted-foreground italic">Source: {option.source_attribution}</div>
                                 )}
+                                </div>
                             </div>
                             <div className="text-right">
                                 <div className="text-2xl font-bold text-primary">
                                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: option.currency }).format(option.price)}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Est. Transit: <span className="font-medium text-foreground">{option.transitTime}</span>
+                                <div className="text-xs text-muted-foreground space-y-1">
+                                    <div>Est. Transit: <span className="font-medium text-foreground">{option.transitTime}</span></div>
+                                    {option.route_type && (
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Badge variant="outline" className="text-[10px] h-5">{option.route_type}</Badge>
+                                            {option.stops !== undefined && (
+                                                <Badge variant="outline" className="text-[10px] h-5">{option.stops} Stops</Badge>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex gap-2 mt-2 justify-end">
                                     <Button 
@@ -95,8 +125,8 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                             </div>
                         </div>
 
-                        {/* Extended Details for AI Quotes */}
-                        {!expandedId && (option.reliability || option.environmental) && (
+                        {/* Extended Details for AI Quotes & Standard Rates */}
+                        {!expandedId && (option.reliability || option.environmental || option.co2_kg) && (
                             <div className="grid grid-cols-2 gap-4 mb-2 p-3 bg-muted/30 rounded-md text-xs">
                                 {option.reliability && (
                                     <div>
@@ -107,12 +137,12 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                                         </div>
                                     </div>
                                 )}
-                                {option.environmental && (
+                                {(option.environmental || option.co2_kg) && (
                                     <div>
                                         <span className="font-semibold block mb-1">Environmental</span>
                                         <div className="flex justify-between text-muted-foreground">
-                                            <span>CO2: {option.environmental.co2_emissions}</span>
-                                            <span>Rating: {option.environmental.rating}</span>
+                                            <span>CO2: {option.co2_kg ? `${option.co2_kg} kg` : option.environmental?.co2_emissions}</span>
+                                            <span>Rating: {option.environmental?.rating || (option.co2_kg ? (option.co2_kg < 1000 ? 'A' : 'B') : 'N/A')}</span>
                                         </div>
                                     </div>
                                 )}
@@ -172,7 +202,8 @@ export function QuoteResultsList({ results, onSelect }: QuoteResultsListProps) {
                         )}
                     </CardContent>
                 </Card>
-            ))}
+                );
+            })}
         </div>
     );
 }

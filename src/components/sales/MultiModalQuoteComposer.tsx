@@ -25,6 +25,7 @@ interface Leg {
   charges: any[];
   legType?: 'transport' | 'service';
   serviceOnlyCategory?: string;
+  carrierName?: string;
 }
 
 interface MultiModalQuoteComposerProps {
@@ -54,6 +55,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [marginPercent, setMarginPercent] = useState(15);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [franchiseId, setFranchiseId] = useState<string | null>(null);
+  const [options, setOptions] = useState<any[]>([]); // Store all available options
   
   // Track charges to delete
   const [chargesToDelete, setChargesToDelete] = useState<string[]>([]);
@@ -86,6 +88,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [tradeDirections, setTradeDirections] = useState<any[]>([]);
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [containerSizes, setContainerSizes] = useState<any[]>([]);
+  const [carriers, setCarriers] = useState<any[]>([]);
 
   // Basis configuration modal
   const [basisModalOpen, setBasisModalOpen] = useState(false);
@@ -132,7 +135,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     if (optionId && tenantId) {
       loadOptionData();
     }
-  }, [optionId, tenantId]);
+  }, [optionId, tenantId, carriers.length, transportModes.length]);
 
   const loadInitialData = async () => {
     console.log('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
@@ -151,7 +154,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (!resolvedTenantId && quoteId) {
         try {
           const { data: quoteRow, error: quoteError } = await scopedDb
-            .from('quotes')
+            .from('quotes', true)
             .select('tenant_id, franchise_id')
             .eq('id', quoteId)
             .maybeSingle();
@@ -175,7 +178,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (!resolvedTenantId && versionId) {
         try {
           const { data: versionRow, error: versionError } = await scopedDb
-            .from('quotation_versions')
+            .from('quotation_versions', true)
             .select('tenant_id')
             .eq('id', versionId)
             .maybeSingle();
@@ -195,7 +198,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (!resolvedTenantId && initialOptionId) {
         try {
           const { data: optionRow, error: optionError } = await scopedDb
-            .from('quotation_version_options')
+            .from('quotation_version_options', true)
             .select('tenant_id')
             .eq('id', initialOptionId)
             .maybeSingle();
@@ -230,7 +233,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           currencies: [] as any[],
           tradeDirections: [] as any[],
           containerTypes: [] as any[],
-          containerSizes: [] as any[]
+          containerSizes: [] as any[],
+          carriers: [] as any[]
         };
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string) => {
@@ -261,7 +265,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           fetchRef('currencies', 'currencies', 'Failed to load currencies'),
           fetchRef('trade_directions', 'tradeDirections', 'Failed to load trade directions'),
           fetchRef('container_types', 'containerTypes', 'Failed to load container types'),
-          fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes')
+          fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes'),
+          fetchRef('carriers', 'carriers', 'Failed to load carriers')
         ]);
 
         return results;
@@ -277,6 +282,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       setTradeDirections(refData.tradeDirections);
       setContainerTypes(refData.containerTypes);
       setContainerSizes(refData.containerSizes);
+      setCarriers(refData.carriers);
 
       // Set default currency
       if (refData.currencies.length > 0) {
@@ -320,11 +326,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Query for existing options
       const { data: existingOptions, error: queryError } = await scopedDb
-        .from('quotation_version_options')
-        .select('id, created_at')
+        .from('quotation_version_options', true)
+        .select('id, created_at, option_name, carrier_name, total_amount, currency, service_type, transit_time, valid_until, source')
         .eq('quotation_version_id', versionId)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .order('created_at', { ascending: false });
 
       if (queryError) {
         console.error('[Composer] Error querying options:', queryError);
@@ -332,16 +337,19 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
 
       if (existingOptions && existingOptions.length > 0) {
-        const existingId = existingOptions[0].id;
-        console.log('[Composer] Found existing option:', existingId);
-        setOptionId(existingId);
+        setOptions(existingOptions);
+        
+        // If optionId is already set and exists in the list, keep it. Otherwise default to first.
+        const validOptionId = existingOptions.find((o: any) => o.id === optionId)?.id || existingOptions[0].id;
+        
+        console.log('[Composer] Found existing options:', existingOptions.length, 'Selected:', validOptionId);
+        setOptionId(validOptionId);
         
         // Update URL to include optionId to prevent duplicates on reload
         const url = new URL(window.location.href);
-        if (!url.searchParams.has('optionId')) {
-          url.searchParams.set('optionId', existingId);
+        if (!url.searchParams.has('optionId') || url.searchParams.get('optionId') !== validOptionId) {
+          url.searchParams.set('optionId', validOptionId);
           window.history.replaceState({}, '', url.toString());
-          console.log('[Composer] Updated URL with optionId');
         }
         return;
       }
@@ -362,7 +370,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         
         // Check if option was created by another process
         const { data: retry } = await scopedDb
-          .from('quotation_version_options')
+          .from('quotation_version_options', true)
           .select('id')
           .eq('quotation_version_id', versionId)
           .limit(1)
@@ -435,11 +443,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const loadOptionData = async () => {
     if (!optionId || !tenantId) return;
 
+    console.log('[Composer] Loading option data for:', { optionId, tenantId });
     setLoading(true);
     try {
       // Load legs from quotation_version_option_legs to align with FK on quote_charges.leg_id
       const { data: legData, error: legError } = await scopedDb
-        .from('quotation_version_option_legs')
+        .from('quotation_version_option_legs', true)
         .select(`
           *,
           quote_charges(
@@ -453,10 +462,29 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         .eq('quotation_version_option_id', optionId)
         .order('sort_order', { ascending: true });
 
-      if (legError) throw legError;
+      if (legError) {
+        console.error('[Composer] Error loading legs:', legError);
+        throw legError;
+      }
+
+      console.log('[Composer] Loaded legs:', legData?.length);
 
       if (legData && legData.length > 0) {
         // Group charges by leg and pair buy/sell
+        let currentOption = options.find((o: any) => o.id === optionId);
+
+        // Fallback: If option not in state (e.g. initial load race condition), fetch it directly
+        if (!currentOption && optionId) {
+          const { data: fetchedOption } = await scopedDb
+            .from('quotation_version_options', true)
+            .select('carrier_name')
+            .eq('id', optionId)
+            .maybeSingle();
+          if (fetchedOption) {
+            currentOption = fetchedOption;
+          }
+        }
+        
         const legsWithCharges = legData.map((leg: any) => {
           const chargesMap = new Map();
 
@@ -485,10 +513,20 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             }
           });
 
+          // Resolve references
+          const carrierName = leg.provider_id 
+             ? carriers.find(c => c.id === leg.provider_id)?.carrier_name 
+             : (leg.carrier_name || (leg.leg_type === 'transport' ? currentOption?.carrier_name : undefined));
+             
+          const modeName = leg.mode_id 
+             ? (transportModes.find(m => m.id === leg.mode_id)?.name || serviceTypes.find(s => s.transport_modes?.id === leg.mode_id)?.transport_modes?.code || 'ocean')
+             : (leg.mode || 'ocean');
+
           return {
             id: leg.id,
-            mode: leg.mode || 'ocean',
+            mode: modeName,
             serviceTypeId: leg.service_type_id || '',
+            carrierName: carrierName,
             origin: leg.origin_location || '',
             destination: leg.destination_location || '',
             legType: leg.leg_type || 'transport',
@@ -501,7 +539,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
       // Load combined charges (leg_id IS NULL) and pair buy/sell
       const { data: combinedData, error: combinedErr } = await scopedDb
-        .from('quote_charges' as any)
+        .from('quote_charges' as any, true)
         .select(`*, charge_sides(code)`)
         .eq('quote_option_id', optionId)
         .is('leg_id', null)
@@ -1442,6 +1480,31 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         <ValidationFeedback errors={validationErrors} warnings={validationWarnings} />
       )}
       
+      {/* Option Selector */}
+      {options.length > 0 && (
+        <Card className="border-muted bg-muted/10">
+          <CardContent className="p-3 flex items-center gap-3 overflow-x-auto">
+            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Quote Options:</span>
+            <div className="flex gap-2">
+              {options.map(opt => (
+                <Button
+                  key={opt.id}
+                  variant={optionId === opt.id ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setOptionId(opt.id)}
+                  className={`h-7 text-xs ${optionId === opt.id ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'text-muted-foreground'}`}
+                  title={`Service: ${opt.service_type || 'N/A'}\nTransit: ${opt.transit_time || 'N/A'}\nValid Until: ${opt.valid_until ? new Date(opt.valid_until).toLocaleDateString() : 'N/A'}`}
+                >
+                  {opt.carrier_name || 'Unknown'} - {opt.option_name || 'Option'}
+                  {opt.service_type && ` (${opt.service_type})`}
+                  {opt.total_amount && ` • ${new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD' }).format(opt.total_amount)}`}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="pt-6">
           <QuotationWorkflowStepper
