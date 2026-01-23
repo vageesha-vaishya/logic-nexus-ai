@@ -13,11 +13,13 @@ CREATE INDEX IF NOT EXISTS idx_ai_quote_cache_hash ON public.ai_quote_cache(requ
 -- RLS Policies
 ALTER TABLE public.ai_quote_cache ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow read access to authenticated users" ON public.ai_quote_cache;
 CREATE POLICY "Allow read access to authenticated users"
 ON public.ai_quote_cache FOR SELECT
 TO authenticated
 USING (true);
 
+DROP POLICY IF EXISTS "Allow insert access to authenticated users" ON public.ai_quote_cache;
 CREATE POLICY "Allow insert access to authenticated users"
 ON public.ai_quote_cache FOR INSERT
 TO authenticated

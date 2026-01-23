@@ -1,9 +1,11 @@
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { QuoteFormValues } from './types';
 import { useQuoteContext } from './QuoteContext';
 
 export function useQuoteRepository() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, context } = useCRM();
+  const { roles } = useAuth();
   const { resolvedTenantId } = useQuoteContext();
 
   const saveQuote = async (params: {
@@ -12,7 +14,7 @@ export function useQuoteRepository() {
   }): Promise<string> => {
     const { quoteId, data } = params;
 
-    const finalTenantId = resolvedTenantId || null;
+    const finalTenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id || null;
 
     let accountId = data.account_id || '';
     let contactId = data.contact_id || '';

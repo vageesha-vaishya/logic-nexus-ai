@@ -421,21 +421,44 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               const aiData = aiRes.data;
               
               if (aiData.options) {
-                  const aiOptions = aiData.options.map((opt: any) => ({
-                      id: opt.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
-                      tier: opt.tier,
-                      name: opt.transport_mode || opt.carrier?.name,
-                      carrier: opt.carrier?.name || 'AI Selected Carrier',
-                      price: opt.price_breakdown?.total || 0,
-                      currency: opt.price_breakdown?.currency || 'USD',
-                      transitTime: opt.transit_time?.details || (opt.transit_time?.total_days + " days"),
-                      legs: opt.legs,
-                      price_breakdown: opt.price_breakdown,
-                      reliability: opt.reliability,
-                      environmental: opt.environmental,
-                      source_attribution: 'AI Smart Engine',
-                      ai_explanation: opt.ai_explanation
-                  }));
+                  const aiOptions = aiData.options.map((opt: any) => {
+                      // Calculate total from breakdown if missing
+                      let calculatedPrice = opt.price_breakdown?.total || opt.price || 0;
+                      if (!calculatedPrice && opt.price_breakdown) {
+                          // Helper to recursively sum numeric values
+                          const sumValues = (obj: any): number => {
+                            return Object.entries(obj).reduce((acc, [key, val]) => {
+                                if (['currency', 'exchange_rate', 'total', 'currency_code'].includes(key)) return acc;
+                                if (typeof val === 'number') return acc + val;
+                                if (typeof val === 'object' && val !== null) return acc + sumValues(val);
+                                return acc;
+                            }, 0);
+                          };
+                          
+                          calculatedPrice = sumValues(opt.price_breakdown);
+                          
+                          // Ensure total is set in breakdown for consistency
+                          if (opt.price_breakdown) {
+                              opt.price_breakdown.total = calculatedPrice;
+                          }
+                      }
+
+                      return {
+                          id: opt.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
+                          tier: opt.tier,
+                          name: opt.transport_mode || opt.carrier?.name,
+                          carrier: opt.carrier?.name || 'AI Selected Carrier',
+                          price: calculatedPrice,
+                          currency: opt.price_breakdown?.currency || 'USD',
+                          transitTime: opt.transit_time?.details || (opt.transit_time?.total_days + " days"),
+                          legs: opt.legs,
+                          price_breakdown: opt.price_breakdown,
+                          reliability: opt.reliability,
+                          environmental: opt.environmental,
+                          source_attribution: 'AI Smart Engine',
+                          ai_explanation: opt.ai_explanation
+                      };
+                  });
                   
                   combinedOptions = [...combinedOptions, ...aiOptions];
                   setMarketAnalysis(aiData.market_analysis);
@@ -498,8 +521,17 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     const transferPayload = { 
       ...form.getValues(),
       ...extendedData,
-      selectedRates: selectedOptions,
-      accountId: accountId
+      selectedRates: selectedOptions.map(opt => ({
+        ...opt,
+        // Ensure AI fields are explicitly passed
+        reliability_score: opt.reliability?.score || undefined,
+        ai_generated: opt.source_attribution === 'AI Smart Engine',
+        ai_explanation: opt.ai_explanation
+      })),
+      accountId: accountId,
+      marketAnalysis,
+      confidenceScore,
+      anomalies
     };
 
     // 1. Validation

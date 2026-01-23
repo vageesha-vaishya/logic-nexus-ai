@@ -25,7 +25,7 @@ import * as XLSX from 'xlsx';
 export default function QuotesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { scopedDb } = useCRM();
+  const { scopedDb, supabase } = useCRM();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -207,32 +207,60 @@ export default function QuotesPipeline() {
     });
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedQuotes.size === 0) return;
-    
+  const deleteQuotes = async (quoteIds: string[]) => {
+    if (!quoteIds.length) return;
+    setLoading(true);
+
     try {
-      const { error } = await scopedDb
-        .from("quotes")
-        .delete()
-        .in("id", Array.from(selectedQuotes));
+      // Use RPC for cascade delete to handle all dependent tables
+      const { error } = await supabase.rpc('delete_quotes_cascade', {
+        quote_ids: quoteIds
+      });
 
       if (error) throw error;
 
-      setQuotes(prev => prev.filter(q => !selectedQuotes.has(q.id)));
-      setSelectedQuotes(new Set());
+      setQuotes(prev => prev.filter(q => !quoteIds.includes(q.id)));
       
+      // Clear selection if any of the deleted quotes were selected
+      setSelectedQuotes(prev => {
+        const newSet = new Set(prev);
+        quoteIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+
       toast({
         title: "Success",
-        description: `Deleted ${selectedQuotes.size} quotes`,
+        description: `Successfully deleted ${quoteIds.length} quote(s)`,
       });
-    } catch (error) {
-      console.error("Error deleting quotes:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete quotes",
-        variant: "destructive",
-      });
+    } catch (err: any) {
+        console.error('Delete failed:', err);
+        toast({
+          title: "Error",
+          description: "Failed to delete quotes",
+          variant: "destructive",
+        });
+    } finally {
+        setLoading(false);
     }
+  };
+
+  const handlePurgeDrafts = () => {
+    const draftIds = quotes.filter(q => (q.status || '').toLowerCase() === 'draft').map(q => q.id);
+    if (draftIds.length === 0) {
+        toast({
+          title: "Info",
+          description: "No draft quotes found to purge",
+        });
+        return;
+    }
+    if (confirm(`Are you sure you want to delete all ${draftIds.length} draft quotes? This action cannot be undone.`)) {
+        deleteQuotes(draftIds);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuotes.size === 0) return;
+    await deleteQuotes(Array.from(selectedQuotes));
   };
 
   const handleBulkStatusChange = async (newStatus: QuoteStatus) => {
@@ -493,6 +521,16 @@ export default function QuotesPipeline() {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/10 border-destructive/50" 
+                  onClick={handlePurgeDrafts}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Purge Drafts
+                </Button>
+
                 <Button
                   variant={bulkMode ? "secondary" : "outline"}
                   size="sm"

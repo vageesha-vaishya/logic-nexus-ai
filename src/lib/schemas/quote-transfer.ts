@@ -21,6 +21,11 @@ export const RateOptionSchema = z.object({
   environmental: z.any().optional(),
   validUntil: z.string().optional().nullable(),
   service_type: z.string().optional(),
+  
+  // AI/Market Data
+  reliability_score: z.number().optional(),
+  ai_generated: z.boolean().optional(),
+  ai_explanation: z.string().optional(),
 }).passthrough(); // Allow extra fields like price_breakdown, transport_mode, etc.
 
 // Define the Transfer Data Schema
@@ -32,6 +37,11 @@ export const QuoteTransferSchema = z.object({
   
   // Selected Rates
   selectedRates: z.array(RateOptionSchema).min(1, "At least one rate must be selected"),
+  
+  // AI Context (Global)
+  marketAnalysis: z.string().optional(),
+  confidenceScore: z.number().optional(),
+  anomalies: z.array(z.string()).optional(),
   
   // Context
   accountId: z.string().optional(),

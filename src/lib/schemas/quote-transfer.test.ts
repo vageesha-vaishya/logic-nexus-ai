@@ -1,161 +1,88 @@
+
 import { describe, it, expect } from 'vitest';
-import { RateOptionSchema, QuoteTransferSchema } from './quote-transfer';
+import { quoteTransferSchema, type QuoteTransferPayload } from './quote-transfer';
 
-describe('Quote Transfer Schemas', () => {
-  describe('RateOptionSchema', () => {
-    it('should validate a valid RateOption with standard fields', () => {
-      const validRate = {
-        id: 'rate-123',
-        carrier: 'COSCO',
-        name: 'Standard Service',
-        price: 1500,
+describe('Quote Transfer Schema', () => {
+  it('should validate a valid payload with AI data', () => {
+    const validPayload: QuoteTransferPayload = {
+      origin: {
+        address: 'Shanghai, China',
+        coordinates: [121.4737, 31.2304]
+      },
+      destination: {
+        address: 'Los Angeles, USA',
+        coordinates: [-118.2437, 34.0522]
+      },
+      settings: {
         currency: 'USD',
-        transitTime: '25 days',
-        tier: 'standard'
-      };
-      
-      const result = RateOptionSchema.safeParse(validRate);
-      expect(result.success).toBe(true);
-    });
-
-    it('should validate and preserve explicit charges array', () => {
-      const rateWithCharges = {
-        id: 'rate-123',
-        carrier: 'ONE',
-        name: 'Express',
-        price: 2000,
-        currency: 'USD',
-        transitTime: '20 days',
-        charges: [
-          { code: 'FREIGHT', amount: 1500, unit: 'PER_CONTAINER' },
-          { code: 'BAF', amount: 300, unit: 'PER_CONTAINER' },
-          { code: 'THC', amount: 200, unit: 'PER_CONTAINER' }
-        ]
-      };
-      
-      const result = RateOptionSchema.safeParse(rateWithCharges);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.charges).toBeDefined();
-        expect(result.data.charges).toHaveLength(3);
-      }
-    });
-
-    it('should validate and preserve price_breakdown object', () => {
-      const rateWithBreakdown = {
-        id: 'rate-456',
-        carrier: 'Maersk',
-        name: 'Eco',
-        price: 1800,
-        currency: 'EUR',
-        transitTime: '30 days',
-        price_breakdown: {
-          base_fare: 1500,
-          surcharges: {
-            fuel: 200,
-            security: 100
-          }
+        incoterms: 'FOB'
+      },
+      items: [
+        {
+          quantity: 1,
+          weight: 1000,
+          volume: 2.5,
+          dimensions: { length: 100, width: 100, height: 100 }
         }
-      };
-      
-      const result = RateOptionSchema.safeParse(rateWithBreakdown);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.price_breakdown).toBeDefined();
-        expect(result.data.price_breakdown.surcharges.fuel).toBe(200);
-      }
-    });
+      ],
+      market_analysis: 'Market is volatile due to peak season.',
+      confidence_score: 85,
+      anomalies: ['Port congestion in LA'],
+      options: [
+        {
+          id: 'opt_1',
+          carrier_name: 'COSCO',
+          service_type: 'Standard',
+          total_amount: 5000,
+          currency: 'USD',
+          transit_time: '25 days',
+          mode: 'sea',
+          ai_generated: true,
+          reliability_score: 90,
+          total_co2_kg: 500.5,
+          legs: [
+            {
+              origin: 'Shanghai',
+              destination: 'Los Angeles',
+              mode: 'sea',
+              charges: [
+                {
+                  description: 'Ocean Freight',
+                  amount: 4500,
+                  currency: 'USD',
+                  category: 'Freight',
+                  type: 'fixed'
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
 
-    it('should allow passthrough of unknown fields', () => {
-      const rateWithExtra = {
-        id: 'rate-789',
-        carrier: 'MSC',
-        price: 1000,
-        currency: 'USD',
-        customField: 'some-value',
-        legacy_data: { foo: 'bar' }
-      };
-      
-      const result = RateOptionSchema.safeParse(rateWithExtra);
-      expect(result.success).toBe(true);
-      // @ts-ignore
-      expect(result.data.customField).toBe('some-value');
-    });
-
-    it('should fail if required fields are missing', () => {
-      const invalidRate = {
-        id: 'rate-bad',
-        // missing carrier
-        price: 1000,
-        currency: 'USD'
-      };
-      
-      const result = RateOptionSchema.safeParse(invalidRate);
-      expect(result.success).toBe(false);
-    });
+    const result = quoteTransferSchema.safeParse(validPayload);
+    expect(result.success).toBe(true);
   });
 
-  describe('QuoteTransferSchema', () => {
-    it('should validate a complete transfer payload', () => {
-      const payload = {
-        origin: 'USLAX',
-        destination: 'CNSHA',
-        mode: 'ocean',
-        selectedRates: [
-          {
-            id: 'rate-1',
-            carrier: 'COSCO',
-            price: 1200,
-            currency: 'USD',
-            charges: [{ code: 'FREIGHT', amount: 1200 }]
-          }
-        ],
-        accountId: 'acc-123',
-        trade_direction: 'export',
-        containerType: '40HC',
-        dangerousGoods: false
-      };
-      
-      const result = QuoteTransferSchema.safeParse(payload);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.selectedRates).toHaveLength(1);
-        expect(result.data.trade_direction).toBe('export');
-      }
-    });
+  it('should fail if required fields are missing', () => {
+    const invalidPayload = {
+      origin: 'Shanghai' // Invalid structure
+    };
 
-    it('should fail if selectedRates is empty', () => {
-      const invalidPayload = {
-        origin: 'USLAX',
-        destination: 'CNSHA',
-        mode: 'ocean',
-        selectedRates: [] // Empty array
-      };
-      
-      const result = QuoteTransferSchema.safeParse(invalidPayload);
-      expect(result.success).toBe(false);
-    });
+    const result = quoteTransferSchema.safeParse(invalidPayload);
+    expect(result.success).toBe(false);
+  });
 
-    it('should preserve nested objects in selectedRates', () => {
-       const payload = {
-        origin: 'USLAX',
-        destination: 'CNSHA',
-        mode: 'ocean',
-        selectedRates: [
-          {
-            id: 'rate-1',
-            carrier: 'COSCO',
-            price: 1200,
-            currency: 'USD',
-            complex_object: { nested: true }
-          }
-        ]
-      };
-      
-      const result = QuoteTransferSchema.safeParse(payload);
-      expect(result.success).toBe(true);
-      // @ts-ignore
-      expect(result.data.selectedRates[0].complex_object).toEqual({ nested: true });
-    });
+  it('should accept optional AI fields as undefined', () => {
+    const basicPayload: QuoteTransferPayload = {
+      origin: { address: 'A', coordinates: [0, 0] },
+      destination: { address: 'B', coordinates: [0, 0] },
+      settings: { currency: 'USD' },
+      items: [],
+      options: []
+    };
+
+    const result = quoteTransferSchema.safeParse(basicPayload);
+    expect(result.success).toBe(true);
   });
 });

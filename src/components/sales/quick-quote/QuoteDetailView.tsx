@@ -1,20 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-    PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
-    BarChart, Bar, XAxis, YAxis, CartesianGrid 
-} from 'recharts';
 import { Truck, Ship, Plane, AlertTriangle, ShieldCheck, FileText, Globe } from "lucide-react";
 import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
+import { ChargeBreakdown } from '../common/ChargeBreakdown';
+import { ChargesAnalysisGraph } from '../common/ChargesAnalysisGraph';
+
+import { cn } from "@/lib/utils";
 
 interface QuoteDetailViewProps {
     quote: any; // Ideally typed
     onClose?: () => void;
+    compact?: boolean;
 }
 
-export function QuoteDetailView({ quote }: QuoteDetailViewProps) {
+export function QuoteDetailView({ quote, compact = false }: QuoteDetailViewProps) {
+    const [activeFilter, setActiveFilter] = useState<{ type: 'category' | 'mode' | 'leg', value: string } | null>(null);
+
     if (!quote) return null;
 
     // Prepare Chart Data
@@ -26,6 +29,23 @@ export function QuoteDetailView({ quote }: QuoteDetailViewProps) {
     ].filter(d => d.value > 0);
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+    // Extract global charges if they exist directly on the quote but not in legs
+    const globalCharges = quote.charges || [];
+
+    const handleSegmentClick = (type: 'category' | 'mode' | 'leg', value: string) => {
+        // If clicking the same filter, toggle it off
+        if (activeFilter?.type === type && activeFilter?.value === value) {
+            setActiveFilter(null);
+        } else {
+            setActiveFilter({ type, value });
+            // Scroll to breakdown
+            const element = document.getElementById('charge-breakdown-section');
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -60,38 +80,19 @@ export function QuoteDetailView({ quote }: QuoteDetailViewProps) {
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Cost Breakdown Chart */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-sm">Cost Structure</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={priceData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {priceData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
+            <div className={cn("grid grid-cols-1 gap-6 items-stretch", !compact && "lg:grid-cols-2")}>
+                {/* Cost Breakdown Analysis Graph */}
+                <div className="min-h-[400px]">
+                    <ChargesAnalysisGraph 
+                        legs={quote.legs || []} 
+                        globalCharges={globalCharges} 
+                        currency={quote.price_breakdown?.currency || 'USD'} 
+                        onSegmentClick={handleSegmentClick}
+                    />
+                </div>
 
                 {/* Regulatory & Compliance */}
-                <Card>
+                <Card className="flex flex-col h-full">
                     <CardHeader>
                         <CardTitle className="text-sm flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4"/> Compliance & Regulations
@@ -141,37 +142,26 @@ export function QuoteDetailView({ quote }: QuoteDetailViewProps) {
                 </Card>
             </div>
 
-            {/* Detailed Charge Table */}
-            <Card>
+            {/* Detailed Charge Breakdown */}
+            <Card id="charge-breakdown-section" className={activeFilter ? "ring-2 ring-primary" : ""}>
                 <CardHeader>
-                    <CardTitle className="text-sm">Detailed Charge Breakdown</CardTitle>
+                    <CardTitle className="text-sm flex justify-between items-center">
+                        Comprehensive Charge Breakdown
+                        {activeFilter && (
+                            <Badge variant="secondary" className="text-xs font-normal">
+                                Filtered by {activeFilter.type}: {activeFilter.value}
+                            </Badge>
+                        )}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-sm space-y-2">
-                        <div className="flex justify-between py-1 border-b">
-                            <span>Base Freight</span>
-                            <span className="font-medium">${quote.price_breakdown?.base_fare?.toLocaleString()}</span>
-                        </div>
-                        
-                        {Object.entries(quote.price_breakdown?.surcharges || {}).map(([key, val]: [string, any]) => (
-                            <div key={key} className="flex justify-between py-1 border-b border-dashed text-muted-foreground">
-                                <span className="capitalize">{key.replace(/_/g, ' ')}</span>
-                                <span>${val}</span>
-                            </div>
-                        ))}
-
-                        {Object.entries(quote.price_breakdown?.fees || {}).map(([key, val]: [string, any]) => (
-                            <div key={key} className="flex justify-between py-1 border-b border-dashed text-muted-foreground">
-                                <span className="capitalize">{key.replace(/_/g, ' ')}</span>
-                                <span>${val}</span>
-                            </div>
-                        ))}
-
-                        <div className="flex justify-between py-2 font-bold text-lg">
-                            <span>Total</span>
-                            <span>${quote.price_breakdown?.total?.toLocaleString()}</span>
-                        </div>
-                    </div>
+                    <ChargeBreakdown 
+                        legs={quote.legs || []} 
+                        globalCharges={globalCharges}
+                        currency={quote.price_breakdown?.currency || 'USD'}
+                        activeFilter={activeFilter}
+                        onClearFilter={() => setActiveFilter(null)}
+                    />
                 </CardContent>
             </Card>
         </div>

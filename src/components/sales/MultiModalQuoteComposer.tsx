@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy } from 'lucide-react';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { QuotationWorkflowStepper } from './composer/QuotationWorkflowStepper';
 import { QuoteDetailsStep } from './composer/QuoteDetailsStep';
 import { LegsConfigurationStep } from './composer/LegsConfigurationStep';
@@ -15,6 +25,7 @@ import { DeleteConfirmDialog } from './composer/DeleteConfirmDialog';
 import { SaveProgress } from './composer/SaveProgress';
 import { ErrorBoundary } from './composer/ErrorBoundary';
 import { ValidationFeedback } from './composer/ValidationFeedback';
+import { QuoteOptionsOverview } from './composer/QuoteOptionsOverview';
 
 interface Leg {
   id: string;
@@ -56,6 +67,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [franchiseId, setFranchiseId] = useState<string | null>(null);
   const [options, setOptions] = useState<any[]>([]); // Store all available options
+  const [viewMode, setViewMode] = useState<'overview' | 'composer'>('composer');
+  const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
+  const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
+  const [anomalies, setAnomalies] = useState<any[]>([]);
   
   // Track charges to delete
   const [chargesToDelete, setChargesToDelete] = useState<string[]>([]);
@@ -102,6 +117,17 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   // Transport modes for mode-to-service-type mapping
   const [transportModes, setTransportModes] = useState<any[]>([]);
+
+  // Option management state
+  const [optionDialogOpen, setOptionDialogOpen] = useState(false);
+  const [editingOption, setEditingOption] = useState<any>(null);
+  const [newOptionData, setNewOptionData] = useState({
+    option_name: '',
+    carrier_name: '',
+    service_type: '',
+    transit_time: '',
+    valid_until: ''
+  });
 
   useEffect(() => {
     loadInitialData();
@@ -179,7 +205,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         try {
           const { data: versionRow, error: versionError } = await scopedDb
             .from('quotation_versions', true)
-            .select('tenant_id')
+            .select('tenant_id, market_analysis, confidence_score, anomalies')
             .eq('id', versionId)
             .maybeSingle();
           
@@ -187,6 +213,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             console.error('[Composer] Error fetching version:', versionError);
           } else if (versionRow) {
             resolvedTenantId = (versionRow as any)?.tenant_id ?? null;
+            setMarketAnalysis((versionRow as any)?.market_analysis ?? null);
+            setConfidenceScore((versionRow as any)?.confidence_score ?? null);
+            setAnomalies((versionRow as any)?.anomalies ?? []);
             console.log('[Composer] Resolved tenant from version:', resolvedTenantId);
           }
         } catch (error) {
@@ -317,17 +346,16 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     console.log('[Composer] Ensuring option exists for version:', versionId);
     
     try {
-      // Check if we already have an optionId from props
-      if (initialOptionId) {
-        console.log('[Composer] Using initial optionId:', initialOptionId);
-        setOptionId(initialOptionId);
-        return;
-      }
-
-      // Query for existing options
+      // Query for existing options with full details for overview
       const { data: existingOptions, error: queryError } = await scopedDb
         .from('quotation_version_options', true)
-        .select('id, created_at, option_name, carrier_name, total_amount, currency, service_type, transit_time, valid_until, source')
+        .select(`
+          *,
+          legs:quotation_version_option_legs(
+            *,
+            charges:quote_charges(*)
+          )
+        `)
         .eq('quotation_version_id', versionId)
         .order('created_at', { ascending: false });
 
@@ -339,16 +367,30 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (existingOptions && existingOptions.length > 0) {
         setOptions(existingOptions);
         
-        // If optionId is already set and exists in the list, keep it. Otherwise default to first.
-        const validOptionId = existingOptions.find((o: any) => o.id === optionId)?.id || existingOptions[0].id;
+        // If initialOptionId is provided, use it.
+        // Otherwise, if current optionId exists in list, keep it.
+        // Otherwise default to first.
+        let targetId = existingOptions[0].id;
         
-        console.log('[Composer] Found existing options:', existingOptions.length, 'Selected:', validOptionId);
-        setOptionId(validOptionId);
+        if (initialOptionId && existingOptions.some((o: any) => o.id === initialOptionId)) {
+          targetId = initialOptionId;
+          setViewMode('composer');
+        } else if (optionId && existingOptions.some((o: any) => o.id === optionId)) {
+          targetId = optionId;
+          // If we have data, default to overview unless explicitly editing?
+          // Let's default to overview for now to show off the new UI
+          setViewMode('overview');
+        } else {
+          setViewMode('overview');
+        }
+        
+        console.log('[Composer] Found existing options:', existingOptions.length, 'Selected:', targetId);
+        setOptionId(targetId);
         
         // Update URL to include optionId to prevent duplicates on reload
         const url = new URL(window.location.href);
-        if (!url.searchParams.has('optionId') || url.searchParams.get('optionId') !== validOptionId) {
-          url.searchParams.set('optionId', validOptionId);
+        if (!url.searchParams.has('optionId') || url.searchParams.get('optionId') !== targetId) {
+          url.searchParams.set('optionId', targetId);
           window.history.replaceState({}, '', url.toString());
         }
         return;
@@ -379,6 +421,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         if (retry?.id) {
           console.log('[Composer] Option found on retry:', retry.id);
           setOptionId(retry.id);
+          setOptions([retry]);
+          setViewMode('composer');
           
           // Update URL
           const url = new URL(window.location.href);
@@ -391,6 +435,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (newOption?.id) {
         console.log('[Composer] Created new option:', newOption.id);
         setOptionId(newOption.id);
+        setOptions([newOption]);
+        setViewMode('composer');
         
         // Update URL with new optionId
         const url = new URL(window.location.href);
@@ -446,45 +492,110 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     console.log('[Composer] Loading option data for:', { optionId, tenantId });
     setLoading(true);
     try {
-      // Load legs from quotation_version_option_legs to align with FK on quote_charges.leg_id
-      const { data: legData, error: legError } = await scopedDb
-        .from('quotation_version_option_legs', true)
-        .select(`
-          *,
-          quote_charges(
+      // Parallel fetch of legs, global charges, and option details
+      const [legResult, chargeResult, optionResult] = await Promise.all([
+        scopedDb
+          .from('quotation_version_option_legs', true)
+          .select(`
+            *,
+            quote_charges(
+              *,
+              charge_sides(code),
+              charge_categories(name, code),
+              charge_bases(name, code),
+              currencies(code, symbol)
+            )
+          `)
+          .eq('quotation_version_option_id', optionId)
+          .order('sort_order', { ascending: true }),
+        
+        scopedDb
+          .from('quote_charges', true)
+          .select(`
             *,
             charge_sides(code),
             charge_categories(name, code),
             charge_bases(name, code),
             currencies(code, symbol)
-          )
-        `)
-        .eq('quotation_version_option_id', optionId)
-        .order('sort_order', { ascending: true });
+          `)
+          .eq('quote_option_id', optionId)
+          .is('leg_id', null),
 
-      if (legError) {
-        console.error('[Composer] Error loading legs:', legError);
-        throw legError;
+        scopedDb
+          .from('quotation_version_options', true)
+          .select('*')
+          .eq('id', optionId)
+          .single()
+      ]);
+
+      const { data: legData, error: legError } = legResult;
+      const { data: chargeData, error: chargeError } = chargeResult;
+      const { data: optionData, error: optionError } = optionResult;
+
+      if (legError) throw legError;
+      if (chargeError) throw chargeError;
+      // optionError might occur if option deleted, but less likely here. Ignore if just missing (handled by if check)
+
+      console.log('[Composer] Loaded legs:', legData?.length, 'Global charges:', chargeData?.length);
+
+      // Always update quoteData with option specifics to ensure UI reflects current option
+      if (optionData) {
+        setQuoteData(prev => ({
+          ...prev,
+          carrier_name: optionData.carrier_name || '',
+          service_type: optionData.service_type || '',
+          transit_time: optionData.transit_time || '',
+          validUntil: optionData.valid_until ? new Date(optionData.valid_until).toISOString().split('T')[0] : prev.validUntil,
+          currencyId: optionData.quote_currency_id || prev.currencyId,
+          option_name: optionData.option_name || ''
+        }));
       }
 
-      console.log('[Composer] Loaded legs:', legData?.length);
+      // Process global charges
+      if (chargeData) {
+        const globalChargesMap = new Map();
+        
+        chargeData.forEach((charge: any) => {
+          const key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
+          if (!globalChargesMap.has(key)) {
+            globalChargesMap.set(key, {
+              id: charge.id,
+              category_id: charge.category_id,
+              basis_id: charge.basis_id,
+              unit: charge.unit,
+              currency_id: charge.currency_id,
+              note: charge.note,
+              buy: { quantity: 0, rate: 0 },
+              sell: { quantity: 0, rate: 0 }
+            });
+          }
+          
+          const chargeObj = globalChargesMap.get(key);
+          const side = charge.charge_sides?.code;
+          
+          if (side === 'buy' || side === 'cost') {
+            chargeObj.buy = {
+              dbChargeId: charge.id,
+              quantity: charge.quantity,
+              rate: charge.rate,
+              amount: charge.amount
+            };
+          } else if (side === 'sell' || side === 'revenue') {
+            chargeObj.sell = {
+              dbChargeId: charge.id,
+              quantity: charge.quantity,
+              rate: charge.rate,
+              amount: charge.amount
+            };
+          }
+        });
+        
+        setCombinedCharges(Array.from(globalChargesMap.values()));
+      } else {
+        setCombinedCharges([]);
+      }
 
       if (legData && legData.length > 0) {
-        // Group charges by leg and pair buy/sell
-        let currentOption = options.find((o: any) => o.id === optionId);
-
-        // Fallback: If option not in state (e.g. initial load race condition), fetch it directly
-        if (!currentOption && optionId) {
-          const { data: fetchedOption } = await scopedDb
-            .from('quotation_version_options', true)
-            .select('carrier_name')
-            .eq('id', optionId)
-            .maybeSingle();
-          if (fetchedOption) {
-            currentOption = fetchedOption;
-          }
-        }
-        
         const legsWithCharges = legData.map((leg: any) => {
           const chargesMap = new Map();
 
@@ -516,7 +627,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           // Resolve references
           const carrierName = leg.provider_id 
              ? carriers.find(c => c.id === leg.provider_id)?.carrier_name 
-             : (leg.carrier_name || (leg.leg_type === 'transport' ? currentOption?.carrier_name : undefined));
+             : (leg.carrier_name || (leg.leg_type === 'transport' ? optionData?.carrier_name : undefined));
              
           const modeName = leg.mode_id 
              ? (transportModes.find(m => m.id === leg.mode_id)?.name || serviceTypes.find(s => s.transport_modes?.id === leg.mode_id)?.transport_modes?.code || 'ocean')
@@ -536,41 +647,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         });
 
         setLegs(legsWithCharges);
-      }
-      // Load combined charges (leg_id IS NULL) and pair buy/sell
-      const { data: combinedData, error: combinedErr } = await scopedDb
-        .from('quote_charges' as any, true)
-        .select(`*, charge_sides(code)`)
-        .eq('quote_option_id', optionId)
-        .is('leg_id', null)
-        .order('sort_order', { ascending: true });
-      if (combinedErr) throw combinedErr;
-      if (Array.isArray(combinedData)) {
-        const map = new Map<string, any>();
-        combinedData.forEach((row: any) => {
-          const key = `${row.category_id}-${row.basis_id}-${row.note || ''}`;
-          const existing = map.get(key) || {
-            id: row.id,
-            category_id: row.category_id,
-            basis_id: row.basis_id,
-            unit: row.unit,
-            currency_id: row.currency_id,
-            note: row.note,
-            buy: { quantity: 0, rate: 0 },
-            sell: { quantity: 0, rate: 0 }
-          };
-          if (row.charge_sides?.code === 'buy') {
-            existing.buy = { quantity: row.quantity || 0, rate: row.rate || 0 };
-          } else if (row.charge_sides?.code === 'sell') {
-            existing.sell = { quantity: row.quantity || 0, rate: row.rate || 0 };
-          }
-          map.set(key, existing);
-        });
-        setCombinedCharges(Array.from(map.values()));
       } else {
-        setCombinedCharges([]);
+        setLegs([]);
       }
     } catch (error: any) {
+      console.error('[Composer] Error loading option data:', error);
       toast({ title: 'Error loading data', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -1236,6 +1317,43 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       
       updateProgress(3); // Legs saved
 
+      // Update Quotation Version (Header)
+      const { error: versionError } = await scopedDb
+        .from('quotation_versions')
+        .update({
+          valid_until: quoteData.validUntil || null,
+          total_weight: quoteData.total_weight ? Number(quoteData.total_weight) : null,
+          total_volume: quoteData.total_volume ? Number(quoteData.total_volume) : null,
+          incoterms: quoteData.incoterms || null,
+          commodity: quoteData.commodity || null,
+          notes: quoteData.notes || null,
+        })
+        .eq('id', versionId);
+
+      if (versionError) {
+        console.error('Error updating version:', versionError);
+        // Non-critical, but good to know
+      }
+
+      // Update Current Option Details
+      if (currentOptionId) {
+        const { error: optionError } = await scopedDb
+          .from('quotation_version_options')
+          .update({
+            carrier_name: quoteData.carrier_name || null,
+            service_type: quoteData.service_type || null,
+            transit_time: quoteData.transit_time || null,
+            valid_until: quoteData.validUntil || null,
+            currency: quoteData.currencyId ? currencies.find(c => c.id === quoteData.currencyId)?.code : null,
+            option_name: quoteData.option_name || null
+          })
+          .eq('id', currentOptionId);
+
+        if (optionError) {
+          console.error('Error updating option:', optionError);
+        }
+      }
+
       // Save combined charges with UPDATE/INSERT logic
       for (const charge of combinedCharges || []) {
         const chargeData = {
@@ -1341,6 +1459,130 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddOption = () => {
+    setEditingOption(null);
+    setNewOptionData({
+      option_name: `Option ${options.length + 1}`,
+      carrier_name: '',
+      service_type: '',
+      transit_time: '',
+      valid_until: ''
+    });
+    setOptionDialogOpen(true);
+  };
+
+  const handleEditOption = (opt: any) => {
+    setEditingOption(opt);
+    setNewOptionData({
+      option_name: opt.option_name || '',
+      carrier_name: opt.carrier_name || '',
+      service_type: opt.service_type || '',
+      transit_time: opt.transit_time || '',
+      valid_until: opt.valid_until ? new Date(opt.valid_until).toISOString().split('T')[0] : ''
+    });
+    setOptionDialogOpen(true);
+  };
+
+  const handleDeleteOption = async (id: string) => {
+    if (options.length <= 1) {
+      toast({ title: 'Cannot delete', description: 'At least one option must exist.', variant: 'destructive' });
+      return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this option? This action cannot be undone.')) return;
+
+    setLoading(true);
+    try {
+      const { error } = await scopedDb
+        .from('quotation_version_options')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const newOptions = options.filter(o => o.id !== id);
+      setOptions(newOptions);
+      if (optionId === id) {
+        setOptionId(newOptions[0].id);
+      }
+      
+      toast({ title: 'Success', description: 'Option deleted successfully.' });
+    } catch (error: any) {
+      console.error('Error deleting option:', error);
+      toast({ title: 'Error', description: 'Failed to delete option: ' + error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveOptionDetails = async () => {
+    if (!newOptionData.option_name) {
+      toast({ title: 'Error', description: 'Option Name is required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const tenant = await ensureTenantForSave();
+      if (!tenant) throw new Error('Tenant context missing');
+
+      const payload = {
+        option_name: newOptionData.option_name,
+        carrier_name: newOptionData.carrier_name,
+        service_type: newOptionData.service_type,
+        transit_time: newOptionData.transit_time,
+        valid_until: newOptionData.valid_until || null,
+        tenant_id: tenant,
+        quotation_version_id: versionId
+      };
+
+      if (editingOption) {
+        // Update existing
+        const { data, error } = await scopedDb
+          .from('quotation_version_options')
+          .update(payload)
+          .eq('id', editingOption.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setOptions(prev => prev.map(o => o.id === editingOption.id ? data : o));
+        if (optionId === editingOption.id) {
+          // Refresh quote data if we edited the current option
+          setQuoteData(prev => ({
+             ...prev,
+             carrier_name: data.carrier_name,
+             service_type: data.service_type,
+             transit_time: data.transit_time,
+             validUntil: data.valid_until ? new Date(data.valid_until).toISOString().split('T')[0] : prev.validUntil,
+             option_name: data.option_name
+          }));
+        }
+      } else {
+        // Create new
+        const { data, error } = await scopedDb
+          .from('quotation_version_options')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setOptions(prev => [...prev, data]);
+        setOptionId(data.id);
+      }
+
+      setOptionDialogOpen(false);
+      toast({ title: 'Success', description: `Option ${editingOption ? 'updated' : 'created'} successfully.` });
+    } catch (error: any) {
+      console.error('Error saving option:', error);
+      toast({ title: 'Error', description: 'Failed to save option: ' + error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1473,6 +1715,25 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     );
   }
 
+  if (viewMode === 'overview') {
+    return (
+      <QuoteOptionsOverview 
+        options={options.map(opt => ({
+          ...opt,
+          mode: opt.service_type ? (opt.service_type.toLowerCase().includes('air') ? 'air' : opt.service_type.toLowerCase().includes('road') ? 'road' : 'sea') : 'sea'
+        }))}
+        selectedId={optionId || undefined}
+        onSelect={(id) => {
+          setOptionId(id);
+          setViewMode('composer');
+        }}
+        marketAnalysis={marketAnalysis}
+        confidenceScore={confidenceScore}
+        anomalies={anomalies}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Validation Feedback */}
@@ -1481,29 +1742,63 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       )}
       
       {/* Option Selector */}
-      {options.length > 0 && (
-        <Card className="border-muted bg-muted/10">
-          <CardContent className="p-3 flex items-center gap-3 overflow-x-auto">
+      <Card className="border-muted bg-muted/10">
+        <CardContent className="p-3 flex items-center gap-3 overflow-x-auto justify-between">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-9 px-2 gap-2"
+                onClick={() => setViewMode('overview')}
+            >
+                <ArrowLeft className="h-3 w-3" />
+                Back to Overview
+            </Button>
+            <div className="h-6 w-px bg-border mx-1" />
             <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Quote Options:</span>
             <div className="flex gap-2">
               {options.map(opt => (
-                <Button
-                  key={opt.id}
-                  variant={optionId === opt.id ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setOptionId(opt.id)}
-                  className={`h-7 text-xs ${optionId === opt.id ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'text-muted-foreground'}`}
-                  title={`Service: ${opt.service_type || 'N/A'}\nTransit: ${opt.transit_time || 'N/A'}\nValid Until: ${opt.valid_until ? new Date(opt.valid_until).toLocaleDateString() : 'N/A'}`}
-                >
-                  {opt.carrier_name || 'Unknown'} - {opt.option_name || 'Option'}
-                  {opt.service_type && ` (${opt.service_type})`}
-                  {opt.total_amount && ` • ${new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD' }).format(opt.total_amount)}`}
-                </Button>
+                <div key={opt.id} className="relative group">
+                  <Button
+                    variant={optionId === opt.id ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setOptionId(opt.id)}
+                    className={`h-9 text-xs pr-8 ${optionId === opt.id ? 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20' : 'text-muted-foreground border border-transparent'}`}
+                    title={`Service: ${opt.service_type || 'N/A'}\nTransit: ${opt.transit_time || 'N/A'}\nValid Until: ${opt.valid_until ? new Date(opt.valid_until).toLocaleDateString() : 'N/A'}`}
+                  >
+                    <div className="flex flex-col items-start text-left leading-tight">
+                      <span className="font-semibold">{opt.option_name || 'Option'}</span>
+                      <span className="text-[10px] opacity-80">{opt.carrier_name || 'No Carrier'}</span>
+                    </div>
+                  </Button>
+                  <div className={`absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 ${optionId === opt.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-3 w-3 hover:text-blue-500"
+                      onClick={(e) => { e.stopPropagation(); handleEditOption(opt); }}
+                    >
+                      <Edit2 className="h-2 w-2" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-3 w-3 hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteOption(opt.id); }}
+                    >
+                      <Trash2 className="h-2 w-2" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          <Button size="sm" variant="outline" className="h-8 gap-2" onClick={handleAddOption}>
+            <Plus className="h-3 w-3" />
+            Add Option
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="pt-6">
@@ -1674,6 +1969,86 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       
       {/* Save Progress Overlay */}
       <SaveProgress show={saveProgress.show} steps={saveProgress.steps} />
+      {/* Option Edit Dialog */}
+      <Dialog open={optionDialogOpen} onOpenChange={setOptionDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingOption ? 'Edit Option' : 'New Option'}</DialogTitle>
+            <DialogDescription>
+              Configure the basic details for this quotation option.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="option_name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="option_name"
+                value={newOptionData.option_name}
+                onChange={(e) => setNewOptionData({ ...newOptionData, option_name: e.target.value })}
+                className="col-span-3"
+                placeholder="e.g. Option 1"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="carrier" className="text-right">
+                Carrier
+              </Label>
+              <Input
+                id="carrier"
+                value={newOptionData.carrier_name}
+                onChange={(e) => setNewOptionData({ ...newOptionData, carrier_name: e.target.value })}
+                className="col-span-3"
+                placeholder="e.g. Maersk"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="service" className="text-right">
+                Service
+              </Label>
+              <Input
+                id="service"
+                value={newOptionData.service_type}
+                onChange={(e) => setNewOptionData({ ...newOptionData, service_type: e.target.value })}
+                className="col-span-3"
+                placeholder="e.g. Direct / Transshipment"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="transit" className="text-right">
+                Transit
+              </Label>
+              <Input
+                id="transit"
+                value={newOptionData.transit_time}
+                onChange={(e) => setNewOptionData({ ...newOptionData, transit_time: e.target.value })}
+                className="col-span-3"
+                placeholder="e.g. 25 days"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="valid" className="text-right">
+                Valid Until
+              </Label>
+              <Input
+                id="valid"
+                type="date"
+                value={newOptionData.valid_until}
+                onChange={(e) => setNewOptionData({ ...newOptionData, valid_until: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOptionDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveOptionDetails} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

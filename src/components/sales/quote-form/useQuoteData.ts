@@ -50,7 +50,7 @@ export function useQuoteData() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('carriers')
-        .select('id, carrier_name, scac_code')
+        .select('id, carrier_name, scac')
         .eq('is_active', true)
         .order('carrier_name');
       if (error) throw error;

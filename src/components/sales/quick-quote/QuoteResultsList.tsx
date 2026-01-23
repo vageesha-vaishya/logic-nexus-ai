@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
 import { QuoteDetailView } from './QuoteDetailView';
 import { QuoteMapVisualizer } from './QuoteMapVisualizer';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { Sparkles, Leaf, Timer, ShieldCheck, DollarSign, ChevronDown, ChevronUp, Map as MapIcon, LayoutList } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -173,20 +174,8 @@ export function QuoteResultsList({ results, onSelect, selectedIds = [], onToggle
                                     
                                     <TabsContent value="details">
                                         <QuoteDetailView 
-                                            quote={{
-                                                ...option,
-                                                transport_mode: option.name, // Mapping fallback
-                                                carrier: { name: option.carrier }, // Mapping fallback
-                                                transit_time: { details: option.transitTime }, // Mapping fallback
-                                                price_breakdown: option.price_breakdown || {
-                                                    total: option.price,
-                                                    currency: option.currency,
-                                                    base_fare: option.price * 0.8,
-                                                    taxes: option.price * 0.1,
-                                                    surcharges: { 'Fuel': option.price * 0.05, 'Security': option.price * 0.05 },
-                                                    fees: {}
-                                                }
-                                            }} 
+                                            quote={mapOptionToQuote(option)} 
+                                            compact={true}
                                         />
                                     </TabsContent>
 

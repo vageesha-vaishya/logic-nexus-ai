@@ -33,7 +33,19 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
       status: 'draft',
       tax_percent: '0',
       shipping_amount: '0',
+      notes: '',
+      title: '',
+      carrier_id: '',
+      service_type_id: '',
+      origin_port_id: '',
+      destination_port_id: '',
+      incoterms: '',
       ...initialData,
+      // Ensure undefined values from initialData fall back to empty strings
+      carrier_id: initialData?.carrier_id ?? '',
+      service_type_id: initialData?.service_type_id ?? '',
+      origin_port_id: initialData?.origin_port_id ?? '',
+      destination_port_id: initialData?.destination_port_id ?? '',
     },
   });
 
@@ -43,7 +55,18 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
         status: 'draft',
         tax_percent: '0',
         shipping_amount: '0',
+        notes: '',
+        title: '',
+        carrier_id: '',
+        service_type_id: '',
+        origin_port_id: '',
+        destination_port_id: '',
+        incoterms: '',
         ...initialData,
+        carrier_id: initialData.carrier_id ?? '',
+        service_type_id: initialData.service_type_id ?? '',
+        origin_port_id: initialData.origin_port_id ?? '',
+        destination_port_id: initialData.destination_port_id ?? '',
       });
     }
   }, [initialData, form]);

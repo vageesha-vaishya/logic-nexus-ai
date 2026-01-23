@@ -188,6 +188,50 @@ export default function Quotes() {
     canNext,
   } = usePagination(sortedQuotes, { initialPageSize: 20 });
 
+  const chunk = (arr: string[], size: number) => {
+    const out: string[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  };
+
+  const deleteQuotes = async (quoteIds: string[]) => {
+    if (!quoteIds.length) return;
+    setLoading(true);
+
+    try {
+      // Use RPC for cascade delete to handle all dependent tables
+      const { error } = await supabase.rpc('delete_quotes_cascade', {
+        quote_ids: quoteIds
+      });
+
+      if (error) throw error;
+
+      toast.success(`Successfully deleted ${quoteIds.length} quote(s)`);
+      fetchQuotes();
+    } catch (err: any) {
+        console.error('Delete failed:', err);
+        toast.error('Failed to delete quotes', { description: err.message });
+        setLoading(false);
+    }
+  };
+
+  const handleDeleteQuote = (quoteId: string) => {
+    if (confirm('Are you sure you want to delete this quote? This action cannot be undone.')) {
+        deleteQuotes([quoteId]);
+    }
+  };
+
+  const handlePurgeDrafts = () => {
+    const draftIds = quotes.filter(q => (q.status || '').toLowerCase() === 'draft').map(q => q.id);
+    if (draftIds.length === 0) {
+        toast.info('No draft quotes found to purge');
+        return;
+    }
+    if (confirm(`Are you sure you want to delete all ${draftIds.length} draft quotes? This action cannot be undone.`)) {
+        deleteQuotes(draftIds);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-in fade-in duration-500">
@@ -215,6 +259,9 @@ export default function Quotes() {
             />
             <Button variant="outline" onClick={() => navigate('/dashboard/quotes/templates')}>
                 <FileText className="mr-2 h-4 w-4" /> Templates
+            </Button>
+            <Button variant="outline" className="text-destructive hover:bg-destructive/10 border-destructive/50" onClick={handlePurgeDrafts}>
+                <Trash2 className="mr-2 h-4 w-4" /> Purge Drafts
             </Button>
             <QuickQuoteModal />
             <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20">
@@ -374,7 +421,13 @@ export default function Quotes() {
                                <Pencil className="mr-2 h-4 w-4" /> Edit Quote
                              </DropdownMenuItem>
                              <Separator className="my-1" />
-                             <DropdownMenuItem className="text-destructive focus:text-destructive">
+                             <DropdownMenuItem 
+                                className="text-destructive focus:text-destructive cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteQuote(q.id);
+                                }}
+                             >
                                <Trash2 className="mr-2 h-4 w-4" /> Delete Quote
                              </DropdownMenuItem>
                            </DropdownMenuContent>
