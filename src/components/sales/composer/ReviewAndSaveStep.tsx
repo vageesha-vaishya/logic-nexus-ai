@@ -107,14 +107,28 @@ export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges
               const legTotalBuy = calculateLegTotal(leg, 'buy');
               const legProfit = legTotalSell - legTotalBuy;
               const isServiceLeg = leg.legType === 'service';
-              
+              const legRole = leg.legType === 'pickup' ? 'Pickup Leg' : 
+                             leg.legType === 'delivery' ? 'Delivery Leg' : 
+                             leg.legType === 'main' ? 'Main Leg' :
+                             isServiceLeg ? 'Service' : 'Leg';
+
               return (
                 <Card key={leg.id} className="border-2">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <p className="font-semibold">
-                          {isServiceLeg ? 'Service' : 'Leg'} {idx + 1} - {leg.mode.toUpperCase()}
+                          {(() => {
+                             // Logic synchronized with quote-mapper.ts/charge-bifurcation.ts
+                             // DB requires 'transport'/'service' so we infer display role from position
+                             if (leg.legType === 'service') return `Service: ${leg.serviceOnlyCategory || 'General'}`;
+                             
+                             if (legs.length === 1) return `Main Leg ${idx + 1} - ${leg.mode.toUpperCase()}`;
+                             
+                             if (idx === 0) return `Pickup Leg - ${leg.mode.toUpperCase()}`;
+                             if (idx === legs.length - 1) return `Delivery Leg - ${leg.mode.toUpperCase()}`;
+                             return `Main Leg ${idx + 1} - ${leg.mode.toUpperCase()}`;
+                          })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {isServiceLeg 

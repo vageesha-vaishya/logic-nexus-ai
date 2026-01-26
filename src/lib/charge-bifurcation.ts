@@ -67,6 +67,26 @@ export function matchLegForCharge(description: string, legs: TransportLeg[]): Tr
         if (!targetLeg) {
             targetLeg = legs.find(l => areLegTypesEquivalent(l.leg_type, matchedRule.legType));
         }
+
+        // 3. Fallback for "Transport" legs that are actually Pickup/Delivery by position
+        if (!targetLeg && (matchedRule.legType === 'pickup' || matchedRule.legType === 'delivery')) {
+            const sortedLegs = [...legs].sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+            if (sortedLegs.length > 1) {
+                if (matchedRule.legType === 'pickup') {
+                    // Check first leg
+                    const firstLeg = sortedLegs[0];
+                    if (firstLeg && firstLeg.mode === 'road') {
+                        targetLeg = firstLeg;
+                    }
+                } else if (matchedRule.legType === 'delivery') {
+                    // Check last leg
+                    const lastLeg = sortedLegs[sortedLegs.length - 1];
+                    if (lastLeg && lastLeg.mode === 'road') {
+                        targetLeg = lastLeg;
+                    }
+                }
+            }
+        }
         
         return targetLeg;
     }

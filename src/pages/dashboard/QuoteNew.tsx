@@ -12,17 +12,19 @@ import { QuoteTemplate } from '@/components/sales/templates/types';
 import { FileText, Loader2 } from 'lucide-react';
 import { QuoteFormValues } from '@/components/sales/quote-form/types';
 import { toast } from 'sonner';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import { matchLegForCharge } from '@/lib/charge-bifurcation';
 import { TransportLeg } from '@/types/quote-breakdown';
+import { QuickQuoteHistory } from '@/components/sales/quick-quote/QuickQuoteHistory';
 
 export default function QuoteNew() {
   const { supabase, context, scopedDb } = useCRM();
   const location = useLocation();
+  const navigate = useNavigate();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -323,9 +325,14 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
                 // Insert Option
                 const sellPrice = rate.total_amount || rate.price || 0;
-                const marginAmount = Number((sellPrice * 0.15).toFixed(2));
-                const buyPrice = Number((sellPrice - marginAmount).toFixed(2));
-                const markupPercent = buyPrice > 0 ? Number(((marginAmount / buyPrice) * 100).toFixed(2)) : 0;
+                
+                // Use existing financials if available (e.g. from DB or previous step), otherwise calculate default
+                const financials = (rate.buyPrice !== undefined && rate.marginAmount !== undefined) 
+                    ? { buyPrice: rate.buyPrice, marginAmount: rate.marginAmount, markupPercent: rate.markupPercent }
+                    : calculateQuoteFinancials(sellPrice);
+                    
+                const { buyPrice, marginAmount, markupPercent } = financials;
+
                 const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rate.id);
 
                 // Calculate total CO2
@@ -413,12 +420,10 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     }
                     
                     // Determine Leg Type dynamically
-                    let legType = 'transport';
-                    const modeLower = legMode.toLowerCase();
-                    if (rateLegs.length > 1) {
-                        if (isFirstLeg && (modeLower.includes('road') || modeLower.includes('truck'))) legType = 'pickup';
-                        else if (isLastLeg && (modeLower.includes('road') || modeLower.includes('truck'))) legType = 'delivery';
-                    }
+                    // Database constraint strictly enforces 'transport' or 'service'
+                    // We rely on the database default ('transport') to avoid any client-side string encoding issues that might trigger the check constraint
+                    // For service legs (future), we will explicitly set 'service'
+                    const legType = 'transport';
 
                     legsToInsert.push({
                         quotation_version_option_id: optionId,
@@ -430,7 +435,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                         origin_location: origin || (isFirstLeg ? state.origin : null), // Fallback for safety
                         destination_location: destination || (isLastLeg ? state.destination : null),
                         sort_order: index + 1,
-                        leg_type: legType,
+                        // leg_type: legType, // Commented out to use DB default ('transport') to fix constraint violation
                         transit_time_hours: parseDurationToHours(leg.transit_time),
                         co2_kg: leg.co2_emission || leg.co2 || null,
                         voyage_number: leg.voyage_number || leg.voyage || null
@@ -483,9 +488,15 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                         return false;
                     }
 
+                    // Use dynamic margin from financials instead of hardcoded 0.85 (15%)
+                    // If markupPercent is undefined, default to 15%
+                    const buyMultiplier = 1 - ((markupPercent ?? 15) / 100);
+                    const buyAmount = Number((amount * buyMultiplier).toFixed(2));
+                    const sellAmount = Number(amount.toFixed(2));
+
                     chargesToInsert.push(
-                        { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: Number((amount * 0.85).toFixed(2)), amount: Number((amount * 0.85).toFixed(2)), currency_id: currId, note: note, unit: chargeUnit },
-                        { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: sellSideId, quantity: 1, rate: Number(amount.toFixed(2)), amount: Number(amount.toFixed(2)), currency_id: currId, note: note, unit: chargeUnit }
+                        { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },
+                        { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: sellSideId, quantity: 1, rate: sellAmount, amount: sellAmount, currency_id: currId, note: note, unit: chargeUnit }
                     );
                     return true;
                 };
@@ -594,10 +605,12 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     // 2. BALANCING CHARGE: Ensure total matches the quoted price
                     // If parts < total, add adjustment. If parts > total, add discount.
                     const discrepancy = sellPrice - totalBreakdownAmount;
-                    if (Math.abs(discrepancy) > 1) {
+                    // Use tighter threshold (0.01) to catch floating point errors
+                    if (Math.abs(discrepancy) > 0.01) {
                          const chargeName = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
-                         const chargeNote = discrepancy > 0 ? 'Unitemized surcharges from Smart Quote' : 'Bundle discount adjustment';
-                         addChargePair(chargeName, discrepancy, chargeNote, mainLegId);
+                         const chargeNote = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
+                         // Round discrepancy to 2 decimal places
+                         addChargePair(chargeName, Number(discrepancy.toFixed(2)), chargeNote, mainLegId);
                          logger.info('[QuoteNew] Added balancing charge', { discrepancy, sellPrice, totalBreakdownAmount });
                     }
                 }
@@ -607,6 +620,66 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
                 if (chargesToInsert.length > 0) {
                     await scopedDb.from('quote_charges').insert(chargesToInsert);
+
+                    // RECONCILIATION: Update Option Header to match the sum of Line Items
+                    // This fixes rounding errors and ensures data integrity between Header and Lines
+                    const finalTotalBuy = chargesToInsert
+                        .filter((c: any) => c.charge_side_id === buySideId)
+                        .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                        
+                    const finalTotalSell = chargesToInsert
+                        .filter((c: any) => c.charge_side_id === sellSideId)
+                        .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                        
+                    const finalMargin = finalTotalSell - finalTotalBuy;
+                    const finalMarkup = finalTotalBuy > 0 ? (finalMargin / finalTotalBuy) * 100 : 0;
+                    
+                    await scopedDb
+                        .from('quotation_version_options')
+                        .update({
+                            total_buy: Number(finalTotalBuy.toFixed(2)),
+                            total_sell: Number(finalTotalSell.toFixed(2)),
+                            total_amount: Number(finalTotalSell.toFixed(2)),
+                            margin_amount: Number(finalMargin.toFixed(2)),
+                            margin_percentage: Number(finalMarkup.toFixed(2))
+                        })
+                        .eq('id', optionId);
+
+                    // VALIDATION & RECORDING: Verify Transfer Integrity
+                    const transferDiff = Math.abs(sellPrice - finalTotalSell);
+                    if (transferDiff > 0.01) {
+                        const errorMsg = `[Data Integrity Failure] Transfer Mismatch: Incoming ${sellPrice} vs Stored ${finalTotalSell} (Diff: ${transferDiff})`;
+                        console.error(errorMsg);
+                        logger.error(errorMsg, { optionId, sellPrice, finalTotalSell });
+                        
+                        // Record anomaly to Version level (best effort)
+                        // We fetch current anomalies first to append
+                        const { data: vData } = await scopedDb
+                            .from('quotation_versions')
+                            .select('anomalies')
+                            .eq('id', versionId)
+                            .single();
+                            
+                        const currentAnomalies = Array.isArray(vData?.anomalies) ? vData.anomalies : [];
+                        await scopedDb.from('quotation_versions').update({
+                            anomalies: [...currentAnomalies, {
+                                type: 'TRANSFER_MISMATCH',
+                                severity: 'CRITICAL',
+                                message: errorMsg,
+                                timestamp: new Date().toISOString(),
+                                option_id: optionId
+                            }]
+                        }).eq('id', versionId);
+                    } else {
+                        logger.info(`[QuoteNew] Transfer Validated: Incoming ${sellPrice} === Stored ${finalTotalSell}`);
+                    }
+                        
+                    logger.info('[QuoteNew] Reconciled option financials', { 
+                        optionId, 
+                        originalSell: sellPrice, 
+                        finalSell: finalTotalSell,
+                        diff: finalTotalSell - sellPrice 
+                    });
                 }
 
                 // Update progress
@@ -678,6 +751,26 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
       console.error('Error applying template', e);
       toast.error('Failed to apply template');
     }
+  };
+
+  const handleHistorySelect = (payload: any) => {
+    if (!payload.selectedRates || payload.selectedRates.length === 0) {
+        toast.error("Selected history item has no valid rates.");
+        return;
+    }
+
+    // Navigate to self with new state to trigger re-initialization
+    navigate('/dashboard/quotes/new', { 
+        state: payload
+    });
+    
+    // Reset local state to ensure fresh processing
+    setCreatedQuoteId(null);
+    setVersionId(null);
+    setOptionsInserted(false);
+    setGeneratedOptionIds([]);
+    setInsertionError(null);
+    setTemplateData(undefined);
   };
 
   const handleSuccess = (quoteId: string) => {
@@ -831,10 +924,13 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
           </Breadcrumb>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">New Quote</h1>
-            <Button variant="outline" onClick={() => setTemplateDialogOpen(true)}>
-              <FileText className="mr-2 h-4 w-4" />
-              Use Template
-            </Button>
+            <div className="flex gap-2">
+                <QuickQuoteHistory onSelect={handleHistorySelect} />
+                <Button variant="outline" onClick={() => setTemplateDialogOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Use Template
+                </Button>
+            </div>
           </div>
         </div>
         

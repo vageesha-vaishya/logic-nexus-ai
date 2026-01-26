@@ -23,6 +23,7 @@ import { QuoteResultsList } from './QuoteResultsList';
 import { QuoteComparisonView } from './QuoteComparisonView';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
+import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 
 const CARRIER_OPTIONS = [
   "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
@@ -71,28 +72,6 @@ type QuickQuoteValues = z.infer<typeof baseSchema> & {
     vehicleType?: string;
 };
 
-interface RateOption {
-  id: string;
-  carrier: string; // carrier name
-  name: string; // option name
-  price: number;
-  currency: string;
-  transitTime: string;
-  tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
-  reliability?: { score: number; on_time_performance: string };
-  environmental?: { co2_emissions: string; rating: string };
-  ai_explanation?: string;
-  source_attribution?: string;
-  co2_kg?: number;
-  route_type?: 'Direct' | 'Transshipment';
-  stops?: number;
-  legs?: any[]; 
-  charges?: any[];
-  price_breakdown?: any;
-  validUntil?: string | null;
-  service_type?: string;
-}
-
 interface QuickQuoteModalProps {
   children?: React.ReactNode;
   accountId?: string;
@@ -138,7 +117,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { supabase } = useCRM();
+  const { supabase, context } = useCRM();
 
   const form = useForm<QuickQuoteValues>({
     resolver: zodResolver(quickQuoteSchema),
@@ -386,17 +365,27 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       // 1. Process Legacy Results
       if (legacyRes.error) {
           console.error("[QuickQuote] Legacy Rate Engine Error:", legacyRes.error);
-          // Don't throw yet, see if AI succeeded
       } else if (legacyRes.data?.options) {
           console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
-          const legacyOptions = legacyRes.data.options.map((opt: any) => ({
-              ...opt,
-              source_attribution: 'Standard Rate Engine',
-              tier: opt.tier || 'standard',
-              co2_kg: opt.co2_kg,
-              route_type: opt.route_type,
-              stops: opt.stops
-          }));
+          const legacyOptions = legacyRes.data.options.map((opt: any) => {
+              const mapped = mapOptionToQuote(opt);
+              const { buyPrice, marginAmount, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
+              return {
+                  ...mapped,
+                  source_attribution: 'Standard Rate Engine',
+                  carrier: mapped.carrier_name, // Ensure carrier is a string for validation
+                  price: mapped.total_amount, // Ensure price field is populated for UI
+                  currency: mapped.currency || 'USD', // Ensure currency is present
+                  name: mapped.option_name,
+                  transitTime: mapped.transit_time?.details,
+                  co2_kg: mapped.total_co2_kg,
+                  legs: mapped.legs,
+                  charges: mapped.charges,
+                  buyPrice,
+                  marginAmount,
+                  markupPercent
+              };
+          });
           combinedOptions = [...combinedOptions, ...legacyOptions];
       }
 
@@ -422,41 +411,23 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               
               if (aiData.options) {
                   const aiOptions = aiData.options.map((opt: any) => {
-                      // Calculate total from breakdown if missing
-                      let calculatedPrice = opt.price_breakdown?.total || opt.price || 0;
-                      if (!calculatedPrice && opt.price_breakdown) {
-                          // Helper to recursively sum numeric values
-                          const sumValues = (obj: any): number => {
-                            return Object.entries(obj).reduce((acc, [key, val]) => {
-                                if (['currency', 'exchange_rate', 'total', 'currency_code'].includes(key)) return acc;
-                                if (typeof val === 'number') return acc + val;
-                                if (typeof val === 'object' && val !== null) return acc + sumValues(val);
-                                return acc;
-                            }, 0);
-                          };
-                          
-                          calculatedPrice = sumValues(opt.price_breakdown);
-                          
-                          // Ensure total is set in breakdown for consistency
-                          if (opt.price_breakdown) {
-                              opt.price_breakdown.total = calculatedPrice;
-                          }
-                      }
-
+                      const mapped = mapOptionToQuote(opt);
+                      const { buyPrice, marginAmount, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
                       return {
-                          id: opt.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
-                          tier: opt.tier,
-                          name: opt.transport_mode || opt.carrier?.name,
-                          carrier: opt.carrier?.name || 'AI Selected Carrier',
-                          price: calculatedPrice,
-                          currency: opt.price_breakdown?.currency || 'USD',
-                          transitTime: opt.transit_time?.details || (opt.transit_time?.total_days + " days"),
-                          legs: opt.legs,
-                          price_breakdown: opt.price_breakdown,
-                          reliability: opt.reliability,
-                          environmental: opt.environmental,
+                          ...mapped,
+                          id: mapped.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
                           source_attribution: 'AI Smart Engine',
-                          ai_explanation: opt.ai_explanation
+                          carrier: mapped.carrier_name, // Ensure carrier is a string for validation
+                           price: mapped.total_amount, // Ensure price field is populated for UI
+                           currency: mapped.currency || 'USD', // Ensure currency is present
+                           name: mapped.option_name,
+                          transitTime: mapped.transit_time?.details,
+                          co2_kg: mapped.total_co2_kg,
+                          legs: mapped.legs,
+                          charges: mapped.charges,
+                          buyPrice,
+                          marginAmount,
+                          markupPercent
                       };
                   });
                   
@@ -473,6 +444,29 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       }
 
       setResults(combinedOptions);
+
+      // Save to History
+      try {
+          const user = (await supabase.auth.getUser()).data.user;
+          if (user && context?.tenantId) {
+              const historyPayload = {
+                  options: combinedOptions,
+                  market_analysis: smartMode && aiRes?.data?.market_analysis ? aiRes.data.market_analysis : null,
+                  confidence_score: smartMode && aiRes?.data?.confidence_score ? aiRes.data.confidence_score : null,
+                  anomalies: smartMode && aiRes?.data?.anomalies ? aiRes.data.anomalies : []
+              };
+
+              await supabase.from('ai_quote_requests').insert({
+                  user_id: user.id,
+                  tenant_id: context.tenantId,
+                  request_payload: payload,
+                  response_payload: historyPayload,
+                  status: 'generated'
+              });
+          }
+      } catch (err) {
+          console.error("[QuickQuote] Failed to save history:", err);
+      }
 
     } catch (error: any) {
       console.error('Rate calculation error:', error);
@@ -908,36 +902,6 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               </div>
             ) : (
                 <div className="space-y-4">
-                    {marketAnalysis && (
-                        <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-100">
-                            <CardContent className="p-4">
-                                <h4 className="text-sm font-semibold text-indigo-800 mb-2 flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4"/> AI Market Analysis
-                                </h4>
-                                <p className="text-xs text-indigo-700 leading-relaxed">
-                                    {marketAnalysis}
-                                </p>
-                                {confidenceScore && (
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <span className="text-xs font-medium text-indigo-800">Confidence Score:</span>
-                                        <div className="h-2 w-24 bg-indigo-200 rounded-full overflow-hidden">
-                                            <div className="h-full bg-indigo-600" style={{ width: `${confidenceScore * 100}%` }}></div>
-                                        </div>
-                                        <span className="text-xs text-indigo-600">{Math.round(confidenceScore * 100)}%</span>
-                                    </div>
-                                )}
-                                {anomalies.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-indigo-200/50">
-                                        <span className="text-xs font-semibold text-red-600 block mb-1">Detected Anomalies:</span>
-                                        <ul className="list-disc list-inside text-xs text-red-700/80">
-                                            {anomalies.map((a, i) => <li key={i}>{a}</li>)}
-                                        </ul>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-lg">Rate Options</h3>
@@ -945,7 +909,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                         </div>
                         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'compare')} className="w-auto">
                             <TabsList className="h-8">
-                                <TabsTrigger value="list" className="text-xs h-7 px-2"><LayoutList className="w-3 h-3 mr-1"/> List</TabsTrigger>
+                                <TabsTrigger value="list" className="text-xs h-7 px-2"><LayoutList className="w-3 h-3 mr-1"/> Browse</TabsTrigger>
                                 <TabsTrigger value="compare" className="text-xs h-7 px-2"><Columns className="w-3 h-3 mr-1"/> Compare</TabsTrigger>
                             </TabsList>
                         </Tabs>
@@ -954,16 +918,21 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     {viewMode === 'list' ? (
                         <QuoteResultsList 
                             results={results} 
-                            onSelect={(opt) => handleConvertToQuote(opt)} 
+                            onSelect={handleConvertToQuote}
                             selectedIds={selectedIds}
                             onToggleSelection={toggleSelection}
+                            onGenerateSmartOptions={smartMode ? () => onSubmit(form.getValues()) : undefined}
+                            marketAnalysis={marketAnalysis}
+                            confidenceScore={confidenceScore}
+                            anomalies={anomalies}
                         />
                     ) : (
                         <QuoteComparisonView 
                             options={results} 
-                            onSelect={(opt) => handleConvertToQuote(opt)}
+                            onSelect={handleConvertToQuote}
                             selectedIds={selectedIds}
                             onToggleSelection={toggleSelection}
+                            onGenerateSmartOptions={smartMode ? () => onSubmit(form.getValues()) : undefined}
                         />
                     )}
 

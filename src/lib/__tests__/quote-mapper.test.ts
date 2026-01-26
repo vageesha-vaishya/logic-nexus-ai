@@ -57,15 +57,16 @@ describe('mapOptionToQuote', () => {
 
         const result = mapOptionToQuote(aiOption);
         
-        // Verify charges array is populated
-        expect(result.charges).toBeDefined();
-        expect(result.charges).toHaveLength(3); // Base, Fuel, Doc
+        // Verify charges array is populated in the synthetic leg
+        expect(result.legs).toHaveLength(1);
+        const legCharges = result.legs[0].charges;
+        expect(legCharges).toHaveLength(3); // Base, Fuel, Doc
         
-        const baseCharge = result.charges.find((c: any) => c.category === 'Freight');
+        const baseCharge = legCharges.find((c: any) => c.category === 'Freight');
         expect(baseCharge).toBeDefined();
         expect(baseCharge.amount).toBe(1000);
 
-        const fuelCharge = result.charges.find((c: any) => c.name === 'Fuel');
+        const fuelCharge = legCharges.find((c: any) => c.name === 'Fuel');
         expect(fuelCharge).toBeDefined();
         expect(fuelCharge.amount).toBe(150);
     });
@@ -84,7 +85,7 @@ describe('mapOptionToQuote', () => {
 
         const result = mapOptionToQuote(quickQuoteOption);
 
-        expect(result.carrier.name).toBe('Maersk');
+        expect(result.carrier).toBe('Maersk');
         expect(result.transport_mode).toBe('Ocean - FCL');
         expect(result.transit_time.details).toBe('25 Days');
         expect(result.total_amount).toBe(2000);
@@ -92,10 +93,10 @@ describe('mapOptionToQuote', () => {
         // It should default all to base_fare if no breakdown provided
         expect(result.price_breakdown.base_fare).toBe(2000);
         
-        // And synthesize charges
-        expect(result.charges).toHaveLength(1);
-        expect(result.charges[0].amount).toBe(2000);
-        expect(result.charges[0].category).toBe('Freight');
+        // And synthesize charges in leg
+        expect(result.legs[0].charges).toHaveLength(1);
+        expect(result.legs[0].charges[0].amount).toBe(2000);
+        expect(result.legs[0].charges[0].category).toBe('Freight');
     });
 
     it('adds balancing charge if parts do not sum to total', () => {
@@ -116,10 +117,35 @@ describe('mapOptionToQuote', () => {
 
         const result = mapOptionToQuote(unbalancedOption);
         
-        expect(result.charges).toBeDefined();
-        const adjustment = result.charges.find((c: any) => c.category === 'Adjustment');
+        const legCharges = result.legs[0].charges;
+        expect(legCharges).toBeDefined();
+        const adjustment = legCharges.find((c: any) => c.category === 'Adjustment');
         expect(adjustment).toBeDefined();
         expect(adjustment.name).toBe('Ancillary Fees');
         expect(adjustment.amount).toBe(150);
+    });
+
+    it('adds balancing charge for small floating point discrepancies > 0.01', () => {
+        const floatOption = {
+            id: 'f-1',
+            total_amount: 100.50,
+            currency: 'USD',
+            price_breakdown: {
+                total: 100.50,
+                base_fare: 50.00,
+                taxes: 50.00,
+                surcharges: {},
+                fees: {}
+            },
+            legs: []
+        };
+        // 50 + 50 = 100. Missing 0.50.
+        // Old logic (> 1) would ignore this. New logic (> 0.01) should catch it.
+
+        const result = mapOptionToQuote(floatOption);
+        const legCharges = result.legs[0].charges;
+        const adjustment = legCharges.find((c: any) => c.category === 'Adjustment');
+        expect(adjustment).toBeDefined();
+        expect(adjustment.amount).toBe(0.50);
     });
 });

@@ -1,3 +1,16 @@
+export const calculateQuoteFinancials = (sellPrice: number) => {
+    const marginAmount = Number((sellPrice * 0.15).toFixed(2));
+    const buyPrice = Number((sellPrice - marginAmount).toFixed(2));
+    const markupPercent = buyPrice > 0 ? Number(((marginAmount / buyPrice) * 100).toFixed(2)) : 0;
+    
+    return {
+        sellPrice,
+        buyPrice,
+        marginAmount,
+        markupPercent
+    };
+};
+
 export const mapOptionToQuote = (opt: any) => {
     if (!opt) return null;
     
@@ -15,6 +28,10 @@ export const mapOptionToQuote = (opt: any) => {
         mode: opt.mode || opt.transport_mode || opt.name, // Fallback chain
         transit_time: typeof opt.transitTime === 'string' ? { details: opt.transitTime } : (opt.transit_time || {}),
         currency: typeof opt.currency === 'object' ? opt.currency?.code : opt.currency,
+        // Financial mappings (DB -> App)
+        buyPrice: opt.buyPrice ?? opt.total_buy ?? opt.buy_price,
+        marginAmount: opt.marginAmount ?? opt.margin_amount,
+        markupPercent: opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage,
     };
     
     // Calculate price breakdown if not present
@@ -92,16 +109,26 @@ export const mapOptionToQuote = (opt: any) => {
                 if (val > 0) charges = [...charges, { category: 'Fee', name: key, amount: val, currency, unit: 'per_shipment', note: key }];
             });
         }
+    }
 
-        // Balancing Charge: Ensure total matches the quoted price
-        // This mirrors the logic in QuoteNew.tsx to prevent discrepancies
+    // Balancing Charge: Ensure total matches the quoted price
+    // This mirrors the logic in QuoteNew.tsx to prevent discrepancies
+    // Now applied universally to catch mismatches in both Smart and Quick quotes
+    if (price_breakdown && price_breakdown.total > 0) {
         const chargesTotal = charges.reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
         const discrepancy = price_breakdown.total - chargesTotal;
         
-        if (Math.abs(discrepancy) > 1) {
+        // Use a tighter threshold (0.01) to catch floating point errors and ensure precision
+        if (Math.abs(discrepancy) > 0.01) {
              const name = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
-             const note = discrepancy > 0 ? 'Unitemized surcharges from Smart Quote' : 'Bundle discount adjustment';
-             charges = [...charges, { category: 'Adjustment', name, amount: discrepancy, currency, unit: 'per_shipment', note }];
+             const note = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
+             
+             // Only add if not already present (simple check)
+             const hasAdjustment = charges.some((c: any) => c.category === 'Adjustment' && Math.abs(c.amount - discrepancy) < 0.01);
+             if (!hasAdjustment) {
+                const currency = price_breakdown.currency || normalized.currency || 'USD';
+                charges = [...charges, { category: 'Adjustment', name, amount: Number(discrepancy.toFixed(2)), currency, unit: 'per_shipment', note }];
+             }
         }
     }
 
@@ -120,9 +147,10 @@ export const mapOptionToQuote = (opt: any) => {
         // Clear global charges as they are now assigned to the leg
         charges = []; 
     } else {
-        // Ensure existing legs have modes
-        legs = legs.map((leg: any) => ({
+        // Ensure existing legs have modes and IDs
+        legs = legs.map((leg: any, index: number) => ({
             ...leg,
+            id: leg.id || `leg-${index}-${Date.now()}`, // Ensure ID exists for mapping
             mode: leg.mode || normalized.mode || 'unknown',
             charges: leg.charges || []
         }));
@@ -150,17 +178,21 @@ export const mapOptionToQuote = (opt: any) => {
         }
     }
 
-    // Bifurcation Logic: Assign leg_type (Origin, Main, Destination)
+    // Bifurcation Logic: Assign bifurcation_role (Origin, Main, Destination)
+    // database constraint requires leg_type to be 'transport' or 'service'
     if (legs.length === 1) {
-        legs[0].leg_type = 'main'; // Direct transport is main carriage
+        legs[0].bifurcation_role = 'main'; // Direct transport is main carriage
+        if (!legs[0].leg_type) legs[0].leg_type = 'transport';
     } else if (legs.length > 1) {
         legs.forEach((leg: any, index: number) => {
+            if (!leg.leg_type) leg.leg_type = 'transport';
+            
             if (index === 0) {
-                leg.leg_type = 'origin';
+                leg.bifurcation_role = 'origin';
             } else if (index === legs.length - 1) {
-                leg.leg_type = 'destination';
+                leg.bifurcation_role = 'destination';
             } else {
-                leg.leg_type = 'main';
+                leg.bifurcation_role = 'main';
             }
         });
     }
@@ -169,9 +201,9 @@ export const mapOptionToQuote = (opt: any) => {
     // Try to move global charges to specific legs based on keywords
     if (charges.length > 0 && legs.length > 0) {
         const remainingGlobalCharges: any[] = [];
-        const mainLeg = legs.find((l: any) => l.leg_type === 'main') || legs[0];
-        const originLeg = legs.find((l: any) => l.leg_type === 'origin');
-        const destLeg = legs.find((l: any) => l.leg_type === 'destination');
+        const mainLeg = legs.find((l: any) => l.bifurcation_role === 'main') || legs[0];
+        const originLeg = legs.find((l: any) => l.bifurcation_role === 'origin');
+        const destLeg = legs.find((l: any) => l.bifurcation_role === 'destination');
 
         charges.forEach((c: any) => {
             const name = (c.name || c.charge_categories?.name || '').toLowerCase();
@@ -185,6 +217,10 @@ export const mapOptionToQuote = (opt: any) => {
                 allocated = true;
             } else if (name.includes('freight') || name.includes('bunker') || name.includes('fuel')) {
                 // Default freight charges to main leg
+                mainLeg.charges.push(c);
+                allocated = true;
+            } else if (legs.length === 1) {
+                // If single leg, everything goes there
                 mainLeg.charges.push(c);
                 allocated = true;
             }

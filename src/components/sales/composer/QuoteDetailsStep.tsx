@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { calculateChargeableWeight, formatWeight } from '@/utils/freightCalculations';
-import { Plane, Ship, Truck } from 'lucide-react';
+import { Plane, Ship, Truck, Sparkles, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { useAiAdvisor } from '@/hooks/useAiAdvisor';
+import { useToast } from '@/hooks/use-toast';
 
 interface QuoteDetailsStepProps {
   quoteData: {
@@ -17,9 +21,14 @@ interface QuoteDetailsStepProps {
     total_weight?: string;
     total_volume?: string;
     commodity?: string;
+    hts_code?: string;
+    schedule_b?: string;
   };
   currencies: any[];
   onChange: (field: string, value: any) => void;
+  origin?: string;
+  destination?: string;
+  validationErrors?: string[];
 }
 
 const INCOTERMS = [
@@ -36,7 +45,21 @@ const INCOTERMS = [
   'CIF - Cost, Insurance and Freight',
 ];
 
-export function QuoteDetailsStep({ quoteData, currencies, onChange }: QuoteDetailsStepProps) {
+export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, destination, validationErrors = [] }: QuoteDetailsStepProps) {
+  const { invokeAiAdvisor } = useAiAdvisor();
+  const { toast } = useToast();
+  const [aiLoading, setAiLoading] = useState(false);
+  const [complianceStatus, setComplianceStatus] = useState<{ compliant: boolean; issues: any[] } | null>(null);
+
+  const getFieldError = (field: string) => {
+    // Basic mapping of validation errors to fields
+    if (field === 'commodity' && validationErrors.some(e => e.toLowerCase().includes('commodity'))) return true;
+    if (field === 'incoterms' && validationErrors.some(e => e.toLowerCase().includes('incoterm'))) return true;
+    if (field === 'validUntil' && validationErrors.some(e => e.toLowerCase().includes('valid until'))) return true;
+    if (field === 'currency' && validationErrors.some(e => e.toLowerCase().includes('currency'))) return true;
+    return false;
+  };
+
   const weight = Number(quoteData.total_weight) || 0;
   const volume = Number(quoteData.total_volume) || 0;
 
@@ -59,10 +82,100 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange }: QuoteDetai
 
   const daysRemaining = calculateDaysRemaining(quoteData.validUntil);
 
+  // AI: Classify Commodity & Suggest HTS
+  const handleAiAnalyze = async () => {
+    if (!quoteData.commodity || quoteData.commodity.length < 3) {
+      toast({
+        title: "Input Required",
+        description: "Please enter a commodity description first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+        // Parallel calls for Classification and Compliance
+        const [classRes, complianceRes] = await Promise.all([
+            invokeAiAdvisor({
+                action: 'classify_commodity', payload: { commodity: quoteData.commodity }
+            }),
+            invokeAiAdvisor({
+                action: 'validate_compliance', payload: { 
+                  commodity: quoteData.commodity,
+                  origin: origin || "Global", 
+                  destination: destination || "Global"
+                }
+            })
+        ]);
+
+        // Handle Classification
+        if (classRes.data?.hts) {
+            onChange('hts_code', classRes.data.hts);
+            if (classRes.data.scheduleB) {
+              onChange('schedule_b', classRes.data.scheduleB);
+            }
+            toast({
+                title: "AI Analysis Complete",
+                description: `Classified as ${classRes.data.type} (HTS: ${classRes.data.hts})`,
+            });
+        }
+
+        // Handle Compliance
+        if (complianceRes.data) {
+            setComplianceStatus(complianceRes.data);
+            if (!complianceRes.data.compliant) {
+              toast({
+                title: "Compliance Warning",
+                description: "Potential trade restrictions detected.",
+                variant: "destructive"
+              });
+            }
+        }
+
+    } catch (err) {
+        console.error("AI Analyze Error:", err);
+        toast({
+          title: "Analysis Failed",
+          description: "Could not complete AI analysis. Please try again.",
+          variant: "destructive"
+        });
+    } finally {
+        setAiLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Quote Details</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Quote Details</span>
+          <div className="flex items-center gap-2">
+            {validationErrors.length > 0 && (
+              <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {validationErrors.length} Error{validationErrors.length > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {complianceStatus && (
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant={complianceStatus.compliant ? "outline" : "destructive"} className="gap-1">
+                  {complianceStatus.compliant ? <ShieldCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                  {complianceStatus.compliant ? "Compliance Verified" : "Compliance Issues"}
+                </Badge>
+                {!complianceStatus.compliant && complianceStatus.issues?.length > 0 && (
+                  <div className="text-[10px] text-destructive bg-destructive/10 p-2 rounded max-w-xs">
+                    <ul className="list-disc pl-3 space-y-1">
+                      {complianceStatus.issues.map((issue: any, i: number) => (
+                        <li key={i}>{issue.message || issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </CardTitle>
         <CardDescription>Set up basic information for this quotation</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -113,13 +226,52 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange }: QuoteDetai
             </div>
             <div>
               <Label htmlFor="commodity">Commodity / Cargo Type</Label>
-              <Input
-                id="commodity"
-                value={quoteData.commodity || ''}
-                onChange={(e) => onChange('commodity', e.target.value)}
-                placeholder="e.g. Electronics, Textiles"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="commodity"
+                  value={quoteData.commodity || ''}
+                  onChange={(e) => onChange('commodity', e.target.value)}
+                  placeholder="e.g. Electronics, Textiles"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={handleAiAnalyze}
+                  disabled={aiLoading}
+                  title="Analyze with AI"
+                >
+                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-600" />}
+                </Button>
+              </div>
             </div>
+            
+            {/* AI Generated Fields */}
+            {(quoteData.hts_code || quoteData.schedule_b) && (
+              <>
+                <div className="animate-in fade-in slide-in-from-top-1">
+                  <Label htmlFor="hts_code">HTS Code</Label>
+                  <Input
+                    id="hts_code"
+                    value={quoteData.hts_code || ''}
+                    onChange={(e) => onChange('hts_code', e.target.value)}
+                    placeholder="Harmonized Tariff Schedule"
+                    className="bg-purple-50/50 border-purple-100"
+                  />
+                </div>
+                <div className="animate-in fade-in slide-in-from-top-1">
+                  <Label htmlFor="schedule_b">Schedule B</Label>
+                  <Input
+                    id="schedule_b"
+                    value={quoteData.schedule_b || ''}
+                    onChange={(e) => onChange('schedule_b', e.target.value)}
+                    placeholder="Export Classification"
+                    className="bg-purple-50/50 border-purple-100"
+                  />
+                </div>
+              </>
+            )}
+
             <div>
               <Label htmlFor="total_weight">Total Weight (kg)</Label>
               <Input

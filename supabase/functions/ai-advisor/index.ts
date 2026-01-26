@@ -225,9 +225,16 @@ Requirements:
    - Break down each route into specific legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
    - Identify **Border Crossings** and **Customs Procedures** needed at each transition.
    - Flag **Transport Regulations** (e.g., road weight limits, low emission zones).
-3. **Dynamic Charge Simulation**:
-   - Provide granular pricing: Base Freight, BAF (Bunker Adjustment Factor), CAF (Currency Adjustment Factor), Terminal Handling (THC), Customs Clearance, Documentation Fees.
-   - Total price must be realistic market rates.
+3. **Dynamic Charge Simulation (CRITICAL)**:
+   - **Leg-Level Pricing**: You MUST calculate and populate charges for **EVERY** leg. Zero-cost legs are NOT allowed (except purely administrative steps).
+   - **Mode-Specific Logic**:
+     - **Road/Trucking**: Calculate based on distance (~$1.50-$4.00/km) + fixed handling fees.
+     - **Air**: Calculate based on chargeable weight (Higher of actual vs vol weight). Range: $2.50-$12.00/kg depending on service.
+     - **Ocean**: Use market rates per container (TEU/FEU) or w/m for LCL. Include BAF/CAF.
+     - **Rail**: Distance-based rail tariffs.
+   - **Granular Breakdown**: Include specific line items (e.g., 'Pickup Haulage', 'Terminal Handling Origin', 'Ocean Freight', 'Delivery Trucking').
+   - **Total Accuracy**: The global 'price_breakdown' total MUST equal the sum of all leg charges.
+
 4. **Reliability & Environmental**:
    - Estimate CO2 emissions.
    - Provide a reliability score (1-10) based on carrier reputation.
@@ -252,7 +259,23 @@ Output JSON Format:
           "distance_km": 150,
           "co2_kg": 20,
           "border_crossing": false,
-          "instructions": "Standard pickup"
+          "instructions": "Standard pickup",
+          "charges": [
+             { "name": "Pickup Haulage", "amount": 450, "currency": "USD", "unit": "per_trip" },
+             { "name": "Fuel Surcharge (Road)", "amount": 45, "currency": "USD", "unit": "per_trip" }
+          ]
+        },
+        {
+          "sequence": 2,
+          "from": "Location B",
+          "to": "Location C",
+          "mode": "ocean",
+          "carrier": "Maersk",
+          "transit_time": "18 days",
+          "charges": [
+             { "name": "Ocean Freight", "amount": 2000, "currency": "USD", "unit": "per_container" },
+             { "name": "BAF", "amount": 150, "currency": "USD", "unit": "per_container" }
+          ]
         }
       ],
       "price_breakdown": {
@@ -260,9 +283,11 @@ Output JSON Format:
         "surcharges": {
             "baf": 150,
             "caf": 50,
-            "peak_season": 0
+            "peak_season": 0,
+            "fuel_road": 45
         },
         "fees": {
+            "pickup": 450,
             "thc_origin": 200,
             "thc_dest": 200,
             "docs": 50,
@@ -270,7 +295,7 @@ Output JSON Format:
         },
         "taxes": 0,
         "currency": "USD",
-        "total": 2770
+        "total": 3265
       },
       "regulatory_info": {
           "customs_procedures": ["Export Declaration", "Import Clearance"],
@@ -358,11 +383,37 @@ function applyDynamicPricing(response: any) {
             // Adjust surcharges if AI didn't provide them explicitly or to enforce our logic
             if (!opt.price_breakdown.surcharges) opt.price_breakdown.surcharges = {};
             
-            // Overwrite/Add Fuel Surcharge
-            opt.price_breakdown.surcharges.fuel_adjustment = Math.round(base * fuelSurchargeRate);
-            
-            // Add Currency Adjustment if international
-            opt.price_breakdown.surcharges.currency_adj = Math.round(base * exchangeRateBuffer);
+            // Calculate dynamic values
+            const fuelAmt = Math.round(base * fuelSurchargeRate);
+            const currencyAmt = Math.round(base * exchangeRateBuffer);
+
+            // Overwrite/Add to Global Breakdown
+            opt.price_breakdown.surcharges.fuel_adjustment = fuelAmt;
+            opt.price_breakdown.surcharges.currency_adj = currencyAmt;
+
+            // --- INJECT INTO LEGS FOR CONSISTENCY ---
+            if (opt.legs && Array.isArray(opt.legs) && opt.legs.length > 0) {
+                // Find Main Leg (longest distance or Ocean/Air)
+                // Heuristic: Look for leg with same mode as option, or longest distance
+                let mainLeg = opt.legs.find((l: any) => opt.transport_mode && l.mode && opt.transport_mode.toLowerCase().includes(l.mode.toLowerCase()));
+                if (!mainLeg) mainLeg = opt.legs.reduce((prev: any, current: any) => (prev.distance_km > current.distance_km) ? prev : current);
+
+                if (mainLeg) {
+                    if (!mainLeg.charges) mainLeg.charges = [];
+                    
+                    // Remove existing dynamic charges to avoid duplication if re-running
+                    mainLeg.charges = mainLeg.charges.filter((c: any) => c.name !== 'Fuel Adjustment (Dynamic)' && c.name !== 'Currency Adjustment (Dynamic)');
+
+                    // Add new charges
+                    if (fuelAmt > 0) {
+                        mainLeg.charges.push({ name: 'Fuel Adjustment (Dynamic)', amount: fuelAmt, currency: opt.price_breakdown.currency || 'USD', unit: 'per_shipment' });
+                    }
+                    if (currencyAmt > 0) {
+                        mainLeg.charges.push({ name: 'Currency Adjustment (Dynamic)', amount: currencyAmt, currency: opt.price_breakdown.currency || 'USD', unit: 'per_shipment' });
+                    }
+                }
+            }
+            // ----------------------------------------
 
             // Recalculate Total
             const surcharges = Object.values(opt.price_breakdown.surcharges).reduce((a: any, b: any) => a + b, 0) as number;

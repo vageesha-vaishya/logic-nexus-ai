@@ -128,12 +128,34 @@ export function ChargeBreakdown({
         // 3. Map to UI Model
         return bifurcated.map(c => {
             const leg = c.assignedLegId ? legs.find(l => l.id === c.assignedLegId) : null;
+            
+            // Normalize legType for display and filtering
+            // The DB constraint only allows 'transport' or 'service'.
+            // However, bifurcation logic might return 'pickup', 'delivery', 'main' as roles.
+            // We map these roles to display labels but keep the strict legType compliant.
+            
+            let strictLegType = c.assignedLegType;
+            let displayRole = c.assignedLegType;
+
+            // Map legacy/role values to strict schema types
+            if (['pickup', 'delivery', 'main', 'origin', 'destination'].includes(c.assignedLegType?.toLowerCase() || '')) {
+                displayRole = c.assignedLegType; // Keep role for display
+                strictLegType = 'transport'; // Schema requires 'transport'
+            } else if (c.assignedLegType === 'service') {
+                strictLegType = 'service';
+                displayRole = 'Service';
+            } else {
+                strictLegType = 'transport'; // Default to transport
+                displayRole = 'Transport';
+            }
+
             return {
                 id: c.id || Math.random().toString(),
                 type: c.assignedLegId ? 'Leg' : 'Global',
                 mode: c.assignedMode || 'N/A',
                 legInfo: leg ? `${leg.origin} → ${leg.destination}` : 'Global Charge',
-                legType: c.assignedLegType,
+                legType: strictLegType, // Strict schema value
+                displayRole: displayRole, // Human-friendly role
                 category: c.charge_categories?.name || c.category || 'General',
                 description: c.name || c.note || '-',
                 basis: c.basis || 'Flat',
@@ -174,12 +196,17 @@ export function ChargeBreakdown({
                     return item.mode.includes(value);
                 }
                 if (type === 'leg') {
-                    // Match the bifurcated leg types
-                    if (value === 'Origin' || value === 'Pickup') return item.legType === 'origin' || item.legType === 'pickup';
-                    if (value === 'Destination' || value === 'Delivery') return item.legType === 'destination' || item.legType === 'delivery';
-                    if (value === 'Main' || value === 'Transport') return item.legType === 'main' || item.legType === 'transport';
-                    // Fallback for direct string match (e.g. "Main Leg" from pie chart)
-                    return item.legType.toLowerCase().includes(value.toLowerCase().replace(' leg', ''));
+                    // Match against displayRole (which captures 'pickup', 'delivery' etc.)
+                    // or strictLegType
+                    const role = (item.displayRole || '').toLowerCase();
+                    const legType = (item.legType || '').toLowerCase();
+                    
+                    if (value === 'Origin' || value === 'Pickup') return role === 'origin' || role === 'pickup';
+                    if (value === 'Destination' || value === 'Delivery') return role === 'destination' || role === 'delivery';
+                    if (value === 'Main' || value === 'Transport') return role === 'main' || role === 'transport' || legType === 'transport';
+                    
+                    // Fallback for direct string match
+                    return role.includes(value.toLowerCase().replace(' leg', ''));
                 }
                 return true;
             });
@@ -187,8 +214,14 @@ export function ChargeBreakdown({
 
         // 3. Apply Sorting
         result.sort((a, b) => {
-            let valA = a[sortField];
-            let valB = b[sortField];
+            let valA: any = a[sortField as keyof typeof a];
+            let valB: any = b[sortField as keyof typeof b];
+
+            // Special handling for virtual sort fields
+            if (sortField === 'leg') {
+                 valA = `${a.displayRole || ''} ${a.legInfo}`;
+                 valB = `${b.displayRole || ''} ${b.legInfo}`;
+            }
 
             // Handle strings case-insensitively
             if (typeof valA === 'string') valA = valA.toLowerCase();
@@ -358,7 +391,7 @@ export function ChargeBreakdown({
                                     </TableCell>
                                     <TableCell className="text-xs">
                                         <div className="flex flex-col">
-                                            <span className="font-medium">{item.legType !== 'Global' ? item.legType?.toUpperCase() : '-'}</span>
+                                            <span className="font-medium">{item.displayRole ? item.displayRole.toUpperCase() : (item.legType !== 'Global' ? item.legType?.toUpperCase() : '-')}</span>
                                             <span className="text-[10px] text-muted-foreground truncate max-w-[150px]" title={item.legInfo}>
                                                 {item.legInfo}
                                             </span>
@@ -477,7 +510,10 @@ export function ChargeBreakdown({
                     {legs.map((leg, index) => {
                         // Check if leg has any charges in filteredCharges
                         // We match by assignedLegId which is set by the bifurcation logic
-                        const legCharges = filteredCharges.filter(fc => fc.type === 'Leg' && fc.original.assignedLegId === leg.id);
+                        const legCharges = filteredCharges.filter(fc => 
+                            fc.type === 'Leg' && 
+                            String(fc.original.assignedLegId) === String(leg.id)
+                        );
                         
                         // Also check if leg itself matches filter if we were to show empty legs (optional, but let's stick to showing where charges exist)
                         if (legCharges.length === 0 && activeFilter) return null;
@@ -493,6 +529,10 @@ export function ChargeBreakdown({
                         const legTotalDisplay = Object.entries(legSubtotalByCurrency)
                             .map(([curr, amt]) => formatCurrency(amt, curr))
                             .join(' + ');
+
+                        // Calculate total charges for this leg from source (for comparison/debug)
+                        const rawLegTotal = (leg.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+                        const hasHiddenCharges = rawLegTotal > 0 && legCharges.length === 0 && !activeFilter;
 
                         return (
                             <div key={leg.id} className="border rounded-lg overflow-hidden transition-all duration-200 shadow-sm print:break-inside-avoid">

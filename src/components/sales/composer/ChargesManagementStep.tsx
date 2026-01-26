@@ -41,6 +41,7 @@ interface ChargesManagementStepProps {
   onRemoveCombinedCharge?: (chargeIdx: number) => void;
   onConfigureCombinedBasis?: (chargeIdx: number) => void;
   onFetchRates?: (legId: string) => void;
+  validationErrors?: string[];
 }
 
 export function ChargesManagementStep({
@@ -137,10 +138,11 @@ export function ChargesManagementStep({
                 st.name === leg.mode
               );
               const legName = serviceType?.name || leg.mode.toUpperCase();
+              const hasError = validationErrors.some(e => e.startsWith(`Leg ${idx + 1}`));
               
               return (
-                <TabsTrigger key={leg.id} value={leg.id}>
-                  Leg {idx + 1} - {legName}
+                <TabsTrigger key={leg.id} value={leg.id} className={hasError ? "text-destructive" : ""}>
+                  Leg {idx + 1} - {legName} {hasError && "*"}
                 </TabsTrigger>
               );
             })}

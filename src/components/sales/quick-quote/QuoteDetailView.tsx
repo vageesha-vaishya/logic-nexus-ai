@@ -60,13 +60,37 @@ export function QuoteDetailView({ quote, compact = false }: QuoteDetailViewProps
                     </h3>
                     <p className="text-sm text-muted-foreground">{quote.tier.toUpperCase()} Option • {quote.transit_time?.details}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right space-y-1">
                     <div className="text-2xl font-bold text-primary">
                         {quote.price_breakdown?.currency} {quote.price_breakdown?.total?.toLocaleString()}
                     </div>
-                    <Badge variant={quote.reliability?.score > 8 ? "default" : "secondary"}>
-                        Reliability: {quote.reliability?.score}/10
-                    </Badge>
+                    
+                    {/* Financials Breakdown */}
+                    {(quote.buyPrice !== undefined || quote.marginAmount !== undefined) && (
+                        <div className="flex items-center justify-end gap-3 text-xs">
+                            {quote.buyPrice !== undefined && (
+                                <span className="text-muted-foreground" title="Buy Price">
+                                    Buy: <span className="font-medium">{quote.price_breakdown?.currency} {quote.buyPrice.toLocaleString()}</span>
+                                </span>
+                            )}
+                            {quote.marginAmount !== undefined && (
+                                <span className="text-green-600" title="Margin Amount">
+                                    Margin: <span className="font-bold">+{quote.price_breakdown?.currency} {quote.marginAmount.toLocaleString()}</span>
+                                </span>
+                            )}
+                            {quote.markupPercent !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 border-green-200 text-green-700 bg-green-50">
+                                    {quote.markupPercent}%
+                                </Badge>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="pt-1">
+                        <Badge variant={quote.reliability?.score > 8 ? "default" : "secondary"}>
+                            Reliability: {quote.reliability?.score}/10
+                        </Badge>
+                    </div>
                 </div>
             </div>
 

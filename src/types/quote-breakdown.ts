@@ -36,6 +36,34 @@ export interface RateBreakdown {
     global_charges: Charge[]; // Charges not specific to a leg (e.g., Insurance, Admin Fee)
 }
 
+export interface RateOption {
+    id: string;
+    carrier: string;
+    name: string;
+    price: number;
+    currency: string;
+    transitTime: string;
+    tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
+    legs?: TransportLeg[]; // More specific type than any[]
+    price_breakdown?: any;
+    reliability?: { score: number; on_time_performance: string };
+    environmental?: { co2_emissions: string; rating: string };
+    source_attribution?: string;
+    ai_explanation?: string;
+    transport_mode?: string;
+    co2_kg?: number;
+    route_type?: 'Direct' | 'Transshipment';
+    stops?: number;
+    // Financials
+    buyPrice?: number;
+    marginAmount?: number;
+    markupPercent?: number;
+    // Additional fields for compatibility
+    charges?: Charge[];
+    service_type?: string;
+    validUntil?: string | null;
+}
+
 // Helper to check if an object is a RateBreakdown
 export const isRateBreakdown = (obj: any): obj is RateBreakdown => {
     return obj && Array.isArray(obj.legs) && typeof obj.total === 'number';

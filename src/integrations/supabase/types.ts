@@ -197,6 +197,54 @@ export type Database = {
           },
         ]
       }
+      ai_quote_requests: {
+        Row: {
+          id: string
+          user_id: string
+          tenant_id: string
+          created_at: string | null
+          request_payload: Json
+          response_payload: Json
+          status: string
+          quote_id: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tenant_id: string
+          created_at?: string | null
+          request_payload: Json
+          response_payload: Json
+          status?: string
+          quote_id?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tenant_id?: string
+          created_at?: string | null
+          request_payload?: Json
+          response_payload?: Json
+          status?: string
+          quote_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_quote_requests_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_quote_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       activities: {
         Row: {
           account_id: string | null

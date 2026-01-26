@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy, Sparkles } from 'lucide-react';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
+import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import {
   Dialog,
   DialogContent,
@@ -71,6 +72,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [isGeneratingSmart, setIsGeneratingSmart] = useState(false);
   
   // Track charges to delete
   const [chargesToDelete, setChargesToDelete] = useState<string[]>([]);
@@ -170,37 +172,54 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     const errors: string[] = [];
     
     try {
-      // Step 1: Resolve tenant ID
-      console.log('[Composer] Step 1: Resolving tenant ID');
+      // Step 1: Resolve tenant ID & Context
+      console.log('[Composer] Step 1: Resolving tenant ID and Context');
       const { data: { user } } = await scopedDb.client.auth.getUser();
       const userTenantId = user?.user_metadata?.tenant_id;
       let resolvedTenantId: string | null = userTenantId ?? null;
 
-      // Fallback 1: fetch from quote context
-      if (!resolvedTenantId && quoteId) {
+      // Always fetch quote details if quoteId is present to populate context
+      if (quoteId) {
         try {
           const { data: quoteRow, error: quoteError } = await scopedDb
             .from('quotes', true)
-            .select('tenant_id, franchise_id')
+            .select('tenant_id, franchise_id, origin_location, destination_location, cargo_details, transport_mode, origin_code, destination_code')
             .eq('id', quoteId)
             .maybeSingle();
           
           if (quoteError) {
             console.error('[Composer] Error fetching quote:', quoteError);
-            errors.push('Failed to load quote details');
+            errors.push(`Failed to load quote details: ${quoteError.message}`);
           } else if (quoteRow) {
-            resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
+            // Use quote's tenant_id if we don't have one yet, or verify it matches
+            if (!resolvedTenantId) {
+              resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
+              console.log('[Composer] Resolved tenant from quote:', resolvedTenantId);
+            }
+            
             if ((quoteRow as any)?.franchise_id) {
               setFranchiseId((quoteRow as any).franchise_id);
             }
-            console.log('[Composer] Resolved tenant from quote:', resolvedTenantId);
+
+            // Normalize quote data for consumption
+            const raw = quoteRow as any;
+            const normalizedQuote = {
+                ...raw,
+                origin: raw.origin_location?.name || raw.origin_code || '',
+                destination: raw.destination_location?.name || raw.destination_code || '',
+                commodity: raw.cargo_details?.commodity || '',
+                mode: raw.transport_mode || 'ocean'
+            };
+
+            setQuoteData(normalizedQuote);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('[Composer] Exception fetching quote:', error);
+          errors.push(`Exception loading quote: ${error.message}`);
         }
       }
 
-      // Fallback 2: fetch from quotation version
+      // Fallback 1: fetch from quotation version
       if (!resolvedTenantId && versionId) {
         try {
           const { data: versionRow, error: versionError } = await scopedDb
@@ -640,7 +659,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             carrierName: carrierName,
             origin: leg.origin_location || '',
             destination: leg.destination_location || '',
-            legType: leg.leg_type || 'transport',
+            // Normalize legType to ensure it's either 'transport' or 'service'
+            legType: leg.leg_type === 'service' ? 'service' : 'transport',
             serviceOnlyCategory: leg.service_only_category || '',
             charges: Array.from(chargesMap.values())
           };
@@ -981,6 +1001,135 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     setCurrentBasisConfig({ tradeDirection: '', containerType: '', containerSize: '', quantity: 1 });
   };
 
+  const refreshOptionsList = async () => {
+    if (!versionId) return;
+    const { data: existingOptions, error: queryError } = await scopedDb
+      .from('quotation_version_options', true)
+      .select(`
+        *,
+        legs:quotation_version_option_legs(
+          *,
+          charges:quote_charges(*)
+        )
+      `)
+      .eq('quotation_version_id', versionId)
+      .order('created_at', { ascending: false });
+
+    if (!queryError && existingOptions) {
+      setOptions(existingOptions);
+    }
+  };
+
+  const handleGenerateSmartOptions = async () => {
+    if (!quoteData || !tenantId) {
+      toast({ title: "Error", description: "Missing quote details or tenant context.", variant: "destructive" });
+      return;
+    }
+
+    setIsGeneratingSmart(true);
+    try {
+      const payload = {
+        origin: quoteData.origin,
+        destination: quoteData.destination,
+        commodity: quoteData.commodity,
+        mode: quoteData.mode || quoteData.transport_mode || 'ocean'
+      };
+
+      // Helper to invoke AI Advisor
+      const invokeAiAdvisor = async (body: any) => {
+        const { data: { session } } = await scopedDb.client.auth.getSession();
+        if (!session) throw new Error('No active session');
+
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-advisor`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ action: 'generate_smart_quotes', payload: body })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`AI Advisor failed: ${errorText}`);
+        }
+
+        return await response.json();
+      };
+
+      toast({ title: "Generating Options", description: "AI is analyzing market rates..." });
+      const aiResponse = await invokeAiAdvisor(payload);
+      
+      if (!aiResponse?.data?.options) {
+        throw new Error('No options returned from AI');
+      }
+
+      const results = aiResponse.data.options;
+      const analysis = aiResponse.data.market_analysis;
+
+      // Update market analysis state
+      if (analysis) setMarketAnalysis(analysis);
+
+      for (const result of results) {
+        const mapped = mapOptionToQuote(result);
+        const financials = calculateQuoteFinancials(mapped.sellPrice);
+
+        const { data: optData, error: optError } = await scopedDb
+          .from('quotation_version_options')
+          .insert({
+            quotation_version_id: versionId,
+            tenant_id: tenantId,
+            franchise_id: franchiseId,
+            carrier_name: mapped.carrier,
+            service_type: mapped.serviceType,
+            transit_time: mapped.transitTime,
+            valid_until: mapped.validUntil,
+            option_name: mapped.optionName,
+            reliability_score: mapped.reliability,
+            ai_generated: true,
+            ai_explanation: mapped.aiExplanation,
+            source: 'ai_smart_quote',
+            total_co2_kg: mapped.co2,
+            market_analysis: analysis,
+            buy_price: financials.buyPrice,
+            margin_amount: financials.marginAmount,
+            markup_percent: financials.markupPercent,
+            sell_price: financials.sellPrice,
+            currency_id: currencies[0]?.id
+          })
+          .select()
+          .single();
+
+        if (optError) throw optError;
+
+        // Create a default transport leg for the option
+        const legId = crypto.randomUUID();
+        await scopedDb
+          .from('quotation_version_option_legs')
+          .insert({
+             id: legId,
+             quotation_version_option_id: optData.id,
+             tenant_id: tenantId,
+             mode: payload.mode,
+             origin_location: payload.origin,
+             destination_location: payload.destination,
+             leg_type: 'transport',
+             carrier_name: mapped.carrier,
+             sort_order: 0
+          });
+      }
+
+      toast({ title: "Success", description: `Generated ${results.length} smart options.` });
+      await refreshOptionsList();
+      
+    } catch (error: any) {
+      console.error('Smart Quote Error:', error);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsGeneratingSmart(false);
+    }
+  };
+
   const validateQuotation = () => {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -995,6 +1144,26 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (!leg.origin) errors.push(`Leg ${idx + 1}: Origin is required`);
       if (!leg.destination) errors.push(`Leg ${idx + 1}: Destination is required`);
       
+      // Validate Service Type / Category based on leg type
+      if (leg.legType === 'service') {
+        if (!leg.serviceOnlyCategory) {
+          errors.push(`Leg ${idx + 1}: Service Category is required`);
+        }
+      } else {
+        // Transport leg
+        if (!leg.serviceTypeId) {
+          errors.push(`Leg ${idx + 1}: Service Type is required`);
+        }
+      }
+      
+      // Air Mode specific validation
+      if (leg.mode.toLowerCase() === 'air') {
+        const weight = Number(quoteData.total_weight);
+        if (!weight || isNaN(weight) || weight <= 0) {
+            errors.push(`Leg ${idx + 1} (Air): Total Weight is required for Air freight`);
+        }
+      }
+
       if (leg.charges.length === 0) {
         warnings.push(`Leg ${idx + 1}: No charges added. Consider adding at least one charge.`);
       }
@@ -1215,7 +1384,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
-              leg_type: leg.legType || 'transport',
+              leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
               service_only_category: leg.serviceOnlyCategory || null,
               tenant_id: finalTenantId,
               franchise_id: franchiseId,
@@ -1236,7 +1405,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               service_type_id: leg.serviceTypeId || null,
               origin_location: leg.origin,
               destination_location: leg.destination,
-              leg_type: leg.legType || 'transport',
+              // Strict enforcement of leg_type constraint
+              leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
               service_only_category: leg.serviceOnlyCategory || null,
               sort_order: i
             })
@@ -1693,9 +1863,16 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         return quoteData.currencyId;
       case 2:
         // Legs - require at least one valid leg
-        return legs.length > 0 && legs.every(leg => 
-          leg.mode && leg.origin && leg.destination
-        );
+        // And if Air mode, require weight
+        return legs.length > 0 && legs.every(leg => {
+          const basic = leg.mode && leg.origin && leg.destination;
+          if (!basic) return false;
+          if (leg.mode.toLowerCase() === 'air') {
+             const weight = Number(quoteData.total_weight);
+             return weight > 0;
+          }
+          return true;
+        });
       case 3:
         // Charges - at least one leg should have charges OR there should be combined charges
         return legs.some(leg => leg.charges.length > 0) || combinedCharges.length > 0;
@@ -1716,23 +1893,24 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   }
 
   if (viewMode === 'overview') {
-    return (
-      <QuoteOptionsOverview 
-        options={options.map(opt => ({
-          ...opt,
-          mode: opt.service_type ? (opt.service_type.toLowerCase().includes('air') ? 'air' : opt.service_type.toLowerCase().includes('road') ? 'road' : 'sea') : 'sea'
-        }))}
-        selectedId={optionId || undefined}
-        onSelect={(id) => {
-          setOptionId(id);
-          setViewMode('composer');
-        }}
-        marketAnalysis={marketAnalysis}
-        confidenceScore={confidenceScore}
-        anomalies={anomalies}
-      />
-    );
-  }
+          return (
+            <QuoteOptionsOverview 
+              options={options.map(opt => ({
+                ...opt,
+                mode: opt.service_type ? (opt.service_type.toLowerCase().includes('air') ? 'air' : opt.service_type.toLowerCase().includes('road') ? 'road' : 'sea') : 'sea'
+              }))}
+              selectedId={optionId || undefined}
+              onSelect={(id) => {
+                setOptionId(id);
+                setViewMode('composer');
+              }}
+              onGenerateSmartOptions={handleGenerateSmartOptions}
+              marketAnalysis={marketAnalysis}
+              confidenceScore={confidenceScore}
+              anomalies={anomalies}
+            />
+          );
+        }
 
   return (
     <div className="space-y-6">
@@ -1814,6 +1992,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         <QuoteDetailsStep
           quoteData={quoteData}
           currencies={currencies}
+          origin={legs.length > 0 ? legs[0].origin : undefined}
+          destination={legs.length > 0 ? legs[legs.length - 1].destination : undefined}
+          validationErrors={validationErrors}
           onChange={(field, value) => {
             setQuoteData((prev: any) => ({ ...prev, [field]: value }));
             
@@ -1854,6 +2035,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onAddLeg={addLeg}
           onUpdateLeg={updateLeg}
           onRemoveLeg={confirmRemoveLeg}
+          validationErrors={validationErrors}
         />
       )}
 
@@ -1881,6 +2063,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onRemoveCombinedCharge={confirmRemoveCombinedCharge}
           onConfigureCombinedBasis={openCombinedBasisModal}
           onFetchRates={handleFetchRates}
+          validationErrors={validationErrors}
         />
       )}
 

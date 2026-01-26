@@ -1,14 +1,19 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, MapPin, Package, Truck } from 'lucide-react';
+import { Trash2, MapPin, Package, Truck, Loader2 } from 'lucide-react';
 import { TransportModeSelector } from './TransportModeSelector';
 import { HelpTooltip } from './HelpTooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAiAdvisor } from '@/hooks/useAiAdvisor';
+import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Leg {
   id: string;
@@ -28,6 +33,85 @@ interface LegsConfigurationStepProps {
   onAddLeg: (mode: string) => void;
   onUpdateLeg: (legId: string, updates: Partial<Leg>) => void;
   onRemoveLeg: (legId: string) => void;
+  validationErrors?: string[];
+}
+
+function LocationAutocomplete({ 
+  value, 
+  onChange, 
+  placeholder, 
+  mode 
+}: { 
+  value: string; 
+  onChange: (val: string) => void; 
+  placeholder: string; 
+  mode: string; 
+}) {
+  const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { invokeAiAdvisor } = useAiAdvisor();
+
+  useEffect(() => {
+    if (!open || value.length < 3) return;
+    
+    const timer = setTimeout(async () => {
+        setLoading(true);
+        const { data } = await invokeAiAdvisor({
+            action: 'lookup_codes', payload: { query: value, mode: mode || 'ocean' }
+        });
+        if (data?.suggestions) {
+            setSuggestions(data.suggestions);
+        }
+        setLoading(false);
+    }, 800);
+    
+    return () => clearTimeout(timer);
+  }, [value, open, mode]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="relative">
+            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+            <Input
+                value={value}
+                onChange={(e) => {
+                    onChange(e.target.value);
+                    setOpen(true);
+                }}
+                placeholder={placeholder}
+                className="pl-9"
+                onFocus={() => setOpen(true)}
+            />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[300px]" align="start">
+        <Command>
+            <CommandList>
+                {loading && <div className="p-2 text-xs text-center text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin inline mr-1"/> Searching...</div>}
+                {!loading && suggestions.length === 0 && <div className="p-2 text-xs text-center text-muted-foreground">Type to search locations...</div>}
+                {suggestions.map((suggestion, i) => (
+                    <CommandItem 
+                        key={i} 
+                        value={suggestion.label}
+                        onSelect={() => {
+                            onChange(suggestion.label);
+                            setOpen(false);
+                        }}
+                        className="cursor-pointer"
+                    >
+                        <div className="flex flex-col">
+                            <span className="font-medium">{suggestion.label}</span>
+                            <span className="text-xs text-muted-foreground">{suggestion.details}</span>
+                        </div>
+                    </CommandItem>
+                ))}
+            </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function LegsConfigurationStep({
@@ -35,7 +119,8 @@ export function LegsConfigurationStep({
   serviceTypes,
   onAddLeg,
   onUpdateLeg,
-  onRemoveLeg
+  onRemoveLeg,
+  validationErrors = []
 }: LegsConfigurationStepProps) {
   // Fetch service leg categories
   const { data: serviceCategories } = useQuery({
@@ -51,6 +136,24 @@ export function LegsConfigurationStep({
       return data || [];
     }
   });
+
+  // Ensure legType is valid
+  useEffect(() => {
+    legs.forEach(leg => {
+      if (leg.legType !== 'transport' && leg.legType !== 'service') {
+        onUpdateLeg(leg.id, { legType: 'transport' });
+      }
+    });
+  }, [legs, onUpdateLeg]);
+
+  const getLegErrors = (index: number) => {
+    if (!validationErrors) return [];
+    // Expecting errors like "Leg 1: Origin is required"
+    const prefix = `Leg ${index + 1}:`;
+    return validationErrors
+      .filter(error => error.startsWith(prefix))
+      .map(error => error.replace(prefix, '').trim());
+  };
 
   return (
     <Card>
@@ -71,11 +174,20 @@ export function LegsConfigurationStep({
           <div className="space-y-4">
             <Label className="text-base font-semibold">Your Legs ({legs.length})</Label>
             {legs.map((leg, index) => {
-              const legType = leg.legType || 'transport';
+              // Normalize legType for UI display - treat everything that isn't explicitly 'service' as 'transport'
+              // This handles legacy types like 'pickup', 'delivery', etc.
+              const legType = leg.legType === 'service' ? 'service' : 'transport';
               const isServiceLeg = legType === 'service';
+              const legErrors = getLegErrors(index);
+              const hasError = legErrors.length > 0;
+              
+              const originError = legErrors.find(e => e.includes('Origin'));
+              const destError = legErrors.find(e => e.includes('Destination'));
+              const serviceTypeError = legErrors.find(e => e.includes('Service Type'));
+              const serviceCategoryError = legErrors.find(e => e.includes('Service Category'));
               
               return (
-                <Card key={leg.id} className="border-2">
+                <Card key={leg.id} className={`border-2 ${hasError ? 'border-destructive/50' : ''}`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -155,12 +267,12 @@ export function LegsConfigurationStep({
                       // Transport Leg Fields
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <Label className="text-sm font-medium mb-2 block">Service Type *</Label>
+                          <Label className={`text-sm font-medium mb-2 block ${serviceTypeError ? 'text-destructive' : ''}`}>Service Type *</Label>
                           <Select
                             value={leg.serviceTypeId}
                             onValueChange={(val) => onUpdateLeg(leg.id, { serviceTypeId: val })}
                           >
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className={`w-full ${serviceTypeError ? 'border-destructive' : ''}`}>
                               <SelectValue placeholder="Select service type" />
                             </SelectTrigger>
                             <SelectContent>
@@ -185,28 +297,22 @@ export function LegsConfigurationStep({
 
                         <div>
                           <Label className="text-sm font-medium mb-2 block">Origin *</Label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              value={leg.origin}
-                              onChange={(e) => onUpdateLeg(leg.id, { origin: e.target.value })}
-                              placeholder="e.g., Shanghai Port"
-                              className="pl-9"
-                            />
-                          </div>
+                          <LocationAutocomplete
+                            value={leg.origin}
+                            onChange={(val) => onUpdateLeg(leg.id, { origin: val })}
+                            placeholder="e.g., Shanghai Port"
+                            mode={leg.mode}
+                          />
                         </div>
 
                         <div>
                           <Label className="text-sm font-medium mb-2 block">Destination *</Label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              value={leg.destination}
-                              onChange={(e) => onUpdateLeg(leg.id, { destination: e.target.value })}
-                              placeholder="e.g., Los Angeles Port"
-                              className="pl-9"
-                            />
-                          </div>
+                          <LocationAutocomplete
+                            value={leg.destination}
+                            onChange={(val) => onUpdateLeg(leg.id, { destination: val })}
+                            placeholder="e.g., Los Angeles Port"
+                            mode={leg.mode}
+                          />
                         </div>
                       </div>
                     )}

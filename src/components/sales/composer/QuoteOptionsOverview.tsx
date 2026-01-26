@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -36,19 +36,28 @@ import {
   Timer,
   ShieldCheck,
   Map as MapIcon,
-  LayoutList
+  LayoutList,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { QuoteLegsVisualizer } from '../quick-quote/QuoteLegsVisualizer';
 import { QuoteDetailView } from '../quick-quote/QuoteDetailView';
 import { QuoteMapVisualizer } from '../quick-quote/QuoteMapVisualizer';
-import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { 
+  getTierBadge, 
+  getModeIcon, 
+  formatCurrency,
+  getReliabilityColor
+} from '../shared/quote-badges';
 
 interface OptionOverviewProps {
   options: any[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  onGenerateSmartOptions?: () => void;
   marketAnalysis?: string | null;
   confidenceScore?: number | null;
   anomalies?: any[];
@@ -58,51 +67,17 @@ export function QuoteOptionsOverview({
   options, 
   selectedId, 
   onSelect, 
+  onGenerateSmartOptions,
   marketAnalysis, 
   confidenceScore,
   anomalies 
 }: OptionOverviewProps) {
   const [viewMode, setViewMode] = useState<'card' | 'list' | 'table'>('card');
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsOption, setDetailsOption] = useState<any>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const handleViewDetails = (e: React.MouseEvent, opt: any) => {
+  const toggleExpand = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    setDetailsOption(opt);
-    setDetailsOpen(true);
-  };
-
-  const getModeIcon = (mode: string) => {
-    if (!mode) return <Ship className="h-4 w-4" />;
-    const m = mode.toLowerCase();
-    if (m.includes('air')) return <Plane className="h-4 w-4" />;
-    if (m.includes('road') || m.includes('truck')) return <Truck className="h-4 w-4" />;
-    return <Ship className="h-4 w-4" />;
-  };
-
-  const formatCurrency = (amount: number, currency: any) => {
-    const code = typeof currency === 'object' ? currency?.code : currency;
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code || 'USD' }).format(amount);
-  };
-
-  const getReliabilityColor = (score: number) => {
-    if (score >= 90) return 'text-green-600 bg-green-50 border-green-200';
-    if (score >= 70) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    return 'text-red-600 bg-red-50 border-red-200';
-  };
-
-  const getTierBadge = (tier: string) => {
-    if (!tier) return null;
-    switch (tier) {
-        case 'contract': return <Badge className="bg-green-600">Contract</Badge>;
-        case 'spot': return <Badge className="bg-blue-600">Spot</Badge>;
-        case 'best_value': return <Badge className="bg-purple-600"><Sparkles className="w-3 h-3 mr-1"/> Best Value</Badge>;
-        case 'cheapest': return <Badge className="bg-emerald-600"><DollarSign className="w-3 h-3 mr-1"/> Cheapest</Badge>;
-        case 'fastest': return <Badge className="bg-amber-600"><Timer className="w-3 h-3 mr-1"/> Fastest</Badge>;
-        case 'greenest': return <Badge className="bg-green-500"><Leaf className="w-3 h-3 mr-1"/> Eco-Friendly</Badge>;
-        case 'reliable': return <Badge className="bg-blue-500"><ShieldCheck className="w-3 h-3 mr-1"/> Most Reliable</Badge>;
-        default: return <Badge variant="outline">{tier}</Badge>;
-    }
+    setExpandedId(prev => prev === id ? null : id);
   };
 
   const handleEdit = (e: React.MouseEvent, id: string) => {
@@ -155,31 +130,44 @@ export function QuoteOptionsOverview({
       {/* View Controls */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold tracking-tight">Rate Options ({options.length})</h3>
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-          <Button 
-            variant={viewMode === 'card' ? 'secondary' : 'ghost'} 
-            size="sm" 
-            className="h-7 px-2"
-            onClick={() => setViewMode('card')}
-          >
-            <LayoutGrid className="h-4 w-4 mr-1" /> Cards
-          </Button>
-          <Button 
-            variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-            size="sm" 
-            className="h-7 px-2"
-            onClick={() => setViewMode('list')}
-          >
-            <ListIcon className="h-4 w-4 mr-1" /> List
-          </Button>
-          <Button 
-            variant={viewMode === 'table' ? 'secondary' : 'ghost'} 
-            size="sm" 
-            className="h-7 px-2"
-            onClick={() => setViewMode('table')}
-          >
-            <Columns className="h-4 w-4 mr-1" /> Grid
-          </Button>
+        <div className="flex items-center gap-2">
+          {onGenerateSmartOptions && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 text-xs gap-1 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800"
+              onClick={onGenerateSmartOptions}
+            >
+              <Sparkles className="h-3 w-3" />
+              Generate Smart Options
+            </Button>
+          )}
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            <Button 
+              variant={viewMode === 'card' ? 'secondary' : 'ghost'}  
+              size="sm" 
+              className="h-7 px-2"
+              onClick={() => setViewMode('card')}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" /> Cards
+            </Button>
+            <Button 
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              className="h-7 px-2"
+              onClick={() => setViewMode('list')}
+            >
+              <ListIcon className="h-4 w-4 mr-1" /> List
+            </Button>
+            <Button 
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              className="h-7 px-2"
+              onClick={() => setViewMode('table')}
+            >
+              <Columns className="h-4 w-4 mr-1" /> Grid
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -189,8 +177,20 @@ export function QuoteOptionsOverview({
         {viewMode === 'card' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {options.map((rawOpt) => {
-              const opt = mapOptionToQuote(rawOpt);
+              let opt = mapOptionToQuote(rawOpt);
               if (!opt) return null;
+
+              // Ensure financials exist (synchronize with New Quote logic)
+              if (opt.total_amount && (opt.markupPercent === undefined || opt.marginAmount === undefined)) {
+                const financials = calculateQuoteFinancials(opt.total_amount); // Use shared helper
+                opt = {
+                    ...opt,
+                    buyPrice: opt.buyPrice || financials.buyPrice,
+                    marginAmount: opt.marginAmount || financials.marginAmount,
+                    markupPercent: opt.markupPercent || financials.markupPercent
+                };
+              }
+
               return (
               <Card 
                 key={opt.id} 
@@ -219,6 +219,22 @@ export function QuoteOptionsOverview({
                         {formatCurrency(opt.total_amount, opt.currency)}
                       </div>
                       <div className="text-xs text-muted-foreground">Total Estimate</div>
+                      
+                      {/* Financials Breakdown */}
+                      {(opt.markupPercent !== undefined || opt.marginAmount !== undefined) && (
+                        <div className="mt-1 flex flex-col items-end gap-0.5">
+                            {opt.markupPercent !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1 h-4 border-green-200 text-green-700 bg-green-50">
+                                    {opt.markupPercent}% Mkp
+                                </Badge>
+                            )}
+                            {opt.marginAmount !== undefined && (
+                                <span className="text-[10px] text-green-600 font-medium">
+                                    +{formatCurrency(opt.marginAmount, opt.currency)}
+                                </span>
+                            )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -270,9 +286,10 @@ export function QuoteOptionsOverview({
                       variant="outline" 
                       size="sm" 
                       className="gap-1 text-xs h-7"
-                      onClick={(e) => handleViewDetails(e, opt)}
+                      onClick={(e) => toggleExpand(e, opt.id)}
                     >
-                      <Info className="h-3 w-3" /> Details
+                      {expandedId === opt.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      Details
                     </Button>
                     <Button 
                       variant="default" 
@@ -283,6 +300,32 @@ export function QuoteOptionsOverview({
                       <Edit2 className="h-3 w-3" /> Edit
                     </Button>
                   </div>
+
+                  {expandedId === opt.id && (
+                    <div className="mt-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200" onClick={(e) => e.stopPropagation()}>
+                        <Tabs defaultValue="details" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 mb-4">
+                                <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Breakdown</TabsTrigger>
+                                <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Map</TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="details">
+                                <QuoteDetailView 
+                                    quote={opt} 
+                                    compact={true}
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="map">
+                                <QuoteMapVisualizer 
+                                    origin={opt.legs?.[0]?.from || "Origin"} 
+                                    destination={opt.legs?.[opt.legs.length - 1]?.to || "Destination"}
+                                    legs={opt.legs || []}
+                                />
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ); })}
@@ -337,6 +380,20 @@ export function QuoteOptionsOverview({
                     <span className="text-lg font-bold text-primary block">
                       {formatCurrency(opt.total_amount, opt.currency)}
                     </span>
+                    {(opt.markupPercent !== undefined || opt.marginAmount !== undefined) && (
+                        <div className="flex flex-col items-end gap-0.5 mt-1">
+                            {opt.markupPercent !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1 h-4 border-green-200 text-green-700 bg-green-50">
+                                    {opt.markupPercent}%
+                                </Badge>
+                            )}
+                            {opt.marginAmount !== undefined && (
+                                <span className="text-[10px] text-green-600 font-medium">
+                                    +{formatCurrency(opt.marginAmount, opt.currency)}
+                                </span>
+                            )}
+                        </div>
+                    )}
                   </div>
                   <Button size="icon" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <ArrowRight className="h-4 w-4" />
@@ -360,6 +417,7 @@ export function QuoteOptionsOverview({
                   <TableHead>Reliability</TableHead>
                   <TableHead>CO2</TableHead>
                   <TableHead className="text-right">Total Amount</TableHead>
+                  <TableHead className="text-right">Markup</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -368,98 +426,108 @@ export function QuoteOptionsOverview({
                   const opt = mapOptionToQuote(rawOpt);
                   if (!opt) return null;
                   return (
-                  <TableRow 
-                    key={opt.id} 
-                    className={cn("cursor-pointer", selectedId === opt.id && "bg-muted/50")}
-                    onClick={() => onSelect(opt.id)}
-                  >
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {opt.carrier_name || opt.carrier?.name || 'Unknown Carrier'}
-                        {opt.ai_generated && <Sparkles className="h-3 w-3 text-purple-500" />}
-                        {getTierBadge(opt.tier)}
-                      </div>
-                    </TableCell>
-                    <TableCell>{opt.option_name}</TableCell>
-                    <TableCell>{opt.service_type || '-'}</TableCell>
-                    <TableCell>{opt.transit_time?.details || opt.transit_time || `${opt.total_transit_days || '-'} days`}</TableCell>
-                    <TableCell>
-                      {opt.reliability_score ? (
-                        <Badge variant="outline" className={cn("font-normal", getReliabilityColor(opt.reliability_score).split(' ')[1])}>
-                          {opt.reliability_score}/10
-                        </Badge>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>{opt.total_co2_kg ? `${opt.total_co2_kg} kg` : '-'}</TableCell>
-                    <TableCell className="text-right font-bold">
-                      {formatCurrency(opt.total_amount, opt.currency)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={(e) => handleViewDetails(e, opt)}
-                          title="View Charge Breakdown"
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 hover:text-primary"
-                          onClick={(e) => handleEdit(e, opt.id)}
-                          title="Edit Configuration"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        {selectedId === opt.id && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ); })}
+                    <React.Fragment key={opt.id}>
+                      <TableRow 
+                        className={cn("cursor-pointer", selectedId === opt.id && "bg-muted/50")}
+                        onClick={() => onSelect(opt.id)}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {opt.carrier_name || opt.carrier?.name || 'Unknown Carrier'}
+                            {opt.ai_generated && <Sparkles className="h-3 w-3 text-purple-500" />}
+                            {getTierBadge(opt.tier)}
+                          </div>
+                        </TableCell>
+                        <TableCell>{opt.option_name}</TableCell>
+                        <TableCell>{opt.service_type || '-'}</TableCell>
+                        <TableCell>{opt.transit_time?.details || opt.transit_time || `${opt.total_transit_days || '-'} days`}</TableCell>
+                        <TableCell>
+                          {opt.reliability_score ? (
+                            <Badge variant="outline" className={cn("font-normal", getReliabilityColor(opt.reliability_score).split(' ')[1])}>
+                              {opt.reliability_score}/10
+                            </Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>{opt.total_co2_kg ? `${opt.total_co2_kg} kg` : '-'}</TableCell>
+                        <TableCell className="text-right font-bold">
+                          {formatCurrency(opt.total_amount, opt.currency)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                            {(opt.markupPercent !== undefined || opt.marginAmount !== undefined) ? (
+                                <div className="flex flex-col items-end gap-0.5">
+                                    {opt.markupPercent !== undefined && (
+                                        <Badge variant="outline" className="text-[10px] px-1 h-4 border-green-200 text-green-700 bg-green-50">
+                                            {opt.markupPercent}%
+                                        </Badge>
+                                    )}
+                                    {opt.marginAmount !== undefined && (
+                                        <span className="text-[10px] text-green-600">
+                                            +{formatCurrency(opt.marginAmount, opt.currency)}
+                                        </span>
+                                    )}
+                                </div>
+                            ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => toggleExpand(e, opt.id)}
+                              title="View Breakdown"
+                            >
+                              {expandedId === opt.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 hover:text-primary"
+                              onClick={(e) => handleEdit(e, opt.id)}
+                              title="Edit Configuration"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            {selectedId === opt.id && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedId === opt.id && (
+                        <TableRow>
+                          <TableCell colSpan={9} className="p-0 bg-muted/30">
+                            <div className="p-4" onClick={(e) => e.stopPropagation()}>
+                              <Tabs defaultValue="details" className="w-full">
+                                  <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+                                      <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Breakdown</TabsTrigger>
+                                      <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Map</TabsTrigger>
+                                  </TabsList>
+                                  
+                                  <TabsContent value="details">
+                                      <QuoteDetailView 
+                                          quote={opt} 
+                                          compact={true}
+                                      />
+                                  </TabsContent>
+
+                                  <TabsContent value="map">
+                                      <QuoteMapVisualizer 
+                                          origin={opt.legs?.[0]?.from || "Origin"} 
+                                          destination={opt.legs?.[opt.legs.length - 1]?.to || "Destination"}
+                                          legs={opt.legs || []}
+                                      />
+                                  </TabsContent>
+                              </Tabs>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  ); })}
               </TableBody>
             </Table>
           </div>
         )}
       </div>
-
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Quote Option Details</DialogTitle>
-            <DialogDescription>
-              Comprehensive breakdown of charges and routing for {detailsOption?.carrier_name || detailsOption?.carrier?.name || 'Unknown Carrier'} - {detailsOption?.option_name}
-            </DialogDescription>
-          </DialogHeader>
-
-          {detailsOption && (
-            <div className="space-y-6">
-                <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 mb-4">
-                        <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Cost & Leg Breakdown</TabsTrigger>
-                        <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Route Map</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="details">
-                        <QuoteDetailView 
-                            quote={mapOptionToQuote(detailsOption)} 
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="map">
-                        <QuoteMapVisualizer 
-                            origin={detailsOption.legs?.[0]?.origin_location || "Origin"} 
-                            destination={detailsOption.legs?.[detailsOption.legs.length - 1]?.destination_location || "Destination"}
-                            legs={detailsOption.legs || []}
-                        />
-                    </TabsContent>
-                </Tabs>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -2,72 +2,70 @@ import React, { useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Check, X, Info, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Check, X, Info, ChevronDown, ChevronUp, Eye, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { bifurcateCharges } from '@/lib/charge-bifurcation';
-import { Charge, TransportLeg } from '@/types/quote-breakdown';
+import { Charge, TransportLeg, RateOption } from '@/types/quote-breakdown';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-
-interface RateOption {
-    id: string;
-    carrier: string;
-    name: string;
-    price: number;
-    currency: string;
-    transitTime: string;
-    tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
-    reliability?: { score: number; on_time_performance: string };
-    environmental?: { co2_emissions: string; rating: string };
-    ai_explanation?: string;
-    source_attribution?: string;
-    co2_kg?: number;
-    route_type?: 'Direct' | 'Transshipment';
-    stops?: number;
-    legs?: TransportLeg[];
-    charges?: Charge[];
-    price_breakdown?: any;
-}
+import { 
+  getTierBadge, 
+  getModeIcon, 
+  formatCurrency, 
+  getReliabilityColor 
+} from '../shared/quote-badges';
+import { cn } from '@/lib/utils';
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QuoteDetailView } from './QuoteDetailView';
+import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 
 interface QuoteComparisonViewProps {
     options: RateOption[];
     onSelect: (option: RateOption) => void;
     selectedIds?: string[];
     onToggleSelection?: (id: string) => void;
+    onGenerateSmartOptions?: () => void;
 }
 
-export function QuoteComparisonView({ options, onSelect, selectedIds = [], onToggleSelection }: QuoteComparisonViewProps) {
+export function QuoteComparisonView({ 
+    options: rawOptions, 
+    onSelect, 
+    selectedIds = [], 
+    onToggleSelection,
+    onGenerateSmartOptions 
+}: QuoteComparisonViewProps) {
     const [showBreakdown, setShowBreakdown] = React.useState(false);
+    const [viewDetailsOption, setViewDetailsOption] = React.useState<RateOption | null>(null);
+
+    // Normalize options and ensure financials
+    const options = useMemo(() => {
+        return rawOptions.map(opt => {
+            const mapped = mapOptionToQuote(opt);
+            if (!mapped) return null;
+
+            // Ensure financials exist (synchronize with New Quote logic)
+            if (mapped.total_amount && (mapped.markupPercent === undefined || mapped.marginAmount === undefined)) {
+                const financials = calculateQuoteFinancials(mapped.total_amount);
+                return {
+                    ...mapped,
+                    buyPrice: mapped.buyPrice || financials.buyPrice,
+                    marginAmount: mapped.marginAmount || financials.marginAmount,
+                    markupPercent: mapped.markupPercent || financials.markupPercent
+                };
+            }
+            return mapped;
+        }).filter(Boolean) as RateOption[];
+    }, [rawOptions]);
 
     if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
 
     // Helper to calculate bifurcated totals for an option
     const getBifurcatedTotals = (opt: RateOption) => {
-        // Use provided charges or fallback to empty
-        // If option has legs but no flat charges list, we might need to extract charges from legs
-        let allCharges: Charge[] = opt.charges || [];
-        
-        if (allCharges.length === 0 && opt.legs) {
-             opt.legs.forEach(leg => {
-                 if (leg.charges) {
-                     // Add leg context if missing
-                     const legCharges = leg.charges.map(c => ({...c, leg_id: c.leg_id || leg.id}));
-                     allCharges = [...allCharges, ...legCharges];
-                 }
-             });
-        }
-        
-        // Also check price_breakdown if it's a simple object and no charges array exists
-        // (This handles some legacy/AI formats)
-        
-        const legs = opt.legs || [];
-        const bifurcated = bifurcateCharges(allCharges, legs);
-
         const totals = {
             origin: 0,
             freight: 0,
@@ -76,17 +74,47 @@ export function QuoteComparisonView({ options, onSelect, selectedIds = [], onTog
             currency: opt.currency
         };
 
-        bifurcated.forEach(c => {
-            if (c.assignedLegType === 'pickup' || c.assignedLegType === 'origin') {
-                totals.origin += c.amount;
-            } else if (c.assignedLegType === 'transport' || c.assignedLegType === 'main') {
-                totals.freight += c.amount;
-            } else if (c.assignedLegType === 'delivery' || c.assignedLegType === 'destination') {
-                totals.destination += c.amount;
-            } else {
-                totals.other += c.amount;
-            }
-        });
+        // 1. Sum up charges from legs (already assigned by mapOptionToQuote)
+        if (opt.legs) {
+            opt.legs.forEach(leg => {
+                const legTotal = (leg.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+                // Use bifurcation_role if available (from quote-mapper), fallback to legacy leg_type checks
+                const role = leg.bifurcation_role;
+                
+                if (role === 'origin' || leg.leg_type === 'origin' || leg.leg_type === 'pickup') {
+                    totals.origin += legTotal;
+                } else if (role === 'destination' || leg.leg_type === 'destination' || leg.leg_type === 'delivery') {
+                    totals.destination += legTotal;
+                } else if (role === 'main' || leg.leg_type === 'main' || leg.leg_type === 'transport') {
+                    totals.freight += legTotal;
+                } else {
+                    totals.freight += legTotal; // Default to freight
+                }
+            });
+        }
+
+        // 2. Handle remaining global charges (bifurcate them)
+        if (opt.charges && opt.charges.length > 0) {
+            const bifurcated = bifurcateCharges(opt.charges, opt.legs || []);
+            bifurcated.forEach(c => {
+                 // Check assignedLegType or if we can map it to a role
+                 if (c.assignedLegType === 'pickup' || c.assignedLegType === 'origin') {
+                    totals.origin += c.amount;
+                } else if (c.assignedLegType === 'transport' || c.assignedLegType === 'main') {
+                    totals.freight += c.amount;
+                } else if (c.assignedLegType === 'delivery' || c.assignedLegType === 'destination') {
+                    totals.destination += c.amount;
+                } else {
+                    totals.other += c.amount;
+                }
+            });
+        }
+        
+        // 3. Fallback: If everything is 0 but we have a total price, put it in Freight
+        const sum = totals.origin + totals.freight + totals.destination + totals.other;
+        if (sum === 0 && (opt.price || opt.total_amount)) {
+            totals.freight = opt.price || opt.total_amount || 0;
+        }
 
         return totals;
     };
@@ -100,6 +128,19 @@ export function QuoteComparisonView({ options, onSelect, selectedIds = [], onTog
 
     return (
         <div className="overflow-x-auto border rounded-md bg-background shadow-sm">
+            {onGenerateSmartOptions && (
+                <div className="p-4 border-b flex justify-end">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-xs gap-1 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800"
+                        onClick={onGenerateSmartOptions}
+                    >
+                        <Sparkles className="h-3 w-3" />
+                        Generate Smart Options
+                    </Button>
+                </div>
+            )}
             <Table>
                 <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -131,14 +172,7 @@ export function QuoteComparisonView({ options, onSelect, selectedIds = [], onTog
                                             )}
                                             
                                             {/* Tier Badge */}
-                                            {opt.tier && (
-                                                <Badge 
-                                                    variant={['best_value', 'cheapest', 'fastest'].includes(opt.tier) ? 'default' : 'secondary'} 
-                                                    className={`mb-2 capitalize ${isBestValue ? 'bg-blue-600 hover:bg-blue-700' : isCheapest ? 'bg-green-600 hover:bg-green-700' : isFastest ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
-                                                >
-                                                    {opt.tier.replace('_', ' ')}
-                                                </Badge>
-                                            )}
+                                            {getTierBadge(opt.tier)}
                                             
                                             <span className="font-bold text-lg text-foreground leading-tight">{opt.carrier}</span>
                                             <span className="text-xs text-muted-foreground">{opt.name}</span>
@@ -154,8 +188,26 @@ export function QuoteComparisonView({ options, onSelect, selectedIds = [], onTog
                     <TableRow>
                         <TableCell className="font-semibold bg-muted/10">Total Estimated Cost</TableCell>
                         {options.map(opt => (
-                            <TableCell key={opt.id} className="text-center font-bold text-xl text-foreground">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency }).format(opt.price)}
+                            <TableCell key={opt.id} className="text-center">
+                                <div className="flex flex-col items-center">
+                                    <span className="font-bold text-xl text-foreground">
+                                        {formatCurrency(opt.price, opt.currency)}
+                                    </span>
+                                    {(opt.markupPercent !== undefined || opt.marginAmount !== undefined) && (
+                                        <div className="flex flex-col items-center gap-0.5 mt-1">
+                                            {opt.markupPercent !== undefined && (
+                                                <Badge variant="outline" className="text-[10px] px-1 h-4 border-green-200 text-green-700 bg-green-50">
+                                                    {opt.markupPercent}% Mkp
+                                                </Badge>
+                                            )}
+                                            {opt.marginAmount !== undefined && (
+                                                <span className="text-[10px] text-green-600 font-medium">
+                                                    +{formatCurrency(opt.marginAmount, opt.currency)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </TableCell>
                         ))}
                     </TableRow>
@@ -206,7 +258,7 @@ export function QuoteComparisonView({ options, onSelect, selectedIds = [], onTog
                                 <div className="flex flex-col gap-2 items-center justify-center py-2">
                                     {opt.reliability ? (
                                         <div className="flex items-center gap-1 text-xs" title="Reliability Score">
-                                            <Badge variant="outline" className="h-5 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                                            <Badge variant="outline" className={cn("h-5 px-1", getReliabilityColor(opt.reliability.score))}>
                                                 ★ {opt.reliability.score}/10
                                             </Badge>
                                         </div>
