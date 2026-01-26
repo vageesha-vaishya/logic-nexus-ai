@@ -32,12 +32,20 @@ deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ category, sentiment, intent }), {
       status: 200,
-      headers: { ...corsHeadersClassify, "Content-Type": "application/json" },
+      headers: { 
+          ...corsHeadersClassify, 
+          "Content-Type": "application/json",
+          "Content-Language": "en"
+      },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as any)?.message || String(e) }), {
       status: 500,
-      headers: { ...corsHeadersClassify, "Content-Type": "application/json" },
+      headers: { 
+          ...corsHeadersClassify, 
+          "Content-Type": "application/json",
+          "Content-Language": "en"
+      },
     });
   }
 });

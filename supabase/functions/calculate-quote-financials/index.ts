@@ -43,7 +43,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Content-Language': 'en' },
       status: 400,
     })
   }

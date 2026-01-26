@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
@@ -38,6 +38,65 @@ export default function QuoteNew() {
   const [insertionError, setInsertionError] = useState<string | null>(null);
   const [insertionProgress, setInsertionProgress] = useState({ current: 0, total: 0 });
   const [insertionStartTime, setInsertionStartTime] = useState<number | null>(null);
+  
+  // Real-time sync listener
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(0);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSyncUpdate = (source: string, payload: any) => {
+    console.log(`[QuoteNew] Sync: ${source} changed`, payload);
+    
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    
+    debounceTimer.current = setTimeout(() => {
+      setLastSyncTimestamp(Date.now());
+      debounceTimer.current = null;
+    }, 500); // 500ms debounce to prevent excessive reloads
+  };
+
+  useEffect(() => {
+    if (!createdQuoteId || !supabase) return;
+
+    const channel = supabase.channel(`quote-sync-${createdQuoteId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotation_versions',
+          filter: `quote_id=eq.${createdQuoteId}`
+        },
+        (payload) => handleSyncUpdate('Version', payload)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotation_version_options',
+          filter: versionId ? `quotation_version_id=eq.${versionId}` : undefined
+        },
+        (payload) => handleSyncUpdate('Option', payload)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_quote_requests',
+          filter: `quote_id=eq.${createdQuoteId}`
+        },
+        (payload) => handleSyncUpdate('AI Quote Request', payload)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [createdQuoteId, versionId, supabase]);
 
   // Timeout monitor
   useEffect(() => {
@@ -176,7 +235,18 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
   useEffect(() => {
     const insertOptions = async () => {
       // Requirements: Version created, Tenant ID known, Options available, Not yet inserted
-      if (!versionId || !tenantId || optionsInserted || isInsertingOptions || !location.state) return;
+      if (!versionId || optionsInserted || isInsertingOptions || !location.state) return;
+
+      let resolvedTenantId = tenantId;
+      if (!resolvedTenantId) {
+          resolvedTenantId = context?.tenantId ?? null;
+          if (!resolvedTenantId) {
+              const { data: u } = await supabase.auth.getUser();
+              resolvedTenantId = (u.user?.user_metadata as any)?.tenant_id;
+          }
+      }
+
+      if (!resolvedTenantId) return;
 
       const state = location.state as any;
       const selectedRates = state.selectedRates; 
@@ -327,11 +397,20 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 const sellPrice = rate.total_amount || rate.price || 0;
                 
                 // Use existing financials if available (e.g. from DB or previous step), otherwise calculate default
+                // NOTE: We trust mapOptionToQuote to have already recalculated financials if the total amount changed significantly
+                // from the historical record.
                 const financials = (rate.buyPrice !== undefined && rate.marginAmount !== undefined) 
                     ? { buyPrice: rate.buyPrice, marginAmount: rate.marginAmount, markupPercent: rate.markupPercent }
                     : calculateQuoteFinancials(sellPrice);
                     
                 const { buyPrice, marginAmount, markupPercent } = financials;
+                
+                // FINAL VALIDATION: Ensure financial consistency before insert
+                // If sellPrice is significantly different from what we expect (e.g. mapper fixed it),
+                // warn or adjust.
+                if (Math.abs(sellPrice - (rate.total_amount || 0)) > 0.01) {
+                    console.warn('[QuoteNew] Discrepancy between sellPrice and rate.total_amount', { sellPrice, rateTotal: rate.total_amount });
+                }
 
                 const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rate.id);
 
@@ -341,7 +420,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 const { data: optionData, error: optionError } = await scopedDb
                   .from('quotation_version_options')
                   .insert({
-                    tenant_id: tenantId,
+                    tenant_id: resolvedTenantId,
                     quotation_version_id: versionId,
                     carrier_rate_id: isUUID ? rate.id : null,
                     option_name: rate.name || `${rate.carrier} ${rate.tier}`,
@@ -473,6 +552,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
                 // Insert Charges
                 const chargesToInsert: any[] = [];
+                let totalInsertedSellAmount = 0;
                 
                 const addChargePair = (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): boolean => {
                     const catId = getCatId(categoryKey);
@@ -495,9 +575,11 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     const sellAmount = Number(amount.toFixed(2));
 
                     chargesToInsert.push(
-                        { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },
-                        { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: sellSideId, quantity: 1, rate: sellAmount, amount: sellAmount, currency_id: currId, note: note, unit: chargeUnit }
+                        { tenant_id: resolvedTenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },
+                        { tenant_id: resolvedTenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: sellSideId, quantity: 1, rate: sellAmount, amount: sellAmount, currency_id: currId, note: note, unit: chargeUnit }
                     );
+                    
+                    totalInsertedSellAmount += sellAmount;
                     return true;
                 };
 
@@ -523,23 +605,57 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     return mainLegId || legData[0].id;
                 };
 
-                // Priority 1: Handle explicit 'charges' array (common in carrier APIs)
+                let chargesFound = false;
+
+                // Priority 1: Process Leg-Specific Charges (Highest Fidelity)
+                // This captures charges already allocated to specific legs by the mapper
+                if (rateLegs && rateLegs.length > 0) {
+                     rateLegs.forEach((leg: any, index: number) => {
+                        if (leg.charges && Array.isArray(leg.charges) && leg.charges.length > 0) {
+                            // Find the corresponding DB leg ID. rateLegs matches legData by index because we sorted legData by sort_order
+                            // and inserted based on rateLegs order.
+                            const targetLegId = legData?.[index]?.id; 
+                            
+                            if (targetLegId) {
+                                leg.charges.forEach((charge: any) => {
+                                    const amount = Number(charge.amount || charge.price || charge.total || 0);
+                                    if (amount === 0) return;
+
+                                    const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
+                                    const unit = charge.unit || charge.basis;
+                                    const note = charge.note || desc;
+
+                                    if (addChargePair(desc, amount, note, targetLegId, unit, unit)) {
+                                        chargesFound = true;
+                                    }
+                                });
+                            }
+                        }
+                     });
+                }
+
+                // Priority 2: Process Global/Remaining Charges
+                // This captures charges that couldn't be allocated to a specific leg (or balancing charges)
                 if (Array.isArray(rate.charges) && rate.charges.length > 0) {
                     rate.charges.forEach((charge: any) => {
                         const amount = Number(charge.amount || charge.price || charge.total || 0);
                         if (amount === 0) return;
 
-                        const desc = charge.description || charge.name || charge.code || 'Charge';
-                        const legId = getLegIdForCharge(desc);
+                        const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
+                        const legId = getLegIdForCharge(desc); // Try to infer leg or use main leg
                         const unit = charge.unit || charge.basis;
+                        const note = charge.note || desc;
                         
-                        addChargePair(desc, amount, desc, legId, unit, unit);
+                        if (addChargePair(desc, amount, note, legId, unit, unit)) {
+                            chargesFound = true;
+                        }
                     });
                 } 
-                // Priority 2: Handle 'price_breakdown' object (AI/Recursive structure)
-                else {
+
+                // Priority 3: Fallback to 'price_breakdown' object (AI/Recursive structure)
+                // Only if no detailed charges were found in legs or global array
+                if (!chargesFound) {
                     const breakdown = rate.price_breakdown || { base_fare: sellPrice };
-                    let totalBreakdownAmount = 0;
                     
                     const processCharge = (key: string, value: any, parentKey: string = '') => {
                         // 1. GLOBAL FILTER: Skip reserved keys at ANY level
@@ -560,7 +676,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                             const legId = getLegIdForCharge(compositeKey, explicitIndex);
                             const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                             if (addChargePair(key, value, formatNote(compositeKey), legId)) {
-                                totalBreakdownAmount += value;
+                                // Amount added to total via addChargePair
                             }
                             return;
                         } 
@@ -587,7 +703,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                                 
                                 // Use the found code as the category key and pass unit/basis if found
                                 if (addChargePair(code, amount, formatNote(compositeKey), legId, unit, unit)) {
-                                    totalBreakdownAmount += amount;
+                                    // Amount added to total via addChargePair
                                 }
                                 return;
                             }
@@ -601,18 +717,18 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     Object.entries(breakdown).forEach(([key, val]) => {
                         processCharge(key, val);
                     });
+                }
 
-                    // 2. BALANCING CHARGE: Ensure total matches the quoted price
-                    // If parts < total, add adjustment. If parts > total, add discount.
-                    const discrepancy = sellPrice - totalBreakdownAmount;
-                    // Use tighter threshold (0.01) to catch floating point errors
-                    if (Math.abs(discrepancy) > 0.01) {
-                         const chargeName = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
-                         const chargeNote = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
-                         // Round discrepancy to 2 decimal places
-                         addChargePair(chargeName, Number(discrepancy.toFixed(2)), chargeNote, mainLegId);
-                         logger.info('[QuoteNew] Added balancing charge', { discrepancy, sellPrice, totalBreakdownAmount });
-                    }
+                // 4. BALANCING CHARGE: Ensure total matches the quoted price
+                // If parts < total, add adjustment. If parts > total, add discount.
+                const discrepancy = sellPrice - totalInsertedSellAmount;
+                // Use tighter threshold (0.01) to catch floating point errors
+                if (Math.abs(discrepancy) > 0.01) {
+                     const chargeName = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
+                     const chargeNote = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
+                     // Round discrepancy to 2 decimal places
+                     addChargePair(chargeName, Number(discrepancy.toFixed(2)), chargeNote, mainLegId);
+                     logger.info('[QuoteNew] Added balancing charge', { discrepancy, sellPrice, totalInsertedSellAmount });
                 }
 
                 // Fallback: If no charges found, add total freight
@@ -702,6 +818,42 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
             setGeneratedOptionIds(newOptionIds);
             setOptionsInserted(true);
             toast.success(`Successfully imported ${newOptionIds.length} options from Quick Quote`);
+            
+            // Explicit feedback for corrected quotes
+            if (newOptionIds.length > 0) {
+                // SYNC: Update AI Request History status
+                if (state.historyId) {
+                    try {
+                        logger.info('[QuoteNew] Syncing back to AI Request History', { historyId: state.historyId });
+                        // Try to link quote_id if possible, otherwise just status
+                        const { error: historyError } = await scopedDb
+                            .from('ai_quote_requests')
+                            .update({ 
+                                status: 'converted',
+                                // We optimistically attempt to link the quote. If column missing, this might fail,
+                                // but we catch it. However, to avoid hard failure, we might just update status.
+                                // Let's stick to status to ensure robustness unless we know schema.
+                            })
+                            .eq('id', state.historyId);
+
+                        if (historyError) {
+                            console.warn('[QuoteNew] Failed to update history status:', historyError);
+                        } else {
+                            logger.info('[QuoteNew] History status updated to converted');
+                        }
+                    } catch (hErr) {
+                        console.error('[QuoteNew] History sync crash:', hErr);
+                    }
+                }
+            }
+            const hasCorrections = selectedRates.some((r: any) => {
+                 const mapped = mapOptionToQuote(r);
+                 // Simple heuristic: If mapped total differs from input total significantly
+                 return Math.abs((mapped?.total_amount || 0) - (r.total_amount || 0)) > 100;
+            });
+            if (hasCorrections) {
+                toast.info("Historical quote data was automatically corrected for accuracy.");
+            }
         } else {
              // If all failed, we should probably set insertion error to prompt user
              setInsertionError("Failed to import any options. Please check the error messages.");
@@ -754,14 +906,18 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
   };
 
   const handleHistorySelect = (payload: any) => {
-    if (!payload.selectedRates || payload.selectedRates.length === 0) {
-        toast.error("Selected history item has no valid rates.");
-        return;
-    }
+    // If we have specific rates, we proceed. 
+    // If rates are empty, it means we just want to use the params (draft mode).
+    // So we remove the strict length check here.
+    
+    // CRITICAL: Ensure we deep copy the payload to avoid reference issues
+    // and force reprocessing of the raw data through the mapper.
+    // The mapper has been updated to fix historical data errors ($12k vs $4k).
+    const safePayload = JSON.parse(JSON.stringify(payload));
 
     // Navigate to self with new state to trigger re-initialization
     navigate('/dashboard/quotes/new', { 
-        state: payload
+        state: safePayload
     });
     
     // Reset local state to ensure fresh processing
@@ -776,6 +932,18 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
   const handleSuccess = (quoteId: string) => {
     // Instead of navigating immediately, create initial version and show composer inline
     setCreatedQuoteId(quoteId);
+
+    // Update AI Quote History if applicable
+    if ((location.state as any)?.historyId) {
+        scopedDb.from('ai_quote_requests')
+            .update({ status: 'converted', quote_id: quoteId })
+            .eq('id', (location.state as any).historyId)
+            .then(({ error }) => {
+                if (error) console.error('[QuoteNew] Failed to update history status:', error);
+                else logger.info('[QuoteNew] Updated history status to converted', { historyId: (location.state as any).historyId });
+            });
+    }
+
     // Fetch tenant_id for the created quote to ensure version insert works
     (async () => {
       const { data } = await scopedDb
@@ -992,6 +1160,8 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
               quoteId={createdQuoteId} 
               versionId={versionId} 
               optionId={generatedOptionIds.length > 0 ? generatedOptionIds[0] : undefined}
+              lastSyncTimestamp={lastSyncTimestamp}
+              tenantId={tenantId || undefined}
             />
           </div>
         )}

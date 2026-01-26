@@ -27,6 +27,11 @@
 - POST /api/documents/generate { shipment_id, template }
 - GET /api/documents/:id
 
+## Localization & Language Policy
+- All API responses are strictly in **English (en-US)**.
+- Response Header: `Content-Language: en` is included in all Edge Function responses.
+- Clients should expect English error messages and data content, regardless of the `Accept-Language` request header or input language.
+
 ## Rate Limits
 - Per-tenant limits: 600 rpm; burst 1200 rpm; 429 on exceed
 

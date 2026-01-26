@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { QuoteDataProvider } from './QuoteContext';
+import { QuoteDataProvider, useQuoteContext } from './QuoteContext';
 import { QuoteHeader } from './QuoteHeader';
 import { QuoteLogistics } from './QuoteLogistics';
 import { QuoteFinancials } from './QuoteFinancials';
@@ -22,6 +22,7 @@ interface QuoteFormProps {
 }
 
 function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFormProps) {
+  const { resolvedTenantId } = useQuoteContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const [composerVersionId] = useState<string>('');
@@ -173,6 +174,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
                         <MultiModalQuoteComposer 
                             quoteId={quoteId}
                             versionId={composerVersionId}
+                            tenantId={resolvedTenantId || undefined}
                         />
                     </div>
                 </section>

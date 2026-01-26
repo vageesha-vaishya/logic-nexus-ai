@@ -24,6 +24,7 @@ import { QuoteComparisonView } from './QuoteComparisonView';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { RateOption } from '@/types/quote-breakdown';
 
 const CARRIER_OPTIONS = [
   "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 

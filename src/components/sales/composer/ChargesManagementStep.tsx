@@ -66,7 +66,8 @@ export function ChargesManagementStep({
   onUpdateCombinedCharge,
   onRemoveCombinedCharge,
   onConfigureCombinedBasis,
-  onFetchRates
+  onFetchRates,
+  validationErrors = []
 }: ChargesManagementStepProps) {
   const calculateTotals = (charges: any[]) => {
     return charges.reduce((acc, charge) => ({

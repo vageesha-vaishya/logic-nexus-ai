@@ -23,14 +23,29 @@ export default function QuoteDetail() {
     const checkQuote = async () => {
       try {
         if (!id) throw new Error('Missing quote identifier');
-        // Allow navigating by either UUID id or quote_number (e.g., QT-2025-002)
-        const { data, error } = await scopedDb
+        
+        // Validate UUID format to prevent "invalid input syntax" DB errors
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        
+        let query = scopedDb
           .from('quotes')
-          .select('id, tenant_id, quote_number')
-          .or(`id.eq.${id},quote_number.eq.${id}`)
+          .select('id, tenant_id, quote_number');
+
+        if (isUuid) {
+           // If it looks like a UUID, check both ID and Quote Number (safe)
+           query = query.or(`id.eq.${id},quote_number.eq.${id}`);
+        } else {
+           // If NOT a UUID, only check Quote Number (avoids UUID syntax error)
+           query = query.eq('quote_number', id);
+        }
+
+        const { data, error } = await query
           .limit(1)
-          .single();
+          .maybeSingle();
+
         if (error) throw error;
+        if (!data) throw new Error('Quote not found');
+
         setResolvedId((data as any)?.id ?? null);
         setTenantId((data as any)?.tenant_id ?? null);
         setQuoteNumber((data as any)?.quote_number ?? null);
@@ -52,7 +67,7 @@ export default function QuoteDetail() {
       try {
         const { data, error } = await (scopedDb
           .from('quotation_versions')
-          .select('id, version_number') as any)
+          .select('id, version_number, tenant_id') as any)
           .eq('quote_id', resolvedId)
           .order('version_number', { ascending: false })
           .limit(1);
@@ -63,8 +78,13 @@ export default function QuoteDetail() {
         }
         
         if (Array.isArray(data) && data.length && (data[0] as any)?.id) {
-          console.log('[QuoteDetail] Found existing version:', (data[0] as any).id);
-          setVersionId(String((data[0] as any).id));
+          const v = data[0] as any;
+          console.log('[QuoteDetail] Found existing version:', v.id);
+          setVersionId(String(v.id));
+          if (!tenantId && v.tenant_id) {
+             console.log('[QuoteDetail] Resolved tenant from version:', v.tenant_id);
+             setTenantId(v.tenant_id);
+          }
           return;
         }
         
@@ -180,7 +200,7 @@ export default function QuoteDetail() {
         
         {resolvedId && versionId && (
           <div className="mt-6">
-            <MultiModalQuoteComposer quoteId={resolvedId} versionId={versionId} />
+            <MultiModalQuoteComposer quoteId={resolvedId} versionId={versionId} tenantId={tenantId || undefined} />
           </div>
         )}
       </div>

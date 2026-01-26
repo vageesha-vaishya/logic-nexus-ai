@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+};
+
 console.log("AI Advisor v2.1 (Enhanced) Initialized")
 
 // Mock Knowledge Base for fallback
@@ -77,7 +81,11 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify(result),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Content-Language": "en"
+        },
         status: 200 
       }
     )
@@ -87,7 +95,11 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ error: (error as Error).message }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Content-Language": "en"
+        },
         status: 400 
       }
     )
@@ -220,12 +232,13 @@ Input:
 - Context: ${historicalContext}
 
 Requirements:
-1. Generate 5 options: "Best Value", "Cheapest", "Fastest", "Greenest", "Reliable".
-2. **Advanced Route Segmentation**: 
+1. **LANGUAGE: OUTPUT MUST BE IN ENGLISH ONLY.** All descriptions, names, instructions, and analysis must be in English, regardless of the input language.
+2. Generate 5 options: "Best Value", "Cheapest", "Fastest", "Greenest", "Reliable".
+3. **Advanced Route Segmentation**: 
    - Break down each route into specific legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
    - Identify **Border Crossings** and **Customs Procedures** needed at each transition.
    - Flag **Transport Regulations** (e.g., road weight limits, low emission zones).
-3. **Dynamic Charge Simulation (CRITICAL)**:
+4. **Dynamic Charge Simulation (CRITICAL)**:
    - **Leg-Level Pricing**: You MUST calculate and populate charges for **EVERY** leg. Zero-cost legs are NOT allowed (except purely administrative steps).
    - **Mode-Specific Logic**:
      - **Road/Trucking**: Calculate based on distance (~$1.50-$4.00/km) + fixed handling fees.
@@ -235,7 +248,7 @@ Requirements:
    - **Granular Breakdown**: Include specific line items (e.g., 'Pickup Haulage', 'Terminal Handling Origin', 'Ocean Freight', 'Delivery Trucking').
    - **Total Accuracy**: The global 'price_breakdown' total MUST equal the sum of all leg charges.
 
-4. **Reliability & Environmental**:
+5. **Reliability & Environmental**:
    - Estimate CO2 emissions.
    - Provide a reliability score (1-10) based on carrier reputation.
 

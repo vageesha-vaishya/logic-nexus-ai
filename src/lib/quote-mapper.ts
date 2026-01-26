@@ -14,10 +14,9 @@ export const calculateQuoteFinancials = (sellPrice: number) => {
 export const mapOptionToQuote = (opt: any) => {
     if (!opt) return null;
     
-    // Idempotency check: if already mapped (has nested structure), return as is
-    if (opt.price_breakdown && typeof opt.transit_time === 'object' && opt.transit_time?.details && opt.charges) {
-        return opt;
-    }
+    // Idempotency check: We no longer return early. 
+    // Instead, we allow the object to flow through to ensure balancing, deduplication, and allocation logic 
+    // is always applied, even to already mapped objects. This fixes data inconsistencies in historical quotes.
     
     // Normalize input keys to support different source formats (Smart Quote vs Quick Quote)
     const normalized = {
@@ -29,6 +28,8 @@ export const mapOptionToQuote = (opt: any) => {
         transit_time: typeof opt.transitTime === 'string' ? { details: opt.transitTime } : (opt.transit_time || {}),
         currency: typeof opt.currency === 'object' ? opt.currency?.code : opt.currency,
         // Financial mappings (DB -> App)
+        // Ensure that if we recalculate total later, these old financials don't mislead us.
+        // We will recalculate them if needed in the return statement.
         buyPrice: opt.buyPrice ?? opt.total_buy ?? opt.buy_price,
         marginAmount: opt.marginAmount ?? opt.margin_amount,
         markupPercent: opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage,
@@ -64,9 +65,9 @@ export const mapOptionToQuote = (opt: any) => {
         }
         
         // Recalculate total if it's 0 but we have components
-        const surchargeTotal = Object.values(surcharges).reduce((sum: number, val: any) => sum + val, 0);
-        const feeTotal = Object.values(fees).reduce((sum: number, val: any) => sum + val, 0);
-        const componentsSum = base_fare + taxes + surchargeTotal + feeTotal;
+        const surchargeTotal = Object.values(surcharges).reduce((sum: number, val: any) => sum + Number(val || 0), 0);
+        const feeTotal = Object.values(fees).reduce((sum: number, val: any) => sum + Number(val || 0), 0);
+        const componentsSum = Number((base_fare + taxes + surchargeTotal + feeTotal).toFixed(2));
 
         if (total === 0 && componentsSum > 0) {
             total = componentsSum;
@@ -111,26 +112,8 @@ export const mapOptionToQuote = (opt: any) => {
         }
     }
 
-    // Balancing Charge: Ensure total matches the quoted price
-    // This mirrors the logic in QuoteNew.tsx to prevent discrepancies
-    // Now applied universally to catch mismatches in both Smart and Quick quotes
-    if (price_breakdown && price_breakdown.total > 0) {
-        const chargesTotal = charges.reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
-        const discrepancy = price_breakdown.total - chargesTotal;
-        
-        // Use a tighter threshold (0.01) to catch floating point errors and ensure precision
-        if (Math.abs(discrepancy) > 0.01) {
-             const name = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
-             const note = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
-             
-             // Only add if not already present (simple check)
-             const hasAdjustment = charges.some((c: any) => c.category === 'Adjustment' && Math.abs(c.amount - discrepancy) < 0.01);
-             if (!hasAdjustment) {
-                const currency = price_breakdown.currency || normalized.currency || 'USD';
-                charges = [...charges, { category: 'Adjustment', name, amount: Number(discrepancy.toFixed(2)), currency, unit: 'per_shipment', note }];
-             }
-        }
-    }
+    // Flag to track if we removed duplicates. If so, we should trust the sum of components over the header total.
+    let duplicatesRemoved = false;
 
     // Retrofitting: Ensure we have at least one leg for the breakdown graph
     let legs = normalized.legs || [];
@@ -158,6 +141,7 @@ export const mapOptionToQuote = (opt: any) => {
         // Deduplicate charges: If a charge exists in a leg, remove it from global charges to prevent double-display
         // This handles cases where the API returns a flattened 'charges' array that includes leg-specific charges
         if (charges.length > 0) {
+            const initialCount = charges.length;
             const legChargeSignatures = new Set();
             legs.forEach((leg: any) => {
                 if (leg.charges) {
@@ -173,8 +157,18 @@ export const mapOptionToQuote = (opt: any) => {
             charges = charges.filter((c: any) => {
                 const name = (c.name || c.charge_categories?.name || '').toLowerCase().trim();
                 const sig = `${name}|${c.amount}|${c.currency || ''}`;
+                
+                // Also check for "Total" keywords in the name which indicates a summary charge
+                const isTotalSummary = name === 'total' || name === 'total amount' || name === 'total price';
+                if (isTotalSummary && c.amount === normalized.total_amount) {
+                    // This is definitely a duplicate summary charge
+                    return false;
+                }
+
                 return !legChargeSignatures.has(sig);
             });
+            
+            if (charges.length < initialCount) duplicatesRemoved = true;
         }
     }
 
@@ -208,21 +202,43 @@ export const mapOptionToQuote = (opt: any) => {
         charges.forEach((c: any) => {
             const name = (c.name || c.charge_categories?.name || '').toLowerCase();
             let allocated = false;
+            let targetLeg: any = null;
 
             if (originLeg && (name.includes('pickup') || name.includes('origin') || name.includes('export'))) {
-                originLeg.charges.push(c);
-                allocated = true;
+                targetLeg = originLeg;
             } else if (destLeg && (name.includes('delivery') || name.includes('destination') || name.includes('import'))) {
-                destLeg.charges.push(c);
-                allocated = true;
+                targetLeg = destLeg;
             } else if (name.includes('freight') || name.includes('bunker') || name.includes('fuel')) {
                 // Default freight charges to main leg
-                mainLeg.charges.push(c);
-                allocated = true;
+                targetLeg = mainLeg;
             } else if (legs.length === 1) {
                 // If single leg, everything goes there
-                mainLeg.charges.push(c);
-                allocated = true;
+                targetLeg = mainLeg;
+            }
+
+            if (targetLeg) {
+                // DUPLICATE DETECTION: Check if this charge already exists in the target leg
+                // This prevents double-counting when global charges are just summaries of leg charges
+                const isDuplicate = targetLeg.charges.some((existing: any) => {
+                    const amountMatch = Math.abs((existing.amount || 0) - (c.amount || 0)) < 0.01;
+                    const currencyMatch = (existing.currency || 'USD') === (c.currency || 'USD');
+                    const existingName = (existing.name || existing.charge_categories?.name || '').toLowerCase();
+                    // Loose name matching
+                    const nameMatch = existingName.includes(name) || name.includes(existingName) || 
+                                      (existingName.includes('freight') && name.includes('freight')) ||
+                                      (existingName.includes('fee') && name.includes('fee'));
+                    return amountMatch && currencyMatch && nameMatch;
+                });
+
+                if (isDuplicate) {
+                    // It's a duplicate, so we mark it as allocated (removed from global) 
+                    // but DO NOT add it to the leg (effectively discarding it)
+                    allocated = true;
+                    duplicatesRemoved = true;
+                } else {
+                    targetLeg.charges.push(c);
+                    allocated = true;
+                }
             }
 
             if (!allocated) {
@@ -233,9 +249,70 @@ export const mapOptionToQuote = (opt: any) => {
         charges = remainingGlobalCharges;
     }
 
+    // Final Reconciliation: Calculate true total from components
+    // This fixes the "Double Counting" issue where header total is inflated ($12k) but components are correct ($4k)
+    // AND ensures we balance correctly by considering ALL charges (legs + global)
+    const legsTotal = legs.reduce((sum: number, leg: any) => 
+        sum + (leg.charges?.reduce((s: number, c: any) => s + Number(c.amount || 0), 0) || 0), 0);
+    const globalTotal = charges.reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+    const calculatedTotal = Number((legsTotal + globalTotal).toFixed(2));
+    
+    if (price_breakdown) {
+        if (duplicatesRemoved) {
+             // If we removed duplicates, the original header total was likely double-counted.
+             // We MUST overwrite it with the true calculated sum.
+             price_breakdown.total = calculatedTotal;
+             // Adjust base_fare if needed (simplified)
+             if (price_breakdown.base_fare > calculatedTotal) price_breakdown.base_fare = calculatedTotal;
+        } else if (Math.abs(price_breakdown.total - calculatedTotal) > 0.01) {
+             // If mismatch exists but NO duplicates were found, it might be an incomplete breakdown.
+             // Add balancing charge ONLY if the discrepancy is positive (Header > Components)
+             const discrepancy = price_breakdown.total - calculatedTotal;
+             if (discrepancy > 0) {
+                 const currency = price_breakdown.currency || normalized.currency || 'USD';
+                 charges.push({ 
+                     category: 'Adjustment', 
+                     name: 'Ancillary Fees', 
+                     amount: Number(discrepancy.toFixed(2)), 
+                     currency, 
+                     unit: 'per_shipment', 
+                     note: 'Unitemized surcharges' 
+                 });
+             } else {
+                 // Header < Components (Discount? Or Header is wrong?)
+                 // We trust components because they are explicit line items.
+                 price_breakdown.total = calculatedTotal;
+             }
+        }
+    }
+
+    // Recalculate Financials if Total Amount Changed significantly
+    // This handles the case where historical data had wrong total (12000) but correct components (4256)
+    // If we kept the old buyPrice (e.g. 10200), we'd have negative margin.
+    let finalBuyPrice = normalized.buyPrice;
+    let finalMarginAmount = normalized.marginAmount;
+    let finalMarkupPercent = normalized.markupPercent;
+
+    if (Math.abs((normalized.total_amount || 0) - price_breakdown.total) > 0.01) {
+        // Total has changed! Recalculate financials based on the new total.
+        // We assume the markup percent is the intent we want to preserve, or default to 15%.
+        const targetMarkup = normalized.markupPercent || 15;
+        // buyPrice = sellPrice / (1 + markup/100) -> Wrong formula for margin
+        // Standard logic: sell = buy / (1 - margin%) ? No.
+        // Logic in QuoteNew: buyMultiplier = 1 - (markupPercent / 100).
+        // buy = sell * buyMultiplier.
+        const buyMultiplier = 1 - (targetMarkup / 100);
+        finalBuyPrice = Number((price_breakdown.total * buyMultiplier).toFixed(2));
+        finalMarginAmount = Number((price_breakdown.total - finalBuyPrice).toFixed(2));
+        finalMarkupPercent = targetMarkup;
+    }
+
     return {
         ...normalized,
         total_amount: price_breakdown.total,
+        buyPrice: finalBuyPrice,
+        marginAmount: finalMarginAmount,
+        markupPercent: finalMarkupPercent,
         transport_mode: normalized.mode,
         carrier: normalized.carrier_name,
         transit_time: typeof normalized.transit_time === 'string' ? { details: normalized.transit_time } : (normalized.transit_time?.details ? normalized.transit_time : { details: normalized.transit_time }), 

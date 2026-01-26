@@ -193,12 +193,15 @@ export function QuoteOptionsOverview({
 
               return (
               <Card 
-                key={opt.id} 
+                key={opt.id || `opt-${Math.random()}`} 
                 className={cn(
                   "cursor-pointer transition-all hover:shadow-md border-2",
-                  selectedId === opt.id ? "border-primary bg-primary/5" : "border-transparent hover:border-muted-foreground/20"
+                  selectedId === opt.id ? "border-primary bg-primary/5" : "border-transparent hover:border-muted-foreground/20",
+                  !opt.id && "opacity-70 cursor-not-allowed"
                 )}
-                onClick={() => onSelect(opt.id)}
+                onClick={() => {
+                  if (opt.id) onSelect(opt.id);
+                }}
               >
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
@@ -296,6 +299,7 @@ export function QuoteOptionsOverview({
                       size="sm" 
                       className="gap-1 text-xs h-7"
                       onClick={(e) => handleEdit(e, opt.id)}
+                      disabled={!opt.id}
                     >
                       <Edit2 className="h-3 w-3" /> Edit
                     </Button>
@@ -340,11 +344,14 @@ export function QuoteOptionsOverview({
               if (!opt) return null;
               return (
               <div 
-                key={opt.id}
-                onClick={() => onSelect(opt.id)}
+                key={opt.id || `list-opt-${Math.random()}`}
+                onClick={() => {
+                  if (opt.id) onSelect(opt.id);
+                }}
                 className={cn(
                   "group flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors",
-                  selectedId === opt.id ? "bg-primary/5 border-primary" : "bg-card hover:bg-muted/50 border-border"
+                  selectedId === opt.id ? "bg-primary/5 border-primary" : "bg-card hover:bg-muted/50 border-border",
+                  !opt.id && "opacity-70 cursor-not-allowed"
                 )}
               >
                 <div className="flex items-center gap-4">
@@ -429,7 +436,9 @@ export function QuoteOptionsOverview({
                     <React.Fragment key={opt.id}>
                       <TableRow 
                         className={cn("cursor-pointer", selectedId === opt.id && "bg-muted/50")}
-                        onClick={() => onSelect(opt.id)}
+                        onClick={() => {
+                          if (opt.id) onSelect(opt.id);
+                        }}
                       >
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -485,6 +494,7 @@ export function QuoteOptionsOverview({
                               className="h-8 w-8 hover:text-primary"
                               onClick={(e) => handleEdit(e, opt.id)}
                               title="Edit Configuration"
+                              disabled={!opt.id}
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>

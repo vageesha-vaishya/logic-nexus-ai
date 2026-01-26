@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+};
+
 console.log("Rate Engine v2.1 Initialized")
 
 interface RateRequest {
@@ -295,15 +299,23 @@ serve(async (req) => {
         headers: { 
             ...corsHeaders, 
             "Content-Type": "application/json",
+            "Content-Language": "en",
             "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30"
-        } 
+        }  
       },
     )
 
   } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { 
+          status: 400, 
+          headers: { 
+              ...corsHeaders, 
+              "Content-Type": "application/json",
+              "Content-Language": "en"
+          } 
+      },
     )
   }
 })

@@ -5,6 +5,10 @@ import { normalizeGmailPayload, normalizeOutlookPayload, NormalizedEmail, correl
 import { classifyEmailContent } from '../_shared/classification-logic.ts';
 import { determineRoute } from '../_shared/routing-logic.ts';
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+};
+
 const logger = new Logger({ module: "ingest-email" });
 
 const corsHeaders = {
@@ -25,7 +29,7 @@ serve(async (req: Request) => {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Content-Language": "en" },
       });
     }
 
@@ -35,7 +39,7 @@ serve(async (req: Request) => {
     if (!provider || (provider !== "gmail" && provider !== "outlook")) {
       return new Response(JSON.stringify({ error: "Invalid or missing provider" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Content-Language": "en" },
       });
     }
 
@@ -52,7 +56,7 @@ serve(async (req: Request) => {
       logger.error("Failed to normalize email payload", { error: err });
       return new Response(JSON.stringify({ error: "Payload normalization failed: " + err.message }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Content-Language": "en" },
       });
     }
 
@@ -204,14 +208,14 @@ serve(async (req: Request) => {
       conversation_id: conversationId
     }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Content-Language": "en" },
     });
 
   } catch (e: any) {
     logger.error("Ingestion error", { error: e });
     return new Response(JSON.stringify({ error: e.message || String(e) }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Content-Language": "en" },
     });
   }
 });

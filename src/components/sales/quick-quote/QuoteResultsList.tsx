@@ -383,7 +383,9 @@ export function QuoteResultsList({
                             <React.Fragment key={option.id}>
                                 <TableRow 
                                     className={cn("cursor-pointer", isSelected ? "bg-muted/50" : "")}
-                                    onClick={() => toggleExpand(option.id)}
+                                    onClick={() => {
+                                        if (option.id) toggleExpand(option.id);
+                                    }}
                                 >
                                     <TableCell onClick={(e) => e.stopPropagation()}>
                                         {onToggleSelection && (

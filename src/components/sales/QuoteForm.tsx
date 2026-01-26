@@ -2641,7 +2641,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                       <DialogTitle>Quotation Composer</DialogTitle>
                     </DialogHeader>
                     {quoteId && composerVersionId ? (
-                      <MultiModalQuoteComposer quoteId={quoteId} versionId={composerVersionId} />
+                      <MultiModalQuoteComposer quoteId={quoteId} versionId={composerVersionId} tenantId={resolvedTenantId || context.tenantId || undefined} />
                     ) : (
                       <div className="p-4 text-sm text-muted-foreground">Preparing composer...</div>
                     )}

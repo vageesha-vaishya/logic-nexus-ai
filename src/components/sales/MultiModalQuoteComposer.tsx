@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy, Sparkl
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
+import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import {
   Dialog,
@@ -44,6 +45,8 @@ interface MultiModalQuoteComposerProps {
   quoteId: string;
   versionId: string;
   optionId?: string;
+  lastSyncTimestamp?: number;
+  tenantId?: string;
 }
 
 const STEPS = [
@@ -53,9 +56,10 @@ const STEPS = [
   { id: 4, title: 'Review & Save', description: 'Finalize quote' }
 ];
 
-export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId }: MultiModalQuoteComposerProps) {
-  const { scopedDb } = useCRM();
+export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId }: MultiModalQuoteComposerProps) {
+  const { scopedDb, context } = useCRM();
   const { toast } = useToast();
+  const { invokeAiAdvisor } = useAiAdvisor();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -133,7 +137,25 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   useEffect(() => {
     loadInitialData();
-    
+  }, [quoteId, versionId, propTenantId]);
+
+  useEffect(() => {
+    if (lastSyncTimestamp && lastSyncTimestamp > 0) {
+      console.log('[Composer] External sync triggered', lastSyncTimestamp);
+      if (optionId && tenantId) {
+        loadOptionData();
+      } else {
+        loadInitialData();
+      }
+      
+      // Also refresh options list to show new AI generated options
+      if (versionId && tenantId) {
+        ensureOptionExists(tenantId);
+      }
+    }
+  }, [lastSyncTimestamp]);
+
+  useEffect(() => {
     // Keyboard shortcuts
     const handleKeyboard = (e: KeyboardEvent) => {
       // Cmd/Ctrl + S to save
@@ -174,18 +196,73 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     try {
       // Step 1: Resolve tenant ID & Context
       console.log('[Composer] Step 1: Resolving tenant ID and Context');
-      const { data: { user } } = await scopedDb.client.auth.getUser();
-      const userTenantId = user?.user_metadata?.tenant_id;
-      let resolvedTenantId: string | null = userTenantId ?? null;
+      
+      let resolvedTenantId: string | null = propTenantId || context?.tenantId || null;
+      
+      // Attempt 1: User Metadata
+      if (!resolvedTenantId) {
+        const { data: { user } } = await scopedDb.client.auth.getUser();
+        resolvedTenantId = user?.user_metadata?.tenant_id ?? null;
+      }
+
+      // Attempt 2: Fetch from Quote (lightweight query)
+      if (!resolvedTenantId && quoteId) {
+          try {
+             // Use bypass mode (true) to rely on RLS, but don't inject missing scope
+             const { data, error } = await scopedDb
+                .from('quotes', true)
+                .select('tenant_id')
+                .eq('id', quoteId)
+                .maybeSingle();
+             
+             if (!error && data) {
+                resolvedTenantId = data.tenant_id;
+                console.log('[Composer] Resolved tenant from quote lookup:', resolvedTenantId);
+             }
+          } catch (e) {
+             console.warn('[Composer] Failed to resolve tenant from quote lookup', e);
+          }
+      }
+
+      // Attempt 3: Fetch from Version (lightweight query)
+      if (!resolvedTenantId && versionId) {
+          try {
+             const { data, error } = await scopedDb
+                .from('quotation_versions', true)
+                .select('tenant_id')
+                .eq('id', versionId)
+                .maybeSingle();
+             
+             if (!error && data) {
+                resolvedTenantId = data.tenant_id;
+                console.log('[Composer] Resolved tenant from version lookup:', resolvedTenantId);
+             }
+          } catch (e) {
+             console.warn('[Composer] Failed to resolve tenant from version lookup', e);
+          }
+      }
+
+      if (!resolvedTenantId) {
+        console.error('[Composer] Failed to resolve tenant ID after all attempts');
+        errors.push('Could not determine tenant context');
+      } else {
+        setTenantId(resolvedTenantId);
+      }
 
       // Always fetch quote details if quoteId is present to populate context
       if (quoteId) {
         try {
-          const { data: quoteRow, error: quoteError } = await scopedDb
+          // Construct query - if we have a resolved tenant, enforce it to satisfy RLS policies
+          let quoteQuery = scopedDb
             .from('quotes', true)
             .select('tenant_id, franchise_id, origin_location, destination_location, cargo_details, transport_mode, origin_code, destination_code')
-            .eq('id', quoteId)
-            .maybeSingle();
+            .eq('id', quoteId);
+            
+          if (resolvedTenantId) {
+             quoteQuery = quoteQuery.eq('tenant_id', resolvedTenantId);
+          }
+
+          const { data: quoteRow, error: quoteError } = await quoteQuery.maybeSingle();
           
           if (quoteError) {
             console.error('[Composer] Error fetching quote:', quoteError);
@@ -194,7 +271,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             // Use quote's tenant_id if we don't have one yet, or verify it matches
             if (!resolvedTenantId) {
               resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
-              console.log('[Composer] Resolved tenant from quote:', resolvedTenantId);
+              if (resolvedTenantId) {
+                 console.log('[Composer] Resolved tenant from full quote load:', resolvedTenantId);
+                 setTenantId(resolvedTenantId);
+              }
             }
             
             if ((quoteRow as any)?.franchise_id) {
@@ -220,7 +300,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
 
       // Fallback 1: fetch from quotation version
-      if (!resolvedTenantId && versionId) {
+      if (versionId) {
         try {
           const { data: versionRow, error: versionError } = await scopedDb
             .from('quotation_versions', true)
@@ -231,11 +311,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           if (versionError) {
             console.error('[Composer] Error fetching version:', versionError);
           } else if (versionRow) {
-            resolvedTenantId = (versionRow as any)?.tenant_id ?? null;
+            if (!resolvedTenantId && (versionRow as any)?.tenant_id) {
+                resolvedTenantId = (versionRow as any).tenant_id;
+                setTenantId(resolvedTenantId);
+            }
             setMarketAnalysis((versionRow as any)?.market_analysis ?? null);
             setConfidenceScore((versionRow as any)?.confidence_score ?? null);
             setAnomalies((versionRow as any)?.anomalies ?? []);
-            console.log('[Composer] Resolved tenant from version:', resolvedTenantId);
           }
         } catch (error) {
           console.error('[Composer] Exception fetching version:', error);
@@ -255,19 +337,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             console.error('[Composer] Error fetching option:', optionError);
           } else if (optionRow) {
             resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
+            if (resolvedTenantId) setTenantId(resolvedTenantId);
             console.log('[Composer] Resolved tenant from option:', resolvedTenantId);
           }
         } catch (error) {
           console.error('[Composer] Exception fetching option:', error);
         }
       }
-
-      if (!resolvedTenantId) {
-        console.error('[Composer] Failed to resolve tenant ID');
-        errors.push('Could not determine tenant context');
-      }
-
-      setTenantId(resolvedTenantId);
 
       // Step 2: Load reference data with individual error handling
       console.log('[Composer] Step 2: Loading reference data');
@@ -1035,40 +1111,33 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         mode: quoteData.mode || quoteData.transport_mode || 'ocean'
       };
 
-      // Helper to invoke AI Advisor
-      const invokeAiAdvisor = async (body: any) => {
-        const { data: { session } } = await scopedDb.client.auth.getSession();
-        if (!session) throw new Error('No active session');
-
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-advisor`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ action: 'generate_smart_quotes', payload: body })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`AI Advisor failed: ${errorText}`);
-        }
-
-        return await response.json();
-      };
-
       toast({ title: "Generating Options", description: "AI is analyzing market rates..." });
-      const aiResponse = await invokeAiAdvisor(payload);
       
-      if (!aiResponse?.data?.options) {
+      const aiResponse = await invokeAiAdvisor({
+        action: 'generate_smart_quotes',
+        payload
+      });
+      
+      if (aiResponse.error) {
+        throw new Error(aiResponse.error.message || 'AI Advisor failed');
+      }
+
+      if (!aiResponse.data?.options) {
         throw new Error('No options returned from AI');
       }
 
       const results = aiResponse.data.options;
       const analysis = aiResponse.data.market_analysis;
 
-      // Update market analysis state
-      if (analysis) setMarketAnalysis(analysis);
+      // Update market analysis state and persist to version
+      if (analysis) {
+        setMarketAnalysis(analysis);
+        // Persist analysis to the version header
+        await scopedDb
+          .from('quotation_versions')
+          .update({ market_analysis: analysis })
+          .eq('id', versionId);
+      }
 
       for (const result of results) {
         const mapped = mapOptionToQuote(result);
@@ -1090,12 +1159,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             ai_explanation: mapped.aiExplanation,
             source: 'ai_smart_quote',
             total_co2_kg: mapped.co2,
-            market_analysis: analysis,
-            buy_price: financials.buyPrice,
+            total_buy: financials.buyPrice,
             margin_amount: financials.marginAmount,
-            markup_percent: financials.markupPercent,
-            sell_price: financials.sellPrice,
-            currency_id: currencies[0]?.id
+            margin_percentage: financials.markupPercent,
+            total_sell: financials.sellPrice,
+            total_amount: financials.sellPrice,
+            quote_currency_id: currencies[0]?.id
           })
           .select()
           .single();
@@ -1117,6 +1186,22 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
              carrier_name: mapped.carrier,
              sort_order: 0
           });
+      }
+
+      // SYNC: Log to AI Request History
+      try {
+          await scopedDb.from('ai_quote_requests').insert({
+              tenant_id: tenantId,
+              request_payload: payload,
+              response_payload: {
+                  options: results,
+                  market_analysis: analysis
+              },
+              status: 'converted'
+          });
+          console.log('[Composer] Logged smart quote generation to history');
+      } catch (logErr) {
+          console.warn('[Composer] Failed to log smart quote history:', logErr);
       }
 
       toast({ title: "Success", description: `Generated ${results.length} smart options.` });
@@ -1315,8 +1400,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Get charge side IDs
       const [buySideRes, sellSideRes] = await Promise.all([
-        scopedDb.from('charge_sides').select('id').eq('code', 'buy').single(),
-        scopedDb.from('charge_sides').select('id').eq('code', 'sell').single()
+        scopedDb.from('charge_sides', true).select('id').eq('code', 'buy').single(),
+        scopedDb.from('charge_sides', true).select('id').eq('code', 'sell').single()
       ]);
 
       if (buySideRes.error || sellSideRes.error || !buySideRes.data || !sellSideRes.data) {
@@ -1645,6 +1730,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const handleEditOption = (opt: any) => {
+    if (!opt.id) {
+      console.warn('Cannot edit option without ID:', opt);
+      toast({ title: 'Error', description: 'Cannot edit option: Missing ID', variant: 'destructive' });
+      return;
+    }
     setEditingOption(opt);
     setNewOptionData({
       option_name: opt.option_name || '',

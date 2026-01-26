@@ -13,6 +13,9 @@ Deno.serve(async (req) => {
   try {
     const { prompt, model, responseFormat } = await req.json();
     
+    // Force English output
+    const promptWithLang = prompt + "\n\n(IMPORTANT: Respond in English only, regardless of the input language.)";
+
     // Check for available API keys
     const geminiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY');
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
@@ -31,7 +34,7 @@ Deno.serve(async (req) => {
 
         try {
           const bodyPayload: any = {
-              contents: [{ parts: [{ text: prompt }] }]
+              contents: [{ parts: [{ text: promptWithLang }] }]
           };
           
           if (responseFormat === 'json') {
@@ -63,7 +66,7 @@ Deno.serve(async (req) => {
         try {
           const bodyPayload: any = {
               model: targetModel,
-              messages: [{ role: 'user', content: prompt }],
+              messages: [{ role: 'user', content: promptWithLang }],
           };
 
           if (responseFormat === 'json') {
@@ -123,12 +126,20 @@ Deno.serve(async (req) => {
         timestamp: new Date().toISOString()
       }
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Content-Language': 'en'
+      },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message || String(error) }), {
+    return new Response(JSON.stringify({ error: (error as any).message || String(error) }), {
       status: 200, // Return 200 so client parses error message
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Content-Language': 'en'
+      },
     });
   }
 });

@@ -14,7 +14,7 @@ denoRoute.serve(async (req: Request) => {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
-        headers: { ...corsHeadersRoute, "Content-Type": "application/json" },
+        headers: { ...corsHeadersRoute, "Content-Type": "application/json", "Content-Language": "en" },
       });
     }
 
@@ -46,7 +46,7 @@ denoRoute.serve(async (req: Request) => {
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as any)?.message || String(e) }), {
       status: 500,
-      headers: { ...corsHeadersRoute, "Content-Type": "application/json" },
+      headers: { ...corsHeadersRoute, "Content-Type": "application/json", "Content-Language": "en" },
     });
   }
 });

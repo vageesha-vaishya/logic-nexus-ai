@@ -1,14 +1,16 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MultiModalQuoteComposer } from "@/components/sales/MultiModalQuoteComposer";
 import { ErrorBoundary } from "@/components/sales/composer/ErrorBoundary";
+import { useCRM } from "@/hooks/useCRM";
 
 export default function MultiModalQuote() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { context } = useCRM();
   const quoteId = searchParams.get('quoteId');
   const versionId = searchParams.get('versionId');
   const optionId = searchParams.get('optionId');
@@ -44,6 +46,7 @@ export default function MultiModalQuote() {
             quoteId={quoteId}
             versionId={versionId}
             optionId={optionId || undefined}
+            tenantId={context.tenantId || undefined}
           />
         </div>
       </ErrorBoundary>
