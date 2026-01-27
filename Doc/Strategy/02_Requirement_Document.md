@@ -73,15 +73,16 @@ The system must support pluggable modules that implement the core interfaces for
 *   **Horizontal Scaling:** Domain plugins must be stateless to allow independent scaling of high-load domains (e.g., Airlines during holidays).
 *   **Elasticity:** Auto-scaling infrastructure based on CPU/Memory/Queue depth.
 
-### 2.3 Security
-*   **Tenant Isolation:** Strict logical isolation of data. A tenant must never access another tenant's data.
-*   **RBAC:** Role-Based Access Control configurable per domain (e.g., "Underwriter" role in Banking vs. "Dispatcher" role in Logistics).
-*   **Encryption:** Data at rest and in transit encrypted (AES-256, TLS 1.3).
+### 2.3 Security, Compliance & Audit
+*   **Tenant Isolation:** Strict logical isolation of data via RLS.
+*   **Data Retention:** The system MUST retain all financial and tax records for a configurable period (default 7 years) in a WORM (Write Once Read Many) compliant format to satisfy GDPR and GoBD requirements.
+*   **Audit Trail:** The system MUST maintain a cryptographically verifiable audit log of all financial transactions, tax calculations, and rule changes, traceable to a specific user and timestamp.
+*   **Encryption:** Data at rest (AES-256) and in transit (TLS 1.3). PII and Financial data must be field-level encrypted.
 
 ### 2.4 Maintainability
-*   **Separation of Concerns:** Clear boundary between Core and Plugins.
-*   **Observability:** Structured logging (JSON) with trace IDs for request tracking across microservices.
-*   **Health Checks:** Automated health endpoints for core and loaded plugins.
+*   **Separation of Concerns:** Clear boundary between Core, Billing, Tax, and Plugins.
+*   **Observability:** Structured logging (JSON) with trace IDs.
+*   **Configurability:** All tax rules and rates MUST be configurable via UI without code deployment.
 
 ## 3. User Stories & Acceptance Criteria
 

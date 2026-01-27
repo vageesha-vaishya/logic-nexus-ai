@@ -38,71 +38,131 @@ graph TD
     *   *Decision:* Start with shared libraries (Strategy Pattern) within the same process for Phase 1, moving to gRPC microservices for Phase 2+.
 *   **Database (PostgreSQL):** Stores core data (Users, Tenants) and domain data (JSONB or separate schemas).
 
-## 4. Taxation Module Component Design
-The Taxation Module is designed as a self-contained service with the following internal components:
+## 4. Taxation & Financials Data Model
 
-*   **Request Handler:** Validates input payloads and authenticates requests.
-*   **Nexus Engine:** Determines if tax is applicable based on "Origin" and "Destination" addresses and Tenant Nexus configuration.
-*   **Rules Engine:** The core logic processor.
-    *   *Inputs:* Transaction Date, Product Code, Jurisdiction.
-    *   *Process:* Queries the `Tax Rules Repository` (cached) to find matching rates and logic.
-    *   *Logic:* Handles thresholds, caps, and tiered rates.
-*   **Master Data Repository:** Stores:
-    *   `TaxJurisdictions` (Country, State, County, City, Special Zone).
-    *   `TaxRates` (Standard, Reduced, Zero, Exempt) with Effective Dates.
-    *   `ProductTaxabilityRules` (Mapping of Categories to Rates).
-*   **External Connector Adapter:** Interface for third-party providers (Avalara, Vertex, Sovos) or Government APIs. Used for real-time address validation and filing.
-*   **Audit Logger:** Asynchronously writes every calculation event to an immutable `TaxAuditLog` table.
+### 4.1 Entity Relationship Diagram (ERD)
+```mermaid
+erDiagram
+    Tenant ||--o{ TaxJurisdiction : defines_nexus_in
+    TaxJurisdiction ||--|{ TaxRule : has
+    TaxRule ||--|{ TaxRateSchedule : specifies_rates
+    TaxRule }|--|| ProductTaxCategory : applies_to
+    
+    Customer ||--o{ ExemptionCertificate : holds
+    ExemptionCertificate }|--|| TaxJurisdiction : valid_in
+    
+    Invoice ||--|{ InvoiceLine : contains
+    Invoice ||--o{ TaxTransaction : generates
+    
+    InvoiceLine }|--|| ProductTaxCategory : classified_as
+    InvoiceLine ||--o{ TaxLineDetail : breakdown
+    
+    TaxTransaction ||--|{ TaxLineDetail : aggregates
+    TaxTransaction }|--|| TaxJurisdiction : owes_to
+    
+    GLAccount ||--o{ GLJournalEntry : records
+    GLJournalEntry }|--|| TaxTransaction : source_ref
+    
+    TaxJurisdiction {
+        string code PK
+        string name
+        enum type "Country,State,City"
+        string currency
+    }
+    
+    TaxRule {
+        uuid id PK
+        string jurisdiction_code FK
+        string product_category_code FK
+        string rule_type "Standard,Reduced,Zero,Exempt"
+        date effective_from
+        date effective_to
+    }
+    
+    TaxRateSchedule {
+        uuid id PK
+        uuid rule_id FK
+        decimal rate_percentage
+        decimal cap_amount
+        boolean is_compounded
+    }
+    
+    TaxTransaction {
+        uuid id PK
+        uuid invoice_id FK
+        decimal total_taxable_amount
+        decimal total_tax_amount
+        timestamp calculation_date
+        string status "Committed,Voided"
+    }
+```
 
-## 5. API Specification (Taxation Module)
+### 4.2 Core Entities
+*   **TaxJurisdiction:** Represents a taxing authority (e.g., "US-NY", "DE-Federal").
+*   **TaxRule:** Links a product category and jurisdiction to a tax behavior, versioned by date.
+*   **ExemptionCertificate:** Stores customer tax documents (file path, expiry, validation status).
+*   **TaxTransaction:** The immutable record of tax liability created upon invoice finalization.
+*   **GLJournalEntry:** Financial record for double-entry bookkeeping (Debits/Credits).
 
-### 5.1 Public APIs
+## 5. API Specification (Financial & Tax)
 
-#### `POST /api/v1/tax/calculate`
-Calculates tax for a potential transaction (Quote/Cart stage).
+### 5.1 Billing & Invoicing API
+
+#### `POST /api/v1/invoices`
+Creates a draft invoice and triggers preliminary tax calculation.
 *   **Request:**
     ```json
     {
-      "transaction_date": "2023-10-27T10:00:00Z",
       "customer_id": "cust_123",
-      "origin_address": { ... },
-      "destination_address": { ... },
-      "items": [
-        { "sku": "ITEM-001", "amount": 100.00, "tax_code": "P001" }
+      "currency": "USD",
+      "lines": [
+        { "sku": "SVC-LOG-001", "quantity": 1, "unit_price": 500.00, "tax_code": "FRT01" }
       ]
     }
     ```
 *   **Response:**
     ```json
     {
-      "total_tax": 15.00,
-      "breakdown": [
-        { "jurisdiction": "NY State", "rate": 0.04, "amount": 4.00 },
-        { "jurisdiction": "NYC City", "rate": 0.045, "amount": 4.50 }
+      "invoice_id": "inv_999",
+      "status": "DRAFT",
+      "subtotal": 500.00,
+      "tax_total": 45.00,
+      "total": 545.00,
+      "tax_breakdown": [ ... ]
+    }
+    ```
+
+#### `POST /api/v1/invoices/{id}/finalize`
+Finalizes the invoice, commits tax to the Audit Log, and triggers GL posting.
+*   **Response:** `200 OK` with finalized Invoice object.
+
+### 5.2 GL Integration API
+
+#### `POST /api/v1/gl/journals`
+(Internal) Records a journal entry. Triggered by Invoice Finalization.
+*   **Request:**
+    ```json
+    {
+      "reference_id": "inv_999",
+      "date": "2023-10-27",
+      "entries": [
+        { "account_code": "1200-AR", "type": "DEBIT", "amount": 545.00 },
+        { "account_code": "4000-REV", "type": "CREDIT", "amount": 500.00 },
+        { "account_code": "2200-TAX-LIAB", "type": "CREDIT", "amount": 45.00 }
       ]
     }
     ```
 
-#### `POST /api/v1/tax/commit`
-Finalizes tax liability (Invoice stage). Persists the transaction to the Audit Log.
-*   **Request:** Same as `/calculate` but with `invoice_id`.
-*   **Response:** `transaction_id` (for audit).
+### 5.3 Tax Calculation API
 
-### 5.2 Internal Configuration APIs
-
-#### `PUT /api/v1/tax/rules/{rule_id}`
-Updates a tax rule.
-*   **Request:**
-    ```json
-    {
-      "rate": 0.21,
-      "effective_from": "2024-01-01",
-      "description": "VAT Rate Increase 2024"
-    }
-    ```
-
-#### `POST /api/v1/tax/exemptions`
-Uploads a customer exemption certificate.
+#### `POST /api/v1/tax/calculate`
+(As previously defined, but enhanced with detailed nexus check).
+*   **Logic:**
+    1.  Validate Address & Nexus.
+    2.  Check for valid Exemption Certificate.
+    3.  Find matching TaxRule (effective date).
+    4.  Apply Rate (compound if needed).
+    5.  Return detailed breakdown.
 
 ## 6. Technology Stack
 *   **Frontend:** React, TypeScript, Tailwind CSS, Shadcn UI.

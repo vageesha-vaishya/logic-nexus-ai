@@ -24,36 +24,60 @@ Articulate the strategic vision to evolve SOS Logistics Pro from a monolithic lo
 - **New Development:** Design and integration of a **pluggable billing module** with detailed specifications for handling domain-specific invoicing formats, compliance rules (e.g., tax regulations per region/industry), payment gateways, and billing cycles.
 - **New Development:** Integration of a comprehensive **Taxation Module** to ensure global compliance and automated tax handling across all supported verticals.
 
-### Taxation Module Strategy
-To support the platform's global expansion and multi-vertical capability, a dedicated, enterprise-grade Taxation Module will be integrated. This module acts as a centralized engine for all tax-related operations, ensuring compliance without burdening individual domain adapters.
+### Taxation, Billing & Financials Module Strategy
+To support the platform's global expansion and multi-vertical capability, a dedicated, enterprise-grade **Taxation & Financials Module** will be integrated. This module acts as the financial backbone of the SOS Nexus platform, ensuring seamless billing, precise tax compliance, and robust financial reconciliation.
 
-#### Key Strategic Capabilities:
-1.  **Global Compliance Engine:**
-    *   **Tax Compliance Requirements:**
-        *   **Scope:** Full support for VAT (EU, UK, APAC), GST (India, Australia, Canada), Sales & Use Tax (USA - State/County/City levels), Corporate Income Tax provisions, and Withholding Tax logic.
-        *   **Reporting Standards:** Native generation of audit files (e.g., OECD SAF-T), real-time e-Invoicing integration (e.g., Peppol BIS Billing 3.0, Italy SDI, Poland KSeF), and digital VAT return formats.
-        *   **Filing Frequencies:** Configurable calendars for Monthly, Quarterly, and Annual filings per jurisdiction.
-        *   **Data Retention:** Enforced 7-10 year retention policies (configurable per region) for all tax-relevant transaction data, ensuring audit readiness.
+#### 1. Tax Compliance Requirements
+The platform must adhere to strict regulatory standards across all operational regions.
+*   **Global Tax Matrix:**
+    *   **VAT/GST:** Support for standard, reduced, and zero-rated schemes in EU (OSS/IOSS), UK (MTD), APAC (GST), and GCC (VAT).
+    *   **Sales & Use Tax:** Support for US state-level, county-level, and city-level taxes with economic nexus tracking.
+    *   **Withholding Tax:** Logic for cross-border service payments (e.g., WHT in emerging markets).
+*   **Filing Frequencies:** Configurable calendars for Monthly, Quarterly, and Annual filings per jurisdiction.
+*   **Reporting Standards:**
+    *   **SAF-T (Standard Audit File for Tax):** Native generation of OECD 2.0 compliant XMLs (Poland, Portugal, Norway).
+    *   **e-Invoicing:** Integration with Peppol BIS Billing 3.0 (Europe), FatturaPA (Italy), ZUGFeRD (Germany), and clearance models (Mexico, Brazil).
+*   **Data Retention:**
+    *   **Policy:** Enforced 7-10 year retention (configurable per region) for all invoices and tax calculations.
+    *   **Format:** WORM (Write Once, Read Many) storage compliance for audit trails (GoBD, GDPR).
 
-2.  **Automated Tax Calculation Logic:**
-    *   **Rules Engine Architecture:** A hybrid rule-based and algorithmic engine.
-        *   **Nexus Determination:** Logic to automatically detect tax obligations based on physical presence (offices, warehouses) and economic thresholds (sales volume/revenue) in a jurisdiction.
-        *   **Categorization:** Intelligent mapping of products/services to tax codes (e.g., HS Codes, UNSPSC) to determine specific rates and exemptions.
-        *   **Real-Time Calculation:** Sub-millisecond calculation of tax amounts, supporting multi-tier taxes (e.g., Canada GST+PST=HST) and reverse charge mechanisms.
-        *   **Data Models:** Standardized `TaxableTransaction`, `TaxAuthority`, `JurisdictionRule`, and `ExemptionCertificate` schemas.
+#### 2. Automated Tax Calculation Logic
+*   **Tax Determination Rules:**
+    *   **Nexus:** Logic to automatically detect tax obligations based on "Ship-From," "Ship-To," "Bill-To," and "Supply" locations, coupled with economic thresholds (e.g., >$100k sales/year).
+    *   **Categorization:** Product/Service mapping using **UNSPSC** or **HTS** codes linked to specific taxability rules (e.g., "Freight Services" vs. "Digital Goods").
+*   **Calculation Algorithms:**
+    *   **Real-Time Engine:** Sub-millisecond calculation supporting:
+        *   **Compound Taxes:** Tax-on-Tax logic (e.g., Quebec QST calculated on GST-inclusive amount).
+        *   **Stacked Jurisdictions:** Additive rates (Country + State + City + Special District).
+*   **Jurisdiction Management:** Hierarchical data model (`Country > State/Province > County > City > District`) with conflict resolution rules favoring the most specific jurisdiction.
+*   **Exemption Handling:**
+    *   **Workflow:** Portal for customers to upload exemption certificates (Reseller, Government, Non-Profit).
+    *   **Validation:** Automated validity checks (format, expiry date) and application logic (suppress tax if valid certificate exists).
+*   **Engine Architecture:** Hybrid Rule Engine (based on Drools concepts) with versioned rule sets (`TaxRule`, `TaxRate`, `TaxTransaction` models).
 
-3.  **Integration Points with Financial Systems:**
-    *   **Seamless Synchronization:** Bi-directional data exchange with Core Financial Modules (Billing, AR, GL).
-    *   **APIs & Protocols:** RESTful APIs for real-time transaction posting and webhooks for status updates.
-        *   `POST /tax/calculate`: Pre-transaction tax estimation.
-        *   `POST /tax/commit`: Finalizing tax liability upon invoice generation.
-    *   **Reconciliation:** Automated daily reconciliation jobs matching calculated tax against GL postings to identify discrepancies immediately.
+#### 3. Integration Points with Financial Systems
+*   **Billing & Invoicing:**
+    *   **API:** RESTful endpoints for invoice generation that trigger tax calculation and lock tax amounts upon finalization.
+    *   **Lifecycle:** Draft -> Calculated -> Finalized (Tax Committed) -> Posted.
+*   **General Ledger (GL) Integration:**
+    *   **Journal Entries:** Automated posting of tax liabilities and expenses.
+        *   *Credit:* Tax Liability Account (Balance Sheet).
+        *   *Debit:* AR Control Account or Tax Expense (P&L).
+    *   **Mechanism:** Event-driven synchronization via Message Queue (RabbitMQ/Kafka) to ensure decoupling.
+*   **Accounts Receivable (AR) Sync:**
+    *   Real-time sync of tax-inclusive invoice totals to the AR subledger.
+    *   Generation of customer statements reflecting accurate tax breakdowns.
+*   **Audit Trail:**
+    *   **Immutable Log:** Every tax calculation is linked to: Source Transaction ID, Applied Rule Version, Rate Effective Date, and User/System Actor.
 
-4.  **Regional Tax Regulations Support:**
-    *   **Dynamic Framework:** A "Configuration-over-Code" approach for managing tax rules.
-    *   **Centralized Repository:** A master database of global tax rates and rules, versioned by effective date.
-    *   **Effective Dating:** Support for future-dated rate changes (e.g., "VAT changes from 20% to 21% on Jan 1st"), ensuring accurate forward-quoting.
-    *   **Governance:** A strict approval workflow for rule updates: Draft -> Compliance Review -> Staged Test -> Production Activation.
+#### 4. Regional Tax Regulations Support
+*   **Centralized Tax Repository:**
+    *   Master database for `TaxRules`, `Rates`, and `Jurisdictions`.
+    *   **Admin UI:** Interface for Tax Managers to CRUD rules without code changes.
+*   **Effective Dating:** All rates and rules have `effective_from` and `effective_to` dates to support historical reprocessing and future rate planning.
+*   **Governance Process:**
+    *   **Workflow:** `Draft Request` -> `Impact Analysis` -> `Legal Review` -> `Approval` -> `Scheduled Deployment`.
+    *   Ensures no rule change goes live without audit.
 
 ### Success Metrics & Key Performance Indicators (KPIs)
 - **Technical KPIs:**

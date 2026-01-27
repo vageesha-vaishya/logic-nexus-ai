@@ -21,6 +21,22 @@
 *   **Resource Allocation:** 4 Backend Engineers, 2 QA Engineers.
 *   **Go/No-Go:** Core API passes contract tests; latency < 200ms for mock requests.
 
+## Phase 2.5: Taxation & Financials Module (Weeks 8-14)
+*   **Goal:** Implement the centralized Financial Backbone (Tax, Billing, GL).
+*   **Concurrent Execution:** Starts mid-Phase 2 to ensure financial readiness for domains.
+*   **Deliverables:**
+    *   **Tax Engine:** Nexus determination, Rate repository, and Real-time calculator.
+    *   **Billing Service:** Invoice generation, Status lifecycle (Draft->Posted), and AR Sync.
+    *   **GL Connector:** Async event bus for Journal Entry posting.
+    *   **Admin UI:** Tax Rule management and Exemption Certificate portal.
+*   **Milestone:** Successful generation of a Tax-Inclusive Invoice with correct GL entries.
+*   **Resource Allocation:** 2 Senior Backend (Financial Domain Experts), 1 Frontend, 1 DBA.
+*   **Use Cases to Validate:**
+    1.  **US Sales Tax:** Calculate NY State + City tax for a physical good.
+    2.  **Cross-Border VAT:** Validate Reverse Charge mechanism for B2B EU transaction.
+    3.  **Invoice Posting:** Verify Invoice Finalization creates immutable Audit Log and GL Debit/Credit pair.
+*   **Go/No-Go:** Financial reconciliation accuracy of 100% (zero penny drift).
+
 ## Phase 3: Plugin SDK & Logistics Domain (Weeks 11-16)
 *   **Goal:** Enable plugin development and migrate the existing Logistics logic.
 *   **Deliverables:**
