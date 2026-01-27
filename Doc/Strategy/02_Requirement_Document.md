@@ -9,6 +9,10 @@ The platform must expose generic interfaces for core business processes, decoupl
     *   `generateQuote(requestContext, lineItems): Quote`
     *   `validateRules(quoteRequest): ValidationResult`
     *   `calculatePricing(lineItems, pricingRules): PriceBreakdown`
+*   **Taxation Engine Interface:**
+    *   `calculateTax(transactionContext, lineItems): TaxBreakdown`
+    *   `validateTaxId(taxId, countryCode): ValidationResult`
+    *   `getTaxRates(region, category): RateSchedule`
 *   **Fulfillment Orchestrator Interface:**
     *   `initiateFulfillment(orderId, context): FulfillmentPlan`
     *   `trackStatus(fulfillmentId): StatusUpdate`
@@ -37,6 +41,26 @@ The system must support pluggable modules that implement the core interfaces for
 *   **Feature Flags:** Enable/disable specific modules or UI components per tenant.
 *   **Rule Engine Configuration:** Upload/edit domain-specific business rules (e.g., in JSON/YAML or via a DSL) without code deployment.
 *   **Workflow Definition:** Configurable state machines for Fulfillment processes (e.g., `Order Placed -> Validated -> Shipped` vs. `Application Received -> Underwriting -> Approved`).
+
+### 1.4 Taxation & Compliance Module
+*   **Tax Calculation Engine:**
+    *   **FR-TAX-001 (Nexus Detection):** The system MUST automatically detect economic nexus based on configured thresholds (revenue/transaction count) per jurisdiction.
+    *   **FR-TAX-002 (Address Validation):** The system MUST validate and normalize addresses to "Rooftop Level" precision to ensure accurate tax jurisdiction assignment (especially for US Sales Tax).
+    *   **FR-TAX-003 (Product Mappings):** The system MUST allow mapping of internal SKUs to global tax codes (e.g., UN/SPSC, Taric) to determine taxability and special rates (e.g., reduced VAT for books/food).
+    *   **FR-TAX-004 (Tiered Calculation):** The system MUST support compound, additive, and non-additive tax stacking (e.g., Quebec QST on GST).
+
+*   **Compliance & Reporting:**
+    *   **FR-TAX-005 (e-Invoicing):** The system MUST generate XML/JSON payloads compliant with regional standards (Peppol BIS 3.0, FatturaPA, ZUGFeRD) and submit them to government gateways.
+    *   **FR-TAX-006 (SAF-T):** The system MUST be able to export standard audit files (SAF-T) for OECD countries upon demand.
+    *   **FR-TAX-007 (Exemption Management):** The system MUST allow users to upload exemption certificates, validate their format, and track expiration dates, automatically suppressing tax where valid.
+
+*   **Financial Integration:**
+    *   **FR-TAX-008 (GL Posting):** The system MUST post tax liability entries to the General Ledger with granular detail (Tax Type, Jurisdiction, Rate).
+    *   **FR-TAX-009 (Reconciliation):** The system MUST provide a reconciliation report highlighting differences between calculated tax, invoiced tax, and collected tax.
+
+*   **Governance:**
+    *   **FR-TAX-010 (Audit Trail):** The system MUST maintain an immutable, time-stamped log of every tax calculation request, input payload, applied rule version, and result for a minimum of 7 years.
+    *   **FR-TAX-011 (Effective Dating):** The system MUST support effective start and end dates for all tax rules and rates, allowing historical recalculation and future planning.
 
 ## 2. Non-Functional Requirements
 
