@@ -370,7 +370,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
           console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
           const legacyOptions = legacyRes.data.options.map((opt: any) => {
               const mapped = mapOptionToQuote(opt);
-              const { buyPrice, marginAmount, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
+              const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
               return {
                   ...mapped,
                   source_attribution: 'Standard Rate Engine',
@@ -384,6 +384,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   charges: mapped.charges,
                   buyPrice,
                   marginAmount,
+                  marginPercent,
                   markupPercent
               };
           });
@@ -413,7 +414,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               if (aiData.options) {
                   const aiOptions = aiData.options.map((opt: any) => {
                       const mapped = mapOptionToQuote(opt);
-                      const { buyPrice, marginAmount, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
+                      const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
                       return {
                           ...mapped,
                           id: mapped.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
@@ -428,6 +429,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                           charges: mapped.charges,
                           buyPrice,
                           marginAmount,
+                          marginPercent,
                           markupPercent
                       };
                   });

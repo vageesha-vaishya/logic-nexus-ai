@@ -45,7 +45,8 @@ export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges
   const grandTotalSell = calculateGrandTotal('sell');
   const grandTotalBuy = calculateGrandTotal('buy');
   const profit = grandTotalSell - grandTotalBuy;
-  const marginPercent = grandTotalBuy > 0 ? ((profit / grandTotalBuy) * 100) : 0;
+  // Use Profit Margin (Profit / Sell) for standard enterprise reporting
+  const marginPercent = grandTotalSell > 0 ? ((profit / grandTotalSell) * 100) : 0;
   
   const currency = currencies.find(c => c.id === quoteData.currencyId);
 

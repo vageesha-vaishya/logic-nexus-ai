@@ -152,7 +152,11 @@ export function ChargesManagementStep({
           {legs.map((leg, legIdx) => {
             const totals = calculateTotals(leg.charges);
             const margin = totals.sell - totals.buy;
-            const marginPercent = totals.buy > 0 ? ((margin / totals.buy) * 100).toFixed(2) : '0.00';
+            // Calculate Profit Margin % (Profit / Sell) to match Auto-Margin input logic
+            const marginPercent = totals.sell > 0 ? ((margin / totals.sell) * 100).toFixed(2) : '0.00';
+            // Also calculate Markup % (Profit / Cost) for reference if needed, but display Margin % as primary
+            const markupPercent = totals.buy > 0 ? ((margin / totals.buy) * 100).toFixed(2) : '0.00';
+
             const serviceType = serviceTypes.find((st) =>
               st.id === leg.serviceTypeId ||
               st.id === leg.mode ||
@@ -298,7 +302,8 @@ export function ChargesManagementStep({
                     <td colSpan={2} className="p-3"></td>
                     <td className="p-3 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
                     <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                      {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)}
+                      {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
+                      {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
                     </td>
                     <td></td>
                   </tr>

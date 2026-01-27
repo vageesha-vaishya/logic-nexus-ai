@@ -569,8 +569,8 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     }
 
                     // Use dynamic margin from financials instead of hardcoded 0.85 (15%)
-                    // If markupPercent is undefined, default to 15%
-                    const buyMultiplier = 1 - ((markupPercent ?? 15) / 100);
+                    // If marginPercent is undefined, default to 15%
+                    const buyMultiplier = 1 - ((marginPercent ?? 15) / 100);
                     const buyAmount = Number((amount * buyMultiplier).toFixed(2));
                     const sellAmount = Number(amount.toFixed(2));
 

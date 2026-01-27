@@ -1,13 +1,18 @@
 export const calculateQuoteFinancials = (sellPrice: number) => {
-    const marginAmount = Number((sellPrice * 0.15).toFixed(2));
+    // Business Logic: 15% Profit Margin by default
+    const marginPercent = 15;
+    const marginAmount = Number((sellPrice * (marginPercent / 100)).toFixed(2));
     const buyPrice = Number((sellPrice - marginAmount).toFixed(2));
+    
+    // Markup = (Profit / Cost) * 100
     const markupPercent = buyPrice > 0 ? Number(((marginAmount / buyPrice) * 100).toFixed(2)) : 0;
     
     return {
         sellPrice,
         buyPrice,
         marginAmount,
-        markupPercent
+        marginPercent, // Explicit Margin %
+        markupPercent  // Explicit Markup % (Cost basis)
     };
 };
 
@@ -32,7 +37,8 @@ export const mapOptionToQuote = (opt: any) => {
         // We will recalculate them if needed in the return statement.
         buyPrice: opt.buyPrice ?? opt.total_buy ?? opt.buy_price,
         marginAmount: opt.marginAmount ?? opt.margin_amount,
-        markupPercent: opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage,
+        marginPercent: opt.marginPercent ?? opt.margin_percent, // Prioritize Margin
+        markupPercent: opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage, // Fallback
     };
     
     // Calculate price breakdown if not present
@@ -295,16 +301,18 @@ export const mapOptionToQuote = (opt: any) => {
 
     if (Math.abs((normalized.total_amount || 0) - price_breakdown.total) > 0.01) {
         // Total has changed! Recalculate financials based on the new total.
-        // We assume the markup percent is the intent we want to preserve, or default to 15%.
-        const targetMarkup = normalized.markupPercent || 15;
-        // buyPrice = sellPrice / (1 + markup/100) -> Wrong formula for margin
-        // Standard logic: sell = buy / (1 - margin%) ? No.
-        // Logic in QuoteNew: buyMultiplier = 1 - (markupPercent / 100).
-        // buy = sell * buyMultiplier.
-        const buyMultiplier = 1 - (targetMarkup / 100);
+        
+        // Prioritize explicit Margin %, fallback to 15%
+        const targetMargin = normalized.marginPercent || 15;
+        
+        // Calculate Buy Price based on Margin % (Profit / Sell)
+        // Buy = Sell * (1 - Margin%)
+        const buyMultiplier = 1 - (targetMargin / 100);
         finalBuyPrice = Number((price_breakdown.total * buyMultiplier).toFixed(2));
         finalMarginAmount = Number((price_breakdown.total - finalBuyPrice).toFixed(2));
-        finalMarkupPercent = targetMarkup;
+        
+        // Recalculate Markup % (Profit / Cost) for consistency
+        finalMarkupPercent = finalBuyPrice > 0 ? Number(((finalMarginAmount / finalBuyPrice) * 100).toFixed(2)) : 0;
     }
 
     return {
@@ -312,6 +320,7 @@ export const mapOptionToQuote = (opt: any) => {
         total_amount: price_breakdown.total,
         buyPrice: finalBuyPrice,
         marginAmount: finalMarginAmount,
+        marginPercent: normalized.marginPercent || 15,
         markupPercent: finalMarkupPercent,
         transport_mode: normalized.mode,
         carrier: normalized.carrier_name,

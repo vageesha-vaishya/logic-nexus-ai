@@ -902,12 +902,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           charge[field] = value;
         }
 
-        // Apply auto margin if enabled
+        // Apply auto margin if enabled (Profit Margin logic: Sell = Buy / (1 - Margin%))
         if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
-          const sellRate = (charge.buy?.rate || 0) * (1 + marginPercent / 100);
+          const buyRate = charge.buy?.rate || 0;
+          const sellRate = marginPercent < 100 ? buyRate / (1 - marginPercent / 100) : buyRate;
           charge.sell = {
             quantity: charge.buy?.quantity || 1,
-            rate: sellRate
+            rate: Number(sellRate.toFixed(2))
           };
         }
 
