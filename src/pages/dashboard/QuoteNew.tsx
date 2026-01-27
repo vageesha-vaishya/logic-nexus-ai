@@ -253,6 +253,18 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
       if (!selectedRates || !Array.isArray(selectedRates) || selectedRates.length === 0) return;
 
+      // Check if options already exist for this version to prevent duplication
+      const { count: existingOptionsCount } = await scopedDb
+          .from('quotation_version_options')
+          .select('*', { count: 'exact', head: true })
+          .eq('quotation_version_id', versionId);
+
+      if (existingOptionsCount && existingOptionsCount > 0) {
+          logger.info('[QuoteNew] Options already exist for version, skipping insertion', { versionId });
+          setOptionsInserted(true);
+          return;
+      }
+
       logger.info('[QuoteNew] Starting option insertion', { count: selectedRates.length, versionId });
       setIsInsertingOptions(true);
       setInsertionStartTime(performance.now());
@@ -1125,6 +1137,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 onSuccess={handleSuccess} 
                 initialData={templateData} 
                 autoSave={!!location.state?.selectedRates}
+                versionId={versionId || undefined}
             />
         ) : (
             <Card className="border-primary/20 bg-primary/5">

@@ -16,16 +16,16 @@ import { useQuoteRepository } from './useQuoteRepository';
 
 interface QuoteFormProps {
   quoteId?: string;
+  versionId?: string;
   onSuccess?: (quoteId: string) => void;
   initialData?: Partial<QuoteFormValues>;
   autoSave?: boolean;
 }
 
-function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFormProps) {
+function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave }: QuoteFormProps) {
   const { resolvedTenantId } = useQuoteContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
-  const [composerVersionId] = useState<string>('');
   const { saveQuote } = useQuoteRepository();
   
   const form = useForm<QuoteFormValues>({
@@ -42,11 +42,6 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
       destination_port_id: '',
       incoterms: '',
       ...initialData,
-      // Ensure undefined values from initialData fall back to empty strings
-      carrier_id: initialData?.carrier_id ?? '',
-      service_type_id: initialData?.service_type_id ?? '',
-      origin_port_id: initialData?.origin_port_id ?? '',
-      destination_port_id: initialData?.destination_port_id ?? '',
     },
   });
 
@@ -64,10 +59,6 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
         destination_port_id: '',
         incoterms: '',
         ...initialData,
-        carrier_id: initialData.carrier_id ?? '',
-        service_type_id: initialData.service_type_id ?? '',
-        origin_port_id: initialData.origin_port_id ?? '',
-        destination_port_id: initialData.destination_port_id ?? '',
       });
     }
   }, [initialData, form]);
@@ -102,15 +93,6 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
     }
   };
 
-  if (isHydrating) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground animate-pulse">Loading quote details...</p>
-      </div>
-    );
-  }
-
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-20">
@@ -135,7 +117,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
                     <X className="h-4 w-4" />
                     Cancel
                  </Button>
-                 <Button type="submit" disabled={isSubmitting} className="gap-2 shadow-sm">
+                 <Button type="submit" disabled={isSubmitting || isHydrating} className="gap-2 shadow-sm">
                     {isSubmitting ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
@@ -146,7 +128,13 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
             </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {isHydrating ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-muted-foreground animate-pulse">Loading quote details...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">1</span>
@@ -173,7 +161,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
                     <div className="border rounded-xl p-6 bg-gradient-to-br from-muted/20 to-muted/5 shadow-inner">
                         <MultiModalQuoteComposer 
                             quoteId={quoteId}
-                            versionId={composerVersionId}
+                            versionId={versionId}
                             tenantId={resolvedTenantId || undefined}
                         />
                     </div>
@@ -188,7 +176,7 @@ function QuoteFormContent({ quoteId, onSuccess, initialData, autoSave }: QuoteFo
                 <QuoteFinancials />
             </section>
         </div>
-
+        )}
       </form>
     </FormProvider>
   );

@@ -42,16 +42,18 @@ export async function invokeFunction<T = any>(
       if (is401) {
         console.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Attempting manual session refresh...`);
         
+        let retryData = null;
+        let retryError = error;
+
+        // Step 1: Try refreshing session
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         
         if (!refreshError && refreshData.session) {
            console.log('[Supabase Function] Session refreshed successfully. Retrying invocation with fresh token...');
            
-           // Retry once with explicit Authorization header to ensure fresh token is used
-           // even if the client singleton hasn't fully propagated the update yet.
            const { Authorization, authorization, ...baseHeaders } = options.headers || {};
            
-           return await supabase.functions.invoke(functionName, {
+           const result = await supabase.functions.invoke(functionName, {
             body: options.body,
             headers: {
               ...baseHeaders,
@@ -59,17 +61,68 @@ export async function invokeFunction<T = any>(
             },
             method: options.method || 'POST',
           });
+          retryData = result.data;
+          retryError = result.error;
         }
+
+        // Check if retry is still 401 (or if refresh failed)
+        const isStill401 = retryError && ((retryError as any)?.context?.status === 401 || 
+                    retryError.message?.includes('Invalid JWT') || 
+                    retryError.message?.includes('jwt expired'));
+
+        // Step 2: Fallback to ANON key if User Token fails
+        if (isStill401) {
+            console.warn(`[Supabase Function] Still 401 after refresh. Fallback to ANON key for ${functionName}...`);
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            
+            if (anonKey) {
+                 const { Authorization, authorization, ...baseHeaders } = options.headers || {};
+                 const anonResult = await supabase.functions.invoke(functionName, {
+                    body: options.body,
+                    headers: {
+                      ...baseHeaders,
+                      Authorization: `Bearer ${anonKey}`
+                    },
+                    method: options.method || 'POST',
+                 });
+                 retryData = anonResult.data;
+                 retryError = anonResult.error;
+            }
+        }
+
+        // If we have a successful retry (or a different error), return it
+        if (!retryError) {
+            return { data: retryData, error: null };
+        }
+        
+        // Update the main error to be the retry error so we can parse it below
+        error = retryError;
       }
 
       // Enhance error message if possible
-      let errorMsg = error.message || 'Unknown error';
       if (error && typeof error === 'object' && 'context' in error) {
          try {
-            // Try to parse response body from context if available (depends on client version)
-            // But usually error.message is populated from the body
+            const response = (error as any).context;
+            // Check if context is a Response-like object and has not been consumed
+            if (response && typeof response.text === 'function' && !response.bodyUsed) {
+                const text = await response.text();
+                try {
+                    const data = JSON.parse(text);
+                    if (data && data.error) {
+                        error.message = data.error;
+                    } else if (data && data.message) {
+                        error.message = data.message;
+                    } else {
+                         // If it's a valid JSON but unknown structure, use stringified
+                         error.message = text;
+                    }
+                } catch {
+                    // Not JSON, use raw text
+                    if (text) error.message = text;
+                }
+            }
          } catch (e) {
-            // ignore
+            console.warn('[Supabase Function] Failed to parse error response body:', e);
          }
       }
       return { data: null, error };

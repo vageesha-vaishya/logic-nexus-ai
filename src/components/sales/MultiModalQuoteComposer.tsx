@@ -1905,7 +1905,53 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       setLegs(prev => prev.map(l => {
         if (l.id === legId) {
-          return { ...l, charges: [...l.charges, ...newCharges] };
+          // Merge new charges with existing ones to prevent duplicates
+          const updatedCharges = [...l.charges];
+          
+          newCharges.forEach(newCharge => {
+            const existingIndex = updatedCharges.findIndex(c => 
+              c.category_id === newCharge.category_id && 
+              // Strict matching to prevent duplication
+              ((!c.basis_id && !newCharge.basis_id) || c.basis_id === newCharge.basis_id) &&
+              ((!c.unit && !newCharge.unit) || c.unit === newCharge.unit)
+            );
+
+            if (existingIndex >= 0) {
+              // Update existing charge
+              const existing = updatedCharges[existingIndex];
+              
+              // Smart Update Logic:
+              // 1. Always update rates and currency
+              // 2. Update quantity only if it's the default (1) or 0, to preserve user edits
+              // 3. Preserve ID (dbChargeId) to ensure UPDATE instead of INSERT
+              
+              updatedCharges[existingIndex] = {
+                ...existing,
+                unit: newCharge.unit || existing.unit,
+                currency_id: newCharge.currency_id,
+                buy: { 
+                    ...existing.buy, 
+                    rate: newCharge.buy.rate,
+                    // If existing quantity is 0 or 1, assume it's default and update it. 
+                    // Otherwise keep user's manual quantity.
+                    quantity: (existing.buy.quantity === 0 || existing.buy.quantity === 1) ? newCharge.buy.quantity : existing.buy.quantity,
+                    amount: ((existing.buy.quantity === 0 || existing.buy.quantity === 1) ? newCharge.buy.quantity : existing.buy.quantity) * newCharge.buy.rate
+                },
+                sell: { 
+                    ...existing.sell, 
+                    rate: newCharge.sell.rate, 
+                    quantity: (existing.sell.quantity === 0 || existing.sell.quantity === 1) ? newCharge.sell.quantity : existing.sell.quantity,
+                    amount: ((existing.sell.quantity === 0 || existing.sell.quantity === 1) ? newCharge.sell.quantity : existing.sell.quantity) * newCharge.sell.rate
+                },
+                note: newCharge.note || existing.note
+              };
+            } else {
+              // Add new charge
+              updatedCharges.push(newCharge);
+            }
+          });
+
+          return { ...l, charges: updatedCharges };
         }
         return l;
       }));

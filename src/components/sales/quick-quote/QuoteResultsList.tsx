@@ -78,23 +78,23 @@ export function QuoteResultsList({
     };
 
     const renderCardView = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
             {results.map((option) => {
                 const isSelected = selectedIds.includes(option.id);
                 return (
                     <Card 
                         key={option.id} 
                         className={cn(
-                            "cursor-pointer transition-all hover:shadow-md border-2",
-                            isSelected ? "border-primary bg-primary/5" : "border-transparent hover:border-muted-foreground/20",
+                            "cursor-pointer transition-all duration-200 hover:shadow-lg border",
+                            isSelected ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50",
                             expandedId === option.id ? "ring-2 ring-primary/20" : ""
                         )}
                         onClick={() => onToggleSelection ? onToggleSelection(option.id) : onSelect(option)}
                     >
-                        <CardHeader className="pb-2">
-                            <div className="flex justify-between items-start gap-2">
+                        <CardHeader className="pb-3 pt-4 px-4">
+                            <div className="flex justify-between items-start gap-3">
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
                                         {onToggleSelection && (
                                             <Checkbox 
                                                 checked={isSelected}
@@ -102,21 +102,21 @@ export function QuoteResultsList({
                                                 onClick={(e) => e.stopPropagation()}
                                             />
                                         )}
-                                        <h4 className="font-bold text-lg mr-1 truncate">{option.carrier}</h4>
+                                        <h4 className="font-bold text-lg leading-tight truncate">{option.carrier}</h4>
                                         {getTierBadge(option.tier)}
                                         {option.source_attribution?.includes("AI") && (
-                                            <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-[10px] px-1 h-5 whitespace-nowrap">
-                                                AI Generated
+                                            <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0">
+                                                AI
                                             </Badge>
                                         )}
                                     </div>
-                                    <p className="text-sm text-muted-foreground truncate" title={option.name}>{option.name}</p>
+                                    <p className="text-sm text-muted-foreground truncate font-medium" title={option.name}>{option.name}</p>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <div className="text-xl font-bold text-primary whitespace-nowrap">
+                                    <div className="text-xl font-bold text-primary whitespace-nowrap tracking-tight">
                                         {formatCurrency(option.price, option.currency)}
                                     </div>
-                                    <div className="text-xs text-muted-foreground">Total Estimate</div>
+                                    <div className="text-[10px] uppercase text-muted-foreground font-semibold">Total Estimate</div>
                                     
                                     {/* Financials (if available) */}
                                     {(option.markupPercent !== undefined || option.marginAmount !== undefined) && (
@@ -136,22 +136,22 @@ export function QuoteResultsList({
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                        <CardContent className="space-y-4 px-4 pb-4 pt-0">
+                            <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground block">Service</span>
-                                    <div className="font-medium flex items-center gap-1">
+                                    <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Service</span>
+                                    <div className="font-medium flex items-center gap-1.5 truncate">
                                         {getModeIcon(option.transport_mode || 'ocean')}
-                                        {option.route_type || 'Standard'}
+                                        <span className="truncate">{option.route_type || 'Standard'}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground block">Transit Time</span>
-                                    <div className="font-medium">{option.transitTime}</div>
+                                    <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Transit Time</span>
+                                    <div className="font-medium truncate">{option.transitTime}</div>
                                 </div>
                             </div>
 
-                            <div className="pt-2 border-t grid grid-cols-2 gap-2">
+                            <div className="pt-3 border-t grid grid-cols-2 gap-2">
                                 {option.reliability && (
                                     <div className={cn("px-2 py-1 rounded text-xs font-medium border flex items-center justify-between", getReliabilityColor(option.reliability.score))}>
                                         <span>Reliability</span>

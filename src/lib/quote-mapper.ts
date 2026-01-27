@@ -1,11 +1,27 @@
 export const calculateQuoteFinancials = (sellPrice: number) => {
+    // Sanitize input
+    if (typeof sellPrice !== 'number' || isNaN(sellPrice)) {
+        return {
+            sellPrice: 0,
+            buyPrice: 0,
+            marginAmount: 0,
+            marginPercent: 15,
+            markupPercent: 0
+        };
+    }
+
     // Business Logic: 15% Profit Margin by default
     const marginPercent = 15;
     const marginAmount = Number((sellPrice * (marginPercent / 100)).toFixed(2));
     const buyPrice = Number((sellPrice - marginAmount).toFixed(2));
     
     // Markup = (Profit / Cost) * 100
-    const markupPercent = buyPrice > 0 ? Number(((marginAmount / buyPrice) * 100).toFixed(2)) : 0;
+    // Prevent division by zero and Infinity
+    let markupPercent = 0;
+    if (buyPrice > 0) {
+        const calculatedMarkup = (marginAmount / buyPrice) * 100;
+        markupPercent = Number.isFinite(calculatedMarkup) ? Number(calculatedMarkup.toFixed(2)) : 0;
+    }
     
     return {
         sellPrice,
@@ -19,6 +35,17 @@ export const calculateQuoteFinancials = (sellPrice: number) => {
 export const mapOptionToQuote = (opt: any) => {
     if (!opt) return null;
     
+    // Helper to safely parse numbers
+    const safeNumber = (val: any) => {
+        if (val === undefined || val === null) return 0;
+        if (typeof val === 'string') {
+            // Remove commas which break Number() parsing
+            val = val.replace(/,/g, '');
+        }
+        const num = Number(val);
+        return isFinite(num) ? num : 0;
+    };
+    
     // Idempotency check: We no longer return early. 
     // Instead, we allow the object to flow through to ensure balancing, deduplication, and allocation logic 
     // is always applied, even to already mapped objects. This fixes data inconsistencies in historical quotes.
@@ -28,17 +55,17 @@ export const mapOptionToQuote = (opt: any) => {
         ...opt,
         carrier_name: opt.carrier_name || (typeof opt.carrier === 'object' ? opt.carrier?.name : opt.carrier) || 'Unknown Carrier',
         option_name: opt.option_name || opt.name,
-        total_amount: opt.total_amount || opt.price,
+        total_amount: safeNumber(opt.total_amount || opt.price),
         mode: opt.mode || opt.transport_mode || opt.name, // Fallback chain
         transit_time: typeof opt.transitTime === 'string' ? { details: opt.transitTime } : (opt.transit_time || {}),
         currency: typeof opt.currency === 'object' ? opt.currency?.code : opt.currency,
         // Financial mappings (DB -> App)
         // Ensure that if we recalculate total later, these old financials don't mislead us.
         // We will recalculate them if needed in the return statement.
-        buyPrice: opt.buyPrice ?? opt.total_buy ?? opt.buy_price,
-        marginAmount: opt.marginAmount ?? opt.margin_amount,
-        marginPercent: opt.marginPercent ?? opt.margin_percent, // Prioritize Margin
-        markupPercent: opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage, // Fallback
+        buyPrice: safeNumber(opt.buyPrice ?? opt.total_buy ?? opt.buy_price),
+        marginAmount: safeNumber(opt.marginAmount ?? opt.margin_amount),
+        marginPercent: safeNumber(opt.marginPercent ?? opt.margin_percent), // Prioritize Margin
+        markupPercent: safeNumber(opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage), // Fallback
     };
     
     // Calculate price breakdown if not present
@@ -263,6 +290,10 @@ export const mapOptionToQuote = (opt: any) => {
     const globalTotal = charges.reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
     const calculatedTotal = Number((legsTotal + globalTotal).toFixed(2));
     
+    // Check if this is an AI quote - they are notoriously bad at summing totals (hallucination)
+    // but usually good at listing specific line items.
+    const isAiGenerated = normalized.source_attribution?.includes("AI") || normalized.ai_generated || (opt.source_attribution?.includes("AI"));
+
     if (price_breakdown) {
         if (duplicatesRemoved) {
              // If we removed duplicates, the original header total was likely double-counted.
@@ -271,23 +302,34 @@ export const mapOptionToQuote = (opt: any) => {
              // Adjust base_fare if needed (simplified)
              if (price_breakdown.base_fare > calculatedTotal) price_breakdown.base_fare = calculatedTotal;
         } else if (Math.abs(price_breakdown.total - calculatedTotal) > 0.01) {
-             // If mismatch exists but NO duplicates were found, it might be an incomplete breakdown.
-             // Add balancing charge ONLY if the discrepancy is positive (Header > Components)
-             const discrepancy = price_breakdown.total - calculatedTotal;
-             if (discrepancy > 0) {
-                 const currency = price_breakdown.currency || normalized.currency || 'USD';
-                 charges.push({ 
-                     category: 'Adjustment', 
-                     name: 'Ancillary Fees', 
-                     amount: Number(discrepancy.toFixed(2)), 
-                     currency, 
-                     unit: 'per_shipment', 
-                     note: 'Unitemized surcharges' 
-                 });
-             } else {
-                 // Header < Components (Discount? Or Header is wrong?)
-                 // We trust components because they are explicit line items.
+             // If mismatch exists...
+             
+             if (isAiGenerated && calculatedTotal > 0) {
+                 // AI HALLUCINATION FIX:
+                 // AI often returns a "Total" that is mathematically incorrect (e.g. 4x multiplier or just random).
+                 // We trust the sum of the generated line items (Components) over the hallucinated Header Total.
+                 // This ensures the displayed price matches the breakdown.
                  price_breakdown.total = calculatedTotal;
+             } else {
+                 // For standard API quotes (e.g. Rate Engine), we assume the Header is the "Truth" 
+                 // and we might be missing hidden fees/surcharges in the line items.
+                 // Add balancing charge ONLY if the discrepancy is positive (Header > Components)
+                 const discrepancy = price_breakdown.total - calculatedTotal;
+                 if (discrepancy > 0) {
+                     const currency = price_breakdown.currency || normalized.currency || 'USD';
+                     charges.push({ 
+                         category: 'Adjustment', 
+                         name: 'Ancillary Fees', 
+                         amount: Number(discrepancy.toFixed(2)), 
+                         currency, 
+                         unit: 'per_shipment', 
+                         note: 'Unitemized surcharges' 
+                     });
+                 } else {
+                     // Header < Components (Discount? Or Header is wrong?)
+                     // We trust components because they are explicit line items.
+                     price_breakdown.total = calculatedTotal;
+                 }
              }
         }
     }

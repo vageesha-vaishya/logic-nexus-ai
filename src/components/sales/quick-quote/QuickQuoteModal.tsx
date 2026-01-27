@@ -604,21 +604,23 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       <DialogTrigger asChild>
         {children || <Button>Quick Quote</Button>}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
+      <DialogContent className="max-w-[95vw] w-[1600px] h-[95vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-8 py-5 border-b bg-background z-10">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
             Quick Quote & AI Analysis
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base">
             Generate instant quotes with AI-powered market analysis and route optimization.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Input Section - Left Side */}
-          <div className="w-5/12 bg-muted/30 p-6 border-r overflow-y-auto">
-            <form onSubmit={form.handleSubmit(onSubmit, (e) => console.error("Form Errors:", e))} className="space-y-5">
+          <div className="w-[400px] shrink-0 bg-muted/30 p-6 border-r overflow-y-auto">
+            <form onSubmit={form.handleSubmit(onSubmit, (e) => console.error("Form Errors:", e))} className="space-y-6">
               
               {/* Smart Mode Toggle */}
               <div className="flex items-center justify-between bg-purple-50 p-3 rounded-md border border-purple-100">
@@ -874,7 +876,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
           </div>
 
           {/* Results Section - Right Side */}
-          <div className="w-7/12 p-6 bg-background overflow-y-auto">
+          <div className="flex-1 p-6 bg-background overflow-y-auto">
             
             {/* Compliance Alert */}
             {complianceCheck && !complianceCheck.compliant && (

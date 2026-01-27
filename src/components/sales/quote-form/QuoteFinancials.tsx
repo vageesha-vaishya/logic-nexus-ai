@@ -30,8 +30,24 @@ export function QuoteFinancials() {
     setIsVerifying(true);
     setServerVerification(null);
     try {
+      // Ensure values are numbers before sending
+      // Handle potentially formatted strings (e.g. "3,324.00" or "$3,324")
+      const cleanSubtotal = String(subtotal).replace(/[^0-9.-]+/g, '');
+      const shippingAmountVal = cleanSubtotal ? parseFloat(cleanSubtotal) : 0;
+      
+      // Handle taxPercent
+      const cleanTax = String(taxPercent).replace(/[^0-9.-]+/g, '');
+      const taxRate = cleanTax ? parseFloat(cleanTax) : 0;
+      
+      console.log('Verifying financials:', { 
+        originalSubtotal: subtotal,
+        originalTax: taxPercent,
+        sentShipping: shippingAmountVal, 
+        sentTax: taxRate 
+      });
+
       const { data, error } = await invokeFunction('calculate-quote-financials', {
-        body: { shipping_amount: subtotal, tax_percent: parseFloat(taxPercent || '0') }
+        body: { shipping_amount: shippingAmountVal, tax_percent: taxRate }
       });
 
       if (error) throw error;
@@ -46,9 +62,9 @@ export function QuoteFinancials() {
       } else {
         toast.warning(`Server calculation differs: $${serverTotal}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Verification failed:', err);
-      toast.error('Failed to verify calculation');
+      toast.error(err.message || 'Failed to verify calculation');
     } finally {
       setIsVerifying(false);
     }

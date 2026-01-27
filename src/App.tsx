@@ -98,6 +98,7 @@ import ContainerTypes from "./pages/dashboard/ContainerTypes";
 import ContainerSizes from "./pages/dashboard/ContainerSizes";
 import ContainerAnalytics from "./pages/dashboard/ContainerAnalytics";
 import ContainerTracking from "./pages/dashboard/ContainerTracking";
+import RateManagement from "./pages/dashboard/RateManagement";
 import VesselTypes from "./pages/dashboard/VesselTypes";
 import VesselClasses from "./pages/dashboard/VesselClasses";
 import Vessels from "./pages/dashboard/Vessels";
@@ -629,6 +630,7 @@ const App = () => (
             <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles" element={<ProtectedRoute><Vehicles /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles/new" element={<ProtectedRoute><VehicleNew /></ProtectedRoute>} />
+            <Route path="/dashboard/rate-management" element={<ProtectedRoute><RateManagement /></ProtectedRoute>} />
             <Route path="/dashboard/carriers" element={<ProtectedRoute><Carriers /></ProtectedRoute>} />
             <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
             <Route path="/dashboard/ports-locations" element={<ProtectedRoute><PortsLocations /></ProtectedRoute>} />
