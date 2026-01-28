@@ -12,8 +12,392 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  finance: {
+    Tables: {
+      tax_jurisdictions: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          parent_id: string | null
+          type: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          parent_id?: string | null
+          type: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          parent_id?: string | null
+          type?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_jurisdictions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "tax_jurisdictions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      tax_codes: {
+        Row: {
+          id: string
+          code: string
+          description: string | null
+          is_active: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          code: string
+          description?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          code?: string
+          description?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      tax_rules: {
+        Row: {
+          id: string
+          jurisdiction_id: string | null
+          tax_code_id: string | null
+          rate: number
+          priority: number | null
+          effective_from: string
+          effective_to: string | null
+          rule_type: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          jurisdiction_id?: string | null
+          tax_code_id?: string | null
+          rate: number
+          priority?: number | null
+          effective_from: string
+          effective_to?: string | null
+          rule_type?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          jurisdiction_id?: string | null
+          tax_code_id?: string | null
+          rate?: number
+          priority?: number | null
+          effective_from?: string
+          effective_to?: string | null
+          rule_type?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_rules_jurisdiction_id_fkey"
+            columns: ["jurisdiction_id"]
+            isOneToOne: false
+            referencedRelation: "tax_jurisdictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_rules_tax_code_id_fkey"
+            columns: ["tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "tax_codes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      invoices: {
+        Row: {
+          id: string
+          tenant_id: string
+          customer_id: string
+          invoice_number: string
+          status: string | null
+          issue_date: string
+          due_date: string
+          currency: string
+          subtotal: number
+          tax_total: number
+          total_amount: number
+          metadata: Json | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          customer_id: string
+          invoice_number: string
+          status?: string | null
+          issue_date: string
+          due_date: string
+          currency: string
+          subtotal: number
+          tax_total: number
+          total_amount: number
+          metadata?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          customer_id?: string
+          invoice_number?: string
+          status?: string | null
+          issue_date?: string
+          due_date?: string
+          currency?: string
+          subtotal?: number
+          tax_total?: number
+          total_amount?: number
+          metadata?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      invoice_items: {
+        Row: {
+          id: string
+          invoice_id: string | null
+          description: string
+          quantity: number
+          unit_price: number
+          tax_code_id: string | null
+          tax_amount: number
+          total_amount: number
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          invoice_id?: string | null
+          description: string
+          quantity: number
+          unit_price: number
+          tax_code_id?: string | null
+          tax_amount: number
+          total_amount: number
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          invoice_id?: string | null
+          description?: string
+          quantity?: number
+          unit_price?: number
+          tax_code_id?: string | null
+          tax_amount?: number
+          total_amount?: number
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_tax_code_id_fkey"
+            columns: ["tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "tax_codes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      gl_accounts: {
+        Row: {
+          id: string
+          tenant_id: string
+          code: string
+          name: string
+          type: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          code: string
+          name: string
+          type: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          code?: string
+          name?: string
+          type?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gl_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      journal_entries: {
+        Row: {
+          id: string
+          tenant_id: string
+          reference_id: string
+          reference_type: string
+          sync_status: string | null
+          external_id: string | null
+          error_message: string | null
+          retry_count: number | null
+          created_at: string | null
+          synced_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          reference_id: string
+          reference_type: string
+          sync_status?: string | null
+          external_id?: string | null
+          error_message?: string | null
+          retry_count?: number | null
+          created_at?: string | null
+          synced_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          reference_id?: string
+          reference_type?: string
+          sync_status?: string | null
+          external_id?: string | null
+          error_message?: string | null
+          retry_count?: number | null
+          created_at?: string | null
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      tenant_nexus: {
+        Row: {
+          id: string
+          tenant_id: string
+          jurisdiction_id: string
+          effective_from: string
+          effective_to: string | null
+          created_at: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          jurisdiction_id: string
+          effective_from: string
+          effective_to?: string | null
+          created_at?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          jurisdiction_id?: string
+          effective_from?: string
+          effective_to?: string | null
+          created_at?: string | null
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_nexus_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_nexus_jurisdiction_id_fkey"
+            columns: ["jurisdiction_id"]
+            isOneToOne: false
+            referencedRelation: "tax_jurisdictions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      platform_domains: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           account_number: string | null

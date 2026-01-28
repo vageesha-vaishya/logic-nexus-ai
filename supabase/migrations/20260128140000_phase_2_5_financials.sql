@@ -118,13 +118,13 @@ CREATE POLICY "Allow read access to tax rules" ON finance.tax_rules FOR SELECT U
 
 -- Invoices and GL Data are Tenant-Scoped
 CREATE POLICY "Tenant isolation for invoices" ON finance.invoices
-    USING (tenant_id = (SELECT tenant_id FROM public.users WHERE id = auth.uid()));
+    USING (tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid()));
 
 CREATE POLICY "Tenant isolation for invoice_items" ON finance.invoice_items
-    USING (invoice_id IN (SELECT id FROM finance.invoices WHERE tenant_id = (SELECT tenant_id FROM public.users WHERE id = auth.uid())));
+    USING (invoice_id IN (SELECT id FROM finance.invoices WHERE tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid())));
 
 CREATE POLICY "Tenant isolation for gl_accounts" ON finance.gl_accounts
-    USING (tenant_id = (SELECT tenant_id FROM public.users WHERE id = auth.uid()));
+    USING (tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid()));
 
 CREATE POLICY "Tenant isolation for journal_entries" ON finance.journal_entries
-    USING (tenant_id = (SELECT tenant_id FROM public.users WHERE id = auth.uid()));
+    USING (tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid()));

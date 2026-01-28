@@ -102,6 +102,14 @@ export function AppSidebar() {
     permissions: (i as any).permissions,
   }));
 
+  const financeItems = (APP_MENU.find((m) => m.label === 'Finance')?.items ?? []).map((i) => ({
+    title: i.name,
+    url: i.path,
+    icon: i.icon,
+    roles: (i as any).roles,
+    permissions: (i as any).permissions,
+  }));
+
   const adminItems = [
     { title: 'Lead Assignment', url: '/dashboard/lead-assignment', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.lead_assignment.manage'] },
     { title: 'Lead Routing', url: '/dashboard/lead-routing', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.lead_routing.manage'] },
@@ -186,6 +194,33 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>
+            {!collapsed && <span>Finance</span>}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {financeItems.map((item) => {
+                const node = (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} className={getNavClass}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+                return item.roles || item.permissions ? (
+                  <RoleGuard key={item.title} roles={(item.roles as any) || []} permissions={item.permissions as any}>
+                    {node}
+                  </RoleGuard>
+                ) : node;
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

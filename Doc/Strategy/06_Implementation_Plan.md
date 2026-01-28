@@ -79,10 +79,10 @@ Based on [04_Low_Level_Design.md](04_Low_Level_Design.md) and [08_Impact_Analysi
 ### Phase 2.5: Taxation & Financials (Weeks 8-14)
 *Goal: Financial Backbone [09_Phase2.5_Technical_Spec.md].*
 *Status: IN PROGRESS*
-*   **Task 2.5.1:** [PENDING] Implement `TaxJurisdiction`, `TaxRule`, and `TaxCode` tables.
-*   **Task 2.5.2:** [PENDING] Build Nexus Determination Logic (Origin vs. Destination).
-*   **Task 2.5.3:** [PENDING] Implement `TaxEngine.calculateTax()` with sub-200ms latency.
-*   **Task 2.5.4:** [PENDING] Build Invoice Finalization Workflow (Draft -> Posted).
+*   **Task 2.5.1:** [COMPLETED] Implement `TaxJurisdiction`, `TaxRule`, and `TaxCode` tables.
+*   **Task 2.5.2:** [IN PROGRESS] Build Nexus Determination Logic (Origin vs. Destination).
+*   **Task 2.5.3:** [IN PROGRESS] Implement `TaxEngine.calculateTax()` with sub-200ms latency.
+*   **Task 2.5.4:** [IN PROGRESS] Build Invoice Finalization Workflow (Draft -> Posted).
 *   **Task 2.5.5:** [PENDING] Implement Async GL Poster (RabbitMQ/PgQueues).
 *   **Task 2.5.6:** [PENDING] Create "Mock" ERP Connector for GL Sync.
 

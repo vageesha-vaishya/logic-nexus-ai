@@ -53,6 +53,12 @@ export const DomainService = {
    * Creates a new domain.
    */
   async createDomain(domain: Omit<PlatformDomain, 'id' | 'created_at' | 'updated_at'>): Promise<PlatformDomain> {
+    // Check for duplicate code
+    const existing = await this.getDomainByCode(domain.code);
+    if (existing) {
+      throw new Error(`Domain with code "${domain.code}" already exists.`);
+    }
+
     const { data, error } = await supabase
       .from('platform_domains')
       .insert(domain)
@@ -68,6 +74,14 @@ export const DomainService = {
    * Updates an existing domain.
    */
   async updateDomain(id: string, updates: Partial<PlatformDomain>): Promise<PlatformDomain> {
+    // Check for duplicate code if code is being updated
+    if (updates.code) {
+      const existing = await this.getDomainByCode(updates.code);
+      if (existing && existing.id !== id) {
+        throw new Error(`Domain with code "${updates.code}" already exists.`);
+      }
+    }
+
     const { data, error } = await supabase
       .from('platform_domains')
       .update(updates)

@@ -98,6 +98,12 @@ import ContainerTypes from "./pages/dashboard/ContainerTypes";
 import ContainerSizes from "./pages/dashboard/ContainerSizes";
 import ContainerAnalytics from "./pages/dashboard/ContainerAnalytics";
 import ContainerTracking from "./pages/dashboard/ContainerTracking";
+import PlatformDomains from "./pages/dashboard/PlatformDomains";
+import PlatformDomainDetail from "./pages/dashboard/PlatformDomainDetail";
+import Invoices from "./pages/dashboard/Invoices";
+import InvoiceDetail from "./pages/dashboard/InvoiceDetail";
+import TaxJurisdictions from "./pages/dashboard/TaxJurisdictions";
+import TaxJurisdictionDetail from "./pages/dashboard/TaxJurisdictionDetail";
 import RateManagement from "./pages/dashboard/RateManagement";
 import VesselTypes from "./pages/dashboard/VesselTypes";
 import VesselClasses from "./pages/dashboard/VesselClasses";
@@ -118,9 +124,6 @@ import QuotePortal from "./pages/portal/QuotePortal";
 import RolesPermissions from "./pages/dashboard/RolesPermissions";
 import TransferCenter from "./pages/dashboard/TransferCenter";
 import DocumentManager from "./pages/dashboard/DocumentManager";
-
-import PlatformDomains from "./pages/dashboard/PlatformDomains";
-import PlatformDomainDetail from "./pages/dashboard/PlatformDomainDetail";
 
 const queryClient = new QueryClient();
 
@@ -621,6 +624,10 @@ const App = () => (
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             <Route path="/dashboard/currencies" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Currencies /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/invoices" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Invoices /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/invoices/:id" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><InvoiceDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/tax-jurisdictions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TaxJurisdictions /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/tax-jurisdictions/:id" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TaxJurisdictionDetail /></ProtectedRoute>} />
             <Route path="/dashboard/container-types" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerTypes /></ProtectedRoute>} />
             <Route path="/dashboard/container-sizes" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerSizes /></ProtectedRoute>} />
             <Route path="/dashboard/container-tracking" element={<ProtectedRoute><ContainerTracking /></ProtectedRoute>} />
