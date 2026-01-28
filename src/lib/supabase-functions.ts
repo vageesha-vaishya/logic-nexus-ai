@@ -25,7 +25,7 @@ export async function invokeFunction<T = any>(
      // We filter out Authorization header to ensure we rely on the client's auth handling
      const { Authorization, authorization, ...customHeaders } = options.headers || {};
      
-     const { data, error } = await supabase.functions.invoke(functionName, {
+     let { data, error } = await supabase.functions.invoke(functionName, {
        body: options.body,
        headers: customHeaders,
        method: options.method || 'POST',

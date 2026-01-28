@@ -15,6 +15,12 @@ This document provides a systematic analysis of the gaps between the current "SO
 
 ## 3. Technological Stack Gaps
 
+### 3.1 Codebase & Schema Gaps (Impact Analysis Findings)
+A detailed analysis reveals specific high-impact coupling in the current system:
+*   **Schema Coupling:** `quote_items` contains `weight_kg`, `volume_cbm` (Logistics only).
+*   **UI Coupling:** `QuotesWidget.tsx` and `OpportunityForm.tsx` are hardcoded to render Logistics fields.
+*   **Migration Requirement:** These tables must be split into `Core` and `Extension` tables (e.g., `logistics_quote_extensions`) to support Banking/Telecom domains.
+
 | Component | Current State | Target State | Action Required |
 | :--- | :--- | :--- | :--- |
 | **Architecture** | Monolithic / Tightly Coupled. | Modular Monolith / Microservices Kernel. | Refactor Core Services into isolated modules. |

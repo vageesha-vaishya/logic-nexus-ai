@@ -46,3 +46,11 @@
     *   **Penetration Testing:** Attempt to bypass Tenant ID checks in API headers.
     *   **Dependency Scanning:** Check for vulnerabilities in third-party libraries (`npm audit`).
     *   **SQL Injection:** Verify that dynamic query building for domain fields is safe.
+
+## 7. Migration & Regression Testing (Legacy Support)
+*   **Objective:** Ensure the transformation to PaaS does not break the existing "Logistics Pro" application.
+*   **Scope:**
+    *   **Data Integrity:** Verify 100% row match between `quote_items` (table) and `quote_items_view` (view) during Phase 0.
+    *   **Legacy API Compatibility:** Run the existing "Logistics Pro" Postman collection against the new architecture to ensure 0% failure rate.
+    *   **UI Visual Regression:** Use Percy/Storybook to detect unintended layout shifts in the legacy React components due to refactoring.
+
