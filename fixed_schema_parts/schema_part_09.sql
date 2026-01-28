@@ -5,8 +5,7 @@ DO $$ BEGIN
     JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
     WHERE kcu.table_name = 'quotes' AND kcu.column_name = 'account_id' AND tc.constraint_type = 'FOREIGN KEY'
   ) THEN
-      ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_account_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_account_id_fkey FOREIGN KEY (account_id)
+      ALTER TABLE public.quotes ADD CONSTRAINT quotes_account_id_fkey FOREIGN KEY (account_id)
       REFERENCES public.accounts(id)
       ON DELETE SET NULL;
   END IF;
@@ -18,8 +17,7 @@ ALTER TABLE public.quotes ADD CONSTRAINT quotes_account_id_fkey FOREIGN KEY (acc
     JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
     WHERE kcu.table_name = 'quotes' AND kcu.column_name = 'franchise_id' AND tc.constraint_type = 'FOREIGN KEY'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_franchise_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_franchise_id_fkey FOREIGN KEY (franchise_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_franchise_id_fkey FOREIGN KEY (franchise_id)
     REFERENCES public.franchises(id)
     ON DELETE SET NULL;
   END IF;
@@ -37,8 +35,7 @@ ALTER TABLE public.quotes ADD CONSTRAINT quotes_franchise_id_fkey FOREIGN KEY (f
     JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
     WHERE kcu.table_name = 'quotes' AND kcu.column_name = 'service_type_id' AND tc.constraint_type = 'FOREIGN KEY'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_service_type_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_service_type_id_fkey FOREIGN KEY (service_type_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_service_type_id_fkey FOREIGN KEY (service_type_id)
     REFERENCES public.service_types(id)
     ON DELETE SET NULL;
   END IF;
@@ -49,8 +46,7 @@ ALTER TABLE public.quotes ADD CONSTRAINT quotes_service_type_id_fkey FOREIGN KEY
     JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
     WHERE kcu.table_name = 'quotes' AND kcu.column_name = 'opportunity_id' AND tc.constraint_type = 'FOREIGN KEY'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_opportunity_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_opportunity_id_fkey FOREIGN KEY (opportunity_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_opportunity_id_fkey FOREIGN KEY (opportunity_id)
     REFERENCES public.opportunities(id)
     ON DELETE SET NULL;
   END IF;

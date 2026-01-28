@@ -1,113 +1,115 @@
-# Detailed Requirement Document: Multi-Tenant Enterprise Platform
+# SOS-Nexus Requirements Analysis & Specifications
 
-## 1. Functional Requirements
+## 1. Project Overview & Scope
 
-### 1.1 Core Domain-Agnostic Interfaces
-The platform must expose generic interfaces for core business processes, decoupling the "what" (interface) from the "how" (implementation).
+### 1.1 Purpose
+This document defines the comprehensive requirements for the **SOS-Nexus** transformation, derived from the [Implementation Plan](06_Implementation_Plan.md). The primary objective is to evolve the existing single-tenant **SOS Logistics Pro** application into a multi-tenant, domain-agnostic Enterprise PaaS capable of serving Logistics, Banking, and Telecom verticals.
 
-*   **Quotation Engine Interface:**
-    *   `generateQuote(requestContext, lineItems): Quote`
-    *   `validateRules(quoteRequest): ValidationResult`
-    *   `calculatePricing(lineItems, pricingRules): PriceBreakdown`
-*   **Taxation Engine Interface:**
-    *   `calculateTax(transactionContext, lineItems): TaxBreakdown`
-    *   `validateTaxId(taxId, countryCode): ValidationResult`
-    *   `getTaxRates(region, category): RateSchedule`
-*   **Fulfillment Orchestrator Interface:**
-    *   `initiateFulfillment(orderId, context): FulfillmentPlan`
-    *   `trackStatus(fulfillmentId): StatusUpdate`
-    *   `handleException(errorContext): ResolutionPlan`
+### 1.2 Strategic Goals
+*   **Code Reuse:** Achieve >75% shared code across domains (Micro-kernel architecture).
+*   **Time-to-Market:** Enable new vertical launch in <6 weeks.
+*   **Stability:** Zero regression for existing Logistics tenants during transition.
 
-### 1.2 Domain-Specific Adapters/Plugins
-The system must support pluggable modules that implement the core interfaces for specific verticals.
+---
 
-*   **Logistics Adapter:**
-    *   Inputs: Weight, Dimensions, Origin, Destination.
-    *   Logic: Rate lookups, carrier selection, volumetric weight calculation.
-*   **Banking Adapter:**
-    *   Inputs: Loan Amount, Credit Score, Tenure, Collateral.
-    *   Logic: Interest rate calculation, credit risk assessment, regulatory compliance checks (KYC/AML).
-*   **Telecommunications Adapter:**
-    *   Inputs: Data Plan, Voice Minutes, Roaming, Device.
-    *   Logic: Bundle pricing, usage capping, activation workflows.
-*   **Airlines Adapter:**
-    *   Inputs: Passenger Details, Route, Class, Date.
-    *   Logic: Dynamic pricing (yield management), seat inventory check, baggage rules.
-*   **Supply Chain Adapter:**
-    *   Inputs: SKU, Quantity, Warehouse Location, Lead Time.
-    *   Logic: Inventory allocation, reorder point calculation, supplier selection.
+## 2. Functional Requirements
 
-### 1.3 Configuration Management
-*   **Feature Flags:** Enable/disable specific modules or UI components per tenant.
-*   **Rule Engine Configuration:** Upload/edit domain-specific business rules (e.g., in JSON/YAML or via a DSL) without code deployment.
-*   **Workflow Definition:** Configurable state machines for Fulfillment processes (e.g., `Order Placed -> Validated -> Shipped` vs. `Application Received -> Underwriting -> Approved`).
+### 2.1 Core Platform & Multi-Tenancy (Phase 1)
+*   **FR-CORE-001 (Tenant Identification):** The system MUST identify tenants via a unique `tenant_id` and classify them by `domain_type` (e.g., `LOGISTICS`, `BANKING`).
+*   **FR-CORE-002 (Request Routing):** The API Gateway MUST route requests to the appropriate Domain Plugin based on the authenticated user's `tenant_id`.
+*   **FR-CORE-003 (Data Isolation):** The system MUST enforce strict logical isolation using Row Level Security (RLS). Users from Tenant A must NEVER access data from Tenant B.
+    *   *Constraint:* RLS policies must utilize `auth.uid()` and join against the `tenants` table.
 
-### 1.4 Taxation & Compliance Module
-*   **Tax Calculation Engine:**
-    *   **FR-TAX-001 (Nexus Detection):** The system MUST automatically detect economic nexus based on configured thresholds (revenue/transaction count) per jurisdiction.
-    *   **FR-TAX-002 (Address Validation):** The system MUST validate and normalize addresses to "Rooftop Level" precision to ensure accurate tax jurisdiction assignment (especially for US Sales Tax).
-    *   **FR-TAX-003 (Product Mappings):** The system MUST allow mapping of internal SKUs to global tax codes (e.g., UN/SPSC, Taric) to determine taxability and special rates (e.g., reduced VAT for books/food).
-    *   **FR-TAX-004 (Tiered Calculation):** The system MUST support compound, additive, and non-additive tax stacking (e.g., Quebec QST on GST).
+### 2.2 Database Architecture (Phase 0)
+*   **FR-DB-001 (Schema Decoupling):** The `quote_items` table MUST be split into:
+    *   **Core Table:** `public.quote_items` (Common fields: ID, Amount, Description).
+    *   **Extension Table:** `logistics.quote_items_extension` (Domain fields: Weight, Volume, CargoType).
+*   **FR-DB-002 (Backward Compatibility):** The system MUST provide a `quote_items_view` that joins Core and Extension tables to present a unified schema identical to the legacy table.
+    *   *Constraint:* Existing application code MUST query this View, not the tables directly.
+*   **FR-DB-003 (Idempotency):** All database migration scripts MUST be idempotent (re-runnable without error).
+    *   *Constraint:* Scripts must use `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, or `DROP ... IF EXISTS` patterns.
 
-*   **Compliance & Reporting:**
-    *   **FR-TAX-005 (e-Invoicing):** The system MUST generate XML/JSON payloads compliant with regional standards (Peppol BIS 3.0, FatturaPA, ZUGFeRD) and submit them to government gateways.
-    *   **FR-TAX-006 (SAF-T):** The system MUST be able to export standard audit files (SAF-T) for OECD countries upon demand.
-    *   **FR-TAX-007 (Exemption Management):** The system MUST allow users to upload exemption certificates, validate their format, and track expiration dates, automatically suppressing tax where valid.
+### 2.3 Quotation Engine (Phase 2)
+*   **FR-QUOTE-001 (Interface Definition):** The system MUST define a generic `IQuotationEngine` interface supporting:
+    *   `calculateQuote(context: QuoteContext): QuoteResult`
+    *   `validateRequirements(context: QuoteContext): ValidationResult`
+*   **FR-QUOTE-002 (Plugin Strategy):** The system MUST implement the Strategy Pattern to inject the correct engine at runtime:
+    *   `LogisticsPlugin`: Calculates freight rates based on weight/volume.
+    *   `BankingPlugin`: Calculates interest rates based on credit score/principal.
 
-*   **Financial Integration:**
-    *   **FR-TAX-008 (GL Posting):** The system MUST post tax liability entries to the General Ledger with granular detail (Tax Type, Jurisdiction, Rate).
-    *   **FR-TAX-009 (Reconciliation):** The system MUST provide a reconciliation report highlighting differences between calculated tax, invoiced tax, and collected tax.
+### 2.4 Taxation & Financials (Phase 2.5)
+*   **FR-TAX-001 (Nexus Determination):** The system MUST automatically determine tax nexus based on:
+    *   **Origin Address:** Where the service/good originates.
+    *   **Destination Address:** Where the service/good is consumed.
+*   **FR-TAX-002 (Real-Time Calculation):** The Tax Engine MUST return calculated tax breakdowns within **200ms**.
+*   **FR-TAX-003 (Invoice Finalization):** The system MUST support a transactional workflow to convert "Draft" invoices to "Posted" (immutable) status.
+*   **FR-TAX-004 (GL Synchronization):** The system MUST asynchronously post finalized financial transactions to the General Ledger.
 
-*   **Governance:**
-    *   **FR-TAX-010 (Audit Trail):** The system MUST maintain an immutable, time-stamped log of every tax calculation request, input payload, applied rule version, and result for a minimum of 7 years.
-    *   **FR-TAX-011 (Effective Dating):** The system MUST support effective start and end dates for all tax rules and rates, allowing historical recalculation and future planning.
+### 2.5 User Interface (Phase 3)
+*   **FR-UI-001 (Dynamic Forms):** The frontend MUST render forms dynamically based on the tenant's configuration (JSON Schema).
+    *   *Example:* Render "Weight" field for Logistics, "Interest Rate" field for Banking.
 
-## 2. Non-Functional Requirements
+---
 
-### 2.1 Performance
-*   **Response Time:** Quotation generation must complete within **< 1 second** (95th percentile).
-*   **Concurrency:** Support **10,000 concurrent transactions** without degradation.
-*   **Throughput:** Handle 500+ requests per second (RPS) per node.
+## 3. Non-Functional Requirements (NFRs)
 
-### 2.2 Scalability
-*   **Horizontal Scaling:** Domain plugins must be stateless to allow independent scaling of high-load domains (e.g., Airlines during holidays).
-*   **Elasticity:** Auto-scaling infrastructure based on CPU/Memory/Queue depth.
+### 3.1 Performance
+*   **NFR-PERF-001:** Tax calculation API latency MUST be < 200ms (p95).
+*   **NFR-PERF-002:** The system MUST support 1,000 requests per second (RPS) for the Quotation Engine.
 
-### 2.3 Security, Compliance & Audit
-*   **Tenant Isolation:** Strict logical isolation of data via RLS.
-*   **Data Retention:** The system MUST retain all financial and tax records for a configurable period (default 7 years) in a WORM (Write Once Read Many) compliant format to satisfy GDPR and GoBD requirements.
-*   **Audit Trail:** The system MUST maintain a cryptographically verifiable audit log of all financial transactions, tax calculations, and rule changes, traceable to a specific user and timestamp.
-*   **Encryption:** Data at rest (AES-256) and in transit (TLS 1.3). PII and Financial data must be field-level encrypted.
+### 3.2 Security
+*   **NFR-SEC-001 (Domain Scoping):** RLS policies MUST prevent Cross-Domain access (e.g., a Banking tenant accessing Logistics extension tables).
+*   **NFR-SEC-002 (Least Privilege):** Database roles MUST be restricted; application users cannot execute DDL commands.
 
-### 2.4 Maintainability
-*   **Separation of Concerns:** Clear boundary between Core, Billing, Tax, and Plugins.
-*   **Observability:** Structured logging (JSON) with trace IDs.
-*   **Configurability:** All tax rules and rates MUST be configurable via UI without code deployment.
+### 3.3 Maintainability
+*   **NFR-MAINT-001 (Monorepo):** The codebase MUST be organized as a Monorepo (Nx/Turborepo) to share libraries between Core and Plugins.
+*   **NFR-MAINT-002 (Migration Safety):** All schema changes MUST be scriptable and verifiable via the `make_schema_idempotent.cjs` utility.
 
-## 3. User Stories & Acceptance Criteria
+### 3.4 Reliability
+*   **NFR-REL-001 (View Stability):** The `quote_items_view` MUST maintain the exact column signature of the legacy table to prevent frontend crashes.
 
-### 3.1 Platform Administrator
-*   **Story:** As a Platform Admin, I want to onboard a new tenant and assign a specific domain plugin (e.g., Banking) so that they access only relevant features.
-*   **Acceptance Criteria:**
-    *   Admin dashboard allows "Create Tenant".
-    *   Dropdown to select "Domain Vertical".
-    *   System provisions tenant-specific configuration and database schema/rows.
+---
 
-### 3.2 Domain Configurator
-*   **Story:** As a Domain Configurator, I want to upload a new pricing rule file for the "Telecom" domain so that the quotation engine reflects the latest tariffs.
-*   **Acceptance Criteria:**
-    *   API/UI to upload rule file (e.g., JSON).
-    *   Hot-reload or zero-downtime update of rules.
-    *   Validation prevents uploading malformed rules.
+## 4. Technical Constraints & Architecture
 
-### 3.3 End-User (Logistics)
-*   **Story:** As a Logistics User, I want to enter shipment dimensions and get a shipping quote so that I can book a carrier.
-*   **Acceptance Criteria:**
-    *   UI shows "Weight" and "Dimensions" fields.
-    *   Quote includes "Freight Cost" and "Fuel Surcharge".
+### 4.1 Technology Stack
+*   **Backend:** Node.js / TypeScript (Edge Functions).
+*   **Database:** PostgreSQL (Supabase) with RLS.
+*   **Frontend:** React (Vite) with Dynamic Form rendering.
+*   **Infrastructure:** Docker containers for local dev, Supabase Cloud for production.
 
-### 3.4 End-User (Banking)
-*   **Story:** As a Banking User, I want to enter loan details and generate an amortization schedule so that I can present it to the customer.
-*   **Acceptance Criteria:**
-    *   UI shows "Loan Amount" and "Interest Rate" fields.
-    *   Output includes monthly EMI breakdown.
+### 4.2 Architectural Patterns
+*   **Micro-kernel:** Core system provides minimal services (Auth, Routing); logic resides in Plugins.
+*   **Extension Tables:** Use 1:1 relationships for domain data extension to keep the core schema clean.
+*   **Async Processing:** Use Message Queues (pg-boss or similar) for GL posting and heavy calculations.
+
+---
+
+## 5. Acceptance Criteria
+
+### 5.1 Phase 0: Stabilization
+*   [ ] `quote_items_view` exists and returns data identical to the legacy table.
+*   [ ] All 9 migration scripts run successfully on a fresh database without errors.
+*   [ ] Existing Logistics UI creates quotes and invoices without any code changes.
+
+### 5.2 Phase 1: Foundation
+*   [ ] RLS prevents User A (Tenant X) from reading User B (Tenant Y) data.
+*   [ ] `tenants` table is populated with at least one `LOGISTICS` tenant.
+
+### 5.3 Phase 2: Core Engine
+*   [ ] `IQuotationEngine` interface is defined in TypeScript.
+*   [ ] Unit tests for `CoreQuoteService` pass with mocked plugins.
+
+### 5.4 Phase 2.5: Taxation
+*   [ ] Tax calculation returns correct rates for Cross-State (US) and Cross-Border (EU) scenarios.
+*   [ ] GL Entries are created within 5 seconds of Invoice Finalization.
+
+---
+
+## 6. Risk Register (Derived from Impact Analysis)
+
+| Risk | Impact | Mitigation Requirement |
+| :--- | :--- | :--- |
+| **Breaking Legacy UI** | Critical | **FR-DB-002:** Strict adherence to View-First strategy. |
+| **Tax Latency** | High | **FR-TAX-002:** Performance budget of 200ms; implementation of caching. |
+| **Data Leakage** | Critical | **FR-CORE-003:** Comprehensive RLS policy testing suite. |

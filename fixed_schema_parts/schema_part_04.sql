@@ -274,6 +274,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['prospect','customer','partner','vendor'] LOOP
       IF NOT EXISTS (
@@ -294,6 +300,12 @@ BEGIN
     WHERE t.typname = 'account_status' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.account_status AS ENUM ('active','inactive','pending');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -330,6 +342,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['new','contacted','qualified','proposal','negotiation','won','lost'] LOOP
       IF NOT EXISTS (
@@ -350,6 +368,12 @@ BEGIN
     WHERE t.typname = 'lead_source' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.lead_source AS ENUM ('website','referral','email','phone','social','event','other');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -386,6 +410,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['call','email','meeting','task','note'] LOOP
       IF NOT EXISTS (
@@ -414,6 +444,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['planned','in_progress','completed','cancelled'] LOOP
       IF NOT EXISTS (
@@ -434,6 +470,12 @@ BEGIN
     WHERE t.typname = 'priority_level' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.priority_level AS ENUM ('low','medium','high','urgent');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -1856,7 +1898,6 @@ $$ language plpgsql;-- Add parent_account_id column to accounts table
 ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS parent_account_id uuid;
 
 -- Add foreign key constraint (self-referencing)
-ALTER TABLE public.accounts DROP CONSTRAINT IF EXISTS fk_parent_account;
 ALTER TABLE public.accounts ADD CONSTRAINT fk_parent_account FOREIGN KEY (parent_account_id)
 REFERENCES public.accounts(id)
 ON DELETE SET NULL;
@@ -1880,6 +1921,12 @@ BEGIN
     WHERE t.typname = 'subscription_tier' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.subscription_tier AS ENUM ('free','basic','starter','business','professional','enterprise');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -1916,6 +1963,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['monthly','annual'] LOOP
       IF NOT EXISTS (
@@ -1944,6 +1997,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['active','trial','past_due','canceled','expired'] LOOP
       IF NOT EXISTS (
@@ -1964,6 +2023,12 @@ BEGIN
     WHERE t.typname = 'plan_type' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.plan_type AS ENUM ('crm_base','service_addon','bundle');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -2337,6 +2402,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['draft','confirmed','in_transit','customs','out_for_delivery','delivered','cancelled','on_hold','returned'] LOOP
       IF NOT EXISTS (
@@ -2357,6 +2428,12 @@ BEGIN
     WHERE t.typname = 'shipment_type' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.shipment_type AS ENUM ('ocean_freight','air_freight','inland_trucking','railway_transport','courier','movers_packers');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -2393,6 +2470,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['20ft_standard','40ft_standard','40ft_high_cube','45ft_high_cube','reefer','open_top','flat_rack','tank'] LOOP
       IF NOT EXISTS (
@@ -2421,6 +2504,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['available','in_use','maintenance','out_of_service'] LOOP
       IF NOT EXISTS (
@@ -2441,6 +2530,12 @@ BEGIN
     WHERE t.typname = 'tracking_event_type' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.tracking_event_type AS ENUM ('created','confirmed','picked_up','in_transit','customs_clearance','customs_released','arrived_at_hub','out_for_delivery','delivered','delayed','exception','returned');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -3281,6 +3376,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['ocean','air','inland_trucking','courier','movers_packers'] LOOP
       IF NOT EXISTS (
@@ -3301,6 +3402,12 @@ BEGIN
     WHERE t.typname = 'contract_type' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.contract_type AS ENUM ('spot','contracted');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -3337,6 +3444,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['draft','sent','accepted','expired','cancelled'] LOOP
       IF NOT EXISTS (
@@ -3365,6 +3478,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['pass','warn','fail'] LOOP
       IF NOT EXISTS (
@@ -3385,6 +3504,12 @@ BEGIN
     WHERE t.typname = 'document_type' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.document_type AS ENUM ('commercial_invoice','bill_of_lading','air_waybill','packing_list','customs_form','quote_pdf');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -3599,8 +3724,7 @@ BEGIN
     WHERE conrelid = 'public.quotes'::regclass
       AND conname = 'quotes_opportunity_id_fkey'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_opportunity_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_opportunity_id_fkey FOREIGN KEY (opportunity_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_opportunity_id_fkey FOREIGN KEY (opportunity_id)
       REFERENCES public.opportunities(id)
       ON DELETE SET NULL;
   END IF;
@@ -3623,8 +3747,7 @@ BEGIN
     WHERE conrelid = 'public.opportunities'::regclass
       AND conname = 'opportunities_primary_quote_id_fkey'
   ) THEN
-    ALTER TABLE public.opportunities DROP CONSTRAINT IF EXISTS opportunities_primary_quote_id_fkey;
-ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_primary_quote_id_fkey FOREIGN KEY (primary_quote_id)
+    ALTER TABLE public.opportunities ADD CONSTRAINT opportunities_primary_quote_id_fkey FOREIGN KEY (primary_quote_id)
       REFERENCES public.quotes(id)
       ON DELETE SET NULL;
   END IF;
@@ -5046,6 +5169,12 @@ BEGIN
     WHERE t.typname = 'shipment_type' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.shipment_type AS ENUM ('ocean_freight','air_freight','inland_trucking','railway_transport','courier','movers_packers');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;

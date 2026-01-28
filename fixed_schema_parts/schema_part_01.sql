@@ -335,6 +335,8 @@ EXCEPTION
 END $$;
 
 DROP FUNCTION IF EXISTS "public"."_current_reset_bucket"("p_policy" "text");
+DROP FUNCTION IF EXISTS "public"."_current_reset_bucket"("p_policy" "text");
+DROP FUNCTION IF EXISTS "public"."_current_reset_bucket"("p_policy" "text");
 CREATE OR REPLACE FUNCTION "public"."_current_reset_bucket"("p_policy" "text") RETURNS "text"
     LANGUAGE "plpgsql"
     AS $$
@@ -354,6 +356,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."accept_quote_by_token"("p_token" "text", "p_decision" "text", "p_name" "text", "p_email" "text", "p_ip" "text", "p_user_agent" "text");
+DROP FUNCTION IF EXISTS "public"."accept_quote_by_token"("p_token" "text", "p_decision" "text", "p_name" "text", "p_email" "text", "p_ip" "text", "p_user_agent" "text");
 DROP FUNCTION IF EXISTS "public"."accept_quote_by_token"("p_token" "text", "p_decision" "text", "p_name" "text", "p_email" "text", "p_ip" "text", "p_user_agent" "text");
 CREATE OR REPLACE FUNCTION "public"."accept_quote_by_token"("p_token" "text", "p_decision" "text", "p_name" "text", "p_email" "text", "p_ip" "text", "p_user_agent" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -410,6 +414,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."assign_franchisee_account_contact"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_account_data" "jsonb", "p_contact_data" "jsonb");
+DROP FUNCTION IF EXISTS "public"."assign_franchisee_account_contact"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_account_data" "jsonb", "p_contact_data" "jsonb");
 DROP FUNCTION IF EXISTS "public"."assign_franchisee_account_contact"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_account_data" "jsonb", "p_contact_data" "jsonb");
 CREATE OR REPLACE FUNCTION "public"."assign_franchisee_account_contact"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_account_data" "jsonb", "p_contact_data" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -566,6 +572,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."assign_lead_with_transaction"("p_lead_id" "uuid", "p_assigned_to" "uuid", "p_assignment_method" "text", "p_rule_id" "uuid", "p_tenant_id" "uuid", "p_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."assign_lead_with_transaction"("p_lead_id" "uuid", "p_assigned_to" "uuid", "p_assignment_method" "text", "p_rule_id" "uuid", "p_tenant_id" "uuid", "p_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."assign_lead_with_transaction"("p_lead_id" "uuid", "p_assigned_to" "uuid", "p_assignment_method" "text", "p_rule_id" "uuid", "p_tenant_id" "uuid", "p_franchise_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."assign_lead_with_transaction"("p_lead_id" "uuid", "p_assigned_to" "uuid", "p_assignment_method" "text", "p_rule_id" "uuid", "p_tenant_id" "uuid", "p_franchise_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     AS $$
@@ -616,6 +624,8 @@ end;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."auto_assign_version_number"();
+DROP FUNCTION IF EXISTS "public"."auto_assign_version_number"();
+DROP FUNCTION IF EXISTS "public"."auto_assign_version_number"();
 CREATE OR REPLACE FUNCTION "public"."auto_assign_version_number"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -628,6 +638,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."auto_generate_quote_number"();
+DROP FUNCTION IF EXISTS "public"."auto_generate_quote_number"();
 DROP FUNCTION IF EXISTS "public"."auto_generate_quote_number"();
 CREATE OR REPLACE FUNCTION "public"."auto_generate_quote_number"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -643,6 +655,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."calculate_dimensional_weight"("p_length_cm" numeric, "p_width_cm" numeric, "p_height_cm" numeric, "p_divisor" numeric);
+DROP FUNCTION IF EXISTS "public"."calculate_dimensional_weight"("p_length_cm" numeric, "p_width_cm" numeric, "p_height_cm" numeric, "p_divisor" numeric);
+DROP FUNCTION IF EXISTS "public"."calculate_dimensional_weight"("p_length_cm" numeric, "p_width_cm" numeric, "p_height_cm" numeric, "p_divisor" numeric);
 CREATE OR REPLACE FUNCTION "public"."calculate_dimensional_weight"("p_length_cm" numeric, "p_width_cm" numeric, "p_height_cm" numeric, "p_divisor" numeric DEFAULT 6000) RETURNS numeric
     LANGUAGE "sql" IMMUTABLE PARALLEL SAFE
     SET "search_path" TO 'public'
@@ -654,6 +668,8 @@ CREATE OR REPLACE FUNCTION "public"."calculate_dimensional_weight"("p_length_cm"
   END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."calculate_lead_score"("lead_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."calculate_lead_score"("lead_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."calculate_lead_score"("lead_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."calculate_lead_score"("lead_id" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -711,6 +727,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."calculate_next_version_number"("p_quote_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."calculate_next_version_number"("p_quote_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."calculate_next_version_number"("p_quote_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."calculate_next_version_number"("p_quote_id" "uuid") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -726,6 +744,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."calculate_option_margins"("p_option_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."calculate_option_margins"("p_option_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."calculate_option_margins"("p_option_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."calculate_option_margins"("p_option_id" "uuid") RETURNS TABLE("total_buy" numeric, "total_sell" numeric, "margin_amount" numeric, "margin_percentage" numeric, "charge_count" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -766,6 +786,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."calculate_option_totals"("p_option_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."calculate_option_totals"("p_option_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."calculate_option_totals"("p_option_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."calculate_option_totals"("p_option_id" "uuid") RETURNS TABLE("leg_count" integer, "charge_count" integer, "total_buy" numeric, "total_sell" numeric)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -786,6 +808,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."check_usage_limit"("_tenant_id" "uuid", "_feature_key" "text");
+DROP FUNCTION IF EXISTS "public"."check_usage_limit"("_tenant_id" "uuid", "_feature_key" "text");
 DROP FUNCTION IF EXISTS "public"."check_usage_limit"("_tenant_id" "uuid", "_feature_key" "text");
 CREATE OR REPLACE FUNCTION "public"."check_usage_limit"("_tenant_id" "uuid", "_feature_key" "text") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -822,6 +846,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."cleanup_old_logs"("days_to_keep" integer);
+DROP FUNCTION IF EXISTS "public"."cleanup_old_logs"("days_to_keep" integer);
+DROP FUNCTION IF EXISTS "public"."cleanup_old_logs"("days_to_keep" integer);
 CREATE OR REPLACE FUNCTION "public"."cleanup_old_logs"("days_to_keep" integer DEFAULT 90) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -836,6 +862,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."compare_versions"("p_version_id_1" "uuid", "p_version_id_2" "uuid");
+DROP FUNCTION IF EXISTS "public"."compare_versions"("p_version_id_1" "uuid", "p_version_id_2" "uuid");
 DROP FUNCTION IF EXISTS "public"."compare_versions"("p_version_id_1" "uuid", "p_version_id_2" "uuid");
 CREATE OR REPLACE FUNCTION "public"."compare_versions"("p_version_id_1" "uuid", "p_version_id_2" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -864,6 +892,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."create_quote_share"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_expires_in_days" integer);
+DROP FUNCTION IF EXISTS "public"."create_quote_share"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_expires_in_days" integer);
+DROP FUNCTION IF EXISTS "public"."create_quote_share"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_expires_in_days" integer);
 CREATE OR REPLACE FUNCTION "public"."create_quote_share"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_expires_in_days" integer DEFAULT 30) RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -877,6 +907,8 @@ BEGIN
 END; $$;
 
 DROP FUNCTION IF EXISTS "public"."decrement_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."decrement_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."decrement_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."decrement_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -888,6 +920,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."ensure_single_primary_quote"();
+DROP FUNCTION IF EXISTS "public"."ensure_single_primary_quote"();
 DROP FUNCTION IF EXISTS "public"."ensure_single_primary_quote"();
 CREATE OR REPLACE FUNCTION "public"."ensure_single_primary_quote"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -905,6 +939,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."evaluate_provider_rate_rules"("p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_quote_data" "jsonb");
+DROP FUNCTION IF EXISTS "public"."evaluate_provider_rate_rules"("p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_quote_data" "jsonb");
 DROP FUNCTION IF EXISTS "public"."evaluate_provider_rate_rules"("p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_quote_data" "jsonb");
 CREATE OR REPLACE FUNCTION "public"."evaluate_provider_rate_rules"("p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_quote_data" "jsonb") RETURNS TABLE("rule_id" "uuid", "rule_name" "text", "rule_type" "text", "actions" "jsonb", "validation_message" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -928,6 +964,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."execute_sql_query"("query_text" "text");
+DROP FUNCTION IF EXISTS "public"."execute_sql_query"("query_text" "text");
 DROP FUNCTION IF EXISTS "public"."execute_sql_query"("query_text" "text");
 CREATE OR REPLACE FUNCTION "public"."execute_sql_query"("query_text" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -953,6 +991,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."execute_transfer"("p_transfer_id" "uuid", "p_approver_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."execute_transfer"("p_transfer_id" "uuid", "p_approver_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."execute_transfer"("p_transfer_id" "uuid", "p_approver_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."execute_transfer"("p_transfer_id" "uuid", "p_approver_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1081,6 +1121,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."generate_next_option_name"("p_version_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."generate_next_option_name"("p_version_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."generate_next_option_name"("p_version_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."generate_next_option_name"("p_version_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1101,6 +1143,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."generate_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."generate_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."generate_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."generate_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid" DEFAULT NULL::"uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1158,11 +1202,15 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."generate_share_token"();
+DROP FUNCTION IF EXISTS "public"."generate_share_token"();
+DROP FUNCTION IF EXISTS "public"."generate_share_token"();
 CREATE OR REPLACE FUNCTION "public"."generate_share_token"() RETURNS "text"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public'
     AS $$ BEGIN RETURN encode(gen_random_bytes(32), 'base64'); END; $$;
 
+DROP FUNCTION IF EXISTS "public"."get_applicable_provider_surcharges"("p_carrier_id" "uuid", "p_service_type" "text", "p_weight_kg" numeric, "p_country_code" "text", "p_is_hazmat" boolean, "p_is_temperature_controlled" boolean);
+DROP FUNCTION IF EXISTS "public"."get_applicable_provider_surcharges"("p_carrier_id" "uuid", "p_service_type" "text", "p_weight_kg" numeric, "p_country_code" "text", "p_is_hazmat" boolean, "p_is_temperature_controlled" boolean);
 DROP FUNCTION IF EXISTS "public"."get_applicable_provider_surcharges"("p_carrier_id" "uuid", "p_service_type" "text", "p_weight_kg" numeric, "p_country_code" "text", "p_is_hazmat" boolean, "p_is_temperature_controlled" boolean);
 CREATE OR REPLACE FUNCTION "public"."get_applicable_provider_surcharges"("p_carrier_id" "uuid", "p_service_type" "text", "p_weight_kg" numeric, "p_country_code" "text" DEFAULT NULL::"text", "p_is_hazmat" boolean DEFAULT false, "p_is_temperature_controlled" boolean DEFAULT false) RETURNS TABLE("surcharge_id" "uuid", "surcharge_code" "text", "surcharge_name" "text", "calculation_type" "text", "rate" numeric, "currency_code" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1209,6 +1257,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_chargeable_weight"("p_actual_weight_kg" numeric, "p_volumetric_weight_kg" numeric);
+DROP FUNCTION IF EXISTS "public"."get_chargeable_weight"("p_actual_weight_kg" numeric, "p_volumetric_weight_kg" numeric);
+DROP FUNCTION IF EXISTS "public"."get_chargeable_weight"("p_actual_weight_kg" numeric, "p_volumetric_weight_kg" numeric);
 CREATE OR REPLACE FUNCTION "public"."get_chargeable_weight"("p_actual_weight_kg" numeric, "p_volumetric_weight_kg" numeric) RETURNS numeric
     LANGUAGE "sql" IMMUTABLE PARALLEL SAFE
     SET "search_path" TO 'public'
@@ -1219,6 +1269,8 @@ CREATE OR REPLACE FUNCTION "public"."get_chargeable_weight"("p_actual_weight_kg"
   );
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_database_enums"();
+DROP FUNCTION IF EXISTS "public"."get_database_enums"();
 DROP FUNCTION IF EXISTS "public"."get_database_enums"();
 CREATE OR REPLACE FUNCTION "public"."get_database_enums"() RETURNS TABLE("enum_type" "text", "labels" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1235,6 +1287,8 @@ CREATE OR REPLACE FUNCTION "public"."get_database_enums"() RETURNS TABLE("enum_t
   ORDER BY t.typname;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_database_functions"();
+DROP FUNCTION IF EXISTS "public"."get_database_functions"();
 DROP FUNCTION IF EXISTS "public"."get_database_functions"();
 CREATE OR REPLACE FUNCTION "public"."get_database_functions"() RETURNS TABLE("name" "text", "schema" "text", "kind" "text", "return_type" "text", "argument_types" "text", "language" "text", "volatility" "text", "security_definer" boolean, "description" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1268,6 +1322,8 @@ CREATE OR REPLACE FUNCTION "public"."get_database_functions"() RETURNS TABLE("na
   ORDER BY n.nspname, p.proname;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_database_functions_with_body"();
+DROP FUNCTION IF EXISTS "public"."get_database_functions_with_body"();
 DROP FUNCTION IF EXISTS "public"."get_database_functions_with_body"();
 CREATE OR REPLACE FUNCTION "public"."get_database_functions_with_body"() RETURNS TABLE("name" "text", "schema" "text", "kind" "text", "return_type" "text", "argument_types" "text", "language" "text", "volatility" "text", "security_definer" boolean, "description" "text", "function_definition" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1303,6 +1359,8 @@ CREATE OR REPLACE FUNCTION "public"."get_database_functions_with_body"() RETURNS
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_database_schema"();
+DROP FUNCTION IF EXISTS "public"."get_database_schema"();
+DROP FUNCTION IF EXISTS "public"."get_database_schema"();
 CREATE OR REPLACE FUNCTION "public"."get_database_schema"() RETURNS TABLE("table_name" "text", "column_name" "text", "data_type" "text", "is_nullable" boolean, "column_default" "text", "is_primary_key" boolean, "is_foreign_key" boolean, "references_table" "text", "references_column" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1337,6 +1395,8 @@ CREATE OR REPLACE FUNCTION "public"."get_database_schema"() RETURNS TABLE("table
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_database_tables"();
+DROP FUNCTION IF EXISTS "public"."get_database_tables"();
+DROP FUNCTION IF EXISTS "public"."get_database_tables"();
 CREATE OR REPLACE FUNCTION "public"."get_database_tables"() RETURNS TABLE("table_name" "text", "table_type" "text", "rls_enabled" boolean, "policy_count" bigint, "column_count" bigint, "index_count" bigint, "row_estimate" bigint)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1361,6 +1421,8 @@ CREATE OR REPLACE FUNCTION "public"."get_database_tables"() RETURNS TABLE("table
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_franchise_user_ids"("_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_franchise_user_ids"("_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_franchise_user_ids"("_franchise_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."get_franchise_user_ids"("_franchise_id" "uuid") RETURNS TABLE("user_id" "uuid")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1370,6 +1432,8 @@ CREATE OR REPLACE FUNCTION "public"."get_franchise_user_ids"("_franchise_id" "uu
   WHERE ur.franchise_id = _franchise_id;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_platform_admins"();
+DROP FUNCTION IF EXISTS "public"."get_platform_admins"();
 DROP FUNCTION IF EXISTS "public"."get_platform_admins"();
 CREATE OR REPLACE FUNCTION "public"."get_platform_admins"() RETURNS TABLE("user_id" "uuid", "email" "text", "first_name" "text", "last_name" "text", "is_active" boolean, "assigned_at" timestamp with time zone)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1389,6 +1453,8 @@ CREATE OR REPLACE FUNCTION "public"."get_platform_admins"() RETURNS TABLE("user_
   ORDER BY ur.assigned_at DESC;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_quote_by_token"("p_token" "text");
+DROP FUNCTION IF EXISTS "public"."get_quote_by_token"("p_token" "text");
 DROP FUNCTION IF EXISTS "public"."get_quote_by_token"("p_token" "text");
 CREATE OR REPLACE FUNCTION "public"."get_quote_by_token"("p_token" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1438,6 +1504,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_rls_policies"();
+DROP FUNCTION IF EXISTS "public"."get_rls_policies"();
+DROP FUNCTION IF EXISTS "public"."get_rls_policies"();
 CREATE OR REPLACE FUNCTION "public"."get_rls_policies"() RETURNS TABLE("table_name" "text", "policy_name" "text", "command" "text", "roles" "text", "using_expression" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1453,6 +1521,8 @@ CREATE OR REPLACE FUNCTION "public"."get_rls_policies"() RETURNS TABLE("table_na
   ORDER BY tablename, policyname;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_rls_status"();
+DROP FUNCTION IF EXISTS "public"."get_rls_status"();
 DROP FUNCTION IF EXISTS "public"."get_rls_status"();
 CREATE OR REPLACE FUNCTION "public"."get_rls_status"() RETURNS TABLE("table_name" "text", "rls_enabled" boolean, "policy_count" bigint)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1470,6 +1540,8 @@ CREATE OR REPLACE FUNCTION "public"."get_rls_status"() RETURNS TABLE("table_name
   ORDER BY c.relname;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_sales_manager_team_user_ids"("_manager_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_sales_manager_team_user_ids"("_manager_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."get_sales_manager_team_user_ids"("_manager_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."get_sales_manager_team_user_ids"("_manager_id" "uuid") RETURNS TABLE("user_id" "uuid")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1489,6 +1561,8 @@ CREATE OR REPLACE FUNCTION "public"."get_sales_manager_team_user_ids"("_manager_
   SELECT _manager_id;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_table_constraints"();
+DROP FUNCTION IF EXISTS "public"."get_table_constraints"();
 DROP FUNCTION IF EXISTS "public"."get_table_constraints"();
 CREATE OR REPLACE FUNCTION "public"."get_table_constraints"() RETURNS TABLE("table_name" "text", "constraint_name" "text", "constraint_type" "text", "constraint_details" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1516,6 +1590,8 @@ CREATE OR REPLACE FUNCTION "public"."get_table_constraints"() RETURNS TABLE("tab
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_table_indexes"();
+DROP FUNCTION IF EXISTS "public"."get_table_indexes"();
+DROP FUNCTION IF EXISTS "public"."get_table_indexes"();
 CREATE OR REPLACE FUNCTION "public"."get_table_indexes"() RETURNS TABLE("table_name" "text", "index_name" "text", "is_unique" boolean, "index_columns" "text", "index_definition" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1538,6 +1614,8 @@ CREATE OR REPLACE FUNCTION "public"."get_table_indexes"() RETURNS TABLE("table_n
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_tenant_plan_tier"("_tenant_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_tenant_plan_tier"("_tenant_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_tenant_plan_tier"("_tenant_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."get_tenant_plan_tier"("_tenant_id" "uuid") RETURNS "public"."subscription_tier"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1552,6 +1630,8 @@ CREATE OR REPLACE FUNCTION "public"."get_tenant_plan_tier"("_tenant_id" "uuid") 
   LIMIT 1;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_tier_rate"("p_tier_config_id" "uuid", "p_value" numeric);
+DROP FUNCTION IF EXISTS "public"."get_tier_rate"("p_tier_config_id" "uuid", "p_value" numeric);
 DROP FUNCTION IF EXISTS "public"."get_tier_rate"("p_tier_config_id" "uuid", "p_value" numeric);
 CREATE OR REPLACE FUNCTION "public"."get_tier_rate"("p_tier_config_id" "uuid", "p_value" numeric) RETURNS TABLE("range_id" "uuid", "rate" numeric, "currency_id" "uuid", "min_value" numeric, "max_value" numeric)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1572,6 +1652,8 @@ CREATE OR REPLACE FUNCTION "public"."get_tier_rate"("p_tier_config_id" "uuid", "
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_user_custom_permissions"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_user_custom_permissions"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_user_custom_permissions"("check_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."get_user_custom_permissions"("check_user_id" "uuid") RETURNS TABLE("permission_key" "text", "access_type" "text")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1586,6 +1668,8 @@ CREATE OR REPLACE FUNCTION "public"."get_user_custom_permissions"("check_user_id
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_user_franchise_id"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_user_franchise_id"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_user_franchise_id"("check_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."get_user_franchise_id"("check_user_id" "uuid") RETURNS "uuid"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1597,6 +1681,8 @@ CREATE OR REPLACE FUNCTION "public"."get_user_franchise_id"("check_user_id" "uui
 $$;
 
 DROP FUNCTION IF EXISTS "public"."get_user_tenant_id"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_user_tenant_id"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."get_user_tenant_id"("check_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."get_user_tenant_id"("check_user_id" "uuid") RETURNS "uuid"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1607,6 +1693,8 @@ CREATE OR REPLACE FUNCTION "public"."get_user_tenant_id"("check_user_id" "uuid")
   LIMIT 1;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."get_weight_break_rate"("p_tenant_id" "uuid", "p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_weight_kg" numeric, "p_effective_date" "date");
+DROP FUNCTION IF EXISTS "public"."get_weight_break_rate"("p_tenant_id" "uuid", "p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_weight_kg" numeric, "p_effective_date" "date");
 DROP FUNCTION IF EXISTS "public"."get_weight_break_rate"("p_tenant_id" "uuid", "p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_weight_kg" numeric, "p_effective_date" "date");
 CREATE OR REPLACE FUNCTION "public"."get_weight_break_rate"("p_tenant_id" "uuid", "p_carrier_id" "uuid", "p_service_type_id" "uuid", "p_weight_kg" numeric, "p_effective_date" "date" DEFAULT CURRENT_DATE) RETURNS TABLE("id" "uuid", "rate_per_kg" numeric, "currency_id" "uuid", "min_weight_kg" numeric, "max_weight_kg" numeric)
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1635,6 +1723,8 @@ CREATE OR REPLACE FUNCTION "public"."get_weight_break_rate"("p_tenant_id" "uuid"
 $$;
 
 DROP FUNCTION IF EXISTS "public"."handle_new_user"();
+DROP FUNCTION IF EXISTS "public"."handle_new_user"();
+DROP FUNCTION IF EXISTS "public"."handle_new_user"();
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1652,6 +1742,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."has_role"("check_user_id" "uuid", "check_role" "public"."app_role");
+DROP FUNCTION IF EXISTS "public"."has_role"("check_user_id" "uuid", "check_role" "public"."app_role");
+DROP FUNCTION IF EXISTS "public"."has_role"("check_user_id" "uuid", "check_role" "public"."app_role");
 CREATE OR REPLACE FUNCTION "public"."has_role"("check_user_id" "uuid", "check_role" "public"."app_role") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1663,6 +1755,8 @@ CREATE OR REPLACE FUNCTION "public"."has_role"("check_user_id" "uuid", "check_ro
   );
 $$;
 
+DROP FUNCTION IF EXISTS "public"."increment_feature_usage"("_tenant_id" "uuid", "_feature_key" "text", "_increment" integer);
+DROP FUNCTION IF EXISTS "public"."increment_feature_usage"("_tenant_id" "uuid", "_feature_key" "text", "_increment" integer);
 DROP FUNCTION IF EXISTS "public"."increment_feature_usage"("_tenant_id" "uuid", "_feature_key" "text", "_increment" integer);
 CREATE OR REPLACE FUNCTION "public"."increment_feature_usage"("_tenant_id" "uuid", "_feature_key" "text", "_increment" integer DEFAULT 1) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1691,6 +1785,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."increment_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."increment_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."increment_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."increment_user_lead_count"("p_user_id" "uuid", "p_tenant_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1707,6 +1803,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."is_current_user_platform_admin"();
+DROP FUNCTION IF EXISTS "public"."is_current_user_platform_admin"();
+DROP FUNCTION IF EXISTS "public"."is_current_user_platform_admin"();
 CREATE OR REPLACE FUNCTION "public"."is_current_user_platform_admin"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1714,6 +1812,8 @@ CREATE OR REPLACE FUNCTION "public"."is_current_user_platform_admin"() RETURNS b
   SELECT public.is_platform_admin(auth.uid());
 $$;
 
+DROP FUNCTION IF EXISTS "public"."is_franchise_admin"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_franchise_admin"("_user_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."is_franchise_admin"("_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."is_franchise_admin"("_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1727,6 +1827,8 @@ CREATE OR REPLACE FUNCTION "public"."is_franchise_admin"("_user_id" "uuid") RETU
 $$;
 
 DROP FUNCTION IF EXISTS "public"."is_platform_admin"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_platform_admin"("check_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_platform_admin"("check_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."is_platform_admin"("check_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1734,6 +1836,8 @@ CREATE OR REPLACE FUNCTION "public"."is_platform_admin"("check_user_id" "uuid") 
   SELECT public.has_role(check_user_id, 'platform_admin'::public.app_role);
 $$;
 
+DROP FUNCTION IF EXISTS "public"."is_sales_manager"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_sales_manager"("_user_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."is_sales_manager"("_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."is_sales_manager"("_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1747,6 +1851,8 @@ CREATE OR REPLACE FUNCTION "public"."is_sales_manager"("_user_id" "uuid") RETURN
 $$;
 
 DROP FUNCTION IF EXISTS "public"."is_super_admin"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_super_admin"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_super_admin"("_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."is_super_admin"("_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1758,6 +1864,8 @@ CREATE OR REPLACE FUNCTION "public"."is_super_admin"("_user_id" "uuid") RETURNS 
   );
 $$;
 
+DROP FUNCTION IF EXISTS "public"."is_tenant_admin"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_tenant_admin"("_user_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."is_tenant_admin"("_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."is_tenant_admin"("_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
@@ -1771,6 +1879,8 @@ CREATE OR REPLACE FUNCTION "public"."is_tenant_admin"("_user_id" "uuid") RETURNS
 $$;
 
 DROP FUNCTION IF EXISTS "public"."is_viewer"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_viewer"("_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."is_viewer"("_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."is_viewer"("_user_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -1782,6 +1892,8 @@ CREATE OR REPLACE FUNCTION "public"."is_viewer"("_user_id" "uuid") RETURNS boole
   );
 $$;
 
+DROP FUNCTION IF EXISTS "public"."log_email_audit"();
+DROP FUNCTION IF EXISTS "public"."log_email_audit"();
 DROP FUNCTION IF EXISTS "public"."log_email_audit"();
 CREATE OR REPLACE FUNCTION "public"."log_email_audit"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1816,6 +1928,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."log_opportunity_probability_changes"();
+DROP FUNCTION IF EXISTS "public"."log_opportunity_probability_changes"();
+DROP FUNCTION IF EXISTS "public"."log_opportunity_probability_changes"();
 CREATE OR REPLACE FUNCTION "public"."log_opportunity_probability_changes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -1842,6 +1956,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."log_option_changes"();
+DROP FUNCTION IF EXISTS "public"."log_option_changes"();
 DROP FUNCTION IF EXISTS "public"."log_option_changes"();
 CREATE OR REPLACE FUNCTION "public"."log_option_changes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1888,6 +2004,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."log_version_changes"();
+DROP FUNCTION IF EXISTS "public"."log_version_changes"();
 DROP FUNCTION IF EXISTS "public"."log_version_changes"();
 CREATE OR REPLACE FUNCTION "public"."log_version_changes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1943,6 +2061,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."populate_option_from_rate"();
+DROP FUNCTION IF EXISTS "public"."populate_option_from_rate"();
+DROP FUNCTION IF EXISTS "public"."populate_option_from_rate"();
 CREATE OR REPLACE FUNCTION "public"."populate_option_from_rate"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -1958,6 +2078,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."preview_next_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."preview_next_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."preview_next_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."preview_next_quote_number"("p_tenant_id" "uuid", "p_franchise_id" "uuid" DEFAULT NULL::"uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2002,6 +2124,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."recalc_carrier_rate_on_rate_update"();
+DROP FUNCTION IF EXISTS "public"."recalc_carrier_rate_on_rate_update"();
+DROP FUNCTION IF EXISTS "public"."recalc_carrier_rate_on_rate_update"();
 CREATE OR REPLACE FUNCTION "public"."recalc_carrier_rate_on_rate_update"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -2019,6 +2143,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."recalc_carrier_rate_total_trigger"();
+DROP FUNCTION IF EXISTS "public"."recalc_carrier_rate_total_trigger"();
 DROP FUNCTION IF EXISTS "public"."recalc_carrier_rate_total_trigger"();
 CREATE OR REPLACE FUNCTION "public"."recalc_carrier_rate_total_trigger"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -2043,6 +2169,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."recalculate_and_sync_quote_trigger"();
+DROP FUNCTION IF EXISTS "public"."recalculate_and_sync_quote_trigger"();
 DROP FUNCTION IF EXISTS "public"."recalculate_and_sync_quote_trigger"();
 CREATE OR REPLACE FUNCTION "public"."recalculate_and_sync_quote_trigger"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -2092,6 +2220,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."recalculate_quote_total_trigger"();
+DROP FUNCTION IF EXISTS "public"."recalculate_quote_total_trigger"();
+DROP FUNCTION IF EXISTS "public"."recalculate_quote_total_trigger"();
 CREATE OR REPLACE FUNCTION "public"."recalculate_quote_total_trigger"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -2137,6 +2267,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."record_customer_selection"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_version_id" "uuid", "p_option_id" "uuid", "p_reason" "text", "p_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."record_customer_selection"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_version_id" "uuid", "p_option_id" "uuid", "p_reason" "text", "p_user_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."record_customer_selection"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_version_id" "uuid", "p_option_id" "uuid", "p_reason" "text", "p_user_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."record_customer_selection"("p_tenant_id" "uuid", "p_quote_id" "uuid", "p_version_id" "uuid", "p_option_id" "uuid", "p_reason" "text", "p_user_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     AS $$
@@ -2160,6 +2292,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."reload_postgrest_schema"();
+DROP FUNCTION IF EXISTS "public"."reload_postgrest_schema"();
+DROP FUNCTION IF EXISTS "public"."reload_postgrest_schema"();
 CREATE OR REPLACE FUNCTION "public"."reload_postgrest_schema"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2170,6 +2304,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."set_admin_override"("p_enabled" boolean, "p_tenant_id" "uuid", "p_franchise_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."set_admin_override"("p_enabled" boolean, "p_tenant_id" "uuid", "p_franchise_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."set_admin_override"("p_enabled" boolean, "p_tenant_id" "uuid", "p_franchise_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."set_admin_override"("p_enabled" boolean, "p_tenant_id" "uuid" DEFAULT NULL::"uuid", "p_franchise_id" "uuid" DEFAULT NULL::"uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2186,6 +2322,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."set_current_version"("p_version_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."set_current_version"("p_version_id" "uuid");
 DROP FUNCTION IF EXISTS "public"."set_current_version"("p_version_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."set_current_version"("p_version_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2217,6 +2355,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."set_updated_at"();
+DROP FUNCTION IF EXISTS "public"."set_updated_at"();
+DROP FUNCTION IF EXISTS "public"."set_updated_at"();
 CREATE OR REPLACE FUNCTION "public"."set_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -2226,6 +2366,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."set_user_scope_preference"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_admin_override" boolean);
+DROP FUNCTION IF EXISTS "public"."set_user_scope_preference"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_admin_override" boolean);
 DROP FUNCTION IF EXISTS "public"."set_user_scope_preference"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_admin_override" boolean);
 CREATE OR REPLACE FUNCTION "public"."set_user_scope_preference"("p_tenant_id" "uuid", "p_franchise_id" "uuid", "p_admin_override" boolean) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2242,6 +2384,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."sync_opportunity_from_primary_quote"();
+DROP FUNCTION IF EXISTS "public"."sync_opportunity_from_primary_quote"();
 DROP FUNCTION IF EXISTS "public"."sync_opportunity_from_primary_quote"();
 CREATE OR REPLACE FUNCTION "public"."sync_opportunity_from_primary_quote"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -2310,6 +2454,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."sync_opportunity_items_from_quote"("p_quote_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."sync_opportunity_items_from_quote"("p_quote_id" "uuid");
+DROP FUNCTION IF EXISTS "public"."sync_opportunity_items_from_quote"("p_quote_id" "uuid");
 CREATE OR REPLACE FUNCTION "public"."sync_opportunity_items_from_quote"("p_quote_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     AS $$
@@ -2341,6 +2487,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."sync_quote_items_from_opportunity_trigger"();
+DROP FUNCTION IF EXISTS "public"."sync_quote_items_from_opportunity_trigger"();
 DROP FUNCTION IF EXISTS "public"."sync_quote_items_from_opportunity_trigger"();
 CREATE OR REPLACE FUNCTION "public"."sync_quote_items_from_opportunity_trigger"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -2418,6 +2566,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."tenant_has_feature"("_tenant_id" "uuid", "_feature_key" "text");
+DROP FUNCTION IF EXISTS "public"."tenant_has_feature"("_tenant_id" "uuid", "_feature_key" "text");
+DROP FUNCTION IF EXISTS "public"."tenant_has_feature"("_tenant_id" "uuid", "_feature_key" "text");
 CREATE OR REPLACE FUNCTION "public"."tenant_has_feature"("_tenant_id" "uuid", "_feature_key" "text") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2437,6 +2587,8 @@ CREATE OR REPLACE FUNCTION "public"."tenant_has_feature"("_tenant_id" "uuid", "_
 $$;
 
 DROP FUNCTION IF EXISTS "public"."trg_set_quote_number_before_insert"();
+DROP FUNCTION IF EXISTS "public"."trg_set_quote_number_before_insert"();
+DROP FUNCTION IF EXISTS "public"."trg_set_quote_number_before_insert"();
 CREATE OR REPLACE FUNCTION "public"."trg_set_quote_number_before_insert"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2453,6 +2605,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."update_lead_last_activity"();
+DROP FUNCTION IF EXISTS "public"."update_lead_last_activity"();
+DROP FUNCTION IF EXISTS "public"."update_lead_last_activity"();
 CREATE OR REPLACE FUNCTION "public"."update_lead_last_activity"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -2467,6 +2621,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."update_lead_score"();
+DROP FUNCTION IF EXISTS "public"."update_lead_score"();
+DROP FUNCTION IF EXISTS "public"."update_lead_score"();
 CREATE OR REPLACE FUNCTION "public"."update_lead_score"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public'
@@ -2477,6 +2633,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."update_option_margins_on_charge_change"();
+DROP FUNCTION IF EXISTS "public"."update_option_margins_on_charge_change"();
 DROP FUNCTION IF EXISTS "public"."update_option_margins_on_charge_change"();
 CREATE OR REPLACE FUNCTION "public"."update_option_margins_on_charge_change"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2518,6 +2676,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."update_option_totals"();
+DROP FUNCTION IF EXISTS "public"."update_option_totals"();
+DROP FUNCTION IF EXISTS "public"."update_option_totals"();
 CREATE OR REPLACE FUNCTION "public"."update_option_totals"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2554,6 +2714,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."update_scheduled_email_timestamp"();
+DROP FUNCTION IF EXISTS "public"."update_scheduled_email_timestamp"();
+DROP FUNCTION IF EXISTS "public"."update_scheduled_email_timestamp"();
 CREATE OR REPLACE FUNCTION "public"."update_scheduled_email_timestamp"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -2565,6 +2727,8 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS "public"."update_updated_at_column"();
+DROP FUNCTION IF EXISTS "public"."update_updated_at_column"();
+DROP FUNCTION IF EXISTS "public"."update_updated_at_column"();
 CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -2574,6 +2738,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."validate_leg_sort_order"();
+DROP FUNCTION IF EXISTS "public"."validate_leg_sort_order"();
 DROP FUNCTION IF EXISTS "public"."validate_leg_sort_order"();
 CREATE OR REPLACE FUNCTION "public"."validate_leg_sort_order"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2590,6 +2756,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."validate_service_leg_requirements"();
+DROP FUNCTION IF EXISTS "public"."validate_service_leg_requirements"();
 DROP FUNCTION IF EXISTS "public"."validate_service_leg_requirements"();
 CREATE OR REPLACE FUNCTION "public"."validate_service_leg_requirements"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2612,6 +2780,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."validate_single_selection_per_version"();
+DROP FUNCTION IF EXISTS "public"."validate_single_selection_per_version"();
 DROP FUNCTION IF EXISTS "public"."validate_single_selection_per_version"();
 CREATE OR REPLACE FUNCTION "public"."validate_single_selection_per_version"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2643,6 +2813,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."validate_version_status_transition"();
+DROP FUNCTION IF EXISTS "public"."validate_version_status_transition"();
 DROP FUNCTION IF EXISTS "public"."validate_version_status_transition"();
 CREATE OR REPLACE FUNCTION "public"."validate_version_status_transition"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2677,6 +2849,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS "public"."validate_version_uniqueness"();
+DROP FUNCTION IF EXISTS "public"."validate_version_uniqueness"();
 DROP FUNCTION IF EXISTS "public"."validate_version_uniqueness"();
 CREATE OR REPLACE FUNCTION "public"."validate_version_uniqueness"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER

@@ -678,6 +678,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END $$;
   END IF;
 END $$;
@@ -1484,8 +1490,7 @@ BEGIN
     WHERE constraint_name = 'quotes_opportunity_id_fkey' 
     AND table_name = 'quotes'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_opportunity_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_opportunity_id_fkey FOREIGN KEY (opportunity_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_opportunity_id_fkey FOREIGN KEY (opportunity_id)
     REFERENCES public.opportunities(id)
     ON DELETE SET NULL;
   END IF;
@@ -1499,8 +1504,7 @@ BEGIN
     WHERE constraint_name = 'quotes_account_id_fkey' 
     AND table_name = 'quotes'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_account_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_account_id_fkey FOREIGN KEY (account_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_account_id_fkey FOREIGN KEY (account_id)
     REFERENCES public.accounts(id)
     ON DELETE SET NULL;
   END IF;
@@ -1514,8 +1518,7 @@ BEGIN
     WHERE constraint_name = 'quotes_contact_id_fkey' 
     AND table_name = 'quotes'
   ) THEN
-    ALTER TABLE public.quotes DROP CONSTRAINT IF EXISTS quotes_contact_id_fkey;
-ALTER TABLE public.quotes ADD CONSTRAINT quotes_contact_id_fkey FOREIGN KEY (contact_id)
+    ALTER TABLE public.quotes ADD CONSTRAINT quotes_contact_id_fkey FOREIGN KEY (contact_id)
     REFERENCES public.contacts(id)
     ON DELETE SET NULL;
   END IF;

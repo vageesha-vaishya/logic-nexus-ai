@@ -3180,6 +3180,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['platform_admin','tenant_admin','franchise_admin','user'] LOOP
       IF NOT EXISTS (

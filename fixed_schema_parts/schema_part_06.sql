@@ -331,6 +331,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END; ELSE
     FOREACH lbl IN ARRAY ARRAY['none','daily','monthly','yearly'] LOOP
       IF NOT EXISTS (
@@ -763,6 +769,12 @@ BEGIN
     WHERE t.typname = 'quote_reset_policy' AND n.nspname = 'public'
   ) THEN BEGIN
     CREATE TYPE public.quote_reset_policy AS ENUM ('none','daily','monthly','yearly');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;
@@ -3261,8 +3273,7 @@ BEGIN
     WHERE t.relname = 'quote_charges'
       AND c.conname = 'quote_charges_leg_id_fkey'
   ) THEN
-    ALTER TABLE public.quote_charges DROP CONSTRAINT IF EXISTS quote_charges_leg_id_fkey;
-ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIGN KEY (leg_id)
+    ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIGN KEY (leg_id)
       REFERENCES public.quotation_version_option_legs(id)
       ON DELETE CASCADE;
   END IF;
@@ -3281,8 +3292,7 @@ ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIG
   END IF;
 
   -- Recreate FK to public.quotation_version_options
-  ALTER TABLE public.quote_charges DROP CONSTRAINT IF EXISTS quote_charges_quote_option_id_fkey;
-ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_quote_option_id_fkey FOREIGN KEY (quote_option_id)
+  ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_quote_option_id_fkey FOREIGN KEY (quote_option_id)
     REFERENCES public.quotation_version_options(id)
     ON DELETE CASCADE;
 END $$;
@@ -3385,8 +3395,7 @@ BEGIN
     WHERE t.relname = 'quote_charges'
       AND c.conname = 'quote_charges_leg_id_fkey'
   ) THEN
-    ALTER TABLE public.quote_charges DROP CONSTRAINT IF EXISTS quote_charges_leg_id_fkey;
-ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIGN KEY (leg_id)
+    ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIGN KEY (leg_id)
       REFERENCES public.quotation_version_option_legs(id)
       ON DELETE CASCADE;
   END IF;
@@ -3405,8 +3414,7 @@ ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIG
   END IF;
 
   -- Recreate FK to public.quotation_version_options
-  ALTER TABLE public.quote_charges DROP CONSTRAINT IF EXISTS quote_charges_quote_option_id_fkey;
-ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_quote_option_id_fkey FOREIGN KEY (quote_option_id)
+  ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_quote_option_id_fkey FOREIGN KEY (quote_option_id)
     REFERENCES public.quotation_version_options(id)
     ON DELETE CASCADE;
 END $$;
@@ -3896,8 +3904,7 @@ BEGIN
     WHERE t.relname = 'quote_charges'
       AND c.conname = 'quote_charges_leg_id_fkey'
   ) THEN
-    ALTER TABLE public.quote_charges DROP CONSTRAINT IF EXISTS quote_charges_leg_id_fkey;
-ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIGN KEY (leg_id)
+    ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIGN KEY (leg_id)
       REFERENCES public.quotation_version_option_legs(id)
       ON DELETE CASCADE;
   END IF;
@@ -3916,8 +3923,7 @@ ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_leg_id_fkey FOREIG
   END IF;
 
   -- Recreate FK to public.quotation_version_options
-  ALTER TABLE public.quote_charges DROP CONSTRAINT IF EXISTS quote_charges_quote_option_id_fkey;
-ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_quote_option_id_fkey FOREIGN KEY (quote_option_id)
+  ALTER TABLE public.quote_charges ADD CONSTRAINT quote_charges_quote_option_id_fkey FOREIGN KEY (quote_option_id)
     REFERENCES public.quotation_version_options(id)
     ON DELETE CASCADE;
 END $$;

@@ -4647,6 +4647,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END $$;
   END IF;
 
@@ -4671,6 +4677,12 @@ EXCEPTION
 END;
 EXCEPTION
     WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
 END $$;
   END IF;
 
@@ -4681,6 +4693,12 @@ END $$;
     WHERE n.nspname = 'public' AND t.typname = 'transfer_entity_type'
   ) THEN BEGIN
     CREATE TYPE public.transfer_entity_type AS ENUM ('lead', 'opportunity', 'quote', 'shipment', 'account', 'contact', 'activity');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END;

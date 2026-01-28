@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SCHEMA_DIR = path.join(__dirname, '../migration_backup_20260127/schema_parts');
+const SCHEMA_DIR = path.join(__dirname, '../fixed_schema_parts');
 
 if (!fs.existsSync(SCHEMA_DIR)) {
   console.error('Schema parts directory not found!');
