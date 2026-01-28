@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,13 @@ import { CrudFormLayout } from '@/components/system/CrudFormLayout';
 import { FormSection } from '@/components/system/FormSection';
 import { FormStepper } from '@/components/system/FormStepper';
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DomainService, PlatformDomain } from '@/services/DomainService';
+
 const tenantSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  domain_id: z.string().min(1, 'Business Domain is required'),
   domain: z.string().optional(),
   logo_url: z.string().url().optional().or(z.literal('')),
   is_active: z.boolean().default(true),
@@ -55,12 +59,37 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   const { toast } = useToast();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<TenantFormValues | null>(null);
+  const [domains, setDomains] = useState<PlatformDomain[]>([]);
+
+  useEffect(() => {
+    if (!DomainService) {
+      console.error('DomainService is undefined');
+      return;
+    }
+    
+    DomainService.getAllDomains()
+      .then((data) => {
+        // Sort domains alphabetically by name
+        const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+        setDomains(sorted);
+      })
+      .catch((err) => {
+        console.error('Failed to load domains', err);
+        const message = err?.message || (err instanceof Error ? err.message : 'Unknown error loading domains');
+        toast({ 
+          title: 'Error Loading Domains', 
+          description: message, 
+          variant: 'destructive' 
+        });
+      });
+  }, []);
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantSchema),
     defaultValues: {
       name: tenant?.name || '',
       slug: tenant?.slug || '',
+      domain_id: tenant?.domain_id || '',
       domain: tenant?.domain || '',
       logo_url: tenant?.logo_url || '',
       is_active: tenant?.is_active ?? true,
@@ -148,6 +177,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       const data = {
         name: values.name,
         slug: values.slug,
+        domain_id: values.domain_id,
         domain: values.domain || null,
         logo_url: values.logo_url || null,
         is_active: values.is_active,
@@ -244,6 +274,31 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               <FormControl>
                 <Input placeholder="Acme Corporation" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="domain_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Business Domain *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a domain" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {domains.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

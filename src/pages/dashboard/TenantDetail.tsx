@@ -75,9 +75,10 @@ export default function TenantDetail() {
       if (error) throw error;
       setTenant(data);
     } catch (error: any) {
+      console.error('Failed to fetch tenant:', error);
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Error Fetching Tenant',
+        description: error?.message || 'Unknown database error',
         variant: 'destructive',
       });
     } finally {

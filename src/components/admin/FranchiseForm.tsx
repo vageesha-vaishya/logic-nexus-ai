@@ -122,11 +122,20 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       // Remove duplicates
       const uniqueUserIds = Array.from(new Set(userIds));
       
-      const { data: profiles } = await supabase
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email')
         .in('id', uniqueUserIds);
         
+      if (error) {
+        console.error('Failed to fetch managers:', error);
+        toast({
+          title: 'Error Loading Managers',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+
       setManagers(profiles || []);
     } else {
       setManagers([]);

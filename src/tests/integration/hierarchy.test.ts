@@ -141,7 +141,7 @@ runTests('Container & Vessel Hierarchy Integration', () => {
     expect(error).toBeNull();
     expect(data?.vessel_classes?.name).toBe(testVesselClass.name);
     // Supabase returns nested objects for relationships
-    // @ts-ignore
+    // @ts-ignore: verify deep property access
     expect(data?.vessel_classes?.vessel_types?.name).toBe(testVesselType.name);
   });
 });

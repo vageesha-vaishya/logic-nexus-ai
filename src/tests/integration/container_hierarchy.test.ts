@@ -171,14 +171,14 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
     // Verify Size Data (joined)
     const size = data?.container_sizes;
     expect(size).toBeDefined();
-    // @ts-ignore
+    // @ts-ignore: verify deep property access
     expect(size?.name).toBe(testContainerSize.name);
     
     // Verify Type Data (deep joined)
-    // @ts-ignore
+    // @ts-ignore: verify deep property access
     const type = size?.container_types;
     expect(type).toBeDefined();
-    // @ts-ignore
+    // @ts-ignore: verify deep property access
     expect(type?.code).toBe(testContainerType.code);
   });
 });

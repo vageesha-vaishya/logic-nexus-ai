@@ -65,24 +65,26 @@ Based on [04_Low_Level_Design.md](04_Low_Level_Design.md) and [08_Impact_Analysi
 
 ### Phase 1: Foundation (Weeks 3-6)
 *Goal: Multi-tenant Infrastructure.*
-*   **Task 1.1:** Initialize Monorepo (Nx/Turborepo).
-*   **Task 1.2:** Implement `tenants` table with `domain_type` enum.
-*   **Task 1.3:** Implement RLS policies using `auth.uid()` and `tenant_id`.
-*   **Task 1.4:** Set up CI/CD with automated linting and unit tests.
+*   **Task 1.1:** [DEFERRED] Initialize Monorepo (Nx/Turborepo). *Decision: Maintain Single Repo for Phase 2 velocity.*
+*   **Task 1.2:** [COMPLETED (Enhanced)] Implement `tenants` and `platform_domains` tables. *Replaced rigid ENUM with dynamic `platform_domains` table.*
+*   **Task 1.3:** [COMPLETED] Implement RLS policies using `auth.uid()` and `tenant_id`.
+*   **Task 1.4:** [COMPLETED] Set up CI/CD with automated linting and unit tests.
 
 ### Phase 2: Core Module Development (Weeks 5-10)
 *Goal: Domain-Agnostic Engines.*
-*   **Task 2.1:** Define `IQuotationEngine` interface [04_Low_Level_Design.md].
-*   **Task 2.2:** Implement `CoreQuoteService` that delegates to plugins.
-*   **Task 2.3:** Create "Mock" adapters for Banking and Telecom.
+*   **Task 2.1:** [COMPLETED] Define `IQuotationEngine` interface [04_Low_Level_Design.md].
+*   **Task 2.2:** [COMPLETED] Implement `CoreQuoteService` that delegates to plugins.
+*   **Task 2.3:** [COMPLETED] Create "Mock" adapters for Banking and Telecom.
 
 ### Phase 2.5: Taxation & Financials (Weeks 8-14)
-*Goal: Financial Backbone [04_Taxation_User_Guide.md].*
-*   **Task 2.5.1:** Implement `TaxJurisdiction` and `TaxRule` tables.
-*   **Task 2.5.2:** Build Nexus Determination Logic (Origin vs. Destination).
-*   **Task 2.5.3:** Implement `TaxEngine.calculateTax()` with sub-200ms latency.
-*   **Task 2.5.4:** Build Invoice Finalization Workflow (Draft -> Posted).
-*   **Task 2.5.5:** Implement Async GL Poster (RabbitMQ/PgQueues).
+*Goal: Financial Backbone [09_Phase2.5_Technical_Spec.md].*
+*Status: IN PROGRESS*
+*   **Task 2.5.1:** [PENDING] Implement `TaxJurisdiction`, `TaxRule`, and `TaxCode` tables.
+*   **Task 2.5.2:** [PENDING] Build Nexus Determination Logic (Origin vs. Destination).
+*   **Task 2.5.3:** [PENDING] Implement `TaxEngine.calculateTax()` with sub-200ms latency.
+*   **Task 2.5.4:** [PENDING] Build Invoice Finalization Workflow (Draft -> Posted).
+*   **Task 2.5.5:** [PENDING] Implement Async GL Poster (RabbitMQ/PgQueues).
+*   **Task 2.5.6:** [PENDING] Create "Mock" ERP Connector for GL Sync.
 
 ### Phase 3: Plugin SDK & Logistics Migration (Weeks 11-16)
 *Goal: Migrate Logistics to Plugin Architecture.*

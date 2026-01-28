@@ -43,6 +43,7 @@
     "supabase:types:gen": "npx supabase gen types typescript --project-id ${VITE_SUPABASE_PROJECT_ID} > src/integrations/supabase/types.ts",
     "supabase:functions:deploy": "npx supabase functions deploy --project-ref ${VITE_SUPABASE_PROJECT_ID}",
     "test:edge": "node --env-file=.env scripts/test-edge-function.js",
+    "test:phase1": "node scripts/tests/test_phase1_tenants.cjs",
     "pgdump:export": "node scripts/pgdump-export.js"
   },
   "dependencies": {

@@ -119,7 +119,7 @@ serve(async (req) => {
     if (originId && destId) {
         const now = new Date().toISOString().split('T')[0]; 
 
-        let query = supabase
+        const query = supabase
             .from('carrier_rates')
             .select(`
                 id, tier, carrier:carrier_id(name),

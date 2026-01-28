@@ -21,6 +21,7 @@ export default function Tenants() {
     name: string;
     slug: string;
     domain: string | null;
+    domain_id?: string; // Added new field
     subscription_tier: string | null;
     is_active: boolean;
     created_at: string;

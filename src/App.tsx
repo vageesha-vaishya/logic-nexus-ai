@@ -119,6 +119,9 @@ import RolesPermissions from "./pages/dashboard/RolesPermissions";
 import TransferCenter from "./pages/dashboard/TransferCenter";
 import DocumentManager from "./pages/dashboard/DocumentManager";
 
+import PlatformDomains from "./pages/dashboard/PlatformDomains";
+import PlatformDomainDetail from "./pages/dashboard/PlatformDomainDetail";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -560,6 +563,14 @@ const App = () => (
             <Route 
               path="/dashboard/settings/data-management" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DataManagement /></ProtectedRoute>} 
+            />
+            <Route 
+              path="/dashboard/settings/domains" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PlatformDomains /></ProtectedRoute>} 
+            />
+            <Route 
+              path="/dashboard/settings/domains/:id" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PlatformDomainDetail /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/database-export" 
