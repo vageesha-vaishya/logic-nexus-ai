@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { initializePlugins } from "./plugins/init";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
@@ -100,10 +101,10 @@ import ContainerAnalytics from "./pages/dashboard/ContainerAnalytics";
 import ContainerTracking from "./pages/dashboard/ContainerTracking";
 import PlatformDomains from "./pages/dashboard/PlatformDomains";
 import PlatformDomainDetail from "./pages/dashboard/PlatformDomainDetail";
-import Invoices from "./pages/dashboard/Invoices";
-import InvoiceDetail from "./pages/dashboard/InvoiceDetail";
-import TaxJurisdictions from "./pages/dashboard/TaxJurisdictions";
-import TaxJurisdictionDetail from "./pages/dashboard/TaxJurisdictionDetail";
+import Invoices from "./pages/dashboard/finance/Invoices";
+import InvoiceDetail from "./pages/dashboard/finance/InvoiceDetail";
+import TaxJurisdictions from "./pages/dashboard/finance/TaxJurisdictions";
+import TaxJurisdictionDetail from "./pages/dashboard/finance/TaxJurisdictionDetail";
 import RateManagement from "./pages/dashboard/RateManagement";
 import VesselTypes from "./pages/dashboard/VesselTypes";
 import VesselClasses from "./pages/dashboard/VesselClasses";
@@ -124,6 +125,9 @@ import QuotePortal from "./pages/portal/QuotePortal";
 import RolesPermissions from "./pages/dashboard/RolesPermissions";
 import TransferCenter from "./pages/dashboard/TransferCenter";
 import DocumentManager from "./pages/dashboard/DocumentManager";
+
+// Initialize plugins at startup
+initializePlugins();
 
 const queryClient = new QueryClient();
 

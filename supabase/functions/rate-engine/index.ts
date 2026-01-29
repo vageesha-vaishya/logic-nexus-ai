@@ -30,7 +30,9 @@ interface RateOption {
   tier: 'contract' | 'spot' | 'market'
   name: string
   carrier: string
-  price: number
+  price: number // Sell Price
+  buyPrice?: number // Cost
+  marginAmount?: number // Profit
   currency: string
   transitTime: string
   validUntil?: string
@@ -79,6 +81,9 @@ serve(async (req) => {
     } catch (e) {
         throw new Error("Invalid JSON body");
     }
+
+    console.log("Processing Request Body:", JSON.stringify(body));
+
     const { 
         origin, destination, weight, mode, unit, account_id,
         containerQty, containerSize, vehicleType 
@@ -104,14 +109,21 @@ serve(async (req) => {
         .from('ports_locations')
         .select('id')
         .eq('location_code', loc)
-        .single();
+        .maybeSingle();
       return data?.id || null;
     }
 
-    const [originId, destId] = await Promise.all([
-      resolveLocation(origin),
-      resolveLocation(destination)
-    ])
+    let originId: string | null = null;
+    let destId: string | null = null;
+
+    try {
+        [originId, destId] = await Promise.all([
+            resolveLocation(origin),
+            resolveLocation(destination)
+        ]);
+    } catch (e) {
+        console.warn("Location resolution failed, proceeding to simulation:", e);
+    }
 
     const options: RateOption[] = []
 
@@ -150,6 +162,8 @@ serve(async (req) => {
                     // In real app, check rate unit (per kg, per shipment)
                     price = price * weightKg; 
                 }
+                
+                const originalCost = price; // Capture Base Cost
 
                 options.push({
                     id: r.id,
@@ -157,6 +171,8 @@ serve(async (req) => {
                     name: isContract ? 'Contract Rate' : (r.tier === 'spot' ? 'Spot Rate' : 'Market Rate'),
                     carrier: r.carrier?.name || 'Unknown',
                     price: Math.round(price * 100) / 100,
+                    buyPrice: Math.round(originalCost * 100) / 100,
+                    marginAmount: 0, // Will be updated if margins applied
                     currency: 'USD',
                     transitTime: r.transit_days ? `${r.transit_days} Days` : '3-5 Days',
                     validUntil: r.valid_to
@@ -218,6 +234,8 @@ serve(async (req) => {
             // CO2 Estimate (Simple Factor)
             const co2Factor = mode === 'air' ? 0.6 : (mode === 'ocean' ? 0.03 : 0.1); // kg CO2 per kg cargo
             const estimatedCo2 = Math.round((weightKg || 1000) * co2Factor * (1 + (stops * 0.1)));
+            
+            const originalCost = simulatedPrice;
 
             options.push({
                 id: `sim_${mode}_${index}_${Date.now()}`,
@@ -225,6 +243,8 @@ serve(async (req) => {
                 name: `${carrierName} ${isExpress ? 'Express' : 'Standard'}`,
                 carrier: carrierName,
                 price: Math.round(simulatedPrice * 100) / 100,
+                buyPrice: Math.round(originalCost * 100) / 100,
+                marginAmount: 0,
                 currency: 'USD',
                 transitTime: `${simulatedTransit} Days`,
                 route_type: routeType,
@@ -275,11 +295,19 @@ serve(async (req) => {
                 }
             }
             
-            // Update price
+            // Update price and calculate financials
             if (appliedMargins.length > 0) {
                 // (opt as any).original_price = opt.price; // Optional: Keep original
-                opt.price = Math.round(price * 100) / 100;
+                const finalPrice = Math.round(price * 100) / 100;
+                opt.price = finalPrice;
                 opt.margin_applied = appliedMargins;
+                
+                // Calculate Margin Amount
+                const cost = opt.buyPrice || finalPrice; // Fallback to final if no buyPrice (should not happen)
+                opt.marginAmount = Math.round((finalPrice - cost) * 100) / 100;
+            } else {
+                 // No margin applied, but we should ensure consistency
+                 opt.marginAmount = 0;
             }
         });
     }

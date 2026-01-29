@@ -3,26 +3,109 @@ import { IQuotationEngine } from '../IQuotationEngine';
 import { RequestContext, LineItem, QuoteResult, ValidationResult } from '../types';
 
 export class LogisticsQuotationEngine implements IQuotationEngine {
+  /**
+   * Calculates the quotation based on logistics-specific rules.
+   * Logic includes:
+   * 1. Chargeable Weight calculation based on Transport Mode (Air/Ocean/Road).
+   * 2. Freight calculation using chargeable weight and mock rates.
+   * 3. Application of standard surcharges (Fuel, Doc, Handling).
+   */
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
-    // Basic implementation for Phase 2 proof-of-concept
     console.log('LogisticsQuotationEngine: Calculating quote for', context.tenantId);
 
-    // Mock calculation logic
-    const totalAmount = items.reduce((sum, item) => {
-      // Assume a simple mock rate of 10 per unit for now
-      return sum + (item.quantity * 10);
-    }, 0);
+    // 1. Extract Contextual Factors
+    const mode = context.metadata?.mode || 'ocean'; // default to ocean
+    const incoterms = context.metadata?.incoterms || 'EXW';
+    const currency = context.currency || 'USD';
+
+    let totalFreight = 0;
+    const itemBreakdowns: any[] = [];
+
+    // 2. Process Line Items
+    for (const item of items) {
+      const quantity = item.quantity || 0;
+      const weight = Number(item.attributes?.weight || 0); // kg
+      const volume = Number(item.attributes?.volume || 0); // cbm
+      
+      // Calculate Chargeable Weight / Revenue Tons
+      let chargeableWeight = 0;
+      let ratePerUnit = 0;
+
+      switch (mode.toLowerCase()) {
+        case 'air':
+          // Standard Air conversion: 1 CBM = 167 KG
+          const volumetricWeightAir = volume * 167;
+          chargeableWeight = Math.max(weight, volumetricWeightAir);
+          ratePerUnit = 2.50; // Mock Rate per KG
+          break;
+        case 'road':
+          // Standard Road conversion: 1 CBM = 333 KG
+          const volumetricWeightRoad = volume * 333;
+          chargeableWeight = Math.max(weight, volumetricWeightRoad);
+          ratePerUnit = 0.80; // Mock Rate per KG
+          break;
+        case 'ocean':
+        default:
+          // Ocean: 1 CBM = 1 Ton (1000 KG)
+          // Revenue Ton (w/m)
+          const weightInTons = weight / 1000;
+          chargeableWeight = Math.max(weightInTons, volume);
+          ratePerUnit = 150.00; // Mock Rate per w/m (CBM/Ton)
+          break;
+      }
+
+      const lineTotal = chargeableWeight * ratePerUnit * quantity; // quantity usually 1 for shipment-level, but if items are packages...
+      
+      // If items are packages, we sum them up. 
+      // Assuming 'quantity' is number of packages and weight/volume is PER PACKAGE.
+      const totalLineWeight = chargeableWeight * quantity;
+      const finalLineCost = totalLineWeight * ratePerUnit;
+
+      totalFreight += finalLineCost;
+
+      itemBreakdowns.push({
+        description: item.description,
+        quantity,
+        chargeableWeight: totalLineWeight,
+        rate: ratePerUnit,
+        total: finalLineCost,
+        unit: mode === 'ocean' ? 'w/m' : 'kg'
+      });
+    }
+
+    // 3. Apply Surcharges
+    const surcharges: Record<string, number> = {};
+    
+    // Fuel Surcharge (e.g., 10% of freight)
+    surcharges['Fuel Surcharge'] = totalFreight * 0.10;
+
+    // Documentation Fee (Fixed)
+    surcharges['Documentation Fee'] = 50.00;
+
+    // Handling Fee (Fixed)
+    surcharges['Handling Fee'] = 35.00;
+
+    // Security Surcharge (Air only)
+    if (mode.toLowerCase() === 'air') {
+        surcharges['Security Surcharge'] = totalFreight * 0.05;
+    }
+
+    const totalSurcharges = Object.values(surcharges).reduce((sum, val) => sum + val, 0);
+    const grandTotal = totalFreight + totalSurcharges;
 
     return {
-      totalAmount,
-      currency: context.currency || 'USD',
+      quoteId: context.metadata?.quoteId, // Pass through if available
+      totalAmount: parseFloat(grandTotal.toFixed(2)),
+      currency: currency,
       breakdown: {
-        freight: totalAmount * 0.8,
-        surcharges: totalAmount * 0.2,
-        items: items.map(item => ({
-          description: item.description,
-          cost: item.quantity * 10
-        }))
+        freight: parseFloat(totalFreight.toFixed(2)),
+        surcharges: surcharges,
+        items: itemBreakdowns,
+        metadata: {
+            mode,
+            incoterms,
+            totalChargeableWeight: itemBreakdowns.reduce((acc, i) => acc + i.chargeableWeight, 0)
+        }
       },
       validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Valid for 7 days
     };
@@ -38,6 +121,11 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
       });
     }
 
+    const mode = context.metadata?.mode;
+    if (!mode) {
+        // Warning only, default to ocean in calc
+    }
+
     items.forEach((item, index) => {
       if (item.quantity <= 0) {
         errors.push({
@@ -45,6 +133,15 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
           message: `Item at index ${index} must have a positive quantity.`,
           field: `items[${index}].quantity`
         });
+      }
+      
+      // Logistics specific validation
+      if ((!item.attributes?.weight || item.attributes.weight <= 0) && (!item.attributes?.volume || item.attributes.volume <= 0)) {
+           errors.push({
+            code: 'MISSING_DIMENSIONS',
+            message: `Item at index ${index} must have weight or volume specified.`,
+            field: `items[${index}].attributes`
+          });
       }
     });
 

@@ -41,7 +41,7 @@ async function main() {
 
   // Try process.env first (from .env), then .env.migration
   const migrationEnv = loadEnvMigration(projectRoot);
-  let dbUrl = process.env.SUPABASE_DB_URL || migrationEnv.SUPABASE_DB_URL;
+  let dbUrl = process.env.SUPABASE_DB_URL || migrationEnv.SUPABASE_DB_URL || process.env.DIRECT_URL || process.env.DATABASE_URL;
   
   if (process.env.SUPABASE_POOLER_URL || migrationEnv.SUPABASE_POOLER_URL) {
     dbUrl = process.env.SUPABASE_POOLER_URL || migrationEnv.SUPABASE_POOLER_URL;
@@ -60,6 +60,7 @@ async function main() {
   const client = new Client({
     connectionString: dbUrl.replace('?sslmode=require', ''),
     ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 20000,
   });
 
   const sqlPath = path.isAbsolute(sqlArg) ? sqlArg : path.join(projectRoot, sqlArg);

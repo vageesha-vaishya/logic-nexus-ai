@@ -40,9 +40,26 @@ serve(async (req: Request) => {
 
   try {
     const { action, payload } = await req.json()
+    // Check for OpenAI Key
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    
     console.log(`[AI-Advisor] Action: ${action}, Key Present: ${!!openAiKey}`);
+
+    if (action === 'generate_smart_quotes' && !openAiKey) {
+        console.warn("[AI-Advisor] Missing OpenAI Key. Returning fallback/empty response.");
+        return new Response(
+            JSON.stringify({ 
+                options: [], 
+                market_analysis: "AI Analysis unavailable (Configuration Missing).",
+                confidence_score: 0,
+                anomalies: [] 
+            }),
+            { 
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200 
+            }
+        );
+    }
+
     
     // Create Supabase Client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';

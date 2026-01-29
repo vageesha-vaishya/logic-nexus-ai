@@ -4,27 +4,98 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Percent, FileText, Lock, Info, Receipt, Server, CheckCircle2, AlertCircle } from 'lucide-react';
+import { DollarSign, Percent, FileText, Lock, Info, Receipt, Server, CheckCircle2, AlertCircle, Calculator } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
+import { PluginRegistry } from '@/services/plugins/PluginRegistry';
+import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
+import { RequestContext, QuoteResult } from '@/services/quotation/types';
 
 export function QuoteFinancials() {
-  const { control } = useFormContext();
-  const { supabase } = useCRM();
+  const { control, setValue } = useFormContext();
+  // const { supabase } = useCRM();
   
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [serverVerification, setServerVerification] = useState<{ verified: boolean; match: boolean } | null>(null);
+  const [calculationResult, setCalculationResult] = useState<QuoteResult | null>(null);
 
   // Watch values for real-time calculation preview
   const shippingAmount = useWatch({ control, name: 'shipping_amount' }) || 0;
   const taxPercent = useWatch({ control, name: 'tax_percent' }) || 0;
   
+  const formItems = useWatch({ control, name: 'items' });
+  const formMode = useWatch({ control, name: 'service_type_id' }); // Assuming this maps to mode temporarily
+  const incoterms = useWatch({ control, name: 'incoterms' });
+
   const subtotal = parseFloat(shippingAmount) || 0;
   const taxAmount = (subtotal * parseFloat(taxPercent || '0')) / 100;
   const total = subtotal + taxAmount;
+
+  const handleCalculateEstimate = async () => {
+    setIsCalculating(true);
+    setCalculationResult(null);
+    try {
+        const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
+
+        if (!logisticsPlugin) {
+            throw new Error('Logistics plugin not initialized or not found');
+        }
+
+        const engine = logisticsPlugin.getQuotationEngine();
+
+        const context: RequestContext = {
+            tenantId: 'current-tenant', // Should come from auth context
+            domainId: 'logistics',
+            currency: 'USD',
+            metadata: {
+                mode: formMode || 'ocean', // Default or map from service_type_id
+                incoterms: incoterms || 'EXW'
+            }
+        };
+
+        // Map form items to engine items
+        // Ensure attributes are present and numbers
+        const engineItems = (formItems || []).map((item: any) => ({
+            description: item.product_name,
+            quantity: Number(item.quantity) || 1,
+            attributes: {
+                weight: Number(item.attributes?.weight) || 0,
+                volume: Number(item.attributes?.volume) || 0
+            }
+        }));
+
+        if (engineItems.length === 0) {
+            toast.warning('Please add items to calculate charges');
+            setIsCalculating(false);
+            return;
+        }
+
+        const result = await engine.calculate(context, engineItems);
+        setCalculationResult(result);
+        
+        // Auto-fill shipping amount if empty or user confirms?
+        // For now, let's just show the result and let user apply it
+        toast.success(`Calculated Estimate: $${result.totalAmount.toFixed(2)}`);
+
+    } catch (err: any) {
+        console.error('Calculation failed:', err);
+        toast.error(err.message || 'Failed to calculate estimate');
+    } finally {
+        setIsCalculating(false);
+    }
+  };
+
+  const applyCalculation = () => {
+      if (calculationResult) {
+          setValue('shipping_amount', calculationResult.breakdown.freight.toFixed(2));
+          // Could also set surcharges to notes or a breakdown field if available
+          toast.success('Applied calculated freight to Shipping Amount');
+      }
+  };
 
   const handleVerifyCalculation = async () => {
     setIsVerifying(true);
@@ -95,9 +166,22 @@ export function QuoteFinancials() {
                         name="shipping_amount"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="flex items-center gap-2 text-foreground/80">
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                                Shipping Amount
+                            <FormLabel className="flex items-center justify-between text-foreground/80">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                                    Shipping Amount
+                                </div>
+                                <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 text-xs gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    onClick={handleCalculateEstimate}
+                                    disabled={isCalculating}
+                                >
+                                    <Calculator className="h-3 w-3" />
+                                    {isCalculating ? 'Calculating...' : 'Calculate Estimate'}
+                                </Button>
                             </FormLabel>
                             <FormControl>
                             <div className="relative group">
@@ -150,7 +234,44 @@ export function QuoteFinancials() {
               </div>
 
               {/* Summary Box */}
-              <div className="lg:col-span-5">
+              <div className="lg:col-span-5 space-y-6">
+                  {calculationResult && (
+                      <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                          <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                                  <Calculator className="h-4 w-4" />
+                                  Estimated Breakdown
+                              </h4>
+                              <Button type="button" variant="ghost" size="sm" className="h-6 text-xs text-blue-700 hover:text-blue-800" onClick={() => setCalculationResult(null)}>Clear</Button>
+                          </div>
+                          <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Base Freight:</span>
+                                  <span className="font-medium">${calculationResult.breakdown.freight?.toFixed(2) || '0.00'}</span>
+                              </div>
+                              {Object.entries(calculationResult.breakdown.surcharges || {}).map(([key, value]) => (
+                                  <div key={key} className="flex justify-between text-xs">
+                                      <span className="text-muted-foreground">{key}:</span>
+                                      <span>${Number(value).toFixed(2)}</span>
+                                  </div>
+                              ))}
+                              <Separator className="bg-blue-200 my-2" />
+                              <div className="flex justify-between font-bold text-blue-900">
+                                  <span>Total Estimate:</span>
+                                  <span>${calculationResult.totalAmount.toFixed(2)}</span>
+                              </div>
+                              <Button 
+                                  type="button"
+                                  size="sm" 
+                                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700"
+                                  onClick={applyCalculation}
+                              >
+                                  Apply to Shipping Amount
+                              </Button>
+                          </div>
+                      </div>
+                  )}
+
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border shadow-sm space-y-4">
                     <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
                         <Receipt className="h-4 w-4 text-gray-500" /> 

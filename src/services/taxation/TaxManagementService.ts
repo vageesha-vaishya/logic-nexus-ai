@@ -102,39 +102,42 @@ export const TaxManagementService = {
       .order('code');
 
     if (error) throw error;
-    return (data || []).map(this.mapTaxCode);
-  },
-
-  async createTaxCode(taxCode: Omit<TaxCode, 'id'>): Promise<TaxCode> {
-    const { data, error } = await supabase
-      .schema('finance')
-      .from('tax_codes')
-      .insert({
-        code: taxCode.code,
-        description: taxCode.description,
-        is_active: taxCode.isActive
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return this.mapTaxCode(data);
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      code: item.code,
+      description: item.description || '',
+      isActive: item.is_active || false
+    }));
   },
 
   // ==========================================
   // Tax Rules
   // ==========================================
 
-  async getTaxRules(jurisdictionId: string): Promise<TaxRule[]> {
+  async getTaxRules(jurisdictionId?: string): Promise<TaxRule[]> {
+    let query = supabase.schema('finance').from('tax_rules').select('*');
+
+    if (jurisdictionId) {
+      query = query.eq('jurisdiction_id', jurisdictionId);
+    }
+
+    const { data, error } = await query.order('priority', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(this.mapTaxRule);
+  },
+
+  async getTaxRuleById(id: string): Promise<TaxRule | null> {
     const { data, error } = await supabase
       .schema('finance')
       .from('tax_rules')
       .select('*')
-      .eq('jurisdiction_id', jurisdictionId)
-      .order('priority', { ascending: false });
+      .eq('id', id)
+      .single();
 
-    if (error) throw error;
-    return (data || []).map(this.mapTaxRule);
+    if (error) return null;
+    return this.mapTaxRule(data);
   },
 
   async createTaxRule(rule: Omit<TaxRule, 'id'>): Promise<TaxRule> {
@@ -143,11 +146,11 @@ export const TaxManagementService = {
       .from('tax_rules')
       .insert({
         jurisdiction_id: rule.jurisdictionId,
-        tax_code_id: rule.taxCodeId,
+        tax_code_id: rule.taxCodeId || null,
         rate: rule.rate,
         priority: rule.priority,
         effective_from: rule.effectiveFrom.toISOString(),
-        effective_to: rule.effectiveTo?.toISOString(),
+        effective_to: rule.effectiveTo?.toISOString() || null,
         rule_type: rule.ruleType
       })
       .select()
@@ -157,39 +160,62 @@ export const TaxManagementService = {
     return this.mapTaxRule(data);
   },
 
+  async updateTaxRule(id: string, updates: Partial<Omit<TaxRule, 'id'>>): Promise<TaxRule> {
+    const dbUpdates: any = {};
+    if (updates.jurisdictionId) dbUpdates.jurisdiction_id = updates.jurisdictionId;
+    if (updates.taxCodeId !== undefined) dbUpdates.tax_code_id = updates.taxCodeId || null;
+    if (updates.rate !== undefined) dbUpdates.rate = updates.rate;
+    if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+    if (updates.effectiveFrom) dbUpdates.effective_from = updates.effectiveFrom.toISOString();
+    if (updates.effectiveTo !== undefined) dbUpdates.effective_to = updates.effectiveTo?.toISOString() || null;
+    if (updates.ruleType) dbUpdates.rule_type = updates.ruleType;
+
+    const { data, error } = await supabase
+      .schema('finance')
+      .from('tax_rules')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return this.mapTaxRule(data);
+  },
+
+  async deleteTaxRule(id: string): Promise<void> {
+    const { error } = await supabase
+      .schema('finance')
+      .from('tax_rules')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
   // ==========================================
   // Mappers
   // ==========================================
 
-  mapJurisdiction(row: any): TaxJurisdiction {
+  mapJurisdiction(data: any): TaxJurisdiction {
     return {
-      id: row.id,
-      code: row.code,
-      name: row.name,
-      type: row.type,
-      parentId: row.parent_id
+      id: data.id,
+      code: data.code,
+      name: data.name,
+      type: data.type,
+      parentId: data.parent_id
     };
   },
 
-  mapTaxCode(row: any): TaxCode {
+  mapTaxRule(data: any): TaxRule {
     return {
-      id: row.id,
-      code: row.code,
-      description: row.description,
-      isActive: row.is_active
-    };
-  },
-
-  mapTaxRule(row: any): TaxRule {
-    return {
-      id: row.id,
-      jurisdictionId: row.jurisdiction_id,
-      taxCodeId: row.tax_code_id,
-      rate: Number(row.rate),
-      priority: row.priority,
-      effectiveFrom: new Date(row.effective_from),
-      effectiveTo: row.effective_to ? new Date(row.effective_to) : undefined,
-      ruleType: row.rule_type
+      id: data.id,
+      jurisdictionId: data.jurisdiction_id,
+      taxCodeId: data.tax_code_id,
+      rate: Number(data.rate),
+      priority: data.priority,
+      effectiveFrom: new Date(data.effective_from),
+      effectiveTo: data.effective_to ? new Date(data.effective_to) : undefined,
+      ruleType: data.rule_type
     };
   }
 };

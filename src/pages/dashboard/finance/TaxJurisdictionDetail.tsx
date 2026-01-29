@@ -7,10 +7,11 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Loader2, Plus, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { TaxManagementService } from '@/services/taxation/TaxManagementService';
 import { TaxJurisdiction, TaxRule } from '@/services/taxation/types';
+import { TaxRuleDialog } from './TaxRuleDialog';
 import {
   Form,
   FormControl,
@@ -328,11 +329,17 @@ export default function TaxJurisdictionDetail() {
 
           {!isNew && (
             <Card>
-              <CardHeader>
-                <CardTitle>Tax Rules</CardTitle>
-                <CardDescription>
-                  Rules defined for this jurisdiction.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Tax Rules</CardTitle>
+                  <CardDescription>
+                    Rules defined for this jurisdiction.
+                  </CardDescription>
+                </div>
+                <Button size="sm" onClick={handleAddRule}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Rule
+                </Button>
               </CardHeader>
               <CardContent>
                 {rules.length === 0 ? (
@@ -347,17 +354,23 @@ export default function TaxJurisdictionDetail() {
                         <TableHead>Type</TableHead>
                         <TableHead>Effective</TableHead>
                         <TableHead>Priority</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {rules.map((rule) => (
                         <TableRow key={rule.id}>
-                          <TableCell className="font-medium">{(rule.rate * 100).toFixed(2)}%</TableCell>
+                          <TableCell className="font-medium">{(rule.rate * 100).toFixed(4)}%</TableCell>
                           <TableCell>{rule.ruleType}</TableCell>
                           <TableCell>
                             {new Date(rule.effectiveFrom).toLocaleDateString()}
                           </TableCell>
                           <TableCell>{rule.priority}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditRule(rule)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -367,6 +380,16 @@ export default function TaxJurisdictionDetail() {
             </Card>
           )}
         </div>
+        
+        {id && !isNew && (
+          <TaxRuleDialog
+            open={ruleDialogOpen}
+            onOpenChange={setRuleDialogOpen}
+            jurisdictionId={id}
+            ruleToEdit={selectedRule}
+            onSuccess={handleRuleSaved}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

@@ -2,12 +2,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InvoiceService } from './InvoiceService';
 import { TaxEngine } from '../taxation/TaxEngine';
+import { GLSyncService } from '../gl/GLSyncService';
 import { CreateInvoiceRequest } from './types';
 
 // Mock Supabase
 const mockUser = { id: 'user-123' };
 const mockTenantId = 'tenant-123';
-const mockInvoice = { id: 'invoice-123' };
+const mockInvoice = { id: 'invoice-123', tenant_id: mockTenantId, status: 'DRAFT' };
 
 const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
@@ -15,6 +16,7 @@ const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockSingle = vi.fn();
 const mockInsert = vi.fn();
+const mockUpdate = vi.fn();
 const mockSchema = vi.fn();
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -35,6 +37,13 @@ vi.mock('../taxation/TaxEngine', () => ({
   }
 }));
 
+// Mock GLSyncService
+vi.mock('../gl/GLSyncService', () => ({
+  GLSyncService: {
+    syncTransaction: vi.fn().mockResolvedValue(undefined)
+  }
+}));
+
 describe('InvoiceService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,37 +51,33 @@ describe('InvoiceService', () => {
     // Setup Supabase Mocks
     mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null });
     
-    // User Role Mock (for tenant_id)
-    mockFrom.mockReturnValue({ select: mockSelect });
-    mockSelect.mockReturnValue({ eq: mockEq });
-    mockEq.mockReturnValue({ single: mockSingle });
-    mockSingle.mockResolvedValue({ data: { tenant_id: mockTenantId }, error: null });
-
     // Schema Mock (finance)
     mockSchema.mockReturnValue({ from: mockFrom });
     
-    // Insert Mock
-    mockInsert.mockReturnValue({ select: mockSelect });
-    mockSelect.mockReturnValue({ single: mockSingle, ...Promise.resolve([]) }); // Handle both single and array return
-    // Wait, for array return (invoice_items), select() returns a PromiseLike
-    // We need to refine this mock if the code uses .select().single() vs .select()
-    
-    // Refined Mock Strategy for Chain
-    const queryBuilder: any = {
-      select: vi.fn(),
-      insert: vi.fn(),
-      eq: vi.fn(),
-      single: vi.fn()
-    };
-    queryBuilder.select.mockReturnValue(queryBuilder);
-    queryBuilder.insert.mockReturnValue(queryBuilder);
-    queryBuilder.eq.mockReturnValue(queryBuilder);
-    queryBuilder.single.mockResolvedValue({ data: mockInvoice, error: null });
-    
-    // Special handling for invoice_items (array return)
-    // We can verify calls instead of perfect return types if we just check logic flow
-    // But the service awaits the result.
-    
+    // Default mocks for query builders
+    mockFrom.mockReturnValue({
+        select: () => ({
+            eq: () => ({
+                single: async () => ({ data: { tenant_id: mockTenantId }, error: null })
+            })
+        }),
+        insert: (data: any) => ({
+            select: () => ({
+                single: async () => ({ data: { ...data, id: 'invoice-123' }, error: null })
+            })
+        }),
+        update: (data: any) => ({
+            eq: () => ({
+                select: () => ({
+                    single: async () => ({ data: { ...mockInvoice, ...data }, error: null })
+                })
+            })
+        })
+    });
+  });
+
+  it('should create an invoice with calculated taxes', async () => {
+    // Custom mock for this test to handle multiple table calls
     mockFrom.mockImplementation((table) => {
         if (table === 'user_roles') {
             return {
@@ -99,11 +104,9 @@ describe('InvoiceService', () => {
                 })
              };
         }
-        return queryBuilder;
+        return {};
     });
-  });
 
-  it('should create an invoice with calculated taxes', async () => {
     const request: CreateInvoiceRequest = {
       customer_id: 'cust-1',
       origin_address: { street: 'Origin', city: 'City', state: 'TX', zip: '75000', country: 'US' },
@@ -157,5 +160,39 @@ describe('InvoiceService', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items![0].tax_amount).toBe(16.5);
     expect(result.items![0].total_amount).toBe(216.5);
+  });
+
+  it('should finalize an invoice and trigger GL sync', async () => {
+    // Custom mock for update
+    const mockUpdateFn = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ 
+                    data: { ...mockInvoice, status: 'SENT' }, 
+                    error: null 
+                })
+            })
+        })
+    });
+
+    mockFrom.mockImplementation((table) => {
+        if (table === 'invoices') {
+            return { update: mockUpdateFn };
+        }
+        return {};
+    });
+
+    const result = await InvoiceService.finalizeInvoice('invoice-123');
+
+    // Verify DB Update
+    expect(mockSchema).toHaveBeenCalledWith('finance');
+    expect(mockFrom).toHaveBeenCalledWith('invoices');
+    expect(mockUpdateFn).toHaveBeenCalledWith({ status: 'SENT' });
+    
+    // Verify Result
+    expect(result.status).toBe('SENT');
+
+    // Verify GL Sync Trigger
+    expect(GLSyncService.syncTransaction).toHaveBeenCalledWith(mockTenantId, 'invoice-123', 'INVOICE');
   });
 });
