@@ -1,8 +1,8 @@
 #!/bin/bash
 
 PROJECT_REF="gzhxgoigflftharcmdqj"
-PASSWORD="123456"
-PASSWORD2="%23%21%23Vimal%402025"
+PASSWORD="#!January#2026!"
+PASSWORD2="%23!January%232026!"
 
 REGIONS=(
   "aws-0-us-east-1"

@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Invoice, CreateInvoiceRequest, InvoiceItem, InvoiceStatus } from './types';
 import { TaxEngine } from '../taxation/TaxEngine';
+import { GLSyncService } from '../gl/GLSyncService';
 
 export const InvoiceService = {
   /**
@@ -186,5 +187,28 @@ export const InvoiceService = {
 
     if (error) throw error;
     return data as Invoice[];
+  },
+
+  /**
+   * Finalizes an invoice (Draft -> Sent) and triggers GL sync.
+   */
+  async finalizeInvoice(id: string): Promise<Invoice> {
+    // 1. Update status
+    const { data: invoice, error } = await supabase
+      .schema('finance')
+      .from('invoices')
+      .update({ status: 'SENT' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // 2. Trigger Async GL Sync
+    // Note: We don't await this so it runs in background
+    GLSyncService.syncTransaction(invoice.tenant_id, invoice.id, 'INVOICE')
+        .catch(err => console.error('Background GL Sync failed', err));
+
+    return invoice as Invoice;
   }
 };

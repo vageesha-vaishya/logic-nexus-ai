@@ -20,6 +20,8 @@ import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import { matchLegForCharge } from '@/lib/charge-bifurcation';
 import { TransportLeg } from '@/types/quote-breakdown';
 import { QuickQuoteHistory } from '@/components/sales/quick-quote/QuickQuoteHistory';
+import { PluginRegistry } from '@/services/plugins/PluginRegistry';
+import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 
 export default function QuoteNew() {
   const { supabase, context, scopedDb } = useCRM();
@@ -306,90 +308,24 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
             scopedDb.from('carriers', true).select('id, carrier_name, scac')
         ]);
 
-        // Helpers
-        const getCatId = (code: string) => {
-            const normalizedCode = code.toUpperCase().replace(/_/g, ' ');
-            const exact = categories?.find((c: any) => c.code === code || c.name.toUpperCase() === normalizedCode)?.id;
-            if (exact) return exact;
-            
-            const mappings: Record<string, string> = {
-                'BASE_FARE': 'FREIGHT', 'FREIGHT': 'FREIGHT', 'TAXES': 'TAXES',
-                'SURCHARGES': 'SURCHARGE', 'FUEL': 'FUEL_SURCHARGE',
-                'PICKUP': 'PICKUP', 'DELIVERY': 'DELIVERY',
-                'DOCUMENTATION': 'DOCUMENTATION', 'CUSTOMS': 'CUSTOMS_CLEARANCE',
-                'INSURANCE': 'INSURANCE', 'HANDLING': 'HANDLING',
-                'THC': 'TERMINAL_HANDLING', 'BUNKER': 'BUNKER_ADJUSTMENT'
-            };
-            const mappedCode = mappings[code] || mappings[normalizedCode];
-            if (mappedCode) {
-                 const mapped = categories?.find((c: any) => c.code === mappedCode || c.name.toUpperCase() === mappedCode)?.id;
-                 if (mapped) return mapped;
-            }
-            const keywordMatch = categories?.find((c: any) => c.name.toUpperCase().includes(normalizedCode) || c.code.includes(code))?.id;
-            if (keywordMatch) return keywordMatch;
-            return categories?.find((c: any) => c.code === 'SURCHARGE')?.id || categories?.[0]?.id;
-        };
+        // Initialize Logistics Plugin Mapper
+        const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
+        if (!logisticsPlugin) {
+            throw new Error('Logistics Core Plugin not found');
+        }
 
-        const getSideId = (code: string) => sides?.find((s: any) => s.code?.toLowerCase() === code.toLowerCase() || s.name?.toLowerCase() === code.toLowerCase())?.id;
-        const getBasisId = (code: string) => bases?.find((b: any) => b.code?.toLowerCase() === code.toLowerCase())?.id || bases?.find((b: any) => b.code === 'shipment' || b.name === 'Per Shipment')?.id;
-        const getCurrId = (code: string) => currencies?.find((c: any) => c.code === code)?.id || currencies?.find((c: any) => c.code === 'USD')?.id;
-        
-        const getServiceTypeId = (mode: string, tier?: string) => {
-            if (!serviceTypes) return null;
-            
-            const modeKey = (mode || '').toLowerCase();
-            const tierKey = (tier || '').toLowerCase();
+        const rateMapper = logisticsPlugin.createRateMapper({
+            categories: categories || [],
+            sides: sides || [],
+            bases: bases || [],
+            currencies: currencies || [],
+            serviceTypes: serviceTypes || [],
+            serviceModes: serviceModes || [],
+            carriers: carriers || []
+        });
 
-            if (tierKey) {
-                const tierMatch = serviceTypes.find((st: any) => 
-                    st.code?.toLowerCase() === tierKey || 
-                    st.name?.toLowerCase() === tierKey
-                );
-                if (tierMatch) return tierMatch.id;
-            }
-
-            // Try exact mode match
-            let modeMatch = serviceTypes.find((st: any) => st.transport_modes?.code?.toLowerCase() === modeKey);
-            if (modeMatch) return modeMatch.id;
-
-            // Try split mode match (e.g. "Ocean - FCL" -> "sea")
-            const splitMode = modeKey.split(/[\s-]+/)[0];
-            const map: Record<string, string> = { 'ocean': 'sea', 'truck': 'road' };
-            const target = map[splitMode] || splitMode;
-
-            modeMatch = serviceTypes.find((st: any) => st.transport_modes?.code?.toLowerCase() === target);
-            return modeMatch?.id || serviceTypes[0]?.id;
-        };
-
-        const getModeId = (modeName: string) => {
-             if (!modeName) return null;
-             const normalized = modeName.toLowerCase();
-             // Map common terms
-             const map: Record<string, string> = { 'ocean': 'sea', 'truck': 'road', 'air': 'air' };
-             
-             // 1. Try exact/mapped match
-             let target = map[normalized] || normalized;
-             let match = serviceModes?.find((m: any) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
-             if (match) return match.id;
-             
-             // 2. Try split match
-             const split = normalized.split(/[\s-]+/)[0];
-             target = map[split] || split;
-             match = serviceModes?.find((m: any) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
-             if (match) return match.id;
-
-             // 3. Fallback to sea/ocean if reasonable default needed, or null
-             return serviceModes?.find((m: any) => m.code.toLowerCase() === 'sea')?.id || null;
-        };
-
-        const getProviderId = (carrierName: string) => {
-             if (!carrierName) return null;
-             const normalized = carrierName.toLowerCase();
-             return carriers?.find((c: any) => c.carrier_name.toLowerCase().includes(normalized) || c.scac?.toLowerCase() === normalized)?.id;
-        };
-
-        const buySideId = getSideId('buy') || getSideId('cost');
-        const sellSideId = getSideId('sell') || getSideId('revenue');
+        const buySideId = rateMapper.getSideId('buy') || rateMapper.getSideId('cost');
+        const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
         if (!buySideId || !sellSideId) {
              console.error('[QuoteNew] Master Data Missing: Sides', { sides });
@@ -442,7 +378,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     total_buy: buyPrice,
                     margin_amount: marginAmount,
                     margin_percentage: markupPercent,
-                    quote_currency_id: getCurrId(rate.currency || 'USD'),
+                    quote_currency_id: rateMapper.getCurrId(rate.currency || 'USD'),
                     transit_time: rate.transitTime,
                     total_transit_days: rate.transitTime ? parseInt(rate.transitTime.match(/\d+/)?.[0] || '0') || null : null,
                     valid_until: rate.validUntil ? new Date(rate.validUntil).toISOString() : null,
@@ -488,7 +424,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 rateLegs.forEach((leg: any, index: number) => {
                     const legMode = leg.mode || rate.transport_mode || 'ocean';
                     const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
-                    const serviceTypeId = getServiceTypeId(legMode, rate.tier);
+                    const serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
                     
                     // Smart location fallback
                     // Only use main origin/destination for the first/last legs respectively
@@ -519,10 +455,10 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     legsToInsert.push({
                         quotation_version_option_id: optionId,
                         tenant_id: tenantId,
-                        mode_id: getModeId(legMode),
+                        mode_id: rateMapper.getModeId(legMode),
                         mode: legMode,
                         service_type_id: serviceTypeId,
-                        provider_id: getProviderId(carrierName),
+                        provider_id: rateMapper.getProviderId(carrierName),
                         origin_location: origin || (isFirstLeg ? state.origin : null), // Fallback for safety
                         destination_location: destination || (isLastLeg ? state.destination : null),
                         sort_order: index + 1,
@@ -558,7 +494,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 });
 
                 // Determine Main Leg
-                const targetModeId = getModeId(rate.transport_mode || 'ocean');
+                const targetModeId = rateMapper.getModeId(rate.transport_mode || 'ocean');
                 const mainLeg = legData?.find((l: any) => l.mode_id === targetModeId && l.leg_type === 'transport') || legData?.[0];
                 const mainLegId = mainLeg?.id;
 
@@ -567,9 +503,9 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 let totalInsertedSellAmount = 0;
                 
                 const addChargePair = (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): boolean => {
-                    const catId = getCatId(categoryKey);
-                    const basisId = getBasisId(basisCode || '') || getBasisId('PER_SHIPMENT');
-                    const currId = getCurrId(rate.currency || 'USD');
+                    const catId = rateMapper.getCatId(categoryKey);
+                    const basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
+                    const currId = rateMapper.getCurrId(rate.currency || 'USD');
                     if (!catId) return false;
                     
                     // Fallback to mainLegId if targetLegId is null, ensuring we never send null for leg_id

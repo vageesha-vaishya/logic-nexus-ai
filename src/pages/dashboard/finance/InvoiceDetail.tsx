@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { InvoiceService } from '@/services/invoicing/InvoiceService';
 import { Invoice } from '@/services/invoicing/types';
@@ -112,6 +112,21 @@ export default function InvoiceDetail() {
         issue_date: new Date(values.issue_date),
         due_date: new Date(values.due_date),
         currency: values.currency,
+        // TODO: Implement address selection in UI. Using defaults for now.
+        origin_address: {
+            street: '123 Origin St',
+            city: 'New York',
+            state: 'NY',
+            zip: '10001',
+            country: 'US'
+        },
+        destination_address: {
+            street: '456 Dest St',
+            city: 'Los Angeles',
+            state: 'CA',
+            zip: '90001',
+            country: 'US'
+        },
         items: values.items.map(item => ({
           description: item.description,
           quantity: item.quantity,

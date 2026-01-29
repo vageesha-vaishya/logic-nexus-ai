@@ -12,392 +12,8 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  finance: {
-    Tables: {
-      tax_jurisdictions: {
-        Row: {
-          id: string
-          code: string
-          name: string
-          parent_id: string | null
-          type: string
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          code: string
-          name: string
-          parent_id?: string | null
-          type: string
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          code?: string
-          name?: string
-          parent_id?: string | null
-          type?: string
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tax_jurisdictions_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "tax_jurisdictions"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      tax_codes: {
-        Row: {
-          id: string
-          code: string
-          description: string | null
-          is_active: boolean | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          code: string
-          description?: string | null
-          is_active?: boolean | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          code?: string
-          description?: string | null
-          is_active?: boolean | null
-          created_at?: string | null
-        }
-        Relationships: []
-      }
-      tax_rules: {
-        Row: {
-          id: string
-          jurisdiction_id: string | null
-          tax_code_id: string | null
-          rate: number
-          priority: number | null
-          effective_from: string
-          effective_to: string | null
-          rule_type: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          jurisdiction_id?: string | null
-          tax_code_id?: string | null
-          rate: number
-          priority?: number | null
-          effective_from: string
-          effective_to?: string | null
-          rule_type?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          jurisdiction_id?: string | null
-          tax_code_id?: string | null
-          rate?: number
-          priority?: number | null
-          effective_from?: string
-          effective_to?: string | null
-          rule_type?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tax_rules_jurisdiction_id_fkey"
-            columns: ["jurisdiction_id"]
-            isOneToOne: false
-            referencedRelation: "tax_jurisdictions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tax_rules_tax_code_id_fkey"
-            columns: ["tax_code_id"]
-            isOneToOne: false
-            referencedRelation: "tax_codes"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      invoices: {
-        Row: {
-          id: string
-          tenant_id: string
-          customer_id: string
-          invoice_number: string
-          status: string | null
-          issue_date: string
-          due_date: string
-          currency: string
-          subtotal: number
-          tax_total: number
-          total_amount: number
-          metadata: Json | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          customer_id: string
-          invoice_number: string
-          status?: string | null
-          issue_date: string
-          due_date: string
-          currency: string
-          subtotal: number
-          tax_total: number
-          total_amount: number
-          metadata?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          customer_id?: string
-          invoice_number?: string
-          status?: string | null
-          issue_date?: string
-          due_date?: string
-          currency?: string
-          subtotal?: number
-          tax_total?: number
-          total_amount?: number
-          metadata?: Json | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoices_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      invoice_items: {
-        Row: {
-          id: string
-          invoice_id: string | null
-          description: string
-          quantity: number
-          unit_price: number
-          tax_code_id: string | null
-          tax_amount: number
-          total_amount: number
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          invoice_id?: string | null
-          description: string
-          quantity: number
-          unit_price: number
-          tax_code_id?: string | null
-          tax_amount: number
-          total_amount: number
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          invoice_id?: string | null
-          description?: string
-          quantity?: number
-          unit_price?: number
-          tax_code_id?: string | null
-          tax_amount?: number
-          total_amount?: number
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_items_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_items_tax_code_id_fkey"
-            columns: ["tax_code_id"]
-            isOneToOne: false
-            referencedRelation: "tax_codes"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      gl_accounts: {
-        Row: {
-          id: string
-          tenant_id: string
-          code: string
-          name: string
-          type: string
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          code: string
-          name: string
-          type: string
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          code?: string
-          name?: string
-          type?: string
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gl_accounts_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      journal_entries: {
-        Row: {
-          id: string
-          tenant_id: string
-          reference_id: string
-          reference_type: string
-          sync_status: string | null
-          external_id: string | null
-          error_message: string | null
-          retry_count: number | null
-          created_at: string | null
-          synced_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          reference_id: string
-          reference_type: string
-          sync_status?: string | null
-          external_id?: string | null
-          error_message?: string | null
-          retry_count?: number | null
-          created_at?: string | null
-          synced_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          reference_id?: string
-          reference_type?: string
-          sync_status?: string | null
-          external_id?: string | null
-          error_message?: string | null
-          retry_count?: number | null
-          created_at?: string | null
-          synced_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "journal_entries_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      tenant_nexus: {
-        Row: {
-          id: string
-          tenant_id: string
-          jurisdiction_id: string
-          effective_from: string
-          effective_to: string | null
-          created_at: string | null
-          created_by: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          jurisdiction_id: string
-          effective_from: string
-          effective_to?: string | null
-          created_at?: string | null
-          created_by?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          jurisdiction_id?: string
-          effective_from?: string
-          effective_to?: string | null
-          created_at?: string | null
-          created_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tenant_nexus_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tenant_nexus_jurisdiction_id_fkey"
-            columns: ["jurisdiction_id"]
-            isOneToOne: false
-            referencedRelation: "tax_jurisdictions"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
-      platform_domains: {
-        Row: {
-          code: string
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       accounts: {
         Row: {
           account_number: string | null
@@ -581,54 +197,6 @@ export type Database = {
           },
         ]
       }
-      ai_quote_requests: {
-        Row: {
-          id: string
-          user_id: string
-          tenant_id: string
-          created_at: string | null
-          request_payload: Json
-          response_payload: Json
-          status: string
-          quote_id: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          tenant_id: string
-          created_at?: string | null
-          request_payload: Json
-          response_payload: Json
-          status?: string
-          quote_id?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          tenant_id?: string
-          created_at?: string | null
-          request_payload?: Json
-          response_payload?: Json
-          status?: string
-          quote_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_quote_requests_quote_id_fkey"
-            columns: ["quote_id"]
-            isOneToOne: false
-            referencedRelation: "quotes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_quote_requests_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       activities: {
         Row: {
           account_id: string | null
@@ -737,13 +305,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "activities_opportunity_id_fkey"
-            columns: ["opportunity_id"]
-            isOneToOne: false
-            referencedRelation: "opportunities"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "activities_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -844,6 +405,78 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ai_quote_cache: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          request_hash: string
+          response_payload: Json
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          request_hash: string
+          response_payload: Json
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          request_hash?: string
+          response_payload?: Json
+        }
+        Relationships: []
+      }
+      ai_quote_requests: {
+        Row: {
+          created_at: string | null
+          id: string
+          quote_id: string | null
+          request_payload: Json
+          response_payload: Json
+          status: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          quote_id?: string | null
+          request_payload: Json
+          response_payload: Json
+          status?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          quote_id?: string | null
+          request_payload?: Json
+          response_payload?: Json
+          status?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_quote_requests_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_quote_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
@@ -1286,6 +919,7 @@ export type Database = {
       carrier_rates: {
         Row: {
           accessorial_fees: Json | null
+          account_id: string | null
           base_rate: number
           carrier_id: string | null
           carrier_name: string
@@ -1295,7 +929,6 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           currency: string | null
-          account_id: string | null
           cut_off_date: string | null
           demurrage_rate: number | null
           destination_location: string | null
@@ -1307,6 +940,7 @@ export type Database = {
           free_time_days: number | null
           id: string
           is_active: boolean | null
+          is_simulated: boolean | null
           markup_amount: number | null
           mode: string | null
           notes: string | null
@@ -1335,6 +969,7 @@ export type Database = {
         }
         Insert: {
           accessorial_fees?: Json | null
+          account_id?: string | null
           base_rate: number
           carrier_id?: string | null
           carrier_name: string
@@ -1344,7 +979,6 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
-          account_id?: string | null
           cut_off_date?: string | null
           demurrage_rate?: number | null
           destination_location?: string | null
@@ -1356,6 +990,7 @@ export type Database = {
           free_time_days?: number | null
           id?: string
           is_active?: boolean | null
+          is_simulated?: boolean | null
           markup_amount?: number | null
           mode?: string | null
           notes?: string | null
@@ -1384,6 +1019,7 @@ export type Database = {
         }
         Update: {
           accessorial_fees?: Json | null
+          account_id?: string | null
           base_rate?: number
           carrier_id?: string | null
           carrier_name?: string
@@ -1393,7 +1029,6 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
-          account_id?: string | null
           cut_off_date?: string | null
           demurrage_rate?: number | null
           destination_location?: string | null
@@ -1405,6 +1040,7 @@ export type Database = {
           free_time_days?: number | null
           id?: string
           is_active?: boolean | null
+          is_simulated?: boolean | null
           markup_amount?: number | null
           mode?: string | null
           notes?: string | null
@@ -1543,6 +1179,7 @@ export type Database = {
           notes: string | null
           rating: number | null
           scac: string | null
+          scac_code: string | null
           service_routes: Json | null
           tenant_id: string
           updated_at: string | null
@@ -1567,6 +1204,7 @@ export type Database = {
           notes?: string | null
           rating?: number | null
           scac?: string | null
+          scac_code?: string | null
           service_routes?: Json | null
           tenant_id: string
           updated_at?: string | null
@@ -1591,6 +1229,7 @@ export type Database = {
           notes?: string | null
           rating?: number | null
           scac?: string | null
+          scac_code?: string | null
           service_routes?: Json | null
           tenant_id?: string
           updated_at?: string | null
@@ -2424,7 +2063,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       container_type_attributes: {
@@ -2469,6 +2108,7 @@ export type Database = {
         Row: {
           code: string | null
           created_at: string | null
+          description: string | null
           id: string
           is_active: boolean | null
           is_special: boolean | null
@@ -2484,6 +2124,7 @@ export type Database = {
         Insert: {
           code?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           is_active?: boolean | null
           is_special?: boolean | null
@@ -2499,6 +2140,7 @@ export type Database = {
         Update: {
           code?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           is_active?: boolean | null
           is_special?: boolean | null
@@ -4636,6 +4278,50 @@ export type Database = {
           },
         ]
       }
+      margin_rules: {
+        Row: {
+          adjustment_type: string
+          adjustment_value: number
+          condition_json: Json
+          created_at: string | null
+          id: string
+          name: string
+          priority: number
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          adjustment_type: string
+          adjustment_value: number
+          condition_json?: Json
+          created_at?: string | null
+          id?: string
+          name: string
+          priority?: number
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          adjustment_type?: string
+          adjustment_value?: number
+          condition_json?: Json
+          created_at?: string | null
+          id?: string
+          name?: string
+          priority?: number
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oauth_configurations: {
         Row: {
           client_id: string
@@ -4860,15 +4546,7 @@ export type Database = {
           unit_price?: number
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "opportunity_items_opportunity_id_fkey"
-            columns: ["opportunity_id"]
-            isOneToOne: false
-            referencedRelation: "opportunities"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       opportunity_probability_history: {
         Row: {
@@ -4901,15 +4579,7 @@ export type Database = {
           old_stage?: Database["public"]["Enums"]["opportunity_stage"] | null
           opportunity_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "opportunity_probability_history_opportunity_id_fkey"
-            columns: ["opportunity_id"]
-            isOneToOne: false
-            referencedRelation: "opportunities"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       package_categories: {
         Row: {
@@ -4986,6 +4656,36 @@ export type Database = {
           tenant_id?: string
           updated_at?: string | null
           width_ft?: number | null
+        }
+        Relationships: []
+      }
+      platform_domains: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -5113,6 +4813,7 @@ export type Database = {
           last_name: string | null
           must_change_password: boolean | null
           phone: string | null
+          tenant_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -5125,6 +4826,7 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean | null
           phone?: string | null
+          tenant_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -5137,9 +4839,18 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean | null
           phone?: string | null
+          tenant_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       provider_api_configs: {
         Row: {
@@ -5928,8 +5639,11 @@ export type Database = {
       }
       quotation_version_option_legs: {
         Row: {
+          carrier_name: string | null
+          co2_kg: number | null
           created_at: string
           destination_location: string | null
+          distance_km: number | null
           franchise_id: string | null
           id: string
           leg_type: string | null
@@ -5945,11 +5659,17 @@ export type Database = {
           service_type_id: string | null
           sort_order: number
           tenant_id: string
+          transit_time_hours: number | null
+          transport_mode: string | null
           updated_at: string | null
+          voyage_number: string | null
         }
         Insert: {
+          carrier_name?: string | null
+          co2_kg?: number | null
           created_at?: string
           destination_location?: string | null
+          distance_km?: number | null
           franchise_id?: string | null
           id?: string
           leg_type?: string | null
@@ -5965,11 +5685,17 @@ export type Database = {
           service_type_id?: string | null
           sort_order?: number
           tenant_id: string
+          transit_time_hours?: number | null
+          transport_mode?: string | null
           updated_at?: string | null
+          voyage_number?: string | null
         }
         Update: {
+          carrier_name?: string | null
+          co2_kg?: number | null
           created_at?: string
           destination_location?: string | null
+          distance_km?: number | null
           franchise_id?: string | null
           id?: string
           leg_type?: string | null
@@ -5985,7 +5711,10 @@ export type Database = {
           service_type_id?: string | null
           sort_order?: number
           tenant_id?: string
+          transit_time_hours?: number | null
+          transport_mode?: string | null
           updated_at?: string | null
+          voyage_number?: string | null
         }
         Relationships: [
           {
@@ -6034,12 +5763,16 @@ export type Database = {
       }
       quotation_version_options: {
         Row: {
+          ai_explanation: string | null
+          ai_generated: boolean | null
           auto_margin_enabled: boolean
           buy_subtotal: number
+          carrier_name: string | null
           carrier_rate_id: string | null
           charge_count: number | null
           created_at: string | null
           created_by: string | null
+          currency: string | null
           franchise_id: string | null
           id: string
           last_calculated_at: string | null
@@ -6055,23 +5788,37 @@ export type Database = {
           quotation_version_id: string
           quote_currency_id: string | null
           recommended: boolean | null
+          reliability_score: number | null
           rounding_rule: string | null
+          route_type: string | null
           sell_subtotal: number
+          service_type: string | null
+          source: string | null
           status: string | null
           tenant_id: string
+          tier: string | null
           total_amount: number
           total_buy: number | null
+          total_co2_kg: number | null
           total_sell: number | null
+          total_stops: number | null
+          total_transit_days: number | null
           trade_direction_id: string | null
+          transit_time: string | null
           updated_at: string | null
+          valid_until: string | null
         }
         Insert: {
+          ai_explanation?: string | null
+          ai_generated?: boolean | null
           auto_margin_enabled?: boolean
           buy_subtotal?: number
+          carrier_name?: string | null
           carrier_rate_id?: string | null
           charge_count?: number | null
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           franchise_id?: string | null
           id?: string
           last_calculated_at?: string | null
@@ -6087,23 +5834,37 @@ export type Database = {
           quotation_version_id: string
           quote_currency_id?: string | null
           recommended?: boolean | null
+          reliability_score?: number | null
           rounding_rule?: string | null
+          route_type?: string | null
           sell_subtotal?: number
+          service_type?: string | null
+          source?: string | null
           status?: string | null
           tenant_id: string
+          tier?: string | null
           total_amount?: number
           total_buy?: number | null
+          total_co2_kg?: number | null
           total_sell?: number | null
+          total_stops?: number | null
+          total_transit_days?: number | null
           trade_direction_id?: string | null
+          transit_time?: string | null
           updated_at?: string | null
+          valid_until?: string | null
         }
         Update: {
+          ai_explanation?: string | null
+          ai_generated?: boolean | null
           auto_margin_enabled?: boolean
           buy_subtotal?: number
+          carrier_name?: string | null
           carrier_rate_id?: string | null
           charge_count?: number | null
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           franchise_id?: string | null
           id?: string
           last_calculated_at?: string | null
@@ -6119,15 +5880,25 @@ export type Database = {
           quotation_version_id?: string
           quote_currency_id?: string | null
           recommended?: boolean | null
+          reliability_score?: number | null
           rounding_rule?: string | null
+          route_type?: string | null
           sell_subtotal?: number
+          service_type?: string | null
+          source?: string | null
           status?: string | null
           tenant_id?: string
+          tier?: string | null
           total_amount?: number
           total_buy?: number | null
+          total_co2_kg?: number | null
           total_sell?: number | null
+          total_stops?: number | null
+          total_transit_days?: number | null
           trade_direction_id?: string | null
+          transit_time?: string | null
           updated_at?: string | null
+          valid_until?: string | null
         }
         Relationships: [
           {
@@ -6176,7 +5947,9 @@ export type Database = {
       }
       quotation_versions: {
         Row: {
+          anomalies: Json | null
           change_reason: string | null
+          confidence_score: number | null
           created_at: string | null
           created_by: string | null
           franchise_id: string | null
@@ -6187,6 +5960,7 @@ export type Database = {
           locked_at: string | null
           locked_by: string | null
           major: number
+          market_analysis: string | null
           minor: number
           quote_id: string
           status: string | null
@@ -6196,7 +5970,9 @@ export type Database = {
           version_number: number
         }
         Insert: {
+          anomalies?: Json | null
           change_reason?: string | null
+          confidence_score?: number | null
           created_at?: string | null
           created_by?: string | null
           franchise_id?: string | null
@@ -6207,6 +5983,7 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           major?: number
+          market_analysis?: string | null
           minor?: number
           quote_id: string
           status?: string | null
@@ -6216,7 +5993,9 @@ export type Database = {
           version_number: number
         }
         Update: {
+          anomalies?: Json | null
           change_reason?: string | null
+          confidence_score?: number | null
           created_at?: string | null
           created_by?: string | null
           franchise_id?: string | null
@@ -6227,6 +6006,7 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           major?: number
+          market_analysis?: string | null
           minor?: number
           quote_id?: string
           status?: string | null
@@ -6351,6 +6131,39 @@ export type Database = {
           },
         ]
       }
+      quote_audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          payload: Json | null
+          result_summary: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          payload?: Json | null
+          result_summary?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          payload?: Json | null
+          result_summary?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       quote_charges: {
         Row: {
           amount: number
@@ -6455,7 +6268,7 @@ export type Database = {
             foreignKeyName: "quote_charges_leg_id_fkey"
             columns: ["leg_id"]
             isOneToOne: false
-            referencedRelation: "quote_option_legs"
+            referencedRelation: "quotation_version_option_legs"
             referencedColumns: ["id"]
           },
           {
@@ -6659,7 +6472,94 @@ export type Database = {
           },
         ]
       }
-      quote_items: {
+      quote_items_core: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          id: string
+          line_number: number
+          line_total: number
+          product_name: string
+          quantity: number
+          quote_id: string
+          tax_amount: number | null
+          tax_percent: number | null
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          line_number: number
+          line_total?: number
+          product_name: string
+          quantity?: number
+          quote_id: string
+          tax_amount?: number | null
+          tax_percent?: number | null
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          id?: string
+          line_number?: number
+          line_total?: number
+          product_name?: string
+          quantity?: number
+          quote_id?: string
+          tax_amount?: number | null
+          tax_percent?: number | null
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      quote_items_extension: {
+        Row: {
+          attributes: Json | null
+          id: string
+          package_category_id: string | null
+          package_size_id: string | null
+        }
+        Insert: {
+          attributes?: Json | null
+          id: string
+          package_category_id?: string | null
+          package_size_id?: string | null
+        }
+        Update: {
+          attributes?: Json | null
+          id?: string
+          package_category_id?: string | null
+          package_size_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_extension_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "quote_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_extension_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "quote_items_core"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_items_legacy: {
         Row: {
           cargo_type_id: string | null
           created_at: string | null
@@ -7626,6 +7526,7 @@ export type Database = {
           billing_address: Json | null
           cargo_details: Json | null
           carrier_id: string | null
+          compliance_checks: Json | null
           compliance_status: string | null
           consignee_id: string | null
           contact_id: string | null
@@ -7635,6 +7536,7 @@ export type Database = {
           currency: string | null
           current_version_id: string | null
           description: string | null
+          destination_code: string | null
           destination_location: Json | null
           destination_port_id: string | null
           discount_amount: number | null
@@ -7649,6 +7551,7 @@ export type Database = {
           margin_percentage: number | null
           notes: string | null
           opportunity_id: string | null
+          origin_code: string | null
           origin_location: Json | null
           origin_port_id: string | null
           owner_id: string | null
@@ -7673,6 +7576,8 @@ export type Database = {
           terms_conditions: string | null
           title: string
           total_amount: number | null
+          transport_mode: string | null
+          unit_details: Json | null
           updated_at: string | null
           valid_until: string | null
         }
@@ -7683,6 +7588,7 @@ export type Database = {
           billing_address?: Json | null
           cargo_details?: Json | null
           carrier_id?: string | null
+          compliance_checks?: Json | null
           compliance_status?: string | null
           consignee_id?: string | null
           contact_id?: string | null
@@ -7692,6 +7598,7 @@ export type Database = {
           currency?: string | null
           current_version_id?: string | null
           description?: string | null
+          destination_code?: string | null
           destination_location?: Json | null
           destination_port_id?: string | null
           discount_amount?: number | null
@@ -7706,6 +7613,7 @@ export type Database = {
           margin_percentage?: number | null
           notes?: string | null
           opportunity_id?: string | null
+          origin_code?: string | null
           origin_location?: Json | null
           origin_port_id?: string | null
           owner_id?: string | null
@@ -7730,6 +7638,8 @@ export type Database = {
           terms_conditions?: string | null
           title: string
           total_amount?: number | null
+          transport_mode?: string | null
+          unit_details?: Json | null
           updated_at?: string | null
           valid_until?: string | null
         }
@@ -7740,6 +7650,7 @@ export type Database = {
           billing_address?: Json | null
           cargo_details?: Json | null
           carrier_id?: string | null
+          compliance_checks?: Json | null
           compliance_status?: string | null
           consignee_id?: string | null
           contact_id?: string | null
@@ -7749,6 +7660,7 @@ export type Database = {
           currency?: string | null
           current_version_id?: string | null
           description?: string | null
+          destination_code?: string | null
           destination_location?: Json | null
           destination_port_id?: string | null
           discount_amount?: number | null
@@ -7763,6 +7675,7 @@ export type Database = {
           margin_percentage?: number | null
           notes?: string | null
           opportunity_id?: string | null
+          origin_code?: string | null
           origin_location?: Json | null
           origin_port_id?: string | null
           owner_id?: string | null
@@ -7787,6 +7700,8 @@ export type Database = {
           terms_conditions?: string | null
           title?: string
           total_amount?: number | null
+          transport_mode?: string | null
+          unit_details?: Json | null
           updated_at?: string | null
           valid_until?: string | null
         }
@@ -7873,6 +7788,7 @@ export type Database = {
           carrier_rate_id: string | null
           final_rate: number
           id: string
+          input_parameters: Json | null
           quote_id: string
           service_id: string | null
         }
@@ -7885,6 +7801,7 @@ export type Database = {
           carrier_rate_id?: string | null
           final_rate: number
           id?: string
+          input_parameters?: Json | null
           quote_id: string
           service_id?: string | null
         }
@@ -7897,6 +7814,7 @@ export type Database = {
           carrier_rate_id?: string | null
           final_rate?: number
           id?: string
+          input_parameters?: Json | null
           quote_id?: string
           service_id?: string | null
         }
@@ -9271,8 +9189,10 @@ export type Database = {
         Row: {
           billing_address: Json | null
           billing_email: string | null
+          config: Json | null
           created_at: string | null
           domain: string | null
+          domain_id: string
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -9287,8 +9207,10 @@ export type Database = {
         Insert: {
           billing_address?: Json | null
           billing_email?: string | null
+          config?: Json | null
           created_at?: string | null
           domain?: string | null
+          domain_id: string
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -9303,8 +9225,10 @@ export type Database = {
         Update: {
           billing_address?: Json | null
           billing_email?: string | null
+          config?: Json | null
           created_at?: string | null
           domain?: string | null
+          domain_id?: string
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -9316,7 +9240,15 @@ export type Database = {
           subscription_tier?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tenants_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "platform_domains"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       territories: {
         Row: {
@@ -10015,44 +9947,6 @@ export type Database = {
           },
         ]
       }
-      vessel_classes: {
-        Row: {
-          beam_limit_meters: number | null
-          draft_limit_meters: number | null
-          id: string
-          max_teu: number | null
-          min_teu: number | null
-          name: string
-          type_id: string | null
-        }
-        Insert: {
-          beam_limit_meters?: number | null
-          draft_limit_meters?: number | null
-          id?: string
-          max_teu?: number | null
-          min_teu?: number | null
-          name: string
-          type_id?: string | null
-        }
-        Update: {
-          beam_limit_meters?: number | null
-          draft_limit_meters?: number | null
-          id?: string
-          max_teu?: number | null
-          min_teu?: number | null
-          name?: string
-          type_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vessel_classes_type_id_fkey"
-            columns: ["type_id"]
-            isOneToOne: false
-            referencedRelation: "vessel_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       vessel_class_capacities: {
         Row: {
           class_id: string | null
@@ -10102,7 +9996,45 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
-          }
+          },
+        ]
+      }
+      vessel_classes: {
+        Row: {
+          beam_limit_meters: number | null
+          draft_limit_meters: number | null
+          id: string
+          max_teu: number | null
+          min_teu: number | null
+          name: string
+          type_id: string | null
+        }
+        Insert: {
+          beam_limit_meters?: number | null
+          draft_limit_meters?: number | null
+          id?: string
+          max_teu?: number | null
+          min_teu?: number | null
+          name: string
+          type_id?: string | null
+        }
+        Update: {
+          beam_limit_meters?: number | null
+          draft_limit_meters?: number | null
+          id?: string
+          max_teu?: number | null
+          min_teu?: number | null
+          name?: string
+          type_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vessel_classes_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_types"
+            referencedColumns: ["id"]
+          },
         ]
       }
       vessel_operational_metrics: {
@@ -10368,6 +10300,24 @@ export type Database = {
       }
     }
     Views: {
+      quote_items: {
+        Row: {
+          attributes: Json | null
+          created_at: string | null
+          description: string | null
+          discount_percent: number | null
+          id: string | null
+          line_number: number | null
+          package_category_id: string | null
+          package_size_id: string | null
+          product_name: string | null
+          quantity: number | null
+          quote_id: string | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       view_container_inventory_summary: {
         Row: {
           category: string | null
@@ -10382,6 +10332,13 @@ export type Database = {
           total_teu: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "container_tracking_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "container_sizes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "container_tracking_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -10458,10 +10415,15 @@ export type Database = {
           total_sell: number
         }[]
       }
+      calculate_teu: {
+        Args: { p_quantity: number; p_size_id: string }
+        Returns: number
+      }
       check_usage_limit: {
         Args: { _feature_key: string; _tenant_id: string }
         Returns: boolean
       }
+      clean_expired_ai_cache: { Args: never; Returns: undefined }
       cleanup_old_logs: { Args: { days_to_keep?: number }; Returns: undefined }
       compare_versions: {
         Args: { p_version_id_1: string; p_version_id_2: string }
@@ -10477,6 +10439,10 @@ export type Database = {
       }
       decrement_user_lead_count: {
         Args: { p_tenant_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      delete_quotes_cascade: {
+        Args: { quote_ids: string[] }
         Returns: undefined
       }
       drop_policy_if_exists: {
@@ -10851,13 +10817,18 @@ export type Database = {
           rate_per_kg: number
         }[]
       }
-      has_role: {
-        Args: {
-          check_role: Database["public"]["Enums"]["app_role"]
-          check_user_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: {
+              check_role: Database["public"]["Enums"]["app_role"]
+              check_user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: { check_role: string; check_user_id: string }
+            Returns: boolean
+          }
       increment_feature_usage: {
         Args: { _feature_key: string; _increment?: number; _tenant_id: string }
         Returns: undefined
@@ -10873,6 +10844,10 @@ export type Database = {
       is_current_user_platform_admin: { Args: never; Returns: boolean }
       is_franchise_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_profile_in_viewer_tenant: {
+        Args: { target_profile_id: string }
+        Returns: boolean
+      }
       is_queue_member_secure: {
         Args: { p_queue_id: string; p_user_id: string }
         Returns: boolean

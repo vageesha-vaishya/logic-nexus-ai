@@ -364,8 +364,27 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       let combinedOptions: RateOption[] = [];
 
       // 1. Process Legacy Results
+      let legacyErrorMsg = '';
       if (legacyRes.error) {
           console.error("[QuickQuote] Legacy Rate Engine Error:", legacyRes.error);
+          
+          // Try to extract body from the error context
+          try {
+             if (legacyRes.error.context && typeof legacyRes.error.context.json === 'function') {
+                 const body = await legacyRes.error.context.json();
+                 legacyErrorMsg = body.error || body.message || legacyRes.error.message;
+             } else {
+                 legacyErrorMsg = legacyRes.error.message || 'Unknown Error';
+             }
+          } catch (e) {
+             legacyErrorMsg = legacyRes.error.message || 'Unknown Error';
+          }
+
+          toast({
+              title: "Rate Engine Error",
+              description: `Legacy Engine Failed: ${legacyErrorMsg}`,
+              variant: "destructive"
+          });
       } else if (legacyRes.data?.options) {
           console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
           const legacyOptions = legacyRes.data.options.map((opt: any) => {
@@ -443,7 +462,8 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       }
 
       if (combinedOptions.length === 0) {
-          throw new Error("No quotes available from any source.");
+          const aiError = aiRes.error ? (aiRes.error.message || 'Unknown AI Error') : 'No Data';
+          throw new Error(`No quotes available. Legacy: ${legacyErrorMsg || 'No Data'}. AI: ${aiError}`);
       }
 
       setResults(combinedOptions);

@@ -47,8 +47,11 @@ echo "  File: ${SQL_FILE}"
 echo "  DB:   ${SUPABASE_DB_URL}"
 
 # Execute SQL file against remote DB URL
+# Strip pgbouncer param which causes psql error
+CLEAN_DB_URL=$(echo "${SUPABASE_DB_URL}" | sed 's/?pgbouncer=true//g' | sed 's/&pgbouncer=true//g')
+
 if command -v psql >/dev/null 2>&1; then
-  psql "${SUPABASE_DB_URL}" -f "${SQL_FILE}"
+  psql "${CLEAN_DB_URL}" -f "${SQL_FILE}"
 else
   echo "Error: psql not found. Cannot execute migration directly."
   exit 1

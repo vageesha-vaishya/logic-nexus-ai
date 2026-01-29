@@ -2,7 +2,7 @@ export interface TaxJurisdiction {
   id: string;
   code: string;
   name: string;
-  type: 'COUNTRY' | 'STATE' | 'CITY' | 'DISTRICT';
+  type: 'COUNTRY' | 'STATE' | 'CITY' | 'DISTRICT' | 'COUNTY';
   parentId?: string;
 }
 

@@ -98,8 +98,8 @@ export const mapOptionToQuote = (opt: any) => {
         }
         
         // Recalculate total if it's 0 but we have components
-        const surchargeTotal = Object.values(surcharges).reduce((sum: number, val: any) => sum + Number(val || 0), 0);
-        const feeTotal = Object.values(fees).reduce((sum: number, val: any) => sum + Number(val || 0), 0);
+        const surchargeTotal = Object.values(surcharges).reduce((sum: number, val: any) => sum + Number(val || 0), 0) as number;
+        const feeTotal = Object.values(fees).reduce((sum: number, val: any) => sum + Number(val || 0), 0) as number;
         const componentsSum = Number((base_fare + taxes + surchargeTotal + feeTotal).toFixed(2));
 
         if (total === 0 && componentsSum > 0) {
@@ -334,15 +334,18 @@ export const mapOptionToQuote = (opt: any) => {
         }
     }
 
-    // Recalculate Financials if Total Amount Changed significantly
+    // Recalculate Financials if Total Amount Changed significantly OR if financials are missing
     // This handles the case where historical data had wrong total (12000) but correct components (4256)
-    // If we kept the old buyPrice (e.g. 10200), we'd have negative margin.
+    // AND handles the case where backend didn't provide financials (legacy/external sources)
     let finalBuyPrice = normalized.buyPrice;
     let finalMarginAmount = normalized.marginAmount;
     let finalMarkupPercent = normalized.markupPercent;
 
-    if (Math.abs((normalized.total_amount || 0) - price_breakdown.total) > 0.01) {
-        // Total has changed! Recalculate financials based on the new total.
+    const totalChanged = Math.abs((normalized.total_amount || 0) - price_breakdown.total) > 0.01;
+    const financialsMissing = !finalBuyPrice || finalBuyPrice <= 0;
+
+    if (totalChanged || financialsMissing) {
+        // Recalculate financials based on the (potentially new) total.
         
         // Prioritize explicit Margin %, fallback to 15%
         const targetMargin = normalized.marginPercent || 15;

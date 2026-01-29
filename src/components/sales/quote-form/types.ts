@@ -25,20 +25,28 @@ export const quoteSchema = z.object({
   notes: z.string().optional(),
   billing_address: z.any().optional(),
   shipping_address: z.any().optional(),
+  items: z.array(z.object({
+    line_number: z.number().optional(),
+    product_name: z.string().min(1, 'Product name is required'),
+    description: z.string().optional(),
+    quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
+    unit_price: z.coerce.number().min(0, 'Price must be non-negative'),
+    discount_percent: z.coerce.number().min(0).max(100).optional(),
+    package_category_id: z.string().optional(),
+    package_size_id: z.string().optional(),
+    attributes: z.object({
+      weight: z.coerce.number().optional(),
+      volume: z.coerce.number().optional(),
+      length: z.coerce.number().optional(),
+      width: z.coerce.number().optional(),
+      height: z.coerce.number().optional(),
+    }).optional()
+  })).optional().default([]),
 });
 
 export type QuoteFormValues = z.infer<typeof quoteSchema>;
 
-export type QuoteItem = {
-  line_number: number;
-  product_name: string;
-  description?: string;
-  quantity: number;
-  unit_price: number;
-  discount_percent: number;
-  package_category_id?: string;
-  package_size_id?: string;
-};
+export type QuoteItem = z.infer<typeof quoteSchema>['items'] extends (infer T)[] | undefined ? T : never;
 
 export type Charge = {
   type: string;

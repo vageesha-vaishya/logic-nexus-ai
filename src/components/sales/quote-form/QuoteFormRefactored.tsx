@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { QuoteDataProvider, useQuoteContext } from './QuoteContext';
 import { QuoteHeader } from './QuoteHeader';
 import { QuoteLogistics } from './QuoteLogistics';
+import { QuoteLineItems } from './QuoteLineItems';
 import { QuoteFinancials } from './QuoteFinancials';
 import { quoteSchema, QuoteFormValues } from './types';
 import { useQuoteHydration } from './useQuoteHydration';
@@ -149,6 +150,14 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
                     <h3>Logistics & Routing</h3>
                 </div>
                 <QuoteLogistics />
+            </section>
+
+            <section className="space-y-4">
+                <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">3</span>
+                    <h3>Cargo Details</h3>
+                </div>
+                <QuoteLineItems />
             </section>
             
             {/* Keeping MultiModalQuoteComposer as a bridge until Phase 2 */}
