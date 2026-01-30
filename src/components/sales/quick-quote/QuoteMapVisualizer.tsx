@@ -11,6 +11,14 @@ interface QuoteMapVisualizerProps {
 }
 
 export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisualizerProps) {
+    // Helper to normalize leg data
+    const normalizedLegs = legs.map(leg => ({
+        ...leg,
+        from: leg.from || leg.origin,
+        to: leg.to || leg.destination,
+        mode: (leg.mode || 'road').toLowerCase()
+    }));
+
     // Simplified World Map SVG Path (Mercator-ish)
     // This is a very rough approximation for visual context
     const worldMapPath = "M50,50 L100,50 L100,100 L50,100 Z"; // Placeholder if I can't find a good path string quickly. 
@@ -33,13 +41,13 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
                 </div>
                 <div className="flex gap-2 mt-2">
                     <Badge variant="outline" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
-                        {legs.filter(l => l.mode === 'ocean').length} Ocean
+                        {normalizedLegs.filter(l => l.mode.includes('ocean')).length} Ocean
                     </Badge>
                     <Badge variant="outline" className="text-[10px] h-5 bg-sky-50 text-sky-700 border-sky-200">
-                        {legs.filter(l => l.mode === 'air').length} Air
+                        {normalizedLegs.filter(l => l.mode.includes('air')).length} Air
                     </Badge>
                     <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
-                        {legs.filter(l => l.mode === 'road').length} Road
+                        {normalizedLegs.filter(l => l.mode.includes('road')).length} Road
                     </Badge>
                 </div>
             </div>
@@ -57,15 +65,15 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
                     </div>
 
                     {/* Legs Nodes */}
-                    {legs.map((leg, i) => (
-                        <div key={i} className="relative z-10 flex flex-col items-center group" style={{ left: `${((i + 1) / (legs.length + 1)) * 100}%`, position: 'absolute' }}>
+                    {normalizedLegs.map((leg, i) => (
+                        <div key={i} className="relative z-10 flex flex-col items-center group" style={{ left: `${((i + 1) / (normalizedLegs.length + 1)) * 100}%`, position: 'absolute' }}>
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className="w-8 h-8 rounded-full bg-white border-2 border-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-110 transition-transform">
-                                            {leg.mode === 'ocean' && <Ship className="w-4 h-4 text-blue-600" />}
-                                            {leg.mode === 'air' && <Plane className="w-4 h-4 text-sky-600" />}
-                                            {leg.mode === 'road' && <Truck className="w-4 h-4 text-amber-600" />}
+                                            {leg.mode.includes('ocean') && <Ship className="w-4 h-4 text-blue-600" />}
+                                            {leg.mode.includes('air') && <Plane className="w-4 h-4 text-sky-600" />}
+                                            {leg.mode.includes('road') && <Truck className="w-4 h-4 text-amber-600" />}
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>

@@ -3,9 +3,11 @@ import { Truck, Ship, Plane, ArrowRight, Warehouse, MapPin } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Leg {
-    from: string;
-    to: string;
-    mode: 'road' | 'ocean' | 'air' | 'rail';
+    from?: string;
+    to?: string;
+    origin?: string;
+    destination?: string;
+    mode: 'road' | 'ocean' | 'air' | 'rail' | string;
     carrier?: string;
     transit_time?: string;
     border_crossing?: boolean;
@@ -17,6 +19,13 @@ interface QuoteLegsVisualizerProps {
 
 export function QuoteLegsVisualizer({ legs }: QuoteLegsVisualizerProps) {
     if (!legs || legs.length === 0) return null;
+
+    // Normalize legs to support both from/to and origin/destination
+    const normalizedLegs = legs.map(leg => ({
+        ...leg,
+        from: leg.from || (leg as any).origin,
+        to: leg.to || (leg as any).destination
+    }));
 
     const getIcon = (mode: string) => {
         switch (mode) {
@@ -30,7 +39,7 @@ export function QuoteLegsVisualizer({ legs }: QuoteLegsVisualizerProps) {
 
     return (
         <div className="flex items-center gap-2 mt-3 overflow-x-auto p-4 bg-muted/20 rounded-md min-h-[100px]">
-            {legs.map((leg, index) => (
+            {normalizedLegs.map((leg, index) => (
                 <div key={index} className="flex items-center shrink-0">
                     <TooltipProvider>
                         <Tooltip>

@@ -1,0 +1,3633 @@
+[
+  {
+    "code": "0101",
+    "name": "PORTLAND, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0102",
+    "name": "BANGOR, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0103",
+    "name": "EASTPORT, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0104",
+    "name": "JACKMAN, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0105",
+    "name": "VANCEBORO, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0106",
+    "name": "HOULTON, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0107",
+    "name": "FORT FAIRFIELD, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0108",
+    "name": "VAN BUREN, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0109",
+    "name": "MADAWASKA, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0110",
+    "name": "FORT KENT, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0111",
+    "name": "BATH, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0112",
+    "name": "BAR HARBOR, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0115",
+    "name": "CALAIS, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "0118",
+    "name": "LIMESTONE, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0121",
+    "name": "ROCKLAND, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0122",
+    "name": "JONESPORT, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0127",
+    "name": "BRIDGEWATER, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0131",
+    "name": "PORTSMOUTH, NH",
+    "state": "NH",
+    "district": "01",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0152",
+    "name": "SEARSPORT, ME",
+    "state": "ME",
+    "district": "01",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0182",
+    "name": "MANCHESTER USER FEE AIRPORT, NH",
+    "state": "NH",
+    "district": "01",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0201",
+    "name": "ST. ALBANS, VT",
+    "state": "VT",
+    "district": "02",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "0203",
+    "name": "RICHFORD, VT",
+    "state": "VT",
+    "district": "02",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0206",
+    "name": "BEECHER FALLS, VT",
+    "state": "VT",
+    "district": "02",
+    "modes": [
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "0207",
+    "name": "BURLINGTON, VT",
+    "state": "VT",
+    "district": "02",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0209",
+    "name": "DERBY LINE, VT",
+    "state": "VT",
+    "district": "02",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0211",
+    "name": "NORTON, VT",
+    "state": "VT",
+    "district": "02",
+    "modes": [
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "0212",
+    "name": "HIGHGATE SPRINGS/ALBURG",
+    "state": null,
+    "district": "02",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0401",
+    "name": "BOSTON, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0402",
+    "name": "SPRINGFIELD, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0403",
+    "name": "WORCESTER, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0404",
+    "name": "GLOUCESTER, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0405",
+    "name": "NEW BEDFORD, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0406",
+    "name": "PLYMOUTH, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0407",
+    "name": "FALL RIVER, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0408",
+    "name": "SALEM, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0410",
+    "name": "BRIDGEPORT, CT",
+    "state": "CT",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0411",
+    "name": "HARTFORD, CT",
+    "state": "CT",
+    "district": "04",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0412",
+    "name": "NEW HAVEN, CT",
+    "state": "CT",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0413",
+    "name": "NEW LONDON, CT",
+    "state": "CT",
+    "district": "04",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0416",
+    "name": "LAWRENCE, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0417",
+    "name": "LOGAN AIRPORT, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0481",
+    "name": "L.G. HANSCOM FIELD, BEDFIELD, MA",
+    "state": "MA",
+    "district": "04",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0501",
+    "name": "NEWPORT, RI",
+    "state": "RI",
+    "district": "05",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0502",
+    "name": "PROVIDENCE, RI",
+    "state": "RI",
+    "district": "05",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0503",
+    "name": "MELLVILLE, RI",
+    "state": "RI",
+    "district": "05",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0701",
+    "name": "OGDENSBURG, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Vessel",
+      "Road"
+    ]
+  },
+  {
+    "code": "0704",
+    "name": "MASSENA, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Vessel",
+      "Road"
+    ]
+  },
+  {
+    "code": "0706",
+    "name": "CAPE VINCENT, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Vessel",
+      "Road"
+    ]
+  },
+  {
+    "code": "0708",
+    "name": "ALEXANDRIA BAY, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Vessel",
+      "Road"
+    ]
+  },
+  {
+    "code": "0712",
+    "name": "CHAMPLAIN-ROUSES POINT, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0714",
+    "name": "CLAYTON, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0715",
+    "name": "TROUT RIVER, NY",
+    "state": "NY",
+    "district": "07",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "0901",
+    "name": "BUFFALO-NIAGARA FALLS NY",
+    "state": null,
+    "district": "09",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "0903",
+    "name": "ROCHESTER, NY",
+    "state": "NY",
+    "district": "09",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0904",
+    "name": "OSWEGO, NY",
+    "state": "NY",
+    "district": "09",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0905",
+    "name": "SODUS POINT, NY",
+    "state": "NY",
+    "district": "09",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "0906",
+    "name": "SYRACUSE, NY",
+    "state": "NY",
+    "district": "09",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "0981",
+    "name": "BINGHAMTON REGIONAL AIRPORT, NY",
+    "state": "NY",
+    "district": "09",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "0983",
+    "name": "ITHACA TOMPKINS INT\u2019L AIR, ITHACA, NY",
+    "state": "NY",
+    "district": "09",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1001",
+    "name": "NEW YORK, NY",
+    "state": "NY",
+    "district": "10",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1002",
+    "name": "ALBANY, NY",
+    "state": "NY",
+    "district": "10",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1101",
+    "name": "PHILADELPHIA, PA",
+    "state": "PA",
+    "district": "11",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1102",
+    "name": "CHESTER, PA",
+    "state": "PA",
+    "district": "11",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1103",
+    "name": "WILMINGTON, DE",
+    "state": "DE",
+    "district": "11",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1104",
+    "name": "PITTSBURGH, PA",
+    "state": "PA",
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1106",
+    "name": "WILKES-BARRE/SCRANTON PA",
+    "state": null,
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1108",
+    "name": "PHILA. INTL. AIRPORT, PA",
+    "state": "PA",
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1109",
+    "name": "HARRISBURG, PA",
+    "state": "PA",
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1113",
+    "name": "GLOUCESTER CITY, NJ",
+    "state": "NJ",
+    "district": "11",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1119",
+    "name": "ALLENTOWN, PA (LEHIGH VALLEY INT\u2019L AIRPORT)",
+    "state": null,
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1182",
+    "name": "ATLANTIC CITY REGIONAL AIRPORT, NJ",
+    "state": "NJ",
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1183",
+    "name": "TRENTON/MERCER COUNTY AIRPORT, NJ",
+    "state": "NJ",
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1195",
+    "name": "UPS, PHILADELPHIA, PA",
+    "state": "PA",
+    "district": "11",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1301",
+    "name": "ANNAPOLIS, MD",
+    "state": "MD",
+    "district": "13",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1302",
+    "name": "CAMBRIDGE, MD",
+    "state": "MD",
+    "district": "13",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1303",
+    "name": "BALTIMORE, MD",
+    "state": "MD",
+    "district": "13",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1304",
+    "name": "CRISFIELD, MD",
+    "state": "MD",
+    "district": "13",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1305",
+    "name": "BWI AIRPORT",
+    "state": null,
+    "district": "13",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1401",
+    "name": "NORFOLK-NEWPORT NEWS, VA",
+    "state": "VA",
+    "district": "14",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1404",
+    "name": "RICHMOND-PETERSBURG, VA",
+    "state": "VA",
+    "district": "14",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1409",
+    "name": "CHARLESTON, WV",
+    "state": "WV",
+    "district": "14",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1410",
+    "name": "FRONT ROYAL, VA",
+    "state": "VA",
+    "district": "14",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1412",
+    "name": "NEW RIVER VALLEY AIRPORT, VA",
+    "state": "VA",
+    "district": "14",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1501",
+    "name": "WILMINGTON, NC",
+    "state": "NC",
+    "district": "15",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1502",
+    "name": "WINSTON-SALEM, NC",
+    "state": "NC",
+    "district": "15",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1503",
+    "name": "DURHAM, NC",
+    "state": "NC",
+    "district": "15",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1511",
+    "name": "BEAUFORT-MOREHEAD CTY,NC",
+    "state": "NC",
+    "district": "15",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1512",
+    "name": "CHARLOTTE, NC",
+    "state": "NC",
+    "district": "15",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1601",
+    "name": "CHARLESTON, SC",
+    "state": "SC",
+    "district": "16",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1602",
+    "name": "GEORGETOWN, SC",
+    "state": "SC",
+    "district": "16",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1603",
+    "name": "GREENVILLE-SPARTANBRG SC",
+    "state": null,
+    "district": "16",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1604",
+    "name": "COLUMBIA, SC",
+    "state": "SC",
+    "district": "16",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1681",
+    "name": "MYRTLE BEACH INT\u2019L AIRPORT, SC",
+    "state": "SC",
+    "district": "16",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1701",
+    "name": "BRUNSWICK, GA",
+    "state": "GA",
+    "district": "17",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1703",
+    "name": "SAVANNAH, GA",
+    "state": "GA",
+    "district": "17",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "1704",
+    "name": "ATLANTA, GA",
+    "state": "GA",
+    "district": "17",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1801",
+    "name": "TAMPA, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1803",
+    "name": "JACKSONVILLE, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1805",
+    "name": "FERNANDINA BEACH, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1807",
+    "name": "BOCA GRANDE, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1808",
+    "name": "ORLANDO, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1809",
+    "name": "ORLANDO-SANFORD AIRPORT, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1814",
+    "name": "ST. PETERSBURG, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1816",
+    "name": "PORT CANAVERAL, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1818",
+    "name": "PANAMA CITY, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1819",
+    "name": "PENSACOLA, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1821",
+    "name": "PORT MANATEE, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1822",
+    "name": "FORT MYERS AIRPORT",
+    "state": null,
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1880",
+    "name": "NAPLES MUNICIPAL USER FEE AIRPORT",
+    "state": null,
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1883",
+    "name": "SARASOTA BRADENTON AIRPT",
+    "state": null,
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1884",
+    "name": "DAYTONA BEACH INT'L AIRP",
+    "state": null,
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1885",
+    "name": "MELBOURNE REGIONAL AIRPORT, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1887",
+    "name": "LEESBURG REGIONAL AIRPORT, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1888",
+    "name": "ORLANDO EXECUTIVE AIRPORT, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1889",
+    "name": "St. AUGUSTINE AIPRORT, FL",
+    "state": "FL",
+    "district": "18",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1901",
+    "name": "MOBILE, AL",
+    "state": "AL",
+    "district": "19",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "1902",
+    "name": "GULFPORT, MS",
+    "state": "MS",
+    "district": "19",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1903",
+    "name": "PASCAGOULA, MS",
+    "state": "MS",
+    "district": "19",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "1904",
+    "name": "BIRMINGHAM, AL",
+    "state": "AL",
+    "district": "19",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "1910",
+    "name": "HUNTSVILLE, AL",
+    "state": "AL",
+    "district": "19",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2001",
+    "name": "MORGAN CITY, LA",
+    "state": "LA",
+    "district": "20",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2002",
+    "name": "NEW ORLEANS, LA",
+    "state": "LA",
+    "district": "20",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2003",
+    "name": "LITTLE ROCK, AR",
+    "state": "AR",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2004",
+    "name": "BATON ROUGE, LA",
+    "state": "LA",
+    "district": "20",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2006",
+    "name": "MEMPHIS, TN",
+    "state": "TN",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2007",
+    "name": "NASHVILLE, TN",
+    "state": "TN",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2008",
+    "name": "CHATTANOOGA, TN",
+    "state": "TN",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2010",
+    "name": "GRAMERCY, LA",
+    "state": "LA",
+    "district": "20",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2011",
+    "name": "GREENVILLE, MS",
+    "state": "MS",
+    "district": "20",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2015",
+    "name": "VICKSBURG, MS",
+    "state": "MS",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2016",
+    "name": "KNOXVILLE, TN",
+    "state": "TN",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2017",
+    "name": "LAKE CHARLES, LA",
+    "state": "LA",
+    "district": "20",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2018",
+    "name": "SHREVEPORT/BOSSIER CITY",
+    "state": null,
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2027",
+    "name": "TRI-CITY AIRPORT, TN",
+    "state": "TN",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2095",
+    "name": "FEDERAL EXPRESS, MEMPHIS, TN",
+    "state": "TN",
+    "district": "20",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2101",
+    "name": "PORT ARTHUR, TX",
+    "state": "TX",
+    "district": "21",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2102",
+    "name": "SABINE, TX",
+    "state": "TX",
+    "district": "21",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2103",
+    "name": "ORANGE, TX",
+    "state": "TX",
+    "district": "21",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2104",
+    "name": "BEAUMONT, TX",
+    "state": "TX",
+    "district": "21",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2301",
+    "name": "BROWNSVILLE, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2302",
+    "name": "DEL RIO, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Air",
+      "Road"
+    ]
+  },
+  {
+    "code": "2303",
+    "name": "EAGLE PASS, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2304",
+    "name": "LAREDO, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2305",
+    "name": "HIDALGO,TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Air",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2307",
+    "name": "RIO GRANDE CITY, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2309",
+    "name": "PROGRESO, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2310",
+    "name": "ROMA, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2383",
+    "name": "VALLEY INT\u2019L. AIRPORT, HARLINGEN, TX",
+    "state": "TX",
+    "district": "23",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2401",
+    "name": "PORT OF YSLETA, TX",
+    "state": "TX",
+    "district": "24",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2402",
+    "name": "EL PASO, TX",
+    "state": "TX",
+    "district": "24",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2403",
+    "name": "PRESIDIO, TX",
+    "state": "TX",
+    "district": "24",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2404",
+    "name": "FABENS, TX",
+    "state": "TX",
+    "district": "24",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2406",
+    "name": "COLUMBUS, NM",
+    "state": "NM",
+    "district": "24",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2407",
+    "name": "ALBUQUERQUE, NM",
+    "state": "NM",
+    "district": "24",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2408",
+    "name": "SANTA TERESA, NM",
+    "state": "NM",
+    "district": "24",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2481",
+    "name": "SANTA TERESA AIRPORT, NM",
+    "state": "NM",
+    "district": "24",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2501",
+    "name": "SAN DIEGO, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "2502",
+    "name": "ANDRADE, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2503",
+    "name": "CALEXICO, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2504",
+    "name": "SAN YSIDRO, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2505",
+    "name": "TECATE, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2506",
+    "name": "OTAY MESA, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2507",
+    "name": "CALEXICO-EAST, CA",
+    "state": "CA",
+    "district": "25",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2601",
+    "name": "DOUGLAS, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2602",
+    "name": "LUKEVILLE, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2603",
+    "name": "NACO, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2604",
+    "name": "NOGALES, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "2605",
+    "name": "PHOENIX, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2606",
+    "name": "SASABE, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2608",
+    "name": "SAN LUIS, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "2609",
+    "name": "TUCSON, AZ",
+    "state": "AZ",
+    "district": "26",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2704",
+    "name": "LOS ANGELES, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2709",
+    "name": "LONG BEACH, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2712",
+    "name": "VENTURA, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2713",
+    "name": "PORT HUENEME, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2715",
+    "name": "CAPITAN, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2719",
+    "name": "MORRO BAY, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "2720",
+    "name": "LOS ANGELES INT ARPT, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2721",
+    "name": "ONTARIO INTL AIRPORT, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2722",
+    "name": "LAS VEGAS, NV",
+    "state": "NV",
+    "district": "27",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2775",
+    "name": "TNT EXPRESS, LAX, CA",
+    "state": "CA",
+    "district": "27",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "2776",
+    "name": "IBC PACIFIC",
+    "state": null,
+    "district": "27",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3013",
+    "name": "FERRY, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3014",
+    "name": "FRIDAY HARBOR, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3015",
+    "name": "BOUNDARY, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3016",
+    "name": "LAURIER, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3017",
+    "name": "POINT ROBERTS, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3018",
+    "name": "KENMORE AIR HARBOR, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3019",
+    "name": "OROVILLE, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air",
+      "Road"
+    ]
+  },
+  {
+    "code": "3020",
+    "name": "FRONTIER, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3022",
+    "name": "SPOKANE, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3023",
+    "name": "LYNDEN, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3025",
+    "name": "METALINE FALLS",
+    "state": null,
+    "district": "30",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3026",
+    "name": "OLYMPIA, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3029",
+    "name": "SEATTLE-TACOMA INTL ARPT",
+    "state": null,
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3071",
+    "name": "UPS, SEATTLE, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3072",
+    "name": "AVION BROKERS @ SEATAC",
+    "state": null,
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3073",
+    "name": "DHL, SEATTLE, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3074",
+    "name": "AIRBORNE EXPRESS @SEATAC",
+    "state": null,
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3082",
+    "name": "GRANT COUNTY AIRPORT, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3095",
+    "name": "UPS, SEATTLE, WA",
+    "state": "WA",
+    "district": "30",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3101",
+    "name": "JUNEAU, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3102",
+    "name": "KETCHIKAN, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3103",
+    "name": "SKAGWAY, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3104",
+    "name": "ALCAN, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Air",
+      "Road"
+    ]
+  },
+  {
+    "code": "3105",
+    "name": "WRANGELL, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3106",
+    "name": "DALTON CACHE, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Road"
+    ]
+  },
+  {
+    "code": "3111",
+    "name": "FAIRBANKS, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3115",
+    "name": "SITKA, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3126",
+    "name": "ANCHORAGE, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3195",
+    "name": "FEDERAL EXPRESS, ANCHORAGE, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3196",
+    "name": "UPS, ANCHORAGE, AK",
+    "state": "AK",
+    "district": "31",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3201",
+    "name": "HONOLULU, HI",
+    "state": "HI",
+    "district": "32",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3202",
+    "name": "HIL0, HI",
+    "state": "HI",
+    "district": "32",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3203",
+    "name": "KAHULUI, HI",
+    "state": "HI",
+    "district": "32",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3204",
+    "name": "NAWILIWILI-PORT ALLEN, HI",
+    "state": "HI",
+    "district": "32",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3205",
+    "name": "HONOLULU INTL AIRPRT, HI",
+    "state": "HI",
+    "district": "32",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3206",
+    "name": "KAILUA-KONA, HI",
+    "state": "HI",
+    "district": "32",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3301",
+    "name": "RAYMOND, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3302",
+    "name": "EASTPORT, ID",
+    "state": "ID",
+    "district": "33",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3303",
+    "name": "SALT LAKE CITY, UT",
+    "state": "UT",
+    "district": "33",
+    "modes": [
+      "Air",
+      "Rail"
+    ]
+  },
+  {
+    "code": "3304",
+    "name": "GREAT FALLS, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3305",
+    "name": "BUTTE, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3306",
+    "name": "TURNER, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3307",
+    "name": "DENVER, CO",
+    "state": "CO",
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3308",
+    "name": "PORTHILL, ID",
+    "state": "ID",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3309",
+    "name": "SCOBY, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3310",
+    "name": "SWEETGRASS, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3316",
+    "name": "PIEGAN, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3317",
+    "name": "OPHEIM, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3318",
+    "name": "ROOSVILLE, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3319",
+    "name": "MORGAN, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3321",
+    "name": "WHITLASH, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3322",
+    "name": "DEL BONITA, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3323",
+    "name": "WILDHORSE, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3324",
+    "name": "KALISPELL AIRPORT, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3325",
+    "name": "WILLOW CREEK, HAVRE, MT",
+    "state": "MT",
+    "district": "33",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3384",
+    "name": "ARAPAHOE COUNTY PUBLIC AIRPORT, CO",
+    "state": "CO",
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3385",
+    "name": "EAGLE COUNTY REGIONAL AIRPORT",
+    "state": null,
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3386",
+    "name": "BOZEMAN YELLOWSTONE USER FEE AIRPORT",
+    "state": null,
+    "district": "33",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3401",
+    "name": "PEMBINA, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Air",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3403",
+    "name": "PORTAL, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3404",
+    "name": "NECHE, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3405",
+    "name": "ST JOHN, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3406",
+    "name": "NORTHGATE, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3407",
+    "name": "WALHALLA, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3408",
+    "name": "HANNAH, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3409",
+    "name": "SARLES, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3410",
+    "name": "AMBROSE, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3411",
+    "name": "FARGO, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3413",
+    "name": "ANTLER, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3414",
+    "name": "SHERWOOD, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3415",
+    "name": "HANSBORO, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3416",
+    "name": "MAIDA, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3417",
+    "name": "FORTUNA, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3419",
+    "name": "WESTHOPE, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3420",
+    "name": "NOONAN, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3421",
+    "name": "CARBURY, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3422",
+    "name": "DUNSEITH, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3423",
+    "name": "WARROAD, MN",
+    "state": "MN",
+    "district": "34",
+    "modes": [
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3424",
+    "name": "BAUDETTE, MN",
+    "state": "MN",
+    "district": "34",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3425",
+    "name": "PINECREEK, MN",
+    "state": "MN",
+    "district": "34",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3426",
+    "name": "ROSEAU, MN",
+    "state": "MN",
+    "district": "34",
+    "modes": [
+      "Road"
+    ]
+  },
+  {
+    "code": "3427",
+    "name": "GRAND FORKS, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3430",
+    "name": "LANCASTER, MN",
+    "state": "MN",
+    "district": "34",
+    "modes": [
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3433",
+    "name": "WILLISTON AIRPORT, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3434",
+    "name": "MINOT AIRPORT, ND",
+    "state": "ND",
+    "district": "34",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3501",
+    "name": "MINNEAPOLIS-ST. PAUL, MN",
+    "state": "MN",
+    "district": "35",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3502",
+    "name": "SOUIX FALLS, SD",
+    "state": "SD",
+    "district": "35",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3510",
+    "name": "DULUTH, MN \u2013 SUPERIOR, WI",
+    "state": "WI",
+    "district": "35",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3511",
+    "name": "ASHLAND, WI",
+    "state": "WI",
+    "district": "35",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3512",
+    "name": "OMAHA, NE",
+    "state": "NE",
+    "district": "35",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3513",
+    "name": "DES MOINES, IA",
+    "state": "IA",
+    "district": "35",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3581",
+    "name": "USER FEE AIRPORT, MN",
+    "state": "MN",
+    "district": "35",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3604",
+    "name": "INTERNATIONAL FALLS, MN",
+    "state": "MN",
+    "district": "36",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3613",
+    "name": "GRAND PORTAGE, MN",
+    "state": "MN",
+    "district": "36",
+    "modes": [
+      "Vessel",
+      "Road"
+    ]
+  },
+  {
+    "code": "3701",
+    "name": "MILWAUKEE, WI",
+    "state": "WI",
+    "district": "37",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3702",
+    "name": "MARINETTE, WI",
+    "state": "WI",
+    "district": "37",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3703",
+    "name": "GREEN BAY, WI",
+    "state": "WI",
+    "district": "37",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3706",
+    "name": "MANITOWOC, WI",
+    "state": "WI",
+    "district": "37",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3708",
+    "name": "RACINE, WI",
+    "state": "WI",
+    "district": "37",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3801",
+    "name": "DETROIT, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3802",
+    "name": "PORT HURON, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Road",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3803",
+    "name": "SAULT STE. MARIE, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3804",
+    "name": "SAGINAW/BAY CITY, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3805",
+    "name": "BATTLE CREEK, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3806",
+    "name": "GRAND RAPIDS, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3807",
+    "name": "DETROIT METROPOLITAN AIRPORT",
+    "state": null,
+    "district": "38",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3808",
+    "name": "ESCANABA, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3809",
+    "name": "MARQUETTE, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3814",
+    "name": "ALGONAC, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Road"
+    ]
+  },
+  {
+    "code": "3815",
+    "name": "MUSKEGON, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3816",
+    "name": "GRAND HAVEN, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3818",
+    "name": "ROGERS CITY, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3819",
+    "name": "DETOUR, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3842",
+    "name": "PRESQUE ISLE, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3843",
+    "name": "ALPENA, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3881",
+    "name": "OAKLAND/PONTIAC AIRPORT, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3882",
+    "name": "WILLOW RUN AIRPORT, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3883",
+    "name": "CAPITAL REGION INTL AIPRORT, MI",
+    "state": "MI",
+    "district": "38",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3901",
+    "name": "CHICAGO, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "3902",
+    "name": "PEORIA, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3905",
+    "name": "GARY, IN",
+    "state": "IN",
+    "district": "39",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3908",
+    "name": "DAVENPORT-ROCK ISLAND, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3909",
+    "name": "GREATER ROCKFORD AIRPORT, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3910",
+    "name": "CHICAGO MIDWAY INT\u2019L AIRPORT, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3971",
+    "name": "TNT EXPRESS CONSIGNMENT, CHICAGO, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3983",
+    "name": "CHICAGO EXECUTIVE AIRPORT",
+    "state": null,
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3987",
+    "name": "UFA UI WILLARD AIRPORT, SAVOY, IL",
+    "state": "IL",
+    "district": "39",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4101",
+    "name": "CLEVELAND, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4102",
+    "name": "CINCINNATI, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4103",
+    "name": "COLUMBUS, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4104",
+    "name": "DAYTON, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4105",
+    "name": "TOLEDO, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4106",
+    "name": "ERIE, PA",
+    "state": "PA",
+    "district": "41",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "4110",
+    "name": "INDIANAPOLIS, IN",
+    "state": "IN",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4115",
+    "name": "LOUISVILLE, KY",
+    "state": "KY",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4116",
+    "name": "OWENSBORO, KY",
+    "state": "KY",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4121",
+    "name": "LORAIN, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4122",
+    "name": "ASHTABULA/CONNEAUT, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "4183",
+    "name": "FORT WAYNE AIRPORT, IN",
+    "state": "IN",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4184",
+    "name": "BLUE GRASS AIRPORT, KY",
+    "state": "KY",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4196",
+    "name": "UPS, LOUISVILLE, KY",
+    "state": "KY",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4197",
+    "name": "DHL CINCINNATI, OH",
+    "state": "OH",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4198",
+    "name": "FEDERAL EXPRESS, INDIANAPOLIS, IN",
+    "state": "IN",
+    "district": "41",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4501",
+    "name": "KANSAS CITY, MO",
+    "state": "MO",
+    "district": "45",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4502",
+    "name": "ST JOSEPH, MO",
+    "state": "MO",
+    "district": "45",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4503",
+    "name": "ST LOUIS, MO",
+    "state": "MO",
+    "district": "45",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4504",
+    "name": "WICHITA, KS",
+    "state": "KS",
+    "district": "45",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4505",
+    "name": "SPRINGFIELD, MO",
+    "state": "MO",
+    "district": "45",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4581",
+    "name": "MIDAMERICAN AIRPORT, MASCOUTAH, IL",
+    "state": "IL",
+    "district": "45",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4601",
+    "name": "NEWARK, NJ",
+    "state": "NJ",
+    "district": "46",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4602",
+    "name": "PERTH AMBOY, NJ",
+    "state": "NJ",
+    "district": "46",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "4670",
+    "name": "UPS, NEWARK, NJ",
+    "state": "NJ",
+    "district": "46",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4671",
+    "name": "FEDERAL EXPRESS, NEWARK, NJ",
+    "state": "NJ",
+    "district": "46",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4681",
+    "name": "MORRISTOWN AIRPORT, NJ",
+    "state": "NJ",
+    "district": "46",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4701",
+    "name": "JOHN F KENNEDY AIRPORT, NY",
+    "state": "NY",
+    "district": "47",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4771",
+    "name": "NYACC",
+    "state": null,
+    "district": "47",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4772",
+    "name": "DHL, JAMAICA, NY",
+    "state": "NY",
+    "district": "47",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4773",
+    "name": "MICOM, NY",
+    "state": "NY",
+    "district": "47",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4774",
+    "name": "AIR FRANCE (MACH PLUS), NY",
+    "state": "NY",
+    "district": "47",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4778",
+    "name": "TNT SKYPAK, NY",
+    "state": "NY",
+    "district": "47",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "4901",
+    "name": "AGUADILLA, PR",
+    "state": "PR",
+    "district": "49",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4904",
+    "name": "FAJARDO, PR",
+    "state": "PR",
+    "district": "49",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "4907",
+    "name": "MAYAGUEZ, PR",
+    "state": "PR",
+    "district": "49",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "4908",
+    "name": "PONCE, PR",
+    "state": "PR",
+    "district": "49",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4909",
+    "name": "SAN JUAN, PR",
+    "state": "PR",
+    "district": "49",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "4913",
+    "name": "INTL AIRPORT, PR",
+    "state": "PR",
+    "district": "49",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5101",
+    "name": "CHARLOTTE AMALIE, VI",
+    "state": "VI",
+    "district": "51",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "5102",
+    "name": "CRUZ BAY, VI",
+    "state": "VI",
+    "district": "51",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5104",
+    "name": "CHRISTIANSTED, VI",
+    "state": "VI",
+    "district": "51",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "5105",
+    "name": "FREDERIKSTED, VI",
+    "state": "VI",
+    "district": "51",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5201",
+    "name": "MIAMI, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5202",
+    "name": "KEY WEST, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "5203",
+    "name": "PORT EVERGLADES, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5204",
+    "name": "WEST PALM BEACH, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "5205",
+    "name": "FORT PIERCE, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "5206",
+    "name": "MIAMI INTL AIRPORT, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5210",
+    "name": "FT. LAUDERDALE-HOLLYWOOD INTL.",
+    "state": null,
+    "district": "52",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5295",
+    "name": "UPS, MIAMI INTL AIRPORT, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5296",
+    "name": "DHL WORLDWIDE EXPRESS, MIAMI, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5297",
+    "name": "FEDERAL EXPRESS, MIAMI, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5298",
+    "name": "IBC COURIER HUB, MIAMI, FL",
+    "state": "FL",
+    "district": "52",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5301",
+    "name": "HOUSTON, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5306",
+    "name": "TEXAS CITY, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5309",
+    "name": "HOUSTON INTERCONTL, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5310",
+    "name": "GALVESTON, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5311",
+    "name": "FREEPORT, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5312",
+    "name": "CORPUS CHRISTI, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5313",
+    "name": "PORT LAVACA, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5381",
+    "name": "SUGAR LAND REGIONAL AIRPORT, TX",
+    "state": "TX",
+    "district": "53",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5401",
+    "name": "WASHINGTON, DC",
+    "state": "DC",
+    "district": "54",
+    "modes": [
+      "Vessel",
+      "Air"
+    ]
+  },
+  {
+    "code": "5402",
+    "name": "ALEXANDRIA, VA",
+    "state": "VA",
+    "district": "54",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "5501",
+    "name": "DALLAS/FT. WORTH, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5502",
+    "name": "AMARILLO, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5503",
+    "name": "LUBBOCK, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5504",
+    "name": "OKLAHOMA CITY, OK",
+    "state": "OK",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5505",
+    "name": "TULSA, OK",
+    "state": "OK",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5506",
+    "name": "AUSTIN, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5507",
+    "name": "SAN ANTONIO, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5582",
+    "name": "MIDLAND INTER AIRPORT, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5583",
+    "name": "FORTH WORTH ALLIANCE AIRPORT, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "5584",
+    "name": "ADDISON AIRPORT, TX",
+    "state": "TX",
+    "district": "55",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "8000",
+    "name": "U.S. MAIL EXPORTS",
+    "state": null,
+    "district": "80",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Rail",
+      "Road"
+    ]
+  }
+]

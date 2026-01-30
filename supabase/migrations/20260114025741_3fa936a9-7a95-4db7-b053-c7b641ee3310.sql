@@ -1,4 +1,5 @@
 -- Function to get exact table count for any schema
+DROP FUNCTION IF EXISTS public.get_table_count(text, text) CASCADE;
 CREATE OR REPLACE FUNCTION public.get_table_count(target_schema text, target_table text)
 RETURNS bigint
 LANGUAGE plpgsql
@@ -22,6 +23,7 @@ END;
 $$;
 
 -- Create function to get detailed database schema
+DROP FUNCTION IF EXISTS public.get_all_database_schema() CASCADE;
 CREATE OR REPLACE FUNCTION public.get_all_database_schema()
 RETURNS TABLE (
   schema_name text,
@@ -69,6 +71,8 @@ AS $$
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- Returns tables from all relevant schemas
+DROP FUNCTION IF EXISTS public.get_all_database_tables() CASCADE; -- Drop the 0-arg overload if it exists
+DROP FUNCTION IF EXISTS public.get_all_database_tables(text[]) CASCADE;
 CREATE OR REPLACE FUNCTION public.get_all_database_tables(schemas text[] DEFAULT ARRAY['public', 'auth', 'storage', 'extensions'])
 RETURNS TABLE (
   schema_name text,
@@ -102,6 +106,7 @@ AS $$
 $$;
 
 -- Auth User Export (using actual auth.users columns)
+DROP FUNCTION IF EXISTS public.get_auth_users_export() CASCADE;
 CREATE OR REPLACE FUNCTION public.get_auth_users_export()
 RETURNS TABLE (
   id uuid,
@@ -139,6 +144,7 @@ AS $$
 $$;
 
 -- Storage Objects Export
+DROP FUNCTION IF EXISTS public.get_storage_objects_export() CASCADE;
 CREATE OR REPLACE FUNCTION public.get_storage_objects_export()
 RETURNS TABLE (
   id uuid,
@@ -168,6 +174,7 @@ AS $$
 $$;
 
 -- Generic Table Data Export (Dynamic)
+DROP FUNCTION IF EXISTS public.get_table_data_dynamic(text, text, int, int) CASCADE;
 CREATE OR REPLACE FUNCTION public.get_table_data_dynamic(
     target_schema text, 
     target_table text, 

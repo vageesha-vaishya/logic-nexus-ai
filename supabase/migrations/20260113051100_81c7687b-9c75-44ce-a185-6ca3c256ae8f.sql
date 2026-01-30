@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS public.queue_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    queue_id UUID NOT NULL REFERENCES public.queues(id) ON DELETE CASCADE,
+    -- queue_id might be missing if table existed from old schema
     name TEXT NOT NULL,
     description TEXT,
     criteria JSONB NOT NULL DEFAULT '{}',
@@ -18,6 +18,29 @@ CREATE TABLE IF NOT EXISTS public.queue_rules (
     created_by UUID REFERENCES auth.users(id),
     UNIQUE(tenant_id, name)
 );
+
+-- Ensure queue_id column exists (schema migration)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'queue_rules' AND column_name = 'queue_id') THEN
+        -- Add as nullable first
+        ALTER TABLE public.queue_rules ADD COLUMN queue_id UUID REFERENCES public.queues(id) ON DELETE CASCADE;
+        
+        -- Migrate data if target_queue_name exists
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'queue_rules' AND column_name = 'target_queue_name') THEN
+             UPDATE public.queue_rules qr
+             SET queue_id = q.id
+             FROM public.queues q
+             WHERE qr.target_queue_name = q.name AND qr.tenant_id = q.tenant_id;
+        END IF;
+
+        -- Remove invalid rows (safety for NOT NULL constraint)
+        DELETE FROM public.queue_rules WHERE queue_id IS NULL;
+        
+        -- Set NOT NULL
+        ALTER TABLE public.queue_rules ALTER COLUMN queue_id SET NOT NULL;
+    END IF;
+END $$;
 
 -- 2. Create index for efficient rule evaluation
 CREATE INDEX IF NOT EXISTS idx_queue_rules_tenant_priority 

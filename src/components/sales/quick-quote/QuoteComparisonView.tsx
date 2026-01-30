@@ -369,6 +369,7 @@ export function QuoteComparisonView({
                         <div className="py-4">
                             <QuoteDetailView 
                                 quote={mapOptionToQuote(viewDetailsOption)} 
+                                defaultAnalysisView={viewDetailsOption.source_attribution === 'AI Smart Engine' ? 'mode' : 'category'}
                             />
                         </div>
                     )}

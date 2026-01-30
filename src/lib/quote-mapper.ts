@@ -1,6 +1,8 @@
-export const calculateQuoteFinancials = (sellPrice: number) => {
+import { matchLegForCharge } from '@/lib/charge-bifurcation';
+
+export const calculateQuoteFinancials = (amount: number, isCost: boolean = false) => {
     // Sanitize input
-    if (typeof sellPrice !== 'number' || isNaN(sellPrice)) {
+    if (typeof amount !== 'number' || isNaN(amount)) {
         return {
             sellPrice: 0,
             buyPrice: 0,
@@ -12,8 +14,21 @@ export const calculateQuoteFinancials = (sellPrice: number) => {
 
     // Business Logic: 15% Profit Margin by default
     const marginPercent = 15;
-    const marginAmount = Number((sellPrice * (marginPercent / 100)).toFixed(2));
-    const buyPrice = Number((sellPrice - marginAmount).toFixed(2));
+    let sellPrice, buyPrice, marginAmount;
+
+    if (isCost) {
+        // Amount is Cost (Buy Price). Sell = Cost / (1 - Margin%)
+        buyPrice = amount;
+        // Avoid division by zero if margin is 100% (unlikely but safe)
+        const divisor = 1 - (marginPercent / 100);
+        sellPrice = divisor > 0 ? Number((buyPrice / divisor).toFixed(2)) : buyPrice;
+        marginAmount = Number((sellPrice - buyPrice).toFixed(2));
+    } else {
+        // Amount is Sell Price (Legacy/Default). Buy = Sell * (1 - Margin%)
+        sellPrice = amount;
+        marginAmount = Number((sellPrice * (marginPercent / 100)).toFixed(2));
+        buyPrice = Number((sellPrice - marginAmount).toFixed(2));
+    }
     
     // Markup = (Profit / Cost) * 100
     // Prevent division by zero and Infinity
@@ -55,13 +70,14 @@ export const mapOptionToQuote = (opt: any) => {
         ...opt,
         carrier_name: opt.carrier_name || (typeof opt.carrier === 'object' ? opt.carrier?.name : opt.carrier) || 'Unknown Carrier',
         option_name: opt.option_name || opt.name,
-        total_amount: safeNumber(opt.total_amount || opt.price),
+        total_amount: safeNumber(opt.total_amount) || safeNumber(opt.price),
         mode: opt.mode || opt.transport_mode || opt.name, // Fallback chain
         transit_time: typeof opt.transitTime === 'string' ? { details: opt.transitTime } : (opt.transit_time || {}),
         currency: typeof opt.currency === 'object' ? opt.currency?.code : opt.currency,
         // Financial mappings (DB -> App)
         // Ensure that if we recalculate total later, these old financials don't mislead us.
         // We will recalculate them if needed in the return statement.
+        sellPrice: safeNumber(opt.sellPrice) || safeNumber(opt.total_amount) || safeNumber(opt.price), // Explicit Sell Price
         buyPrice: safeNumber(opt.buyPrice ?? opt.total_buy ?? opt.buy_price),
         marginAmount: safeNumber(opt.marginAmount ?? opt.margin_amount),
         marginPercent: safeNumber(opt.marginPercent ?? opt.margin_percent), // Prioritize Margin
@@ -81,14 +97,14 @@ export const mapOptionToQuote = (opt: any) => {
             normalized.legs.forEach((leg: any) => {
                 if (leg.charges) {
                     leg.charges.forEach((charge: any) => {
-                        const amount = charge.sell?.amount || charge.amount || 0;
+                        const amount = safeNumber(charge.sell?.amount) || safeNumber(charge.amount);
                         const name = (charge.charge_categories?.name || charge.name || '').toLowerCase();
                         if (name.includes('tax') || name.includes('duty')) {
                             taxes += amount;
                         } else if (name.includes('fuel') || name.includes('surcharge')) {
-                            surcharges[charge.charge_categories?.name || 'Surcharge'] = amount;
+                            surcharges[charge.charge_categories?.name || 'Surcharge'] = (surcharges[charge.charge_categories?.name || 'Surcharge'] || 0) + amount;
                         } else if (name.includes('fee')) {
-                            fees[charge.charge_categories?.name || 'Fee'] = amount;
+                            fees[charge.charge_categories?.name || 'Fee'] = (fees[charge.charge_categories?.name || 'Fee'] || 0) + amount;
                         } else {
                             base_fare += amount;
                         }
@@ -168,7 +184,21 @@ export const mapOptionToQuote = (opt: any) => {
             ...leg,
             id: leg.id || `leg-${index}-${Date.now()}`, // Ensure ID exists for mapping
             mode: leg.mode || normalized.mode || 'unknown',
-            charges: leg.charges || []
+            // Fallback to quote-level origin/destination if missing on leg
+            origin: leg.origin || (index === 0 ? normalized.origin : undefined) || 'Origin',
+            destination: leg.destination || (index === legs.length - 1 ? normalized.destination : undefined) || 'Destination',
+            charges: (leg.charges || []).map((c: any) => {
+                // Infer category if missing
+                if (!c.category && !c.charge_categories?.name) {
+                    const name = (c.name || '').toLowerCase();
+                    if (name.includes('freight')) c.category = 'Freight';
+                    else if (name.includes('fuel') || name.includes('baf')) c.category = 'Surcharge';
+                    else if (name.includes('doc') || name.includes('fee')) c.category = 'Fee';
+                    else if (name.includes('tax') || name.includes('duty') || name.includes('vat')) c.category = 'Tax';
+                    else if (name.includes('pickup') || name.includes('delivery') || name.includes('haulage')) c.category = 'Transport';
+                }
+                return c;
+            })
         }));
 
         // Deduplicate charges: If a charge exists in a leg, remove it from global charges to prevent double-display
@@ -224,31 +254,18 @@ export const mapOptionToQuote = (opt: any) => {
         });
     }
 
-    // Intelligent Global Charge Allocation (if any remain)
-    // Try to move global charges to specific legs based on keywords
+    // Intelligent Global Charge Allocation (using unified matchLegForCharge logic)
     if (charges.length > 0 && legs.length > 0) {
         const remainingGlobalCharges: any[] = [];
-        const mainLeg = legs.find((l: any) => l.bifurcation_role === 'main') || legs[0];
-        const originLeg = legs.find((l: any) => l.bifurcation_role === 'origin');
-        const destLeg = legs.find((l: any) => l.bifurcation_role === 'destination');
 
         charges.forEach((c: any) => {
             const name = (c.name || c.charge_categories?.name || '').toLowerCase();
+            
+            // Use shared bifurcation logic to find the best leg
+            // We cast legs to any[] because matchLegForCharge expects TransportLeg[] but our legs are still being built
+            const targetLeg = matchLegForCharge(name, legs as any[]);
+
             let allocated = false;
-            let targetLeg: any = null;
-
-            if (originLeg && (name.includes('pickup') || name.includes('origin') || name.includes('export'))) {
-                targetLeg = originLeg;
-            } else if (destLeg && (name.includes('delivery') || name.includes('destination') || name.includes('import'))) {
-                targetLeg = destLeg;
-            } else if (name.includes('freight') || name.includes('bunker') || name.includes('fuel')) {
-                // Default freight charges to main leg
-                targetLeg = mainLeg;
-            } else if (legs.length === 1) {
-                // If single leg, everything goes there
-                targetLeg = mainLeg;
-            }
-
             if (targetLeg) {
                 // DUPLICATE DETECTION: Check if this charge already exists in the target leg
                 // This prevents double-counting when global charges are just summaries of leg charges
@@ -269,6 +286,7 @@ export const mapOptionToQuote = (opt: any) => {
                     allocated = true;
                     duplicatesRemoved = true;
                 } else {
+                    if (!targetLeg.charges) targetLeg.charges = [];
                     targetLeg.charges.push(c);
                     allocated = true;
                 }

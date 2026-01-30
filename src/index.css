@@ -101,10 +101,8 @@ All colors MUST be HSL.
     --accent: 197 71% 52%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    /* Ensure table text follows foreground unless overridden by theme */
-    --table-foreground: var(--foreground);
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
@@ -116,118 +114,14 @@ All colors MUST be HSL.
     --input: 217 32% 17%;
     --ring: 217 91% 60%;
 
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 32% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 32% 17%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217 91% 60%;
-
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(197 71% 52%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(222 47% 11%) 0%, hsl(217 32% 17%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 71% 55%) 100%);
-  }
-}
-
-/* Email content hardening to prevent horizontal overflow and ensure responsive HTML */
-@layer components {
-  /* Enterprise-grade form typography and layout */
-  .enterprise-form {
-    @apply mx-auto max-w-6xl px-4 md:px-6;
-  }
-  .enterprise-form .ef-card {
-    @apply rounded-xl border bg-background shadow-sm transition-shadow;
-  }
-  .enterprise-form .ef-card:hover {
-    @apply shadow-md;
-  }
-  .enterprise-form .ef-header {
-    @apply pb-1;
-  }
-  .enterprise-form .ef-title {
-    @apply text-xl md:text-2xl font-semibold tracking-tight;
-  }
-  .enterprise-form .ef-subtitle {
-    @apply text-xs text-muted-foreground;
-  }
-  .enterprise-form label {
-    @apply text-xs md:text-sm font-medium text-muted-foreground;
-  }
-  .enterprise-form .form-description {
-    @apply text-[11px] md:text-xs text-muted-foreground;
-  }
-  .enterprise-form .ef-grid {
-    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1;
-  }
-  .enterprise-form .ef-divider {
-    @apply border-t pt-1 mt-1;
-  }
-  .enterprise-form .ef-hover {
-    @apply transition-shadow;
-  }
-  .enterprise-form .ef-hover:hover {
-    @apply shadow-sm;
-  }
-  /* Mild glow pulse animation for shield boundary */
-  .animate-glow-pulse {
-    animation: glow-pulse 2.2s ease-in-out infinite;
-  }
-
-  /* Hover-only animation hooks for ShieldLogo */
-  .shield-logo:hover .glow-stroke--subtle {
-    animation: glow-pulse 2.2s ease-in-out infinite;
-  }
-  .shield-logo:hover .glow-stroke--strong {
-    animation: glow-pulse-strong 2s ease-in-out infinite;
-  }
-
-  @keyframes glow-pulse {
-    0% {
-      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
-    }
-    50% {
-      filter: drop-shadow(0 0 8px hsl(var(--glow-color) / 0.35));
-    }
-    100% {
-      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
-    }
-  }
-
-  /* Stronger glow variant for hover-only use */
-  @keyframes glow-pulse-strong {
-    0% {
-      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
-    }
-    50% {
-      filter: drop-shadow(0 0 12px hsl(var(--glow-color) / 0.45));
-    }
-    100% {
-      filter: drop-shadow(0 0 0 hsl(var(--glow-color) / 0));
-    }
-  }
-  .email-content {
-    max-width: 100%;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-  }
-  .email-content img {
-    max-width: 100%;
-    height: auto;
-  }
-  .email-content table {
-    width: 100%;
-    display: block;
-    overflow-x: auto;
-  }
-  .email-content pre,
-  .email-content code {
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .email-content a {
-    word-break: break-all;
   }
 }
 
@@ -235,8 +129,33 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Custom Scrollbar Utilities (mimicking tailwind-scrollbar) */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: auto; /* Changed from thin to auto for better visibility on all platforms initially */
+    scrollbar-color: hsl(var(--muted-foreground)) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px; /* Increased from 6px */
+    height: 8px; /* Increased from 6px */
+  }
+
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded-full; /* Darker for better contrast */
+  }
+
+  .dark .scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
+    @apply bg-gray-500 rounded-full;
+  }
+
+  /* Fallback track styling */
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-muted/20; /* Slight background to indicate scroll area */
   }
 }

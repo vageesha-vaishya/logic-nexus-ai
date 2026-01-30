@@ -103,8 +103,58 @@ export class LogisticsRateMapper {
 
   getProviderId(carrierName: string) {
      const { carriers } = this.masterData;
-     if (!carrierName) return null;
-     const normalized = carrierName.toLowerCase();
-     return carriers?.find((c: any) => c.carrier_name.toLowerCase().includes(normalized) || c.scac?.toLowerCase() === normalized)?.id;
+     if (!carrierName || !carriers) return null;
+     
+     const normalizedSearch = carrierName.toLowerCase().trim();
+     if (!normalizedSearch) return null;
+
+     // 1. Exact Name Match (case-insensitive)
+     let match = carriers.find((c: any) => c.carrier_name.toLowerCase() === normalizedSearch);
+
+     // 2. SCAC Match
+     if (!match) {
+         match = carriers.find((c: any) => c.scac?.toLowerCase() === normalizedSearch);
+     }
+
+     // 3. Includes Check (Bidirectional) - Prioritize explicit name match over generic
+     if (!match) {
+         // Try to find where DB name contains search name (e.g. "Evergreen Marine" contains "Evergreen")
+         match = carriers.find((c: any) => c.carrier_name.toLowerCase().includes(normalizedSearch));
+     }
+     
+     if (!match) {
+         // Try reverse: Search name contains DB name (e.g. "Evergreen Line" contains "Evergreen")
+         // Be careful with short names like "ONE" matching "None" etc.
+         match = carriers.find((c: any) => normalizedSearch.includes(c.carrier_name.toLowerCase()) && c.carrier_name.length > 2);
+     }
+
+     // 4. Hardcoded Aliases for common mismatches
+     if (!match) {
+         const aliases: Record<string, string[]> = {
+             'evergreen': ['evergreen line', 'evergreen marine', 'emc'],
+             'maersk': ['maersk line', 'maersk sealand'],
+             'msc': ['mediterranean shipping company'],
+             'cma cgm': ['cma', 'cgm'],
+             'cosco': ['cosco shipping'],
+             'one': ['ocean network express'],
+             'zim': ['zim integrated shipping services'],
+             'hmm': ['hyundai merchant marine'],
+             'yang ming': ['yang ming marine transport'],
+             'apl': ['american president lines']
+         };
+
+         for (const [key, variants] of Object.entries(aliases)) {
+             if (normalizedSearch.includes(key) || variants.some(v => normalizedSearch.includes(v))) {
+                 // Find the canonical carrier in masterData
+                 match = carriers.find((c: any) => 
+                     c.carrier_name.toLowerCase().includes(key) || 
+                     (c.scac && c.scac.toLowerCase() === key)
+                 );
+                 if (match) break;
+             }
+         }
+     }
+
+     return match ? match.id : null;
   }
 }

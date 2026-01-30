@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronRight, Truck, Ship, Plane, Info, DollarSign, Download, Printer, FileText, ArrowUpDown, Search, Filter, LayoutList, ListTree, Globe, ArrowRight, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, Truck, Ship, Plane, Info, DollarSign, Download, Printer, FileText, ArrowUpDown, Search, Filter, LayoutList, ListTree, Globe, ArrowRight, AlertTriangle, Pencil, Trash, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
@@ -27,6 +27,10 @@ interface ChargeBreakdownProps {
     enableAdvancedFeatures?: boolean;
     activeFilter?: { type: 'category' | 'mode' | 'leg', value: string } | null;
     onClearFilter?: () => void;
+    onEditCharge?: (charge: Charge) => void;
+    onDeleteCharge?: (chargeId: string) => void;
+    onAddCharge?: () => void;
+    containerHeight?: string;
 }
 
 type SortField = 'category' | 'description' | 'amount' | 'mode' | 'leg' | 'rate_reference';
@@ -39,7 +43,11 @@ export function ChargeBreakdown({
     className, 
     enableAdvancedFeatures = true,
     activeFilter,
-    onClearFilter
+    onClearFilter,
+    onEditCharge,
+    onDeleteCharge,
+    onAddCharge,
+    containerHeight
 }: ChargeBreakdownProps) {
     const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
     const [expandedLegs, setExpandedLegs] = useState<Record<string, boolean>>({});
@@ -80,11 +88,13 @@ export function ChargeBreakdown({
         return <Truck className="h-4 w-4" />;
     };
 
-    const formatCurrency = (amount: number, curr: string = currency) => {
+    const formatCurrency = (amount: any, curr: string = currency) => {
+        const val = Number(amount);
+        if (!Number.isFinite(val)) return '-';
         try {
-            return new Intl.NumberFormat('en-US', { style: 'currency', currency: curr }).format(amount);
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: curr }).format(val);
         } catch (e) {
-            return `${curr} ${amount.toFixed(2)}`;
+            return `${curr} ${val.toFixed(2)}`;
         }
     };
 
@@ -109,7 +119,7 @@ export function ChargeBreakdown({
         const legTotals: Record<string, number> = {};
         (leg.charges || []).forEach(c => {
             const curr = c.currency || currency;
-            legTotals[curr] = (legTotals[curr] || 0) + (c.amount || 0);
+            legTotals[curr] = (legTotals[curr] || 0) + (Number(c.amount) || 0);
         });
         return legTotals;
     };
@@ -153,10 +163,10 @@ export function ChargeBreakdown({
                 id: c.id || Math.random().toString(),
                 type: c.assignedLegId ? 'Leg' : 'Global',
                 mode: c.assignedMode || 'N/A',
-                legInfo: leg ? `${leg.origin} → ${leg.destination}` : 'Global Charge',
+                legInfo: leg ? `${leg.origin || 'Origin'} → ${leg.destination || 'Destination'}` : 'Global Charge',
                 legType: strictLegType, // Strict schema value
                 displayRole: displayRole, // Human-friendly role
-                category: c.charge_categories?.name || c.category || 'General',
+                category: c.charge_categories?.name || c.category || (c.name?.toLowerCase().includes('freight') ? 'Freight' : 'General'),
                 description: c.name || c.note || '-',
                 basis: c.basis || 'Flat',
                 rate: c.rate || 0,
@@ -257,6 +267,8 @@ export function ChargeBreakdown({
         window.print();
     };
 
+    const hasActions = !!(onEditCharge || onDeleteCharge);
+
     return (
         <div className={cn("space-y-4 print:space-y-2", className)}>
             {/* Controls */}
@@ -295,6 +307,11 @@ export function ChargeBreakdown({
                 </div>
 
                 <div className="flex gap-2 w-full md:w-auto justify-end">
+                    {onAddCharge && (
+                        <Button size="sm" className="h-9 gap-1" onClick={onAddCharge}>
+                            <Plus className="w-4 h-4" /> Add Charge
+                        </Button>
+                    )}
                     {activeFilter && (
                          <Badge variant="secondary" className="h-9 px-3 flex gap-2 items-center bg-primary/10 text-primary border-primary/20">
                             <Filter className="w-3 h-3" />
@@ -345,9 +362,12 @@ export function ChargeBreakdown({
 
             {/* List View (Detailed Table) */}
             {viewMode === 'list' && (
-                <div className="border rounded-md overflow-hidden bg-card">
-                    <Table>
-                        <TableHeader className="bg-muted/40">
+                <div 
+                    className="border rounded-md overflow-auto bg-card scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 pb-2"
+                    style={{ maxHeight: containerHeight }}
+                >
+                    <Table className="min-w-[800px]">
+                        <TableHeader className="bg-muted sticky top-0 z-20 shadow-sm">
                             <TableRow>
                                 <TableHead className="w-[180px] cursor-pointer hover:text-primary" onClick={() => handleSort('category')}>
                                     <span className="flex items-center gap-1">Category <ArrowUpDown className="h-3 w-3" /></span>
@@ -367,9 +387,16 @@ export function ChargeBreakdown({
                                 <TableHead className="text-right">Basis</TableHead>
                                 <TableHead className="text-right">Rate</TableHead>
                                 <TableHead className="text-right">Qty</TableHead>
-                                <TableHead className="text-right cursor-pointer hover:text-primary" onClick={() => handleSort('amount')}>
+                                <TableHead 
+                                    className={cn(
+                                        "text-right cursor-pointer hover:text-primary",
+                                        hasActions ? "sticky right-[80px] bg-background z-10 shadow-[-1px_0_0_0_rgba(0,0,0,0.1)]" : "sticky right-0 bg-background z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                                    )} 
+                                    onClick={() => handleSort('amount')}
+                                >
                                     <span className="flex items-center justify-end gap-1">Amount <ArrowUpDown className="h-3 w-3" /></span>
                                 </TableHead>
+                                {hasActions && <TableHead className="w-[80px] sticky right-0 bg-background z-10"></TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -382,6 +409,7 @@ export function ChargeBreakdown({
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-xs text-muted-foreground">{item.description}</TableCell>
+                                    <TableCell className="text-xs font-mono text-muted-foreground">{item.rate_reference}</TableCell>
                                     <TableCell className="text-xs">
                                         {item.mode !== 'N/A' && (
                                             <Badge variant="outline" className="font-normal text-[10px] px-1.5 py-0 h-5">
@@ -402,15 +430,48 @@ export function ChargeBreakdown({
                                         {item.rate ? formatCurrency(item.rate, item.currency) : '-'}
                                     </TableCell>
                                     <TableCell className="text-right text-xs">{item.quantity}</TableCell>
-                                    <TableCell className="text-right text-xs font-bold text-primary">
+                                    <TableCell className={cn(
+                                        "text-right text-xs font-bold text-primary",
+                                        hasActions ? "sticky right-[80px] bg-background z-10 shadow-[-1px_0_0_0_rgba(0,0,0,0.1)]" : "sticky right-0 bg-background z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                                    )}>
                                         {formatCurrency(item.amount, item.currency)}
                                     </TableCell>
+                                    {hasActions && (
+                                        <TableCell className="text-right sticky right-0 bg-background z-10">
+                                            <div className="flex justify-end gap-1">
+                                                {onEditCharge && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEditCharge(item.original)}>
+                                                        <Pencil className="w-3 h-3" />
+                                                    </Button>
+                                                )}
+                                                {onDeleteCharge && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => onDeleteCharge(item.id)}>
+                                                        <Trash className="w-3 h-3" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                                    <TableCell colSpan={(onEditCharge || onDeleteCharge) ? 10 : 9} className="h-24 text-center text-muted-foreground">
                                         No charges match your filters.
                                     </TableCell>
+                                </TableRow>
+                            )}
+                            {filteredCharges.length > 0 && (
+                                <TableRow className="bg-muted/50 hover:bg-muted/50 font-bold border-t-2">
+                                    <TableCell colSpan={8} className="text-right text-xs uppercase tracking-wider text-muted-foreground">
+                                        Total Amount ({currency})
+                                    </TableCell>
+                                    <TableCell className={cn(
+                                        "text-right text-sm text-primary",
+                                        hasActions ? "sticky right-[80px] bg-muted/50 z-10 shadow-[-1px_0_0_0_rgba(0,0,0,0.1)]" : "sticky right-0 bg-muted/50 z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                                    )}>
+                                        {formatCurrency(filteredCharges.reduce((sum, c) => sum + (c.amount || 0), 0), currency)}
+                                    </TableCell>
+                                    {hasActions && <TableCell className="sticky right-0 bg-muted/50 z-10" />}
                                 </TableRow>
                             )}
                         </TableBody>
@@ -420,7 +481,10 @@ export function ChargeBreakdown({
 
             {/* Grouped View (Detailed Hierarchical) */}
             {viewMode === 'grouped' && (
-                <div className="space-y-4">
+                <div 
+                    className="space-y-4 overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 pb-2 pr-2"
+                    style={{ maxHeight: containerHeight }}
+                >
                     {/* Global Charges Section */}
                     {(() => {
                         const globalChargesList = filteredCharges.filter(fc => fc.type === 'Global');
@@ -537,6 +601,7 @@ export function ChargeBreakdown({
                         return (
                             <div key={leg.id} className="border rounded-lg overflow-hidden transition-all duration-200 shadow-sm print:break-inside-avoid">
                                 <div 
+                                    data-testid={`leg-header-${leg.id}`}
                                     className={cn(
                                         "flex items-center justify-between p-3 cursor-pointer transition-colors",
                                         isExpanded ? "bg-muted/50 border-b" : "bg-card hover:bg-muted/30"
@@ -560,9 +625,9 @@ export function ChargeBreakdown({
                                                     </Badge>
                                                 </div>
                                                 <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                                                    <span className="font-medium text-foreground">{leg.origin}</span> 
+                                                    <span className="font-medium text-foreground">{leg.origin || 'Origin'}</span> 
                                                     <ArrowRight className="w-3 h-3" /> 
-                                                    <span className="font-medium text-foreground">{leg.destination}</span>
+                                                    <span className="font-medium text-foreground">{leg.destination || 'Destination'}</span>
                                                 </div>
                                             </div>
                                         </div>

@@ -14,6 +14,7 @@ interface ChargesAnalysisGraphProps {
     globalCharges?: Charge[];
     currency: string;
     onSegmentClick?: (type: 'category' | 'mode' | 'leg', value: string) => void;
+    defaultViewMode?: 'category' | 'mode' | 'leg';
 }
 
 const COLORS = {
@@ -37,8 +38,8 @@ const COLORS = {
     Delivery: '#10b981',
 };
 
-export function ChargesAnalysisGraph({ legs, globalCharges = [], currency, onSegmentClick }: ChargesAnalysisGraphProps) {
-    const [viewMode, setViewMode] = useState<'category' | 'mode' | 'leg'>('category');
+export function ChargesAnalysisGraph({ legs, globalCharges = [], currency, onSegmentClick, defaultViewMode = 'category' }: ChargesAnalysisGraphProps) {
+    const [viewMode, setViewMode] = useState<'category' | 'mode' | 'leg'>(defaultViewMode);
 
     // Aggregate Data for Pie Chart
     const data = useMemo(() => {
@@ -131,7 +132,7 @@ export function ChargesAnalysisGraph({ legs, globalCharges = [], currency, onSeg
                 </div>
             </CardHeader>
             <CardContent className="flex-1 min-h-0 p-4 flex flex-col">
-                <div className="flex-1 min-h-[300px] w-full relative flex flex-col">
+                <div className="w-full h-[300px] relative flex flex-col">
                     {data.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart margin={{ top: 0, right: 0, bottom: 20, left: 0 }}>

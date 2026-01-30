@@ -41,6 +41,7 @@ export interface RateOption {
     carrier: string;
     name: string;
     price: number;
+    total_amount?: number; // Alias for price/total for compatibility
     currency: string;
     transitTime: string;
     tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
@@ -62,6 +63,12 @@ export interface RateOption {
     charges?: Charge[];
     service_type?: string;
     validUntil?: string | null;
+    verified?: boolean;
+    verificationTimestamp?: string;
+    regulatory_info?: {
+        customs_procedures?: string[];
+        restrictions?: string[];
+    };
 }
 
 // Helper to check if an object is a RateBreakdown

@@ -29,7 +29,7 @@ const toRecord = (value: any): Record<string, any> => {
 const portLocationSchema = z.object({
   location_name: z.string().min(1, 'Location name is required'),
   location_code: z.string().optional(),
-  location_type: z.enum(['seaport', 'airport', 'inland_port', 'warehouse', 'terminal']).optional(),
+  location_type: z.enum(['seaport', 'airport', 'inland_port', 'warehouse', 'terminal', 'railway_terminal']).optional(),
   country: z.string().optional(),
   city: z.string().optional(),
   state_province: z.string().optional(),
@@ -76,7 +76,7 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
           .single();
         if (error) throw error;
         if (data) {
-          const typeOptions = ['seaport', 'airport', 'inland_port', 'warehouse', 'terminal'] as const;
+          const typeOptions = ['seaport', 'airport', 'inland_port', 'warehouse', 'terminal', 'railway_terminal'] as const;
           const typeValue = typeOptions.includes(data.location_type as any)
             ? (data.location_type as (typeof typeOptions)[number])
             : undefined;

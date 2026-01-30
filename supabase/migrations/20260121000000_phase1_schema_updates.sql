@@ -11,9 +11,16 @@ ALTER TABLE public.quotes
   ADD COLUMN IF NOT EXISTS is_hazmat BOOLEAN DEFAULT false;
 
 -- 2. Enhance 'quote_items' table
-ALTER TABLE public.quote_items 
-  ADD COLUMN IF NOT EXISTS hazmat_class TEXT,
-  ADD COLUMN IF NOT EXISTS un_number TEXT; -- United Nations number for hazmat
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'quote_items' AND table_type = 'BASE TABLE') THEN
+        ALTER TABLE public.quote_items 
+          ADD COLUMN IF NOT EXISTS hazmat_class TEXT,
+          ADD COLUMN IF NOT EXISTS un_number TEXT; -- United Nations number for hazmat
+    ELSE
+        RAISE NOTICE 'quote_items is not a base table, skipping column addition.';
+    END IF;
+END $$;
 
 -- 3. Enhance 'carrier_rates' to support 3-Tier Rate Engine
 -- Tier 1: Contract (Customer specific)

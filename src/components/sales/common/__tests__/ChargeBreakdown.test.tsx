@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ChargeBreakdown } from '../ChargeBreakdown';
 import { exportExcel } from '@/lib/import-export';
@@ -8,15 +9,18 @@ vi.mock('@/lib/import-export', () => ({
   exportExcel: vi.fn(),
 }));
 
-vi.mock('lucide-react', async () => {
-  const actual = await vi.importActual('lucide-react');
-  return {
-    ...actual,
-    Ship: () => <span data-testid="icon-ship">Ship</span>,
-    Plane: () => <span data-testid="icon-plane">Plane</span>,
-    Truck: () => <span data-testid="icon-truck">Truck</span>,
-  };
-});
+// Mock DropdownMenu to avoid Radix UI pointer event issues in JSDOM
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick }: { children: React.ReactNode, onClick?: () => void }) => (
+    <div onClick={onClick} role="menuitem">{children}</div>
+  ),
+}));
+
+// Removed lucide-react mock as it was causing issues. 
+// We will test presence/absence of leg content by text instead.
 
 describe('ChargeBreakdown', () => {
   const mockLegs = [
@@ -27,8 +31,8 @@ describe('ChargeBreakdown', () => {
       destination: 'Los Angeles',
       sequence: 1,
       charges: [
-        { id: 'c1', name: 'Freight', amount: 1000, currency: 'USD' },
-        { id: 'c2', name: 'THC', amount: 200, currency: 'USD' },
+        { id: 'c1', name: 'Freight', amount: 1000, currency: 'USD', category: 'Freight' },
+        { id: 'c2', name: 'THC', amount: 200, currency: 'USD', category: 'Origin' },
       ],
     },
     {
@@ -38,7 +42,7 @@ describe('ChargeBreakdown', () => {
       destination: 'Las Vegas',
       sequence: 2,
       charges: [
-        { id: 'c3', name: 'Trucking', amount: 500, currency: 'USD' },
+        { id: 'c3', name: 'Trucking', amount: 500, currency: 'USD', category: 'Transport' },
       ],
     },
     {
@@ -48,13 +52,13 @@ describe('ChargeBreakdown', () => {
       destination: 'New York',
       sequence: 3,
       charges: [
-        { id: 'c4', name: 'Air Freight', amount: 300, currency: 'EUR' },
+        { id: 'c4', name: 'Air Freight', amount: 300, currency: 'EUR', category: 'Freight' },
       ],
     },
   ];
 
   const mockGlobalCharges = [
-    { id: 'g1', name: 'Admin Fee', amount: 50, currency: 'USD' },
+    { id: 'g1', name: 'Admin Fee', amount: 50, currency: 'USD', category: 'Documentation' },
   ];
 
   it('renders all legs and global charges correctly', () => {
@@ -67,7 +71,6 @@ describe('ChargeBreakdown', () => {
     );
 
     // Check legs
-    // Note: Cities might appear multiple times (as destination of one leg and origin of next)
     expect(screen.getAllByText(/Shanghai/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Los Angeles/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Las Vegas/).length).toBeGreaterThan(0);
@@ -87,63 +90,65 @@ describe('ChargeBreakdown', () => {
       />
     );
 
-    // USD Total: 1000 + 200 + 500 + 50 = 1750 USD
-    // EUR Total: 300 EUR
-    // Use regex to be safe against spacing characters
-    // Note: getByText fails if multiple found (e.g. in leg header AND footer), so use getAllByText
     expect(screen.getAllByText(/\$1,750\.00/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/€300\.00/).length).toBeGreaterThan(0);
   });
 
   it('filters legs by mode', () => {
-    render(
+    const { rerender } = render(
       <ChargeBreakdown 
         legs={mockLegs} 
         globalCharges={mockGlobalCharges} 
         currency="USD" 
+        activeFilter={null}
       />
     );
 
     // Initial: All legs visible
-    // Icons exist in filter buttons (always 1) AND in legs
-    // Ship: 1 button + 1 leg = 2
-    // Truck: 1 button + 1 leg = 2
-    // Plane: 1 button + 1 leg = 2
-    expect(screen.getAllByTestId('icon-ship')).toHaveLength(2);
-    expect(screen.getAllByTestId('icon-truck')).toHaveLength(2);
-    expect(screen.getAllByTestId('icon-plane')).toHaveLength(2);
+    expect(screen.getAllByText('Ocean - FCL').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Road').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Air').length).toBeGreaterThan(0);
 
-    // Filter Ocean
-    fireEvent.click(screen.getByText('Ocean'));
-    
-    // Ship: 1 button + 1 leg = 2
-    expect(screen.getAllByTestId('icon-ship')).toHaveLength(2);
-    // Truck: 1 button + 0 legs = 1
-    expect(screen.getAllByTestId('icon-truck')).toHaveLength(1);
-    // Plane: 1 button + 0 legs = 1
-    expect(screen.getAllByTestId('icon-plane')).toHaveLength(1);
-
-    // Reset
-    fireEvent.click(screen.getByText('All'));
-    expect(screen.getAllByTestId('icon-truck')).toHaveLength(2);
-  });
-
-  it('calls exportExcel when export button is clicked (direct mode)', () => {
-    render(
+    // Apply Filter: Ocean
+    rerender(
       <ChargeBreakdown 
         legs={mockLegs} 
         globalCharges={mockGlobalCharges} 
         currency="USD" 
-        enableAdvancedFeatures={false}
+        activeFilter={{ type: 'mode', value: 'Ocean' }}
       />
+    );
+    
+    // Ocean should remain
+    expect(screen.getAllByText('Ocean - FCL').length).toBeGreaterThan(0);
+    // Road and Air should be gone
+    expect(screen.queryByText('Road')).toBeNull();
+    expect(screen.queryByText('Air')).toBeNull();
+
+    // Reset (Clear Filter)
+    rerender(
+        <ChargeBreakdown 
+          legs={mockLegs} 
+          globalCharges={mockGlobalCharges} 
+          currency="USD" 
+          activeFilter={null}
+        />
+    );
+    expect(screen.getAllByText('Road').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Air').length).toBeGreaterThan(0);
+  });
+
+  it('calls exportExcel when export button is clicked (direct mode)', () => {
+    render(
+        <ChargeBreakdown 
+            legs={mockLegs} 
+            globalCharges={mockGlobalCharges} 
+            currency="USD" 
+            enableAdvancedFeatures={false}
+        />
     );
 
     // In direct mode (advanced=false), buttons are directly visible
-    // But wait, the button text is "Export" in both cases.
-    // In direct mode: <Button ...> <Download ... /> Export </Button>
-    // In dropdown mode: <Button ...> <Download ... /> Export </Button> (trigger)
-    
-    // However, in direct mode, clicking it triggers handleExportExcel directly.
     const exportBtn = screen.getByText('Export');
     fireEvent.click(exportBtn);
 
@@ -156,10 +161,10 @@ describe('ChargeBreakdown', () => {
     // Verify some row data in the call
     const calls = (exportExcel as any).mock.calls;
     const rows = calls[0][2];
-    expect(rows.length).toBe(5); // 1 global + 2 leg1 + 1 leg2 + 1 leg3
+    expect(rows.length).toBe(5); 
   });
 
-  it('calls window.print when print button is clicked (direct mode)', () => {
+  it('calls window.print when print button is clicked', async () => {
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
     
     render(
@@ -167,18 +172,23 @@ describe('ChargeBreakdown', () => {
             legs={mockLegs} 
             globalCharges={mockGlobalCharges} 
             currency="USD" 
-            enableAdvancedFeatures={false}
+            enableAdvancedFeatures={true} 
         />
     );
 
-    const printBtn = screen.getByText('Print');
+    // Open dropdown
+    const exportBtn = screen.getByText('Export');
+    fireEvent.click(exportBtn);
+
+    // Use findByText with a slightly longer timeout just in case
+    const printBtn = await screen.findByText('Print / Save PDF', {}, { timeout: 2000 });
     fireEvent.click(printBtn);
 
     expect(printSpy).toHaveBeenCalled();
     printSpy.mockRestore();
   });
 
-  it('expands and collapses legs', () => {
+  it('expands and collapses legs in grouped view', async () => {
     render(
       <ChargeBreakdown 
         legs={mockLegs} 
@@ -187,19 +197,26 @@ describe('ChargeBreakdown', () => {
       />
     );
 
-    // Legs are expanded by default (logic: isExpanded = expandedLegs[id] ?? true)
-    // So "Freight" (charge inside leg1) should be visible
-    expect(screen.getByText('Freight')).toBeDefined();
+    // Switch to Grouped View
+    const groupedBtn = screen.getByText('Grouped');
+    fireEvent.click(groupedBtn);
+
+    // Legs are expanded by default
+    // Use "THC" which is unique to Leg 1
+    const thcElements = await screen.findAllByText('THC');
+    expect(thcElements.length).toBeGreaterThan(0);
 
     // Click to collapse first leg (leg1)
     const legHeader = screen.getByTestId('leg-header-leg1');
     fireEvent.click(legHeader);
 
-    // Now "Freight" should NOT be visible
-    expect(screen.queryByText('Freight')).toBeNull();
+    // Now "THC" should NOT be visible
+    await waitFor(() => {
+      expect(screen.queryByText('THC')).toBeNull();
+    });
     
     // Click to expand again
     fireEvent.click(legHeader);
-    expect(screen.getByText('Freight')).toBeDefined();
+    expect(screen.getAllByText('THC').length).toBeGreaterThan(0);
   });
 });

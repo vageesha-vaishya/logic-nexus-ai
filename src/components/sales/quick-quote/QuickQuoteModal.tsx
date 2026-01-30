@@ -25,6 +25,7 @@ import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import { RateOption } from '@/types/quote-breakdown';
+import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 
 const CARRIER_OPTIONS = [
   "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
@@ -89,7 +90,6 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{ unit: string; confidence: number } | null>(null);
   const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
-  const [codeSuggestions, setCodeSuggestions] = useState<any[]>([]);
   
   // AI Analysis State
   const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
@@ -138,40 +138,24 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   useEffect(() => {
     setResults(null);
     setComplianceCheck(null);
-    setCodeSuggestions([]);
   }, [mode]);
 
-  // AI: Lookup Codes (Debounced)
-  useEffect(() => {
-    const lookup = async (query: string, field: 'origin' | 'destination') => {
-        if (query.length < 3) return;
-        try {
-            const { data } = await invokeAiAdvisor({
-                action: 'lookup_codes', payload: { query, mode }
-            });
-            if (data?.suggestions && data.suggestions.length > 0) {
-                setCodeSuggestions(data.suggestions);
-                
-                // Auto-populate details from best match to ensure QuoteNew has full address
-                const bestMatch = data.suggestions[0];
-                setExtendedData(prev => ({
-                    ...prev,
-                    [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
-                        name: bestMatch.label,
-                        formatted_address: bestMatch.details || bestMatch.label, // Ensure formatted_address exists
-                        ...bestMatch
-                    }
-                }));
+  const handleLocationChange = (field: 'origin' | 'destination', value: string, location?: any) => {
+    form.setValue(field, value);
+    if (location) {
+        setExtendedData(prev => ({
+            ...prev,
+            [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
+                name: location.location_name,
+                formatted_address: [location.city, location.state_province, location.country].filter(Boolean).join(", "),
+                code: location.location_code,
+                type: location.location_type,
+                country: location.country,
+                city: location.city
             }
-        } catch (e) { console.error(e); }
-    };
-
-    const timer = setTimeout(() => {
-        if (origin) lookup(origin, 'origin');
-        if (destination) lookup(destination, 'destination');
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [origin, destination, mode]);
+        }));
+    }
+  };
 
 
   // AI: Classify Commodity & Suggest HTS
@@ -387,7 +371,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
           });
       } else if (legacyRes.data?.options) {
           console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
-          const legacyOptions = legacyRes.data.options.map((opt: any) => {
+          let legacyOptions = legacyRes.data.options.map((opt: any) => {
               const mapped = mapOptionToQuote(opt);
               const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
               return {
@@ -404,9 +388,26 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   buyPrice,
                   marginAmount,
                   marginPercent,
-                  markupPercent
+                  markupPercent,
+                  verified: true, // Mock verification for Market Rates
+                  verificationTimestamp: new Date().toISOString()
               };
           });
+
+          // Filter Market Rates: Top 2 based on Cost, Transit Time, Reliability
+          legacyOptions = legacyOptions.sort((a: any, b: any) => {
+              // 1. Price (Ascending)
+              if (a.price !== b.price) return a.price - b.price;
+              
+              // 2. Transit Time (Ascending)
+              const getDays = (s?: string) => {
+                  if (!s) return 999;
+                  const match = s.match(/(\d+)/);
+                  return match ? parseInt(match[1]) : 999;
+              };
+              return getDays(a.transitTime) - getDays(b.transitTime);
+          }).slice(0, 2);
+
           combinedOptions = [...combinedOptions, ...legacyOptions];
       }
 
@@ -431,7 +432,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               const aiData = aiRes.data;
               
               if (aiData.options) {
-                  const aiOptions = aiData.options.map((opt: any) => {
+                  let aiOptions = aiData.options.map((opt: any) => {
                       const mapped = mapOptionToQuote(opt);
                       const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
                       return {
@@ -453,7 +454,26 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                       };
                   });
                   
-                  combinedOptions = [...combinedOptions, ...aiOptions];
+                  // Filter AI Rates: Top 5 per carrier
+                  const aiOptionsByCarrier: Record<string, RateOption[]> = {};
+                  aiOptions.forEach((opt: RateOption) => {
+                      const carrier = opt.carrier || 'Unknown';
+                      if (!aiOptionsByCarrier[carrier]) aiOptionsByCarrier[carrier] = [];
+                      aiOptionsByCarrier[carrier].push(opt);
+                  });
+
+                  const filteredAiOptions: RateOption[] = [];
+                  Object.values(aiOptionsByCarrier).forEach((rates) => {
+                      // Sort by Tier (Best Value first) then Price
+                      const sorted = rates.sort((a, b) => {
+                          if (a.tier === 'best_value' && b.tier !== 'best_value') return -1;
+                          if (a.tier !== 'best_value' && b.tier === 'best_value') return 1;
+                          return a.price - b.price;
+                      });
+                      filteredAiOptions.push(...sorted.slice(0, 5));
+                  });
+                  
+                  combinedOptions = [...combinedOptions, ...filteredAiOptions];
                   setMarketAnalysis(aiData.market_analysis);
                   setConfidenceScore(aiData.confidence_score);
                   setAnomalies(aiData.anomalies || []);
@@ -674,22 +694,25 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="flex justify-between">
-                    {mode === 'ocean' ? 'Origin Port' : mode === 'air' ? 'Origin Airport' : 'Origin City'}
+                    Origin
                     {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
                   </Label>
-                  <Input placeholder={mode === 'ocean' ? 'e.g. USLAX' : 'e.g. JFK'} {...form.register("origin")} className="bg-background"/>
-                  {codeSuggestions.length > 0 && origin && (
-                    <div className="text-[10px] text-muted-foreground truncate">
-                        Suggestion: {codeSuggestions[0].label}
-                    </div>
-                  )}
+                  <LocationAutocomplete
+                    placeholder="Search origin port, airport, or city..."
+                    value={origin}
+                    onChange={(value, location) => handleLocationChange('origin', value, location)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex justify-between">
-                    {mode === 'ocean' ? 'Dest Port' : mode === 'air' ? 'Dest Airport' : 'Dest City'}
+                    Destination
                     {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
                   </Label>
-                  <Input placeholder={mode === 'ocean' ? 'e.g. CNSHA' : 'e.g. LHR'} {...form.register("destination")} className="bg-background"/>
+                  <LocationAutocomplete
+                    placeholder="Search destination port, airport, or city..."
+                    value={destination}
+                    onChange={(value, location) => handleLocationChange('destination', value, location)}
+                  />
                 </div>
               </div>
 

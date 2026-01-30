@@ -238,6 +238,7 @@ CREATE POLICY "Public read vessels" ON public.vessels FOR SELECT TO authenticate
 -- Views for Drill-Down Reporting
 --------------------------------------------------------------------------------
 
+DROP VIEW IF EXISTS public.view_container_inventory_summary;
 CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
 SELECT 
     ct.tenant_id,

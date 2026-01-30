@@ -33,7 +33,7 @@ export default function PortsLocations() {
   const [editingLocationId, setEditingLocationId] = useState<string | undefined>(undefined);
   const [filterName, setFilterName] = useState('');
   const [filterCode, setFilterCode] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'seaport' | 'airport' | 'inland_port' | 'warehouse' | 'terminal'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'seaport' | 'airport' | 'inland_port' | 'warehouse' | 'terminal' | 'railway_terminal'>('all');
   const [filterCity, setFilterCity] = useState('');
   const [filterCountry, setFilterCountry] = useState('');
   const [filterCustoms, setFilterCustoms] = useState<'all' | 'yes' | 'no'>('all');
@@ -191,6 +191,7 @@ export default function PortsLocations() {
                     <SelectItem value="inland_port">Inland Port</SelectItem>
                     <SelectItem value="warehouse">Warehouse</SelectItem>
                     <SelectItem value="terminal">Terminal</SelectItem>
+                    <SelectItem value="railway_terminal">Railway Terminal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -642,7 +642,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           transit_time: optionData.transit_time || '',
           validUntil: optionData.valid_until ? new Date(optionData.valid_until).toISOString().split('T')[0] : prev.validUntil,
           currencyId: optionData.quote_currency_id || prev.currencyId,
-          option_name: optionData.option_name || ''
+          option_name: optionData.option_name || '',
+          ai_generated: optionData.ai_generated || false
         }));
       }
 
@@ -1140,9 +1141,25 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .eq('id', versionId);
       }
 
+      // Fetch Master Data for resolution
+      const { data: currencies } = await scopedDb.from('currencies').select('id, code');
+      const { data: categories } = await scopedDb.from('charge_categories').select('id, name');
+
       for (const result of results) {
         const mapped = mapOptionToQuote(result);
-        const financials = calculateQuoteFinancials(mapped.sellPrice);
+        // Use mapped financials if available (preserving source data/logic), otherwise default calculate
+        const financials = (mapped.buyPrice !== undefined && mapped.marginAmount !== undefined && mapped.buyPrice > 0)
+            ? { 
+                buyPrice: mapped.buyPrice, 
+                marginAmount: mapped.marginAmount, 
+                markupPercent: mapped.markupPercent,
+                sellPrice: mapped.total_amount || mapped.sellPrice || 0
+              }
+            : calculateQuoteFinancials(mapped.sellPrice);
+
+        // Resolve Currency (default to USD if not found)
+        const currencyCode = mapped.currency || 'USD';
+        const currencyId = currencies?.find(c => c.code === currencyCode)?.id || currencies?.[0]?.id;
 
         const { data: optData, error: optError } = await scopedDb
           .from('quotation_version_options')
@@ -1165,28 +1182,139 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             margin_percentage: financials.markupPercent,
             total_sell: financials.sellPrice,
             total_amount: financials.sellPrice,
-            quote_currency_id: currencies[0]?.id
+            quote_currency_id: currencyId
           })
           .select()
           .single();
 
         if (optError) throw optError;
 
-        // Create a default transport leg for the option
-        const legId = crypto.randomUUID();
-        await scopedDb
-          .from('quotation_version_option_legs')
-          .insert({
-             id: legId,
-             quotation_version_option_id: optData.id,
-             tenant_id: tenantId,
-             mode: payload.mode,
-             origin_location: payload.origin,
-             destination_location: payload.destination,
-             leg_type: 'transport',
-             carrier_name: mapped.carrier,
-             sort_order: 0
-          });
+        // Insert Legs and Charges (Correctly respecting bifurcation)
+        if (mapped.legs && mapped.legs.length > 0) {
+            for (let i = 0; i < mapped.legs.length; i++) {
+                const leg = mapped.legs[i];
+                const legId = crypto.randomUUID();
+                
+                // Determine Service Type ID for leg (if transport)
+                // This is a simplification; ideally we'd look up service types
+                // But for now we rely on the option's service type or generic
+                
+                const { data: legData, error: legError } = await scopedDb
+                  .from('quotation_version_option_legs')
+                  .insert({
+                     id: legId,
+                     quotation_version_option_id: optData.id,
+                     tenant_id: tenantId,
+                     mode: leg.mode || payload.mode,
+                     origin_location: leg.origin || payload.origin,
+                     destination_location: leg.destination || payload.destination,
+                     leg_type: leg.leg_type || 'transport', // mapOptionToQuote now assigns this
+                     carrier_name: leg.carrier || mapped.carrier,
+                     sort_order: i,
+                     transit_time: leg.transit_time
+                  })
+                  .select()
+                  .single();
+
+                if (legError) {
+                    console.error("Failed to insert leg:", legError);
+                    continue;
+                }
+
+                // Insert Charges for this Leg
+                if (leg.charges && leg.charges.length > 0) {
+                    // Calculate Chargeable Weight for this leg
+                    const weight = Number(quoteData.total_weight) || 0;
+                    const volume = Number(quoteData.total_volume) || 0;
+                    const legMode = (leg.mode || payload.mode || 'ocean').toLowerCase();
+                    
+                    let transportMode: TransportMode = 'ocean';
+                    if (legMode.includes('air')) transportMode = 'air';
+                    else if (legMode.includes('road') || legMode.includes('truck')) transportMode = 'road';
+                    else if (legMode.includes('rail')) transportMode = 'rail';
+                    
+                    const chargeableWeight = calculateChargeableWeight(weight, volume, transportMode);
+
+                    const chargesToInsert = leg.charges.map((c: any) => {
+                        // Resolve Category ID
+                        const cName = (c.name || c.charge_categories?.name || '').toLowerCase();
+                        let category = categories?.find(cat => cat.name.toLowerCase() === cName || cName.includes(cat.name.toLowerCase()));
+                        
+                        // Fallback to 'Freight' or first available category if not found
+                        if (!category && categories && categories.length > 0) {
+                            category = categories.find(cat => cat.name.toLowerCase().includes('freight')) || categories[0];
+                        }
+                        
+                        // Resolve Currency ID
+                        const cCurrency = c.currency || currencyCode;
+                        const cCurrencyId = currencies?.find(cur => cur.code === cCurrency)?.id || currencyId;
+
+                        // Map unit string to basis_id and determine quantity
+                        let basisId = 'fc9fd073-e16b-4064-b915-c0d965351d68'; // Default: Per Shipment
+                        let quantity = 1;
+                        const unitLower = (c.unit || '').toLowerCase();
+                        
+                        if (unitLower.includes('kg') || unitLower.includes('kilogram')) {
+                            basisId = '297dc9e1-b128-4909-a5fc-48ca11f85f3d';
+                            quantity = chargeableWeight;
+                        } else if (unitLower.includes('container') || unitLower.includes('box') || unitLower.includes('teu') || unitLower.includes('feu')) {
+                            basisId = '495e6fc6-e8b3-4d2d-8761-e0135b82b511';
+                            // Default to 1 if container count not available, or parse from quoteData if present
+                            quantity = 1; 
+                        } else if (unitLower.includes('cbm') || unitLower.includes('cubic')) {
+                            basisId = 'ede3ff41-d0d1-40fb-b719-c3ba8fa89d78';
+                            quantity = volume || 1;
+                        } else if (unitLower.includes('mile')) {
+                            basisId = 'fb0e952e-e0be-478b-9616-986528bef6f8';
+                            quantity = 1;
+                        }
+
+                        const rate = c.amount || 0;
+                        const totalAmount = rate * quantity;
+
+                        return {
+                            leg_id: legId,
+                            tenant_id: tenantId,
+                            quote_option_id: optData.id,
+                            category_id: category?.id,
+                            charge_side_id: '0e065e06-1e00-4aa2-8f83-9223abe18a05', // Default to Sell side
+                            basis_id: basisId,
+                            currency_id: cCurrencyId,
+                            unit: c.unit || 'per_shipment',
+                            rate: rate,
+                            quantity: quantity,
+                            amount: totalAmount,
+                            note: c.note || c.name,
+                            sort_order: 0
+                        };
+                    });
+
+                    const { error: chargeError } = await scopedDb
+                        .from('quote_charges')
+                        .insert(chargesToInsert);
+                        
+                    if (chargeError) {
+                         console.error("Failed to insert leg charges:", chargeError);
+                    }
+                }
+            }
+        } else {
+             // Fallback: Create default leg if mapOptionToQuote failed to produce legs (Unlikely with new logic)
+             const legId = crypto.randomUUID();
+             await scopedDb
+              .from('quotation_version_option_legs')
+              .insert({
+                 id: legId,
+                 quotation_version_option_id: optData.id,
+                 tenant_id: tenantId,
+                 mode: payload.mode,
+                 origin_location: payload.origin,
+                 destination_location: payload.destination,
+                 leg_type: 'transport',
+                 carrier_name: mapped.carrier,
+                 sort_order: 0
+              });
+        }
       }
 
       // SYNC: Log to AI Request History
@@ -1593,6 +1721,27 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       // Update Current Option Details
       if (currentOptionId) {
+        // Recalculate Option Financials from Charges to ensure sync
+        let newTotalBuy = 0;
+        let newTotalSell = 0;
+
+        // Sum from Legs
+        legs.forEach(leg => {
+            leg.charges.forEach((c: any) => {
+                newTotalBuy += (c.buy?.quantity || 1) * (c.buy?.rate || 0);
+                newTotalSell += (c.sell?.quantity || 1) * (c.sell?.rate || 0);
+            });
+        });
+
+        // Sum from Combined Charges
+        combinedCharges.forEach((c: any) => {
+            newTotalBuy += (c.buy?.quantity || 1) * (c.buy?.rate || 0);
+            newTotalSell += (c.sell?.quantity || 1) * (c.sell?.rate || 0);
+        });
+
+        const newMarginAmount = newTotalSell - newTotalBuy;
+        const newMarginPercent = newTotalSell > 0 ? (newMarginAmount / newTotalSell) * 100 : 0;
+
         const { error: optionError } = await scopedDb
           .from('quotation_version_options')
           .update({
@@ -1601,7 +1750,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             transit_time: quoteData.transit_time || null,
             valid_until: quoteData.validUntil || null,
             currency: quoteData.currencyId ? currencies.find(c => c.id === quoteData.currencyId)?.code : null,
-            option_name: quoteData.option_name || null
+            option_name: quoteData.option_name || null,
+            total_buy: newTotalBuy,
+            total_sell: newTotalSell,
+            total_amount: newTotalSell,
+            margin_amount: newMarginAmount,
+            margin_percentage: newMarginPercent
           })
           .eq('id', currentOptionId);
 
@@ -1848,45 +2002,119 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const handleFetchRates = async (legId: string) => {
+    const leg = legs.find(l => l.id === legId);
+    if (!leg) return;
+
     setLoading(true);
+    toast({
+      title: "Fetching AI Rates",
+      description: "Consulting AI Smart Advisor for real-time market rates...",
+    });
+
     try {
-      const leg = legs.find(l => l.id === legId);
-      if (!leg) return;
+      // 1. Prepare Payload for AI
+      // We treat this leg as a mini-shipment to get specific rates
+      const payload = {
+        origin: leg.origin,
+        destination: leg.destination,
+        commodity: quoteData.commodity || 'General Cargo',
+        mode: leg.mode.toLowerCase(),
+        // Add context if available
+        container_type: quoteData.container_type,
+        weight: quoteData.total_weight,
+        volume: quoteData.total_volume
+      };
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // 2. Invoke AI Advisor
+      const aiResponse = await invokeAiAdvisor({
+        action: 'generate_smart_quotes',
+        payload
+      });
 
-      const mode = leg.mode.toLowerCase();
-      const mockRates = [];
+      if (aiResponse.error) {
+        throw new Error(aiResponse.error.message || 'AI Advisor failed');
+      }
 
-      // Generate mock rates based on mode
-      if (mode.includes('air')) {
-        mockRates.push({ category: 'Freight', basis: 'kg', buy: 2.5 + Math.random(), sell: 3.5 + Math.random(), unit: 'kg' });
-        mockRates.push({ category: 'Fuel', basis: 'kg', buy: 0.5, sell: 0.55, unit: 'kg' });
-        mockRates.push({ category: 'Security', basis: 'kg', buy: 0.15, sell: 0.20, unit: 'kg' });
-      } else if (mode.includes('sea') || mode.includes('ocean')) {
-        mockRates.push({ category: 'Freight', basis: 'container', buy: 1200 + (Math.random() * 200), sell: 1500 + (Math.random() * 300), unit: '20ft' });
-        mockRates.push({ category: 'Bunker', basis: 'container', buy: 150, sell: 150, unit: '20ft' });
-        mockRates.push({ category: 'Doc', basis: 'shipment', buy: 50, sell: 75, unit: 'doc' });
-      } else if (mode.includes('road') || mode.includes('truck')) {
-        mockRates.push({ category: 'Freight', basis: 'trip', buy: 400 + (Math.random() * 50), sell: 550 + (Math.random() * 50), unit: 'trip' });
-        mockRates.push({ category: 'Fuel', basis: 'trip', buy: 40, sell: 45, unit: 'trip' });
-      } else {
-        mockRates.push({ category: 'Freight', basis: 'unit', buy: 100, sell: 150, unit: 'unit' });
+      if (!aiResponse.data?.options || aiResponse.data.options.length === 0) {
+        throw new Error('No rates found for this route');
+      }
+
+      // 3. Process Result
+      // We take the first (best) option returned by AI
+      const bestOption = aiResponse.data.options[0];
+      const mapped = mapOptionToQuote(bestOption);
+
+      if (!mapped) throw new Error('Failed to process AI rates');
+
+      // 4. Extract Charges
+      // Collect charges from all returned legs (in case AI broke it down) and global charges
+      let extractedCharges: any[] = [];
+      
+      if (mapped.legs) {
+        mapped.legs.forEach((l: any) => {
+          if (l.charges) extractedCharges = [...extractedCharges, ...l.charges];
+        });
+      }
+      if (mapped.charges) {
+        extractedCharges = [...extractedCharges, ...mapped.charges];
+      }
+
+      if (extractedCharges.length === 0) {
+        // Fallback: If AI returned a total but no details, create a lump sum
+        if (mapped.total_amount > 0) {
+            extractedCharges.push({
+                name: 'Freight Charges',
+                amount: mapped.total_amount,
+                currency: mapped.currency || 'USD',
+                unit: 'per_shipment'
+            });
+        }
       }
 
       const weight = Number(quoteData.total_weight) || 0;
       const volume = Number(quoteData.total_volume) || 0;
       const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
-      
-      const newCharges = mockRates.map(rate => {
-        // Match category
-        const cat = chargeCategories.find(c => c.name.toLowerCase().includes(rate.category.toLowerCase())) || chargeCategories[0];
-        // Match basis
-        const basis = chargeBases.find(b => b.code.toLowerCase().includes(rate.basis.toLowerCase())) || chargeBases[0];
+
+      // 5. Map to Composer Charge Format
+      const newCharges = extractedCharges.map(chg => {
+        // Find matching IDs from master data
+        const catName = chg.category || chg.name || 'Freight';
+        const cat = chargeCategories.find(c => 
+          (c.name && c.name.toLowerCase() === catName.toLowerCase()) || 
+          (c.code && c.code.toLowerCase() === catName.toLowerCase())
+        ) || chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
+
+        // Basis mapping
+        const basisName = chg.unit || 'per_shipment';
+        // Try to match basis code or name
+        let basis = chargeBases.find(b => 
+          (b.code && b.code.toLowerCase() === basisName.toLowerCase()) ||
+          (b.name && b.name.toLowerCase() === basisName.toLowerCase())
+        );
         
+        // Fallback for common units
+        if (!basis) {
+            if (basisName.includes('kg')) basis = chargeBases.find(b => b.code === 'kg');
+            else if (basisName.includes('cbm')) basis = chargeBases.find(b => b.code === 'cbm');
+            else if (basisName.includes('cont') || basisName.includes('box')) basis = chargeBases.find(b => b.code === 'container');
+            else basis = chargeBases.find(b => b.code === 'shipment'); // Default
+        }
+
+        const curr = currencies.find(c => c.code === (chg.currency || 'USD')) || currencies[0];
+        
+        // Calculate Buy/Sell
+        // If AI provides specific buy/sell, use them. Otherwise use standard margin logic.
+        const sellRate = Number(chg.amount || chg.rate || 0);
+        let buyRate = Number(chg.buyRate || chg.cost || 0);
+        
+        if (buyRate === 0 && sellRate > 0) {
+            // Reverse calculate buy rate assuming 15% margin if not provided
+            buyRate = Number((sellRate * 0.85).toFixed(2));
+        }
+
         // Determine quantity
-        let quantity = 1;
+        let quantity = Number(chg.quantity || 1);
+        // Adjust quantity based on basis if needed (similar to original logic)
         if (basis?.code?.toLowerCase().includes('kg') || basis?.code?.toLowerCase().includes('cbm')) {
              quantity = chargeableWeight > 0 ? chargeableWeight : 1;
         }
@@ -1895,15 +2123,24 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           id: `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           category_id: cat?.id || '',
           basis_id: basis?.id || '',
-          unit: rate.unit,
-          currency_id: currencies[0]?.id || '',
-          buy: { quantity, rate: Number(rate.buy.toFixed(2)), dbChargeId: null },
-          sell: { quantity, rate: Number(rate.sell.toFixed(2)), dbChargeId: null },
-          note: `Market Rate: ${rate.category}`
+          unit: basis?.code || 'shipment',
+          currency_id: curr?.id || '',
+          buy: {
+            quantity,
+            rate: buyRate,
+            dbChargeId: null
+          },
+          sell: {
+            quantity,
+            rate: sellRate,
+            dbChargeId: null
+          },
+          note: chg.note || `AI Rate: ${chg.name || catName}`
         };
       });
 
-      setLegs(prev => prev.map(l => {
+      // 6. Update State (using smart merge)
+      setLegs(currentLegs => currentLegs.map(l => {
         if (l.id === legId) {
           // Merge new charges with existing ones to prevent duplicates
           const updatedCharges = [...l.charges];
@@ -1920,11 +2157,6 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               // Update existing charge
               const existing = updatedCharges[existingIndex];
               
-              // Smart Update Logic:
-              // 1. Always update rates and currency
-              // 2. Update quantity only if it's the default (1) or 0, to preserve user edits
-              // 3. Preserve ID (dbChargeId) to ensure UPDATE instead of INSERT
-              
               updatedCharges[existingIndex] = {
                 ...existing,
                 unit: newCharge.unit || existing.unit,
@@ -1932,8 +2164,6 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 buy: { 
                     ...existing.buy, 
                     rate: newCharge.buy.rate,
-                    // If existing quantity is 0 or 1, assume it's default and update it. 
-                    // Otherwise keep user's manual quantity.
                     quantity: (existing.buy.quantity === 0 || existing.buy.quantity === 1) ? newCharge.buy.quantity : existing.buy.quantity,
                     amount: ((existing.buy.quantity === 0 || existing.buy.quantity === 1) ? newCharge.buy.quantity : existing.buy.quantity) * newCharge.buy.rate
                 },
@@ -1957,16 +2187,16 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }));
 
       toast({
-        title: 'Rates Fetched',
-        description: `Retrieved ${mockRates.length} market rates for ${leg.mode}.`,
+        title: "Rates Fetched",
+        description: `Successfully retrieved ${newCharges.length} AI rates.`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching rates:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to fetch carrier rates.',
-        variant: 'destructive'
+        title: "Rate Fetch Failed",
+        description: error.message || "Could not retrieve AI rates.",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);

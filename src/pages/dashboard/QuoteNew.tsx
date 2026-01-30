@@ -204,11 +204,18 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
       const primaryRate = selectedRates[0];
       let carrierId = undefined;
+
+      // Robust Carrier Matching Logic
       if (primaryRate && masterData.carriers?.length > 0) {
-          carrierId = masterData.carriers.find(
-              c => c.carrier_name.toLowerCase().includes(primaryRate.carrier.toLowerCase()) || 
-                   c.scac?.toLowerCase() === primaryRate.carrier.toLowerCase()
-          )?.id;
+          const searchName = (primaryRate.carrier || primaryRate.carrier_name || '');
+          carrierId = findCarrierId(searchName, masterData.carriers);
+          
+          if (carrierId) {
+             const matchedCarrier = masterData.carriers.find(c => c.id === carrierId);
+             console.log(`[QuoteNew] Matched carrier '${searchName}' to '${matchedCarrier?.carrier_name}' (ID: ${carrierId})`);
+          } else {
+             console.warn(`[QuoteNew] Failed to match carrier '${searchName}' against ${masterData.carriers.length} records.`);
+          }
       }
 
       setTemplateData(prev => ({
@@ -517,8 +524,8 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                     }
 
                     // Use dynamic margin from financials instead of hardcoded 0.85 (15%)
-                    // If marginPercent is undefined, default to 15%
-                    const buyMultiplier = 1 - ((marginPercent ?? 15) / 100);
+                    const marginPercent = Number(rate.marginPercent || rate.margin_percent || 15);
+                    const buyMultiplier = 1 - (marginPercent / 100);
                     const buyAmount = Number((amount * buyMultiplier).toFixed(2));
                     const sellAmount = Number(amount.toFixed(2));
 
@@ -1152,4 +1159,60 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
       </div>
     </DashboardLayout>
   );
+}
+
+// Helper function for robust carrier matching
+function findCarrierId(searchName: string, carriers: any[]): string | undefined {
+    if (!searchName || !carriers || carriers.length === 0) return undefined;
+    
+    const normalizedSearch = searchName.toLowerCase().trim();
+    if (!normalizedSearch) return undefined;
+
+    // 1. Exact Name Match (case-insensitive)
+    let match = carriers.find(c => c.carrier_name.toLowerCase() === normalizedSearch);
+
+    // 2. SCAC Match
+    if (!match) {
+        match = carriers.find(c => c.scac?.toLowerCase() === normalizedSearch);
+    }
+
+    // 3. Includes Check (Bidirectional)
+    if (!match) {
+        // Try to find where DB name contains search name (e.g. "Evergreen Marine" contains "Evergreen")
+        match = carriers.find(c => c.carrier_name.toLowerCase().includes(normalizedSearch));
+    }
+    if (!match) {
+        // Try reverse: Search name contains DB name (e.g. "Evergreen Line" contains "Evergreen")
+        // Be careful with short names like "ONE" matching "None" etc.
+        match = carriers.find(c => normalizedSearch.includes(c.carrier_name.toLowerCase()) && c.carrier_name.length > 2);
+    }
+
+    // 4. Hardcoded Aliases for common mismatches
+    if (!match) {
+        const aliases: Record<string, string[]> = {
+            'evergreen': ['evergreen line', 'evergreen marine', 'emc'],
+            'maersk': ['maersk line', 'maersk sealand'],
+            'msc': ['mediterranean shipping company'],
+            'cma cgm': ['cma', 'cgm'],
+            'cosco': ['cosco shipping'],
+            'one': ['ocean network express'],
+            'zim': ['zim integrated shipping services'],
+            'hmm': ['hyundai merchant marine'],
+            'yang ming': ['yang ming marine transport'],
+            'apl': ['american president lines']
+        };
+
+        for (const [key, variants] of Object.entries(aliases)) {
+            if (normalizedSearch.includes(key) || variants.some(v => normalizedSearch.includes(v))) {
+                // Find the canonical carrier in masterData
+                match = carriers.find(c => 
+                    c.carrier_name.toLowerCase().includes(key) || 
+                    (c.scac && c.scac.toLowerCase() === key)
+                );
+                if (match) break;
+            }
+        }
+    }
+    
+    return match ? match.id : undefined;
 }

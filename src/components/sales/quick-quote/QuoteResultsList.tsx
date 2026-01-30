@@ -3,6 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { 
+    Tooltip, 
+    TooltipContent, 
+    TooltipProvider, 
+    TooltipTrigger 
+} from "@/components/ui/tooltip";
 import { 
     Table, 
     TableBody, 
@@ -12,21 +26,21 @@ import {
     TableRow 
 } from '@/components/ui/table';
 import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
-import { QuoteDetailView } from './QuoteDetailView';
 import { QuoteMapVisualizer } from './QuoteMapVisualizer';
+import { QuoteDetailView } from './QuoteDetailView';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { 
     Sparkles, 
     Leaf, 
     ChevronDown, 
     ChevronUp, 
-    Map as MapIcon, 
+    ShieldCheck,
     LayoutList,
+    MapIcon,
     LayoutGrid,
-    List as ListIcon,
-    Columns
+    ListIcon,
+    Columns,
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 import { 
@@ -36,16 +50,6 @@ import {
     getReliabilityColor
 } from '../shared/quote-badges';
 import { RateOption, TransportLeg } from '@/types/quote-breakdown';
-
-const mapLegsForVisualizer = (legs?: TransportLeg[]) => {
-    if (!legs) return [];
-    return legs.map(leg => ({
-        ...leg,
-        from: leg.origin,
-        to: leg.destination,
-        mode: leg.mode as 'ocean' | 'air' | 'road' | 'rail'
-    }));
-};
 
 interface QuoteResultsListProps {
     results: RateOption[];
@@ -58,7 +62,20 @@ interface QuoteResultsListProps {
     anomalies?: any[];
 }
 
-export function QuoteResultsList({ 
+const mapLegsForVisualizer = (legs: TransportLeg[] | undefined) => {
+    if (!legs) return [];
+    return legs.map(leg => ({
+        from: leg.origin,
+        to: leg.destination,
+        mode: leg.mode,
+        carrier: leg.carrier,
+        transit_time: leg.transit_time,
+        origin: leg.origin,
+        destination: leg.destination
+    }));
+};
+
+export function QuoteResultsList({  
     results, 
     onSelect, 
     selectedIds = [], 
@@ -69,17 +86,26 @@ export function QuoteResultsList({
     anomalies
 }: QuoteResultsListProps) {
     const [viewMode, setViewMode] = useState<'card' | 'list' | 'table'>('card');
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
+    const [filterType, setFilterType] = useState<'all' | 'market' | 'ai'>('all');
+
+    const viewDetailsOption = results.find(r => r.id === viewDetailsId);
 
     if (!results || results.length === 0) return null;
 
-    const toggleExpand = (id: string) => {
-        setExpandedId(prev => prev === id ? null : id);
-    };
+    // Filter results
+    const filteredResults = results.filter(r => {
+        if (filterType === 'all') return true;
+        if (filterType === 'market') return r.source_attribution === 'Standard Rate Engine';
+        if (filterType === 'ai') return r.source_attribution === 'AI Smart Engine';
+        return true;
+    });
+
+
 
     const renderCardView = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
-            {results.map((option) => {
+            {filteredResults.map((option) => {
                 const isSelected = selectedIds.includes(option.id);
                 return (
                     <Card 
@@ -87,7 +113,7 @@ export function QuoteResultsList({
                         className={cn(
                             "cursor-pointer transition-all duration-200 hover:shadow-lg border",
                             isSelected ? "border-primary bg-primary/5 shadow-md" : "border-border hover:border-primary/50",
-                            expandedId === option.id ? "ring-2 ring-primary/20" : ""
+                            viewDetailsId === option.id ? "ring-2 ring-primary/20" : ""
                         )}
                         onClick={() => onToggleSelection ? onToggleSelection(option.id) : onSelect(option)}
                     >
@@ -104,11 +130,34 @@ export function QuoteResultsList({
                                         )}
                                         <h4 className="font-bold text-lg leading-tight truncate">{option.carrier}</h4>
                                         {getTierBadge(option.tier)}
-                                        {option.source_attribution?.includes("AI") && (
-                                            <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0">
-                                                AI
-                                            </Badge>
+                                        {option.source_attribution?.includes("AI") ? (
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                                                            <Sparkles className="w-3 h-3" /> AI Generated
+                                                        </Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Generated by AI Advisor based on historical data.</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        ) : (
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                                                            <ShieldCheck className="w-3 h-3" /> Market Rate
+                                                        </Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Real-time market rate verified via Carrier API.</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         )}
+
                                     </div>
                                     <p className="text-sm text-muted-foreground truncate font-medium" title={option.name}>{option.name}</p>
                                 </div>
@@ -118,6 +167,13 @@ export function QuoteResultsList({
                                     </div>
                                     <div className="text-[10px] uppercase text-muted-foreground font-semibold">Total Estimate</div>
                                     
+                                    {option.verified && (
+                                        <div className="flex items-center gap-1 text-[9px] text-green-600 justify-end mb-1">
+                                            <ShieldCheck className="w-2.5 h-2.5" />
+                                            <span>Verified {option.verificationTimestamp ? new Date(option.verificationTimestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</span>
+                                        </div>
+                                    )}
+
                                     {/* Financials (if available) */}
                                     {(option.markupPercent !== undefined || option.marginAmount !== undefined) && (
                                         <div className="mt-1 flex flex-col items-end gap-0.5">
@@ -184,10 +240,10 @@ export function QuoteResultsList({
                                     className="gap-1 text-xs h-7"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        toggleExpand(option.id);
+                                        setViewDetailsId(option.id);
                                     }}
                                 >
-                                    {expandedId === option.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                    <ListIcon className="w-3 h-3" />
                                     Details
                                 </Button>
                                 <Button 
@@ -203,31 +259,7 @@ export function QuoteResultsList({
                                 </Button>
                             </div>
 
-                            {expandedId === option.id && (
-                                <div className="mt-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200" onClick={(e) => e.stopPropagation()}>
-                                    <Tabs defaultValue="details" className="w-full">
-                                        <TabsList className="grid w-full grid-cols-2 mb-4">
-                                            <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Breakdown</TabsTrigger>
-                                            <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Map</TabsTrigger>
-                                        </TabsList>
-                                        
-                                        <TabsContent value="details">
-                                            <QuoteDetailView 
-                                                quote={mapOptionToQuote(option)} 
-                                                compact={true}
-                                            />
-                                        </TabsContent>
 
-                                        <TabsContent value="map">
-                                                        <QuoteMapVisualizer 
-                                                            origin={option.legs?.[0]?.origin || "Origin"} 
-                                                            destination={option.legs?.[option.legs.length - 1]?.destination || "Destination"}
-                                                            legs={mapLegsForVisualizer(option.legs) || []}
-                                                        />
-                                                    </TabsContent>
-                                    </Tabs>
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
                 );
@@ -245,9 +277,9 @@ export function QuoteResultsList({
                         className={cn(
                             "group rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer",
                             isSelected ? "border-primary bg-primary/5" : "border-border",
-                            expandedId === option.id ? "ring-2 ring-primary/20" : ""
+                            viewDetailsId === option.id ? "ring-2 ring-primary/20" : ""
                         )}
-                        onClick={() => toggleExpand(option.id)}
+                        onClick={() => setViewDetailsId(option.id)}
                     >
                         <div className="flex items-center justify-between p-3">
                             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -308,10 +340,10 @@ export function QuoteResultsList({
                                         className="shrink-0"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            toggleExpand(option.id);
+                                            setViewDetailsId(option.id);
                                         }}
                                     >
-                                        {expandedId === option.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        <ListIcon className="w-4 h-4" />
                                     </Button>
                                     <Button 
                                         size="sm"
@@ -327,32 +359,7 @@ export function QuoteResultsList({
                             </div>
                         </div>
                         
-                        {/* Expandable content for List View */}
-                        {expandedId === option.id && (
-                             <div className="w-full px-4 pb-4 border-t pt-4 cursor-default" onClick={(e) => e.stopPropagation()}>
-                                <Tabs defaultValue="details" className="w-full">
-                                    <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-                                        <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Breakdown</TabsTrigger>
-                                        <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Map</TabsTrigger>
-                                    </TabsList>
-                                    
-                                    <TabsContent value="details">
-                                        <QuoteDetailView 
-                                            quote={mapOptionToQuote(option)} 
-                                            compact={true}
-                                        />
-                                    </TabsContent>
 
-                                    <TabsContent value="map">
-                                        <QuoteMapVisualizer 
-                                            origin={option.legs?.[0]?.origin || "Origin"} 
-                                            destination={option.legs?.[option.legs.length - 1]?.destination || "Destination"}
-                                            legs={mapLegsForVisualizer(option.legs) || []}
-                                        />
-                                    </TabsContent>
-                                </Tabs>
-                            </div>
-                        )}
                     </div>
                 );
             })}
@@ -384,7 +391,7 @@ export function QuoteResultsList({
                                 <TableRow 
                                     className={cn("cursor-pointer", isSelected ? "bg-muted/50" : "")}
                                     onClick={() => {
-                                        if (option.id) toggleExpand(option.id);
+                                        if (option.id) setViewDetailsId(option.id);
                                     }}
                                 >
                                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -450,10 +457,10 @@ export function QuoteResultsList({
                                                 size="sm"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    toggleExpand(option.id);
+                                                    setViewDetailsId(option.id);
                                                 }}
                                             >
-                                                {expandedId === option.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                <ListIcon className="w-4 h-4" />
                                             </Button>
                                             <Button 
                                                 size="sm"
@@ -468,35 +475,7 @@ export function QuoteResultsList({
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                                {expandedId === option.id && (
-                                    <TableRow>
-                                        <TableCell colSpan={9} className="p-0">
-                                            <div className="p-4 bg-muted/30">
-                                                <Tabs defaultValue="details" className="w-full">
-                                                    <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-                                                        <TabsTrigger value="details" className="text-xs h-7"><LayoutList className="w-3 h-3 mr-2"/>Breakdown</TabsTrigger>
-                                                        <TabsTrigger value="map" className="text-xs h-7"><MapIcon className="w-3 h-3 mr-2"/>Map</TabsTrigger>
-                                                    </TabsList>
-                                                    
-                                                    <TabsContent value="details">
-                                                        <QuoteDetailView 
-                                                            quote={mapOptionToQuote(option)} 
-                                                            compact={true}
-                                                        />
-                                                    </TabsContent>
 
-                                                    <TabsContent value="map">
-                                                        <QuoteMapVisualizer 
-                                                            origin={option.legs?.[0]?.origin || "Origin"} 
-                                                            destination={option.legs?.[option.legs.length - 1]?.destination || "Destination"}
-                                                            legs={mapLegsForVisualizer(option.legs) || []}
-                                                        />
-                                                    </TabsContent>
-                                                </Tabs>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </React.Fragment>
                         );
                     })}
@@ -580,6 +559,30 @@ export function QuoteResultsList({
             {viewMode === 'card' && renderCardView()}
             {viewMode === 'list' && renderListView()}
             {viewMode === 'table' && renderTableView()}
+
+            {/* Modal for Detailed View */}
+            <Dialog open={!!viewDetailsId} onOpenChange={(open) => !open && setViewDetailsId(null)}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <span>{viewDetailsOption?.carrier} - {viewDetailsOption?.name}</span>
+                            {viewDetailsOption?.tier && (
+                                <span className="transform scale-90 origin-left">
+                                    {getTierBadge(viewDetailsOption.tier)}
+                                </span>
+                            )}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {viewDetailsOption && (
+                        <div className="py-4">
+                            <QuoteDetailView 
+                                quote={mapOptionToQuote(viewDetailsOption)} 
+                                defaultAnalysisView={viewDetailsOption.source_attribution === 'AI Smart Engine' ? 'mode' : 'category'}
+                            />
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -14,12 +14,34 @@ CREATE TABLE IF NOT EXISTS public.platform_domains (
 );
 
 -- 2. Populate platform_domains with initial data
-INSERT INTO public.platform_domains (code, name, description)
-VALUES 
-  ('logistics', 'Logistics & Freight', 'Core logistics and freight forwarding capabilities'),
-  ('banking', 'Banking & Finance', 'Financial services and loan origination'),
-  ('telecom', 'Telecommunications', 'Subscription billing and service management')
-ON CONFLICT (code) DO NOTHING;
+-- Use DO block to handle potential name conflicts by updating codes if necessary
+DO $$
+BEGIN
+    -- Logistics (Standard)
+    INSERT INTO public.platform_domains (code, name, description)
+    VALUES ('logistics', 'Logistics & Freight', 'Core logistics and freight forwarding capabilities')
+    ON CONFLICT (code) DO NOTHING;
+
+    -- Banking
+    -- If 'Banking & Finance' exists (likely with code 'BANKING'), update code to 'banking'
+    IF EXISTS (SELECT 1 FROM public.platform_domains WHERE name = 'Banking & Finance' AND code != 'banking') THEN
+        UPDATE public.platform_domains SET code = 'banking' WHERE name = 'Banking & Finance';
+    ELSE
+        INSERT INTO public.platform_domains (code, name, description)
+        VALUES ('banking', 'Banking & Finance', 'Financial services and loan origination')
+        ON CONFLICT (code) DO NOTHING;
+    END IF;
+
+    -- Telecom
+    -- If 'Telecommunications' exists (likely with code 'TELECOM'), update code to 'telecom'
+    IF EXISTS (SELECT 1 FROM public.platform_domains WHERE name = 'Telecommunications' AND code != 'telecom') THEN
+        UPDATE public.platform_domains SET code = 'telecom' WHERE name = 'Telecommunications';
+    ELSE
+        INSERT INTO public.platform_domains (code, name, description)
+        VALUES ('telecom', 'Telecommunications', 'Subscription billing and service management')
+        ON CONFLICT (code) DO NOTHING;
+    END IF;
+END $$;
 
 -- 3. Ensure tenants has domain_id column
 DO $$

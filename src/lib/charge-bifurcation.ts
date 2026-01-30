@@ -18,16 +18,25 @@ interface BifurcationRule {
 
 /**
  * Rules for mapping charge categories to Leg Types / Modes
+ * ORDER MATTERS: Rules are evaluated top-to-bottom.
  */
 const KEYWORD_RULES: BifurcationRule[] = [
+    // 1. Specific Charge Types (High Priority) - Override positional keywords
+    { keywords: ['thc', 'terminal', 'wharfage', 'baf', 'bunker', 'isf', 'ams', 'imo', 'bl fee', 'doc fee'], legType: 'transport', mode: 'ocean' },
+    { keywords: ['air freight', 'fsc', 'myc', 'screening', 'security'], legType: 'transport', mode: 'air' },
+    { keywords: ['rail freight'], legType: 'transport', mode: 'rail' },
+    
+    // 2. Main Freight Keywords
+    { keywords: ['ocean freight', 'sea freight', 'freight', 'base fare', 'base rate', 'basic freight'], legType: 'transport', mode: 'ocean' },
+    
+    // 3. Positional Keywords (Pickup/Delivery)
     { keywords: ['pickup', 'origin', 'export', 'drayage origin', 'cartage origin', 'pre-carriage'], legType: 'pickup', mode: 'road' },
     { keywords: ['delivery', 'destination', 'import', 'drayage dest', 'cartage dest', 'on-carriage'], legType: 'delivery', mode: 'road' },
-    { keywords: ['air', 'aft', 'fsc', 'security', 'screening', 'myc', 'air freight'], legType: 'transport', mode: 'air' },
-    { keywords: ['rail', 'train', 'rail freight'], legType: 'transport', mode: 'rail' },
+    
+    // 4. Generic/Fallback Keywords
     { keywords: ['trucking', 'haulage', 'road freight'], legType: 'transport', mode: 'road' },
-    { keywords: ['freight', 'ocean', 'sea', 'baf', 'fuel', 'bunker', 'imo', 'ams', 'isf', 'base fare', 'base rate', 'basic freight'], legType: 'transport', mode: 'ocean' },
-    { keywords: ['customs', 'duty', 'tax', 'vat'], legType: 'delivery', mode: 'road' }, // Default to dest/delivery for customs
-    { keywords: ['doc', 'admin', 'handling', 'bl fee'], legType: 'transport', mode: 'ocean' }, // Default to main leg
+    { keywords: ['customs', 'duty', 'tax', 'vat'], legType: 'delivery', mode: 'road' }, 
+    { keywords: ['admin', 'handling'], legType: 'transport', mode: 'ocean' },
 ];
 
 /**
@@ -131,23 +140,13 @@ export function bifurcateCharges(charges: Charge[], legs: TransportLeg[]): Bifur
             };
         }
 
-        // 3. Fallback to Main Leg (or first leg)
-        if (mainLeg) {
-             return {
-                ...charge,
-                assignedMode: mainLeg.mode,
-                assignedLegType: mainLeg.leg_type || 'transport',
-                assignedLegId: mainLeg.id,
-                isBifurcated: true
-            };
-        }
-
-        // 4. Absolute Fallback
+        // 3. No Match - Return as Global/Unassigned
         return {
             ...charge,
-            assignedMode: 'Other',
-            assignedLegType: 'General',
-            isBifurcated: true
+            assignedMode: 'N/A',
+            assignedLegType: 'Global',
+            assignedLegId: undefined,
+            isBifurcated: false
         };
     });
 }
