@@ -1,59 +1,64 @@
-
 import { IQuotationEngine } from '../IQuotationEngine';
 import { RequestContext, LineItem, QuoteResult, ValidationResult } from '../types';
-import { TelecomMockService } from '../../telecom/TelecomMockService';
 
 export class TelecomQuotationEngine implements IQuotationEngine {
-  async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
-    console.log('TelecomQuotationEngine: Calculating for', context.tenantId);
+  private baseRates: Record<string, number> = {
+    'fiber': 50, // Base $50/mo
+    '5g': 80,    // Base $80/mo
+    'satellite': 120,
+    'voip': 20
+  };
 
-    // In Telecom context, a "Quote" is typically a Bill Estimate or New Plan Costing
-    let totalCost = 0;
-    const breakdown: Record<string, any> = { plans: [], activationFees: 0 };
+  private bandwidthMultipliers: Record<string, number> = {
+    '100mbps': 1,
+    '1gbps': 2.5,
+    '10gbps': 15
+  };
+
+  async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
+    console.log('[TelecomEngine] Calculating quote...');
+    let total = 0;
+    const breakdown: any[] = [];
 
     for (const item of items) {
-      // Attributes might contain planId or requirements
-      const planId = item.attributes?.planId;
+      const { service_type, bandwidth, contract_duration } = item.attributes;
       
-      if (planId) {
-        try {
-          const availablePlans = await TelecomMockService.getAvailablePlans(context.tenantId);
-          const plan = availablePlans.find(p => p.id === planId);
+      const baseRate = this.baseRates[service_type] || 50;
+      const multiplier = this.bandwidthMultipliers[bandwidth] || 1;
+      const duration = Number(contract_duration) || 12;
 
-          if (plan) {
-            const cost = plan.price * item.quantity; // Quantity = months or number of lines
-            totalCost += cost;
-            breakdown.plans.push({
-              name: plan.name,
-              monthlyCost: plan.price,
-              lines: item.quantity,
-              subtotal: cost
-            });
-          } else {
-            breakdown.plans.push({ error: `Plan ${planId} not available` });
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      }
+      const monthlyCost = baseRate * multiplier;
+      const itemTotal = monthlyCost * duration;
+
+      total += itemTotal;
+      breakdown.push({
+        description: item.description || `${service_type} ${bandwidth}`,
+        monthly_cost: monthlyCost,
+        duration_months: duration,
+        total: itemTotal
+      });
     }
 
     return {
-      totalAmount: totalCost,
+      totalAmount: total,
       currency: context.currency || 'USD',
-      breakdown,
-      validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      breakdown: breakdown,
+      metadata: {
+        engine: 'TelecomQuotationEngine',
+        timestamp: new Date().toISOString()
+      }
     };
   }
 
   async validate(context: RequestContext, items: LineItem[]): Promise<ValidationResult> {
     const errors = [];
-    
-    // Telecom often requires location data for coverage check (optional for mock)
-    // if (!context.metadata?.location) {
-    //   errors.push({ code: 'LOCATION_REQUIRED', message: 'Service location required' });
-    // }
-
-    return { isValid: errors.length === 0, errors };
+    for (const item of items) {
+      if (!item.attributes.service_type) errors.push({ code: 'MISSING_TYPE', message: 'Service type required' });
+      if (!item.attributes.contract_duration) errors.push({ code: 'MISSING_DURATION', message: 'Contract duration required' });
+    }
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 }

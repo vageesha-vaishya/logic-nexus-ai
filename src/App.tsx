@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { CRMProvider } from "./hooks/useCRM";
+import { DomainContextProvider } from "./contexts/DomainContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
@@ -137,9 +138,10 @@ const App = () => (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <CRMProvider>
-          <ThemeProvider>
-            <TooltipProvider>
-              <LeadsViewStateProvider>
+          <DomainContextProvider>
+            <ThemeProvider>
+              <TooltipProvider>
+                <LeadsViewStateProvider>
                 <Toaster />
                 <Sonner />
                 <Routes>
@@ -672,11 +674,12 @@ const App = () => (
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </LeadsViewStateProvider>
-      </TooltipProvider>
-    </ThemeProvider>
-  </CRMProvider>
-</AuthProvider>
+                </LeadsViewStateProvider>
+              </TooltipProvider>
+            </ThemeProvider>
+          </DomainContextProvider>
+        </CRMProvider>
+      </AuthProvider>
     </BrowserRouter>
   </QueryClientProvider>
 );

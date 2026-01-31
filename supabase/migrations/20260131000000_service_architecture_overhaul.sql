@@ -27,6 +27,10 @@ BEGIN
   END IF;
 END $$;
 
+-- BACKWARD COMPATIBILITY: Create a view for legacy code querying 'transport_modes'
+CREATE OR REPLACE VIEW transport_modes AS
+SELECT * FROM service_modes;
+
 -- Enable RLS
 ALTER TABLE service_modes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Anyone can view active service modes" ON service_modes;
