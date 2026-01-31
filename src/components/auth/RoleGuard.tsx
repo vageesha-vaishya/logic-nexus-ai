@@ -11,9 +11,9 @@ interface RoleGuardProps {
 }
 
 export function RoleGuard({ children, roles, fallback = null, permissions }: RoleGuardProps) {
-  const { hasRole, hasPermission } = useAuth();
+  const { hasRole, hasPermission, isPlatformAdmin } = useAuth();
 
-  const hasRequiredRole = roles.length === 0 || roles.some(role => hasRole(role));
+  const hasRequiredRole = roles.length === 0 || roles.some(role => hasRole(role)) || isPlatformAdmin();
   const hasRequiredPermission = !permissions || permissions.length === 0 || permissions.some(p => hasPermission(p));
 
   if (!hasRequiredRole || !hasRequiredPermission) {

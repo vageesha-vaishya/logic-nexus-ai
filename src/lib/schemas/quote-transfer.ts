@@ -25,7 +25,6 @@ export const RateOptionSchema = z.object({
   // AI/Market Data
   reliability_score: z.number().optional(),
   ai_generated: z.boolean().optional(),
-  ai_explanation: z.string().optional(),
 }).passthrough(); // Allow extra fields like price_breakdown, transport_mode, etc.
 
 // Define the Transfer Data Schema
@@ -58,6 +57,7 @@ export const QuoteTransferSchema = z.object({
   
   // Compliance
   htsCode: z.string().optional(),
+  aes_hts_id: z.string().optional(),
   scheduleB: z.string().optional(),
   dangerousGoods: z.boolean().optional(),
   

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Upload, Download, Search, Plus, Edit2, Trash2, Save, X, Filter, FileSpreadsheet, Database, RefreshCw, Info } from 'lucide-react';
+import { Upload, Download, Search, Plus, Edit2, Trash2, Save, X, Filter, FileSpreadsheet, Database, RefreshCw, Info, CloudCog } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { ActionsToolbar } from '@/components/ui/ActionsToolbar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { parseFileRows, exportCsv, exportExcel, exportJsonTemplate, downloadErrorsCsv, exportJson } from '@/lib/import-export';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 type CodeRecord = {
   id?: string;
@@ -57,6 +60,80 @@ const AESHTSCodeManager: React.FC = () => {
     duty_rate_error?: string;
   }>>([]);
   const [showErrorTable, setShowErrorTable] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const handleSync = async () => {
+    // Check Auth first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Please log in to synchronize HTS codes.");
+      return;
+    }
+
+    if (!confirm("This will synchronize HTS codes with the US Census Bureau. This operation may take a minute. Continue?")) return;
+    
+    setIsSyncing(true);
+    const toastId = toast.loading("Synchronizing with Census Bureau...");
+    
+    try {
+        // Try invoking the function via Supabase client
+        const { data, error } = await supabase.functions.invoke('sync-hts-data');
+        
+        if (error) {
+           console.warn("Supabase invoke failed, trying direct fetch fallback...", error);
+           throw error; // Throw to catch block to try fallback
+        }
+        
+        if (data && !data.success) throw new Error(data.error || 'Sync failed');
+        
+        toast.dismiss(toastId);
+        toast.success(`Sync Complete: ${data.message || 'Data updated'}`);
+        await loadCodes();
+    } catch (err: any) {
+        console.error("Sync error details:", err);
+        
+        // Fallback: Direct Fetch
+        try {
+            const baseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+            const functionUrl = `${baseUrl.replace(/\/$/, '')}/functions/v1/sync-hts-data`;
+            
+            console.log("Attempting fallback fetch to:", functionUrl);
+            
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Fallback failed: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            if (!data.success) throw new Error(data.error || 'Sync failed');
+            
+            toast.dismiss(toastId);
+            toast.success(`Sync Complete: ${data.message || 'Data updated'}`);
+            await loadCodes();
+            
+        } catch (fallbackErr: any) {
+             console.error("Fallback sync error:", fallbackErr);
+             toast.dismiss(toastId);
+             
+             let errorMessage = fallbackErr.message || "Unknown error";
+             if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
+                 errorMessage = "Edge Function unreachable. Check your network connection or CORS configuration.";
+             }
+             
+             toast.error(`Sync Failed: ${errorMessage}`);
+        }
+    } finally {
+        setIsSyncing(false);
+    }
+  };
   
   const [formData, setFormData] = useState<FormData>({
     hts_code: '',
@@ -539,9 +616,25 @@ const AESHTSCodeManager: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 AES HTS/Schedule B Code Manager
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 mb-4">
                 Comprehensive management system for Automated Export System filing
               </p>
+              <div className="flex items-center gap-4">
+                {isSyncing && (
+                    <div className="flex flex-col items-end min-w-[150px]">
+                        <span className="text-xs text-blue-600 animate-pulse mb-1 font-medium">Processing...</span>
+                        <Progress value={undefined} className="h-2 w-full" />
+                    </div>
+                )}
+                <Button 
+                  onClick={handleSync} 
+                  disabled={isSyncing} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                >
+                  <CloudCog className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? "Synchronizing..." : "Sync with Census"}
+                </Button>
+              </div>
             </div>
             <FileSpreadsheet className="w-16 h-16 text-blue-600" />
           </div>

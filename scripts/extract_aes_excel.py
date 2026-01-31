@@ -50,12 +50,14 @@ UPDATE public.ports_locations pl
 SET 
     location_name = t.name,
     port_type = t.modes,
+    schedule_d_code = t.code, -- Ensure Schedule D is set
     updated_at = NOW()
 FROM temp_aes_ports_full t
-WHERE pl.schedule_d_code = t.code;
+WHERE pl.location_code = t.code OR pl.schedule_d_code = t.code;
 
 -- 2. Insert NEW ports that don't exist
 INSERT INTO public.ports_locations (
+    location_code,
     location_name,
     schedule_d_code,
     port_type,
@@ -65,6 +67,7 @@ INSERT INTO public.ports_locations (
     updated_at
 )
 SELECT 
+    t.code,
     t.name,
     t.code,
     t.modes,
@@ -75,7 +78,7 @@ SELECT
 FROM temp_aes_ports_full t
 WHERE NOT EXISTS (
     SELECT 1 FROM public.ports_locations pl 
-    WHERE pl.schedule_d_code = t.code
+    WHERE pl.location_code = t.code OR pl.schedule_d_code = t.code
 );
 
 -- 3. Log the operation
@@ -130,19 +133,19 @@ def main():
         print(f"Columns found: {df.columns.tolist()}")
 
         # Identify key columns (Code, Name) using user-defined strict mapping
-        # Mapping Rule: lo_code -> code, Port_name -> name
-        required_columns = ['lo_code', 'Port_name']
+        # Mapping Rule: PORT_CODE -> code, PORT_NAME -> name
+        required_columns = ['PORT_CODE', 'PORT_NAME']
         
         # Verify columns exist
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             print(f"Error: Missing required columns: {missing_columns}")
             print(f"Available columns: {df.columns.tolist()}")
-            print("Please ensure the Excel file contains 'lo_code' and 'Port_name' columns.")
+            print("Please ensure the Excel file contains 'PORT_CODE' and 'PORT_NAME' columns.")
             sys.exit(1)
 
-        code_col = 'lo_code'
-        name_col = 'Port_name'
+        code_col = 'PORT_CODE'
+        name_col = 'PORT_NAME'
 
         extracted_ports = []
         seen_codes = set()
@@ -153,16 +156,24 @@ def main():
 
             # Error handling for null values
             if pd.isna(code_raw) or pd.isna(name_raw):
-                print(f"Warning: Skipping row {index+2} due to null values (Code: {code_raw}, Name: {name_raw})")
+                # print(f"Warning: Skipping row {index+2} due to null values")
                 continue
 
-            code = normalize_text(code_raw)
+            # Logic to handle Integer codes (e.g. 101 -> "0101")
+            if isinstance(code_raw, (int, float)):
+                code = str(int(code_raw)).zfill(4)
+            else:
+                code = str(code_raw).strip()
+                if code.isdigit():
+                    code = code.zfill(4)
+            
             name = normalize_text(name_raw)
 
             # Validate Code format (Appendix D is typically 4 digits)
-            if not code or len(code) != 4 or not code.isdigit():
-                 print(f"Warning: Skipping row {index+2} due to invalid code format: '{code}'")
+            if not code or len(code) != 4:
+                 print(f"Warning: Skipping row {index+2} due to invalid code format: '{code}' (Raw: {code_raw})")
                  continue
+
             
             if code in seen_codes:
                 # print(f"Info: Skipping duplicate code {code}")
@@ -170,15 +181,33 @@ def main():
 
             # Check for mode flags if available (Vessel, Air, Rail, Road, Fixed)
             modes = []
-            # Heuristic for finding mode columns
-            for col in df.columns:
-                val = normalize_text(row[col])
-                if val == 'Y':
-                    if 'Vessel' in col: modes.append('Vessel')
-                    elif 'Air' in col: modes.append('Air')
-                    elif 'Rail' in col: modes.append('Rail')
-                    elif 'Road' in col: modes.append('Road')
-                    elif 'Fixed' in col: modes.append('Fixed')
+            
+            # Parse ACPTD_MOTS_TXT if present
+            mots_txt = row.get('ACPTD_MOTS_TXT')
+            if not pd.isna(mots_txt):
+                raw_modes = str(mots_txt).replace(';', ',').split(',')
+                for m in raw_modes:
+                    m = m.strip().upper()
+                    if 'VESSEL' in m: modes.append('Vessel')
+                    if 'AIR' in m: modes.append('Air')
+                    if 'RAIL' in m: modes.append('Rail')
+                    if 'TRUCK' in m or 'ROAD' in m: modes.append('Road')
+                    if 'MAIL' in m: modes.append('Mail')
+                    if 'PASSENGER' in m: modes.append('Passenger')
+                    if 'PIPELINE' in m: modes.append('Pipeline')
+                    if 'FIXED' in m: modes.append('Fixed')
+                modes = list(set(modes))
+            
+            # Fallback Heuristic for finding mode columns if ACPTD_MOTS_TXT is missing/empty
+            if not modes:
+                for col in df.columns:
+                    val = normalize_text(row[col])
+                    if val == 'Y':
+                        if 'Vessel' in col: modes.append('Vessel')
+                        elif 'Air' in col: modes.append('Air')
+                        elif 'Rail' in col: modes.append('Rail')
+                        elif 'Road' in col: modes.append('Road')
+                        elif 'Fixed' in col: modes.append('Fixed')
 
             extracted_ports.append({
                 "code": code,

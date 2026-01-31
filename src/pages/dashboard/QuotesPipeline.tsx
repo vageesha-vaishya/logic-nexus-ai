@@ -92,7 +92,15 @@ export default function QuotesPipeline() {
           accounts:account_id(name),
           opportunities:opportunity_id(name),
           service_types:service_type_id(name),
-          franchises:franchise_id(name)
+          franchises:franchise_id(name),
+          quotation_versions (
+            version_number,
+            created_at,
+            aes_hts_codes (
+              code,
+              description
+            )
+          )
         `)
         .order("created_at", { ascending: false });
 
@@ -303,18 +311,30 @@ export default function QuotesPipeline() {
   };
 
   const handleExport = () => {
-    const dataToExport = filteredQuotes.map(q => ({
-      'Quote Number': q.quote_number,
-      'Title': q.title,
-      'Status': statusConfig[q.status]?.label || q.status,
-      'Account': q.accounts?.name || 'N/A',
-      'Value': q.sell_price,
-      'Margin': q.margin_amount,
-      'Margin %': q.margin_percentage,
-      'Priority': q.priority || 'Medium',
-      'Created At': new Date(q.created_at).toLocaleDateString(),
-      'Valid Until': q.valid_until ? new Date(q.valid_until).toLocaleDateString() : 'N/A'
-    }));
+    const dataToExport = filteredQuotes.map(q => {
+      // Get latest version
+      const latestVersion = q.quotation_versions?.slice().sort((a, b) => 
+        (b.version_number || 0) - (a.version_number || 0)
+      )[0];
+
+      const htsDisplay = latestVersion?.aes_hts_codes 
+        ? `${latestVersion.aes_hts_codes.code}` 
+        : 'N/A';
+
+      return {
+        'Quote Number': q.quote_number,
+        'Title': q.title,
+        'Status': statusConfig[q.status]?.label || q.status,
+        'Account': q.accounts?.name || 'N/A',
+        'HTS Code': htsDisplay,
+        'Value': q.sell_price,
+        'Margin': q.margin_amount,
+        'Margin %': q.margin_percentage,
+        'Priority': q.priority || 'Medium',
+        'Created At': new Date(q.created_at).toLocaleDateString(),
+        'Valid Until': q.valid_until ? new Date(q.valid_until).toLocaleDateString() : 'N/A'
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();

@@ -311,6 +311,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cargo_details_aes_hts_id_fkey"
+            columns: ["aes_hts_id"]
+            isOneToOne: false
+            referencedRelation: "aes_hts_codes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       admin_override_audit: {
@@ -699,6 +706,7 @@ export type Database = {
         }
         Insert: {
           actual_weight_kg?: number | null
+          aes_hts_id?: string | null
           cargo_type_id?: string | null
           chargeable_weight_kg?: number | null
           commodity_description?: string | null
@@ -785,6 +793,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cargo_details_aes_hts_id_fkey"
+            columns: ["aes_hts_id"]
+            isOneToOne: false
+            referencedRelation: "aes_hts_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -5946,10 +5961,11 @@ export type Database = {
         ]
       }
       quotation_versions: {
-        Row: {
-          anomalies: Json | null
-          change_reason: string | null
-          confidence_score: number | null
+            Row: {
+              aes_hts_id: string | null
+              anomalies: Json | null
+              change_reason: string | null
+              confidence_score: number | null
           created_at: string | null
           created_by: string | null
           franchise_id: string | null
@@ -5993,9 +6009,10 @@ export type Database = {
           version_number: number
         }
         Update: {
-          anomalies?: Json | null
-          change_reason?: string | null
-          confidence_score?: number | null
+              aes_hts_id?: string | null
+              anomalies?: Json | null
+              change_reason?: string | null
+              confidence_score?: number | null
           created_at?: string | null
           created_by?: string | null
           franchise_id?: string | null

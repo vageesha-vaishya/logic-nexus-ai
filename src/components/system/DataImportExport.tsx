@@ -74,6 +74,8 @@ interface DataImportExportProps {
   // Additional filters for export
   exportFilters?: React.ReactNode;
   onExportFilterApply?: (query: any, filters: any) => any;
+  // Function to process data before export (e.g. resolve FKs)
+  onPrepareExportData?: (data: any[]) => Promise<any[]>;
   // Navigation
   listPath: string; // e.g., "/dashboard/leads"
   enableAutoCorrection?: boolean;
@@ -180,6 +182,8 @@ export default function DataImportExport({
   listPath,
   enableAutoCorrection = true,
   onExportFilterApply,
+  onPrepareExportData,
+  onPrepareImportBatch,
 }: DataImportExportProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -947,10 +951,15 @@ export default function DataImportExport({
         return;
       }
 
+      let finalData = data;
+      if (onPrepareExportData) {
+        finalData = await onPrepareExportData(data as any[]);
+      }
+
       setExportStage('building');
       
       // Map data to export fields
-      const exportData = (data as any[]).map((row: any) => {
+      const exportData = (finalData as any[]).map((row: any) => {
         const mapped: Record<string, any> = {};
         for (const fieldKey of currentExportFields) {
            const fieldDef = exportFields.find(f => f.key === fieldKey);

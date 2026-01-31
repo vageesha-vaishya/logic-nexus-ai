@@ -304,7 +304,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         try {
           const { data: versionRow, error: versionError } = await scopedDb
             .from('quotation_versions', true)
-            .select('tenant_id, market_analysis, confidence_score, anomalies')
+            .select('tenant_id, market_analysis, confidence_score, anomalies, aes_hts_id, aes_hts_codes(hts_code, description)')
             .eq('id', versionId)
             .maybeSingle();
           
@@ -318,6 +318,15 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             setMarketAnalysis((versionRow as any)?.market_analysis ?? null);
             setConfidenceScore((versionRow as any)?.confidence_score ?? null);
             setAnomalies((versionRow as any)?.anomalies ?? []);
+
+            // Load HTS/AES data if present
+            if ((versionRow as any).aes_hts_id) {
+              setQuoteData((prev: any) => ({
+                ...prev,
+                aes_hts_id: (versionRow as any).aes_hts_id,
+                hts_code: (versionRow as any).aes_hts_codes?.hts_code
+              }));
+            }
           }
         } catch (error) {
           console.error('[Composer] Exception fetching version:', error);
@@ -1711,6 +1720,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           incoterms: quoteData.incoterms || null,
           commodity: quoteData.commodity || null,
           notes: quoteData.notes || null,
+          aes_hts_id: quoteData.aes_hts_id || null,
         })
         .eq('id', versionId);
 

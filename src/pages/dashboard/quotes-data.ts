@@ -32,6 +32,14 @@ export interface Quote {
   carriers?: { carrier_name: string } | null;
   service_types?: { name: string } | null;
   franchises?: { name: string } | null;
+  quotation_versions?: {
+    version_number: number;
+    created_at: string;
+    aes_hts_codes?: {
+      code: string;
+      description: string;
+    } | null;
+  }[] | null;
   priority?: 'high' | 'medium' | 'low';
 }
 

@@ -34,6 +34,7 @@
     "sync:docs": "node scripts/sync-document.js",
     "migrate:docs": "export NODE_TLS_REJECT_UNAUTHORIZED=0 && cd supabase/migration-package/direct-migration && ./apply-migrations.sh ../../migrations/20260110_document_versioning.sql",
     "migrate:auto": "node scripts/automated_migration.js",
+    "auth:setup": "node scripts/configure_supabase_token.js",
     "supabase:exec": "bash ./scripts/supabase-exec.sh",
     "supabase:status": "npx supabase status",
     "supabase:start": "npx supabase start",

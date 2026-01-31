@@ -63,11 +63,11 @@ WHERE EXISTS (SELECT 1 FROM quotes LIMIT 1);
 -- ==========================================
 -- Quotation Versions
 -- ==========================================
-SELECT 'INSERT INTO quotation_versions (id, tenant_id, quote_id, version_number, version_notes, created_by, created_at) VALUES ' ||
+SELECT 'INSERT INTO quotation_versions (id, tenant_id, quote_id, version_number, version_notes, aes_hts_id, created_by, created_at) VALUES ' ||
   string_agg(
     format(
-      '(%L, %L, %L, %L, %L, %L, %L)',
-      id, tenant_id, quote_id, version_number, version_notes, created_by, created_at
+      '(%L, %L, %L, %L, %L, %L, %L, %L)',
+      id, tenant_id, quote_id, version_number, version_notes, aes_hts_id, created_by, created_at
     ),
     ', '
   ) || ' ON CONFLICT (id) DO NOTHING;'
@@ -175,11 +175,11 @@ WHERE EXISTS (SELECT 1 FROM shipments LIMIT 1);
 -- ==========================================
 -- Cargo Details
 -- ==========================================
-SELECT 'INSERT INTO cargo_details (id, tenant_id, service_id, service_type, cargo_type_id, commodity_description, hs_code, weight_kg, volume_cbm, dimensions_cm, value_amount, value_currency, is_hazardous, hazmat_un_number, hazmat_class, temperature_controlled, temperature_range, special_requirements, notes, created_by, created_at, updated_at) VALUES ' ||
+SELECT 'INSERT INTO cargo_details (id, tenant_id, service_id, service_type, cargo_type_id, commodity_description, hs_code, aes_hts_id, weight_kg, volume_cbm, dimensions_cm, value_amount, value_currency, is_hazardous, hazmat_un_number, hazmat_class, temperature_controlled, temperature_range, special_requirements, notes, created_by, created_at, updated_at) VALUES ' ||
   string_agg(
     format(
-      '(%L, %L, %L, %L, %L, %L, %L, %L, %L, %L::jsonb, %L, %L, %L, %L, %L, %L, %L::jsonb, %L, %L, %L, %L, %L)',
-      id, tenant_id, service_id, service_type, cargo_type_id, commodity_description, hs_code, weight_kg, volume_cbm, dimensions_cm::text, value_amount, value_currency, is_hazardous, hazmat_un_number, hazmat_class, temperature_controlled, temperature_range::text, special_requirements, notes, created_by, created_at, updated_at
+      '(%L, %L, %L, %L, %L, %L, %L, %L, %L, %L, %L::jsonb, %L, %L, %L, %L, %L, %L, %L::jsonb, %L, %L, %L, %L, %L)',
+      id, tenant_id, service_id, service_type, cargo_type_id, commodity_description, hs_code, aes_hts_id, weight_kg, volume_cbm, dimensions_cm::text, value_amount, value_currency, is_hazardous, hazmat_un_number, hazmat_class, temperature_controlled, temperature_range::text, special_requirements, notes, created_by, created_at, updated_at
     ),
     ', '
   ) || ' ON CONFLICT (id) DO NOTHING;'

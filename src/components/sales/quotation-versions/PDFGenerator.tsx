@@ -187,6 +187,39 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
         </div>
 
         <div class="section">
+          <h2>Shipment Information</h2>
+          <div class="info-row">
+            <span><strong>Status:</strong></span>
+            <span>${version.status || 'Draft'}</span>
+          </div>
+          ${version.aes_hts_codes ? `
+          <div class="info-row">
+            <span><strong>HTS Code:</strong></span>
+            <span>${version.aes_hts_codes.code} - ${version.aes_hts_codes.description}</span>
+          </div>` : ''}
+          ${version.incoterms ? `
+          <div class="info-row">
+            <span><strong>Incoterms:</strong></span>
+            <span>${version.incoterms}</span>
+          </div>` : ''}
+          ${version.commodity ? `
+          <div class="info-row">
+            <span><strong>Commodity:</strong></span>
+            <span>${version.commodity}</span>
+          </div>` : ''}
+          ${version.total_weight ? `
+          <div class="info-row">
+            <span><strong>Total Weight:</strong></span>
+            <span>${version.total_weight} kg</span>
+          </div>` : ''}
+          ${version.total_volume ? `
+          <div class="info-row">
+            <span><strong>Total Volume:</strong></span>
+            <span>${version.total_volume} m³</span>
+          </div>` : ''}
+        </div>
+
+        <div class="section">
           <h2>Quote Options</h2>
           ${options.map((option, index) => `
             <div class="option">

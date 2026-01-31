@@ -1,0 +1,3711 @@
+[
+  {
+    "code": "0101",
+    "name": "PORTLAND, ME",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0102",
+    "name": "BANGOR, ME",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0103",
+    "name": "EASTPORT, ME",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0104",
+    "name": "JACKMAN, ME",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0105",
+    "name": "VANCEBORO, ME",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0106",
+    "name": "HOULTON, ME",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0107",
+    "name": "FORT FAIRFIELD, ME",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0108",
+    "name": "VAN BUREN, ME",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0109",
+    "name": "MADAWASKA, ME",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0110",
+    "name": "FORT KENT, ME",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0111",
+    "name": "BATH, ME",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0112",
+    "name": "BAR HARBOR, ME",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0115",
+    "name": "CALAIS, ME",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "0118",
+    "name": "LIMESTONE, ME",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0121",
+    "name": "ROCKLAND, ME",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0122",
+    "name": "JONESPORT, ME",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0127",
+    "name": "BRIDGEWATER, ME",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail"
+    ]
+  },
+  {
+    "code": "0131",
+    "name": "PORTSMOUTH, NH",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0132",
+    "name": "BELFAST, ME",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0152",
+    "name": "SEARSPORT, ME",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0182",
+    "name": "MANCHESTER AIRPORT",
+    "modes": [
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0201",
+    "name": "ST. ALBANS, VT",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0203",
+    "name": "RICHFORD, VT",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0206",
+    "name": "BEECHER FALLS, VT",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0207",
+    "name": "BURLINGTON, VT",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0209",
+    "name": "DERBY LINE, VT",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0211",
+    "name": "NORTON, VT",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0212",
+    "name": "HIGHGATE SPRINGS/ALBURG",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0401",
+    "name": "BOSTON, MA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0402",
+    "name": "SPRINGFIELD, MA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0403",
+    "name": "WORCESTER, MA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0404",
+    "name": "GLOUCESTER, MA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0405",
+    "name": "NEW BEDFORD, MA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0406",
+    "name": "PLYMOUTH, MA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0407",
+    "name": "FALL RIVER, MA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0408",
+    "name": "BEVERLY, MA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0410",
+    "name": "BRIDGEPORT, CT",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0411",
+    "name": "HARTFORD, CT",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0412",
+    "name": "NEW HAVEN, CT",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0413",
+    "name": "NEW LONDON, CT",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0416",
+    "name": "LAWRENCE, MA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0417",
+    "name": "LOGAN AIRPORT, MA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0481",
+    "name": "HANSCOM USER FEE AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0501",
+    "name": "NEWPORT, RI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0502",
+    "name": "PROVIDENCE, RI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0503",
+    "name": "MELLVILLE, RI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0701",
+    "name": "OGDENSBURG, NY",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0704",
+    "name": "MASSENA, NY",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0706",
+    "name": "CAPE VINCENT, NY",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0708",
+    "name": "ALEXANDRIA BAY, NY",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0712",
+    "name": "CHAMPLAIN-ROUSES POINT",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0714",
+    "name": "CLAYTON, NY",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0715",
+    "name": "TROUT RIVER, NY",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "0901",
+    "name": "BUFFALO-NIAGARA FALLS",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Air",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "0903",
+    "name": "ROCHESTER, NY",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0904",
+    "name": "OSWEGO, NY",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0905",
+    "name": "SODUS POINT, NY",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0906",
+    "name": "SYRACUSE, NY",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "0981",
+    "name": "BINGHAMTON REGIONAL (UFA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1001",
+    "name": "NEW YORK, NY",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1002",
+    "name": "ALBANY, NY",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1101",
+    "name": "PHILADELPHIA, PA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1102",
+    "name": "CHESTER, PA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1103",
+    "name": "WILMINGTON, DE",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1104",
+    "name": "PITTSBURGH, PA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1105",
+    "name": "PAULSBORO, NJ",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1106",
+    "name": "WILKES-BARRE/SCRANTON, P",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1107",
+    "name": "CAMDEN, NJ",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1108",
+    "name": "PHILA. INTERNATIONAL AIR",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1109",
+    "name": "HARRISBURG, PA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1113",
+    "name": "GLOUCESTER CITY",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1119",
+    "name": "ALLENTOWN, PA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1182",
+    "name": "ATLANTIC CITY AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1183",
+    "name": "TRENTON/MERCER CTY ARPT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1195",
+    "name": "UPS HUB, PHILADELPHIA, P",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1301",
+    "name": "ANNAPOLIS, MD",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1302",
+    "name": "CAMBRIDGE, MD",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1303",
+    "name": "BALTIMORE, MD",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1304",
+    "name": "CRISFIELD, MD",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1305",
+    "name": "BWI AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1401",
+    "name": "NORFOLK-NEWPORT NEWS, VA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1404",
+    "name": "RICHMOND-PETERSBURG, VA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1409",
+    "name": "CHARLESTON, WV",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1410",
+    "name": "FRONT ROYAL, VA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1412",
+    "name": "NO STAFF-CSMS 13-000148",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1501",
+    "name": "WILMINGTON, NC",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1502",
+    "name": "WINSTON-SALEM, NC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1503",
+    "name": "DURHAM, NC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1511",
+    "name": "BEAUFORT-MOREHEAD CTY,NC",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1512",
+    "name": "CHARLOTTE, NC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1601",
+    "name": "CHARLESTON, SC",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1602",
+    "name": "GEORGETOWN, SC",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1603",
+    "name": "GREENVILLE-SPARTANBRG SC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1604",
+    "name": "COLUMBIA, SC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1681",
+    "name": "MYRTLE BEACH INTL AIRPOR",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1701",
+    "name": "BRUNSWICK, GA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1703",
+    "name": "SAVANNAH, GA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1704",
+    "name": "ATLANTA, GA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1801",
+    "name": "TAMPA, FL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1803",
+    "name": "JACKSONVILLE, FL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1805",
+    "name": "FERNANDINA BEACH, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1807",
+    "name": "BOCA GRANDE, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1808",
+    "name": "ORLANDO, FL",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1809",
+    "name": "ORLANDO SANFORD AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1814",
+    "name": "ST. PETERSBURG, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1816",
+    "name": "PORT CANAVERAL, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1818",
+    "name": "PANAMA CITY, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1819",
+    "name": "PENSACOLA, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1821",
+    "name": "PORT MANATEE, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1822",
+    "name": "FORT MYERS",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1880",
+    "name": "NAPLES MUNICIPAL AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1883",
+    "name": "SARASOTA BRADENTON AIRPT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1884",
+    "name": "DAYTONA BEACH INTL AIRPO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1885",
+    "name": "MELBOURNE AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1887",
+    "name": "LEESBURG REGIONAL AIRPT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1888",
+    "name": "ORLANDO EXECUTIVE AIRPT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1889",
+    "name": "ST AUGUSTINE ARPT UFA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1901",
+    "name": "MOBILE, AL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1902",
+    "name": "GULFPORT, MS",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1903",
+    "name": "PASCAGOULA, MS",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1904",
+    "name": "BIRMINGHAM, AL",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "1910",
+    "name": "HUNTSVILLE, AL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2001",
+    "name": "MORGAN CITY, LA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2002",
+    "name": "NEW ORLEANS, LA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2003",
+    "name": "LITTLE ROCK, AR",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2004",
+    "name": "BATON ROUGE, LA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2006",
+    "name": "MEMPHIS, TN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2007",
+    "name": "NASHVILLE, TN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2008",
+    "name": "CHATTANOOGA, TN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2010",
+    "name": "GRAMERCY, LA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2011",
+    "name": "GREENVILLE, MS",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2015",
+    "name": "VICKSBURG, MS",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2016",
+    "name": "KNOXVILLE, TN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2017",
+    "name": "LAKE CHARLES, LA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2018",
+    "name": "SHREVEPORT/BOSSIER CITY",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2027",
+    "name": "PORT OF TRI-CITIES",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2095",
+    "name": "FEDEX COURIER, MEMPHIS T",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2101",
+    "name": "PORT ARTHUR, TX",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2102",
+    "name": "SABINE, TX",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2103",
+    "name": "ORANGE, TX",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2104",
+    "name": "BEAUMONT, TX",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2301",
+    "name": "BROWNSVILLE, TX",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2302",
+    "name": "DEL RIO, TX",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2303",
+    "name": "EAGLE PASS, TX",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2304",
+    "name": "LAREDO, TX",
+    "modes": [
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2305",
+    "name": "HIDALGO, TX",
+    "modes": [
+      "Air",
+      "Fixed",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2307",
+    "name": "RIO GRANDE CITY, TX",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2309",
+    "name": "PROGRESO, TX",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2310",
+    "name": "ROMA, TX",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2383",
+    "name": "VALLEY INTL AIRPORT  UFA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2402",
+    "name": "EL PASO, TX",
+    "modes": [
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2403",
+    "name": "PRESIDIO, TX",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2404",
+    "name": "TORNILLO, TX",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2406",
+    "name": "COLUMBUS, NM",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2407",
+    "name": "ALBUQUERQUE, NM",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2408",
+    "name": "SANTA TERESA NM",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2481",
+    "name": "SANTA TERESA AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2501",
+    "name": "SAN DIEGO, CA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2502",
+    "name": "ANDRADE, CA",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2503",
+    "name": "CALEXICO, CA",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2504",
+    "name": "SAN YSIDRO",
+    "modes": [
+      "Rail",
+      "Air",
+      "Fixed",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2505",
+    "name": "TECATE, CA",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2506",
+    "name": "OTAY MESA",
+    "modes": [
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "2507",
+    "name": "CALEXICO-EAST",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2601",
+    "name": "DOUGLAS, AZ",
+    "modes": [
+      "Passenger",
+      "Fixed",
+      "Road"
+    ]
+  },
+  {
+    "code": "2602",
+    "name": "LUKEVILLE, AZ",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2603",
+    "name": "NACO, AZ",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2604",
+    "name": "NOGALES, AZ",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2605",
+    "name": "PHOENIX, AZ",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2606",
+    "name": "SASABE, AZ",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2608",
+    "name": "SAN LUIS, AZ",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "2609",
+    "name": "TUCSON, AZ",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2704",
+    "name": "LOS ANGELES, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2709",
+    "name": "LONG BEACH, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2711",
+    "name": "EL SEGUNDO, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2712",
+    "name": "VENTURA, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2713",
+    "name": "PORT HUENEME, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2715",
+    "name": "CAPITAN, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2719",
+    "name": "MORRO BAY, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2720",
+    "name": "LOS ANGELES INT AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2721",
+    "name": "ONTARIO INTL AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2722",
+    "name": "LAS VEGAS, NV",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2770",
+    "name": "INACTIVE DO NOT USE",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2775",
+    "name": "TNT EXPRESS WORLDWIDE",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2776",
+    "name": "INT'L BONDED COURIERS",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2781",
+    "name": "PALM SPRINGS USER FEE",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2782",
+    "name": "SAN BERNARDINO U.F. AIRP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2786",
+    "name": "MEADOWS FIELD AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2791",
+    "name": "DHL- HUB",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2795",
+    "name": "UPS-ONTARIO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2801",
+    "name": "SAN FRANCISCO INTL AIRPO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2802",
+    "name": "EUREKA, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2803",
+    "name": "FRESNO, CA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2805",
+    "name": "MONTEREY, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2809",
+    "name": "SAN FRANCISCO, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2810",
+    "name": "STOCKTON, CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2811",
+    "name": "OAKLAND, CA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2812",
+    "name": "RICHMOND,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2813",
+    "name": "ALAMEDA,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2815",
+    "name": "CROCKETT,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2820",
+    "name": "MARTINEZ,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2821",
+    "name": "REDWOOD CITY,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2827",
+    "name": "SELBY,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2828",
+    "name": "SAN JUAQUIN RIVER,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2829",
+    "name": "SAN PABLO BAY,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2830",
+    "name": "CARQUINEZ STRAIT,CA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2833",
+    "name": "RENO, NV",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2834",
+    "name": "SAN JOSE INTL AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2835",
+    "name": "SACRAMENTO INT AIRPORT",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2870",
+    "name": "DHL WORLDWIDE EXPRESS",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2871",
+    "name": "AIRCARGO HANDLING SERVIC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2872",
+    "name": "TNT SKYPAK",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2895",
+    "name": "FEDEX COURIER FACILITY",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2901",
+    "name": "ASTORIA, OR",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2902",
+    "name": "NEWPORT, OR",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2903",
+    "name": "COOS BAY, OR",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2904",
+    "name": "PORTLAND, OR",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2905",
+    "name": "LONGVIEW, WA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2907",
+    "name": "BOISE, ID",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2908",
+    "name": "VANCOUVER, WA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2909",
+    "name": "KALAMA, WA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "2910",
+    "name": "PORTLAND INTL AIRPORT, O",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3001",
+    "name": "SEATTLE, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3002",
+    "name": "TACOMA, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3003",
+    "name": "ABERDEEN, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3004",
+    "name": "BLAINE, WA",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3005",
+    "name": "BELLINGHAM, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3006",
+    "name": "EVERETT, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3007",
+    "name": "PORT ANGELES, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3008",
+    "name": "PORT TOWNSEND, WA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3009",
+    "name": "SUMAS, WA",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3010",
+    "name": "ANACORTES, WA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3011",
+    "name": "NIGHTHAWK, WA",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3012",
+    "name": "DANVILLE, WA",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3013",
+    "name": "FERRY, WA",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3014",
+    "name": "FRIDAY HARBOR, WA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3015",
+    "name": "BOUNDARY, WA",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3016",
+    "name": "LAURIER, WA",
+    "modes": [
+      "Rail",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3017",
+    "name": "POINT ROBERTS, WA",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3018",
+    "name": "KENMORE AIR HARBOR, WA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3019",
+    "name": "OROVILLE, WA",
+    "modes": [
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3020",
+    "name": "FRONTIER, WA",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3022",
+    "name": "SPOKANE, WA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3023",
+    "name": "LYNDEN, WA",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3025",
+    "name": "METALINE FALLS",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3026",
+    "name": "OLYMPIA, WA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3029",
+    "name": "SEATTLE-TACOMA INTL AIRP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3071",
+    "name": "U.P.S.",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3072",
+    "name": "AVION BROKERS @ SEATAC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3073",
+    "name": "DHL WORLDWIDE EXP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3074",
+    "name": "AIRBORNE EXPRESS @SEATAC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3082",
+    "name": "GRANT COUNTY AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3095",
+    "name": "UPS COURIER HUB",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3101",
+    "name": "JUNEAU, AK",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3102",
+    "name": "KETCHIKAN, AK",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3103",
+    "name": "SKAGWAY, AK",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail"
+    ]
+  },
+  {
+    "code": "3104",
+    "name": "ALCAN, AK",
+    "modes": [
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3105",
+    "name": "WRANGELL, AK",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3106",
+    "name": "DALTON CACHE, AK",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Road",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3111",
+    "name": "FAIRBANKS, AK",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3115",
+    "name": "SITKA, AK",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3126",
+    "name": "ANCHORAGE, AK",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3195",
+    "name": "FEDERAL EXPRESS COURIER",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3196",
+    "name": "UPS COURIER HUB, AK",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3201",
+    "name": "HONOLULU, HI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3202",
+    "name": "HILO, HI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3203",
+    "name": "KAHULUI, HI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3204",
+    "name": "NAWILIWILI-PORT ALLEN, H",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3205",
+    "name": "HONOLULU AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3206",
+    "name": "KONA HI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3295",
+    "name": "HONOLULU INTL AP INACTIV",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3301",
+    "name": "RAYMOND, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3302",
+    "name": "EASTPORT, ID",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3303",
+    "name": "SALT LAKE CITY, UT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3304",
+    "name": "GREAT FALLS, MT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3305",
+    "name": "BUTTE, MT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3306",
+    "name": "TURNER, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3307",
+    "name": "DENVER, CO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3308",
+    "name": "PORTHILL, ID",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3309",
+    "name": "SCOBEY, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3310",
+    "name": "SWEETGRASS, MT",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3316",
+    "name": "PIEGAN, MT",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3317",
+    "name": "OPHEIM, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3318",
+    "name": "ROOSVILLE, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3319",
+    "name": "MORGAN, MT",
+    "modes": [
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3321",
+    "name": "WHITLASH, MT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3322",
+    "name": "DEL BONITA, MT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3323",
+    "name": "WILDHORSE, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3324",
+    "name": "KALISPELL, MT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3325",
+    "name": "WILLOW CREEK, MT",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3384",
+    "name": "CENTENNIAL AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3385",
+    "name": "EAGLE COUNTY REGNL AIRPT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3386",
+    "name": "BOZEMAN YELLOWSTONE UFA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3401",
+    "name": "PEMBINA, ND",
+    "modes": [
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3403",
+    "name": "PORTAL, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3404",
+    "name": "NECHE, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3405",
+    "name": "ST JOHN, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3406",
+    "name": "NORTHGATE, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3407",
+    "name": "WALHALLA, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3408",
+    "name": "HANNAH, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3409",
+    "name": "SARLES, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3410",
+    "name": "AMBROSE, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3411",
+    "name": "FARGO INT'L AIRPORT, ND",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3413",
+    "name": "ANTLER, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3414",
+    "name": "SHERWOOD, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3415",
+    "name": "HANSBORO, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3416",
+    "name": "MAIDA, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3417",
+    "name": "FORTUNA, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3419",
+    "name": "WESTHOPE, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3420",
+    "name": "NOONAN, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3421",
+    "name": "CARBURY, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3422",
+    "name": "DUNSEITH, ND",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3423",
+    "name": "WARROAD, MN",
+    "modes": [
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3424",
+    "name": "BAUDETTE, MN",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3425",
+    "name": "PINECREEK, MN",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3426",
+    "name": "ROSEAU, MN",
+    "modes": [
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3427",
+    "name": "GRAND FORKS AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3430",
+    "name": "LANCASTER, MN",
+    "modes": [
+      "Passenger",
+      "Fixed",
+      "Road"
+    ]
+  },
+  {
+    "code": "3433",
+    "name": "WILLISTON AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3434",
+    "name": "MINOT AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3501",
+    "name": "MINNEAPOLIS-ST. PAUL, MN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3502",
+    "name": "SIOUX FALLS, SD",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3510",
+    "name": "DULUTH, MN",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3511",
+    "name": "ASHLAND, WI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3512",
+    "name": "OMAHA, NE",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3513",
+    "name": "DES MOINES, IA",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3581",
+    "name": "ROCHESTER, MN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3604",
+    "name": "INTERNATIONAL FALLS, MN",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Air",
+      "Road",
+      "Rail"
+    ]
+  },
+  {
+    "code": "3613",
+    "name": "GRAND PORTAGE, MN",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3701",
+    "name": "MILWAUKEE, WI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3702",
+    "name": "MARINETTE, WI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3703",
+    "name": "GREEN BAY, WI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3706",
+    "name": "MANITOWOC, WI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3707",
+    "name": "SHEBOYGAN, WI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3708",
+    "name": "RACINE, WI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3801",
+    "name": "DETROIT, MI",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Air",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3802",
+    "name": "PORT HURON, MI",
+    "modes": [
+      "Vessel",
+      "Passenger",
+      "Road",
+      "Rail",
+      "Fixed"
+    ]
+  },
+  {
+    "code": "3803",
+    "name": "SAULT STE. MARIE, MI",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3804",
+    "name": "SAGINAW/BAY CITY, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3805",
+    "name": "BATTLE CREEK, MI",
+    "modes": [
+      "Vessel"
+    ]
+  },
+  {
+    "code": "3806",
+    "name": "GRAND RAPIDS, MI",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3807",
+    "name": "DETROIT METROPLTN AIRPRT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3808",
+    "name": "ESCANABA, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3809",
+    "name": "MARQUETTE, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3814",
+    "name": "ALGONAC, MI",
+    "modes": [
+      "Vessel",
+      "Rail",
+      "Passenger",
+      "Road"
+    ]
+  },
+  {
+    "code": "3815",
+    "name": "MUSKEGON, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3816",
+    "name": "GRAND HAVEN, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3818",
+    "name": "ROGERS CITY, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3819",
+    "name": "DETOUR, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3842",
+    "name": "PRESQUE ISLE, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3843",
+    "name": "ALPENA, MI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3881",
+    "name": "OAKLAND COUNTY INT'L AIR",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3882",
+    "name": "WILLOW RUN AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3883",
+    "name": "CAPITAL REGION INTL AIRP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3901",
+    "name": "CHICAGO, IL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3902",
+    "name": "PEORIA, IL",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3905",
+    "name": "GARY, IN",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3908",
+    "name": "DAVENPORT-ROCK ISLAND",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3909",
+    "name": "ROCKFORD AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3910",
+    "name": "MIDWAY INT'L AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3971",
+    "name": "ECCF TNT CHICAGO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "3983",
+    "name": "CHICAGO EXECUTIVE AIRPOR",
+    "modes": [
+      "Air"
+    ]
+  },
+  {
+    "code": "3984",
+    "name": "DUPAGE AIRPORT AUTH",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4101",
+    "name": "CLEVELAND, OH",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4102",
+    "name": "CINCINNATI, OH",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4103",
+    "name": "COLUMBUS, OH",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4104",
+    "name": "DAYTON, OH",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4105",
+    "name": "TOLEDO, OH",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4106",
+    "name": "ERIE, PA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4110",
+    "name": "INDIANAPOLIS, IN",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4115",
+    "name": "LOUISVILLE, KY",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4116",
+    "name": "OWENSBORO-EVANSVILLE",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4117",
+    "name": "HURON, OH",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4121",
+    "name": "LORAIN, OH",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4122",
+    "name": "ASHTABULA/CONNEAUT",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4183",
+    "name": "FORT WAYNE AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4184",
+    "name": "BLUE GRASS AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4196",
+    "name": "UPS COURIER LOUISVILLE",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4197",
+    "name": "DHL COURIER",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4198",
+    "name": "FEDERAL EXPRESS HUB",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4501",
+    "name": "KANSAS CITY, MO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4502",
+    "name": "ST JOSEPH, MO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4503",
+    "name": "ST LOUIS, MO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4504",
+    "name": "WICHITA, KS",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4505",
+    "name": "SPRINGFIELD, MO",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4581",
+    "name": "MIDAMERICA AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4601",
+    "name": "NEW YORK/NEWARK AREA",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4602",
+    "name": "PERTH AMBOY, NJ",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4670",
+    "name": "UPS NEWARK, NJ",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4671",
+    "name": "FEDERAL EXPRESS ECCF",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4681",
+    "name": "MORRISTOWN AIRPORT, NJ",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4701",
+    "name": "JOHN F KENNEDY AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4771",
+    "name": "NYACC (ECCF)",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4772",
+    "name": "DHL AIRWAYS",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4773",
+    "name": "MICOM (ECCF)",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4774",
+    "name": "IBC (ECCF)",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4778",
+    "name": "TNT SKYPAK (ECCF)",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4901",
+    "name": "AGUADILLA, PR",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4904",
+    "name": "FAJARDO, PR",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4907",
+    "name": "MAYAGUEZ, PR",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4908",
+    "name": "PONCE, PR",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4909",
+    "name": "SAN JUAN, PR",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "4913",
+    "name": "SAN JUAN INTL AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5101",
+    "name": "CHARLOTTE AMALIE, VI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5102",
+    "name": "CRUZ BAY, VI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5104",
+    "name": "CHRISTIANSTED, VI",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5105",
+    "name": "FREDERIKSTED, VI",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5201",
+    "name": "MIAMI, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5202",
+    "name": "KEY WEST, FL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5203",
+    "name": "PORT EVERGLADES, FL",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5204",
+    "name": "WEST PALM BEACH, FL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5205",
+    "name": "FORT PIERCE, FL",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5206",
+    "name": "MIAMI INTERNATIONAL AIRP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5210",
+    "name": "FT LAUDERDALE INTL AIRPT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5295",
+    "name": "UPS MIAMI INTL AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5296",
+    "name": "DHL WORLDWIDE EX MIAMI",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5297",
+    "name": "FEDEX COURIER HUB MIAMI",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5298",
+    "name": "IBC COURIER HUB MIAMI",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5301",
+    "name": "HOUSTON, TX",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5306",
+    "name": "TEXAS CITY, TX",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5309",
+    "name": "HOUSTON GEO. BUSH INTERC",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5310",
+    "name": "GALVESTON, TX",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5311",
+    "name": "FREEPORT, TX",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5312",
+    "name": "CORPUS CHRISTI, TX",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5313",
+    "name": "PORT LAVACA, TX",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5381",
+    "name": "SUGAR LAND REGIONAL AIRP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5401",
+    "name": "WASHINGTON, DC  (DULLES)",
+    "modes": [
+      "Vessel",
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5402",
+    "name": "ALEXANDRIA, VA",
+    "modes": [
+      "Vessel",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5501",
+    "name": "DALLAS/FT WORTH TX",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5502",
+    "name": "AMARILLO, TX",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5503",
+    "name": "LUBBOCK, TX",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5504",
+    "name": "OKLAHOMA CITY, OK",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5505",
+    "name": "TULSA, OK",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5506",
+    "name": "AUSTIN, TX",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5507",
+    "name": "SAN ANTONIO, TX",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5582",
+    "name": "MIDLAND INTERNATIONAL AI",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5583",
+    "name": "FORT WORTH ALLIANCE AP",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5584",
+    "name": "ADDISON AIRPORT",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "5588",
+    "name": "DALLAS LOVE FIELD (DAL)",
+    "modes": [
+      "Air",
+      "Passenger"
+    ]
+  },
+  {
+    "code": "8000",
+    "name": "US MAIL EEI PORT CODE",
+    "modes": [
+      "Mail"
+    ]
+  }
+]

@@ -85,6 +85,7 @@ import PackageCategories from "./pages/dashboard/PackageCategories";
 import PackageSizes from "./pages/dashboard/PackageSizes";
 import CargoTypes from "./pages/dashboard/CargoTypes";
 import CargoDetails from "./pages/dashboard/CargoDetails";
+import LogisticsManager from "./pages/LogisticsManager";
 import Incoterms from "./pages/dashboard/Incoterms";
 import UIDemoForms from "./pages/dashboard/UIDemoForms";
 import UIDemoAdvanced from "./pages/dashboard/UIDemoAdvanced";
@@ -660,6 +661,7 @@ const App = () => (
              <Route path="/dashboard/package-sizes" element={<ProtectedRoute><PackageSizes /></ProtectedRoute>} />
              <Route path="/dashboard/cargo-types" element={<ProtectedRoute><CargoTypes /></ProtectedRoute>} />
              <Route path="/dashboard/cargo-details" element={<ProtectedRoute><CargoDetails /></ProtectedRoute>} />
+             <Route path="/dashboard/logistics-manager" element={<ProtectedRoute requiredRole="tenant_admin"><LogisticsManager /></ProtectedRoute>} />
               <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
              <Route path="/dashboard/service-types" element={<ProtectedRoute><ServiceTypes /></ProtectedRoute>} />
              <Route path="/dashboard/transport-modes" element={<ProtectedRoute><TransportModes /></ProtectedRoute>} />

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AsyncComboboxField } from "@/components/forms/AdvancedFields";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -17,6 +18,7 @@ const cargoDetailsSchema = z.object({
   service_id: z.string().min(1, "Service is required"),
   cargo_type_id: z.string().optional(),
   commodity_description: z.string().optional(),
+  aes_hts_id: z.string().uuid().optional().or(z.literal('')),
   hs_code: z.string().optional(),
   total_weight_kg: z.coerce.number().optional(),
   total_volume_cbm: z.coerce.number().optional(),
@@ -45,6 +47,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
       service_id: initialData?.service_id || "",
       cargo_type_id: initialData?.cargo_type_id || "",
       commodity_description: initialData?.commodity_description || "",
+      aes_hts_id: initialData?.aes_hts_id || "",
       hs_code: initialData?.hs_code || "",
       total_weight_kg: initialData?.total_weight_kg ?? undefined,
       total_volume_cbm: initialData?.total_volume_cbm ?? undefined,
@@ -57,6 +60,25 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   });
 
   const selectedType = form.watch("service_type");
+
+  const htsLoader = async (search: string) => {
+    if (!search) return [];
+    const { data, error } = await scopedDb
+      .from('aes_hts_codes', true)
+      .select('id, hts_code, description')
+      .or(`hts_code.ilike.%${search}%,description.ilike.%${search}%`)
+      .limit(20);
+    
+    if (error) {
+      console.error(error);
+      return [];
+    }
+    
+    return data.map((item: any) => ({
+      label: `${item.hts_code} - ${item.description}`,
+      value: item.id
+    }));
+  };
 
   useEffect(() => {
     // Load service types (publicly viewable per migration)
@@ -121,6 +143,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           service_id: values.service_id,
           cargo_type_id: values.cargo_type_id,
           commodity_description: values.commodity_description,
+          aes_hts_id: values.aes_hts_id || null,
           hs_code: values.hs_code,
           dimensions_cm: values.dimensions as Json,
           is_hazardous: values.is_hazardous,
@@ -139,6 +162,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           service_id: values.service_id,
           cargo_type_id: values.cargo_type_id,
           commodity_description: values.commodity_description,
+          aes_hts_id: values.aes_hts_id || null,
           hs_code: values.hs_code,
           dimensions_cm: values.dimensions as Json,
           is_hazardous: values.is_hazardous,
@@ -239,18 +263,13 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
             )}
           />
 
-          <FormField
+          <AsyncComboboxField
             control={form.control}
-            name="hs_code"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>HS Code</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., 9403.20" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            name="aes_hts_id"
+            label="HTS / Schedule B Code"
+            placeholder="Search by code or description..."
+            loader={htsLoader}
+            className="flex flex-col"
           />
         </div>
 

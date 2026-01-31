@@ -18,7 +18,7 @@ export function ProtectedRoute({
   requireAuth = true,
   requiredPermissions
 }: ProtectedRouteProps) {
-  const { user, loading, hasRole, hasPermission } = useAuth();
+  const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -34,7 +34,8 @@ export function ProtectedRoute({
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  if (requiredRole && !hasRole(requiredRole)) {
+  // Platform Admin bypasses specific role checks
+  if (requiredRole && !hasRole(requiredRole) && !isPlatformAdmin()) {
     console.warn(`[ProtectedRoute] Access denied. User missing required role: ${requiredRole}`);
     return <Navigate to="/unauthorized" state={{ reason: 'missing_role', requiredRole }} replace />;
   }

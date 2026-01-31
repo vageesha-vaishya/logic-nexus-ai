@@ -166,6 +166,7 @@ export default function CargoDetails() {
                   cargo_type_id: editItem.cargo_type_id || "",
                   commodity_description: editItem.commodity_description || "",
                   hs_code: editItem.hs_code || "",
+                  aes_hts_id: editItem.aes_hts_id || "",
                   total_weight_kg: editItem.weight_kg ?? undefined,
                   total_volume_cbm: editItem.volume_cbm ?? undefined,
                   is_hazardous: !!editItem.is_hazardous,

@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CargoForm } from '@/components/logistics/CargoForm';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TrackingTimeline } from '@/components/logistics/TrackingTimeline';
 import { useCRM } from '@/hooks/useCRM';
@@ -32,6 +35,34 @@ export default function ShipmentDetail() {
   const [podUploading, setPodUploading] = useState(false);
   const { supabase, context, scopedDb } = useCRM();
   const [podFile, setPodFile] = useState<File | null>(null);
+  
+  // Cargo state
+  const [cargoItems, setCargoItems] = useState<any[]>([]);
+  const [isCargoOpen, setIsCargoOpen] = useState(false);
+  const [editingCargo, setEditingCargo] = useState<any>(null);
+
+  const fetchCargo = useCallback(async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await scopedDb
+        .from('cargo_details')
+        .select(`
+          *,
+          cargo_types (cargo_type_name),
+          aes_hts_codes (hts_code, description)
+        `)
+        .eq('service_id', id)
+        .eq('service_type', 'shipment')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setCargoItems(data || []);
+    } catch (error) {
+      console.error('Failed to load cargo:', error);
+      // toast.error('Failed to load cargo details'); // Optional: don't spam toasts
+    }
+  }, [id, scopedDb]);
 
   const fetchShipment = useCallback(async () => {
     try {
@@ -75,8 +106,24 @@ export default function ShipmentDetail() {
     if (id) {
       fetchShipment();
       fetchAttachments();
+      fetchCargo();
     }
-  }, [id, fetchShipment, fetchAttachments]);
+  }, [id, fetchShipment, fetchAttachments, fetchCargo]);
+
+  const handleDeleteCargo = async (cargoId: string) => {
+    if (!confirm('Are you sure you want to delete this cargo item?')) return;
+    try {
+      const { error } = await scopedDb
+        .from('cargo_details')
+        .update({ is_active: false })
+        .eq('id', cargoId);
+      if (error) throw error;
+      toast.success('Cargo item deleted');
+      fetchCargo();
+    } catch (error: any) {
+      toast.error('Failed to delete cargo: ' + error.message);
+    }
+  };
 
   const handleUploadPOD = async () => {
     try {
@@ -302,6 +349,126 @@ export default function ShipmentDetail() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Cargo Details */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                <CardTitle>Cargo Items</CardTitle>
+              </div>
+              <Dialog open={isCargoOpen} onOpenChange={setIsCargoOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="mr-2 h-4 w-4" /> Add Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Add Cargo Item</DialogTitle>
+                  </DialogHeader>
+                  <CargoForm
+                    serviceId={id}
+                    serviceType="shipment"
+                    onSuccess={() => {
+                      setIsCargoOpen(false);
+                      fetchCargo();
+                    }}
+                    onCancel={() => setIsCargoOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>HTS Code</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cargoItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No cargo items added yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  cargoItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">
+                        {item.commodity_description}
+                        {item.hazmat && (
+                          <Badge variant="destructive" className="ml-2 text-[10px] px-1 py-0 h-4">
+                            HAZMAT
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{item.cargo_types?.cargo_type_name || '-'}</TableCell>
+                      <TableCell>
+                        {item.aes_hts_codes ? (
+                          <div className="flex flex-col">
+                            <span className="font-mono text-xs font-medium">{item.aes_hts_codes.hts_code}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[150px]" title={item.aes_hts_codes.description}>
+                              {item.aes_hts_codes.description}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">Unclassified</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div>Pkg: {item.package_count}</div>
+                        <div>{item.total_weight_kg} kg / {item.total_volume_cbm} m³</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => setEditingCargo(item)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteCargo(item.id)} className="text-red-500 hover:text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editingCargo} onOpenChange={(open) => !open && setEditingCargo(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Cargo Item</DialogTitle>
+            </DialogHeader>
+            {editingCargo && (
+              <CargoForm
+                cargoId={editingCargo.id}
+                serviceId={id}
+                serviceType="shipment"
+                defaultValues={{
+                  ...editingCargo,
+                  aes_hts_id: editingCargo.aes_hts_id || '', // Ensure string
+                }}
+                onSuccess={() => {
+                  setEditingCargo(null);
+                  fetchCargo();
+                }}
+                onCancel={() => setEditingCargo(null)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Emails */}
         <EmailHistoryPanel 

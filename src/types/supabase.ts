@@ -624,6 +624,7 @@ export type Database = {
       cargo_details: {
         Row: {
           actual_weight_kg: number | null
+          aes_hts_id: string | null
           cargo_type_id: string | null
           chargeable_weight_kg: number | null
           commodity_description: string | null
@@ -658,6 +659,7 @@ export type Database = {
         }
         Insert: {
           actual_weight_kg?: number | null
+          aes_hts_id?: string | null
           cargo_type_id?: string | null
           chargeable_weight_kg?: number | null
           commodity_description?: string | null
@@ -692,6 +694,7 @@ export type Database = {
         }
         Update: {
           actual_weight_kg?: number | null
+          aes_hts_id?: string | null
           cargo_type_id?: string | null
           chargeable_weight_kg?: number | null
           commodity_description?: string | null
@@ -725,6 +728,13 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cargo_details_aes_hts_id_fkey"
+            columns: ["aes_hts_id"]
+            isOneToOne: false
+            referencedRelation: "aes_hts_codes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cargo_details_cargo_type_id_fkey"
             columns: ["cargo_type_id"]

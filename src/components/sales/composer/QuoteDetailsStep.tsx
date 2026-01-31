@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -50,6 +52,21 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, dest
   const { toast } = useToast();
   const [aiLoading, setAiLoading] = useState(false);
   const [complianceStatus, setComplianceStatus] = useState<{ compliant: boolean; issues: any[] } | null>(null);
+
+  const htsLoader = async (search: string) => {
+    if (!search) return [];
+    const { data } = await supabase
+      .from('aes_hts_codes')
+      .select('id, hts_code, description')
+      .or(`hts_code.ilike.%${search}%,description.ilike.%${search}%`)
+      .limit(20);
+    
+    return (data || []).map(item => ({
+      label: `${item.hts_code} - ${item.description}`,
+      value: item.id,
+      original: item
+    }));
+  };
 
   const getFieldError = (field: string) => {
     // Basic mapping of validation errors to fields
