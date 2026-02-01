@@ -1,0 +1,10 @@
+Initialising login role...
+Connecting to remote database...
+Skipping migration 20260128140000_phase_2_5_financials.sql.bak... (file name must match pattern "<timestamp>_name.sql")
+Skipping migration 20260128150000_add_tenant_nexus.sql.bak... (file name must match pattern "<timestamp>_name.sql")
+Skipping migration 20260128150000_fix_finance_permissions.sql.bak... (file name must match pattern "<timestamp>_name.sql")
+Do you want to push these migrations to the remote database?
+ • 20260131210000_consolidated_cleanup.sql
+
+ [Y/n] Applying migration 20260131210000_consolidated_cleanup.sql...
+Finished supabase db push.

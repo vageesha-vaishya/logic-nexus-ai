@@ -15,6 +15,7 @@ import { CarrierQuotesSection } from '@/components/sales/CarrierQuotesSection';
 import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
+import { useDebug } from '@/hooks/useDebug';
 import { toast } from 'sonner';
 import { invokeFunction } from '@/lib/supabase-functions';
 import OpportunitySelectDialogList from '@/components/crm/OpportunitySelectDialogList';
@@ -80,6 +81,7 @@ type CarrierQuote = {
 
 export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?: (quoteId: string) => void }) {
   const { context, scopedDb, supabase, user } = useCRM();
+  const debug = useDebug('Sales', 'QuoteForm');
   const { roles } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -116,7 +118,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
   // Resolved labels for package categories and sizes that may be hidden by RLS/tenant scope
   const [resolvedPackageCategoryLabels, setResolvedPackageCategoryLabels] = useState<Record<string, string>>({});
   const [resolvedPackageSizeLabels, setResolvedPackageSizeLabels] = useState<Record<string, string>>({});
-  const debugHydration = import.meta.env.DEV;
+
 
   // Ensure unique option lists by id to avoid duplicate React keys
   const uniqueById = (arr: any[]) => {
@@ -322,7 +324,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
             })) as any[];
           }
         } catch (fallbackErr) {
-          console.warn('Fallback service data load failed:', fallbackErr);
+          debug.warn('Fallback service data load failed:', fallbackErr);
         }
       }
 
@@ -331,7 +333,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
       setServices(servicesForDropdown as any[]);
 
     } catch (error) {
-      console.error('Error loading service data:', error);
+      debug.error('Error loading service data:', error);
       toast.error('Failed to load service options.');
     }
   };
@@ -381,7 +383,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           form.setValue('contact_id', String(lastQuote.contact_id));
         }
       } catch (error) {
-        console.warn('Failed to fetch last used values:', error);
+        debug.warn('Failed to fetch last used values:', error);
       }
     };
 
@@ -445,7 +447,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               }));
             }
           } catch (err) {
-            console.warn('Failed to fetch carrier:', err);
+            debug.warn('Failed to fetch carrier:', err);
           }
         }
 
@@ -482,7 +484,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               }
             }
           } catch (oppErr) {
-            console.warn('Failed to load full opportunity, using fallback:', oppErr);
+            debug.warn('Failed to load full opportunity, using fallback:', oppErr);
             const joinedOpp = (quote as any)?.opportunities;
             if (joinedOpp?.name) {
               opportunityToAdd = { 
@@ -590,17 +592,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         }
         // Defer syncing of selectedServiceType (code) to effect that watches service_type_id
         setQuoteNumberPreview((quote as any).quote_number || '');
-        if (debugHydration) {
-          try {
-            console.debug('[hydrate] form.reset applied', {
-              service_type_id: form.getValues('service_type_id'),
-              service_id: form.getValues('service_id'),
-              selectedServiceType,
-            });
-          } catch {
-            // ignore
-          }
-        }
+        debug.debug('[hydrate] form.reset applied', {
+          service_type_id: form.getValues('service_type_id'),
+          service_id: form.getValues('service_id'),
+          selectedServiceType,
+        });
 
         // Load items; tolerate RLS issues by falling back to empty
         const { data: itemsRes, error: itemsErr } = await scopedDb
@@ -649,13 +645,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
               })),
               selling_charges: [],
             }));
-            if (debugHydration) {
-              try {
-                console.debug('[hydrate:rates] quoteId', String(quoteId), 'rows', rows.length, 'mapped', mapped.length);
-              } catch {
-                // ignore
-              }
-            }
+            debug.debug('[hydrate:rates]', { quoteId: String(quoteId), rows: rows.length, mapped: mapped.length });
             setCarrierQuotes(mapped);
             setExistingRateIds(rows.map((r: any) => String(r.id)));
           }
@@ -679,17 +669,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 ...prev,
                 [String(data.id)]: data.service_name || 'Selected Service',
               }));
-              if (debugHydration) {
-                try {
-                  console.debug('[hydrate] injected service from fetch', {
-                    id: String(data.id),
-                    label: data.service_name,
-                    svcType: String(data.service_type || ''),
-                    formServiceId: form.getValues('service_id'),
-                  });
-                } catch {
-                  // ignore
-                }
+              try {
+                debug.debug('[hydrate] injected service from fetch', {
+                  id: String(data.id),
+                  label: data.service_name,
+                  svcType: String(data.service_type || ''),
+                  formServiceId: form.getValues('service_id'),
+                });
+              } catch {
+                // ignore
               }
               // If edit mode has no selectedServiceType yet, derive from saved service
               try {
@@ -719,17 +707,15 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 if (!selectedServiceType && (quote as any).service_type) {
                   setSelectedServiceType(String((quote as any).service_type));
                 }
-                if (debugHydration) {
-                  try {
-                    console.debug('[hydrate] injected service via fallback', {
-                      id: String(selServiceId),
-                      label: fallbackLabel,
-                      svcType: String((quote as any).service_type || selectedServiceType || ''),
-                      formServiceId: form.getValues('service_id'),
-                    });
-                  } catch {
-                    // ignore
-                  }
+                try {
+                  debug.debug('[hydrate] injected service via fallback', {
+                    id: String(selServiceId),
+                    label: fallbackLabel,
+                    svcType: String((quote as any).service_type || selectedServiceType || ''),
+                    formServiceId: form.getValues('service_id'),
+                  });
+                } catch {
+                  // ignore
                 }
                 // Ensure the form reflects the saved selection even without full dataset
                 try {
@@ -747,18 +733,12 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 if (!selectedServiceType && (quote as any).service_type) {
                   setSelectedServiceType(String((quote as any).service_type));
                 }
-                if (debugHydration) {
-                  try {
-                    console.debug('[hydrate] injected service via final fallback', {
-                      id: String(selServiceId),
-                      label: fallbackLabel,
-                      svcType: String((quote as any).service_type || selectedServiceType || ''),
-                      formServiceId: form.getValues('service_id'),
-                    });
-                  } catch {
-                    // ignore
-                  }
-                }
+                debug.debug('[hydrate] injected service via final fallback', {
+                  id: String(selServiceId),
+                  label: fallbackLabel,
+                  svcType: String((quote as any).service_type || selectedServiceType || ''),
+                  formServiceId: form.getValues('service_id'),
+                });
                 // Ensure the form reflects the saved selection even without full dataset
                 try {
                   const curFormServiceId = form.getValues('service_id');
@@ -836,17 +816,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 if (!selectedServiceType && injected.code) {
                   setSelectedServiceType(injected.code);
                 }
-                if (debugHydration) {
-                  try {
-                    console.debug('[hydrate] injected service type from fetch', {
-                      id: String(selServiceTypeId),
-                      code: String(injected.code || ''),
-                      formTypeId: form.getValues('service_type_id'),
-                    });
-                  } catch {
-                    // ignore
-                  }
-                }
+                debug.debug('[hydrate] injected service type from fetch', {
+                  id: String(selServiceTypeId),
+                  code: String(injected.code || ''),
+                  formTypeId: form.getValues('service_type_id'),
+                });
               } else {
                 // Fallback: inject minimal service type from textual service_type on quote if available
                 const derivedCode = String((quote as any).service_type || '');
@@ -871,17 +845,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 if (!selectedServiceType && derivedCode) {
                   setSelectedServiceType(derivedCode);
                 }
-                if (debugHydration) {
-                  try {
-                    console.debug('[hydrate] injected service type via fallback', {
-                      id: String(selServiceTypeId),
-                      code: String(derivedCode || ''),
-                      formTypeId: form.getValues('service_type_id'),
-                    });
-                  } catch {
-                    // ignore
-                  }
-                }
+                debug.debug('[hydrate] injected service type via fallback', {
+                  id: String(selServiceTypeId),
+                  code: String(derivedCode || ''),
+                  formTypeId: form.getValues('service_type_id'),
+                });
               }
             } catch {
               // ignore
@@ -890,10 +858,10 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
           // Note: opportunity, account, contact already fetched above
         } catch (e) {
-          console.warn('Failed to hydrate selected options for edit mode:', e);
+          debug.warn('Failed to hydrate selected options for edit mode:', e);
         }
       } catch (err: any) {
-        console.error('Failed to load existing quote:', err?.message || err);
+        debug.error('Failed to load existing quote:', err?.message || err);
         toast.error('Failed to load existing quote', { description: err?.message });
       }
       finally {
@@ -935,21 +903,11 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceTypeId, serviceTypes]);
   useEffect(() => {
-    if (!debugHydration) return;
-    try {
-      console.debug('[render] selectedServiceType code', selectedServiceType);
-    } catch {
-      // ignore
-    }
-  }, [selectedServiceType, debugHydration]);
+    debug.debug('[render] selectedServiceType code', selectedServiceType);
+  }, [selectedServiceType]);
   useEffect(() => {
-    if (!debugHydration) return;
-    try {
-      console.debug('[render] filteredServices length', filteredServices.length);
-    } catch {
-      // ignore
-    }
-  }, [filteredServices, debugHydration]);
+    debug.debug('[render] filteredServices length', filteredServices.length);
+  }, [filteredServices]);
 
   // In edit mode, if selectedServiceType is still empty, derive it from saved service or fetch by type id
   useEffect(() => {
@@ -1167,7 +1125,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 }
               }
             } catch (fnErr) {
-              console.warn('Account label resolution failed:', fnErr);
+              debug.warn('Account label resolution failed:', fnErr);
             }
           }
         }
@@ -1223,7 +1181,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 }
               }
             } catch (fnErr) {
-              console.warn('Contact label resolution failed:', fnErr);
+              debug.warn('Contact label resolution failed:', fnErr);
             }
           }
         }
@@ -1262,16 +1220,16 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                 }
               }
             } catch (fnErr) {
-              console.warn('Opportunity label resolution failed:', fnErr);
+              debug.warn('Opportunity label resolution failed:', fnErr);
             }
           }
         }
       } catch (e) {
-        console.warn('CRM option merge after tenant fetch failed:', e);
+        debug.warn('CRM option merge after tenant fetch failed:', e);
       }
 
     } catch (error: any) {
-      console.error('Failed to fetch data:', error);
+      debug.error('Failed to fetch data:', error);
     }
   };
 
@@ -1324,7 +1282,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         .eq('service_type', normCode)
         .eq('is_active', true);
       if (carriersRes.error) {
-        console.warn('Failed to fetch carriers by service type:', carriersRes.error);
+        debug.warn('Failed to fetch carriers by service type:', carriersRes.error);
         setCarriers([]);
         return;
       }
@@ -1402,7 +1360,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         setQuoteNumberPreview(typeof data === 'string' ? data : 'Auto-generated on save');
       } catch (err) {
         // Keep default hint on any error
-        console.warn('Preview quote number failed:', err);
+        debug.warn('Preview quote number failed:', err);
       }
     };
     preview();
@@ -1775,7 +1733,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
         });
       }
     } catch (err) {
-      console.error('Error selecting opportunity:', err);
+      debug.error('Error selecting opportunity:', err);
       // Basic fallback
       if (opp.account_id) form.setValue('account_id', String(opp.account_id), { shouldDirty: true });
       if (opp.contact_id) form.setValue('contact_id', String(opp.contact_id), { shouldDirty: true });
@@ -1994,7 +1952,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
         }
       } catch (e) {
-        console.warn('Failed to update opportunity stage from quote status', e);
+        debug.warn('Failed to update opportunity stage from quote status', e);
       }
 
       const itemsData = items.map((item) => ({
@@ -2083,7 +2041,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
           }
         }
       } catch (err: any) {
-        console.warn('Carrier rates/options handling failed', err);
+        debug.warn('Carrier rates/options handling failed', err);
         toast.error('Saved quote, but failed to generate options from carrier rates');
       }
 
@@ -2608,7 +2566,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         }));
                         if (debugHydration) {
                           try {
-                            console.debug('[modal:rates] auto-hydrate on open', { quoteId, rows: (rows || []).length, mapped: mapped.length });
+                            debug.debug('[modal:rates] auto-hydrate on open', { quoteId, rows: (rows || []).length, mapped: mapped.length });
                           } catch {
                             // ignore
                           }
@@ -2617,7 +2575,7 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         setExistingRateIds((rows || []).map((r: any) => String(r.id)));
                       }
                     } catch (e: any) {
-                      console.warn('Prepare composer & hydrate rates failed', e);
+                      debug.warn('Prepare composer & hydrate rates failed', e);
                     }
                   }}
                 >

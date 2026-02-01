@@ -1,52 +1,5 @@
 import { matchLegForCharge } from '@/lib/charge-bifurcation';
 
-export const calculateQuoteFinancials = (amount: number, isCost: boolean = false) => {
-    // Sanitize input
-    if (typeof amount !== 'number' || isNaN(amount)) {
-        return {
-            sellPrice: 0,
-            buyPrice: 0,
-            marginAmount: 0,
-            marginPercent: 15,
-            markupPercent: 0
-        };
-    }
-
-    // Business Logic: 15% Profit Margin by default
-    const marginPercent = 15;
-    let sellPrice, buyPrice, marginAmount;
-
-    if (isCost) {
-        // Amount is Cost (Buy Price). Sell = Cost / (1 - Margin%)
-        buyPrice = amount;
-        // Avoid division by zero if margin is 100% (unlikely but safe)
-        const divisor = 1 - (marginPercent / 100);
-        sellPrice = divisor > 0 ? Number((buyPrice / divisor).toFixed(2)) : buyPrice;
-        marginAmount = Number((sellPrice - buyPrice).toFixed(2));
-    } else {
-        // Amount is Sell Price (Legacy/Default). Buy = Sell * (1 - Margin%)
-        sellPrice = amount;
-        marginAmount = Number((sellPrice * (marginPercent / 100)).toFixed(2));
-        buyPrice = Number((sellPrice - marginAmount).toFixed(2));
-    }
-    
-    // Markup = (Profit / Cost) * 100
-    // Prevent division by zero and Infinity
-    let markupPercent = 0;
-    if (buyPrice > 0) {
-        const calculatedMarkup = (marginAmount / buyPrice) * 100;
-        markupPercent = Number.isFinite(calculatedMarkup) ? Number(calculatedMarkup.toFixed(2)) : 0;
-    }
-    
-    return {
-        sellPrice,
-        buyPrice,
-        marginAmount,
-        marginPercent, // Explicit Margin %
-        markupPercent  // Explicit Markup % (Cost basis)
-    };
-};
-
 export const mapOptionToQuote = (opt: any) => {
     if (!opt) return null;
     

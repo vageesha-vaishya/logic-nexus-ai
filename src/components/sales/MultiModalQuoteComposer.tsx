@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
-import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +30,9 @@ import { SaveProgress } from './composer/SaveProgress';
 import { ErrorBoundary } from './composer/ErrorBoundary';
 import { ValidationFeedback } from './composer/ValidationFeedback';
 import { QuoteOptionsOverview } from './composer/QuoteOptionsOverview';
+import { PricingService } from '@/services/pricing.service';
+import { logger } from '@/lib/logger';
+import { useDebug } from '@/hooks/useDebug';
 
 interface Leg {
   id: string;
@@ -58,10 +63,19 @@ const STEPS = [
 
 export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId }: MultiModalQuoteComposerProps) {
   const { scopedDb, context } = useCRM();
+  const debug = useDebug('Sales', 'QuoteComposer');
   const { toast } = useToast();
   const { invokeAiAdvisor } = useAiAdvisor();
+  
+  // Initialize Pricing Service
+  const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
+  const debounceTimers = useRef(new Map<string, NodeJS.Timeout>());
+
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('SUBSCRIBED');
+  const [pricingRequestsCount, setPricingRequestsCount] = useState(0);
+  const isPricingCalculating = pricingRequestsCount > 0;
   const [saving, setSaving] = useState(false);
   const [optionId, setOptionId] = useState<string | null>(initialOptionId || null);
   const [legs, setLegs] = useState<Leg[]>([]);
@@ -139,9 +153,34 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     loadInitialData();
   }, [quoteId, versionId, propTenantId]);
 
+  // Real-time Pricing Updates Subscription
+  useEffect(() => {
+    const subscription = pricingService.subscribeToUpdates(() => {
+      toast({
+        title: "Pricing Updated",
+        description: "Market rates or pricing configurations have been updated.",
+      });
+      // Cache is automatically cleared by the service.
+      // Future improvement: Automatically re-calculate open quotes if auto-margin is enabled.
+    }, (status) => {
+        setConnectionStatus(status);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+             toast({
+                title: "Pricing Service Disconnected",
+                description: "Attempting to reconnect...",
+                variant: "destructive"
+             });
+        }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pricingService, toast]);
+
   useEffect(() => {
     if (lastSyncTimestamp && lastSyncTimestamp > 0) {
-      console.log('[Composer] External sync triggered', lastSyncTimestamp);
+      debug.debug('[Composer] External sync triggered', lastSyncTimestamp);
       if (optionId && tenantId) {
         loadOptionData();
       } else {
@@ -188,14 +227,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   }, [optionId, tenantId, carriers.length, transportModes.length]);
 
   const loadInitialData = async () => {
-    console.log('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
+    debug.debug('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
     setLoading(true);
     
     const errors: string[] = [];
     
     try {
       // Step 1: Resolve tenant ID & Context
-      console.log('[Composer] Step 1: Resolving tenant ID and Context');
+      debug.debug('[Composer] Step 1: Resolving tenant ID and Context');
       
       let resolvedTenantId: string | null = propTenantId || context?.tenantId || null;
       
@@ -217,10 +256,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
              
              if (!error && data) {
                 resolvedTenantId = data.tenant_id;
-                console.log('[Composer] Resolved tenant from quote lookup:', resolvedTenantId);
+                debug.log('[Composer] Resolved tenant from quote lookup:', resolvedTenantId);
              }
           } catch (e) {
-             console.warn('[Composer] Failed to resolve tenant from quote lookup', e);
+             debug.warn('[Composer] Failed to resolve tenant from quote lookup', e);
           }
       }
 
@@ -235,15 +274,15 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
              
              if (!error && data) {
                 resolvedTenantId = data.tenant_id;
-                console.log('[Composer] Resolved tenant from version lookup:', resolvedTenantId);
+                debug.log('[Composer] Resolved tenant from version lookup:', resolvedTenantId);
              }
           } catch (e) {
-             console.warn('[Composer] Failed to resolve tenant from version lookup', e);
+             debug.warn('[Composer] Failed to resolve tenant from version lookup', e);
           }
       }
 
       if (!resolvedTenantId) {
-        console.error('[Composer] Failed to resolve tenant ID after all attempts');
+        debug.error('[Composer] Failed to resolve tenant ID after all attempts');
         errors.push('Could not determine tenant context');
       } else {
         setTenantId(resolvedTenantId);
@@ -265,14 +304,61 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           const { data: quoteRow, error: quoteError } = await quoteQuery.maybeSingle();
           
           if (quoteError) {
-            console.error('[Composer] Error fetching quote:', quoteError);
+            debug.error('[Composer] Error fetching quote', { error: quoteError, component: 'MultiModalQuoteComposer' });
             errors.push(`Failed to load quote details: ${quoteError.message}`);
+            toast({
+              title: "Error Loading Quote",
+              description: quoteError.message,
+              variant: "destructive"
+            });
           } else if (quoteRow) {
+            // Fetch quote items to calculate total weight and volume
+            let calculatedTotalWeight = 0;
+            let calculatedTotalVolume = 0;
+            let derivedCommodity = '';
+
+            try {
+              const { data: items, error: itemsError } = await scopedDb
+                .from('quote_items')
+                .select('weight_kg, volume_cbm, quantity, product_name, description')
+                .eq('quote_id', quoteId);
+
+              if (itemsError) {
+                 debug.error('[Composer] Error fetching quote items:', itemsError);
+                 toast({
+                   title: "Warning",
+                   description: "Could not load cargo items. Totals may be zero.",
+                   variant: "destructive"
+                 });
+              }
+
+              if (!itemsError && items) {
+                items.forEach((item: any) => {
+                  const qty = Number(item.quantity) || 1;
+                  const weight = Number(item.weight_kg) || 0;
+                  const volume = Number(item.volume_cbm) || 0;
+                  
+                  // Assuming weight_kg and volume_cbm are per-line-item totals or per-unit? 
+                  // In logistics, usually specificed as total for the line. 
+                  // If ambiguous, we sum the raw values.
+                  calculatedTotalWeight += weight;
+                  calculatedTotalVolume += volume;
+                  
+                  if (!derivedCommodity && (item.product_name || item.description)) {
+                    derivedCommodity = item.product_name || item.description;
+                  }
+                });
+                debug.log('[Composer] Calculated totals from items:', { weight: calculatedTotalWeight, volume: calculatedTotalVolume });
+              }
+            } catch (e) {
+              debug.warn('[Composer] Failed to fetch items for totals', e);
+            }
+
             // Use quote's tenant_id if we don't have one yet, or verify it matches
             if (!resolvedTenantId) {
               resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
               if (resolvedTenantId) {
-                 console.log('[Composer] Resolved tenant from full quote load:', resolvedTenantId);
+                 debug.log('[Composer] Resolved tenant from full quote load:', resolvedTenantId);
                  setTenantId(resolvedTenantId);
               }
             }
@@ -283,18 +369,42 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
             // Normalize quote data for consumption
             const raw = quoteRow as any;
+            const cargoDetails = raw.cargo_details;
+            
+            // Check for [object Object] corruption or valid JSON
+            let validCargoDetails = cargoDetails;
+            if (typeof cargoDetails === 'string' && cargoDetails === '[object Object]') {
+                validCargoDetails = null;
+            }
+
+            // Fallback to cargo_details if calculation yields zero (e.g. no items found)
+            if (calculatedTotalWeight === 0 && validCargoDetails?.total_weight_kg) {
+                calculatedTotalWeight = Number(validCargoDetails.total_weight_kg) || 0;
+                debug.log('[Composer] Used fallback weight from cargo_details:', calculatedTotalWeight);
+            }
+            if (calculatedTotalVolume === 0 && validCargoDetails?.total_volume_cbm) {
+                calculatedTotalVolume = Number(validCargoDetails.total_volume_cbm) || 0;
+                debug.log('[Composer] Used fallback volume from cargo_details:', calculatedTotalVolume);
+            }
+
             const normalizedQuote = {
                 ...raw,
                 origin: raw.origin_location?.name || raw.origin_code || '',
                 destination: raw.destination_location?.name || raw.destination_code || '',
-                commodity: raw.cargo_details?.commodity || '',
-                mode: raw.transport_mode || 'ocean'
+                commodity: validCargoDetails?.commodity || derivedCommodity || '',
+                mode: raw.transport_mode || 'ocean',
+                total_weight: calculatedTotalWeight,
+                total_volume: calculatedTotalVolume
             };
 
             setQuoteData(normalizedQuote);
           }
         } catch (error: any) {
-          console.error('[Composer] Exception fetching quote:', error);
+          debug.error('[Composer] Exception fetching quote', { 
+            error: error.message, 
+            stack: error.stack, 
+            component: 'MultiModalQuoteComposer' 
+          });
           errors.push(`Exception loading quote: ${error.message}`);
         }
       }
@@ -309,7 +419,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .maybeSingle();
           
           if (versionError) {
-            console.error('[Composer] Error fetching version:', versionError);
+            logger.error('[Composer] Error fetching version', { error: versionError, component: 'MultiModalQuoteComposer' });
           } else if (versionRow) {
             if (!resolvedTenantId && (versionRow as any)?.tenant_id) {
                 resolvedTenantId = (versionRow as any).tenant_id;
@@ -328,8 +438,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               }));
             }
           }
-        } catch (error) {
-          console.error('[Composer] Exception fetching version:', error);
+        } catch (error: any) {
+          logger.error('[Composer] Exception fetching version', { 
+            error: error.message, 
+            stack: error.stack, 
+            component: 'MultiModalQuoteComposer' 
+          });
         }
       }
 
@@ -343,19 +457,23 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .maybeSingle();
           
           if (optionError) {
-            console.error('[Composer] Error fetching option:', optionError);
+            logger.error('[Composer] Error fetching option', { error: optionError, component: 'MultiModalQuoteComposer' });
           } else if (optionRow) {
             resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
             if (resolvedTenantId) setTenantId(resolvedTenantId);
-            console.log('[Composer] Resolved tenant from option:', resolvedTenantId);
+            debug.debug('[Composer] Resolved tenant from option:', resolvedTenantId);
           }
-        } catch (error) {
-          console.error('[Composer] Exception fetching option:', error);
+        } catch (error: any) {
+          logger.error('[Composer] Exception fetching option', { 
+            error: error.message, 
+            stack: error.stack, 
+            component: 'MultiModalQuoteComposer' 
+          });
         }
       }
 
       // Step 2: Load reference data with individual error handling
-      console.log('[Composer] Step 2: Loading reference data');
+      debug.debug('[Composer] Step 2: Loading reference data');
       
       const loadReferenceData = async () => {
         const results = {
@@ -378,14 +496,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               .eq('is_active', true) as any);
             
             if (error) {
-              console.error(`[Composer] Error loading ${table}:`, error);
+              debug.error(`[Composer] Error loading ${table}:`, error);
               errors.push(errorMsg);
             } else {
               (results as any)[resultKey] = data || [];
-              console.log(`[Composer] Loaded ${table}:`, (results as any)[resultKey].length);
+              debug.debug(`[Composer] Loaded ${table}:`, (results as any)[resultKey].length);
             }
           } catch (error) {
-            console.error(`[Composer] Exception loading ${table}:`, error);
+            debug.error(`[Composer] Exception loading ${table}:`, error);
             errors.push(errorMsg);
           }
         };
@@ -420,7 +538,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       // Set default currency
       if (refData.currencies.length > 0) {
         setQuoteData((prev: any) => ({ ...prev, currencyId: refData.currencies[0].id }));
-        console.log('[Composer] Set default currency:', refData.currencies[0].id);
+        debug.debug('[Composer] Set default currency:', refData.currencies[0].id);
       }
 
       // Step 3: Ensure option exists if we have a versionId
@@ -428,7 +546,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         await ensureOptionExists(resolvedTenantId);
       }
 
-      console.log('[Composer] Initial data load complete. Errors:', errors.length);
+      debug.debug('[Composer] Initial data load complete. Errors:', errors.length);
       
       if (errors.length > 0) {
         toast({ 
@@ -438,7 +556,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         });
       }
     } catch (error: any) {
-      console.error('[Composer] Critical error in loadInitialData:', error);
+      debug.error('[Composer] Critical error in loadInitialData:', error);
       toast({ title: 'Error', description: 'Failed to initialize composer: ' + error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -447,7 +565,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   // Ensure an option exists for this version
   const ensureOptionExists = async (resolvedTenantId: string) => {
-    console.log('[Composer] Ensuring option exists for version:', versionId);
+    debug.debug('[Composer] Ensuring option exists for version:', versionId);
     
     try {
       // Query for existing options with full details for overview
@@ -464,7 +582,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         .order('created_at', { ascending: false });
 
       if (queryError) {
-        console.error('[Composer] Error querying options:', queryError);
+        debug.error('[Composer] Error querying options:', queryError);
         return;
       }
 
@@ -488,7 +606,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           setViewMode('overview');
         }
         
-        console.log('[Composer] Found existing options:', existingOptions.length, 'Selected:', targetId);
+        debug.debug('[Composer] Found existing options:', existingOptions.length, 'Selected:', targetId);
         setOptionId(targetId);
         
         // Update URL to include optionId to prevent duplicates on reload
@@ -501,7 +619,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
 
       // Create new option only if none exists
-      console.log('[Composer] Creating new option for version');
+      debug.debug('[Composer] Creating new option for version');
       const { data: newOption, error: insertError } = await scopedDb
         .from('quotation_version_options')
         .insert({
@@ -512,7 +630,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         .maybeSingle();
 
       if (insertError) {
-        console.error('[Composer] Error creating option:', insertError);
+        debug.error('[Composer] Error creating option:', insertError);
         
         // Check if option was created by another process
         const { data: retry } = await scopedDb
@@ -523,7 +641,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .maybeSingle();
 
         if (retry?.id) {
-          console.log('[Composer] Option found on retry:', retry.id);
+          debug.debug('[Composer] Option found on retry:', retry.id);
           setOptionId(retry.id);
           setOptions([retry]);
           setViewMode('composer');
@@ -537,7 +655,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
 
       if (newOption?.id) {
-        console.log('[Composer] Created new option:', newOption.id);
+        debug.debug('[Composer] Created new option:', newOption.id);
         setOptionId(newOption.id);
         setOptions([newOption]);
         setViewMode('composer');
@@ -546,10 +664,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         const url = new URL(window.location.href);
         url.searchParams.set('optionId', newOption.id);
         window.history.replaceState({}, '', url.toString());
-        console.log('[Composer] Updated URL with new optionId');
+        debug.debug('[Composer] Updated URL with new optionId');
       }
     } catch (error) {
-      console.error('[Composer] Unexpected error in ensureOptionExists:', error);
+      debug.error('[Composer] Unexpected error in ensureOptionExists:', error);
     }
   };
 
@@ -593,7 +711,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const loadOptionData = async () => {
     if (!optionId || !tenantId) return;
 
-    console.log('[Composer] Loading option data for:', { optionId, tenantId });
+    debug.debug('[Composer] Loading option data for:', { optionId, tenantId });
     setLoading(true);
     try {
       // Parallel fetch of legs, global charges, and option details
@@ -640,7 +758,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (chargeError) throw chargeError;
       // optionError might occur if option deleted, but less likely here. Ignore if just missing (handled by if check)
 
-      console.log('[Composer] Loaded legs:', legData?.length, 'Global charges:', chargeData?.length);
+      debug.debug('[Composer] Loaded legs:', legData?.length, 'Global charges:', chargeData?.length);
 
       // Always update quoteData with option specifics to ensure UI reflects current option
       if (optionData) {
@@ -757,7 +875,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         setLegs([]);
       }
     } catch (error: any) {
-      console.error('[Composer] Error loading option data:', error);
+      debug.error('[Composer] Error loading option data:', error);
       toast({ title: 'Error loading data', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -850,6 +968,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const removeLeg = (legId: string) => {
+    const startTime = performance.now();
+    debug.info('Removing leg', { legId });
     // Track charges that need to be deleted from DB
     const legToRemove = legs.find(leg => leg.id === legId);
     if (legToRemove) {
@@ -865,6 +985,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     
     setLegs(legs.filter(leg => leg.id !== legId));
     setDeleteDialog({ open: false, type: 'leg' });
+    
+    const duration = performance.now() - startTime;
+    debug.log(`Leg removed: ${legId}`, { duration: `${duration.toFixed(2)}ms` });
   };
 
   const addCharge = (legId: string) => {
@@ -900,6 +1023,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const updateCharge = (legId: string, chargeIdx: number, field: string, value: any) => {
+    // 1. Sync Update
     setLegs(legs.map(leg => {
       if (leg.id === legId) {
         const charges = [...leg.charges];
@@ -911,22 +1035,56 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         } else {
           charge[field] = value;
         }
-
-        // Apply auto margin if enabled (Profit Margin logic: Sell = Buy / (1 - Margin%))
-        if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
-          const buyRate = charge.buy?.rate || 0;
-          const sellRate = marginPercent < 100 ? buyRate / (1 - marginPercent / 100) : buyRate;
-          charge.sell = {
-            quantity: charge.buy?.quantity || 1,
-            rate: Number(sellRate.toFixed(2))
-          };
-        }
-
         charges[chargeIdx] = charge;
         return { ...leg, charges };
       }
       return leg;
     }));
+
+    // 2. Async Pricing Calculation (Debounced)
+    if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
+        // Retrieve current rate from state (optimistic) or use value if it's the field being updated
+        const currentLeg = legs.find(l => l.id === legId);
+        const currentCharge = currentLeg?.charges[chargeIdx];
+        const buyRate = field === 'buy.rate' ? Number(value) : (currentCharge?.buy?.rate || 0);
+        
+        const timerKey = `leg-${legId}-charge-${chargeIdx}`;
+
+        if (debounceTimers.current.has(timerKey)) {
+            clearTimeout(debounceTimers.current.get(timerKey));
+        }
+
+        const timer = setTimeout(() => {
+            setPricingRequestsCount(prev => prev + 1);
+            pricingService.calculateFinancials(buyRate, marginPercent, true)
+            .then(result => {
+                setLegs(currentLegs => currentLegs.map(l => {
+                if (l.id === legId) {
+                    const newCharges = [...l.charges];
+                    if (newCharges[chargeIdx]) {
+                    newCharges[chargeIdx] = {
+                        ...newCharges[chargeIdx],
+                        sell: {
+                        ...newCharges[chargeIdx].sell,
+                        quantity: newCharges[chargeIdx].buy?.quantity || 1,
+                        rate: result.sellPrice
+                        }
+                    };
+                    }
+                    return { ...l, charges: newCharges };
+                }
+                return l;
+                }));
+            })
+            .catch(err => logger.error('Pricing calculation failed', { error: err }))
+            .finally(() => {
+                setPricingRequestsCount(prev => Math.max(0, prev - 1));
+                debounceTimers.current.delete(timerKey);
+            });
+        }, 300);
+
+        debounceTimers.current.set(timerKey, timer);
+    }
   };
 
   const confirmRemoveCharge = (legId: string, chargeIdx: number) => {
@@ -938,6 +1096,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const removeCharge = (legId: string, chargeIdx: number) => {
+    const startTime = performance.now();
+    debug.info('Removing charge', { legId, chargeIdx });
     setLegs(legs.map(leg => {
       if (leg.id === legId) {
         const chargeToRemove = leg.charges[chargeIdx];
@@ -961,6 +1121,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }));
     
     setDeleteDialog({ open: false, type: 'charge' });
+    
+    const duration = performance.now() - startTime;
+    debug.log(`Charge removed from leg ${legId}`, { duration: `${duration.toFixed(2)}ms` });
   };
 
   // Combined charges handlers
@@ -981,6 +1144,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const updateCombinedCharge = (chargeIdx: number, field: string, value: any) => {
+    // 1. Sync Update
     setCombinedCharges(prev => {
       const next = [...prev];
       const charge = { ...next[chargeIdx] };
@@ -990,17 +1154,47 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       } else {
         charge[field] = value;
       }
-      if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
-        const buyAmount = (charge.buy?.quantity || 1) * (charge.buy?.rate || 0);
-        const sellRate = (charge.buy?.rate || 0) * (1 + marginPercent / 100);
-        charge.sell = {
-          quantity: charge.buy?.quantity || 1,
-          rate: sellRate
-        };
-      }
       next[chargeIdx] = charge;
       return next;
     });
+
+    // 2. Async Pricing Calculation (Debounced)
+    if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
+        const buyRate = field === 'buy.rate' ? Number(value) : (combinedCharges[chargeIdx]?.buy?.rate || 0);
+        const timerKey = `combined-${chargeIdx}`;
+
+        if (debounceTimers.current.has(timerKey)) {
+            clearTimeout(debounceTimers.current.get(timerKey));
+        }
+        
+        const timer = setTimeout(() => {
+            setPricingRequestsCount(prev => prev + 1);
+            pricingService.calculateFinancials(buyRate, marginPercent, true)
+            .then(result => {
+                setCombinedCharges(curr => {
+                const next = [...curr];
+                if (next[chargeIdx]) {
+                    next[chargeIdx] = {
+                    ...next[chargeIdx],
+                    sell: {
+                        ...next[chargeIdx].sell,
+                        quantity: next[chargeIdx].buy?.quantity || 1,
+                        rate: result.sellPrice
+                        }
+                    };
+                }
+                return next;
+                });
+            })
+            .catch(err => debug.error('Combined charge pricing failed', { error: err }))
+            .finally(() => {
+                setPricingRequestsCount(prev => Math.max(0, prev - 1));
+                debounceTimers.current.delete(timerKey);
+            });
+        }, 300);
+
+        debounceTimers.current.set(timerKey, timer);
+    }
   };
 
   const confirmRemoveCombinedCharge = (chargeIdx: number) => {
@@ -1012,6 +1206,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const removeCombinedCharge = (chargeIdx: number) => {
+    const startTime = performance.now();
+    debug.info('Removing combined charge', { chargeIdx });
     setCombinedCharges(prev => {
       const chargeToRemove = prev[chargeIdx];
       
@@ -1029,6 +1225,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     });
     
     setDeleteDialog({ open: false, type: 'combinedCharge' });
+    
+    const duration = performance.now() - startTime;
+    debug.log(`Combined charge removed: ${chargeIdx}`, { duration: `${duration.toFixed(2)}ms` });
   };
 
   const openBasisModal = (legId: string, chargeIdx: number) => {
@@ -1157,14 +1356,32 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       for (const result of results) {
         const mapped = mapOptionToQuote(result);
         // Use mapped financials if available (preserving source data/logic), otherwise default calculate
-        const financials = (mapped.buyPrice !== undefined && mapped.marginAmount !== undefined && mapped.buyPrice > 0)
-            ? { 
+        let financials;
+        if (mapped.buyPrice !== undefined && mapped.marginAmount !== undefined && mapped.buyPrice > 0) {
+            financials = { 
                 buyPrice: mapped.buyPrice, 
                 marginAmount: mapped.marginAmount, 
                 markupPercent: mapped.markupPercent,
                 sellPrice: mapped.total_amount || mapped.sellPrice || 0
-              }
-            : calculateQuoteFinancials(mapped.sellPrice);
+            };
+        } else {
+            // Async Pricing Service Call
+            // Defaults: 15% Margin, Sell-Based (isCostBased=false)
+            const calc = await pricingService.calculateFinancials(mapped.sellPrice, 15, false);
+            
+            // Calculate Markup for backward compatibility (Profit / Cost * 100)
+            let markup = 0;
+            if (calc.buyPrice > 0) {
+                markup = (calc.marginAmount / calc.buyPrice) * 100;
+            }
+
+            financials = {
+                buyPrice: calc.buyPrice,
+                marginAmount: calc.marginAmount,
+                markupPercent: Number(markup.toFixed(2)),
+                sellPrice: calc.sellPrice
+            };
+        }
 
         // Resolve Currency (default to USD if not found)
         const currencyCode = mapped.currency || 'USD';
@@ -1226,7 +1443,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                   .single();
 
                 if (legError) {
-                    console.error("Failed to insert leg:", legError);
+                    debug.error("Failed to insert leg:", legError);
                     continue;
                 }
 
@@ -1303,7 +1520,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                         .insert(chargesToInsert);
                         
                     if (chargeError) {
-                         console.error("Failed to insert leg charges:", chargeError);
+                         debug.error("Failed to insert leg charges:", chargeError);
                     }
                 }
             }
@@ -1337,16 +1554,16 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               },
               status: 'converted'
           });
-          console.log('[Composer] Logged smart quote generation to history');
+          debug.debug('[Composer] Logged smart quote generation to history');
       } catch (logErr) {
-          console.warn('[Composer] Failed to log smart quote history:', logErr);
+          debug.warn('[Composer] Failed to log smart quote history:', logErr);
       }
 
       toast({ title: "Success", description: `Generated ${results.length} smart options.` });
       await refreshOptionsList();
       
     } catch (error: any) {
-      console.error('Smart Quote Error:', error);
+      debug.error('Smart Quote Error:', error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsGeneratingSmart(false);
@@ -1440,6 +1657,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }
 
     setSaving(true);
+    const startTime = performance.now();
+    debug.info('Starting quotation save...', { 
+      versionId, 
+      optionId, 
+      legsCount: legs.length,
+      combinedChargesCount: combinedCharges.length 
+    });
     
     // Initialize progress tracking
     const progressSteps = [
@@ -1475,12 +1699,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       updateProgress(0); // Validation complete
 
       // Ensure we have an option to save to
-      console.log('[Composer] Ensuring option exists before save. Current optionId:', optionId);
+      debug.debug('[Composer] Ensuring option exists before save. Current optionId:', optionId);
       let currentOptionId = optionId;
       
       if (!currentOptionId) {
         // This should rarely happen now that we call ensureOptionExists in loadInitialData
-        console.log('[Composer] No optionId - checking for existing options');
+        debug.debug('[Composer] No optionId - checking for existing options');
         const { data: existingOptions } = await scopedDb
           .from('quotation_version_options')
           .select('id')
@@ -1491,9 +1715,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         if (existingOptions && existingOptions.length > 0) {
           currentOptionId = existingOptions[0].id;
           setOptionId(currentOptionId);
-          console.log('[Composer] Using existing option:', currentOptionId);
+          debug.debug('[Composer] Using existing option:', currentOptionId);
         } else {
-          console.log('[Composer] Creating new option during save');
+          debug.debug('[Composer] Creating new option during save');
           const { data: newOption, error: optError } = await scopedDb
             .from('quotation_version_options')
             .insert({
@@ -1504,18 +1728,18 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .maybeSingle();
           
           if (optError) {
-            console.error('[Composer] Error creating option:', optError);
+            debug.error('[Composer] Error creating option:', optError);
             throw new Error(`Failed to create quotation option: ${optError.message}`);
           }
           
           if (newOption?.id) {
             currentOptionId = newOption.id;
             setOptionId(currentOptionId);
-            console.log('[Composer] Created option:', currentOptionId);
+            debug.debug('[Composer] Created option:', currentOptionId);
           }
         }
       } else {
-        console.log('[Composer] Using existing optionId:', currentOptionId);
+        debug.debug('[Composer] Using existing optionId:', currentOptionId);
       }
       
       updateProgress(1); // Option created
@@ -1528,7 +1752,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .in('id', chargesToDelete);
         
         if (deleteError) {
-          console.error('Error deleting charges:', deleteError);
+          debug.error('Error deleting charges:', deleteError);
           throw new Error(`Failed to delete charges: ${deleteError.message}`);
         }
         
@@ -1574,7 +1798,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .eq('quote_option_id', currentOptionId);
         
         if (chargeDeleteError) {
-          console.error('Error deleting leg charges:', chargeDeleteError);
+          debug.error('Error deleting leg charges:', chargeDeleteError);
           throw new Error(`Failed to delete leg charges: ${chargeDeleteError.message}`);
         }
         
@@ -1585,7 +1809,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .in('id', toDeleteLegIds);
         
         if (legDeleteError) {
-          console.error('Error deleting legs:', legDeleteError);
+          debug.error('Error deleting legs:', legDeleteError);
           throw new Error(`Failed to delete legs: ${legDeleteError.message}`);
         }
       }
@@ -1725,7 +1949,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         .eq('id', versionId);
 
       if (versionError) {
-        console.error('Error updating version:', versionError);
+        debug.error('Error updating version:', versionError);
         // Non-critical, but good to know
       }
 
@@ -1770,7 +1994,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .eq('id', currentOptionId);
 
         if (optionError) {
-          console.error('Error updating option:', optionError);
+          debug.error('Error updating option:', optionError);
         }
       }
 
@@ -1840,6 +2064,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       
       updateProgress(4); // Charges saved
 
+      const duration = performance.now() - startTime;
+      debug.log('Quotation saved successfully', { 
+        versionId, 
+        optionId: currentOptionId,
+        duration: `${duration.toFixed(2)}ms`
+      });
+
       toast({ 
         title: 'Success', 
         description: 'Quotation saved successfully',
@@ -1866,7 +2097,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }, 1000);
       
     } catch (error: any) {
-      console.error('Save quotation error:', error);
+      const duration = performance.now() - startTime;
+      debug.error('Save quotation error:', error, { duration: `${duration.toFixed(2)}ms` });
       const errorMessage = error.message || 'Failed to save quotation';
       
       // Hide progress on error
@@ -1896,7 +2128,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const handleEditOption = (opt: any) => {
     if (!opt.id) {
-      console.warn('Cannot edit option without ID:', opt);
+      debug.warn('Cannot edit option without ID:', opt);
       toast({ title: 'Error', description: 'Cannot edit option: Missing ID', variant: 'destructive' });
       return;
     }
@@ -1920,6 +2152,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     if (!confirm('Are you sure you want to delete this option? This action cannot be undone.')) return;
 
     setLoading(true);
+    const startTime = performance.now();
+    debug.info('Deleting quote option', { optionId: id });
+
     try {
       const { error } = await scopedDb
         .from('quotation_version_options')
@@ -1934,9 +2169,17 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         setOptionId(newOptions[0].id);
       }
       
+      const duration = performance.now() - startTime;
+      debug.log('Option deleted successfully', { 
+        optionId: id,
+        remainingOptions: newOptions.length,
+        duration: `${duration.toFixed(2)}ms`
+      });
+      
       toast({ title: 'Success', description: 'Option deleted successfully.' });
     } catch (error: any) {
-      console.error('Error deleting option:', error);
+      const duration = performance.now() - startTime;
+      debug.error('Error deleting option:', error, { duration: `${duration.toFixed(2)}ms` });
       toast({ title: 'Error', description: 'Failed to delete option: ' + error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -1950,6 +2193,13 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     }
 
     setLoading(true);
+    const startTime = performance.now();
+    debug.info('Saving option details', { 
+      isNew: !editingOption, 
+      optionId: editingOption?.id,
+      name: newOptionData.option_name 
+    });
+
     try {
       const tenant = await ensureTenantForSave();
       if (!tenant) throw new Error('Tenant context missing');
@@ -2001,10 +2251,18 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         setOptionId(data.id);
       }
 
+      const duration = performance.now() - startTime;
+      debug.log('Option details saved successfully', { 
+        optionId: editingOption?.id || 'new',
+        operation: editingOption ? 'update' : 'create',
+        duration: `${duration.toFixed(2)}ms`
+      });
+
       setOptionDialogOpen(false);
       toast({ title: 'Success', description: `Option ${editingOption ? 'updated' : 'created'} successfully.` });
     } catch (error: any) {
-      console.error('Error saving option:', error);
+      const duration = performance.now() - startTime;
+      debug.error('Error saving option:', error, { duration: `${duration.toFixed(2)}ms` });
       toast({ title: 'Error', description: 'Failed to save option: ' + error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -2086,7 +2344,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
 
       // 5. Map to Composer Charge Format
-      const newCharges = extractedCharges.map(chg => {
+      const newCharges = await Promise.all(extractedCharges.map(async (chg) => {
         // Find matching IDs from master data
         const catName = chg.category || chg.name || 'Freight';
         const cat = chargeCategories.find(c => 
@@ -2119,7 +2377,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         
         if (buyRate === 0 && sellRate > 0) {
             // Reverse calculate buy rate assuming 15% margin if not provided
-            buyRate = Number((sellRate * 0.85).toFixed(2));
+            // Use PricingService for consistent financial logic
+            const financials = await pricingService.calculateFinancials(sellRate, 15, false);
+            buyRate = financials.buyPrice;
         }
 
         // Determine quantity
@@ -2147,7 +2407,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           },
           note: chg.note || `AI Rate: ${chg.name || catName}`
         };
-      });
+      }));
 
       // 6. Update State (using smart merge)
       setLegs(currentLegs => currentLegs.map(l => {
@@ -2202,7 +2462,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       });
 
     } catch (error: any) {
-      console.error('Error fetching rates:', error);
+      debug.error('Error fetching rates:', error);
       toast({
         title: "Rate Fetch Failed",
         description: error.message || "Could not retrieve AI rates.",
@@ -2261,9 +2521,22 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   if (loading) {
     return (
       <Card>
-        <CardContent className="py-12 flex flex-col items-center justify-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading quotation data...</p>
+        <CardContent className="p-6 space-y-6">
+          <div className="flex items-center justify-between">
+             <Skeleton className="h-10 w-48" />
+             <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+             <Skeleton className="h-32 w-full" />
+             <Skeleton className="h-32 w-full" />
+             <Skeleton className="h-32 w-full" />
+             <Skeleton className="h-32 w-full" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -2310,6 +2583,17 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 Back to Overview
             </Button>
             <div className="h-6 w-px bg-border mx-1" />
+            
+             {connectionStatus === 'SUBSCRIBED' ? (
+                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 gap-1 h-6 px-2" title="Real-time Pricing Active">
+                    <Wifi className="h-3 w-3" />
+                </Badge>
+             ) : (
+                <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 gap-1 h-6 px-2" title="Pricing Service Disconnected">
+                    <WifiOff className="h-3 w-3" />
+                </Badge>
+             )}
+
             <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Quote Options:</span>
             <div className="flex gap-2">
               {options.map(opt => (
@@ -2340,6 +2624,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                       size="icon"
                       className="h-3 w-3 hover:text-destructive"
                       onClick={(e) => { e.stopPropagation(); handleDeleteOption(opt.id); }}
+                      data-testid={`delete-option-btn-${opt.id}`}
                     >
                       <Trash2 className="h-2 w-2" />
                     </Button>
@@ -2441,6 +2726,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onConfigureCombinedBasis={openCombinedBasisModal}
           onFetchRates={handleFetchRates}
           validationErrors={validationErrors}
+          isPricingCalculating={isPricingCalculating}
         />
       )}
 

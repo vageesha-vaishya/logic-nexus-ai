@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2 } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { useDebug } from '@/hooks/useDebug';
 
 type Charge = {
   type: string;
@@ -36,6 +37,7 @@ export function CarrierQuotesSection({
   onSave?: () => void | Promise<void>;
   onReload?: () => void | Promise<void>;
 }) {
+  const debug = useDebug('Sales', 'CarrierQuotesSection');
   // Collapsible on mobile, open by default on md+; persist to localStorage
   const [accordionOpen, setAccordionOpen] = useState<boolean>(true);
   useEffect(() => {
@@ -54,6 +56,7 @@ export function CarrierQuotesSection({
     }
   }, [accordionOpen]);
   const addCarrierQuote = () => {
+    debug.log('Adding carrier quote', { existingCount: carrierQuotes.length });
     setCarrierQuotes((prev) => ([
       ...prev,
       { carrier_id: '', mode: selectedServiceType || undefined, buying_charges: [], selling_charges: [] },
@@ -61,6 +64,7 @@ export function CarrierQuotesSection({
   };
 
   const removeCarrierQuote = (index: number) => {
+    debug.log('Removing carrier quote', { index });
     setCarrierQuotes((prev) => prev.filter((_, i) => i !== index));
   };
 

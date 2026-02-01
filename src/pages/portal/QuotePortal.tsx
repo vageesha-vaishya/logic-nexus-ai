@@ -9,6 +9,7 @@ import { Loader2, ShieldCheck, AlertCircle, CheckCircle2, X } from 'lucide-react
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { logger } from '@/lib/logger';
 
 type QuoteRecord = {
   id: string;
@@ -54,6 +55,12 @@ export default function QuotePortal() {
         setQuote(q);
       }
     } catch (e: any) {
+      logger.error('Error fetching quote by token', {
+        error: e.message,
+        stack: e.stack,
+        token: useToken,
+        component: 'QuotePortal'
+      });
       setError(e.message || 'An error occurred');
       setQuote(null);
     } finally {

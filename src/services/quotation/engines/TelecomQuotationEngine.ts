@@ -1,7 +1,14 @@
 import { IQuotationEngine } from '../IQuotationEngine';
 import { RequestContext, LineItem, QuoteResult, ValidationResult } from '../types';
+import { createDebugLogger } from '@/lib/debug-logger';
 
 export class TelecomQuotationEngine implements IQuotationEngine {
+  private debug;
+
+  constructor() {
+    this.debug = createDebugLogger('QuotationEngine', 'Telecom');
+  }
+
   private baseRates: Record<string, number> = {
     'fiber': 50, // Base $50/mo
     '5g': 80,    // Base $80/mo
@@ -16,7 +23,7 @@ export class TelecomQuotationEngine implements IQuotationEngine {
   };
 
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
-    console.log('[TelecomEngine] Calculating quote...');
+    this.debug.info('Calculating quote...');
     let total = 0;
     const breakdown: any[] = [];
 

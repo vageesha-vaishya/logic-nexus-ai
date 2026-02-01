@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -45,7 +45,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { QuoteLegsVisualizer } from '../quick-quote/QuoteLegsVisualizer';
 import { QuoteDetailView } from '../quick-quote/QuoteDetailView';
 import { QuoteMapVisualizer } from '../quick-quote/QuoteMapVisualizer';
-import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { PricingService } from '@/services/pricing.service';
+import { useCRM } from '@/hooks/useCRM';
 import { 
   getTierBadge, 
   getModeIcon, 
@@ -74,6 +76,53 @@ export function QuoteOptionsOverview({
 }: OptionOverviewProps) {
   const [viewMode, setViewMode] = useState<'card' | 'list' | 'table'>('card');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  const { scopedDb } = useCRM();
+  const [enrichedOptions, setEnrichedOptions] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const enrichOptions = async () => {
+        if (!options || options.length === 0) {
+            setEnrichedOptions([]);
+            return;
+        }
+
+        const pricingService = new PricingService(scopedDb.client);
+        
+        const enriched = await Promise.all(options.map(async (rawOpt) => {
+            let opt = mapOptionToQuote(rawOpt);
+            if (!opt) return null;
+
+            // Check if financials are missing (legacy data support)
+            if (opt.total_amount && (opt.markupPercent === undefined || opt.marginAmount === undefined)) {
+                try {
+                    // Async Pricing Service Call
+                    // Defaults: 15% Margin, Sell-Based (isCostBased=false)
+                    const calc = await pricingService.calculateFinancials(opt.total_amount, 15, false);
+                    
+                    let markup = 0;
+                    if (calc.buyPrice > 0) {
+                        markup = (calc.marginAmount / calc.buyPrice) * 100;
+                    }
+
+                    opt = {
+                        ...opt,
+                        buyPrice: opt.buyPrice || calc.buyPrice,
+                        marginAmount: opt.marginAmount || calc.marginAmount,
+                        markupPercent: opt.markupPercent || Number(markup.toFixed(2))
+                    };
+                } catch (err) {
+                    console.warn('Pricing enrichment failed for option:', opt.id);
+                }
+            }
+            return opt;
+        }));
+        
+        setEnrichedOptions(enriched.filter(Boolean));
+    };
+    
+    enrichOptions();
+  }, [options, scopedDb]);
 
   const toggleExpand = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -176,20 +225,8 @@ export function QuoteOptionsOverview({
         {/* Card View */}
         {viewMode === 'card' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {options.map((rawOpt) => {
-              let opt = mapOptionToQuote(rawOpt);
+            {enrichedOptions.map((opt) => {
               if (!opt) return null;
-
-              // Ensure financials exist (synchronize with New Quote logic)
-              if (opt.total_amount && (opt.markupPercent === undefined || opt.marginAmount === undefined)) {
-                const financials = calculateQuoteFinancials(opt.total_amount); // Use shared helper
-                opt = {
-                    ...opt,
-                    buyPrice: opt.buyPrice || financials.buyPrice,
-                    marginAmount: opt.marginAmount || financials.marginAmount,
-                    markupPercent: opt.markupPercent || financials.markupPercent
-                };
-              }
 
               return (
               <Card 
@@ -429,8 +466,7 @@ export function QuoteOptionsOverview({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {options.map((rawOpt) => {
-                  const opt = mapOptionToQuote(rawOpt);
+                {enrichedOptions.map((opt) => {
                   if (!opt) return null;
                   return (
                     <React.Fragment key={opt.id}>

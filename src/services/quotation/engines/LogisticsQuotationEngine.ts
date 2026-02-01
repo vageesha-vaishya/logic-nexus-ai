@@ -1,8 +1,15 @@
 
 import { IQuotationEngine } from '../IQuotationEngine';
 import { RequestContext, LineItem, QuoteResult, ValidationResult } from '../types';
+import { createDebugLogger } from '@/lib/debug-logger';
 
 export class LogisticsQuotationEngine implements IQuotationEngine {
+  private debug;
+
+  constructor() {
+    this.debug = createDebugLogger('QuotationEngine', 'Logistics');
+  }
+
   /**
    * Calculates the quotation based on logistics-specific rules.
    * Logic includes:
@@ -11,7 +18,7 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
    * 3. Application of standard surcharges (Fuel, Doc, Handling).
    */
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
-    console.log('LogisticsQuotationEngine: Calculating quote for', context.tenantId);
+    this.debug.info('Calculating quote for', { tenantId: context.tenantId });
 
     // 1. Extract Contextual Factors
     const mode = context.metadata?.mode || 'ocean'; // default to ocean

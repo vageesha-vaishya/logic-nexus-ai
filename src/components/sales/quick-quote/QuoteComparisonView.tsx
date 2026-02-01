@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { QuoteDetailView } from './QuoteDetailView';
-import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
 
 interface QuoteComparisonViewProps {
     options: RateOption[];
@@ -39,28 +39,55 @@ export function QuoteComparisonView({
     onToggleSelection,
     onGenerateSmartOptions 
 }: QuoteComparisonViewProps) {
+    const { scopedDb, supabase } = useCRM();
     const [showBreakdown, setShowBreakdown] = React.useState(false);
     const [viewDetailsOption, setViewDetailsOption] = React.useState<RateOption | null>(null);
+    const [options, setOptions] = useState<RateOption[]>([]);
 
     // Normalize options and ensure financials
-    const options = useMemo(() => {
-        return rawOptions.map(opt => {
-            const mapped = mapOptionToQuote(opt);
-            if (!mapped) return null;
-
-            // Ensure financials exist (synchronize with New Quote logic)
-            if (mapped.total_amount && (mapped.markupPercent === undefined || mapped.marginAmount === undefined)) {
-                const financials = calculateQuoteFinancials(mapped.total_amount);
-                return {
-                    ...mapped,
-                    buyPrice: mapped.buyPrice || financials.buyPrice,
-                    marginAmount: mapped.marginAmount || financials.marginAmount,
-                    markupPercent: mapped.markupPercent || financials.markupPercent
-                };
+    useEffect(() => {
+        const enrichOptions = async () => {
+            if (!rawOptions || rawOptions.length === 0) {
+                setOptions([]);
+                return;
             }
-            return mapped;
-        }).filter(Boolean) as RateOption[];
-    }, [rawOptions]);
+
+            const pricingService = new PricingService(scopedDb || supabase);
+            
+            const enriched = await Promise.all(rawOptions.map(async (opt) => {
+                const mapped = mapOptionToQuote(opt);
+                if (!mapped) return null;
+
+                // Ensure financials exist (synchronize with New Quote logic)
+                if (mapped.total_amount && (mapped.markupPercent === undefined || mapped.marginAmount === undefined)) {
+                    try {
+                        const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
+                        
+                        let markupPercent = 0;
+                        if (calc.buyPrice > 0) {
+                            markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
+                        }
+
+                        return {
+                            ...mapped,
+                            buyPrice: mapped.buyPrice || calc.buyPrice,
+                            marginAmount: mapped.marginAmount || calc.marginAmount,
+                            markupPercent: mapped.markupPercent || markupPercent,
+                            marginPercent: mapped.marginPercent || calc.marginPercent
+                        };
+                    } catch (e) {
+                        console.warn('Pricing enrichment failed', e);
+                        return mapped;
+                    }
+                }
+                return mapped;
+            }));
+            
+            setOptions(enriched.filter(Boolean) as RateOption[]);
+        };
+        
+        enrichOptions();
+    }, [rawOptions, scopedDb, supabase]);
 
     if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
 

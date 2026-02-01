@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -24,6 +25,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Quotation Composer Error:', error, errorInfo);
+    
+    // Log to platform system logs
+    logger.error('Quotation Composer Error', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      component: 'ComposerErrorBoundary'
+    });
   }
 
   private handleReset = () => {

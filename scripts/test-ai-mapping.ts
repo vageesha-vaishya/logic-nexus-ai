@@ -1,5 +1,5 @@
 
-import { mapOptionToQuote, calculateQuoteFinancials } from '../src/lib/quote-mapper';
+import { mapOptionToQuote } from '../src/lib/quote-mapper';
 
 // Mock matchLegForCharge since it's imported in quote-mapper
 // But wait, we are importing the real one. That's fine if charge-bifurcation is pure logic.
@@ -61,14 +61,3 @@ try {
     console.error("Error running test:", e);
 }
 
-// Test Financial Calculation
-console.log("\nTesting calculateQuoteFinancials...");
-const cost = 1000;
-const financials = calculateQuoteFinancials(cost, true); // cost-plus
-console.log(`Cost: ${cost}, Cost-Plus Result:`, financials);
-
-if (financials.buyPrice === 1000 && financials.marginPercent === 15) {
-     console.log("PASS: Financial calculation (cost-plus)");
-} else {
-     console.error("FAIL: Financial calculation mismatch");
-}

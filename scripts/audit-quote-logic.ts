@@ -85,30 +85,39 @@ function matchLegForCharge(description: string, legs: TransportLeg[]): Transport
 // LOGIC FROM src/lib/quote-mapper.ts
 // ==========================================
 
-const calculateQuoteFinancials = (amount: number, isCost: boolean = false) => {
-    const marginPercent = 15;
-    let sellPrice, buyPrice, marginAmount;
+const calculateFinancials = (amount: number, marginPercent: number = 15, isCostBased: boolean = true) => {
+    let sellPrice = 0;
+    let buyPrice = 0;
+    let marginAmount = 0;
     
-    if (isCost) {
-        buyPrice = amount;
-        // Formula: Sell = Cost / (1 - Margin%)
-        const divisor = 1 - (marginPercent / 100);
+    // Ensure valid inputs
+    const safeCost = Number(amount) || 0;
+    const safeMargin = Number(marginPercent) || 0;
+
+    if (isCostBased) {
+        // Cost-Plus Model: Sell = Cost / (1 - Margin%)
+        buyPrice = safeCost;
+        const divisor = 1 - (safeMargin / 100);
         sellPrice = divisor > 0 ? Number((buyPrice / divisor).toFixed(2)) : buyPrice;
         marginAmount = Number((sellPrice - buyPrice).toFixed(2));
     } else {
-        // Legacy: Input is Sell Price
-        sellPrice = amount;
-        marginAmount = Number((sellPrice * (marginPercent / 100)).toFixed(2));
+        // Sell-Based Model (Discount): Buy = Sell * (1 - Margin%)
+        sellPrice = safeCost;
+        marginAmount = Number((sellPrice * (safeMargin / 100)).toFixed(2));
         buyPrice = Number((sellPrice - marginAmount).toFixed(2));
     }
     
-    const markupPercent = buyPrice > 0 ? Number(((marginAmount / buyPrice) * 100).toFixed(2)) : 0;
+    // Calculate markup for backward compatibility
+    let markupPercent = 0;
+    if (buyPrice > 0) {
+        markupPercent = Number(((marginAmount / buyPrice) * 100).toFixed(2));
+    }
     
     return {
         sellPrice,
         buyPrice,
         marginAmount,
-        marginPercent, 
+        marginPercent: safeMargin, 
         markupPercent 
     };
 };
@@ -463,12 +472,12 @@ async function runAudit() {
       financials = { buyPrice: mapped.buyPrice, marginAmount: mapped.marginAmount, markupPercent: mapped.markupPercent };
   } else {
       console.log("Calculating Default Financials (Treating Input as Sell Price)");
-      financials = calculateQuoteFinancials(sellPrice);
+      financials = calculateFinancials(sellPrice, 15, false);
   }
   console.log("Financials (Legacy Mode):", financials);
 
   // Test New Financial Logic
-  const costFinancials = calculateQuoteFinancials(sellPrice, true);
+  const costFinancials = calculateFinancials(sellPrice, 15, true);
   console.log("Financials (Cost-Plus Mode):", costFinancials);
 
   // Analysis of Financials

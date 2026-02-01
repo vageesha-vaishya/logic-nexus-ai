@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ROLE_PERMISSIONS, unionPermissions, type Permission } from '@/config/permissions';
 import { RoleService } from '@/lib/api/roles';
 import { ScopedDataAccess } from '@/lib/db/access';
+import { logger } from '@/lib/logger';
 
 type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
@@ -114,15 +115,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserData = async (currentUser: User) => {
     try {
-      console.log('Loading user data for:', currentUser.id);
+      logger.info('Loading user data', { userId: currentUser.id, component: 'AuthProvider' });
 
       // Load roles first so admin-gated UI (AdminScopeSwitcher, Transfer Center, etc.)
       // can appear even if other (slower) lookups are still running.
-      const profilePromise = fetchProfile(currentUser.id);
-      const customPermsPromise = fetchCustomPermissions(currentUser.id);
+      const timeout = <T,>(ms: number, fallback: T, name: string) =>
+        new Promise<T>((resolve) => setTimeout(() => {
+          logger.warn(`Timeout loading ${name}`, { userId: currentUser.id, component: 'AuthProvider' });
+          resolve(fallback);
+        }, ms));
 
-      const timeout = <T,>(ms: number, fallback: T) =>
-        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms));
+      const profilePromise = Promise.race([
+        fetchProfile(currentUser.id),
+        timeout(5000, null, 'profile')
+      ]);
+
+      const customPermsPromise = Promise.race([
+        fetchCustomPermissions(currentUser.id),
+        timeout(5000, { granted: [], denied: [] } as { granted: Permission[], denied: Permission[] }, 'customPermissions')
+      ]);
 
       // Create a temporary scoped access with minimal context for fetching system definitions
       // These tables (auth_role_permissions, auth_role_hierarchy) are system-wide
@@ -137,21 +148,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const dynamicMapPromise = Promise.race([
         roleService.getRolePermissions().catch((e) => {
-          console.warn('Failed to load dynamic permissions', e);
+          logger.warn('Failed to load dynamic permissions', { error: e, component: 'AuthProvider' });
           return {} as Record<string, string[]>;
         }),
-        timeout(2500, {} as Record<string, string[]>),
+        timeout(5000, {} as Record<string, string[]>, 'dynamicPermissions'),
       ]);
 
       const hierarchyPromise = Promise.race([
         roleService.getRoleHierarchy().catch((e) => {
-          console.warn('Failed to load role hierarchy', e);
+          logger.warn('Failed to load role hierarchy', { error: e, component: 'AuthProvider' });
           return { parentsToChildren: {}, childrenToParents: {}, available: false };
         }),
-        timeout(2500, { parentsToChildren: {}, childrenToParents: {}, available: false }),
+        timeout(5000, { parentsToChildren: {}, childrenToParents: {}, available: false }, 'roleHierarchy'),
       ]);
 
-      const rolesResult = await fetchUserRoles(currentUser.id);
+      const rolesResult = await Promise.race([
+        fetchUserRoles(currentUser.id),
+        timeout(5000, [], 'userRoles')
+      ]) as any[];
+
       setRoles(rolesResult);
 
       const [profileResult, customPermsResult, dynamicMapResult, hierarchyResult] = await Promise.all([
@@ -194,9 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const finalPerms = mergedPerms.filter((p) => !denied.includes(p));
 
       setPermissions(finalPerms);
-      console.log('User data loaded successfully');
-    } catch (error) {
-      console.error('Error loading user data:', error);
+      logger.info('User data loaded successfully', { userId: currentUser.id, roleCount: rolesResult.length, permCount: finalPerms.length, component: 'AuthProvider' });
+    } catch (error: any) {
+      logger.error('Error loading user data', { error: error.message, stack: error.stack, component: 'AuthProvider' });
       // Ensure we don't leave the app in a broken state
       setPermissions([]);
     }
@@ -223,20 +238,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
-        console.log(`Auth session applied (${source})`, currentSession.user.id);
+        logger.info(`Auth session applied`, { source, userId: currentSession.user.id, component: 'AuthProvider' });
         
         // Only load data if it's a new user or not yet loaded
         if (lastLoadedUserId !== currentSession.user.id) {
           lastLoadedUserId = currentSession.user.id;
           // Ensure loading is true while fetching user data
           setLoading(true);
-          console.log(`[Auth] Starting user data load for ${currentSession.user.id}`);
+          logger.info(`Starting user data load`, { userId: currentSession.user.id, component: 'AuthProvider' });
           loadUserData(currentSession.user)
             .then(() => {
-              console.log(`[Auth] User data load completed for ${currentSession.user.id}`);
+              logger.info(`User data load completed`, { userId: currentSession.user.id, component: 'AuthProvider' });
             })
             .catch(err => {
-              console.error('[Auth] Failed to load user data:', err);
+              logger.error('Failed to load user data', { error: err, component: 'AuthProvider' });
             })
             .finally(() => {
               setLoading(false);
@@ -244,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Same user, data already loaded or loading in progress.
           // Do NOT set loading to false here, as a previous fetch might still be running.
-          console.log(`[Auth] Skipping data load for ${currentSession.user.id} (already loaded/loading)`);
+          logger.debug(`Skipping data load (already loaded/loading)`, { userId: currentSession.user.id, component: 'AuthProvider' });
         }
       } else {
         lastLoadedUserId = null;
@@ -265,11 +280,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // If we already have an authenticated user in-flight, keep waiting.
         if (lastLoadedUserId) {
-          console.warn('Auth loading is taking longer than expected; still waiting for user data...');
+          logger.warn('Auth loading is taking longer than expected; still waiting for user data...', { userId: lastLoadedUserId, component: 'AuthProvider' });
+          // Force completion after 30s total (15s existing + 15s extra check effectively via loadUserData timeouts)
+          // Actually, we should probably force it eventually to avoid permanent white screen.
+          // But with the new timeouts in loadUserData, that should resolve naturally.
           return true;
         }
 
-        console.warn('Auth loading timed out (no authenticated user), forcing completion');
+        logger.warn('Auth loading timed out (no authenticated user), forcing completion', { component: 'AuthProvider' });
         return false;
       });
     }, 15000);
@@ -278,7 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      console.log('Auth state change:', event, currentSession?.user?.id);
+      logger.info('Auth state change', { event, userId: currentSession?.user?.id, component: 'AuthProvider' });
       applySession(currentSession, `onAuthStateChange:${event}`);
     });
 
@@ -290,7 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         applySession(currentSession, 'getSession');
       })
       .catch((err) => {
-        console.error('getSession failed', err);
+        logger.error('getSession failed', { error: err, component: 'AuthProvider' });
         setLoading(false);
       });
 

@@ -1,11 +1,16 @@
 import { IQuotationEngine } from '../IQuotationEngine';
 import { RequestContext, LineItem, QuoteResult, ValidationResult } from '../types';
+import { createDebugLogger } from '@/lib/debug-logger';
 
 export class BaseQuotationEngine implements IQuotationEngine {
-  constructor(private domainName: string) {}
+  private debug;
+
+  constructor(private domainName: string) {
+    this.debug = createDebugLogger('QuotationEngine', domainName);
+  }
 
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
-    console.log(`[${this.domainName}] Calculating quote...`);
+    this.debug.info(`Calculating quote...`);
     return {
       totalAmount: 0,
       currency: context.currency || 'USD',

@@ -2,6 +2,7 @@ import { createContext, useContext, ReactNode, useState, useEffect, useMemo, use
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
+import { logger } from '@/lib/logger';
 
 interface CRMContextType {
   user: any;

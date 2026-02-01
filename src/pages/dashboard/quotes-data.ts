@@ -36,7 +36,7 @@ export interface Quote {
     version_number: number;
     created_at: string;
     aes_hts_codes?: {
-      code: string;
+      hts_code: string;
       description: string;
     } | null;
   }[] | null;

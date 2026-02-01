@@ -16,15 +16,18 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { matchLegForCharge } from '@/lib/charge-bifurcation';
 import { TransportLeg } from '@/types/quote-breakdown';
 import { QuickQuoteHistory } from '@/components/sales/quick-quote/QuickQuoteHistory';
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
+import { PricingService } from '@/services/pricing.service';
 
 export default function QuoteNew() {
   const { supabase, context, scopedDb } = useCRM();
+  // Cast supabase to any to avoid strict type mismatch, assuming it's a valid client when used
+  const pricingService = new PricingService(supabase as any);
   const location = useLocation();
   const navigate = useNavigate();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
@@ -354,9 +357,26 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 // Use existing financials if available (e.g. from DB or previous step), otherwise calculate default
                 // NOTE: We trust mapOptionToQuote to have already recalculated financials if the total amount changed significantly
                 // from the historical record.
-                const financials = (rate.buyPrice !== undefined && rate.marginAmount !== undefined) 
-                    ? { buyPrice: rate.buyPrice, marginAmount: rate.marginAmount, markupPercent: rate.markupPercent }
-                    : calculateQuoteFinancials(sellPrice);
+                let financials;
+                if (rate.buyPrice !== undefined && rate.marginAmount !== undefined) {
+                    financials = { buyPrice: rate.buyPrice, marginAmount: rate.marginAmount, markupPercent: rate.markupPercent };
+                } else {
+                    const pricingService = new PricingService(scopedDb);
+                    // Use default 15% margin as per legacy logic (false = sell price based)
+                    const calc = await pricingService.calculateFinancials(sellPrice, 15, false);
+                    
+                    // Calculate markup for backward compatibility
+                    let markup = 0;
+                    if (calc.buyPrice > 0) {
+                        markup = (calc.marginAmount / calc.buyPrice) * 100;
+                    }
+
+                    financials = {
+                        buyPrice: calc.buyPrice,
+                        marginAmount: calc.marginAmount,
+                        markupPercent: Number(markup.toFixed(2))
+                    };
+                }
                     
                 const { buyPrice, marginAmount, markupPercent } = financials;
                 
@@ -509,7 +529,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 const chargesToInsert: any[] = [];
                 let totalInsertedSellAmount = 0;
                 
-                const addChargePair = (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): boolean => {
+                const addChargePair = async (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): Promise<boolean> => {
                     const catId = rateMapper.getCatId(categoryKey);
                     const basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
                     const currId = rateMapper.getCurrId(rate.currency || 'USD');
@@ -525,9 +545,10 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
                     // Use dynamic margin from financials instead of hardcoded 0.85 (15%)
                     const marginPercent = Number(rate.marginPercent || rate.margin_percent || 15);
-                    const buyMultiplier = 1 - (marginPercent / 100);
-                    const buyAmount = Number((amount * buyMultiplier).toFixed(2));
-                    const sellAmount = Number(amount.toFixed(2));
+                    // Use PricingService for centralized calculation (Sell-Based Model: isCostBased = false)
+                    const financials = await pricingService.calculateFinancials(amount, marginPercent, false);
+                    const buyAmount = financials.buyPrice;
+                    const sellAmount = financials.sellPrice;
 
                     chargesToInsert.push(
                         { tenant_id: resolvedTenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },
@@ -565,46 +586,46 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 // Priority 1: Process Leg-Specific Charges (Highest Fidelity)
                 // This captures charges already allocated to specific legs by the mapper
                 if (rateLegs && rateLegs.length > 0) {
-                     rateLegs.forEach((leg: any, index: number) => {
+                     for (const [index, leg] of rateLegs.entries()) {
                         if (leg.charges && Array.isArray(leg.charges) && leg.charges.length > 0) {
                             // Find the corresponding DB leg ID. rateLegs matches legData by index because we sorted legData by sort_order
                             // and inserted based on rateLegs order.
                             const targetLegId = legData?.[index]?.id; 
                             
                             if (targetLegId) {
-                                leg.charges.forEach((charge: any) => {
+                                for (const charge of leg.charges) {
                                     const amount = Number(charge.amount || charge.price || charge.total || 0);
-                                    if (amount === 0) return;
+                                    if (amount !== 0) {
+                                        const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
+                                        const unit = charge.unit || charge.basis;
+                                        const note = charge.note || desc;
 
-                                    const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
-                                    const unit = charge.unit || charge.basis;
-                                    const note = charge.note || desc;
-
-                                    if (addChargePair(desc, amount, note, targetLegId, unit, unit)) {
-                                        chargesFound = true;
+                                        if (await addChargePair(desc, amount, note, targetLegId, unit, unit)) {
+                                            chargesFound = true;
+                                        }
                                     }
-                                });
+                                }
                             }
                         }
-                     });
+                     }
                 }
 
                 // Priority 2: Process Global/Remaining Charges
                 // This captures charges that couldn't be allocated to a specific leg (or balancing charges)
                 if (Array.isArray(rate.charges) && rate.charges.length > 0) {
-                    rate.charges.forEach((charge: any) => {
+                    for (const charge of rate.charges) {
                         const amount = Number(charge.amount || charge.price || charge.total || 0);
-                        if (amount === 0) return;
-
-                        const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
-                        const legId = getLegIdForCharge(desc); // Try to infer leg or use main leg
-                        const unit = charge.unit || charge.basis;
-                        const note = charge.note || desc;
-                        
-                        if (addChargePair(desc, amount, note, legId, unit, unit)) {
-                            chargesFound = true;
+                        if (amount !== 0) {
+                            const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
+                            const legId = getLegIdForCharge(desc); // Try to infer leg or use main leg
+                            const unit = charge.unit || charge.basis;
+                            const note = charge.note || desc;
+                            
+                            if (await addChargePair(desc, amount, note, legId, unit, unit)) {
+                                chargesFound = true;
+                            }
                         }
-                    });
+                    }
                 } 
 
                 // Priority 3: Fallback to 'price_breakdown' object (AI/Recursive structure)
@@ -612,7 +633,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 if (!chargesFound) {
                     const breakdown = rate.price_breakdown || { base_fare: sellPrice };
                     
-                    const processCharge = (key: string, value: any, parentKey: string = '') => {
+                    const processCharge = async (key: string, value: any, parentKey: string = '') => {
                         // 1. GLOBAL FILTER: Skip reserved keys at ANY level
                         // This prevents double counting when AI returns both itemized charges and their totals
                         if (['total', 'total_amount', 'total_price', 'subtotal', 'currency', 'currency_code', 'exchange_rate', 'symbol'].includes(key.toLowerCase())) {
@@ -630,9 +651,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
                             const legId = getLegIdForCharge(compositeKey, explicitIndex);
                             const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                            if (addChargePair(key, value, formatNote(compositeKey), legId)) {
-                                // Amount added to total via addChargePair
-                            }
+                            await addChargePair(key, value, formatNote(compositeKey), legId);
                             return;
                         } 
                         
@@ -657,21 +676,21 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                                 const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                                 
                                 // Use the found code as the category key and pass unit/basis if found
-                                if (addChargePair(code, amount, formatNote(compositeKey), legId, unit, unit)) {
-                                    // Amount added to total via addChargePair
-                                }
+                                await addChargePair(code, amount, formatNote(compositeKey), legId, unit, unit);
                                 return;
                             }
     
                             // Otherwise recurse
                             const newParentKey = parentKey ? `${parentKey}_${key}` : key;
-                            Object.entries(value).forEach(([k, v]) => processCharge(k, v, newParentKey));
+                            for (const [k, v] of Object.entries(value)) {
+                                await processCharge(k, v, newParentKey);
+                            }
                         }
                     };
     
-                    Object.entries(breakdown).forEach(([key, val]) => {
-                        processCharge(key, val);
-                    });
+                    for (const [key, val] of Object.entries(breakdown)) {
+                        await processCharge(key, val);
+                    }
                 }
 
                 // 4. BALANCING CHARGE: Ensure total matches the quoted price
@@ -682,12 +701,12 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                      const chargeName = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
                      const chargeNote = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
                      // Round discrepancy to 2 decimal places
-                     addChargePair(chargeName, Number(discrepancy.toFixed(2)), chargeNote, mainLegId);
+                     await addChargePair(chargeName, Number(discrepancy.toFixed(2)), chargeNote, mainLegId);
                      logger.info('[QuoteNew] Added balancing charge', { discrepancy, sellPrice, totalInsertedSellAmount });
                 }
 
                 // Fallback: If no charges found, add total freight
-                if (chargesToInsert.length === 0) addChargePair('FREIGHT', sellPrice, 'Total Freight', mainLegId);
+                if (chargesToInsert.length === 0) await addChargePair('FREIGHT', sellPrice, 'Total Freight', mainLegId);
 
                 if (chargesToInsert.length > 0) {
                     await scopedDb.from('quote_charges').insert(chargesToInsert);

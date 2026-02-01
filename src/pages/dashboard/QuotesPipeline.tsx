@@ -21,11 +21,14 @@ import { QuoteAnalytics } from "@/components/sales/analytics/QuoteAnalytics";
 import { Badge } from "@/components/ui/badge";
 import { ViewToggle, ViewMode } from "@/components/ui/view-toggle";
 import * as XLSX from 'xlsx';
+import { logger } from "@/lib/logger";
+import { useDebug } from '@/hooks/useDebug';
 
 export default function QuotesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { scopedDb, supabase } = useCRM();
+  const debug = useDebug('Sales', 'QuotesPipeline');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -82,8 +85,10 @@ export default function QuotesPipeline() {
   }, []);
 
   const fetchQuotes = async () => {
+    const startTime = performance.now();
     try {
       setLoading(true);
+      debug.info('Fetching pipeline quotes', { filters: { searchQuery, accountFilter, franchiseFilter } });
       
       const { data, error } = await scopedDb
         .from("quotes")
@@ -93,11 +98,11 @@ export default function QuotesPipeline() {
           opportunities:opportunity_id(name),
           service_types:service_type_id(name),
           franchises:franchise_id(name),
-          quotation_versions (
+          quotation_versions:quotation_versions!quotation_versions_quote_id_fkey (
             version_number,
             created_at,
             aes_hts_codes (
-              code,
+              hts_code,
               description
             )
           )
@@ -105,9 +110,24 @@ export default function QuotesPipeline() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      
+      const duration = performance.now() - startTime;
+      debug.info('Pipeline quotes loaded', { 
+        count: (data || []).length,
+        duration: `${duration.toFixed(2)}ms`
+      });
+
       setQuotes((data || []) as unknown as Quote[]);
-    } catch (error) {
-      console.error("Error fetching quotes:", error);
+    } catch (error: any) {
+      const duration = performance.now() - startTime;
+      logger.error("Error fetching quotes", {
+        error: error.message,
+        stack: error.stack,
+        details: error.details || error.hint,
+        component: "QuotesPipeline",
+        duration: `${duration.toFixed(2)}ms`
+      });
+      debug.error("Error fetching quotes:", error, { duration: `${duration.toFixed(2)}ms` });
       toast({
         title: "Error",
         description: "Failed to fetch quotes",
@@ -129,7 +149,7 @@ export default function QuotesPipeline() {
       if (error) throw error;
       setAccounts((data || []) as any);
     } catch (error) {
-      console.error("Error fetching accounts:", error);
+      debug.error("Error fetching accounts:", error);
     }
   };
 
@@ -147,6 +167,9 @@ export default function QuotesPipeline() {
       return;
     }
 
+    const startTime = performance.now();
+    debug.info('Updating quote status', { quoteId, newStatus });
+
     try {
       const { error } = await scopedDb
         .from("quotes")
@@ -161,12 +184,20 @@ export default function QuotesPipeline() {
         )
       );
 
+      const duration = performance.now() - startTime;
+      debug.info('Quote status updated', { 
+        quoteId, 
+        newStatus,
+        duration: `${duration.toFixed(2)}ms`
+      });
+
       toast({
         title: "Success",
         description: "Quote status updated",
       });
     } catch (error) {
-      console.error("Error updating quote status:", error);
+      const duration = performance.now() - startTime;
+      debug.error("Error updating quote status:", error, { duration: `${duration.toFixed(2)}ms` });
       toast({
         title: "Error",
         description: "Failed to update quote status",
@@ -218,6 +249,8 @@ export default function QuotesPipeline() {
   const deleteQuotes = async (quoteIds: string[]) => {
     if (!quoteIds.length) return;
     setLoading(true);
+    const startTime = performance.now();
+    debug.info('Starting pipeline quote deletion', { count: quoteIds.length, quoteIds });
 
     try {
       // Use RPC for cascade delete to handle all dependent tables
@@ -236,12 +269,20 @@ export default function QuotesPipeline() {
         return newSet;
       });
 
+      const duration = performance.now() - startTime;
+      debug.info('Pipeline quote deletion successful', { 
+        count: quoteIds.length, 
+        quoteIds,
+        duration: `${duration.toFixed(2)}ms`
+      });
+
       toast({
         title: "Success",
         description: `Successfully deleted ${quoteIds.length} quote(s)`,
       });
     } catch (err: any) {
-        console.error('Delete failed:', err);
+        const duration = performance.now() - startTime;
+        debug.error('Delete failed:', err, { duration: `${duration.toFixed(2)}ms` });
         toast({
           title: "Error",
           description: "Failed to delete quotes",
@@ -293,7 +334,7 @@ export default function QuotesPipeline() {
         description: `Updated ${selectedQuotes.size} quotes to ${statusConfig[newStatus].label}`,
       });
     } catch (error) {
-      console.error("Error updating quotes:", error);
+      debug.error("Error updating quotes:", error);
       toast({
         title: "Error",
         description: "Failed to update quotes",

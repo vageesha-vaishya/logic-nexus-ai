@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { logger } from "@/lib/logger";
 import { initializePlugins } from "./plugins/init";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -80,6 +81,7 @@ import QuoteDetail from "./pages/dashboard/QuoteDetail";
 import QuotesPipeline from "./pages/dashboard/QuotesPipeline";
 import MultiModalQuote from "./pages/dashboard/MultiModalQuote";
 import Carriers from "./pages/dashboard/Carriers";
+import Vendors from "./pages/dashboard/Vendors";
 import Consignees from "./pages/dashboard/Consignees";
 import PortsLocations from "./pages/dashboard/PortsLocations";
 import PackageCategories from "./pages/dashboard/PackageCategories";
@@ -124,14 +126,27 @@ import ContactsPipeline from "./pages/dashboard/ContactsPipeline";
 import QuotationTests from "./pages/testing/QuotationTests";
 import QuotePortal from "./pages/portal/QuotePortal";
     
+import SystemLogs from "./pages/dashboard/SystemLogs";
 import RolesPermissions from "./pages/dashboard/RolesPermissions";
 import TransferCenter from "./pages/dashboard/TransferCenter";
 import DocumentManager from "./pages/dashboard/DocumentManager";
+import LogTestPage from "./pages/dashboard/LogTest";
+import DebugConsole from "./pages/dashboard/DebugConsole";
 
 // Initialize plugins at startup
-initializePlugins();
+try {
+  initializePlugins();
+} catch (e) {
+  logger.error("Failed to initialize plugins:", e);
+}
 
 const queryClient = new QueryClient();
+
+try {
+  logger.info('App initialization started', { component: 'App' });
+} catch (e) {
+  logger.error("Failed to log app initialization:", e);
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -326,6 +341,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
                   <SecurityOverview />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/dashboard/system-logs" 
+              element={
+                <ProtectedRoute requiredRole="platform_admin">
+                  <SystemLogs />
                 </ProtectedRoute>
               }
             />
@@ -657,6 +680,7 @@ const App = () => (
             <Route path="/dashboard/vehicles/new" element={<ProtectedRoute><VehicleNew /></ProtectedRoute>} />
             <Route path="/dashboard/rate-management" element={<ProtectedRoute><RateManagement /></ProtectedRoute>} />
             <Route path="/dashboard/carriers" element={<ProtectedRoute><Carriers /></ProtectedRoute>} />
+            <Route path="/dashboard/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
             <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
             <Route path="/dashboard/ports-locations" element={<ProtectedRoute><PortsLocations /></ProtectedRoute>} />
             <Route path="/dashboard/package-categories" element={<ProtectedRoute><PackageCategories /></ProtectedRoute>} />
@@ -672,6 +696,8 @@ const App = () => (
             {/* Subscription & Billing Routes */}
             <Route path="/dashboard/subscriptions" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
+            <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
+            <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
                 </LeadsViewStateProvider>

@@ -18,20 +18,29 @@ type ServiceTypeRow = {
   code: string;
   description: string | null;
   is_active: boolean;
+  category_id: string | null;
+  mode_id: string | null;
+  categories?: { name: string };
+  service_modes?: { name: string };
 };
 
 export default function ServiceTypes() {
   const { scopedDb, context } = useCRM();
   const [types, setTypes] = useState<ServiceTypeRow[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [modes, setModes] = useState<{ id: string; name: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [categoryId, setCategoryId] = useState<string>('none');
+  const [modeId, setModeId] = useState<string>('none');
+  
   // Search / filter / sort
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all'|'active'|'inactive'>('all');
-  const [sortKey, setSortKey] = useState<'name'|'status'|'description'>('name');
+  const [sortKey, setSortKey] = useState<'name'|'status'|'description'|'category'|'mode'>('name');
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
   const [editOpen, setEditOpen] = useState(false);
@@ -40,18 +49,38 @@ export default function ServiceTypes() {
   const [editCode, setEditCode] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
+  const [editCategoryId, setEditCategoryId] = useState<string>('none');
+  const [editModeId, setEditModeId] = useState<string>('none');
 
   const isPlatform = context.isPlatformAdmin;
 
   useEffect(() => {
     fetchTypes();
+    fetchMetadata();
   }, []);
+
+  const fetchMetadata = async () => {
+    try {
+      const [catRes, modeRes] = await Promise.all([
+        scopedDb.from('service_categories').select('id, name').order('name'),
+        scopedDb.from('service_modes').select('id, name').order('name')
+      ]);
+      if (catRes.data) setCategories(catRes.data);
+      if (modeRes.data) setModes(modeRes.data);
+    } catch (err) {
+      console.error('Failed to fetch metadata:', err);
+    }
+  };
 
   const fetchTypes = async () => {
     try {
       const { data, error } = await scopedDb
         .from('service_types', true)
-        .select('*')
+        .select(`
+          *,
+          categories:category_id (name),
+          service_modes:mode_id (name)
+        `)
         .order('name');
       if (error) throw error;
       setTypes((data || []) as ServiceTypeRow[]);
@@ -67,6 +96,8 @@ export default function ServiceTypes() {
     setCode('');
     setDescription('');
     setIsActive(true);
+    setCategoryId('none');
+    setModeId('none');
   };
 
   const resetEditForm = () => {
@@ -75,6 +106,8 @@ export default function ServiceTypes() {
     setEditCode('');
     setEditDescription('');
     setEditIsActive(true);
+    setEditCategoryId('none');
+    setEditModeId('none');
   };
 
   const handleCreate = async () => {
@@ -95,8 +128,10 @@ export default function ServiceTypes() {
         name: name.trim(), 
         code: code.trim().toLowerCase(),
         description: description || null, 
-        is_active: isActive 
-      } as const;
+        is_active: isActive,
+        category_id: categoryId === 'none' ? null : categoryId,
+        mode_id: modeId === 'none' ? null : modeId
+      };
       const { error } = await scopedDb.from('service_types').insert(payload);
       if (error) throw error;
       toast.success('Service type created');
@@ -152,6 +187,8 @@ export default function ServiceTypes() {
     setEditCode(row.code);
     setEditDescription(row.description || '');
     setEditIsActive(row.is_active);
+    setEditCategoryId(row.category_id || 'none');
+    setEditModeId(row.mode_id || 'none');
     setEditOpen(true);
   };
 
@@ -175,6 +212,8 @@ export default function ServiceTypes() {
         code: editCode.trim().toLowerCase(),
         description: editDescription || null,
         is_active: editIsActive,
+        category_id: editCategoryId === 'none' ? null : editCategoryId,
+        mode_id: editModeId === 'none' ? null : editModeId
       } as const;
       const { error } = await scopedDb
         .from('service_types')
@@ -196,7 +235,7 @@ export default function ServiceTypes() {
     const filtered = types.filter((t) => {
       const matchesSearch = term === ''
         ? true
-        : [t.name, t.description || ''].some(v => String(v).toLowerCase().includes(term));
+        : [t.name, t.description || '', t.categories?.name || '', t.service_modes?.name || ''].some(v => String(v).toLowerCase().includes(term));
       const matchesStatus = statusFilter === 'all'
         ? true
         : statusFilter === 'active'
@@ -208,6 +247,8 @@ export default function ServiceTypes() {
       let av: string | number; let bv: string | number;
       if (sortKey === 'name') { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
       else if (sortKey === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
+      else if (sortKey === 'category') { av = (a.categories?.name || '').toLowerCase(); bv = (b.categories?.name || '').toLowerCase(); }
+      else if (sortKey === 'mode') { av = (a.service_modes?.name || '').toLowerCase(); bv = (b.service_modes?.name || '').toLowerCase(); }
       else { av = a.is_active ? 1 : 0; bv = b.is_active ? 1 : 0; }
       const base = av < bv ? -1 : av > bv ? 1 : 0;
       return sortDir === 'asc' ? base : -base;
@@ -249,6 +290,34 @@ export default function ServiceTypes() {
                     <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. ocean" />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <Select value={categoryId} onValueChange={setCategoryId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Mode</label>
+                    <Select value={modeId} onValueChange={setModeId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {modes.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Description</label>
                     <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
                   </div>
@@ -270,7 +339,7 @@ export default function ServiceTypes() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
               <Input
-                placeholder="Search name or description"
+                placeholder="Search name, category, or mode"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -284,12 +353,14 @@ export default function ServiceTypes() {
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={sortKey} onValueChange={(v) => setSortKey(v as 'name'|'description'|'status')}>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as 'name'|'description'|'status'|'category'|'mode')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="mode">Mode</SelectItem>
                   <SelectItem value="description">Description</SelectItem>
                   <SelectItem value="status">Status</SelectItem>
                 </SelectContent>
@@ -309,58 +380,90 @@ export default function ServiceTypes() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Code</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Mode</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
-            <TableBody>
-              {visibleTypes.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-medium">{row.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{row.code}</TableCell>
-                  <TableCell>{row.description || '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant={row.is_active ? 'default' : 'secondary'}>
-                      {row.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={row.is_active} onCheckedChange={(v) => handleToggleActive(row, v)} disabled={!isPlatform} />
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(row)} disabled={!isPlatform}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(row)} disabled={!isPlatform}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      {/* Edit dialog */}
-      <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) resetEditForm(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Service Type</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name</label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Code</label>
-              <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
-            </div>
+              <TableBody>
+                {visibleTypes.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.name}</TableCell>
+                    <TableCell className="font-mono text-sm">{row.code}</TableCell>
+                    <TableCell>{row.categories?.name || '—'}</TableCell>
+                    <TableCell>{row.service_modes?.name || '—'}</TableCell>
+                    <TableCell>{row.description || '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={row.is_active ? 'default' : 'secondary'}>
+                        {row.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={row.is_active} onCheckedChange={(v) => handleToggleActive(row, v)} disabled={!isPlatform} />
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(row)} disabled={!isPlatform}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(row)} disabled={!isPlatform}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+        {/* Edit dialog */}
+        <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) resetEditForm(); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Service Type</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Name</label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Code</label>
+                <Input value={editCode} onChange={(e) => setEditCode(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={editCategoryId} onValueChange={setEditCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mode</label>
+                <Select value={editModeId} onValueChange={setEditModeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {modes.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description</label>
+                <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+              </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Active</label>
               <div className="flex items-center gap-2">

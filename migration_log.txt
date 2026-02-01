@@ -1,0 +1,151 @@
+Initialising login role...
+Connecting to remote database...
+Skipping migration 20260128140000_phase_2_5_financials.sql.bak... (file name must match pattern "<timestamp>_name.sql")
+Skipping migration 20260128150000_add_tenant_nexus.sql.bak... (file name must match pattern "<timestamp>_name.sql")
+Skipping migration 20260128150000_fix_finance_permissions.sql.bak... (file name must match pattern "<timestamp>_name.sql")
+Do you want to push these migrations to the remote database?
+ • 20260131210000_consolidated_cleanup.sql
+
+ [Y/n] Applying migration 20260131210000_consolidated_cleanup.sql...
+ERROR: duplicate key value violates unique constraint "uniq_service_types_norm_name" (SQLSTATE 23505)                                                             
+Key (lower(TRIM(BOTH FROM name)))=(ocean freight) already exists.                                                                                                 
+At statement: 5                                                                                                                                                   
+-----------------------------------------------------------------------------                                                                                     
+-- 3. Service Types (Canonical List)                                                                                                                              
+-----------------------------------------------------------------------------                                                                                     
+-- Helper to get IDs                                                                                                                                              
+DO $$                                                                                                                                                             
+DECLARE                                                                                                                                                           
+  v_cat_transport UUID;                                                                                                                                           
+  v_cat_trading UUID;                                                                                                                                             
+  v_cat_insurance UUID;                                                                                                                                           
+  v_cat_customs UUID;                                                                                                                                             
+  v_mode_ocean UUID;                                                                                                                                              
+  v_mode_air UUID;                                                                                                                                                
+  v_mode_road UUID;                                                                                                                                               
+  v_mode_rail UUID;                                                                                                                                               
+  v_mode_digital UUID;                                                                                                                                            
+                                                                                                                                                                  
+  v_type_procurement UUID;                                                                                                                                        
+  v_type_inspection UUID;                                                                                                                                         
+  v_type_insurance UUID;                                                                                                                                          
+  v_type_customs UUID;                                                                                                                                            
+BEGIN                                                                                                                                                             
+  SELECT id INTO v_cat_transport FROM service_categories WHERE code = 'transport';                                                                                
+  SELECT id INTO v_cat_trading FROM service_categories WHERE code = 'trading';                                                                                    
+  SELECT id INTO v_cat_insurance FROM service_categories WHERE code = 'insurance';                                                                                
+  SELECT id INTO v_cat_customs FROM service_categories WHERE code = 'customs';                                                                                    
+                                                                                                                                                                  
+  SELECT id INTO v_mode_ocean FROM service_modes WHERE code = 'ocean';                                                                                            
+  SELECT id INTO v_mode_air FROM service_modes WHERE code = 'air';                                                                                                
+  SELECT id INTO v_mode_road FROM service_modes WHERE code = 'road';                                                                                              
+  SELECT id INTO v_mode_rail FROM service_modes WHERE code = 'rail';                                                                                              
+  SELECT id INTO v_mode_digital FROM service_modes WHERE code = 'digital';                                                                                        
+                                                                                                                                                                  
+  -- A. Transport Types (Logistics)                                                                                                                               
+  -- Standardize codes. 2025 migration used names like 'ocean' as code? Let's ensure 'ocean_freight' style codes or keep simple.                                  
+  -- The 2025 migration inserted name='ocean'. Let's stick to explicit codes.                                                                                     
+                                                                                                                                                                  
+  -- Ocean                                                                                                                                                        
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES ('ocean_freight', 'Ocean Freight', 'General ocean freight', true, v_cat_transport, v_mode_ocean)                                                         
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id;                                                                
+                                                                                                                                                                  
+  -- Handle legacy 'ocean' name -> update to code 'ocean_freight' if possible, or just insert new.                                                                
+  -- To be safe, we rely on the new codes.                                                                                                                        
+                                                                                                                                                                  
+  -- Air                                                                                                                                                          
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES ('air_freight', 'Air Freight', 'General air freight', true, v_cat_transport, v_mode_air)                                                                 
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id;                                                                
+                                                                                                                                                                  
+  -- Road (Trucking)                                                                                                                                              
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES ('road_freight', 'Road Freight', 'General road transport', true, v_cat_transport, v_mode_road)                                                           
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id;                                                                
+                                                                                                                                                                  
+  -- Rail                                                                                                                                                         
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES ('rail_freight', 'Rail Freight', 'General rail transport', true, v_cat_transport, v_mode_rail)                                                           
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id;                                                                
+                                                                                                                                                                  
+  -- B. Non-Logistics Types (Trading, Insurance, Customs)                                                                                                         
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES                                                                                                                                                          
+    ('procurement_agent', 'Procurement Agent', 'Sourcing and supplier management services', true, v_cat_trading, v_mode_digital)                                  
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id                                                                 
+  RETURNING id INTO v_type_procurement;                                                                                                                           
+                                                                                                                                                                  
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES                                                                                                                                                          
+    ('quality_inspection', 'Quality Inspection', 'Product quality verification and audit', true, v_cat_trading, v_mode_digital)                                   
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id                                                                 
+  RETURNING id INTO v_type_inspection;                                                                                                                            
+                                                                                                                                                                  
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES                                                                                                                                                          
+    ('cargo_insurance', 'Cargo Insurance', 'Insurance for goods in transit', true, v_cat_insurance, v_mode_digital)                                               
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id                                                                 
+  RETURNING id INTO v_type_insurance;                                                                                                                             
+                                                                                                                                                                  
+  INSERT INTO service_types (code, name, description, is_active, category_id, mode_id)                                                                            
+  VALUES                                                                                                                                                          
+    ('import_clearance', 'Import Clearance', 'Customs clearance for inbound goods', true, v_cat_customs, v_mode_digital)                                          
+  ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id                                                                 
+  RETURNING id INTO v_type_customs;                                                                                                                               
+                                                                                                                                                                  
+  -----------------------------------------------------------------------------                                                                                   
+  -- 4. Attribute Definitions (Canonical List)                                                                                                                    
+  -----------------------------------------------------------------------------                                                                                   
+  -- Procurement                                                                                                                                                  
+  INSERT INTO service_attribute_definitions (service_type_id, attribute_key, label, data_type, validation_rules, is_required, display_order)                      
+  VALUES                                                                                                                                                          
+    (v_type_procurement, 'market_region', 'Market Region', 'select', '{"options": ["Asia", "Europe", "North America", "Global"]}', true, 10),                     
+    (v_type_procurement, 'commission_rate_percent', 'Commission Rate (%)', 'number', '{"min": 0, "max": 100}', true, 20),                                         
+    (v_type_procurement, 'specialties', 'Specialties', 'json', '{"type": "array", "items": ["Electronics", "Textiles", "Machinery", "Raw Materials"]}', false, 30)
+  ON CONFLICT (service_type_id, attribute_key) DO UPDATE SET                                                                                                      
+    label = EXCLUDED.label,                                                                                                                                       
+    data_type = EXCLUDED.data_type,                                                                                                                               
+    validation_rules = EXCLUDED.validation_rules,                                                                                                                 
+    is_required = EXCLUDED.is_required,                                                                                                                           
+    display_order = EXCLUDED.display_order;                                                                                                                       
+                                                                                                                                                                  
+  -- Quality Inspection                                                                                                                                           
+  INSERT INTO service_attribute_definitions (service_type_id, attribute_key, label, data_type, validation_rules, is_required, display_order)                      
+  VALUES                                                                                                                                                          
+    (v_type_inspection, 'inspection_standard', 'Inspection Standard', 'select', '{"options": ["ISO9001", "AQL Level II", "Custom"]}', true, 10),                  
+    (v_type_inspection, 'report_format', 'Report Format', 'select', '{"options": ["PDF", "Video", "Live Stream"]}', true, 20)                                     
+  ON CONFLICT (service_type_id, attribute_key) DO UPDATE SET                                                                                                      
+    label = EXCLUDED.label,                                                                                                                                       
+    data_type = EXCLUDED.data_type,                                                                                                                               
+    validation_rules = EXCLUDED.validation_rules,                                                                                                                 
+    is_required = EXCLUDED.is_required,                                                                                                                           
+    display_order = EXCLUDED.display_order;                                                                                                                       
+                                                                                                                                                                  
+  -- Insurance                                                                                                                                                    
+  INSERT INTO service_attribute_definitions (service_type_id, attribute_key, label, data_type, validation_rules, is_required, display_order)                      
+  VALUES                                                                                                                                                          
+    (v_type_insurance, 'coverage_type', 'Coverage Type', 'select', '{"options": ["All Risk", "Total Loss Only", "General Average"]}', true, 10),                  
+    (v_type_insurance, 'deductible_percent', 'Deductible (%)', 'number', '{"min": 0, "max": 100}', true, 20),                                                     
+    (v_type_insurance, 'max_insured_value', 'Max Insured Value (USD)', 'number', '{"min": 0}', true, 30)                                                          
+  ON CONFLICT (service_type_id, attribute_key) DO UPDATE SET                                                                                                      
+    label = EXCLUDED.label,                                                                                                                                       
+    data_type = EXCLUDED.data_type,                                                                                                                               
+    validation_rules = EXCLUDED.validation_rules,                                                                                                                 
+    is_required = EXCLUDED.is_required,                                                                                                                           
+    display_order = EXCLUDED.display_order;                                                                                                                       
+                                                                                                                                                                  
+  -- Customs                                                                                                                                                      
+  INSERT INTO service_attribute_definitions (service_type_id, attribute_key, label, data_type, validation_rules, is_required, display_order)                      
+  VALUES                                                                                                                                                          
+    (v_type_customs, 'customs_regime', 'Customs Regime', 'select', '{"options": ["Home Use", "Temporary Admission", "Bonded Warehouse", "Transit"]}', true, 10),  
+    (v_type_customs, 'requires_poa', 'Requires Power of Attorney', 'boolean', '{}', true, 20)                                                                     
+  ON CONFLICT (service_type_id, attribute_key) DO UPDATE SET                                                                                                      
+    label = EXCLUDED.label,                                                                                                                                       
+    data_type = EXCLUDED.data_type,                                                                                                                               
+    validation_rules = EXCLUDED.validation_rules,                                                                                                                 
+    is_required = EXCLUDED.is_required,                                                                                                                           
+    display_order = EXCLUDED.display_order;                                                                                                                       
+                                                                                                                                                                  
+END $$                                                                                                                                                            
+Try rerunning the command with --debug to troubleshoot the error.

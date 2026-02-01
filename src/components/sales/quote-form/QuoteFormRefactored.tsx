@@ -14,6 +14,7 @@ import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteCompo
 import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuoteRepository } from './useQuoteRepository';
+import { useFormDebug } from '@/hooks/useFormDebug';
 
 interface QuoteFormProps {
   quoteId?: string;
@@ -45,6 +46,18 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
       ...initialData,
     },
   });
+
+  // Debugging hook for form
+  const formValues = form.watch();
+  // Hierarchy: Sales (Module) -> Quotes (Sub-module) -> QuoteForm (Form) -> Details (Section)
+  const formDebug = useFormDebug('Sales:Quotes', 'QuoteForm:Details', formValues);
+
+  // Log validation errors
+  useEffect(() => {
+    if (Object.keys(form.formState.errors).length > 0) {
+      formDebug.logValidationErrors(form.formState.errors);
+    }
+  }, [form.formState.errors]);
 
   useEffect(() => {
     if (initialData) {
@@ -80,13 +93,24 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
 
   const onSubmit = async (data: QuoteFormValues) => {
     setIsSubmitting(true);
+    const startTime = performance.now();
+    formDebug.logSubmit(data); // Log submission start
+
     try {
       const savedId = await saveQuote({ quoteId, data });
-
+      
+      const duration = performance.now() - startTime;
+      formDebug.logResponse(
+        { success: true, savedId }, 
+        { duration: `${duration.toFixed(2)}ms` }
+      ); // Log success with metrics
+      
       toast.success('Quote saved successfully');
       if (onSuccess) onSuccess(savedId);
     } catch (error: any) {
+      const duration = performance.now() - startTime;
       console.error('Submission error:', error);
+      formDebug.logError(error, { duration: `${duration.toFixed(2)}ms` }); // Log error with metrics
       const description = error?.message || 'Unexpected error during save';
       toast.error('Failed to save quote', { description });
     } finally {

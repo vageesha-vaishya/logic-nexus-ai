@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { DomainService, PlatformDomain } from '../services/DomainService';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface DomainContextType {
   currentDomain: PlatformDomain | null;
@@ -23,6 +24,7 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
   const loadDomains = async () => {
     try {
       setIsLoading(true);
+      logger.debug('Loading platform domains...', { component: 'DomainContext' });
       const domains = await DomainService.getAllDomains();
       setAvailableDomains(domains);
 
@@ -35,9 +37,12 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
 
       if (targetDomain) {
         setCurrentDomainState(targetDomain);
+        logger.info('Platform domain set', { domain: targetDomain.code, component: 'DomainContext' });
+      } else {
+        logger.warn('No suitable platform domain found', { component: 'DomainContext' });
       }
-    } catch (error) {
-      console.error('Failed to load domains:', error);
+    } catch (error: any) {
+      logger.error('Failed to load domains', { error: error.message, component: 'DomainContext' });
       toast.error('Failed to load platform domains');
     } finally {
       setIsLoading(false);

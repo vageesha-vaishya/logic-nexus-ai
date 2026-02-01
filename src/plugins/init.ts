@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { PluginRegistry } from '../services/plugins/PluginRegistry';
 import { LogisticsPlugin } from './logistics/LogisticsPlugin';
 import { BankingPlugin } from './banking/BankingPlugin';
@@ -7,13 +8,17 @@ import { CustomsPlugin } from './customs/CustomsPlugin';
 import { TelecomPlugin } from './telecom/TelecomPlugin';
 import { RealEstatePlugin } from './real_estate/RealEstatePlugin';
 import { EcommercePlugin } from './ecommerce/EcommercePlugin';
+import { performanceMonitor } from '@/lib/performance-monitor';
 
 /**
  * Initializes all registered plugins.
  * This should be called at application startup.
  */
 export function initializePlugins() {
-  console.log('[Plugins] Initializing plugins...');
+  logger.info('[Plugins] Initializing plugins...');
+  
+  // Initialize Performance Monitor
+  performanceMonitor.initialize();
   
   // Register Logistics Plugin
   const logisticsPlugin = new LogisticsPlugin();
@@ -46,6 +51,6 @@ export function initializePlugins() {
   // Register E-commerce Plugin
   const ecommercePlugin = new EcommercePlugin();
   PluginRegistry.register(ecommercePlugin);
-  
-  console.log('[Plugins] Initialization complete.');
+
+  logger.info('[Plugins] Initialization complete.');
 }

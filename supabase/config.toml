@@ -346,6 +346,13 @@ verify_jwt = false
 [functions.send-email]
 verify_jwt = false
 
+[functions.alert-notifier]
+verify_jwt = false
+
+[functions.anomaly-detector]
+verify_jwt = false
+# schedule = "*/5 * * * *"
+
 [analytics]
 enabled = true
 port = 54327

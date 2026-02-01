@@ -22,10 +22,13 @@ import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
 import { QuickQuoteModal } from '@/components/sales/quick-quote/QuickQuoteModal';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { logger } from "@/lib/logger";
+import { useDebug } from '@/hooks/useDebug';
 
 export default function Quotes() {
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
+  const debug = useDebug('Sales', 'QuotesList');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -58,7 +61,16 @@ export default function Quotes() {
   const [endDate, setEndDate] = useState<string>('');
 
   const fetchQuotes = useCallback(async () => {
+    const startTime = performance.now();
     try {
+      debug.info('Fetching quotes list', { 
+        filters: { 
+          status: quoteStatus, 
+          customer: customerQuery, 
+          dateRange: { start: startDate, end: endDate } 
+        } 
+      });
+
       const { data, error } = await scopedDb
         .from('quotes')
         .select('*')
@@ -90,13 +102,33 @@ export default function Quotes() {
       );
 
       setQuotes(quotesWithRelations as unknown as Quote[]);
-    } catch (err: unknown) {
+      
+      const duration = performance.now() - startTime;
+      debug.info('Quotes loaded successfully', { 
+        count: quotesWithRelations.length,
+        duration: `${duration.toFixed(2)}ms`
+      });
+    } catch (err: any) {
+      const duration = performance.now() - startTime;
+      debug.error('Failed to load quotes', {
+        error: err.message,
+        stack: err.stack,
+        details: err.details || err.hint,
+        duration: `${duration.toFixed(2)}ms`
+      });
+      // Fallback to system logger
+      logger.error('Failed to load quotes', {
+        error: err.message,
+        stack: err.stack,
+        details: err.details || err.hint,
+        component: 'QuotesList'
+      });
       const description = err instanceof Error ? err.message : String(err);
       toast.error('Failed to load quotes', { description });
     } finally {
       setLoading(false);
     }
-  }, [scopedDb]);
+  }, [scopedDb, quoteStatus, customerQuery, startDate, endDate]); // Added dependencies
 
   useEffect(() => {
     fetchQuotes();
@@ -197,6 +229,8 @@ export default function Quotes() {
   const deleteQuotes = async (quoteIds: string[]) => {
     if (!quoteIds.length) return;
     setLoading(true);
+    const startTime = performance.now();
+    debug.info('Starting quote deletion', { count: quoteIds.length, quoteIds });
 
     try {
       // Use RPC for cascade delete to handle all dependent tables
@@ -206,10 +240,26 @@ export default function Quotes() {
 
       if (error) throw error;
 
+      const duration = performance.now() - startTime;
+      debug.info('Quote deletion successful', { 
+        count: quoteIds.length, 
+        quoteIds,
+        duration: `${duration.toFixed(2)}ms` 
+      });
+
       toast.success(`Successfully deleted ${quoteIds.length} quote(s)`);
       fetchQuotes();
     } catch (err: any) {
-        console.error('Delete failed:', err);
+        const duration = performance.now() - startTime;
+        logger.error('Delete failed', {
+            error: err.message,
+            stack: err.stack,
+            component: 'QuotesList',
+            action: 'deleteQuotes',
+            quoteIds,
+            duration: `${duration.toFixed(2)}ms`
+        });
+        debug.error('Delete failed:', err, { duration: `${duration.toFixed(2)}ms` });
         toast.error('Failed to delete quotes', { description: err.message });
         setLoading(false);
     }

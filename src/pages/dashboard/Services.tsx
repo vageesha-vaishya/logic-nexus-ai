@@ -3,21 +3,28 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Pencil } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trash2, Plus, Pencil, Eye } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { useDebug } from '@/hooks/useDebug';
+
+import { ServiceAttributeRenderer } from '@/components/services/ServiceAttributeRenderer';
+import { ServiceHistoryPanel } from '@/components/sales/history/ServiceHistoryPanel';
+import { ServiceVendorsPanel } from '@/components/logistics/ServiceVendorsPanel';
 
 type ServiceRow = {
   id: string;
   tenant_id: string;
   service_name: string;
   service_type: string;
+  service_type_id: string | null;
   service_code: string | null;
   description: string | null;
   pricing_unit: string | null;
@@ -28,8 +35,9 @@ type ServiceRow = {
 
 export default function Services() {
   const { supabase, scopedDb, context } = useCRM();
+  const debug = useDebug('Services', 'ServiceList');
   const [services, setServices] = useState<ServiceRow[]>([]);
-  const [types, setTypes] = useState<{ name: string; is_active: boolean }[]>([]);
+  const [types, setTypes] = useState<{ id: string; name: string; is_active: boolean }[]>([]);
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState('');
@@ -41,6 +49,7 @@ export default function Services() {
   const [basePrice, setBasePrice] = useState<number | ''>('');
   const [transitDays, setTransitDays] = useState<number | ''>('');
   const [isActive, setIsActive] = useState(true);
+  const [attributes, setAttributes] = useState<Record<string, any>>({});
 
   const [editOpen, setEditOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<ServiceRow | null>(null);
@@ -54,6 +63,12 @@ export default function Services() {
   const [editIsActive, setEditIsActive] = useState(true);
   const [editTenantId, setEditTenantId] = useState('');
   const [editMigrateMappings, setEditMigrateMappings] = useState(false);
+  const [editAttributes, setEditAttributes] = useState<Record<string, any>>({});
+
+  const [viewRow, setViewRow] = useState<ServiceRow | null>(null);
+  const [viewAttributes, setViewAttributes] = useState<Record<string, any>>({});
+  const [viewOpen, setViewOpen] = useState(false);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [mappingsCount, setMappingsCount] = useState<number>(0);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -75,14 +90,14 @@ export default function Services() {
     try {
       const { data, error } = await scopedDb
         .from('service_types', true)
-        .select('name, is_active')
+        .select('id, name, is_active')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;
-      setTypes((data || []) as { name: string; is_active: boolean }[]);
+      setTypes((data || []) as { id: string; name: string; is_active: boolean }[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch service types:', message);
+      debug.error('Failed to fetch service types', { error: message });
     }
   }, [supabase]);
 
@@ -95,9 +110,10 @@ export default function Services() {
         .order('name');
       if (error) throw error;
       setTenants((data || []) as { id: string; name: string }[]);
+      debug.log('Tenants fetched', { count: data?.length });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch tenants:', message);
+      debug.error('Failed to fetch tenants', { error: message });
       toast.error('Failed to fetch tenants', { description: message });
     }
   }, [supabase, toast]);
@@ -108,7 +124,7 @@ export default function Services() {
       // scopedDb handles tenant scoping automatically for non-platform users
       let query = scopedDb
         .from('services')
-        .select('id, tenant_id, service_name, service_type, service_code, description, pricing_unit, base_price, transit_time_days, is_active')
+        .select('id, tenant_id, service_name, service_type, service_type_id, service_code, description, pricing_unit, base_price, transit_time_days, is_active')
         .order('service_name');
 
       if (!isPlatform && !tenantId) {
@@ -121,9 +137,10 @@ export default function Services() {
       const { data, error } = await query;
       if (error) throw error;
       setServices((data || []) as ServiceRow[]);
+      debug.log('Services fetched', { count: data?.length, tenantId });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch services:', message);
+      debug.error('Failed to fetch services', { error: message });
       toast.error('Failed to fetch services', { description: message });
     }
   }, [supabase, isPlatform, tenantId, toast]);
@@ -143,6 +160,7 @@ export default function Services() {
     setBasePrice('');
     setTransitDays('');
     setIsActive(true);
+    setAttributes({});
   };
 
   const resetEditForm = () => {
@@ -157,6 +175,7 @@ export default function Services() {
     setEditIsActive(true);
     setEditTenantId('');
     setEditMigrateMappings(false);
+    setEditAttributes({});
   };
 
   const handleCreate = async () => {
@@ -174,7 +193,14 @@ export default function Services() {
         toast.error('Service name is required');
         return;
       }
-      const chosenType = serviceType || resolvedDefaultServiceType;
+      if (!serviceCode.trim()) {
+        toast.error('Service code is required');
+        return;
+      }
+      const chosenTypeObj = types.find(t => t.name === (serviceType || resolvedDefaultServiceType));
+      const chosenType = chosenTypeObj?.name;
+      const chosenTypeId = chosenTypeObj?.id;
+
       if (!chosenType) {
         toast.error('No active service types available', { description: 'Activate at least one type under Service Types.' });
         return;
@@ -183,6 +209,7 @@ export default function Services() {
         tenant_id: string;
         service_name: string;
         service_type: string;
+        service_type_id: string | null;
         service_code: string | null;
         description: string | null;
         pricing_unit: string | null;
@@ -193,6 +220,7 @@ export default function Services() {
         tenant_id: targetTenantId,
         service_name: serviceName.trim(),
         service_type: chosenType,
+        service_type_id: chosenTypeId || null,
         service_code: serviceCode || null,
         description: description || null,
         pricing_unit: pricingUnit || null,
@@ -200,8 +228,21 @@ export default function Services() {
         transit_time_days: transitDays === '' ? null : Number(transitDays),
         is_active: isActive,
       };
-      const { error } = await scopedDb.from('services').insert(payload);
+      const { data, error } = await scopedDb.from('services').insert(payload).select().single();
       if (error) throw error;
+
+      // Insert attributes if any
+      if (data && Object.keys(attributes).length > 0) {
+        const { error: attrError } = await scopedDb.from('service_details').insert({
+          service_id: data.id,
+          attributes: attributes
+        });
+        if (attrError) {
+           debug.error('Failed to save service attributes:', attrError);
+           toast.error('Service created but failed to save attributes');
+        }
+      }
+
       toast.success('Service created');
       setOpen(false);
       resetForm();
@@ -262,11 +303,29 @@ export default function Services() {
     setEditTenantId(row.tenant_id);
     setEditMigrateMappings(false);
     setEditOpen(true);
+
+    // Fetch attributes
+    scopedDb.from('service_details').select('attributes').eq('service_id', row.id).maybeSingle().then(({data}) => {
+        setEditAttributes(data?.attributes || {});
+     });
+  };
+
+  const openView = (row: ServiceRow) => {
+    setViewRow(row);
+    setViewOpen(true);
+    // Fetch attributes
+    scopedDb.from('service_details').select('attributes').eq('service_id', row.id).maybeSingle().then(({data}) => {
+       setViewAttributes(data?.attributes || {});
+    });
   };
 
   const doSaveWithMigrationIfNeeded = async () => {
     try {
       if (!isAdmin || !editingRow) return;
+      if (!editServiceCode.trim()) {
+        toast.error('Service code is required');
+        return;
+      }
       const payload: {
         service_name: string;
         service_code: string | null;
@@ -302,6 +361,17 @@ export default function Services() {
         .update(payload)
         .eq('id', editingRow.id);
       if (error) throw error;
+
+      // Upsert attributes
+      if (editAttributes) {
+         const { data: existingDetails } = await scopedDb.from('service_details').select('id').eq('service_id', editingRow.id).maybeSingle();
+         if (existingDetails) {
+             await scopedDb.from('service_details').update({ attributes: editAttributes }).eq('id', existingDetails.id);
+         } else {
+             await scopedDb.from('service_details').insert({ service_id: editingRow.id, attributes: editAttributes });
+         }
+      }
+
       toast.success('Service updated');
       setEditOpen(false);
       setConfirmOpen(false);
@@ -501,8 +571,8 @@ export default function Services() {
                 </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Service Code</label>
-                      <Input value={serviceCode} onChange={(e) => setServiceCode(e.target.value)} placeholder="Optional" />
+                      <label className="text-sm font-medium">Service Code <span className="text-red-500">*</span></label>
+                      <Input value={serviceCode} onChange={(e) => setServiceCode(e.target.value)} placeholder="e.g. SVC-001" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Pricing Unit</label>
@@ -530,6 +600,13 @@ export default function Services() {
                     <label className="text-sm font-medium">Description</label>
                     <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
                   </div>
+
+                  <ServiceAttributeRenderer
+                      serviceTypeId={types.find(t => t.name === (serviceType || resolvedDefaultServiceType))?.id || null}
+                      value={attributes}
+                      onChange={setAttributes}
+                  />
+
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => { setOpen(false); resetForm(); }}>Cancel</Button>
                     <Button onClick={handleCreate} disabled={!isAdmin || (isPlatform && !selectedTenantId && !tenantId)}>Save</Button>
@@ -633,6 +710,9 @@ export default function Services() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openView(row)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Switch checked={row.is_active} onCheckedChange={(v) => handleToggleActive(row, v)} disabled={!isAdmin} />
                         <Button variant="ghost" size="icon" onClick={() => openEdit(row)} disabled={!isAdmin}>
                           <Pencil className="h-4 w-4" />
@@ -650,11 +730,17 @@ export default function Services() {
         </Card>
         {/* Edit dialog */}
         <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) resetEditForm(); }}>
-          <DialogContent>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Service</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <Tabs defaultValue="general" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="general">General Details</TabsTrigger>
+                <TabsTrigger value="suppliers">Suppliers & Cost</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="general" className="space-y-4 pt-4">
               {isPlatform ? (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Tenant</label>
@@ -698,7 +784,7 @@ export default function Services() {
             </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Service Code</label>
+                  <label className="text-sm font-medium">Service Code <span className="text-red-500">*</span></label>
                   <Input value={editServiceCode} onChange={(e) => setEditServiceCode(e.target.value)} />
                 </div>
                 <div className="space-y-2">
@@ -727,11 +813,71 @@ export default function Services() {
                 <label className="text-sm font-medium">Description</label>
                 <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
               </div>
+
+              <ServiceAttributeRenderer
+                  serviceTypeId={types.find(t => t.name === editServiceType)?.id || null}
+                  value={editAttributes}
+                  onChange={setEditAttributes}
+              />
+
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => { setEditOpen(false); resetEditForm(); }}>Cancel</Button>
                 <Button onClick={handleUpdate} disabled={!isAdmin || (isPlatform && !editTenantId)}>Save</Button>
               </div>
+              </TabsContent>
+
+              <TabsContent value="suppliers" className="space-y-4 pt-4">
+                {editingRow ? (
+                  <ServiceVendorsPanel serviceId={editingRow.id} />
+                ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    Please save the service first to manage suppliers.
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Details Dialog */}
+        <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Service Details</DialogTitle>
+              <DialogDescription>
+                 {viewRow?.service_name} ({viewRow?.service_type})
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+               <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="font-medium">Code:</div>
+                  <div>{viewRow?.service_code || '—'}</div>
+                  <div className="font-medium">Price:</div>
+                  <div>{viewRow?.base_price ? `${viewRow.base_price} / ${viewRow.pricing_unit || 'unit'}` : '—'}</div>
+                  <div className="font-medium">Transit Time:</div>
+                  <div>{viewRow?.transit_time_days ? `${viewRow.transit_time_days} days` : '—'}</div>
+                  <div className="font-medium">Tenant:</div>
+                  <div>{tenantNameById[viewRow?.tenant_id || ''] || '—'}</div>
+               </div>
+
+               <div className="h-[300px]">
+                 <ServiceHistoryPanel serviceId={viewRow?.id || ''} />
+               </div>
+
+               {Object.keys(viewAttributes).length > 0 || viewRow?.service_type_id || viewRow?.service_type ? (
+                 <ServiceAttributeRenderer
+                    serviceTypeId={viewRow?.service_type_id || types.find(t => t.name === viewRow?.service_type)?.id || null}
+                    value={viewAttributes}
+                    onChange={() => {}}
+                    readOnly={true}
+                 />
+               ) : (
+                 <div className="text-sm text-muted-foreground italic">No additional attributes</div>
+               )}
             </div>
+            <DialogFooter>
+               <Button onClick={() => setViewOpen(false)}>Close</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

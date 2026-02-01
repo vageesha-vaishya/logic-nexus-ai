@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Globe } from 'lucide-react';
+import { Plus, Globe, Loader2 } from 'lucide-react';
+import { VirtualChargesList } from './VirtualChargesList';
 import { ChargeRow } from './ChargeRow';
 import { HelpTooltip } from './HelpTooltip';
 
@@ -42,6 +43,7 @@ interface ChargesManagementStepProps {
   onConfigureCombinedBasis?: (chargeIdx: number) => void;
   onFetchRates?: (legId: string) => void;
   validationErrors?: string[];
+  isPricingCalculating?: boolean;
 }
 
 export function ChargesManagementStep({
@@ -67,7 +69,8 @@ export function ChargesManagementStep({
   onRemoveCombinedCharge,
   onConfigureCombinedBasis,
   onFetchRates,
-  validationErrors = []
+  validationErrors = [],
+  isPricingCalculating = false
 }: ChargesManagementStepProps) {
   const calculateTotals = (charges: any[]) => {
     return charges.reduce((acc, charge) => ({
@@ -75,6 +78,27 @@ export function ChargesManagementStep({
       sell: acc.sell + ((charge.sell?.quantity || 0) * (charge.sell?.rate || 0))
     }), { buy: 0, sell: 0 });
   };
+
+  const renderTotals = (totals: { buy: number; sell: number }, margin: number, marginPercent: string) => (
+    <div className="bg-muted/30 font-semibold border-t p-2 flex items-center gap-2 text-sm mt-2">
+      <div className="flex-1 text-right pr-2">Totals:</div>
+      {/* Align with Buy Amt (approx) */}
+      <div className="w-[120px] text-right px-2 border-r border-border/50">
+        <span className="text-xs text-muted-foreground mr-1">Buy:</span>
+        {totals.buy.toFixed(2)}
+      </div>
+      {/* Align with Sell Amt */}
+      <div className="w-[120px] text-right px-2 border-r border-border/50">
+        <span className="text-xs text-muted-foreground mr-1">Sell:</span>
+        {totals.sell.toFixed(2)}
+      </div>
+      {/* Align with Margin */}
+      <div className={`w-[120px] text-right px-2 ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+        <span className="text-xs text-muted-foreground mr-1">Margin:</span>
+        {margin.toFixed(2)} ({marginPercent}%)
+      </div>
+    </div>
+  );
 
   if (legs.length === 0) {
     return (
@@ -113,6 +137,12 @@ export function ChargesManagementStep({
               <HelpTooltip content="When enabled, sell rates will automatically be calculated based on buy rates plus the margin percentage." />
             </Label>
           </div>
+          {isPricingCalculating && (
+            <div className="flex items-center gap-2 text-sm text-primary animate-pulse ml-auto">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Updating prices...</span>
+            </div>
+          )}
           {autoMargin && (
             <div className="flex items-center gap-3 ml-4 pl-4 border-l border-border">
               <Label className="text-sm font-medium">Margin %:</Label>
@@ -190,49 +220,18 @@ export function ChargesManagementStep({
                 </div>
 
                 {leg.charges.length > 0 ? (
-                  <div className="overflow-x-auto border rounded-lg shadow-sm">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="p-3 text-left font-semibold">Category</th>
-                          <th className="p-3 text-left font-semibold">Basis</th>
-                          <th className="p-3 text-left font-semibold">Unit</th>
-                          <th className="p-3 text-left font-semibold">Currency</th>
-                          <th className="p-3 text-right font-semibold">Buy Qty</th>
-                          <th className="p-3 text-right font-semibold">Buy Rate</th>
-                          <th className="p-3 text-right font-semibold">Buy Amt</th>
-                          <th className="p-3 text-center font-semibold">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leg.charges.map((charge, idx) => (
-                          <ChargeRow
-                            key={charge.id || idx}
-                            charge={charge}
-                            categories={chargeCategories}
-                            bases={chargeBases}
-                            currencies={currencies}
-                            onUpdate={(field, value) => onUpdateCharge(leg.id, idx, field, value)}
-                            onRemove={() => onRemoveCharge(leg.id, idx)}
-                            onConfigureBasis={() => onConfigureBasis(leg.id, idx)}
-                            showBuySell={true}
-                          />
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-muted/30 font-semibold border-t">
-                        <tr>
-                          <td colSpan={5} className="p-3 text-right">Totals:</td>
-                          {/* Below Buy Rate */}
-                          <td className="p-3 text-right">{totals.buy.toFixed(2)}</td>
-                          {/* Below Buy Amt / Sell Amt */}
-                          <td className="p-3 text-right">{totals.sell.toFixed(2)}</td>
-                          {/* Margin total with percent */}
-                          <td className={`p-3 text-right font-bold ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}> 
-                            {margin.toFixed(2)} ({marginPercent}%)
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                  <div>
+                    <VirtualChargesList
+                      charges={leg.charges}
+                      categories={chargeCategories}
+                      bases={chargeBases}
+                      currencies={currencies}
+                      onUpdate={(idx, field, value) => onUpdateCharge(leg.id, idx, field, value)}
+                      onRemove={(idx) => onRemoveCharge(leg.id, idx)}
+                      onConfigureBasis={(idx) => onConfigureBasis(leg.id, idx)}
+                      height={400}
+                    />
+                    {renderTotals(totals, margin, marginPercent)}
                   </div>
                 ) : (
                   <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">

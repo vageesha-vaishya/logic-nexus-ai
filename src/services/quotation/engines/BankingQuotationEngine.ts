@@ -2,10 +2,17 @@
 import { IQuotationEngine } from '../IQuotationEngine';
 import { RequestContext, LineItem, QuoteResult, ValidationResult } from '../types';
 import { BankingMockService } from '../../banking/BankingMockService';
+import { createDebugLogger } from '@/lib/debug-logger';
 
 export class BankingQuotationEngine implements IQuotationEngine {
+  private debug;
+
+  constructor() {
+    this.debug = createDebugLogger('QuotationEngine', 'Banking');
+  }
+
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
-    console.log('BankingQuotationEngine: Processing for', context.tenantId);
+    this.debug.info('Processing for', { tenantId: context.tenantId });
 
     // In Banking context, a "Quote" is typically a Loan Offer or Fee Calculation
     // We assume LineItems represent loan requests or service fee inquiries
@@ -30,7 +37,7 @@ export class BankingQuotationEngine implements IQuotationEngine {
              totalInterest += (loanOffer.amount * (loanOffer.interestRate / 100));
           }
         } catch (error: unknown) {
-          console.error('Error getting loan offer:', error);
+          this.debug.error('Error getting loan offer:', error);
           breakdown.offers.push({ error: (error as Error).message });
         }
       }

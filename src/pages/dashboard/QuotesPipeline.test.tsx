@@ -19,6 +19,7 @@ vi.mock('@/hooks/useAuth', () => ({
     loading: false,
     hasRole: vi.fn(),
     hasPermission: vi.fn(),
+    isPlatformAdmin: vi.fn(() => true),
   })),
 }));
 vi.mock('@/integrations/supabase/client', () => ({
@@ -47,6 +48,11 @@ vi.mock('@/lib/db/access', async (importOriginal) => {
     },
   };
 });
+
+// Mock DashboardLayout to avoid context issues
+vi.mock('@/components/layout/DashboardLayout', () => ({
+  DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>
+}));
 
 // Mock SwimLane to debug rendering
 vi.mock('@/components/kanban/SwimLane', () => ({

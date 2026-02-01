@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { parseFileRows, exportCsv, exportExcel, exportJsonTemplate, downloadErrorsCsv, exportJson } from '@/lib/import-export';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useDebug } from '@/hooks/useDebug';
 
 type CodeRecord = {
   id?: string;
@@ -34,6 +35,7 @@ type FormData = Omit<CodeRecord, 'id' | 'created_at' | 'updated_at'>;
 // Main Application Component
 const AESHTSCodeManager: React.FC = () => {
   const { scopedDb } = useCRM();
+  const debug = useDebug('Compliance', 'HTSManager');
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [codes, setCodes] = useState<CodeRecord[]>([]);
   const [filteredCodes, setFilteredCodes] = useState<CodeRecord[]>([]);
@@ -80,7 +82,7 @@ const AESHTSCodeManager: React.FC = () => {
         const { data, error } = await supabase.functions.invoke('sync-hts-data');
         
         if (error) {
-           console.warn("Supabase invoke failed, trying direct fetch fallback...", error);
+           debug.warn("Supabase invoke failed, trying direct fetch fallback...", { error });
            throw error; // Throw to catch block to try fallback
         }
         
@@ -90,14 +92,14 @@ const AESHTSCodeManager: React.FC = () => {
         toast.success(`Sync Complete: ${data.message || 'Data updated'}`);
         await loadCodes();
     } catch (err: any) {
-        console.error("Sync error details:", err);
+        debug.error("Sync error details:", err);
         
         // Fallback: Direct Fetch
         try {
             const baseUrl = import.meta.env.VITE_SUPABASE_URL || '';
             const functionUrl = `${baseUrl.replace(/\/$/, '')}/functions/v1/sync-hts-data`;
             
-            console.log("Attempting fallback fetch to:", functionUrl);
+            debug.log("Attempting fallback fetch to:", functionUrl);
             
             const response = await fetch(functionUrl, {
                 method: 'POST',
@@ -120,7 +122,7 @@ const AESHTSCodeManager: React.FC = () => {
             await loadCodes();
             
         } catch (fallbackErr: any) {
-             console.error("Fallback sync error:", fallbackErr);
+             debug.error("Fallback sync error:", fallbackErr);
              toast.dismiss(toastId);
              
              let errorMessage = fallbackErr.message || "Unknown error";
@@ -193,7 +195,7 @@ const AESHTSCodeManager: React.FC = () => {
       setFilteredCodes(data || []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Error loading codes:', err);
+      debug.error('Error loading codes:', err);
       // If table doesn't exist, use sample data
       if (typeof message === 'string' && message.includes('relation')) {
         const sampleData = generateSampleData();
@@ -329,7 +331,7 @@ const AESHTSCodeManager: React.FC = () => {
       setActiveTab('browse');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Error saving code:', err);
+      debug.error('Error saving code:', err);
       alert('Error saving code: ' + message);
     } finally {
       setLoading(false);
@@ -371,7 +373,7 @@ const AESHTSCodeManager: React.FC = () => {
       await loadCodes();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Error deleting code:', err);
+      debug.error('Error deleting code:', err);
       alert('Error deleting code: ' + message);
     } finally {
       setLoading(false);
@@ -452,12 +454,12 @@ const AESHTSCodeManager: React.FC = () => {
       try {
         const { data, error } = await scopedDb.from('aes_hts_codes', true).select('hts_code');
         if (error) {
-          console.warn('Failed to fetch live codes before import, using cached list:', error.message);
+          debug.warn('Failed to fetch live codes before import, using cached list:', error.message);
         } else if (data) {
           existingSet = new Set<string>((data as Array<{ hts_code: string }>).map(d => (d.hts_code || '').trim()));
         }
       } catch (fetchErr) {
-        console.warn('Error while fetching live codes before import:', fetchErr);
+        debug.warn('Error while fetching live codes before import:', fetchErr);
       }
       const seenSet = new Set<string>();
       const validSanitized = sanitized.filter((r, idx) => {
@@ -537,7 +539,7 @@ const AESHTSCodeManager: React.FC = () => {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Import error:', err);
+      debug.error('Import error:', err);
       alert('Error importing file: ' + message);
     } finally {
       setLoading(false);
@@ -599,7 +601,7 @@ const AESHTSCodeManager: React.FC = () => {
       alert(`Successfully seeded ${sanitized.length} sample records`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Seed error:', err);
+      debug.error('Seed error:', err);
       alert('Error seeding database: ' + message);
     } finally {
       setLoading(false);

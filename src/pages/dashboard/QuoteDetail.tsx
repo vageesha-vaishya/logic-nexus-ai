@@ -8,11 +8,13 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
+import { useDebug } from '@/hooks/useDebug';
 
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
+  const debug = useDebug('Sales', 'QuoteDetail');
   const [loading, setLoading] = useState(true);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export default function QuoteDetail() {
     const checkQuote = async () => {
       try {
         if (!id) throw new Error('Missing quote identifier');
+        debug.info('Resolving quote', { id });
         
         // Validate UUID format to prevent "invalid input syntax" DB errors
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -46,11 +49,13 @@ export default function QuoteDetail() {
         if (error) throw error;
         if (!data) throw new Error('Quote not found');
 
+        debug.log('Quote resolved', data);
         setResolvedId((data as any)?.id ?? null);
         setTenantId((data as any)?.tenant_id ?? null);
         setQuoteNumber((data as any)?.quote_number ?? null);
         setLoading(false);
       } catch (err: any) {
+        debug.error('Failed to load quote', { error: err.message });
         toast.error('Failed to load quote', { description: err.message });
         navigate('/dashboard/quotes');
       }
@@ -62,7 +67,7 @@ export default function QuoteDetail() {
     const loadLatestVersion = async () => {
       if (!resolvedId) return;
       
-      console.log('[QuoteDetail] Loading latest version for quote:', resolvedId);
+      debug.info('Loading latest version', { quoteId: resolvedId });
       
       try {
         const { data, error } = await (scopedDb
@@ -73,23 +78,23 @@ export default function QuoteDetail() {
           .limit(1);
         
         if (error) {
-          console.error('[QuoteDetail] Error querying versions:', error);
+          debug.error('Error querying versions', error);
           return;
         }
         
         if (Array.isArray(data) && data.length && (data[0] as any)?.id) {
           const v = data[0] as any;
-          console.log('[QuoteDetail] Found existing version:', v.id);
+          debug.log('Found existing version', { versionId: v.id });
           setVersionId(String(v.id));
           if (!tenantId && v.tenant_id) {
-             console.log('[QuoteDetail] Resolved tenant from version:', v.tenant_id);
+             debug.log('Resolved tenant from version', v.tenant_id);
              setTenantId(v.tenant_id);
           }
           return;
         }
         
         // Create initial version only if none exists
-        console.log('[QuoteDetail] No version found, creating version 1');
+        debug.log('No version found, creating version 1');
         
         let finalTenantId = tenantId;
         if (!finalTenantId) {

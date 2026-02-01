@@ -68,6 +68,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Warehouses', path: '/dashboard/warehouses', icon: Warehouse, description: 'Manage warehouses' },
       { name: 'Vehicles', path: '/dashboard/vehicles', icon: Truck, description: 'Fleet management' },
       { name: 'Rate Management', path: '/dashboard/rate-management', icon: LineChart, description: 'Market analysis & rate sheets' },
+      { name: 'Vendors', path: '/dashboard/vendors', icon: Building2, description: 'Manage carriers & partners' },
       { name: 'Carriers', path: '/dashboard/carriers', icon: Ship, description: 'Shipping carriers' },
       { name: 'Consignees', path: '/dashboard/consignees', icon: Users2, description: 'Shipping receivers' },
       { name: 'Ports & Locations', path: '/dashboard/ports-locations', icon: MapPin, description: 'Ports and facilities' },

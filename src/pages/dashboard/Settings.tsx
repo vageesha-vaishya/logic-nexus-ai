@@ -1,6 +1,6 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';

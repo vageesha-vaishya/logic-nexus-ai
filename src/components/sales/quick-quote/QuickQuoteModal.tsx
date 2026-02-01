@@ -23,9 +23,11 @@ import { QuoteResultsList } from './QuoteResultsList';
 import { QuoteComparisonView } from './QuoteComparisonView';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
-import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { PricingService } from '@/services/pricing.service';
 import { RateOption } from '@/types/quote-breakdown';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
+import { useDebug } from '@/hooks/useDebug';
 
 const CARRIER_OPTIONS = [
   "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
@@ -80,6 +82,7 @@ interface QuickQuoteModalProps {
 }
 
 export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
+  const debug = useDebug('Sales', 'QuickQuoteModal');
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<RateOption[] | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
@@ -134,15 +137,28 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const origin = form.watch("origin");
   const destination = form.watch("destination");
 
+  // Log Mode Toggle
+  useEffect(() => {
+    if (isOpen) {
+        debug.info('QuickQuote Modal Opened', { mode: viewMode, smartMode });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    debug.info('Smart Mode Toggled', { enabled: smartMode });
+  }, [smartMode]);
+
   // Reset/Adjust when mode changes
   useEffect(() => {
     setResults(null);
     setComplianceCheck(null);
+    debug.log('Transport Mode Changed', { mode });
   }, [mode]);
 
   const handleLocationChange = (field: 'origin' | 'destination', value: string, location?: any) => {
     form.setValue(field, value);
     if (location) {
+        debug.log(`Location Selected: ${field}`, { location: location.location_name, code: location.location_code });
         setExtendedData(prev => ({
             ...prev,
             [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
@@ -162,7 +178,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const handleAiSuggest = async () => {
     if (!commodity || commodity.length < 3) return;
 
+    debug.info('Starting AI Suggestion', { commodity });
     setAiLoading(true);
+    const startTime = performance.now();
+
     try {
         // Parallel calls for Unit and Classification
         const [unitRes, classRes] = await Promise.all([
@@ -174,10 +193,14 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
             })
         ]);
 
+        const duration = performance.now() - startTime;
+        debug.log('AI Suggestion Completed', { duration: `${duration.toFixed(2)}ms` });
+
         // Handle Unit
         if (unitRes.data?.unit) {
             setAiSuggestion(unitRes.data);
             form.setValue('unit', unitRes.data.unit);
+            debug.log('AI Suggested Unit', unitRes.data);
         }
 
         // Handle Classification
@@ -187,6 +210,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                 htsCode: classRes.data.hts,
                 scheduleB: classRes.data.scheduleB || prev.scheduleB
             }));
+            debug.log('AI Classified Commodity', classRes.data);
             toast({
                 title: "AI Analysis Complete",
                 description: `Classified as ${classRes.data.type} (HTS: ${classRes.data.hts})`,
@@ -194,7 +218,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         }
 
     } catch (err) {
-        console.error("AI Suggest Error:", err);
+        debug.error("AI Suggest Error", err);
     } finally {
         setAiLoading(false);
     }
@@ -217,20 +241,19 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         const { data: { session } } = await supabase.auth.getSession();
         sessionToken = session?.access_token;
     } catch (e) {
-        console.warn("Failed to get session for AI Advisor", e);
+        debug.warn("Failed to get session for AI Advisor", e);
     }
 
     if (!anonKey) {
-        console.error("Missing Supabase Anon/Publishable Key");
+        debug.error("Missing Supabase Anon/Publishable Key");
         return { data: null, error: new Error("Configuration Error: Missing API Key") };
     }
 
     // Function to perform the fetch
     const doFetch = async (token: string | null | undefined, useAnon: boolean) => {
         const keyToUse = useAnon ? anonKey : (token || anonKey);
-        console.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
-        // console.log(`[AI-Advisor] Using Key Prefix: ${keyToUse?.substring(0, 10)}...`); // Debug only
-
+        // debug.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
+        
         return fetch(functionUrl, {
             method: 'POST',
             headers: {
@@ -250,12 +273,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
             
             // If 401, retry with Anon Key
             if (response.status === 401) {
-                console.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
+                debug.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
                 response = await doFetch(anonKey, true);
             }
         } else {
             // No session, try Anon Key directly
-            console.warn("[AI-Advisor] No active session. Using Anon Key.");
+            debug.warn("[AI-Advisor] No active session. Using Anon Key.");
             response = await doFetch(anonKey, true);
         }
 
@@ -273,7 +296,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         const data = await response.json();
         return { data, error: null };
     } catch (err) {
-        console.error("AI Advisor Invocation Error:", err);
+        debug.error("AI Advisor Invocation Error", err);
         return { data: null, error: err };
     }
   };
@@ -293,20 +316,26 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         });
 
         if (error) {
-            console.error("Compliance Check Failed:", error);
+            debug.error("Compliance Check Failed", error);
             // Fallback to true (allow user to proceed if AI fails)
             return true;
         }
 
         setComplianceCheck(data);
+        if (data?.compliant === false) {
+             debug.warn("Compliance Issues Found", data.issues);
+        }
         return data?.compliant !== false; // Default true if error
     } catch (e) {
-        console.error(e);
+        debug.error("Compliance Check Exception", e);
         return true;
     }
   };
 
   const onSubmit = async (data: QuickQuoteValues) => {
+    const submitStartTime = performance.now();
+    debug.info('Quote Submission Initiated', { data, extendedData });
+
     // 1. Compliance Check
     const isCompliant = await validateCompliance();
     if (!isCompliant) {
@@ -326,16 +355,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     setComplianceCheck(null);
 
     try {
-      console.log('Form Submitted:', data);
-      console.log('Extended Data:', extendedData);
-
       const payload = {
         ...data,
         ...extendedData,
         account_id: accountId
       };
 
-      console.log('Invoking Edge Functions with payload:', payload);
+      debug.log('Invoking Rate Engines', { payload, smartMode });
 
       // Define promises for parallel execution
       const legacyPromise = supabase.functions.invoke('rate-engine', { body: payload });
@@ -344,13 +370,17 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         : Promise.resolve({ data: null, error: null });
 
       const [legacyRes, aiRes] = await Promise.all([legacyPromise, aiPromise]);
+      const duration = performance.now() - submitStartTime;
+      debug.info('Rate Engines Completed', { duration: `${duration.toFixed(2)}ms` });
+
+      const pricingService = new PricingService(supabase);
 
       let combinedOptions: RateOption[] = [];
 
       // 1. Process Legacy Results
       let legacyErrorMsg = '';
       if (legacyRes.error) {
-          console.error("[QuickQuote] Legacy Rate Engine Error:", legacyRes.error);
+          debug.error("[QuickQuote] Legacy Rate Engine Error", legacyRes.error);
           
           // Try to extract body from the error context
           try {
@@ -370,10 +400,14 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               variant: "destructive"
           });
       } else if (legacyRes.data?.options) {
-          console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
-          let legacyOptions = legacyRes.data.options.map((opt: any) => {
+          debug.log("[QuickQuote] Legacy Rate Engine Data Received", { count: legacyRes.data.options.length });
+          let legacyOptions = await Promise.all(legacyRes.data.options.map(async (opt: any) => {
               const mapped = mapOptionToQuote(opt);
-              const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
+              const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
+              let markupPercent = 0;
+              if (calc.buyPrice > 0) {
+                  markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
+              }
               return {
                   ...mapped,
                   source_attribution: 'Standard Rate Engine',
@@ -385,14 +419,14 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   co2_kg: mapped.total_co2_kg,
                   legs: mapped.legs,
                   charges: mapped.charges,
-                  buyPrice,
-                  marginAmount,
-                  marginPercent,
+                  buyPrice: calc.buyPrice,
+                  marginAmount: calc.marginAmount,
+                  marginPercent: calc.marginPercent,
                   markupPercent,
                   verified: true, // Mock verification for Market Rates
                   verificationTimestamp: new Date().toISOString()
               };
-          });
+          }));
 
           // Filter Market Rates: Top 2 based on Cost, Transit Time, Reliability
           legacyOptions = legacyOptions.sort((a: any, b: any) => {
@@ -414,7 +448,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       // 2. Process AI Results
       if (smartMode) {
           if (aiRes.error) {
-              console.error("[QuickQuote] AI Advisor Error:", aiRes.error);
+              debug.error("[QuickQuote] AI Advisor Error", aiRes.error);
               
               let errorMsg = "Could not generate smart quotes, showing standard rates only.";
               
@@ -428,13 +462,20 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   variant: "destructive" 
               });
           } else if (aiRes.data) {
-              console.log("[QuickQuote] AI Advisor Data:", aiRes.data);
+              debug.log("[QuickQuote] AI Advisor Data Received", { data: aiRes.data });
               const aiData = aiRes.data;
               
               if (aiData.options) {
-                  let aiOptions = aiData.options.map((opt: any) => {
+                  let aiOptions = await Promise.all(aiData.options.map(async (opt: any) => {
                       const mapped = mapOptionToQuote(opt);
-                      const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
+                      // Replace synchronous legacy calc with async PricingService
+                      const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
+
+                      let markupPercent = 0;
+                      if (calc.buyPrice > 0) {
+                          markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
+                      }
+
                       return {
                           ...mapped,
                           id: mapped.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
@@ -447,12 +488,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                           co2_kg: mapped.total_co2_kg,
                           legs: mapped.legs,
                           charges: mapped.charges,
-                          buyPrice,
-                          marginAmount,
-                          marginPercent,
-                          markupPercent
+                          buyPrice: calc.buyPrice,
+                          marginAmount: calc.marginAmount,
+                          marginPercent: calc.marginPercent,
+                          markupPercent: markupPercent
                       };
-                  });
+                  }));
                   
                   // Filter AI Rates: Top 5 per carrier
                   const aiOptionsByCarrier: Record<string, RateOption[]> = {};
@@ -578,7 +619,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         const validatedData = QuoteTransferSchema.parse(transferPayload);
         
         // 2. Logging
-        logger.info('Initiating Quick Quote to New Quote Transfer', {
+        debug.info('Initiating Quick Quote to New Quote Transfer', {
             origin: validatedData.origin,
             destination: validatedData.destination,
             mode: validatedData.mode,
@@ -595,16 +636,16 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         });
     } catch (error) {
         if (error instanceof z.ZodError) {
-            logger.error('Quote Transfer Validation Failed', { errors: error.errors });
+            debug.error('Quote Transfer Validation Failed', { errors: error.errors });
             toast({
                 title: "Data Validation Error",
                 description: "Cannot proceed: Missing required fields for quote generation.",
                 variant: "destructive"
             });
             // Detailed log for debugging
-            console.error("Validation details:", error.errors);
+            debug.error("Validation details:", error.errors);
         } else {
-            logger.error('Unexpected Transfer Error', { error });
+            debug.error('Unexpected Transfer Error', { error });
             toast({
                 title: "Transfer Error",
                 description: "An unexpected error occurred preparing the quote.",

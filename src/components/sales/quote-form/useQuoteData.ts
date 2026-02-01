@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
+import { useDebug } from '@/hooks/useDebug';
 import { toast } from 'sonner';
 import { quoteKeys } from './queryKeys';
 
 export function useQuoteData() {
   const { context, supabase } = useCRM();
   const { roles } = useAuth();
+  const debug = useDebug('Sales', 'useQuoteData');
   
   const [resolvedTenantId, setResolvedTenantId] = useState<string | null>(null);
   
@@ -109,6 +111,11 @@ export function useQuoteData() {
       }
 
       const { data: mappingsData, error: mappingsError } = await query;
+      if (mappingsError) {
+          debug.error('Failed to fetch service mappings', { error: mappingsError });
+          throw mappingsError;
+      }
+      
       const mappingRows = Array.isArray(mappingsData) ? mappingsData : [];
       const serviceIds = [...new Set(mappingRows.map((m: any) => m.service_id).filter(Boolean))];
 
@@ -119,9 +126,18 @@ export function useQuoteData() {
           .select('id, service_name, is_active')
           .in('id', serviceIds)
           .eq('is_active', true);
-        if (svcErr) throw svcErr;
+        if (svcErr) {
+             debug.error('Failed to fetch services details', { error: svcErr });
+             throw svcErr;
+        }
         for (const s of svcData || []) servicesById[String(s.id)] = s;
       }
+      
+      debug.log('Fetched services data', { 
+          tenantId, 
+          mappingsCount: mappingRows.length, 
+          servicesCount: Object.keys(servicesById).length 
+      });
 
       const uniqueTypeIds = [...new Set(mappingRows
         .map((m: any) => m.service_type_id)

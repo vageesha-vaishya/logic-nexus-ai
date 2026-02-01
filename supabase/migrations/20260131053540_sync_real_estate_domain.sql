@@ -4,6 +4,11 @@
 
 BEGIN;
 
+-- Handle name conflict: If a domain with name 'Real Estate' exists but different key, update its key to REAL_ESTATE
+UPDATE platform_domains 
+SET key = 'REAL_ESTATE' 
+WHERE name = 'Real Estate' AND key != 'REAL_ESTATE';
+
 INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
 VALUES (
     'REAL_ESTATE',

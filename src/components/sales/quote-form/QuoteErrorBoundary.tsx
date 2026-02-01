@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -23,6 +24,14 @@ export class QuoteErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error in Quote Form:', error, errorInfo);
+    
+    // Log to platform system logs
+    logger.error('Uncaught error in Quote Form', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      component: 'QuoteErrorBoundary'
+    });
   }
 
   public render() {
