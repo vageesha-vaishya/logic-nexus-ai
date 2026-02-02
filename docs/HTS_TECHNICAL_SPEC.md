@@ -29,75 +29,26 @@ This system covers:
 ## 2. Overall Description
 
 ### 2.1 Product Perspective
-The framework operates as a backend service integrated with the existing PostgreSQL database (`master_hts` table). It interacts with external APIs (Federal Register) and static file servers (Census Bureau).
+The framework operates as a backend service integrated with the existing PostgreSQL database (`aes_hts_codes` table). It interacts with external APIs (Federal Register) and static file servers (Census Bureau).
 
 ### 2.2 Product Functions
-1.  **Daily ETL**: Pulls data, calculates SHA-256 checksums, updates DB.
-2.  **Validation**: Checks code formatting (regex) and source alignment.
-3.  **Alerting**: Simulates JIRA ticket creation for discrepancies.
-4.  **Reporting**: Generates compliance artifacts.
+1.  **Daily ETL**: Pulls data, updates `aes_hts_codes`.
+2.  **Validation**: Checks code formatting (regex).
+3.  **Search**: Full-text search via `search_hts_codes` RPC.
 
 ---
 
 ## 3. Specific Requirements
 
-### 3.1 External Interface Requirements
-#### 3.1.1 User Interfaces
-- **CLI Tools**: `scripts/hts_etl_pipeline.py`, `scripts/generate_hts_report.py`.
-- **Database Views**: `master_hts` for active codes.
+### 3.1 Data Model (Active)
+The system uses `aes_hts_codes` as the single source of truth.
+- `id` (UUID)
+- `hts_code` (Unique)
+- `description` (Text)
+- `search_vector` (TSVector for search)
+- `chapter`, `heading`, `subheading` (Hierarchy)
 
-#### 3.1.2 Hardware Interfaces
-- Standard server environment (Linux/macOS) with network access to `.gov` domains.
-
-#### 3.1.3 Software Interfaces
-- **PostgreSQL 14+**: Main storage.
-- **Python 3.9+**: ETL logic.
-- **Federal Register API**: v1 REST API.
-
-### 3.2 System Features
-
-#### 3.2.1 Multi-Source Data Acquisition
-**Description**: The system must ingest data from multiple authoritative sources.
-**Inputs**: 
-- Census `expaes.txt`
-- Federal Register API JSON
-- USITC Data (simulated/CSV)
-**Processing**:
-- Class-based fetchers (`CensusSource`, `FederalRegisterSource`, `USITCSource`).
-- Normalization to `XXXX.XX.XX.XX` format.
-**Outputs**: 
-- Normalized record objects in memory.
-
-#### 3.2.2 Data Validation & Integrity
-**Description**: Enforce strict quality gates.
-**Constraints**:
-- **Uniqueness**: `UNIQUE(hts_code)` constraint in DB.
-- **Completeness**: `NOT NULL` on `description`.
-- **Format**: `CHECK (hts_code ~ '^[0-9]{4}(\.[0-9]{2}){0,3}$')`.
-**KPIs**:
-- 99.5% field completeness (enforced by schema).
-- < 24h lag (enforced by daily cron schedule).
-
-#### 3.2.3 Discrepancy Management
-**Description**: Track conflicts between sources.
-**Logic**:
-- Compare `description` and `unit_of_measure` between Census (Primary) and others.
-- Log to `discrepancy_logs` table.
-- Auto-create JIRA ticket if `severity` >= WARNING.
-
-### 3.3 Database Schema
-
-#### 3.3.1 Entity Relationship Diagram (ERD) Overview
-- **master_hts**: Core table.
-    - `id` (PK, UUID)
-    - `hts_code` (Unique, Char)
-    - `checksum_sha256` (Hash)
-    - `verified_flag` (Boolean)
-- **discrepancy_logs**:
-    - `log_id` (PK)
-    - `hts_code` (FK)
-    - `root_cause` (Enum)
-- **hts_verification_reports**:
+*Note: The previous `master_hts` table and associated "Discovery Framework" tables have been deprecated and removed as of 2026-02-06.*
     - `report_id` (PK)
     - `master_checksum` (Hash of DB state)
 

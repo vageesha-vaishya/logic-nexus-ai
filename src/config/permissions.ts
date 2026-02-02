@@ -59,6 +59,7 @@ export type Permission =
   | 'warehouses.view' | 'warehouses.create' | 'warehouses.edit' | 'warehouses.delete'
   | 'vehicles.view' | 'vehicles.create' | 'vehicles.edit' | 'vehicles.delete'
   | 'carriers.view' | 'carriers.create' | 'carriers.edit' | 'carriers.delete'
+  | 'vendors.view' | 'vendors.create' | 'vendors.edit' | 'vendors.delete'
   | 'service_types.view' | 'service_types.create' | 'service_types.edit' | 'service_types.delete'
   | 'services.view' | 'services.create' | 'services.edit' | 'services.delete'
   | 'service_type_mappings.view' | 'service_type_mappings.create' | 'service_type_mappings.edit' | 'service_type_mappings.delete'
@@ -90,6 +91,8 @@ export const ROLE_PERMISSIONS: Record<
     'calendar.view','calendar.manage',
     'admin.tenants.manage','admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
     'shipments.view','shipments.create','shipments.edit','shipments.delete',
+    'vendors.view','vendors.create','vendors.edit','vendors.delete',
+    'warehouses.view','warehouses.create','warehouses.edit','warehouses.delete',
     'shipments.approvals.view','shipments.approvals.manage',
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',
@@ -113,6 +116,7 @@ export const ROLE_PERMISSIONS: Record<
     'calendar.view','calendar.manage',
     'admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
     'shipments.view','shipments.create','shipments.edit','shipments.delete',
+    'vendors.view','vendors.create','vendors.edit','vendors.delete',
     'shipments.approvals.view','shipments.approvals.manage',
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',

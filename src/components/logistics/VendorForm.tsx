@@ -19,11 +19,21 @@ import { toast } from 'sonner';
 const vendorSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   code: z.string().optional(),
-  type: z.enum(['carrier', 'agent', 'broker', 'warehouse', 'technology', 'other']),
+  type: z.enum([
+    'carrier', 'agent', 'broker', 'warehouse', 'technology', 
+    'manufacturing', 'retail', '3pl', 'freight_forwarder', 'courier',
+    'ocean_carrier', 'air_carrier', 'trucker', 'rail_carrier', 
+    'customs_broker', 'wholesaler', 'consulting', 'other'
+  ]),
   status: z.enum(['active', 'inactive', 'pending']),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
   website: z.string().url('Invalid URL').optional().or(z.literal('')),
+  address_street: z.string().optional(),
+  address_city: z.string().optional(),
+  address_state: z.string().optional(),
+  address_zip: z.string().optional(),
+  address_country: z.string().optional(),
 });
 
 type VendorFormValues = z.infer<typeof vendorSchema>;
@@ -38,6 +48,13 @@ export function VendorForm({ initialData, onSuccess, onCancel }: VendorFormProps
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(false);
 
+  // Helper to safely get address fields
+  const getAddressField = (field: string) => {
+    if (!initialData?.contact_info?.address) return '';
+    if (typeof initialData.contact_info.address === 'string') return ''; // Or parse string if possible?
+    return initialData.contact_info.address[field] || '';
+  };
+
   const defaultValues: Partial<VendorFormValues> = {
     name: initialData?.name || '',
     code: initialData?.code || '',
@@ -46,6 +63,11 @@ export function VendorForm({ initialData, onSuccess, onCancel }: VendorFormProps
     email: initialData?.contact_info?.email || '',
     phone: initialData?.contact_info?.phone || '',
     website: initialData?.contact_info?.website || '',
+    address_street: getAddressField('street'),
+    address_city: getAddressField('city'),
+    address_state: getAddressField('state'),
+    address_zip: getAddressField('zip'),
+    address_country: getAddressField('country'),
   };
 
   const form = useForm<VendorFormValues>({
@@ -56,10 +78,21 @@ export function VendorForm({ initialData, onSuccess, onCancel }: VendorFormProps
   const onSubmit = async (data: VendorFormValues) => {
     setLoading(true);
     try {
+      // Construct address object if any address fields are provided
+      const hasAddress = data.address_street || data.address_city || data.address_state || data.address_zip || data.address_country;
+      const address = hasAddress ? {
+        street: data.address_street,
+        city: data.address_city,
+        state: data.address_state,
+        zip: data.address_zip,
+        country: data.address_country,
+      } : undefined;
+
       const contact_info = {
         email: data.email,
         phone: data.phone,
         website: data.website,
+        address,
       };
 
       const payload = {
@@ -140,11 +173,23 @@ export function VendorForm({ initialData, onSuccess, onCancel }: VendorFormProps
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="carrier">Carrier</SelectItem>
+                    <SelectItem value="carrier">Carrier (General)</SelectItem>
+                    <SelectItem value="ocean_carrier">Ocean Carrier</SelectItem>
+                    <SelectItem value="air_carrier">Air Carrier</SelectItem>
+                    <SelectItem value="trucker">Trucking Company</SelectItem>
+                    <SelectItem value="rail_carrier">Rail Carrier</SelectItem>
+                    <SelectItem value="freight_forwarder">Freight Forwarder</SelectItem>
+                    <SelectItem value="courier">Courier / Express</SelectItem>
+                    <SelectItem value="3pl">3PL Provider</SelectItem>
+                    <SelectItem value="warehouse">Warehouse</SelectItem>
+                    <SelectItem value="customs_broker">Customs Broker</SelectItem>
                     <SelectItem value="agent">Agent</SelectItem>
                     <SelectItem value="broker">Broker</SelectItem>
-                    <SelectItem value="warehouse">Warehouse</SelectItem>
-                    <SelectItem value="technology">Technology</SelectItem>
+                    <SelectItem value="technology">Technology Provider</SelectItem>
+                    <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                    <SelectItem value="retail">Retail</SelectItem>
+                    <SelectItem value="wholesaler">Wholesaler</SelectItem>
+                    <SelectItem value="consulting">Consulting</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -219,6 +264,79 @@ export function VendorForm({ initialData, onSuccess, onCancel }: VendorFormProps
               </FormItem>
             )}
           />
+
+          <div className="space-y-4 pt-2 border-t mt-4">
+            <h5 className="text-sm font-medium text-muted-foreground">Address</h5>
+            <FormField
+              control={form.control}
+              name="address_street"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Street Address</FormLabel>
+                  <FormControl>
+                    <Input placeholder="123 Logistics Way" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="address_city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="New York" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State / Province</FormLabel>
+                    <FormControl>
+                      <Input placeholder="NY" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="address_zip"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ZIP / Postal Code</FormLabel>
+                    <FormControl>
+                      <Input placeholder="10001" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address_country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <FormControl>
+                      <Input placeholder="USA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-4">

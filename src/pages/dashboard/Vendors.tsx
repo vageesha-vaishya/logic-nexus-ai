@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Filter } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { VendorForm } from '@/components/logistics/VendorForm';
+import { ClauseLibraryDialog } from './vendors/components/ClauseLibraryDialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -19,18 +21,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import { logger } from '@/lib/logger';
+
 export default function Vendors() {
+  const navigate = useNavigate();
   const { supabase } = useCRM();
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [clauseLibraryOpen, setClauseLibraryOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
+  useEffect(() => {
+    logger.info('Vendors page mounted', { component: 'Vendors' });
+  }, []);
+
   const fetchVendors = async () => {
     setLoading(true);
     try {
+      logger.debug('Fetching vendors', { filter: typeFilter, search: searchTerm, component: 'Vendors' });
       let query = supabase
         .from('vendors')
         .select('*')
@@ -46,9 +57,10 @@ export default function Vendors() {
 
       const { data, error } = await query;
       if (error) throw error;
+      logger.debug('Vendors fetched successfully', { count: data?.length, component: 'Vendors' });
       setVendors(data || []);
     } catch (error: any) {
-      console.error('Error fetching vendors:', error);
+      logger.error('Error fetching vendors:', error);
       toast.error('Failed to load vendors');
     } finally {
       setLoading(false);
@@ -89,12 +101,20 @@ export default function Vendors() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Vendor Management</h1>
             <p className="text-muted-foreground">
-              Manage carriers, agents, brokers, and other service partners.
+              Manage your suppliers, carriers, and service providers.
             </p>
           </div>
-          <Button onClick={() => { setEditingVendor(null); setDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Vendor
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setClauseLibraryOpen(true)}>
+              Clause Library
+            </Button>
+            <Button onClick={() => {
+              setEditingVendor(null);
+              setDialogOpen(true);
+            }}>
+              <Plus className="mr-2 h-4 w-4" /> Add Vendor
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -119,11 +139,23 @@ export default function Vendors() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="carrier">Carriers</SelectItem>
-                  <SelectItem value="agent">Agents</SelectItem>
-                  <SelectItem value="broker">Brokers</SelectItem>
-                  <SelectItem value="warehouse">Warehouses</SelectItem>
-                  <SelectItem value="technology">Technology</SelectItem>
+                  <SelectItem value="carrier">Carrier (General)</SelectItem>
+                  <SelectItem value="ocean_carrier">Ocean Carrier</SelectItem>
+                  <SelectItem value="air_carrier">Air Carrier</SelectItem>
+                  <SelectItem value="trucker">Trucking Company</SelectItem>
+                  <SelectItem value="rail_carrier">Rail Carrier</SelectItem>
+                  <SelectItem value="freight_forwarder">Freight Forwarder</SelectItem>
+                  <SelectItem value="courier">Courier / Express</SelectItem>
+                  <SelectItem value="3pl">3PL Provider</SelectItem>
+                  <SelectItem value="warehouse">Warehouse</SelectItem>
+                  <SelectItem value="customs_broker">Customs Broker</SelectItem>
+                  <SelectItem value="agent">Agent</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                  <SelectItem value="technology">Technology Provider</SelectItem>
+                  <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                  <SelectItem value="retail">Retail</SelectItem>
+                  <SelectItem value="wholesaler">Wholesaler</SelectItem>
+                  <SelectItem value="consulting">Consulting</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -180,6 +212,9 @@ export default function Vendors() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/vendors/${vendor.id}`)}>
+                              Manage
+                            </Button>
                             <Button variant="ghost" size="sm" onClick={() => handleEdit(vendor)}>
                               Edit
                             </Button>
@@ -214,6 +249,10 @@ export default function Vendors() {
             />
           </DialogContent>
         </Dialog>
+        <ClauseLibraryDialog 
+          open={clauseLibraryOpen} 
+          onOpenChange={setClauseLibraryOpen} 
+        />
       </div>
     </DashboardLayout>
   );

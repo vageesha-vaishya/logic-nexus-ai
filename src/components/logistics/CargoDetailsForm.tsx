@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AsyncComboboxField } from "@/components/forms/AdvancedFields";
+import { SmartCargoInput, CommoditySelection } from '@/components/logistics/SmartCargoInput';
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -39,6 +40,12 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   const [serviceTypes, setServiceTypes] = useState<ServiceTypeOption[]>([]);
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [cargoTypes, setCargoTypes] = useState<CargoTypeOption[]>([]);
+  
+  // Duty Calculation State
+  const [originCountry, setOriginCountry] = useState('');
+  const [destCountry, setDestCountry] = useState('');
+  const [dutyResult, setDutyResult] = useState<{ total_duty: number; currency: string; breakdown: any[] } | null>(null);
+  const [calculatingDuty, setCalculatingDuty] = useState(false);
 
   const form = useForm<CargoDetailsFormData>({
     resolver: zodResolver(cargoDetailsSchema),
@@ -60,6 +67,26 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   });
 
   const selectedType = form.watch("service_type");
+
+  const handleSmartSelect = (selection: CommoditySelection) => {
+    if (selection.description) {
+      form.setValue('commodity_description', selection.description);
+    }
+    if (selection.aes_hts_id) {
+      form.setValue('aes_hts_id', selection.aes_hts_id);
+    }
+    if (selection.cargo_type_id) {
+      form.setValue('cargo_type_id', selection.cargo_type_id);
+    }
+    if (selection.hazmat_class) {
+      form.setValue('is_hazardous', true);
+      form.setValue('hazmat_class', selection.hazmat_class);
+    }
+    if (selection.unit_value) {
+      // Assuming value logic exists or will be added
+    }
+    toast.success("Commodity details populated");
+  };
 
   const htsLoader = async (search: string) => {
     if (!search) return [];
@@ -189,6 +216,18 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        
+        <div className="bg-slate-50 p-4 rounded-md border border-slate-200 mb-4">
+          <FormLabel className="mb-2 block">Quick Add from Catalog / HTS Search</FormLabel>
+          <SmartCargoInput 
+            onSelect={handleSmartSelect} 
+            placeholder="Search by SKU, Name, or HTS Code..."
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            Select a commodity to auto-populate description, HTS code, and classification.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -372,6 +411,86 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
             </FormItem>
           )}
         />
+
+        {/* Duty Estimation Section */}
+        <div className="bg-slate-50 p-4 rounded-md border border-slate-200">
+          <FormLabel className="mb-2 block text-base font-semibold">Landed Cost Estimation</FormLabel>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+             <div>
+                <FormLabel className="text-xs">Origin Country (ISO)</FormLabel>
+                <Input value={originCountry} onChange={(e) => setOriginCountry(e.target.value)} maxLength={2} placeholder="CN" />
+             </div>
+             <div>
+                <FormLabel className="text-xs">Destination Country (ISO)</FormLabel>
+                <Input value={destCountry} onChange={(e) => setDestCountry(e.target.value)} maxLength={2} placeholder="US" />
+             </div>
+          </div>
+          
+          <Button 
+            type="button" 
+            variant="secondary" 
+            className="w-full mb-4"
+            onClick={async () => {
+              const htsId = form.getValues('aes_hts_id');
+              
+              setCalculatingDuty(true);
+              try {
+                // Fetch HTS Code string
+                let codeStr = '';
+                if (htsId) {
+                   const { data } = await scopedDb.from('aes_hts_codes').select('hts_code').eq('id', htsId).single();
+                   if (data) codeStr = data.hts_code;
+                }
+                
+                if (!codeStr) {
+                  toast.error("Please select an HTS code first.");
+                  setCalculatingDuty(false);
+                  return;
+                }
+
+                // Call RPC
+                const { data, error } = await scopedDb.rpc('calculate_duty', {
+                  p_origin_country: originCountry,
+                  p_destination_country: destCountry,
+                  p_items: [{
+                    hts_code: codeStr,
+                    value: 1000, // Hardcoded simulation value for now
+                    quantity: 1
+                  }]
+                });
+                
+                if (error) throw error;
+                setDutyResult(data as any);
+                toast.success("Duty calculated successfully");
+              } catch (e: any) {
+                console.error(e);
+                toast.error(e.message || "Failed to calculate duty");
+              } finally {
+                setCalculatingDuty(false);
+              }
+            }}
+            disabled={calculatingDuty}
+          >
+            {calculatingDuty ? "Calculating..." : "Estimate Duty (Base Value: $1000)"}
+          </Button>
+
+          {dutyResult && (
+            <div className="bg-white p-3 rounded border text-sm">
+               <div className="flex justify-between font-bold border-b pb-2 mb-2">
+                 <span>Total Duty:</span>
+                 <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: dutyResult.currency }).format(dutyResult.total_duty)}</span>
+               </div>
+               <div className="space-y-1">
+                 {dutyResult.breakdown.map((item: any, idx: number) => (
+                   <div key={idx} className="flex justify-between text-xs text-muted-foreground">
+                      <span>{item.hts_code} ({item.rate_type}):</span>
+                      <span>{item.rate_applied}</span>
+                   </div>
+                 ))}
+               </div>
+            </div>
+          )}
+        </div>
 
         <Button type="submit" className="w-full">
           {initialData?.id ? "Update Cargo Details" : "Create Cargo Details"}

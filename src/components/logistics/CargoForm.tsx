@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { SmartCargoInput, CommoditySelection } from '@/components/logistics/SmartCargoInput';
 import { AsyncComboboxField } from '@/components/forms/AdvancedFields';
 import {
   Select,
@@ -82,6 +83,26 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
       return data;
     },
   });
+
+  const handleSmartSelect = (selection: CommoditySelection) => {
+    if (selection.description) {
+      form.setValue('commodity_description', selection.description);
+    }
+    if (selection.aes_hts_id) {
+      form.setValue('aes_hts_id', selection.aes_hts_id);
+    }
+    if (selection.cargo_type_id) {
+      form.setValue('cargo_type_id', selection.cargo_type_id);
+    }
+    if (selection.hazmat_class) {
+      form.setValue('hazmat', true);
+      form.setValue('hazmat_class', selection.hazmat_class);
+    }
+    if (selection.unit_value) {
+      // Assuming value logic exists or will be added
+    }
+    toast.success("Commodity details populated");
+  };
 
   // HTS Loader for AsyncCombobox
   const htsLoader = React.useCallback(async (search: string) => {
@@ -194,6 +215,18 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         
+        <div className="bg-slate-50 p-4 rounded-md border border-slate-200 mb-4">
+          <FormLabel className="mb-2 block">Quick Add from Catalog / HTS Search</FormLabel>
+          <SmartCargoInput 
+            onSelect={handleSmartSelect} 
+            placeholder="Search by SKU, Name, or HTS Code..."
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            Select a commodity to auto-populate description, HTS code, and classification.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
         <FormField
           control={form.control}
           name="cargo_type_id"
@@ -225,6 +258,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
           loader={htsLoader}
           className="flex flex-col"
         />
+        </div>
 
         <FormField
           control={form.control}

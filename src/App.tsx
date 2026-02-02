@@ -82,6 +82,7 @@ import QuotesPipeline from "./pages/dashboard/QuotesPipeline";
 import MultiModalQuote from "./pages/dashboard/MultiModalQuote";
 import Carriers from "./pages/dashboard/Carriers";
 import Vendors from "./pages/dashboard/Vendors";
+import VendorDetail from "./pages/dashboard/vendors/VendorDetail";
 import Consignees from "./pages/dashboard/Consignees";
 import PortsLocations from "./pages/dashboard/PortsLocations";
 import PackageCategories from "./pages/dashboard/PackageCategories";
@@ -681,6 +682,7 @@ const App = () => (
             <Route path="/dashboard/rate-management" element={<ProtectedRoute><RateManagement /></ProtectedRoute>} />
             <Route path="/dashboard/carriers" element={<ProtectedRoute><Carriers /></ProtectedRoute>} />
             <Route path="/dashboard/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
+            <Route path="/dashboard/vendors/:id" element={<ProtectedRoute><VendorDetail /></ProtectedRoute>} />
             <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
             <Route path="/dashboard/ports-locations" element={<ProtectedRoute><PortsLocations /></ProtectedRoute>} />
             <Route path="/dashboard/package-categories" element={<ProtectedRoute><PackageCategories /></ProtectedRoute>} />
