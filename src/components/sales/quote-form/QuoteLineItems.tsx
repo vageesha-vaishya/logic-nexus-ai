@@ -27,7 +27,8 @@ export function QuoteLineItems() {
         volume: 0,
         length: 0,
         width: 0,
-        height: 0
+        height: 0,
+        hs_code: ''
       }
     });
   };
@@ -93,10 +94,22 @@ export function QuoteLineItems() {
                                         </FormItem>
                                     )}
                                 />
+                                <FormField
+                                    control={control}
+                                    name={`items.${index}.attributes.hs_code`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">HS Code</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="e.g. 8517.12" />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
                             </div>
 
                             {/* Qty & Price */}
-                            <div className="md:col-span-3 grid grid-cols-2 gap-2">
+                            <div className="md:col-span-3 grid grid-cols-3 gap-2">
                                 <FormField
                                     control={control}
                                     name={`items.${index}.quantity`}
@@ -118,6 +131,18 @@ export function QuoteLineItems() {
                                             <FormLabel className="text-xs">Value (USD)</FormLabel>
                                             <FormControl>
                                                 <Input type="number" {...field} min={0} step="0.01" />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={control}
+                                    name={`items.${index}.discount_percent`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">Disc %</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" {...field} min={0} max={100} step="0.1" />
                                             </FormControl>
                                         </FormItem>
                                     )}

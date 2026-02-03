@@ -36,11 +36,12 @@ export default function Invoices() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PAID': return 'default'; // primary
-      case 'SENT': return 'secondary';
-      case 'DRAFT': return 'outline';
-      case 'OVERDUE': return 'destructive';
-      case 'VOID': return 'secondary'; // or destructive outline?
+      case 'paid': return 'default'; // primary
+      case 'issued': return 'secondary';
+      case 'draft': return 'outline';
+      case 'overdue': return 'destructive';
+      case 'void': return 'secondary';
+      case 'cancelled': return 'destructive';
       default: return 'outline';
     }
   };
@@ -92,14 +93,16 @@ export default function Invoices() {
                       onClick={() => navigate(`/dashboard/finance/invoices/${inv.id}`)}
                     >
                       <TableCell className="font-mono font-medium">{inv.invoice_number}</TableCell>
-                      <TableCell>{inv.customer_id}</TableCell>
-                      <TableCell>{format(new Date(inv.issue_date), 'MMM d, yyyy')}</TableCell>
-                      <TableCell>{format(new Date(inv.due_date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{inv.customer?.name || inv.customer_id || 'Unknown'}</TableCell>
+                      <TableCell>{inv.issue_date ? format(new Date(inv.issue_date), 'MMM d, yyyy') : '-'}</TableCell>
+                      <TableCell>{inv.due_date ? format(new Date(inv.due_date), 'MMM d, yyyy') : '-'}</TableCell>
                       <TableCell className="text-right font-medium">
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency }).format(inv.total_amount)}
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency }).format(inv.total)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusColor(inv.status) as any}>{inv.status}</Badge>
+                        <Badge variant={getStatusColor(inv.status) as any}>
+                          {inv.status.toUpperCase()}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   ))}

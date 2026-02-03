@@ -11,7 +11,40 @@ export type WidgetType =
   | 'shipments'
   | 'transfers'
   | 'custom_chart'
-  | 'insights';
+  | 'insights'
+  | 'financial'
+  | 'volume';
+
+export interface FinancialMetric {
+  month: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+}
+
+export interface CarrierVolume {
+  carrier_name: string;
+  volume: number;
+}
+
+export interface DashboardStats {
+  total_revenue: number;
+  active_shipments: number;
+  pending_invoices: number;
+  total_profit: number;
+}
+
+export interface DailyStatPoint {
+  date: string;
+  value: number;
+}
+
+export interface DailyStats {
+  revenue: DailyStatPoint[];
+  shipments: DailyStatPoint[];
+  invoices: DailyStatPoint[];
+  profit: DailyStatPoint[];
+}
 
 export type WidgetSize = 'small' | 'medium' | 'large' | 'full';
 

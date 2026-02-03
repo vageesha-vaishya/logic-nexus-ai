@@ -131,6 +131,50 @@ export function useQuoteRepository() {
       throw new Error('Quote save did not return an id');
     }
 
+    // Save Line Items
+    if (data.items && data.items.length > 0) {
+      // First, delete existing items to ensure clean state (simple strategy)
+      // Ideally we would diff, but full replace is safer for consistency here
+      const { error: deleteError } = await scopedDb
+        .from('quote_items')
+        .delete()
+        .eq('quote_id', savedId);
+      
+      if (deleteError) {
+        console.error('[QuoteRepository] Error deleting old items:', deleteError);
+        // Continue to try inserting? Or throw?
+        // Throwing might be safer to avoid duplicate/inconsistent state
+        throw deleteError;
+      }
+
+      const itemsPayload = data.items.map((item, index) => ({
+        quote_id: savedId,
+        line_number: index + 1,
+        product_name: item.product_name,
+        description: item.description || null,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_percent: item.discount_percent || 0,
+        package_category_id: item.package_category_id || null,
+        package_size_id: item.package_size_id || null,
+        // Calculate totals if needed, or let DB handle it?
+        // Usually DB triggers might handle line_total, but let's provide if we can.
+        // For now, minimal fields.
+      }));
+
+      const { error: itemsError } = await scopedDb
+        .from('quote_items')
+        .insert(itemsPayload);
+      
+      if (itemsError) {
+        console.error('[QuoteRepository] Error saving items:', itemsError);
+        throw itemsError;
+      }
+    } else {
+        // If items is empty array, we should probably clear existing items too
+        await scopedDb.from('quote_items').delete().eq('quote_id', savedId);
+    }
+
     return savedId;
   };
 

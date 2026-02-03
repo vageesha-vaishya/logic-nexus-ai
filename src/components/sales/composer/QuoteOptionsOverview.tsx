@@ -79,6 +79,18 @@ export function QuoteOptionsOverview({
   
   const { scopedDb } = useCRM();
   const [enrichedOptions, setEnrichedOptions] = useState<any[]>([]);
+
+  // Helper to safely render strings
+  const getSafeString = (val: any, fallback: string = '') => {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object') {
+       // Try common properties
+       return val.name || val.code || val.details || val.description || fallback;
+    }
+    return String(val);
+  };
   
   useEffect(() => {
     const enrichOptions = async () => {
@@ -244,7 +256,7 @@ export function QuoteOptionsOverview({
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h4 className="font-bold text-lg mr-1">{opt.carrier_name}</h4>
+                        <h4 className="font-bold text-lg mr-1">{getSafeString(opt.carrier_name, 'Unknown Carrier')}</h4>
                         {getTierBadge(opt.tier)}
                         {opt.ai_generated && (
                           <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-[10px] px-1 h-5">
@@ -252,7 +264,7 @@ export function QuoteOptionsOverview({
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{opt.option_name}</p>
+                      <p className="text-sm text-muted-foreground">{getSafeString(opt.option_name, 'Standard Option')}</p>
                     </div>
                     <div className="text-right">
                       <div className="text-xl font-bold text-primary">
@@ -284,12 +296,12 @@ export function QuoteOptionsOverview({
                       <span className="text-xs text-muted-foreground block">Service</span>
                       <div className="font-medium flex items-center gap-1">
                         {getModeIcon(opt.mode)}
-                        {opt.service_type || 'Standard'}
+                        {getSafeString(opt.service_type, 'Standard')}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <span className="text-xs text-muted-foreground block">Transit Time</span>
-                      <div className="font-medium">{opt.transit_time?.details || opt.transit_time || `${opt.total_transit_days || '-'} days`}</div>
+                      <div className="font-medium">{getSafeString(opt.transit_time?.details || opt.transit_time, `${opt.total_transit_days || '-'} days`)}</div>
                     </div>
                   </div>
 
@@ -485,7 +497,7 @@ export function QuoteOptionsOverview({
                         </TableCell>
                         <TableCell>{opt.option_name}</TableCell>
                         <TableCell>{opt.service_type || '-'}</TableCell>
-                        <TableCell>{opt.transit_time?.details || opt.transit_time || `${opt.total_transit_days || '-'} days`}</TableCell>
+                        <TableCell>{opt.transit_time?.details || (typeof opt.transit_time === 'string' ? opt.transit_time : '') || `${opt.total_transit_days || '-'} days`}</TableCell>
                         <TableCell>
                           {opt.reliability_score ? (
                             <Badge variant="outline" className={cn("font-normal", getReliabilityColor(opt.reliability_score).split(' ')[1])}>

@@ -183,6 +183,26 @@ export function QuoteFinancials() {
                                     {isCalculating ? 'Calculating...' : 'Calculate Estimate'}
                                 </Button>
                             </FormLabel>
+                            {calculationResult && (
+                                <div className="absolute z-10 top-8 right-0 w-64 p-3 bg-white border rounded-md shadow-lg animate-in fade-in slide-in-from-top-1">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs font-semibold">Est. Freight:</span>
+                                        <span className="text-sm font-bold text-green-600">${calculationResult.breakdown.freight.toFixed(2)}</span>
+                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        size="sm" 
+                                        variant="secondary" 
+                                        className="w-full h-7 text-xs"
+                                        onClick={() => {
+                                            applyCalculation();
+                                            setCalculationResult(null);
+                                        }}
+                                    >
+                                        Apply Amount
+                                    </Button>
+                                </div>
+                            )}
                             <FormControl>
                             <div className="relative group">
                                  <span className="absolute left-3 top-2.5 text-muted-foreground group-focus-within:text-green-600 transition-colors">$</span>
@@ -284,7 +304,7 @@ export function QuoteFinancials() {
                             <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm text-gray-600">
-                            <span>Tax ({taxPercent}%)</span>
+                            <span>Tax ({String(taxPercent)}%)</span>
                             <span className="font-medium text-gray-900">${taxAmount.toFixed(2)}</span>
                         </div>
                         <Separator className="bg-gray-200 border-dashed my-2" />

@@ -155,6 +155,16 @@ export function LegsConfigurationStep({
       .map(error => error.replace(prefix, '').trim());
   };
 
+  const getSafeName = (obj: any, fallback: string = '') => {
+    if (obj === null || obj === undefined) return fallback;
+    if (typeof obj === 'string') return obj;
+    if (typeof obj === 'number') return String(obj);
+    if (typeof obj === 'object') {
+       return obj.name || obj.code || obj.details || obj.description || fallback;
+    }
+    return String(obj);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -199,8 +209,8 @@ export function LegsConfigurationStep({
                         <CardTitle className="text-base">
                           {isServiceLeg ? 'Service' : 'Leg'} {index + 1} - {
                             isServiceLeg 
-                              ? (serviceCategories?.find((c) => c.code === leg.serviceOnlyCategory)?.name || 'Service')
-                              : (serviceTypes.find((st) => st.id === leg.serviceTypeId)?.name || leg.carrierName || leg.mode.toUpperCase())
+                              ? getSafeName(serviceCategories?.find((c) => c.code === leg.serviceOnlyCategory), 'Service')
+                              : (getSafeName(serviceTypes.find((st) => st.id === leg.serviceTypeId)) || leg.carrierName || leg.mode.toUpperCase())
                           }
                         </CardTitle>
                       </div>
@@ -254,13 +264,15 @@ export function LegsConfigurationStep({
                           <SelectContent>
                             {serviceCategories?.map((cat) => (
                               <SelectItem key={cat.id} value={cat.code}>
-                                {cat.name}
+                                {getSafeName(cat)}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {serviceCategories?.find((c) => c.code === leg.serviceOnlyCategory)?.description}
+                          {typeof (serviceCategories?.find((c) => c.code === leg.serviceOnlyCategory)?.description) === 'string' 
+                            ? serviceCategories?.find((c) => c.code === leg.serviceOnlyCategory)?.description 
+                            : ''}
                         </p>
                       </div>
                     ) : (
@@ -288,7 +300,7 @@ export function LegsConfigurationStep({
                                 })
                                 .map((st) => (
                                   <SelectItem key={st.id} value={st.id}>
-                                    {st.name}
+                                    {getSafeName(st)}
                                   </SelectItem>
                                 ))}
                             </SelectContent>

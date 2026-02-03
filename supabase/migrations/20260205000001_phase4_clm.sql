@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.contract_clauses (
 -- RLS for Clause Library
 ALTER TABLE public.contract_clauses ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant Access Clauses" ON public.contract_clauses;
 CREATE POLICY "Tenant Access Clauses" ON public.contract_clauses
     FOR ALL
     USING (tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()));
@@ -44,6 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_contract_comments_contract ON public.vendo
 -- RLS for Comments
 ALTER TABLE public.vendor_contract_comments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant Access Contract Comments" ON public.vendor_contract_comments;
 CREATE POLICY "Tenant Access Contract Comments" ON public.vendor_contract_comments
     FOR ALL
     USING (

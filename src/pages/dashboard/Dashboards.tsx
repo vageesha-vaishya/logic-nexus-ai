@@ -51,8 +51,10 @@ import { useToast } from '@/components/ui/use-toast';
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'stats-1', type: 'stats', title: 'KPIs', size: 'full', order: 0 },
-  { id: 'leads-1', type: 'leads', title: 'My Leads', size: 'medium', order: 1 },
-  { id: 'activities-1', type: 'activities', title: 'My Activities', size: 'medium', order: 2 },
+  { id: 'financial-1', type: 'financial', title: 'Financial Performance', size: 'large', order: 1 },
+  { id: 'volume-1', type: 'volume', title: 'Shipment Volume', size: 'medium', order: 2 },
+  { id: 'leads-1', type: 'leads', title: 'My Leads', size: 'medium', order: 3 },
+  { id: 'activities-1', type: 'activities', title: 'My Activities', size: 'medium', order: 4 },
 ];
 
 export default function Dashboards() {

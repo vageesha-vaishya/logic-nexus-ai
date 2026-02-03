@@ -1,188 +1,22 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Invoice, CreateInvoiceRequest, InvoiceItem, InvoiceStatus } from './types';
-import { TaxEngine } from '../taxation/TaxEngine';
-import { GLSyncService } from '../gl/GLSyncService';
+import { Invoice, CreateInvoiceRequest, InvoiceLineItem } from './types';
 
 export const InvoiceService = {
   /**
-   * Generates a unique invoice number.
-   * Format: INV-{YYYYMMDD}-{RANDOM}
+   * Lists all invoices for the current tenant.
    */
-  generateInvoiceNumber(): string {
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `INV-${date}-${random}`;
-  },
-
-  /**
-   * Creates a new invoice with line items.
-   * Calculates totals and taxes automatically.
-   */
-  async createInvoice(request: CreateInvoiceRequest): Promise<Invoice> {
-    // 0. Authenticate and get Tenant ID
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) throw new Error('User not authenticated');
-
-    const { data: userRole, error: roleError } = await supabase
-      .from('user_roles')
-      .select('tenant_id')
-      .eq('user_id', userData.user.id)
-      .single();
-
-    if (roleError || !userRole) {
-       throw new Error('Could not determine tenant_id for user');
-    }
-    const tenantId = userRole.tenant_id;
-
-    // 1. Calculate items and totals
-    let subtotal = 0;
-    
-    // Prepare items for tax calculation
-    const itemsWithIds = request.items.map((item, index) => ({
-      ...item,
-      tempId: index.toString(),
-      amount: item.quantity * item.unit_price
-    }));
-
-    // Calculate Subtotal
-    subtotal = itemsWithIds.reduce((sum, item) => sum + item.amount, 0);
-
-    // 2. Determine Nexus & Calculate Tax
-    let taxTotal = 0;
-    const itemTaxMap: Record<string, number> = {}; // tempId -> totalTax
-
-    // Initialize tax map
-    itemsWithIds.forEach(item => itemTaxMap[item.tempId] = 0);
-
-    const nexusResult = await TaxEngine.determineNexus({
-      origin: request.origin_address,
-      destination: request.destination_address,
-      tenantId: tenantId
-    });
-
-    if (nexusResult.hasNexus) {
-      for (const jurisdiction of nexusResult.jurisdictions) {
-        const taxResult = await TaxEngine.calculate({
-          jurisdictionCode: jurisdiction,
-          items: itemsWithIds.map(item => ({
-            id: item.tempId,
-            amount: item.amount,
-            taxCode: item.tax_code_id
-          }))
-        });
-
-        // Accumulate taxes per item
-        if (taxResult.lineItems) {
-            taxResult.lineItems.forEach(lineItem => {
-                if (lineItem.id && itemTaxMap[lineItem.id] !== undefined) {
-                    itemTaxMap[lineItem.id] += lineItem.taxAmount;
-                }
-            });
-        }
-      }
-    }
-
-    // Sum up total tax from items
-    taxTotal = Object.values(itemTaxMap).reduce((sum, tax) => sum + tax, 0);
-
-    // 3. Prepare Invoice Items for Insertion
-    const calculatedItems = itemsWithIds.map(item => {
-      const taxAmount = itemTaxMap[item.tempId];
-      const totalAmount = item.amount + taxAmount;
-      
-      return {
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        tax_code_id: item.tax_code_id || null,
-        tax_amount: taxAmount,
-        total_amount: totalAmount
-      };
-    });
-
-    const totalAmount = subtotal + taxTotal;
-    const invoiceNumber = this.generateInvoiceNumber();
-
-    const invoiceInsert = {
-      tenant_id: tenantId,
-      customer_id: request.customer_id,
-      invoice_number: invoiceNumber,
-      status: 'DRAFT' as InvoiceStatus,
-      issue_date: request.issue_date.toISOString(),
-      due_date: request.due_date.toISOString(),
-      currency: request.currency,
-      subtotal,
-      tax_total: taxTotal,
-      total_amount: totalAmount,
-      metadata: request.metadata || {}
-    };
-
-    const { data: invoice, error: invoiceError } = await supabase
-      .schema('finance')
-      .from('invoices')
-      .insert(invoiceInsert)
-      .select()
-      .single();
-
-    if (invoiceError) throw invoiceError;
-
-    // 3. Insert Invoice Items
-    const itemsInsert = calculatedItems.map(item => ({
-      invoice_id: invoice.id,
-      ...item
-    }));
-
-    const { data: items, error: itemsError } = await supabase
-      .schema('finance')
-      .from('invoice_items')
-      .insert(itemsInsert)
-      .select();
-
-    if (itemsError) {
-      // Rollback invoice? Supabase doesn't support transactions in JS client easily.
-      // We would log error.
-      console.error('Failed to insert invoice items', itemsError);
-      throw itemsError;
-    }
-
-    return {
-      ...invoice,
-      items: items as InvoiceItem[]
-    } as Invoice;
-  },
-
-  /**
-   * Get a single invoice by ID
-   */
-  async getInvoice(id: string): Promise<Invoice | null> {
+  async listInvoices(): Promise<Invoice[]> {
     const { data, error } = await supabase
-      .schema('finance')
       .from('invoices')
       .select(`
         *,
-        items:invoice_items(*)
+        customer:customer_id (
+          id,
+          name,
+          email
+        )
       `)
-      .eq('id', id)
-      .single();
-
-    if (error) {
-        if (error.code === 'PGRST116') return null; // Not found
-        throw error;
-    }
-
-    return data as Invoice;
-  },
-
-  /**
-   * List invoices for the current tenant
-   */
-  async listInvoices(limit = 20, offset = 0): Promise<Invoice[]> {
-    const { data, error } = await supabase
-      .schema('finance')
-      .from('invoices')
-      .select('*')
-      .range(offset, offset + limit - 1)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -190,25 +24,112 @@ export const InvoiceService = {
   },
 
   /**
-   * Finalizes an invoice (Draft -> Sent) and triggers GL sync.
+   * Gets a single invoice by ID with line items.
    */
-  async finalizeInvoice(id: string): Promise<Invoice> {
-    // 1. Update status
-    const { data: invoice, error } = await supabase
-      .schema('finance')
+  async getInvoice(id: string): Promise<Invoice | null> {
+    const { data, error } = await supabase
       .from('invoices')
-      .update({ status: 'SENT' })
+      .select(`
+        *,
+        invoice_line_items (*),
+        customer:customer_id (
+          id,
+          name,
+          email
+        )
+      `)
       .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data as Invoice;
+  },
+
+  /**
+   * Creates a new invoice manually (without shipment).
+   * Note: This assumes the user has permission to create invoices.
+   */
+  async createInvoice(request: CreateInvoiceRequest): Promise<Invoice> {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('User not authenticated');
+
+    // Get Tenant ID
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('tenant_id')
+      .eq('user_id', userData.user.id)
+      .single();
+
+    if (!userRole?.tenant_id) throw new Error('Tenant ID not found');
+    const tenantId = userRole.tenant_id;
+
+    // 1. Get next invoice number
+    const { data: nextDocNum, error: seqError } = await supabase
+      .rpc('get_next_document_number', {
+        p_tenant_id: tenantId,
+        p_type: 'invoice'
+      });
+    
+    if (seqError) throw seqError;
+
+    // 2. Create Invoice Header
+    const { data: invoice, error: invError } = await supabase
+      .from('invoices')
+      .insert({
+        tenant_id: tenantId,
+        invoice_number: nextDocNum,
+        customer_id: request.customer_id,
+        shipment_id: request.shipment_id,
+        issue_date: request.issue_date.toISOString(),
+        due_date: request.due_date.toISOString(),
+        currency: request.currency,
+        created_by: userData.user.id
+      })
       .select()
       .single();
 
-    if (error) throw error;
+    if (invError) throw invError;
 
-    // 2. Trigger Async GL Sync
-    // Note: We don't await this so it runs in background
-    GLSyncService.syncTransaction(invoice.tenant_id, invoice.id, 'INVOICE')
-        .catch(err => console.error('Background GL Sync failed', err));
+    // 3. Create Line Items and Calculate Totals
+    let subtotal = 0;
+    
+    if (request.items.length > 0) {
+      const itemsToInsert = request.items.map(item => {
+        const amount = item.quantity * item.unit_price;
+        subtotal += amount;
+        return {
+          invoice_id: invoice.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          charge_id: item.charge_id
+        };
+      });
 
-    return invoice as Invoice;
+      const { error: itemsError } = await supabase
+        .from('invoice_line_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
+    }
+
+    // 4. Update Invoice Totals (since no trigger on line_items yet)
+    // Note: tax_total is 0 for now until tax engine is integrated
+    const { error: updateError } = await supabase
+        .from('invoices')
+        .update({
+            subtotal: subtotal,
+            tax_total: 0,
+            total: subtotal,
+            balance_due: subtotal
+        })
+        .eq('id', invoice.id);
+    
+    if (updateError) throw updateError;
+    
+    return this.getInvoice(invoice.id) as Promise<Invoice>;
   }
 };

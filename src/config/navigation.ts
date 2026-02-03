@@ -54,7 +54,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Dashboards', path: '/dashboard/dashboards', icon: BarChart3, description: 'Visual dashboards' },
       { name: 'CRM Workspace', path: '/dashboard/crm-workspace', icon: BarChart3, description: 'Integrated CRM prototype workspace' },
       { name: 'Leads Workspace', path: '/dashboard/leads/pipeline', icon: Users, description: 'Leads-focused workspace variant' },
-      { name: 'Reports', path: '/dashboard/reports', icon: PieChart, description: 'Analytics and reports' },
+      { name: 'Reports', path: '/dashboard/reports', icon: PieChart, description: 'Analytics and reports', permissions: ['reports.view'] },
       { name: 'Chatter', path: '/dashboard/chatter', icon: MessageSquare, description: 'Collaboration feed' },
       { name: 'Groups', path: '/dashboard/groups', icon: UsersRound, description: 'Team groups' },
       { name: 'Calendar', path: '/dashboard/calendar', icon: CalendarDays, description: 'Events and schedules' },
@@ -85,6 +85,12 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Service Types', path: '/dashboard/service-types', icon: Cog, description: 'Define allowed service type values', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Service Type Mappings', path: '/dashboard/service-type-mappings', icon: GitBranch, description: 'Manage service type mappings', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Services', path: '/dashboard/services', icon: Package, description: 'Manage tenant service catalog', roles: ['platform_admin','tenant_admin','franchise_admin'] },
+    ],
+  },
+  {
+    label: 'Compliance',
+    items: [
+      { name: 'Restricted Party Screening', path: '/dashboard/restricted-party-screening', icon: FileCheck, description: 'Screen entities against watchlists' },
     ],
   },
   {
@@ -123,6 +129,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Master Data (Subscription Plans)', path: '/dashboard/settings/master-data-subscription-plans', icon: DollarSign, description: 'Subscription plan catalog and metadata' },
       { name: 'Master Data (HTS Codes)', path: '/dashboard/settings/master-data-hts', icon: FileText, description: 'HTS/Schedule B codes manager' },
       { name: 'Quote Numbering', path: '/dashboard/settings/quote-numbers', icon: FileCheck, description: 'Prefixes and reset policy' },
+      { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: FileText, description: 'View system audit logs', roles: ['platform_admin', 'tenant_admin'] },
       { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns' },
       { name: 'UI Advanced Demo', path: '/dashboard/ui-advanced-demo', icon: FileCheck, description: 'Phase 3–5 advanced fields' },
     ],

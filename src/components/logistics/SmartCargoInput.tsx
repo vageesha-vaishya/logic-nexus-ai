@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search, Package, AlertCircle } from 'lucide-react';
+import { Check, ChevronsUpDown, Search, Package, AlertCircle, FolderSearch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { VisualHTSBrowser } from '@/components/hts/VisualHTSBrowser';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Command,
   CommandEmpty,
@@ -38,6 +40,7 @@ interface SmartCargoInputProps {
 export function SmartCargoInput({ onSelect, className, placeholder = "Search commodities or HTS codes..." }: SmartCargoInputProps) {
   const { supabase } = useCRM();
   const [open, setOpen] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -73,28 +76,29 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     queryFn: async () => {
       if (!debouncedSearch) return [];
       
-      // Use the RPC function if available, otherwise fallback to simple search
-      try {
-        const { data, error } = await supabase.rpc('search_hts_codes', {
-          search_term: debouncedSearch,
-          limit_count: 10
-        });
-        
-        if (!error) return data;
-      } catch (e) {
-        // Fallback
-      }
-
-      const { data, error } = await supabase
-        .from('aes_hts_codes')
-        .select('id, hts_code, description, category')
-        .or(`hts_code.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
-        .limit(10);
-        
+      // Use the Smart Search RPC (Fuzzy Matching)
+      const { data, error } = await supabase.rpc('search_hts_codes_smart', {
+        p_search_term: debouncedSearch,
+        p_limit: 10
+      });
+      
       if (error) {
-        console.error('Error fetching HTS codes:', error);
-        return [];
+        console.warn('Smart search failed, falling back to simple search:', error);
+        
+        // Fallback to simple ILIKE search
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('aes_hts_codes')
+          .select('id, hts_code, description, category')
+          .or(`hts_code.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
+          .limit(10);
+          
+        if (fallbackError) {
+          console.error('Fallback search failed:', fallbackError);
+          return [];
+        }
+        return fallbackData;
       }
+      
       return data;
     },
     enabled: debouncedSearch.length > 1,
@@ -120,81 +124,112 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     setOpen(false);
   };
 
+  const handleBrowserSelect = (selection: { code: string; description: string; id: string }) => {
+    onSelect({
+      description: selection.description,
+      aes_hts_id: selection.id,
+    });
+    setBrowserOpen(false);
+    setSearchTerm(selection.code);
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-full justify-between text-left font-normal", !searchTerm && "text-muted-foreground", className)}
-        >
-          {searchTerm || placeholder}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[500px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput 
-            placeholder="Type to search..." 
-            value={searchTerm}
-            onValueChange={setSearchTerm}
-          />
-          <CommandList>
-            <CommandEmpty>
-              {debouncedSearch.length < 2 ? "Type at least 2 characters..." : "No results found."}
-            </CommandEmpty>
-            
-            {masterCommodities && masterCommodities.length > 0 && (
-              <CommandGroup heading="My Catalog (Master Commodities)">
-                {masterCommodities.map((item: any) => (
-                  <CommandItem
-                    key={item.id}
-                    value={item.id}
-                    onSelect={() => handleSelectMaster(item)}
-                    className="flex flex-col items-start gap-1 py-3"
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <Package className="h-4 w-4 text-blue-500" />
-                      <span className="font-medium">{item.name}</span>
-                      {item.sku && <Badge variant="outline" className="text-xs">{item.sku}</Badge>}
-                    </div>
-                    {item.description && (
-                      <span className="text-xs text-muted-foreground line-clamp-1 pl-6">
+    <div className={cn("flex gap-2 w-full", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn("flex-1 justify-between text-left font-normal", !searchTerm && "text-muted-foreground")}
+          >
+            {searchTerm || placeholder}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[500px] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput 
+              placeholder="Type to search..." 
+              value={searchTerm}
+              onValueChange={setSearchTerm}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {debouncedSearch.length < 2 ? "Type at least 2 characters..." : "No results found."}
+              </CommandEmpty>
+              
+              {masterCommodities && masterCommodities.length > 0 && (
+                <CommandGroup heading="My Catalog (Master Commodities)">
+                  {masterCommodities.map((item: any) => (
+                    <CommandItem
+                      key={item.id}
+                      value={item.id}
+                      onSelect={() => handleSelectMaster(item)}
+                      className="flex flex-col items-start gap-1 py-3"
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <Package className="h-4 w-4 text-blue-500" />
+                        <span className="font-medium">{item.name}</span>
+                        {item.sku && <Badge variant="outline" className="text-xs">{item.sku}</Badge>}
+                      </div>
+                      {item.description && (
+                        <span className="text-xs text-muted-foreground line-clamp-1 pl-6">
+                          {item.description}
+                        </span>
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+
+              {(masterCommodities?.length ?? 0) > 0 && (htsCodes?.length ?? 0) > 0 && <CommandSeparator />}
+
+              {htsCodes && htsCodes.length > 0 && (
+                <CommandGroup heading="Global HTS / Schedule B Codes">
+                  {htsCodes.map((item: any) => (
+                    <CommandItem
+                      key={item.id}
+                      value={item.id}
+                      onSelect={() => handleSelectHTS(item)}
+                      className="flex flex-col items-start gap-1 py-3"
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <Search className="h-4 w-4 text-green-500" />
+                        <span className="font-mono font-medium">{item.hts_code}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{item.category?.substring(0, 30)}...</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground line-clamp-2 pl-6">
                         {item.description}
                       </span>
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-            {(masterCommodities?.length ?? 0) > 0 && (htsCodes?.length ?? 0) > 0 && <CommandSeparator />}
+      <Button 
+        variant="outline" 
+        size="icon" 
+        onClick={() => setBrowserOpen(true)}
+        title="Browse HTS Codes"
+      >
+        <FolderSearch className="h-4 w-4" />
+      </Button>
 
-            {htsCodes && htsCodes.length > 0 && (
-              <CommandGroup heading="Global HTS / Schedule B Codes">
-                {htsCodes.map((item: any) => (
-                  <CommandItem
-                    key={item.id}
-                    value={item.id}
-                    onSelect={() => handleSelectHTS(item)}
-                    className="flex flex-col items-start gap-1 py-3"
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <Search className="h-4 w-4 text-green-500" />
-                      <span className="font-mono font-medium">{item.hts_code}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{item.category?.substring(0, 30)}...</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground line-clamp-2 pl-6">
-                      {item.description}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+      <Dialog open={browserOpen} onOpenChange={setBrowserOpen}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Visual HTS Browser</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden min-h-0">
+            <VisualHTSBrowser onSelect={handleBrowserSelect} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

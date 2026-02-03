@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -6,13 +7,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
     Truck, Ship, Plane, AlertTriangle, ShieldCheck, FileText, Globe, 
-    Clock, MapPin, DollarSign, BarChart3, Layers, CheckCircle2, Download, Printer, FileSpreadsheet
+    Clock, MapPin, DollarSign, BarChart3, Layers, CheckCircle2, Download, Printer, FileSpreadsheet, Loader2, ArrowRight
 } from "lucide-react";
 import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
 import { QuoteMapVisualizer } from './QuoteMapVisualizer';
 import { ChargeBreakdown } from '../common/ChargeBreakdown';
 import { ChargesAnalysisGraph } from '../common/ChargesAnalysisGraph';
 import { cn } from "@/lib/utils";
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from "@/components/ui/use-toast";
 
 import { Button } from "@/components/ui/button";
 
@@ -25,8 +28,41 @@ interface QuoteDetailViewProps {
 
 export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 'category' }: QuoteDetailViewProps) {
     const [activeFilter, setActiveFilter] = useState<{ type: 'category' | 'mode' | 'leg', value: string } | null>(null);
+    const [isConverting, setIsConverting] = useState(false);
+    const { toast } = useToast();
 
     if (!quote) return null;
+
+    const handleConvertToShipment = async () => {
+        try {
+            setIsConverting(true);
+            const { data: shipmentId, error } = await supabase.rpc('create_shipment_from_quote', {
+                p_quote_id: quote.id,
+                p_tenant_id: quote.tenant_id
+            });
+
+            if (error) throw error;
+
+            toast({
+                title: "Success",
+                description: "Quote converted to shipment successfully.",
+            });
+            
+            // Redirect to shipment detail
+            if (shipmentId) {
+                navigate(`/dashboard/shipments/${shipmentId}`);
+            }
+        } catch (error: any) {
+            console.error('Conversion error:', error);
+            toast({
+                title: "Error",
+                description: error.message || "Failed to convert quote to shipment",
+                variant: "destructive"
+            });
+        } finally {
+            setIsConverting(false);
+        }
+    };
 
     // Extract global charges if they exist directly on the quote but not in legs
     const globalCharges = quote.charges || [];
@@ -133,6 +169,16 @@ export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 
                         </Button>
                         <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 text-muted-foreground hover:text-primary" onClick={handleExportCSV}>
                             <FileSpreadsheet className="w-3 h-3" /> Export CSV
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 text-xs gap-1 text-muted-foreground hover:text-primary" 
+                            onClick={handleConvertToShipment}
+                            disabled={isConverting}
+                        >
+                            {isConverting ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
+                            Convert to Shipment
                         </Button>
                     </div>
                     <div className="text-3xl font-bold text-primary tracking-tight">

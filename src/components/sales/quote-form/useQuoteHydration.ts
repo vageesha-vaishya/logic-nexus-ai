@@ -38,6 +38,17 @@ export function useQuoteHydration(
         if (error) throw error;
         if (!quote) return;
 
+        // Fetch Items
+        const { data: items, error: itemsError } = await supabase
+          .from('quote_items')
+          .select('*')
+          .eq('quote_id', quoteId)
+          .order('line_number', { ascending: true });
+
+        if (itemsError) {
+          console.error('[QuoteHydration] Error fetching items:', itemsError);
+        }
+
         // Set Tenant Context
         if (quote.tenant_id) {
           setResolvedTenantId(String(quote.tenant_id));
@@ -63,6 +74,16 @@ export function useQuoteHydration(
           shipping_amount: quote.shipping_amount ? String(quote.shipping_amount) : '0',
           terms_conditions: quote.terms_conditions || '',
           notes: quote.notes || '',
+          items: items ? items.map((item: any) => ({
+            line_number: item.line_number,
+            product_name: item.product_name,
+            description: item.description || '',
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_percent: item.discount_percent || 0,
+            package_category_id: item.package_category_id ? String(item.package_category_id) : '',
+            package_size_id: item.package_size_id ? String(item.package_size_id) : '',
+          })) : [],
         });
 
         // Handle Service Label Injection if missing (Simplified)

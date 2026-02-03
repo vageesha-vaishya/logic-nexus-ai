@@ -168,7 +168,7 @@ export function ChargesManagementStep({
                 st.code === leg.mode ||
                 st.name === leg.mode
               );
-              const legName = serviceType?.name || leg.mode.toUpperCase();
+              const legName = (typeof serviceType?.name === 'string' ? serviceType.name : String(serviceType?.name || '')) || leg.mode.toUpperCase();
               const hasError = validationErrors.some(e => e.startsWith(`Leg ${idx + 1}`));
               
               return (
@@ -199,7 +199,7 @@ export function ChargesManagementStep({
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-semibold text-lg">
-                      Leg {legIdx + 1}: {serviceType?.name || leg.mode.toUpperCase()}
+                      Leg {legIdx + 1}: {getSafeName(serviceType?.name) || leg.mode.toUpperCase()}
                     </h4>
                     <p className="text-sm text-muted-foreground">
                       {leg.origin || 'Origin'} → {leg.destination || 'Destination'}

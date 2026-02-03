@@ -12,6 +12,7 @@ CREATE INDEX IF NOT EXISTS idx_vendor_notifications_doc_type ON vendor_notificat
 
 ALTER TABLE vendor_notifications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Platform admins can view notifications" ON vendor_notifications;
 CREATE POLICY "Platform admins can view notifications" ON vendor_notifications
   FOR SELECT
   TO authenticated

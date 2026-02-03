@@ -133,7 +133,7 @@ export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {isServiceLeg 
-                            ? `Service: ${leg.serviceOnlyCategory || 'Not specified'}`
+                            ? `Service: ${getSafeName(leg.serviceOnlyCategory) || 'Not specified'}`
                             : `${leg.origin || 'Origin'} → ${leg.destination || 'Destination'}`
                           }
                         </p>

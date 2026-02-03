@@ -27,11 +27,13 @@ ALTER TABLE public.vendor_folders ENABLE ROW LEVEL SECURITY;
 
 -- 4. RLS Policies
 -- Platform Admin: Full Access
+DROP POLICY IF EXISTS "Platform Admin Full Access Folders" ON public.vendor_folders;
 CREATE POLICY "Platform Admin Full Access Folders" ON public.vendor_folders
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
 
 -- Tenant Access: View/Edit based on tenant
+DROP POLICY IF EXISTS "Tenant Access Folders" ON public.vendor_folders;
 CREATE POLICY "Tenant Access Folders" ON public.vendor_folders
     FOR ALL
     USING (

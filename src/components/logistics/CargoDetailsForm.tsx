@@ -28,6 +28,8 @@ const cargoDetailsSchema = z.object({
   hazmat_class: z.string().optional(),
   temperature_controlled: z.boolean().default(false),
   notes: z.string().optional(),
+  value_amount: z.coerce.number().optional(),
+  value_currency: z.string().default("USD"),
 });
 
 export type CargoDetailsFormData = z.infer<typeof cargoDetailsSchema> & { id?: string };
@@ -63,6 +65,8 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
       hazmat_class: initialData?.hazmat_class || "",
       temperature_controlled: !!initialData?.temperature_controlled,
       notes: initialData?.notes || "",
+      value_amount: initialData?.value_amount ?? undefined,
+      value_currency: initialData?.value_currency || "USD",
     },
   });
 
@@ -111,7 +115,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
     // Load service types (publicly viewable per migration)
     (async () => {
       const { data } = await scopedDb.from("service_types", true).select("name, description, is_active");
-      const values = (data || []).filter((t) => (t as ServiceTypeOption).is_active !== false) as ServiceTypeOption[];
+      const values = (data || []).filter((t: ServiceTypeOption) => t.is_active !== false) as ServiceTypeOption[];
       // Fallback to known values if empty
       setServiceTypes(
         values.length > 0
@@ -135,7 +139,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
         .from("cargo_types")
         .select("id, cargo_type_name, is_active");
       if (!error && data) {
-        const rows = data.filter((c) => c.is_active !== false).map(c => ({
+        const rows = data.filter((c: { is_active: boolean | null }) => c.is_active !== false).map(c => ({
           id: c.id,
           cargo_type_name: c.cargo_type_name,
           is_active: c.is_active
@@ -165,7 +169,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
   async function handleSubmit(values: CargoDetailsFormData) {
     try {
       if (initialData?.id) {
-        const updatePayload: Omit<Database["public"]["Tables"]["cargo_details"]["Update"], "tenant_id"> = {
+        const updatePayload = {
           service_type: values.service_type,
           service_id: values.service_id,
           cargo_type_id: values.cargo_type_id,
@@ -179,6 +183,8 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           notes: values.notes,
           weight_kg: values.total_weight_kg,
           volume_cbm: values.total_volume_cbm,
+          value_amount: values.value_amount,
+          value_currency: values.value_currency,
         };
         const { error } = await scopedDb.from("cargo_details").update(updatePayload as any).eq("id", initialData.id);
         if (error) throw error;
@@ -198,6 +204,8 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
           notes: values.notes,
           weight_kg: values.total_weight_kg,
           volume_cbm: values.total_volume_cbm,
+          value_amount: values.value_amount,
+          value_currency: values.value_currency,
         };
         const { error } = await scopedDb.from("cargo_details").insert(insertPayload as any);
         if (error) throw error;
@@ -352,6 +360,45 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                 <FormMessage />
               </FormItem>
             )}
+        />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="value_amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Declared Value</FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.01" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="value_currency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Currency</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="USD" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="CNY">CNY</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
           />
         </div>
 
@@ -449,13 +496,23 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                 }
 
                 // Call RPC
+                const declaredValue = form.getValues('value_amount') || 0;
+                const declaredCurrency = form.getValues('value_currency') || 'USD';
+                
+                if (declaredValue <= 0) {
+                  toast.error("Please enter a Declared Value greater than 0.");
+                  setCalculatingDuty(false);
+                  return;
+                }
+
                 const { data, error } = await scopedDb.rpc('calculate_duty', {
                   p_origin_country: originCountry,
                   p_destination_country: destCountry,
                   p_items: [{
                     hts_code: codeStr,
-                    value: 1000, // Hardcoded simulation value for now
-                    quantity: 1
+                    value: declaredValue,
+                    quantity: 1,
+                    currency: declaredCurrency
                   }]
                 });
                 
@@ -471,7 +528,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
             }}
             disabled={calculatingDuty}
           >
-            {calculatingDuty ? "Calculating..." : "Estimate Duty (Base Value: $1000)"}
+            {calculatingDuty ? "Calculating..." : "Estimate Duty (based on Declared Value)"}
           </Button>
 
           {dutyResult && (

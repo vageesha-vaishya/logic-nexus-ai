@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
+import { logger } from '@/lib/logger';
 
 export default function ShipmentDetail() {
   const { id } = useParams();
@@ -33,8 +34,9 @@ export default function ShipmentDetail() {
   };
   const [attachments, setAttachments] = useState<ShipmentAttachment[]>([]);
   const [podUploading, setPodUploading] = useState(false);
-  const { supabase, context, scopedDb } = useCRM();
+  const { supabase, context, scopedDb, preferences } = useCRM();
   const [podFile, setPodFile] = useState<File | null>(null);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   
   // Cargo state
   const [cargoItems, setCargoItems] = useState<any[]>([]);
@@ -81,6 +83,42 @@ export default function ShipmentDetail() {
       setLoading(false);
     }
   }, [supabase, context, id, toast]);
+
+  const handleCreateInvoice = useCallback(async () => {
+    try {
+      if (!id) {
+        toast.error('Missing shipment id');
+        return;
+      }
+      if (!preferences?.tenant_id) {
+        toast.error('Select a tenant scope before creating an invoice');
+        return;
+      }
+      setCreatingInvoice(true);
+      const { data: createdId, error } = await supabase
+        .rpc('create_invoice_from_shipment', {
+          p_shipment_id: id,
+          p_tenant_id: preferences.tenant_id,
+        });
+      if (error) throw error;
+
+      // Fetch invoice number for confirmation
+      const { data: inv, error: invErr } = await (scopedDb as any)
+        .from('invoices' as any)
+        .select('id, invoice_number, status, total')
+        .eq('id', createdId)
+        .maybeSingle();
+      if (invErr) throw invErr;
+
+      toast.success(`Invoice ${inv?.invoice_number || createdId} created`);
+      navigate(`/dashboard/finance/invoices/${createdId}`);
+    } catch (e: any) {
+      logger.error('Failed to create invoice', { component: 'ShipmentDetail', error: e?.message, stack: e?.stack, shipmentId: id });
+      toast.error(e?.message || 'Failed to create invoice');
+    } finally {
+      setCreatingInvoice(false);
+    }
+  }, [id, preferences?.tenant_id, supabase, scopedDb]);
 
   const fetchAttachments = useCallback(async () => {
     try {
@@ -239,10 +277,15 @@ export default function ShipmentDetail() {
               )
             )}
           </div>
+          <div className="flex gap-2">
           <Button>
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
+          <Button variant="outline" onClick={handleCreateInvoice} disabled={creatingInvoice}>
+            {creatingInvoice ? 'Creating…' : 'Create Invoice'}
+          </Button>
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">

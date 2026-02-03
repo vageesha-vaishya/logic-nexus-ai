@@ -368,7 +368,7 @@ export function QuoteHeader() {
                   <SelectContent>
                     {filteredContacts.map((con: any) => (
                       <SelectItem key={con.id} value={String(con.id)}>
-                        {con.first_name} {con.last_name}
+                        {String(con.first_name || '')} {String(con.last_name || '')}
                       </SelectItem>
                     ))}
                   </SelectContent>

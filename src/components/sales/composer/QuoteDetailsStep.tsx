@@ -184,7 +184,11 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, dest
                   <div className="text-[10px] text-destructive bg-destructive/10 p-2 rounded max-w-xs">
                     <ul className="list-disc pl-3 space-y-1">
                       {complianceStatus.issues.map((issue: any, i: number) => (
-                        <li key={i}>{issue.message || issue}</li>
+                        <li key={i}>
+                          {typeof issue === 'string' 
+                            ? issue 
+                            : (issue.message || issue.description || JSON.stringify(issue))}
+                        </li>
                       ))}
                     </ul>
                   </div>

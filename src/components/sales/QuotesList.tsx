@@ -101,9 +101,9 @@ export function QuotesList({
                 <TableCell>
                   <Badge 
                     variant="secondary" 
-                    className={`${statusConfig[quote.status].color} hover:bg-opacity-80`}
+                    className={`${(statusConfig[quote.status as keyof typeof statusConfig] || { color: 'bg-gray-100 text-gray-800' }).color} hover:bg-opacity-80`}
                   >
-                    {statusConfig[quote.status].label}
+                    {(statusConfig[quote.status as keyof typeof statusConfig] || { label: quote.status }).label}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-medium">

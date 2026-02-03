@@ -59,8 +59,8 @@ export function QuoteLogistics() {
                     {serviceTypes.map((st: any) => (
                       <SelectItem key={st.id} value={st.id}>
                         <div className="flex items-center gap-2">
-                            {getServiceIcon(st.name)}
-                            {st.name}
+                            {getServiceIcon(typeof st.name === 'string' ? st.name : '')}
+                            {typeof st.name === 'string' ? st.name : String(st.name || '')}
                         </div>
                       </SelectItem>
                     ))}
@@ -86,7 +86,7 @@ export function QuoteLogistics() {
                   <SelectContent>
                     {filteredServices.map((s: any) => (
                       <SelectItem key={s.id} value={String(s.id)}>
-                        {s.service_name}
+                        {typeof s.service_name === 'string' ? s.service_name : String(s.service_name || '')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -128,8 +128,8 @@ export function QuoteLogistics() {
                         {ports.map((p: any) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                             <div className="flex flex-col items-start">
-                                <span className="font-medium">{p.name || p.location_name}</span>
-                                <span className="text-xs text-muted-foreground">{p.code || p.location_code}</span>
+                                <span className="font-medium">{typeof (p.name || p.location_name) === 'string' ? (p.name || p.location_name) : String(p.name || p.location_name || '')}</span>
+                                <span className="text-xs text-muted-foreground">{typeof (p.code || p.location_code) === 'string' ? (p.code || p.location_code) : String(p.code || p.location_code || '')}</span>
                             </div>
                         </SelectItem>
                         ))}
@@ -165,8 +165,8 @@ export function QuoteLogistics() {
                         {ports.map((p: any) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                              <div className="flex flex-col items-start">
-                                <span className="font-medium">{p.name || p.location_name}</span>
-                                <span className="text-xs text-muted-foreground">{p.code || p.location_code}</span>
+                                <span className="font-medium">{typeof (p.name || p.location_name) === 'string' ? (p.name || p.location_name) : String(p.name || p.location_name || '')}</span>
+                                <span className="text-xs text-muted-foreground">{typeof (p.code || p.location_code) === 'string' ? (p.code || p.location_code) : String(p.code || p.location_code || '')}</span>
                             </div>
                         </SelectItem>
                         ))}

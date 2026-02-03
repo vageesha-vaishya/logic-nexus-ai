@@ -22,6 +22,7 @@ import OpportunitySelectDialogList from '@/components/crm/OpportunitySelectDialo
 import AccountSelectDialogList from '@/components/crm/AccountSelectDialogList';
 import ContactSelectDialogList from '@/components/crm/ContactSelectDialogList';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
+import { ScreeningButton } from '@/components/compliance/ScreeningButton';
 import {
   upsertRatesAndChargesForQuote,
   createQuotationVersionWithOptions,
@@ -202,6 +203,8 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
 
   // Watch selected account to enable contact filtering
   const accountId = form.watch('account_id');
+  const contactId = form.watch('contact_id');
+  const consigneeId = form.watch('consignee_id');
   // Watch selected carrier to ensure its label is available immediately
   const carrierId = form.watch('carrier_id');
   // Watch service type id (UUID) to sync code for filtering/mappings
@@ -2249,10 +2252,21 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         )}
                       </SelectContent>
                     </Select>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={() => setContactDialogOpen(true)}>
                         <Search className="h-4 w-4 mr-2" /> Browse contacts
                       </Button>
+                      {field.value && (
+                        <ScreeningButton
+                          quoteId={quoteId}
+                          contactId={field.value}
+                          direction="shipper"
+                          name={(() => {
+                            const c = contacts.find((c: any) => String(c.id) === String(field.value));
+                            return c ? `${c.first_name} ${c.last_name}` : 'Unknown Contact';
+                          })()}
+                        />
+                      )}
                     </div>
                     <FormMessage />
                   </FormItem>
@@ -2329,6 +2343,19 @@ export function QuoteForm({ quoteId, onSuccess }: { quoteId?: string; onSuccess?
                         })()}
                       </SelectContent>
                     </Select>
+                    <div className="mt-2">
+                      {field.value && (
+                        <ScreeningButton
+                          quoteId={quoteId}
+                          contactId={field.value}
+                          direction="consignee"
+                          name={(() => {
+                            const c = consignees.find((c: any) => String(c.id) === String(field.value));
+                            return c ? c.company_name : 'Unknown Consignee';
+                          })()}
+                        />
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

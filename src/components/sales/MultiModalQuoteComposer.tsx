@@ -61,6 +61,18 @@ const STEPS = [
   { id: 4, title: 'Review & Save', description: 'Finalize quote' }
 ];
 
+// Helper to safely render strings from potential DB objects
+const getSafeString = (val: any, fallback: string = '') => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number') return String(val);
+  if (typeof val === 'object') {
+     // Try common properties
+     return val.name || val.code || val.details || val.description || fallback;
+  }
+  return String(val);
+};
+
 export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId }: MultiModalQuoteComposerProps) {
   const { scopedDb, context } = useCRM();
   const debug = useDebug('Sales', 'QuoteComposer');
@@ -224,7 +236,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     if (optionId && tenantId) {
       loadOptionData();
     }
-  }, [optionId, tenantId, carriers.length, transportModes.length]);
+  }, [optionId, tenantId, carriers.length, transportModes.length, serviceTypes.length]);
 
   const loadInitialData = async () => {
     debug.debug('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
@@ -308,7 +320,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             errors.push(`Failed to load quote details: ${quoteError.message}`);
             toast({
               title: "Error Loading Quote",
-              description: quoteError.message,
+              description: typeof quoteError.message === 'string' ? quoteError.message : JSON.stringify(quoteError.message || 'Unknown error'),
               variant: "destructive"
             });
           } else if (quoteRow) {
@@ -391,7 +403,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 ...raw,
                 origin: raw.origin_location?.name || raw.origin_code || '',
                 destination: raw.destination_location?.name || raw.destination_code || '',
-                commodity: validCargoDetails?.commodity || derivedCommodity || '',
+                commodity: getSafeString(validCargoDetails?.commodity) || derivedCommodity || '',
                 mode: raw.transport_mode || 'ocean',
                 total_weight: calculatedTotalWeight,
                 total_volume: calculatedTotalVolume
@@ -488,11 +500,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           carriers: [] as any[]
         };
 
-        const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string) => {
+        const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
           try {
             const { data, error } = await (scopedDb
               .from(table as any, true)
-              .select('*')
+              .select(selectQuery)
               .eq('is_active', true) as any);
             
             if (error) {
@@ -509,7 +521,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         };
 
         await Promise.all([
-          fetchRef('service_types', 'serviceTypes', 'Failed to load service types'),
+          fetchRef('service_types', 'serviceTypes', 'Failed to load service types', '*, transport_modes(*)'),
           fetchRef('transport_modes', 'transportModes', 'Failed to load transport modes'),
           fetchRef('charge_categories', 'chargeCategories', 'Failed to load charge categories'),
           fetchRef('charge_bases', 'chargeBases', 'Failed to load charge bases'),
@@ -764,12 +776,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (optionData) {
         setQuoteData(prev => ({
           ...prev,
-          carrier_name: optionData.carrier_name || '',
-          service_type: optionData.service_type || '',
-          transit_time: optionData.transit_time || '',
+          carrier_name: getSafeString(optionData.carrier_name),
+          service_type: getSafeString(optionData.service_type),
+          transit_time: getSafeString(optionData.transit_time),
           validUntil: optionData.valid_until ? new Date(optionData.valid_until).toISOString().split('T')[0] : prev.validUntil,
           currencyId: optionData.quote_currency_id || prev.currencyId,
-          option_name: optionData.option_name || '',
+          option_name: getSafeString(optionData.option_name),
           ai_generated: optionData.ai_generated || false
         }));
       }
@@ -841,9 +853,19 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             const chargeObj = chargesMap.get(key);
             const side = charge.charge_sides?.code;
             if (side === 'buy') {
-              chargeObj.buy = { quantity: charge.quantity || 0, rate: charge.rate || 0 };
+              chargeObj.buy = { 
+                dbChargeId: charge.id, 
+                quantity: charge.quantity || 0, 
+                rate: charge.rate || 0, 
+                amount: charge.amount || 0 
+              };
             } else if (side === 'sell') {
-              chargeObj.sell = { quantity: charge.quantity || 0, rate: charge.rate || 0 };
+              chargeObj.sell = { 
+                dbChargeId: charge.id, 
+                quantity: charge.quantity || 0, 
+                rate: charge.rate || 0, 
+                amount: charge.amount || 0 
+              };
             }
           });
 
@@ -858,14 +880,14 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
           return {
             id: leg.id,
-            mode: modeName,
+            mode: getSafeString(modeName),
             serviceTypeId: leg.service_type_id || '',
-            carrierName: carrierName,
-            origin: leg.origin_location || '',
-            destination: leg.destination_location || '',
+            carrierName: getSafeString(carrierName),
+            origin: getSafeString(leg.origin_location),
+            destination: getSafeString(leg.destination_location),
             // Normalize legType to ensure it's either 'transport' or 'service'
             legType: leg.leg_type === 'service' ? 'service' : 'transport',
-            serviceOnlyCategory: leg.service_only_category || '',
+            serviceOnlyCategory: getSafeString(leg.service_only_category),
             charges: Array.from(chargesMap.values())
           };
         });

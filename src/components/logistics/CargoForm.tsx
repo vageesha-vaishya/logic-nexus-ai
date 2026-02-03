@@ -39,6 +39,8 @@ const cargoFormSchema = z.object({
   hazmat: z.boolean().default(false),
   hazmat_class: z.string().optional(),
   temperature_controlled: z.boolean().default(false),
+  value_amount: z.coerce.number().min(0).optional(),
+  value_currency: z.string().default('USD'),
 });
 
 type CargoFormValues = z.infer<typeof cargoFormSchema>;
@@ -67,6 +69,8 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
       hazmat: false,
       hazmat_class: '',
       temperature_controlled: false,
+      value_amount: 0,
+      value_currency: 'USD',
       ...defaultValues,
     },
   });
@@ -310,6 +314,46 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="value_amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Declared Value</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="value_currency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Currency</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="USD">USD - US Dollar</SelectItem>
+                    <SelectItem value="EUR">EUR - Euro</SelectItem>
+                    <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                    <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
+                    <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

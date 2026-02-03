@@ -13,6 +13,8 @@ const ShipmentsWidget = lazy(() => import('@/components/dashboard/widgets/Shipme
 const TransfersWidget = lazy(() => import('@/components/dashboard/widgets/TransfersWidget').then(m => ({ default: m.TransfersWidget })));
 const CustomChartWidget = lazy(() => import('@/components/dashboard/widgets/CustomChartWidget').then(m => ({ default: m.CustomChartWidget })));
 const InsightsWidget = lazy(() => import('@/components/dashboard/widgets/InsightsWidget').then(m => ({ default: m.InsightsWidget })));
+const FinancialWidget = lazy(() => import('@/components/dashboard/widgets/FinancialWidget').then(m => ({ default: m.FinancialWidget })));
+const VolumeWidget = lazy(() => import('@/components/dashboard/widgets/VolumeWidget').then(m => ({ default: m.VolumeWidget })));
 
 export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
   {
@@ -89,6 +91,20 @@ export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
       groupBy: 'status',
       chartType: 'bar'
     }
+  },
+  {
+    type: 'financial',
+    label: 'Financial Performance',
+    description: 'Revenue vs Cost overview',
+    defaultSize: 'large',
+    component: FinancialWidget as unknown as ComponentType<any>,
+  },
+  {
+    type: 'volume',
+    label: 'Shipment Volume',
+    description: 'Shipment volume by carrier',
+    defaultSize: 'medium',
+    component: VolumeWidget as unknown as ComponentType<any>,
   },
 ];
 

@@ -10,7 +10,10 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-const migrationFile = path.join(__dirname, '..', 'supabase', 'migrations', '20260204010000_granular_logistics_types.sql');
+const migrationPathArg = process.argv[2];
+const migrationFile = migrationPathArg 
+  ? path.resolve(process.cwd(), migrationPathArg)
+  : path.join(__dirname, '..', 'supabase', 'migrations', '20260204010000_granular_logistics_types.sql');
 
 async function runMigration() {
   console.log('🚀 Applying Granular Logistics Types Migration...');

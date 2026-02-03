@@ -63,6 +63,7 @@ import Dashboards from "./pages/dashboard/Dashboards";
 import CRMWorkspace from "./pages/dashboard/CRMWorkspace";
 import More from "./pages/dashboard/More";
 import PermissionsMatrix from "./pages/dashboard/PermissionsMatrix";
+import AuditLogs from "./pages/dashboard/AuditLogs";
 import CustomRoles from "./pages/dashboard/CustomRoles";
 import Shipments from "./pages/dashboard/Shipments";
 import ShipmentNew from "./pages/dashboard/ShipmentNew";
@@ -97,6 +98,7 @@ import QuoteNumberSettings from "./pages/dashboard/QuoteNumberSettings";
 import DataManagement from "./pages/dashboard/DataManagement";
 import ServiceTypeMappings from "./pages/dashboard/ServiceTypeMappings";
 import ServiceTypes from "./pages/dashboard/ServiceTypes";
+import RestrictedPartyScreening from "./pages/dashboard/RestrictedPartyScreening";
 import TransportModes from "./pages/dashboard/TransportModes";
 import Services from "./pages/dashboard/Services";
 import Currencies from "./pages/dashboard/Currencies";
@@ -651,7 +653,9 @@ const App = () => (
             <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><CRMWorkspace /></ProtectedRoute>} />
             <Route path="/dashboard/leads-workspace" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
-            <Route path="/dashboard/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PermissionsMatrix /></ProtectedRoute>} />
+            <Route path="/dashboard/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             <Route path="/dashboard/currencies" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Currencies /></ProtectedRoute>} />
@@ -693,6 +697,7 @@ const App = () => (
               <Route path="/dashboard/incoterms" element={<ProtectedRoute><Incoterms /></ProtectedRoute>} />
              <Route path="/dashboard/service-types" element={<ProtectedRoute><ServiceTypes /></ProtectedRoute>} />
              <Route path="/dashboard/transport-modes" element={<ProtectedRoute><TransportModes /></ProtectedRoute>} />
+             <Route path="/dashboard/restricted-party-screening" element={<ProtectedRoute><RestrictedPartyScreening /></ProtectedRoute>} />
              <Route path="/dashboard/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
              <Route path="/dashboard/service-type-mappings" element={<ProtectedRoute><ServiceTypeMappings /></ProtectedRoute>} />
             {/* Subscription & Billing Routes */}

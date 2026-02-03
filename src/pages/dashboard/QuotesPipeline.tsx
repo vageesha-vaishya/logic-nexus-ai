@@ -161,7 +161,7 @@ export default function QuotesPipeline() {
     if (limit < 999 && currentCount >= limit) {
       toast({
         title: "WIP Limit Reached",
-        description: `Cannot move to ${statusConfig[newStatus].label} (Limit: ${limit})`,
+        description: `Cannot move to ${statusConfig[newStatus]?.label || newStatus} (Limit: ${limit})`,
         variant: "destructive",
       });
       return;
@@ -330,8 +330,8 @@ export default function QuotesPipeline() {
       setBulkMode(false);
 
       toast({
-        title: "Success",
-        description: `Updated ${selectedQuotes.size} quotes to ${statusConfig[newStatus].label}`,
+        title: "Status Updated",
+        description: `Updated ${selectedQuotes.size} quotes to ${statusConfig[newStatus]?.label || newStatus}`,
       });
     } catch (error) {
       debug.error("Error updating quotes:", error);
@@ -622,7 +622,7 @@ export default function QuotesPipeline() {
                       <SelectContent>
                         {(selectedStages.length ? selectedStages : stages).map(stage => (
                           <SelectItem key={stage} value={stage}>
-                            {statusConfig[stage].label}
+                            {statusConfig[stage]?.label || stage}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -674,7 +674,7 @@ export default function QuotesPipeline() {
                                 }}
                               />
                               <Label htmlFor={`col-${stage}`} className="text-xs truncate">
-                                {statusConfig[stage].label}
+                                {statusConfig[stage]?.label || stage}
                               </Label>
                             </div>
                           ))}
@@ -684,7 +684,7 @@ export default function QuotesPipeline() {
                         <div className="space-y-2">
                           {stages.slice(0, 3).map(stage => (
                             <div key={stage} className="flex items-center justify-between">
-                              <Label className="text-xs">{statusConfig[stage].label}</Label>
+                              <Label className="text-xs">{statusConfig[stage]?.label || stage}</Label>
                               <Input
                                 type="number"
                                 min="0"

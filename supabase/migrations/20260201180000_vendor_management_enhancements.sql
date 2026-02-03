@@ -106,6 +106,7 @@ ALTER TABLE public.vendor_risk_assessments ENABLE ROW LEVEL SECURITY;
 -- For simplicity, we'll allow access if user belongs to the vendor's tenant (or if vendor is global)
 
 -- Helper policy for documents
+DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_documents;
 CREATE POLICY "Tenant Access" ON public.vendor_documents
     USING (
         EXISTS (
@@ -115,6 +116,7 @@ CREATE POLICY "Tenant Access" ON public.vendor_documents
         )
     );
 
+DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_contracts;
 CREATE POLICY "Tenant Access" ON public.vendor_contracts
     USING (
         EXISTS (
@@ -124,6 +126,7 @@ CREATE POLICY "Tenant Access" ON public.vendor_contracts
         )
     );
 
+DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_performance_reviews;
 CREATE POLICY "Tenant Access" ON public.vendor_performance_reviews
     USING (
         EXISTS (
@@ -133,6 +136,7 @@ CREATE POLICY "Tenant Access" ON public.vendor_performance_reviews
         )
     );
 
+DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_risk_assessments;
 CREATE POLICY "Tenant Access" ON public.vendor_risk_assessments
     USING (
         EXISTS (

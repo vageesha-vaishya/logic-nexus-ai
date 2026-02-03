@@ -9,10 +9,12 @@ DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON public.v
 DROP POLICY IF EXISTS "Enable update access for authenticated users" ON public.vendor_documents;
 DROP POLICY IF EXISTS "Enable delete access for authenticated users" ON public.vendor_documents;
 
+DROP POLICY IF EXISTS "Platform Admin Full Access Documents" ON public.vendor_documents;
 CREATE POLICY "Platform Admin Full Access Documents" ON public.vendor_documents
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Tenant Access Documents" ON public.vendor_documents;
 CREATE POLICY "Tenant Access Documents" ON public.vendor_documents
     FOR ALL
     USING (
@@ -32,10 +34,12 @@ DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON public.v
 DROP POLICY IF EXISTS "Enable update access for authenticated users" ON public.vendor_contracts;
 DROP POLICY IF EXISTS "Enable delete access for authenticated users" ON public.vendor_contracts;
 
+DROP POLICY IF EXISTS "Platform Admin Full Access Contracts" ON public.vendor_contracts;
 CREATE POLICY "Platform Admin Full Access Contracts" ON public.vendor_contracts
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Tenant Access Contracts" ON public.vendor_contracts;
 CREATE POLICY "Tenant Access Contracts" ON public.vendor_contracts
     FOR ALL
     USING (
@@ -59,6 +63,7 @@ DROP POLICY IF EXISTS "Vendor Docs Access" ON storage.objects;
 DROP POLICY IF EXISTS "Users can upload vendor docs" ON storage.objects;
 
 -- Create Tenant-Aware Storage Policies
+DROP POLICY IF EXISTS "Vendor Docs Tenant Access" ON storage.objects;
 CREATE POLICY "Vendor Docs Tenant Access" ON storage.objects
 FOR ALL
 USING (

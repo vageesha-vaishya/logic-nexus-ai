@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Printer, FileText, Package, Box } from 'lucide-react';
+import { Printer, FileText, Package, Box, Calculator } from 'lucide-react';
+import { LandedCostService, LandedCostResult } from '@/services/quotation/LandedCostService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DocumentPreviewProps {
   quoteData: any;
@@ -11,15 +13,89 @@ interface DocumentPreviewProps {
 }
 
 export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: DocumentPreviewProps) {
+  const [landedCost, setLandedCost] = useState<LandedCostResult | null>(null);
+
+  // Helper to parse country code from destination string
+  const getCountryCode = (destination: string): string => {
+      if (!destination) return 'US';
+      const dest = destination.trim().toUpperCase();
+      
+      // Exact 2-letter match
+      if (dest.length === 2) return dest;
+      
+      // Ends with ", US" or " US"
+      if (dest.endsWith(' US') || dest.endsWith(', US') || dest.endsWith(', USA')) return 'US';
+      
+      // Contains United States
+      if (dest.includes('UNITED STATES')) return 'US';
+      
+      // Default fallback (can be improved with a lookup table later)
+      return 'US'; 
+  };
+
+  useEffect(() => {
+    const calculateCost = async () => {
+        // Map items from quoteData to LandedCostItem format
+        // Assuming quoteData.items exists (from QuoteLineItems)
+        // If items are not present, we can't calculate
+        if (quoteData?.items?.length) {
+             const items = quoteData.items.map((item: any) => ({
+                 hs_code: item.attributes?.hs_code,
+                 value: Number(item.unit_price || 0) * Number(item.quantity || 1), 
+                 quantity: Number(item.quantity || 1),
+                 weight: Number(item.attributes?.weight || 0),
+                 origin_country: quoteData.origin_country // Optional, defaults to NULL/World in DB if needed, or ignored
+             })).filter((i: any) => i.hs_code);
+
+             if (items.length > 0) {
+                 // Parse country code from destination string or use port_id
+                 let dest = 'US';
+                 
+                 if (quoteData.destination_port_id) {
+                    const { data: port } = await supabase
+                        .from('ports_locations')
+                        .select('countries(code_iso2)')
+                        .eq('id', quoteData.destination_port_id)
+                        .single();
+                    
+                    // @ts-ignore - nested relationship query
+                    if (port?.countries?.code_iso2) {
+                        // @ts-ignore
+                        dest = port.countries.code_iso2;
+                    }
+                } else {
+                     dest = getCountryCode(quoteData.destination);
+                 }
+
+                 const result = await LandedCostService.calculate(items, dest);
+                 setLandedCost(result);
+             }
+        }
+    };
+    calculateCost();
+  }, [quoteData]);
+
   const handlePrint = () => {
     window.print();
   };
 
+  const getSafeString = (val: any, fallback: string = '') => {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'object') {
+       return val.name || val.code || val.details || val.description || fallback;
+    }
+    return String(val);
+  };
+
   const today = new Date().toLocaleDateString();
 
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
+  const currency = quoteData.currency || 'USD';
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Printer className="h-4 w-4" />
           Generate Documents
@@ -72,7 +148,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                 <div className="flex justify-between items-start border-b pb-6 mb-6">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">QUOTATION</h1>
-                        <p className="text-slate-500 mt-1">Reference: {quoteData.reference || 'DRAFT'}</p>
+                        <p className="text-slate-500 mt-1">Reference: {getSafeString(quoteData.reference, 'DRAFT')}</p>
                     </div>
                     <div className="text-right">
                         <div className="font-bold text-xl text-slate-800">SOS Logistics Pro</div>
@@ -87,9 +163,9 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                     <div>
                         <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Prepared For</h3>
                         <div className="text-sm font-medium">
-                            <p className="font-bold text-lg">{quoteData.account_id || 'Client Name'}</p>
-                            <p className="text-slate-500">{quoteData.contact_id || 'Contact Person'}</p>
-                            <p className="text-slate-500 mt-1">{quoteData.destination || 'Client Address'}</p>
+                            <p className="font-bold text-lg">{getSafeString(quoteData.account_id, 'Client Name')}</p>
+                            <p className="text-slate-500">{getSafeString(quoteData.contact_id, 'Contact Person')}</p>
+                            <p className="text-slate-500 mt-1">{getSafeString(quoteData.destination, 'Client Address')}</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -99,11 +175,11 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                         </div>
                         <div>
                             <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Valid Until</h3>
-                            <p className="text-sm font-medium">{quoteData.validUntil || '30 Days from Date'}</p>
+                            <p className="text-sm font-medium">{getSafeString(quoteData.validUntil, '30 Days from Date')}</p>
                         </div>
                         <div>
                             <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Incoterms</h3>
-                            <p className="text-sm font-medium">{quoteData.incoterms || 'Ex Works (EXW)'}</p>
+                            <p className="text-sm font-medium">{getSafeString(quoteData.incoterms, 'Ex Works (EXW)')}</p>
                         </div>
                         <div>
                              <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Currency</h3>
@@ -126,7 +202,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                          </div>
                          <div>
                             <span className="text-slate-500 block text-xs">Description</span>
-                            <span className="font-medium">{quoteData.commodity || 'General Cargo'}</span>
+                            <span className="font-medium">{getSafeString(quoteData.commodity, 'General Cargo')}</span>
                          </div>
                     </div>
                 </div>
@@ -138,14 +214,14 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                         {legs.map((leg, i) => (
                              <div key={leg.id} className="flex items-center text-sm border p-3 rounded-md">
                                 <span className="font-bold text-slate-400 mr-4 w-6">0{i+1}</span>
-                                <span className="font-semibold uppercase w-24 px-2 py-1 bg-slate-100 rounded text-center text-xs mr-4">{leg.mode}</span>
+                                <span className="font-semibold uppercase w-24 px-2 py-1 bg-slate-100 rounded text-center text-xs mr-4">{getSafeString(leg.mode)}</span>
                                 <div className="flex-1 flex items-center gap-2">
-                                    <span className="font-medium">{leg.origin || leg.origin_location_id || 'Origin'}</span>
+                                    <span className="font-medium">{getSafeString(leg.origin || leg.origin_location_id, 'Origin')}</span>
                                     <span className="text-slate-400">→</span>
-                                    <span className="font-medium">{leg.destination || leg.destination_location_id || 'Destination'}</span>
+                                    <span className="font-medium">{getSafeString(leg.destination || leg.destination_location_id, 'Destination')}</span>
                                 </div>
                                 <div className="text-xs text-slate-500">
-                                    {leg.carrierName || 'TBD'}
+                                    {getSafeString(leg.carrierName, 'TBD')}
                                 </div>
                              </div>
                         ))}
@@ -168,8 +244,8 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                             {legs.flatMap(l => l.charges).map((c: any, i: number) => (
                                 <tr key={i}>
                                     <td className="p-3">
-                                        <div className="font-medium">{c.category || 'Charge'}</div>
-                                        <div className="text-xs text-slate-500">{c.note || c.name || '-'}</div>
+                                        <div className="font-medium">{getSafeString(c.category, 'Charge')}</div>
+                                        <div className="text-xs text-slate-500">{getSafeString(c.note || c.name, '-')}</div>
                                     </td>
                                     <td className="p-3 text-right text-slate-600">{c.sell?.quantity || 1}</td>
                                     <td className="p-3 text-right text-slate-600">{c.sell?.rate?.toFixed(2)}</td>
@@ -179,8 +255,8 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                             {combinedCharges.map((c: any, i: number) => (
                                 <tr key={`combined-${i}`}>
                                     <td className="p-3">
-                                        <div className="font-medium">{c.description || 'Combined Charge'}</div>
-                                        <div className="text-xs text-slate-500">{c.category || 'Additional'}</div>
+                                        <div className="font-medium">{getSafeString(c.description, 'Combined Charge')}</div>
+                                        <div className="text-xs text-slate-500">{getSafeString(c.category, 'Additional')}</div>
                                     </td>
                                     <td className="p-3 text-right text-slate-600">{c.sell?.quantity || 1}</td>
                                     <td className="p-3 text-right text-slate-600">{c.sell?.rate?.toFixed(2)}</td>
@@ -202,6 +278,39 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                     </table>
                 </div>
 
+                {/* Landed Cost Estimate */}
+                {landedCost && (
+                    <div className="mb-8 border-t-2 border-slate-100 pt-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Calculator className="h-4 w-4 text-slate-500" />
+                            <h3 className="font-bold text-sm text-slate-700">Estimated Landed Cost (Duties & Taxes)</h3>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-lg">
+                            <div className="grid grid-cols-2 gap-x-12 gap-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Total Duties</span>
+                                    <span className="font-medium">{currency} {landedCost.summary.total_duty.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Merchandise Processing Fee (MPF)</span>
+                                    <span className="font-medium">{currency} {landedCost.summary.estimated_mpf.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Harbor Maintenance Fee (HMF)</span>
+                                    <span className="font-medium">{currency} {landedCost.summary.estimated_hmf.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-slate-200 pt-2 mt-2 col-span-2 font-bold text-slate-800">
+                                    <span>Total Estimated Landed Cost</span>
+                                    <span>{currency} {landedCost.summary.grand_total_estimated_landed_cost.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-3 italic">
+                                * Estimated values based on provided HS codes and value. Final assessment by Customs may vary.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Footer */}
                 <div className="text-xs text-slate-400 mt-12 pt-6 border-t text-center">
                     <p className="mb-2">This quotation is subject to our Standard Trading Conditions. Rates are subject to space and equipment availability.</p>
@@ -222,7 +331,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                         <div className="font-medium text-sm">
                             {quoteData.origin ? (
                                 <>
-                                    <p>Shipper at {quoteData.origin}</p>
+                                    <p>Shipper at {getSafeString(quoteData.origin)}</p>
                                     <p className="text-slate-500 text-xs mt-1">Address on file</p>
                                 </>
                             ) : 'TBD'}
@@ -230,7 +339,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                     </div>
                     <div className="border-b border-slate-300 p-4 min-h-[120px]">
                         <span className="block font-bold text-xs uppercase text-slate-400 mb-1">Booking No.</span>
-                        <p className="font-mono text-lg">{quoteData.reference || 'DRAFT-001'}</p>
+                        <p className="font-mono text-lg">{getSafeString(quoteData.reference, 'DRAFT-001')}</p>
                         <div className="mt-4">
                             <span className="block font-bold text-xs uppercase text-slate-400 mb-1">Export References</span>
                             <p className="text-sm">Ref: {new Date().getFullYear()}-{Math.floor(Math.random()*1000)}</p>
@@ -242,7 +351,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                         <div className="font-medium text-sm">
                             {quoteData.destination ? (
                                 <>
-                                    <p>Consignee at {quoteData.destination}</p>
+                                    <p>Consignee at {getSafeString(quoteData.destination)}</p>
                                     <p className="text-slate-500 text-xs mt-1">Address on file</p>
                                 </>
                             ) : 'TBD'}
@@ -263,14 +372,14 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
                     </div>
                     <div className="grid grid-cols-4 min-h-[200px] text-sm">
                          <div className="p-4 border-r border-slate-300 font-mono">
-                            {quoteData.reference || 'N/A'}<br/>
+                            {getSafeString(quoteData.reference, 'N/A')}<br/>
                             1/1
                          </div>
                          <div className="p-4 border-r border-slate-300 col-span-2">
-                            <p className="font-bold mb-2">{quoteData.commodity || 'General Cargo'}</p>
+                            <p className="font-bold mb-2">{getSafeString(quoteData.commodity, 'General Cargo')}</p>
                             <p className="text-xs text-slate-500">
                                 Total Volume: {quoteData.total_volume || '0'} CBM<br/>
-                                Transport Mode: {quoteData.mode?.toUpperCase() || 'OCEAN'}
+                                Transport Mode: {getSafeString(quoteData.mode).toUpperCase() || 'OCEAN'}
                             </p>
                          </div>
                          <div className="p-4 font-mono text-right">

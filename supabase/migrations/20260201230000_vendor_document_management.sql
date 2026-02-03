@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_storage_usage (
 
 -- 5. Storage Policies (RLS)
 -- Allow authenticated users to upload/read files in the bucket
+DROP POLICY IF EXISTS "Vendor Docs Access" ON storage.objects;
 CREATE POLICY "Vendor Docs Access" ON storage.objects FOR ALL USING (
     bucket_id = 'vendor-documents' 
     AND auth.role() = 'authenticated'
@@ -55,10 +56,12 @@ ALTER TABLE public.vendor_storage_usage ENABLE ROW LEVEL SECURITY;
 -- 7. RLS Policies for new tables
 
 -- vendor_contract_versions
+DROP POLICY IF EXISTS "Platform Admin Full Access Versions" ON public.vendor_contract_versions;
 CREATE POLICY "Platform Admin Full Access Versions" ON public.vendor_contract_versions
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Tenant Access Versions" ON public.vendor_contract_versions;
 CREATE POLICY "Tenant Access Versions" ON public.vendor_contract_versions
     FOR ALL
     USING (
@@ -74,10 +77,12 @@ CREATE POLICY "Tenant Access Versions" ON public.vendor_contract_versions
     );
 
 -- vendor_storage_usage
+DROP POLICY IF EXISTS "Platform Admin Full Access Usage" ON public.vendor_storage_usage;
 CREATE POLICY "Platform Admin Full Access Usage" ON public.vendor_storage_usage
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Tenant Access Usage" ON public.vendor_storage_usage;
 CREATE POLICY "Tenant Access Usage" ON public.vendor_storage_usage
     FOR ALL
     USING (

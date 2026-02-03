@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { LandedCostService, LandedCostResult } from '@/services/quotation/LandedCostService';
 
 interface PDFGeneratorProps {
   versionId: string;
@@ -27,11 +28,54 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
 
       const { data: quote, error: qErr } = await supabase
         .from('quotes')
-        .select('*, accounts(*)')
+        .select('*, accounts(*), quote_items(*)')
         .eq('id', quoteId)
         .single();
 
       if (qErr) throw qErr;
+
+      // Calculate Landed Cost if items exist
+      let landedCost: LandedCostResult | null = null;
+      if (quote?.quote_items?.length) {
+         const items = quote.quote_items.map((item: any) => ({
+             hs_code: item.attributes?.hs_code,
+             value: Number(item.unit_price || 0) * Number(item.quantity || 1),
+             quantity: Number(item.quantity || 1),
+             weight: Number(item.attributes?.weight || 0),
+             origin_country: quote.origin_country
+         })).filter((i: any) => i.hs_code);
+
+         if (items.length > 0) {
+             let destCountry = 'US'; // Default
+
+             // Try to resolve destination country
+            if (quote.destination_port_id) {
+                const { data: port } = await supabase
+                    .from('ports_locations')
+                    .select('countries(code_iso2)')
+                    .eq('id', quote.destination_port_id)
+                    .single();
+                
+                // @ts-ignore
+                if (port?.countries?.code_iso2) {
+                    // @ts-ignore
+                    destCountry = port.countries.code_iso2;
+                }
+            } else if (quote.destination) {
+                 const getCountryCode = (destination: string): string => {
+                    if (!destination) return 'US';
+                    const dest = destination.trim().toUpperCase();
+                    if (dest.length === 2) return dest;
+                    if (dest.endsWith(' US') || dest.endsWith(', US') || dest.endsWith(', USA')) return 'US';
+                    if (dest.includes('UNITED STATES')) return 'US';
+                    return 'US';
+                 };
+                 destCountry = getCountryCode(quote.destination);
+             }
+
+             landedCost = await LandedCostService.calculate(items, destCountry);
+         }
+      }
 
       const { data: options, error: oErr } = await supabase
         .from('quotation_version_options')
@@ -48,7 +92,7 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
       if (oErr) throw oErr;
 
       // Generate PDF content
-      const pdfContent = generatePDFContent(quote, version, options || []);
+      const pdfContent = generatePDFContent(quote, version, options || [], landedCost);
       
       // Create a simple HTML-based PDF using window.print
       const printWindow = window.open('', '_blank');
@@ -75,8 +119,9 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
     }
   };
 
-  const generatePDFContent = (quote: any, version: any, options: any[]) => {
+  const generatePDFContent = (quote: any, version: any, options: any[], landedCost: LandedCostResult | null) => {
     const account = quote.accounts || {};
+    const currency = quote.currency || 'USD';
     
     return `
       <!DOCTYPE html>
@@ -146,6 +191,20 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
             border-top: 2px solid #333;
             padding-top: 10px;
             margin-top: 10px;
+          }
+          .landed-cost {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+            page-break-inside: avoid;
+          }
+          .landed-cost h3 {
+             margin-top: 0;
+             color: #166534;
+             border-bottom: 1px solid #bbf7d0;
+             padding-bottom: 10px;
           }
           @media print {
             body { margin: 20px; }
@@ -254,6 +313,31 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
             </div>
           `).join('')}
         </div>
+
+        ${landedCost ? `
+        <div class="section landed-cost">
+            <h3>Estimated Landed Cost (Duties & Taxes)</h3>
+            <div class="pricing-row">
+                <span>Total Duties:</span>
+                <span>${currency} ${landedCost.summary.total_duty.toFixed(2)}</span>
+            </div>
+            <div class="pricing-row">
+                <span>Merchandise Processing Fee (MPF):</span>
+                <span>${currency} ${landedCost.summary.estimated_mpf.toFixed(2)}</span>
+            </div>
+            <div class="pricing-row">
+                <span>Harbor Maintenance Fee (HMF):</span>
+                <span>${currency} ${landedCost.summary.estimated_hmf.toFixed(2)}</span>
+            </div>
+            <div class="pricing-row total" style="border-top-color: #166534; color: #166534;">
+                <span>Total Estimated Landed Cost:</span>
+                <span>${currency} ${landedCost.summary.grand_total_estimated_landed_cost.toFixed(2)}</span>
+            </div>
+            <p style="font-size: 10px; color: #666; margin-top: 10px; font-style: italic;">
+                * Estimated values based on provided HS codes and value. Final assessment by Customs may vary.
+            </p>
+        </div>
+        ` : ''}
 
         <div class="section">
           <p style="font-size: 12px; color: #6b7280; margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px;">

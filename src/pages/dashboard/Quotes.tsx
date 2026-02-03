@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Quote, QuoteStatus, statusConfig } from '@/pages/dashboard/quotes-data';
-import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus, Sparkles } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
 import { QuickQuoteModal } from '@/components/sales/quick-quote/QuickQuoteModal';
@@ -307,15 +307,24 @@ export default function Quotes() {
               modes={['pipeline','list','grid']}
               onChange={(v) => v === 'pipeline' ? navigate('/dashboard/quotes/pipeline') : setViewMode(v)}
             />
-            <Button variant="outline" onClick={() => navigate('/dashboard/quotes/templates')}>
-                <FileText className="mr-2 h-4 w-4" /> Templates
+            <Button variant="outline" onClick={() => navigate('/dashboard/quotes/templates')} className="px-3 md:px-4">
+                <FileText className="h-4 w-4 md:mr-2" /> 
+                <span className="hidden md:inline">Templates</span>
             </Button>
-            <Button variant="outline" className="text-destructive hover:bg-destructive/10 border-destructive/50" onClick={handlePurgeDrafts}>
-                <Trash2 className="mr-2 h-4 w-4" /> Purge Drafts
+            <Button variant="outline" className="text-destructive hover:bg-destructive/10 border-destructive/50 px-3 md:px-4" onClick={handlePurgeDrafts}>
+                <Trash2 className="h-4 w-4 md:mr-2" /> 
+                <span className="hidden md:inline">Purge Drafts</span>
             </Button>
-            <QuickQuoteModal />
-            <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20">
-                <Plus className="mr-2 h-4 w-4" /> New Quote
+            <QuickQuoteModal>
+                <Button variant="outline" className="gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Quick Quote
+                </Button>
+            </QuickQuoteModal>
+            <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20 gap-2 min-w-[140px]">
+                <Plus className="h-4 w-4" /> 
+                <span className="hidden sm:inline">Create Detailed Quote</span>
+                <span className="sm:hidden">Detailed Quote</span>
             </Button>
           </div>
         </div>

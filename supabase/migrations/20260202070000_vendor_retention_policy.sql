@@ -2,6 +2,16 @@
 -- Created at: 2026-02-02
 -- Description: Adds RPC to archive expired documents
 
+-- Update status constraint to include 'archived'
+DO $$ 
+BEGIN
+    ALTER TABLE public.vendor_documents DROP CONSTRAINT IF EXISTS vendor_documents_status_check;
+    ALTER TABLE public.vendor_documents ADD CONSTRAINT vendor_documents_status_check 
+        CHECK (status IN ('pending', 'verified', 'rejected', 'expired', 'archived'));
+EXCEPTION
+    WHEN OTHERS THEN NULL; -- Ignore if it fails (e.g. if constraint name is different)
+END $$;
+
 -- Function to archive expired documents
 CREATE OR REPLACE FUNCTION archive_expired_vendor_documents(p_retention_days INT DEFAULT 3650)
 RETURNS TABLE (

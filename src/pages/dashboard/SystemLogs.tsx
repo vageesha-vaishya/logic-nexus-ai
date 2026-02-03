@@ -138,14 +138,21 @@ export default function SystemLogs() {
   });
 
   // Logs Query
+  const { tenant } = useCRM();
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['system-logs', page, levelFilter, search, traceFilter, componentFilter, dateRange],
+    queryKey: ['system-logs', page, levelFilter, search, traceFilter, componentFilter, dateRange, tenant?.id],
     queryFn: async () => {
       let query = supabase
         .from('system_logs')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      // Filter by tenant if available
+      if (tenant?.id) {
+        query = query.eq('tenant_id', tenant.id);
+      }
 
       if (levelFilter !== 'ALL') {
         query = query.eq('level', levelFilter);

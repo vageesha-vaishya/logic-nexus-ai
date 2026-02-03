@@ -148,8 +148,8 @@ export function QuotesKanbanBoard({
             <KanbanColumn
               key={stage}
               id={stage}
-              title={statusConfig[stage].label}
-              color={statusConfig[stage].color}
+              title={statusConfig[stage]?.label || stage}
+              color={statusConfig[stage]?.color || 'bg-gray-100'}
               quotes={columns[stage]}
               wipLimit={wipLimits?.[stage]}
               bulkMode={bulkMode}
@@ -168,8 +168,8 @@ export function QuotesKanbanBoard({
               <KanbanColumn
                 key={stage}
                 id={stage}
-                title={statusConfig[stage].label}
-                color={statusConfig[stage].color}
+                title={statusConfig[stage]?.label || stage}
+                color={statusConfig[stage]?.color || 'bg-gray-100'}
                 quotes={columns[stage]}
                 wipLimit={wipLimits?.[stage]}
                 bulkMode={bulkMode}

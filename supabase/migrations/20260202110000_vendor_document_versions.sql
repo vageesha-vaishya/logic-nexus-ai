@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_document_versions (
 ALTER TABLE public.vendor_document_versions ENABLE ROW LEVEL SECURITY;
 
 -- Policies (matching vendor_documents)
+DROP POLICY IF EXISTS "Vendor document versions are viewable by tenant users" ON public.vendor_document_versions;
 CREATE POLICY "Vendor document versions are viewable by tenant users"
     ON public.vendor_document_versions FOR SELECT
     USING (
@@ -29,6 +30,7 @@ CREATE POLICY "Vendor document versions are viewable by tenant users"
         )
     );
 
+DROP POLICY IF EXISTS "Vendor document versions are insertable by tenant users" ON public.vendor_document_versions;
 CREATE POLICY "Vendor document versions are insertable by tenant users"
     ON public.vendor_document_versions FOR INSERT
     WITH CHECK (
@@ -40,6 +42,7 @@ CREATE POLICY "Vendor document versions are insertable by tenant users"
         )
     );
 
+DROP POLICY IF EXISTS "Vendor document versions are deletable by tenant admins" ON public.vendor_document_versions;
 CREATE POLICY "Vendor document versions are deletable by tenant admins"
     ON public.vendor_document_versions FOR DELETE
     USING (
