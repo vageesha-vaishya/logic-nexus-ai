@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -414,15 +415,6 @@ export default function ShipmentsPipeline() {
 
   const swimLanes = getSwimLanes();
 
-  const formatCurrency = (amount: number | null, currency: string | null) => {
-    if (!amount) return "—";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatDate = (date: string | null) => {
     if (!date) return "—";
     return new Date(date).toLocaleDateString("en-US", {
@@ -679,7 +671,7 @@ export default function ShipmentsPipeline() {
                     title={lane.title}
                     count={lane.shipments.length}
                     metrics={[
-                      { label: 'Total Charges', value: formatCurrency(totalCharges, 'USD') },
+                      { label: 'Total Charges', value: formatCurrency(totalCharges, 'USD', { placeholder: '—', minimumFractionDigits: 0 }) },
                       { label: 'Packages', value: totalPackages },
                     ]}
                   >
@@ -820,7 +812,7 @@ export default function ShipmentsPipeline() {
                                       )}
                                       {showFields.charges && shipment.total_charges && (
                                         <div className="text-xs font-semibold text-primary">
-                                          {formatCurrency(shipment.total_charges, shipment.currency)}
+                                          {formatCurrency(shipment.total_charges, shipment.currency || 'USD', { placeholder: '—', minimumFractionDigits: 0 })}
                                         </div>
                                       )}
                                       {showFields.deliveryDate && shipment.estimated_delivery_date && (
@@ -830,7 +822,7 @@ export default function ShipmentsPipeline() {
                                       )}
                                       {shipment.total_charges && (
                                         <div className="text-xs font-semibold text-primary">
-                                          {formatCurrency(shipment.total_charges, shipment.currency)}
+                                          {formatCurrency(shipment.total_charges, shipment.currency || 'USD', { placeholder: '—', minimumFractionDigits: 0 })}
                                         </div>
                                       )}
                                       {!shipment.pod_received && shipment.status === 'delivered' && (
@@ -874,7 +866,7 @@ export default function ShipmentsPipeline() {
                     </div>
                     {activeShipment.total_charges && (
                       <div className="text-xs font-semibold text-primary">
-                        {formatCurrency(activeShipment.total_charges, activeShipment.currency)}
+                        {formatCurrency(activeShipment.total_charges, activeShipment.currency || 'USD', { placeholder: '—', minimumFractionDigits: 0 })}
                       </div>
                     )}
                   </CardContent>

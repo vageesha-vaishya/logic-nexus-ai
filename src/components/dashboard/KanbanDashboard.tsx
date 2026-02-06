@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCRM } from "@/hooks/useCRM";
 import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 import { Input } from "@/components/ui/input";
+import { formatCurrency } from "@/lib/utils";
 
 interface KanbanStats {
   leads: { total: number; byStage: Record<string, number>; avgDays?: Record<string, number> };
@@ -217,14 +218,6 @@ export function KanbanDashboard() {
     loadFranchises();
   }, [context.franchiseId, context.tenantId, context.isPlatformAdmin, context.adminOverrideEnabled]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const leadFunnel = [
     { key: "new", label: "🔍 New Inquiry", color: "#3b82f6", fill: "#3b82f6", value: stats.leads.byStage.new || 0 },
     { key: "contacted", label: "📞 Contact Attempted", color: "#a855f7", fill: "#a855f7", value: stats.leads.byStage.contacted || 0 },
@@ -366,7 +359,7 @@ export function KanbanDashboard() {
         { key: "closed_lost", label: "❌ Lost", count: stats.opportunities.byStage.closed_lost || 0, color: "bg-red-500/10 text-red-700" },
       ],
       path: "/dashboard/opportunities/pipeline",
-      value: formatCurrency(stats.opportunities.totalValue),
+      value: formatCurrency(stats.opportunities.totalValue, 'USD', { minimumFractionDigits: 0 }),
     },
     {
       title: "Quotes Pipeline",
@@ -384,7 +377,7 @@ export function KanbanDashboard() {
         { key: "expired", label: "⏰ Expired", count: stats.quotes.byStatus.expired || 0, color: "bg-orange-500/10 text-orange-700" },
       ],
       path: "/dashboard/quotes/pipeline",
-      value: formatCurrency(stats.quotes.totalValue),
+      value: formatCurrency(stats.quotes.totalValue, 'USD', { minimumFractionDigits: 0 }),
     },
     {
       title: "Shipments Pipeline",

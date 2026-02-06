@@ -1,7 +1,8 @@
 // @ts-ignore Supabase Edge runtime provides this module at deploy time
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Logger } from '../_shared/logger.ts';
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth, createServiceClient } from '../_shared/auth.ts';
 
 type RemoteConnection = {
   host: string;
@@ -38,9 +39,29 @@ type RemoteImportSummary = {
 // @ts-ignore Supabase Edge runtime provides Deno global
 Deno.serve(async (req: Request) => {
   const logger = new Logger({ function: 'remote-import' });
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Auth validation
+  const { user, error: authError } = await requireAuth(req);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Verify platform_admin role
+  const serviceClient = createServiceClient();
+  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  if (!roleData) {
+    return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   if (req.method !== 'POST') {

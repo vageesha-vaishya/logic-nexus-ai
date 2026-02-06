@@ -48,12 +48,12 @@ import {
 import { cn } from '@/lib/utils';
 import { formatContainerSize } from '@/lib/container-utils';
 
-import { 
-    getTierBadge, 
-    getModeIcon, 
-    formatCurrency,
+import {
+    getTierBadge,
+    getModeIcon,
     getReliabilityColor
 } from '../shared/quote-badges';
+import { formatCurrency } from '@/lib/utils';
 import { RateOption, TransportLeg } from '@/types/quote-breakdown';
 
 interface QuoteResultsListProps {

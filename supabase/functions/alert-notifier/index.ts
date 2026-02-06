@@ -1,4 +1,6 @@
 import { serveWithLogger } from "../_shared/logger.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SLACK_WEBHOOK_URL = Deno.env.get("SLACK_WEBHOOK_URL");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -11,6 +13,21 @@ const lastAlerts: Map<string, number> = new Map();
 const THROTTLE_MS = 60 * 1000; // 1 minute throttle per identical error
 
 serveWithLogger(async (req, logger, supabase) => {
+  const headers = getCorsHeaders(req);
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers });
+  }
+
+  // Auth: verify service role key or authenticated user (admin manually triggering)
+  const authHeader = req.headers.get('Authorization');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!authHeader || !authHeader.includes(serviceKey)) {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+  }
+
   const payload = await req.json();
   // Support direct call or DB Webhook (payload.record)
   const logEntry = payload.record || payload;

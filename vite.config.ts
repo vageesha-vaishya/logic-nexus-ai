@@ -32,5 +32,29 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["react", "react-dom", "@tanstack/react-query"],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          // Heavy libraries — split into dedicated chunks
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            return 'recharts';
+          }
+          if (id.includes('node_modules/xlsx')) {
+            return 'xlsx';
+          }
+          if (id.includes('node_modules/@dnd-kit')) {
+            return 'dnd-kit';
+          }
+          if (id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
+            return 'pdf-export';
+          }
+          if (id.includes('node_modules/jszip')) {
+            return 'jszip';
+          }
+        },
+      },
+    },
+  },
   // Automated testing configuration was removed; see TESTING.md for restoration notes.
 }));

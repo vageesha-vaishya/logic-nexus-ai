@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { corsHeaders } from "../_shared/cors.ts"
+import { getCorsHeaders } from "../_shared/cors.ts"
+import { requireAuth } from "../_shared/auth.ts"
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -39,12 +40,19 @@ const KNOWLEDGE_BASE = {
 };
 
 serve(async (req: Request) => {
+  const headers = getCorsHeaders(req);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers })
   }
 
   try {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     const { action, payload } = await req.json()
     // Check for OpenAI Key
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
@@ -60,7 +68,7 @@ serve(async (req: Request) => {
                 anomalies: [] 
             }),
             { 
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                headers: { ...headers, "Content-Type": "application/json" },
                 status: 200 
             }
         );
@@ -105,7 +113,7 @@ serve(async (req: Request) => {
       JSON.stringify(result),
       { 
         headers: { 
-            ...corsHeaders, 
+            ...headers, 
             "Content-Type": "application/json",
             "Content-Language": "en"
         },
@@ -119,7 +127,7 @@ serve(async (req: Request) => {
       JSON.stringify({ error: (error as Error).message }),
       { 
         headers: { 
-            ...corsHeaders, 
+            ...headers, 
             "Content-Type": "application/json",
             "Content-Language": "en"
         },

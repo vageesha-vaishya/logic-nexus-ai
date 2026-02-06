@@ -1,27 +1,38 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
 import { Logger } from "../_shared/logger.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
-}
+import { getCorsHeaders } from "../_shared/cors.ts"
+import { requireAuth } from "../_shared/auth.ts"
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID();
 
   // Initialize Logger
-  const logger = new Logger(null, { 
-    method: req.method, 
+  const logger = new Logger(null, {
+    method: req.method,
     url: req.url,
-    component: 'sync-cn-hs-data' 
+    component: 'sync-cn-hs-data'
   }, correlationId);
-  
+
   await logger.info(`Request received: ${req.method} ${req.url}`);
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  // Allow service role key OR authenticated user
+  const authHeader = req.headers.get('Authorization');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const isServiceRole = authHeader && serviceKey && authHeader.includes(serviceKey);
+  if (!isServiceRole) {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   try {

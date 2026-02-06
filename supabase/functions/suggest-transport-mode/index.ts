@@ -1,4 +1,5 @@
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -6,11 +7,18 @@ declare const Deno: {
 };
 
 Deno.serve(async (req) => {
+  const headers = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers });
   }
 
   try {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     const { prompt, model, responseFormat } = await req.json();
     
     // Force English output
@@ -127,7 +135,7 @@ Deno.serve(async (req) => {
       }
     }), {
       headers: { 
-          ...corsHeaders, 
+          ...headers, 
           'Content-Type': 'application/json',
           'Content-Language': 'en'
       },
@@ -136,7 +144,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: (error as any).message || String(error) }), {
       status: 200, // Return 200 so client parses error message
       headers: { 
-          ...corsHeaders, 
+          ...headers, 
           'Content-Type': 'application/json',
           'Content-Language': 'en'
       },

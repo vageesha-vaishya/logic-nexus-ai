@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
+import { requireAuth } from '../_shared/auth.ts'
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -64,12 +65,19 @@ const CARRIERS = {
 };
 
 serve(async (req) => {
+  const headers = getCorsHeaders(req);
+
   // 1. CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers })
   }
 
   try {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     // 2. Auth & Client Setup
     const authHeader = req.headers.get('Authorization')
     const supabase = createClient(
@@ -340,7 +348,7 @@ serve(async (req) => {
       JSON.stringify({ options }),
       { 
         headers: { 
-            ...corsHeaders, 
+            ...headers, 
             "Content-Type": "application/json",
             "Content-Language": "en",
             "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30"
@@ -354,7 +362,7 @@ serve(async (req) => {
       { 
           status: 400, 
           headers: { 
-              ...corsHeaders, 
+              ...headers, 
               "Content-Type": "application/json",
               "Content-Language": "en"
           } 

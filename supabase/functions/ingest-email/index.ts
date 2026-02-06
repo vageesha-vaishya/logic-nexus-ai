@@ -4,6 +4,8 @@ import { Logger } from '../_shared/logger.ts';
 import { normalizeGmailPayload, normalizeOutlookPayload, NormalizedEmail, correlateThread } from './utils.ts';
 import { classifyEmailContent } from '../_shared/classification-logic.ts';
 import { determineRoute } from '../_shared/routing-logic.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -11,14 +13,16 @@ declare const Deno: {
 
 const logger = new Logger({ module: "ingest-email" });
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Auth: require authenticated user
+  const { user, error: authError } = await requireAuth(req);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   try {

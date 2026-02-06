@@ -1,6 +1,6 @@
 declare const Deno: any;
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
 import { Logger } from '../_shared/logger.ts';
 
 interface PlanPayload {
@@ -30,8 +30,10 @@ interface PlanPayload {
 const logger = new Logger({ resource: 'subscription-plans' });
 
 Deno.serve(async (req: Request) => {
+  const headers = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers });
   }
 
   try {
@@ -49,7 +51,7 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -66,7 +68,7 @@ Deno.serve(async (req: Request) => {
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
@@ -74,7 +76,7 @@ Deno.serve(async (req: Request) => {
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
@@ -87,12 +89,12 @@ Deno.serve(async (req: Request) => {
         logger.error('List plans failed', { error: error.message });
         return new Response(JSON.stringify({ error: error.message }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
       return new Response(JSON.stringify({ data }), {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
@@ -107,7 +109,7 @@ Deno.serve(async (req: Request) => {
         logger.error('Create plan failed', { error: error.message });
         return new Response(JSON.stringify({ error: error.message }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
       const createdId = (data as any)?.id;
@@ -122,7 +124,7 @@ Deno.serve(async (req: Request) => {
       }
       return new Response(JSON.stringify({ data }), {
         status: 201,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
@@ -130,7 +132,7 @@ Deno.serve(async (req: Request) => {
       if (!id) {
         return new Response(JSON.stringify({ error: 'Missing id' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
       const body = (await req.json()) as PlanPayload;
@@ -142,7 +144,7 @@ Deno.serve(async (req: Request) => {
         logger.error('Update plan failed', { error: error.message });
         return new Response(JSON.stringify({ error: error.message }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
       await supabase.from('audit_logs').insert({
@@ -154,7 +156,7 @@ Deno.serve(async (req: Request) => {
       });
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
@@ -162,7 +164,7 @@ Deno.serve(async (req: Request) => {
       if (!id) {
         return new Response(JSON.stringify({ error: 'Missing id' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
       const { error } = await supabase
@@ -173,7 +175,7 @@ Deno.serve(async (req: Request) => {
         logger.error('Delete plan failed', { error: error.message });
         return new Response(JSON.stringify({ error: error.message }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
       await supabase.from('audit_logs').insert({
@@ -185,19 +187,19 @@ Deno.serve(async (req: Request) => {
       });
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
 
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
     logger.error('Unexpected error', { error: err?.message });
     return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
     });
   }
 });

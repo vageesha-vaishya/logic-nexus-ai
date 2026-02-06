@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/utils';
 
 interface Opportunity {
   id: string;
@@ -47,14 +48,6 @@ export function OpportunitiesWidget() {
     fetchOpportunities();
   }, [context?.userId]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -83,7 +76,7 @@ export function OpportunitiesWidget() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium">{formatCurrency(opp.amount)}</p>
+                  <p className="text-sm font-medium">{formatCurrency(opp.amount, 'USD', { minimumFractionDigits: 0 })}</p>
                   <Badge variant="secondary" className="text-[10px] h-4 px-1">
                     {opp.stage.replace('_', ' ')}
                   </Badge>

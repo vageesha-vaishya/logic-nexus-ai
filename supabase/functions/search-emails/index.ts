@@ -1,16 +1,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 Deno.serve(async (req: Request) => {
+  const headers = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers });
   }
 
   try {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     const requireEnv = (name: string) => {
       const v = Deno.env.get(name);
       if (!v) throw new Error(`Missing environment variable: ${name}`);
@@ -18,16 +22,10 @@ Deno.serve(async (req: Request) => {
     };
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing Authorization header", code: "AUTH_REQUIRED" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_ANON_KEY"), {
       global: {
-        headers: { Authorization: authHeader },
+        headers: { Authorization: authHeader! },
       },
     });
 
@@ -57,7 +55,7 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(
         JSON.stringify({ success: false, error: "Invalid JSON body", code: "BAD_REQUEST" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...headers, "Content-Type": "application/json" } }
       );
     }
 
@@ -82,7 +80,7 @@ Deno.serve(async (req: Request) => {
     if (!email && groupBy !== "conversation") {
       return new Response(
         JSON.stringify({ success: false, error: "Missing required field: email", code: "BAD_REQUEST" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -237,7 +235,7 @@ Deno.serve(async (req: Request) => {
           pageSize,
           data: pageItems,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
       );
     } else {
       return new Response(
@@ -248,7 +246,7 @@ Deno.serve(async (req: Request) => {
           pageSize,
           data: data,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -256,7 +254,7 @@ Deno.serve(async (req: Request) => {
     console.error("Error searching emails:", error);
     return new Response(
       JSON.stringify({ success: false, error: (error instanceof Error) ? error.message : String(error) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
     );
   }
 });

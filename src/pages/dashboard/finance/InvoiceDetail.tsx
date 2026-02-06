@@ -9,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, Plus, Trash2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useCRM } from '@/hooks/useCRM';
 import { InvoiceService } from '@/services/invoicing/InvoiceService';
 import { Invoice } from '@/services/invoicing/types';
-import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import {
   Form,
@@ -48,6 +48,7 @@ export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { scopedDb, supabase } = useCRM();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -79,7 +80,7 @@ export default function InvoiceDetail() {
 
   const loadInvoice = async (invoiceId: string) => {
     try {
-      const data = await InvoiceService.getInvoice(invoiceId);
+      const data = await InvoiceService.getInvoice(invoiceId, scopedDb);
       if (!data) throw new Error('Invoice not found');
       setInvoice(data);
       
@@ -145,7 +146,7 @@ export default function InvoiceDetail() {
             tax_code_id: item.tax_code_id,
             metadata: item.metadata
         }))
-      });
+      }, scopedDb);
       toast({ title: 'Success', description: 'Invoice created successfully' });
       navigate('/dashboard/finance/invoices');
     } catch (error: any) {

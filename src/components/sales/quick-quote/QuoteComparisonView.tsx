@@ -11,13 +11,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { 
-  getTierBadge, 
-  getModeIcon, 
-  formatCurrency, 
-  getReliabilityColor 
+import {
+  getTierBadge,
+  getModeIcon,
+  getReliabilityColor
 } from '../shared/quote-badges';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

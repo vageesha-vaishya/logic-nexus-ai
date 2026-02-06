@@ -142,7 +142,6 @@ CREATE TABLE IF NOT EXISTS "carrier_service_types" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" uuid NOT NULL,
   "carrier_id" uuid NOT NULL,
-  "carrier_id" uuid NOT NULL,
   "service_type" text NOT NULL,
   "code_type" text,
   "code_value" text,
@@ -238,7 +237,6 @@ CREATE TABLE IF NOT EXISTS "contacts" (
 
 CREATE TABLE IF NOT EXISTS "custom_role_permissions" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
-  "role_id" uuid NOT NULL,
   "role_id" uuid NOT NULL,
   "permission_key" text NOT NULL,
   "created_at" timestamp with time zone DEFAULT now(),
@@ -365,7 +363,6 @@ CREATE TABLE IF NOT EXISTS "emails" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" uuid,
   "franchise_id" uuid,
-  "account_id" uuid NOT NULL,
   "account_id" uuid NOT NULL,
   "message_id" text NOT NULL,
   "thread_id" text,
@@ -534,7 +531,6 @@ CREATE TABLE IF NOT EXISTS "leads" (
 CREATE TABLE IF NOT EXISTS "oauth_configurations" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "user_id" uuid NOT NULL,
-  "user_id" uuid NOT NULL,
   "tenant_id" uuid,
   "provider" text NOT NULL,
   "client_id" text NOT NULL,
@@ -621,7 +617,6 @@ CREATE TABLE IF NOT EXISTS "ports_locations" (
 );
 
 CREATE TABLE IF NOT EXISTS "profiles" (
-  "id" uuid NOT NULL,
   "id" uuid NOT NULL,
   "email" text NOT NULL,
   "first_name" text,
@@ -779,7 +774,6 @@ CREATE TABLE IF NOT EXISTS "rate_calculations" (
 CREATE TABLE IF NOT EXISTS "routes" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" uuid NOT NULL,
-  "tenant_id" uuid NOT NULL,
   "franchise_id" uuid,
   "route_name" text NOT NULL,
   "route_code" text NOT NULL,
@@ -819,7 +813,6 @@ CREATE TABLE IF NOT EXISTS "service_types" (
 CREATE TABLE IF NOT EXISTS "services" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" uuid NOT NULL,
-  "tenant_id" uuid NOT NULL,
   "service_code" text NOT NULL,
   "service_name" text NOT NULL,
   "service_type" text NOT NULL,
@@ -856,7 +849,6 @@ CREATE TABLE IF NOT EXISTS "shipment_items" (
 
 CREATE TABLE IF NOT EXISTS "shipments" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
-  "tenant_id" uuid NOT NULL,
   "tenant_id" uuid NOT NULL,
   "franchise_id" uuid,
   "shipment_number" text NOT NULL,
@@ -976,8 +968,6 @@ CREATE TABLE IF NOT EXISTS "subscription_plans" (
 CREATE TABLE IF NOT EXISTS "tenant_subscriptions" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" uuid NOT NULL,
-  "tenant_id" uuid NOT NULL,
-  "plan_id" uuid NOT NULL,
   "plan_id" uuid NOT NULL,
   "status" USER-DEFINED NOT NULL DEFAULT 'trial'::subscription_status,
   "stripe_subscription_id" text,
@@ -1024,8 +1014,6 @@ CREATE TABLE IF NOT EXISTS "territories" (
 CREATE TABLE IF NOT EXISTS "territory_assignments" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "territory_id" uuid NOT NULL,
-  "territory_id" uuid NOT NULL,
-  "user_id" uuid NOT NULL,
   "user_id" uuid NOT NULL,
   "is_primary" boolean DEFAULT false,
   "created_at" timestamp with time zone DEFAULT now()
@@ -1062,7 +1050,6 @@ CREATE TABLE IF NOT EXISTS "usage_records" (
 CREATE TABLE IF NOT EXISTS "user_capacity" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "user_id" uuid NOT NULL,
-  "user_id" uuid NOT NULL,
   "tenant_id" uuid NOT NULL,
   "franchise_id" uuid,
   "max_leads" integer DEFAULT 50,
@@ -1076,8 +1063,6 @@ CREATE TABLE IF NOT EXISTS "user_capacity" (
 CREATE TABLE IF NOT EXISTS "user_custom_roles" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "user_id" uuid NOT NULL,
-  "user_id" uuid NOT NULL,
-  "role_id" uuid NOT NULL,
   "role_id" uuid NOT NULL,
   "tenant_id" uuid NOT NULL,
   "franchise_id" uuid,
@@ -1088,13 +1073,8 @@ CREATE TABLE IF NOT EXISTS "user_custom_roles" (
 CREATE TABLE IF NOT EXISTS "user_roles" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "user_id" uuid NOT NULL,
-  "user_id" uuid NOT NULL,
-  "user_id" uuid NOT NULL,
-  "role" USER-DEFINED NOT NULL,
   "role" USER-DEFINED NOT NULL,
   "tenant_id" uuid,
-  "tenant_id" uuid,
-  "franchise_id" uuid,
   "franchise_id" uuid,
   "assigned_by" uuid,
   "assigned_at" timestamp with time zone DEFAULT now()
@@ -1102,7 +1082,6 @@ CREATE TABLE IF NOT EXISTS "user_roles" (
 
 CREATE TABLE IF NOT EXISTS "vehicles" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
-  "tenant_id" uuid NOT NULL,
   "tenant_id" uuid NOT NULL,
   "franchise_id" uuid,
   "vehicle_number" text NOT NULL,
@@ -1142,7 +1121,6 @@ CREATE TABLE IF NOT EXISTS "warehouse_inventory" (
 
 CREATE TABLE IF NOT EXISTS "warehouses" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
-  "tenant_id" uuid NOT NULL,
   "tenant_id" uuid NOT NULL,
   "franchise_id" uuid,
   "name" text NOT NULL,

@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronRight, Truck, Ship, Plane, Info, DollarSign, Download, Printer, FileText, ArrowUpDown, Search, Filter, LayoutList, ListTree, Globe, ArrowRight, AlertTriangle, Pencil, Trash, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronRight, Truck, Ship, Plane, Train, Info, DollarSign, Download, Printer, FileText, ArrowUpDown, Search, Filter, LayoutList, ListTree, Globe, ArrowRight, AlertTriangle, Pencil, Trash, Plus } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -87,16 +87,6 @@ export function ChargeBreakdown({
         if (m.includes('air')) return <Plane className="h-4 w-4" />;
         if (m.includes('rail') || m.includes('train')) return <Train className="h-4 w-4" />;
         return <Truck className="h-4 w-4" />;
-    };
-
-    const formatCurrency = (amount: any, curr: string = currency) => {
-        const val = Number(amount);
-        if (!Number.isFinite(val)) return '-';
-        try {
-            return new Intl.NumberFormat('en-US', { style: 'currency', currency: curr }).format(val);
-        } catch (e) {
-            return `${curr} ${val.toFixed(2)}`;
-        }
     };
 
     // Calculate Totals by Currency
@@ -527,7 +517,7 @@ export function ChargeBreakdown({
                                         <div className="text-right">
                                             <div className="text-xs text-muted-foreground mb-0.5">Subtotal</div>
                                             <div className="font-bold text-sm text-primary">
-                                                {globalTotalDisplay || formatCurrency(0)}
+                                                {globalTotalDisplay || formatCurrency(0, currency)}
                                             </div>
                                         </div>
                                     </div>
@@ -637,7 +627,7 @@ export function ChargeBreakdown({
                                     <div className="text-right">
                                         <div className="text-xs text-muted-foreground mb-0.5">Subtotal</div>
                                         <div className="font-bold text-sm text-primary">
-                                            {legTotalDisplay || formatCurrency(0)}
+                                            {legTotalDisplay || formatCurrency(0, currency)}
                                         </div>
                                     </div>
                                 </div>
@@ -695,7 +685,7 @@ export function ChargeBreakdown({
                                                     <>
                                                         <AlertTriangle className="w-4 h-4 text-yellow-500" />
                                                         <span className="text-yellow-600">
-                                                            Charges exist ({formatCurrency(rawLegTotal)}) but are not linked to this leg view.
+                                                            Charges exist ({formatCurrency(rawLegTotal, currency)}) but are not linked to this leg view.
                                                         </span>
                                                     </>
                                                 ) : (
@@ -759,7 +749,7 @@ export function ChargeBreakdown({
                                         <div className="text-right">
                                             <div className="text-xs text-muted-foreground mb-0.5">Subtotal</div>
                                             <div className="font-bold text-sm text-primary">
-                                                {unassignedTotalDisplay || formatCurrency(0)}
+                                                {unassignedTotalDisplay || formatCurrency(0, currency)}
                                             </div>
                                         </div>
                                     </div>

@@ -23,6 +23,7 @@ import { ViewToggle, ViewMode } from "@/components/ui/view-toggle";
 import * as XLSX from 'xlsx';
 import { logger } from "@/lib/logger";
 import { useDebug } from '@/hooks/useDebug';
+import { formatCurrency } from '@/lib/utils';
 
 export default function QuotesPipeline() {
   const navigate = useNavigate();
@@ -489,11 +490,6 @@ export default function QuotesPipeline() {
       quotes: filteredQuotes
     }];
   })();
-
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
 
   return (
     <DashboardLayout>

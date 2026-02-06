@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useCRM } from '@/hooks/useCRM';
@@ -20,22 +20,22 @@ import { auditLogger } from '@/lib/audit';
 import { VendorStatusBadge } from './components/VendorStatusBadge';
 import { VendorPreferredCarriers } from "./components/VendorPreferredCarriers";
 import { RiskBadge } from './components/RiskBadge';
-import { VendorContractDialog } from './components/VendorContractDialog';
-import { VendorDocumentDialog } from './components/VendorDocumentDialog';
-import { VendorFolderDialog } from './components/VendorFolderDialog';
-import { VendorRiskDialog } from './components/VendorRiskDialog';
-import { VendorPerformanceDialog } from './components/VendorPerformanceDialog';
 import { VendorFolderSidebar } from './components/VendorFolderSidebar';
-import { VendorPerformanceScorecard } from './components/VendorPerformanceScorecard';
-import { VendorContractVersionDialog } from './components/VendorContractVersionDialog';
-import { VendorDocumentVersionDialog } from './components/VendorDocumentVersionDialog';
-import { ContractManagementDialog } from './components/ContractManagementDialog';
-import { VendorMoveDocumentDialog } from './components/VendorMoveDocumentDialog';
-import { VendorCompliance } from './components/VendorCompliance';
-import { FilePreviewDialog } from '@/components/common/FilePreviewDialog';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import JSZip from 'jszip';
+
+// Lazy-loaded dialog components (only loaded when opened)
+const VendorContractDialog = lazy(() => import('./components/VendorContractDialog').then(m => ({ default: m.VendorContractDialog })));
+const VendorDocumentDialog = lazy(() => import('./components/VendorDocumentDialog').then(m => ({ default: m.VendorDocumentDialog })));
+const VendorFolderDialog = lazy(() => import('./components/VendorFolderDialog').then(m => ({ default: m.VendorFolderDialog })));
+const VendorRiskDialog = lazy(() => import('./components/VendorRiskDialog').then(m => ({ default: m.VendorRiskDialog })));
+const VendorPerformanceDialog = lazy(() => import('./components/VendorPerformanceDialog').then(m => ({ default: m.VendorPerformanceDialog })));
+const VendorPerformanceScorecard = lazy(() => import('./components/VendorPerformanceScorecard').then(m => ({ default: m.VendorPerformanceScorecard })));
+const VendorContractVersionDialog = lazy(() => import('./components/VendorContractVersionDialog').then(m => ({ default: m.VendorContractVersionDialog })));
+const VendorDocumentVersionDialog = lazy(() => import('./components/VendorDocumentVersionDialog').then(m => ({ default: m.VendorDocumentVersionDialog })));
+const ContractManagementDialog = lazy(() => import('./components/ContractManagementDialog').then(m => ({ default: m.ContractManagementDialog })));
+const VendorMoveDocumentDialog = lazy(() => import('./components/VendorMoveDocumentDialog').then(m => ({ default: m.VendorMoveDocumentDialog })));
+const FilePreviewDialog = lazy(() => import('@/components/common/FilePreviewDialog').then(m => ({ default: m.FilePreviewDialog })));
 import {
   Table,
   TableBody,
@@ -140,6 +140,7 @@ export default function VendorDetail() {
     const toastId = toast.loading('Preparing zip file...');
 
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       
       let processed = 0;
@@ -1157,11 +1158,13 @@ export default function VendorDetail() {
 
           {/* Performance Tab */}
           <TabsContent value="performance" className="space-y-8">
-            <VendorPerformanceScorecard 
+            <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            <VendorPerformanceScorecard
                 metrics={performanceMetrics}
                 history={performanceHistory}
                 onRefresh={handleRefreshScore}
             />
+            </Suspense>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1324,6 +1327,7 @@ export default function VendorDetail() {
         </DialogContent>
       </Dialog>
 
+      <Suspense fallback={null}>
       <VendorContractDialog
         open={contractDialogOpen}
         onOpenChange={setContractDialogOpen}
@@ -1349,7 +1353,7 @@ export default function VendorDetail() {
         vendor={vendor}
         onUpdate={fetchVendorDetails}
       />
-      
+
       <FilePreviewDialog
         open={previewOpen}
         onOpenChange={setPreviewOpen}
@@ -1407,6 +1411,7 @@ export default function VendorDetail() {
         documentName={selectedDocForVersion?.name || ''}
         onSuccess={fetchVendorDetails}
       />
+      </Suspense>
     </DashboardLayout>
   );
 }

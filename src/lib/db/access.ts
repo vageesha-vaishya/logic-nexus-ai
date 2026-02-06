@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
+import { logger } from '@/lib/logger';
 
 export interface DataAccessContext {
   tenantId?: string | null;
@@ -56,6 +57,16 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
   
   // Franchise Admin: Must scope to their franchise (and implicitly tenant)
   if (context.isFranchiseAdmin) {
+    if (context.tenantId) {
+      scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    }
+    if (context.franchiseId) {
+      scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
+    }
+  }
+
+  // Regular user: Must scope to their tenant + franchise (defense-in-depth with RLS)
+  if (!context.isPlatformAdmin && !context.isTenantAdmin && !context.isFranchiseAdmin) {
     if (context.tenantId) {
       scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
     }
@@ -220,9 +231,6 @@ export class ScopedDataAccess {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
         console.debug(`[ScopedDataAccess] Platform Admin Override applied: Tenant=${ctx.tenantId}, Franchise=${ctx.franchiseId}`);
       }
-      
-      // LOGGING FOR DEBUGGING
-      console.log(`[ScopedDataAccess] Applying Admin Override Filters. Tenant: ${ctx.tenantId}, Franchise: ${ctx.franchiseId}`);
 
       if (ctx.tenantId) {
         query = query.eq('tenant_id', ctx.tenantId);
@@ -262,6 +270,20 @@ export class ScopedDataAccess {
       }
       if (ctx.franchiseId) {
         // Special-case: franchises table uses 'id' not 'franchise_id'
+        if (table === 'franchises') {
+          query = query.eq('id', ctx.franchiseId);
+        } else {
+          query = query.eq('franchise_id', ctx.franchiseId);
+        }
+      }
+    }
+
+    // Regular user: Must scope to their tenant + franchise (defense-in-depth with RLS)
+    if (!ctx.isPlatformAdmin && !ctx.isTenantAdmin && !ctx.isFranchiseAdmin) {
+      if (ctx.tenantId) {
+        query = query.eq('tenant_id', ctx.tenantId);
+      }
+      if (ctx.franchiseId) {
         if (table === 'franchises') {
           query = query.eq('id', ctx.franchiseId);
         } else {

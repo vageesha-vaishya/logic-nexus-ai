@@ -1,6 +1,6 @@
 import { serve } from "std/http/server.ts"
-import { createClient } from "@supabase/supabase-js"
-import { corsHeaders } from "../_shared/cors.ts"
+import { getCorsHeaders } from "../_shared/cors.ts"
+import { requireAuth, createServiceClient } from "../_shared/auth.ts"
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -9,17 +9,28 @@ declare const Deno: {
 console.log("Invoice Extractor v1.0 Initialized")
 
 serve(async (req: Request) => {
+  const headers = getCorsHeaders(req);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers })
   }
 
   try {
+    // Require authentication
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { ...headers, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
     const { file_url, file_type } = await req.json()
-    
+
     // Validate Input
-    if (!file_url) {
-      throw new Error('Missing file_url');
+    if (!file_url || typeof file_url !== 'string') {
+      throw new Error('Missing or invalid file_url');
     }
 
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
@@ -27,10 +38,8 @@ serve(async (req: Request) => {
         throw new Error('Missing OPENAI_API_KEY');
     }
 
-    // Initialize Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Initialize Supabase with service role for HTS lookups
+    const supabase = createServiceClient();
 
     console.log(`Processing Invoice: ${file_url}`);
 
@@ -142,7 +151,7 @@ serve(async (req: Request) => {
           original_items: extractedData.items,
           enriched_items: enrichedItems 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...headers, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {
     console.error(error)

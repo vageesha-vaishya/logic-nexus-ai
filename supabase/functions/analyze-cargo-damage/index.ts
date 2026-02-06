@@ -1,6 +1,7 @@
 import { serve } from "std/http/server.ts"
 import { createClient } from "@supabase/supabase-js"
-import { corsHeaders } from "../_shared/cors.ts"
+import { getCorsHeaders } from "../_shared/cors.ts"
+import { requireAuth } from "../_shared/auth.ts"
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -9,12 +10,19 @@ declare const Deno: {
 console.log("Cargo Damage Analyzer v1.0 Initialized")
 
 serve(async (req: Request) => {
+  const headers = getCorsHeaders(req);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers })
   }
 
   try {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     const { file_url } = await req.json()
     
     // Validate Input
@@ -98,13 +106,13 @@ serve(async (req: Request) => {
           analysis: analysisResult,
           timestamp: new Date().toISOString()
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...headers, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {
     console.error(error)
     return new Response(
       JSON.stringify({ error: error.message || 'An unknown error occurred' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      { headers: { ...headers, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
 })

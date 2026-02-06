@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth, createServiceClient } from '../_shared/auth.ts';
 
 type ResetPayload = {
   target_user_id: string;
@@ -14,31 +11,41 @@ type ResetPayload = {
 };
 
 serve(async (req: any) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    if (!serviceKey || !supabaseUrl || !anonKey) {
-      throw new Error("Supabase environment not configured");
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
-    });
-
-    const { data: callerRes } = await supabaseUser.auth.getUser();
-    const callerId = callerRes?.user?.id;
-    if (!callerId) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    // Auth validation
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Verify platform_admin role
+    const serviceClient = createServiceClient();
+    const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+    if (!roleData) {
+      return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const callerId = user.id;
+
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    if (!serviceKey || !supabaseUrl) {
+      throw new Error("Supabase environment not configured");
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
     const body: ResetPayload = await req.json();
     const targetUserId = body?.target_user_id;

@@ -1,198 +1,160 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InvoiceService } from './InvoiceService';
-import { TaxEngine } from '../taxation/TaxEngine';
-import { GLSyncService } from '../gl/GLSyncService';
 import { CreateInvoiceRequest } from './types';
 
-// Mock Supabase
+// Mock Supabase (still needed for auth.getUser)
 const mockUser = { id: 'user-123' };
 const mockTenantId = 'tenant-123';
-const mockInvoice = { id: 'invoice-123', tenant_id: mockTenantId, status: 'DRAFT' };
-
-const mockGetUser = vi.fn();
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockSingle = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockSchema = vi.fn();
+const mockFranchiseId = 'franchise-456';
+const mockInvoice = { id: 'invoice-123', tenant_id: mockTenantId, status: 'draft' };
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
-      getUser: () => mockGetUser()
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-123' } }, error: null })
+    }
+  }
+}));
+
+// Create a mock ScopedDataAccess
+function createMockScopedDb(overrides: Record<string, any> = {}) {
+  const mockSelect = vi.fn().mockReturnValue({
+    order: vi.fn().mockResolvedValue({ data: [mockInvoice], error: null }),
+    eq: vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({ data: mockInvoice, error: null })
+    })
+  });
+
+  const mockInsert = vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({ data: { ...mockInvoice, invoice_number: 'INV-001' }, error: null })
+    })
+  });
+
+  const mockUpdate = vi.fn().mockReturnValue({
+    eq: vi.fn().mockResolvedValue({ error: null })
+  });
+
+  const mockDelete = vi.fn();
+
+  const mockFrom = vi.fn().mockReturnValue({
+    select: mockSelect,
+    insert: mockInsert,
+    update: mockUpdate,
+    delete: mockDelete,
+  });
+
+  const mockRpc = vi.fn().mockResolvedValue({ data: 'INV-001', error: null });
+
+  return {
+    from: mockFrom,
+    rpc: mockRpc,
+    accessContext: {
+      tenantId: mockTenantId,
+      franchiseId: mockFranchiseId,
+      isPlatformAdmin: false,
+      isTenantAdmin: true,
+      isFranchiseAdmin: false,
+      userId: mockUser.id,
     },
-    from: (table: string) => mockFrom(table),
-    schema: (schema: string) => mockSchema(schema)
-  }
-}));
-
-// Mock TaxEngine
-vi.mock('../taxation/TaxEngine', () => ({
-  TaxEngine: {
-    determineNexus: vi.fn(),
-    calculate: vi.fn()
-  }
-}));
-
-// Mock GLSyncService
-vi.mock('../gl/GLSyncService', () => ({
-  GLSyncService: {
-    syncTransaction: vi.fn().mockResolvedValue(undefined)
-  }
-}));
+    client: {},
+    ...overrides,
+    // Expose mocks for assertions
+    _mocks: { mockFrom, mockSelect, mockInsert, mockUpdate, mockRpc }
+  } as any;
+}
 
 describe('InvoiceService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Setup Supabase Mocks
-    mockGetUser.mockResolvedValue({ data: { user: mockUser }, error: null });
-    
-    // Schema Mock (finance)
-    mockSchema.mockReturnValue({ from: mockFrom });
-    
-    // Default mocks for query builders
-    mockFrom.mockReturnValue({
-        select: () => ({
-            eq: () => ({
-                single: async () => ({ data: { tenant_id: mockTenantId }, error: null })
-            })
-        }),
-        insert: (data: any) => ({
-            select: () => ({
-                single: async () => ({ data: { ...data, id: 'invoice-123' }, error: null })
-            })
-        }),
-        update: (data: any) => ({
-            eq: () => ({
-                select: () => ({
-                    single: async () => ({ data: { ...mockInvoice, ...data }, error: null })
-                })
-            })
-        })
-    });
   });
 
-  it('should create an invoice with calculated taxes', async () => {
-    // Custom mock for this test to handle multiple table calls
-    mockFrom.mockImplementation((table) => {
-        if (table === 'user_roles') {
-            return {
-                select: () => ({
-                    eq: () => ({
-                        single: async () => ({ data: { tenant_id: mockTenantId }, error: null })
-                    })
-                })
-            };
-        }
-        if (table === 'invoices') {
-             return {
-                insert: (data: any) => ({
-                    select: () => ({
-                        single: async () => ({ data: { ...data, id: 'invoice-123' }, error: null })
-                    })
-                })
-             };
-        }
-        if (table === 'invoice_items') {
-             return {
-                insert: (data: any) => ({
-                    select: async () => ({ data: data, error: null })
-                })
-             };
-        }
-        return {};
+  it('should list invoices using scoped query', async () => {
+    const scopedDb = createMockScopedDb();
+
+    const result = await InvoiceService.listInvoices(scopedDb);
+
+    expect(scopedDb.from).toHaveBeenCalledWith('invoices');
+    expect(result).toEqual([mockInvoice]);
+  });
+
+  it('should get a single invoice by ID using scoped query', async () => {
+    const scopedDb = createMockScopedDb();
+
+    const result = await InvoiceService.getInvoice('invoice-123', scopedDb);
+
+    expect(scopedDb.from).toHaveBeenCalledWith('invoices');
+    expect(result).toEqual(mockInvoice);
+  });
+
+  it('should create an invoice using scoped insert', async () => {
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { id: 'invoice-123', invoice_number: 'INV-001' }, error: null })
+      })
     });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null })
+    });
+
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { ...mockInvoice, subtotal: 200, total: 200 }, error: null })
+      })
+    });
+
+    let callCount = 0;
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === 'invoices') {
+        callCount++;
+        // First call = insert, second = update, third = select (getInvoice)
+        if (callCount === 1) return { insert: mockInsert };
+        if (callCount === 2) return { update: mockUpdate };
+        if (callCount === 3) return { select: mockSelect };
+      }
+      if (table === 'invoice_line_items') {
+        return { insert: vi.fn().mockResolvedValue({ error: null }) };
+      }
+      return {};
+    });
+
+    const scopedDb = createMockScopedDb({ from: mockFrom });
 
     const request: CreateInvoiceRequest = {
       customer_id: 'cust-1',
-      origin_address: { street: 'Origin', city: 'City', state: 'TX', zip: '75000', country: 'US' },
-      destination_address: { street: 'Dest', city: 'LA', state: 'CA', zip: '90000', country: 'US' },
       issue_date: new Date(),
       due_date: new Date(),
       currency: 'USD',
       items: [
-        { description: 'Item 1', quantity: 2, unit_price: 100, tax_code_id: 'TC1' }
+        { description: 'Freight charges', quantity: 2, unit_price: 100 }
       ]
     };
 
-    // Mock Nexus: US-CA
-    vi.mocked(TaxEngine.determineNexus).mockResolvedValue({
-      hasNexus: true,
-      jurisdictions: ['US-CA']
-    });
+    const result = await InvoiceService.createInvoice(request, scopedDb);
 
-    // Mock Calculation
-    vi.mocked(TaxEngine.calculate).mockResolvedValue({
-      totalTax: 16.5, // 8.25% of 200
-      breakdown: [],
-      lineItems: [
-        { id: '0', taxAmount: 16.5, taxRate: 0.0825 }
-      ]
-    });
-
-    const result = await InvoiceService.createInvoice(request);
-
-    // Verify Tenant ID Lookup
-    expect(mockFrom).toHaveBeenCalledWith('user_roles');
-    
-    // Verify Nexus Call
-    expect(TaxEngine.determineNexus).toHaveBeenCalledWith({
-      origin: request.origin_address,
-      destination: request.destination_address,
-      tenantId: mockTenantId
-    });
-
-    // Verify Tax Calculation
-    expect(TaxEngine.calculate).toHaveBeenCalledWith(expect.objectContaining({
-      jurisdictionCode: 'US-CA',
-      items: expect.arrayContaining([
-        expect.objectContaining({ amount: 200, taxCode: 'TC1' })
-      ])
-    }));
-
-    // Verify Result
-    expect(result.tax_total).toBe(16.5);
-    expect(result.total_amount).toBe(216.5);
-    expect(result.items).toHaveLength(1);
-    expect(result.items![0].tax_amount).toBe(16.5);
-    expect(result.items![0].total_amount).toBe(216.5);
+    // Verify scoped insert was used (not raw supabase)
+    expect(mockFrom).toHaveBeenCalledWith('invoices');
+    expect(mockInsert).toHaveBeenCalled();
+    // Verify tenant_id is NOT manually set — ScopedDataAccess handles injection
+    const insertArg = mockInsert.mock.calls[0][0];
+    expect(insertArg).not.toHaveProperty('tenant_id');
+    expect(insertArg).toHaveProperty('invoice_number', 'INV-001');
   });
 
-  it('should finalize an invoice and trigger GL sync', async () => {
-    // Custom mock for update
-    const mockUpdateFn = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ 
-                    data: { ...mockInvoice, status: 'SENT' }, 
-                    error: null 
-                })
-            })
-        })
-    });
+  it('should throw if tenant ID is missing from scope context', async () => {
+    const scopedDb = createMockScopedDb();
+    scopedDb.accessContext.tenantId = null;
 
-    mockFrom.mockImplementation((table) => {
-        if (table === 'invoices') {
-            return { update: mockUpdateFn };
-        }
-        return {};
-    });
+    const request: CreateInvoiceRequest = {
+      customer_id: 'cust-1',
+      issue_date: new Date(),
+      due_date: new Date(),
+      currency: 'USD',
+      items: [{ description: 'Test', quantity: 1, unit_price: 50 }]
+    };
 
-    const result = await InvoiceService.finalizeInvoice('invoice-123');
-
-    // Verify DB Update
-    expect(mockSchema).toHaveBeenCalledWith('finance');
-    expect(mockFrom).toHaveBeenCalledWith('invoices');
-    expect(mockUpdateFn).toHaveBeenCalledWith({ status: 'SENT' });
-    
-    // Verify Result
-    expect(result.status).toBe('SENT');
-
-    // Verify GL Sync Trigger
-    expect(GLSyncService.syncTransaction).toHaveBeenCalledWith(mockTenantId, 'invoice-123', 'INVOICE');
+    await expect(InvoiceService.createInvoice(request, scopedDb)).rejects.toThrow('Tenant ID not found in scope context');
   });
 });

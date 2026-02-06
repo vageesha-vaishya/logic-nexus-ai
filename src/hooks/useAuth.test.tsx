@@ -1,5 +1,9 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Restore real useAuth (overrides global mock from setup.ts)
+vi.unmock('@/hooks/useAuth');
+
 import { useAuth, AuthProvider } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';

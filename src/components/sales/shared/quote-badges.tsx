@@ -42,11 +42,3 @@ export const getReliabilityColor = (score: number) => {
     return 'text-red-600 bg-red-50 border-red-200';
 };
 
-export const formatCurrency = (amount: number, currency: string | { code: string }) => {
-    const code = typeof currency === 'object' ? currency?.code : currency;
-    // Handle invalid inputs
-    if (typeof amount !== 'number' || isNaN(amount)) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: code || 'USD' }).format(0);
-    }
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code || 'USD' }).format(amount);
-};

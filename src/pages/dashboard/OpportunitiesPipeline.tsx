@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -352,15 +353,6 @@ export default function OpportunitiesPipeline() {
 
   const swimLanes = getSwimLanes();
 
-  const formatCurrency = (amount: number | null) => {
-    if (!amount) return "—";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatDate = (date: string | null) => {
     if (!date) return "—";
     return new Date(date).toLocaleDateString("en-US", {
@@ -676,7 +668,7 @@ export default function OpportunitiesPipeline() {
                       title={lane.title}
                       count={lane.opportunities.length}
                       metrics={[
-                        { label: 'Total Value', value: formatCurrency(totalValue) },
+                        { label: 'Total Value', value: formatCurrency(totalValue, 'USD', { placeholder: '—', minimumFractionDigits: 0 }) },
                         { label: 'Avg Probability', value: `${avgProbability}%` },
                       ]}
                     >
@@ -745,7 +737,7 @@ export default function OpportunitiesPipeline() {
                                         )}
                                         {showFields.amount && opportunity.amount && (
                                           <div className="text-xs font-semibold text-primary">
-                                            {formatCurrency(opportunity.amount)}
+                                            {formatCurrency(opportunity.amount, 'USD', { placeholder: '—', minimumFractionDigits: 0 })}
                                           </div>
                                         )}
                                         {showFields.probability && opportunity.probability !== null && (
@@ -795,7 +787,7 @@ export default function OpportunitiesPipeline() {
                       )}
                       {activeOpportunity.amount && (
                         <div className="text-xs font-semibold text-primary">
-                          {formatCurrency(activeOpportunity.amount)}
+                          {formatCurrency(activeOpportunity.amount, 'USD', { placeholder: '—', minimumFractionDigits: 0 })}
                         </div>
                       )}
                     </CardContent>

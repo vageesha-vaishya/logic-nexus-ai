@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/utils';
 
 interface Quote {
   id: string;
@@ -48,14 +49,6 @@ export function QuotesWidget() {
     fetchQuotes();
   }, [context?.userId]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -84,7 +77,7 @@ export function QuotesWidget() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium">{formatCurrency(quote.total_amount)}</p>
+                  <p className="text-sm font-medium">{formatCurrency(quote.total_amount, 'USD', { minimumFractionDigits: 0 })}</p>
                   <Badge variant="outline" className="text-[10px] h-4 px-1">
                     {quote.status}
                   </Badge>

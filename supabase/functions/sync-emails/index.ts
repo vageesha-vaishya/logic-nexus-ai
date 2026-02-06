@@ -3,18 +3,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import PostalMime from "https://esm.sh/postal-mime@2.2.0";
 import { Logger } from '../_shared/logger.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 console.log("Sync-emails function loaded");
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 type GmailHeader = { name: string; value: string };
 type GmailMessagePart = {
   mimeType?: string;
-  body?: { 
+  body?: {
     data?: string;
     attachmentId?: string;
     size?: number;
@@ -26,6 +23,7 @@ type GmailMessagePart = {
 type GraphRecipient = { emailAddress?: { address?: string; name?: string } };
 
 serve(async (req: any) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -38,18 +36,23 @@ serve(async (req: any) => {
       if (!v) throw new Error(`Missing environment variable: ${name}`);
       return v;
     };
-    
+
     const supabaseUrl = requireEnv("SUPABASE_URL");
     const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
     const anonKey = requireEnv("SUPABASE_ANON_KEY");
 
-    // Create Supabase client with Auth context (User or Service Role)
+    // Auth: verify service role key or authenticated user
     const authHeader = req.headers.get('Authorization');
     let supabase: any;
 
     if (authHeader && authHeader.includes(serviceKey)) {
       supabase = createClient(supabaseUrl, serviceKey);
     } else {
+      // Fallback: verify user auth
+      const { user, error: authError } = await requireAuth(req);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       supabase = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader || '' } },
       });

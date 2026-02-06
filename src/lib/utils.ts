@@ -29,9 +29,28 @@ export function matchText(
   }
 }
 
-export function formatCurrency(value: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-  }).format(value);
+export function formatCurrency(
+  amount: number | null | undefined,
+  currency: string | { code: string } = 'USD',
+  options?: { minimumFractionDigits?: number; placeholder?: string },
+): string {
+  const code = typeof currency === 'object' ? currency?.code : currency;
+  const resolvedCode = code || 'USD';
+  const placeholder = options?.placeholder ?? '-';
+
+  if (amount == null || typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return placeholder;
+  }
+
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: resolvedCode,
+      ...(options?.minimumFractionDigits !== undefined && {
+        minimumFractionDigits: options.minimumFractionDigits,
+      }),
+    }).format(amount);
+  } catch {
+    return `${resolvedCode} ${amount.toFixed(2)}`;
+  }
 }

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { formatCurrency } from "@/lib/utils";
 
 interface QuotesListProps {
   quotes: Quote[];
@@ -38,11 +39,6 @@ export function QuotesList({
   bulkMode,
 }: QuotesListProps) {
   const navigate = useNavigate();
-
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
 
   return (
     <div className="rounded-md border bg-card">

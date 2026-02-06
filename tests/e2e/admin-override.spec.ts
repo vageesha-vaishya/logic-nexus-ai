@@ -1,12 +1,15 @@
 import { test, expect } from '@playwright/test';
 
+const E2E_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
+const E2E_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'changeme';
+
 test.describe('Platform Admin Override Workflow', () => {
   test('should allow platform admin to enable override and view scoped data', async ({ page }) => {
     // 1. Authentication
     console.log('Navigating to /auth...');
     await page.goto('/auth');
-    await page.fill('input[type="email"]', 'Bahuguna.vimal@gmail.com');
-    await page.fill('input[type="password"]', 'Vimal@1234');
+    await page.fill('input[type="email"]', E2E_ADMIN_EMAIL);
+    await page.fill('input[type="password"]', E2E_ADMIN_PASSWORD);
     
     console.log('Clicking Sign In...');
     await page.getByRole('button', { name: /sign in/i }).click();

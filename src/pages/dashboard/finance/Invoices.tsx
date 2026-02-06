@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useCRM } from '@/hooks/useCRM';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { InvoiceService } from '@/services/invoicing/InvoiceService';
@@ -16,16 +17,17 @@ import { format } from 'date-fns';
 export default function Invoices() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { scopedDb } = useCRM();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchInvoices();
-  }, []);
+  }, [scopedDb]);
 
   const fetchInvoices = async () => {
     try {
-      const data = await InvoiceService.listInvoices();
+      const data = await InvoiceService.listInvoices(scopedDb);
       setInvoices(data);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });

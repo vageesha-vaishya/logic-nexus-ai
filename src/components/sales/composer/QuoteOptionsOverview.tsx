@@ -48,12 +48,12 @@ import { QuoteMapVisualizer } from '../quick-quote/QuoteMapVisualizer';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { PricingService } from '@/services/pricing.service';
 import { useCRM } from '@/hooks/useCRM';
-import { 
-  getTierBadge, 
-  getModeIcon, 
-  formatCurrency,
+import {
+  getTierBadge,
+  getModeIcon,
   getReliabilityColor
 } from '../shared/quote-badges';
+import { formatCurrency } from '@/lib/utils';
 
 interface OptionOverviewProps {
   options: any[];

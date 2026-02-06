@@ -1,7 +1,8 @@
 declare const Deno: any;
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://esm.sh/zod@3.22.4';
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth } from '../_shared/auth.ts';
 import { Logger } from '../_shared/logger.ts';
 
 const LeadEventSchema = z.object({
@@ -12,8 +13,15 @@ const LeadEventSchema = z.object({
 });
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Auth: require authenticated user
+  const { user, error: authError } = await requireAuth(req);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const logger = new Logger({ function: 'lead-event-webhook' });

@@ -1,15 +1,20 @@
 import { determineRoute } from '../_shared/routing-logic.ts';
-
-const corsHeadersRoute = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
 const denoRoute = (globalThis as any).Deno;
 denoRoute.serve(async (req: Request) => {
+  const corsHeadersRoute = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeadersRoute });
   }
+
+  // Auth: require authenticated user
+  const { user, error: authError } = await requireAuth(req);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeadersRoute, 'Content-Type': 'application/json' } });
+  }
+
   try {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {

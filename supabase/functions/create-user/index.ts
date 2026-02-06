@@ -1,18 +1,33 @@
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from '../_shared/cors.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth, createServiceClient } from '../_shared/auth.ts';
 import { Logger } from '../_shared/logger.ts';
 
 declare const Deno: any;
 
 Deno.serve(async (req: Request) => {
   const logger = new Logger({ function: 'create-user' });
+  const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers });
   }
 
   try {
+    // Auth validation
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
+    // Verify platform_admin role
+    const serviceClient = createServiceClient();
+    const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+    if (!roleData) {
+      return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY');
 
@@ -20,12 +35,12 @@ Deno.serve(async (req: Request) => {
       const missing = [];
       if (!supabaseUrl) missing.push('SUPABASE_URL');
       if (!serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-      
+
       const errorMsg = `Critical Configuration Error: Missing environment variables: ${missing.join(', ')}`;
       logger.error(errorMsg);
       return new Response(
         JSON.stringify({ error: errorMsg, code: 'CONFIG_ERROR' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...headers, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -40,57 +55,28 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    // Manual Auth Verification (to bypass Gateway 401 issues)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-       logger.warn('Missing Authorization header');
-       return new Response(
-         JSON.stringify({ error: 'Unauthorized: Missing Authorization header' }),
-         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    
-    // 1. Check if it's the Service Role Key (Admin Scripts)
-    if (token === serviceRoleKey) {
-        logger.info('Authenticated via Service Role Key');
-    } else {
-        // 2. Check if it's a valid User Token
-        const { data: { user }, error: userVerifyError } = await supabaseAdmin.auth.getUser(token);
-        
-        if (userVerifyError || !user) {
-            logger.error('Manual Auth Verification Failed', { error: userVerifyError });
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized', details: userVerifyError?.message || 'Invalid Token' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-        logger.info('Authenticated via User Token', { userId: user.id });
-    }
-
     const body = await req.json();
     const { email, password, first_name, last_name, phone, avatar_url, is_active, must_change_password, email_verified, role, tenant_id, franchise_id } = body;
 
     logger.info('Creating new user', { email, role, tenant_id, franchise_id });
 
     // Create auth user
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: email_verified ?? true,
       user_metadata: { first_name, last_name }
     });
 
-    if (authError) {
-      logger.error('Failed to create auth user', { error: authError, code: authError.status });
-      
+    if (createError) {
+      logger.error('Failed to create auth user', { error: createError, code: createError.status });
+
       // Check for JWT/Auth specific errors
-      if (authError.message?.includes('JWT') || authError.status === 401) {
+      if (createError.message?.includes('JWT') || createError.status === 401) {
          logger.error('JWT/Auth Error detected during user creation. Check Service Role Key.');
       }
 
-      throw authError;
+      throw createError;
     }
 
     logger.info('Auth user created', { userId: authData.user.id });
@@ -133,7 +119,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ success: true, user: authData.user }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
@@ -148,7 +134,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ error: errorMessage, details: errorContext }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         status: 400,
       }
     );

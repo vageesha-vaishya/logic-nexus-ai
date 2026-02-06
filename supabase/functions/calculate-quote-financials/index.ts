@@ -1,14 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { corsHeaders } from "../_shared/cors.ts"
+import { getCorsHeaders } from "../_shared/cors.ts"
+import { requireAuth } from "../_shared/auth.ts"
 
 console.log("Hello from calculate-quote-financials!")
 
 serve(async (req) => {
+  const headers = getCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers })
   }
 
   try {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
     const { shipping_amount, tax_percent } = await req.json()
 
     // Input validation
@@ -37,13 +45,13 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Content-Language': 'en' },
+      headers: { ...headers, 'Content-Type': 'application/json', 'Content-Language': 'en' },
       status: 400,
     })
   }

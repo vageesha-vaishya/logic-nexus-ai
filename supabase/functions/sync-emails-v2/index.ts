@@ -5,13 +5,10 @@ import { ImapService } from "./services/imap.ts";
 import { Pop3Service } from "./services/pop3.ts";
 import { GmailService } from "./services/gmail.ts";
 import { saveSyncLog, getAdminSupabaseClient } from "./utils/db.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -50,28 +47,8 @@ serve(async (req) => {
       } = await supabase.auth.getUser(token);
 
       if (userError || !user) {
-        console.error("Auth error:", userError);
-        return new Response(JSON.stringify({ 
-            error: "Unauthorized",
-            details: userError,
-            debug: {
-                 hasAuthHeader: !!authHeader,
-                 hasServiceKey: !!serviceRoleKey,
-                 authLength: authHeader?.length,
-                 authHeaderStart: authHeader ? authHeader.substring(0, 10) : null,
-                 keyLength: serviceRoleKey?.length,
-                 keySnippet: serviceRoleKey ? serviceRoleKey.slice(0, 5) + "..." + serviceRoleKey.slice(-5) : null,
-                 authSnippet: authHeader ? authHeader.slice(0, 15) + "..." + authHeader.slice(-5) : null,
-                 isServiceRole: isServiceRole,
-                 userError: userError || { message: "User is null, no error returned" }, // Ensure visibility
-                 tokenSnippet: token ? token.slice(-5) : "null", // Log what we passed to getUser
-                 env: {
-                    supabaseUrl: Deno.env.get("SUPABASE_URL") ? "Set" : "Missing",
-                    supabaseAnonKey: Deno.env.get("SUPABASE_ANON_KEY") ? "Set" : "Missing",
-                    urlSnippet: Deno.env.get("SUPABASE_URL")?.slice(0, 20)
-                 }
-             }
-        }), {
+        console.error("Auth error:", userError?.message || "User is null");
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

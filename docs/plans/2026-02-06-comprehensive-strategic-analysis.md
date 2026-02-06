@@ -2,11 +2,12 @@
 ## Logic Nexus AI: Enterprise Multi-Domain CRM Platform
 ## Platform Hierarchy: Super Admin → Multi-Tenant → Multi-Franchise
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Date:** February 6, 2026
 **Author:** Technical Analysis Team
-**Status:** In Progress
+**Status:** In Progress — Factual corrections applied (v1.1)
 **Classification:** Internal Strategic Document
+**Revision Notes (v1.1):** Corrected migration count (489, not 280+), Leads.tsx line count (715, not 800+), lead scoring description (rule-based, not AI), booking system status (DB only, no UI), removed non-existent tables from schema diagrams, corrected competitive ratings, added budget realism note, marked Sections 7-9 as unwritten stubs, added user-role scoping to ScopedDataAccess documentation.
 
 ---
 
@@ -331,6 +332,12 @@ if (context.isFranchiseAdmin) {
   if (context.tenantId) query = query.eq('tenant_id', context.tenantId);
   if (context.franchiseId) query = query.eq('franchise_id', context.franchiseId);
 }
+
+// Regular User: Must scope to tenant + franchise (defense-in-depth with RLS)
+if (!context.isPlatformAdmin && !context.isTenantAdmin && !context.isFranchiseAdmin) {
+  if (context.tenantId) query = query.eq('tenant_id', context.tenantId);
+  if (context.franchiseId) query = query.eq('franchise_id', context.franchiseId);
+}
 ```
 
 **Automatic Scope Injection:**
@@ -357,8 +364,9 @@ from('leads').insert({ name: 'New Lead' })
 
 🔴 **Critical Gaps:**
 - ~30% of components don't use ScopedDataAccess
-- Direct Supabase client usage in services layer
+- Direct Supabase client usage in services layer (notably `InvoiceService.ts` bypasses ScopedDataAccess entirely, calling `supabase.from('invoices')` directly)
 - No compile-time enforcement of scoping
+- `user` role had NO scoping applied — fell through with zero filters (FIXED in v1.1)
 
 ### 1.1.5 Hierarchy Enforcement Gaps & Technical Debt
 
@@ -530,7 +538,7 @@ logic-nexus-ai/
 │   │   └── navigation.ts   # Menu structure
 │   └── types/               # TypeScript type definitions
 ├── supabase/
-│   ├── migrations/          # Database migrations (280+ files)
+│   ├── migrations/          # Database migrations (489 files)
 │   ├── functions/           # Edge functions (AI advisor, rate engine)
 │   └── seeds/              # Seed data scripts
 ├── scripts/                 # Utility scripts (100+ files)
@@ -706,9 +714,8 @@ The Logic Nexus AI platform uses **PostgreSQL** (via Supabase) with a **shared d
 5. Financial Layer (Tenant + Franchise scoped)
    ├── invoices
    ├── invoice_items
-   ├── payments
-   ├── billing_cycles
-   └── revenue_recognition
+   └── payments
+   NOTE: billing_cycles and revenue_recognition tables do NOT exist in the schema
 
 6. Master Data Layer
    ├── carriers (tenant-scoped with global templates)
@@ -974,12 +981,12 @@ CREATE POLICY "Tenant admins view all tenant quotes" ON public.quotes
 **Migration Strategy:**
 
 - **Tool**: Supabase CLI with PostgreSQL migrations
-- **Migration Count**: 280+ migration files
+- **Migration Count**: 489 migration files (177 contain CREATE POLICY statements)
 - **Naming Convention**: `YYYYMMDDHHMMSS_description.sql`
 
 **Current Migration Issues:**
 
-1. **Migration Sprawl**: 280+ files make it hard to understand schema evolution
+1. **Migration Sprawl**: 489 files make it hard to understand schema evolution
 2. **No Rollback Scripts**: Most migrations lack DOWN migrations
 3. **Idempotency**: Inconsistent use of `IF NOT EXISTS` clauses
 4. **Testing**: No automated migration testing
@@ -1549,7 +1556,7 @@ Users can have multiple roles across different tenants/franchises:
 **⚠️ Technical Debt:**
 1. Inconsistent data fetching patterns across codebase
 2. Missing indexes on hierarchy columns (performance)
-3. 280+ migrations with poor documentation
+3. 489 migrations with poor documentation
 4. No automated testing for hierarchy enforcement
 5. JSONB overuse in schema design
 
@@ -1642,7 +1649,7 @@ CREATE TABLE public.leads (
   expected_close_date DATE,
   description TEXT,
   notes TEXT,
-  lead_score INTEGER DEFAULT 0,  -- AI-powered scoring
+  lead_score INTEGER DEFAULT 0,  -- Rule-based heuristic scoring (not AI/ML)
   owner_id UUID REFERENCES public.profiles(id),
   converted_account_id UUID REFERENCES public.accounts(id),
   converted_contact_id UUID REFERENCES public.contacts(id),
@@ -1696,7 +1703,7 @@ CREATE TABLE public.leads (
 - Web-to-lead forms (via API)
 
 ✅ **Lead Scoring**
-- AI-powered lead scoring (0-100)
+- Rule-based heuristic scoring (0-100) — NOT AI/ML-powered despite UI labels
 - Configurable scoring weights
 - Decay over time for inactive leads
 - Score tracking history
@@ -1780,7 +1787,7 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
 
 | Issue | Severity | Files Affected | Impact |
 |-------|----------|----------------|---------|
-| `Leads.tsx` is 800+ lines | 🔴 HIGH | Leads.tsx | Hard to maintain, test |
+| `Leads.tsx` is ~715 lines | 🟡 MEDIUM | Leads.tsx | Hard to maintain, test |
 | Duplicate filtering logic | 🟡 MEDIUM | Leads.tsx, LeadsPipeline.tsx | Inconsistent behavior |
 | No shared lead data hook | 🟡 MEDIUM | Multiple files | Duplicate API calls |
 | Direct Supabase calls | 🔴 HIGH | LeadAssignment.tsx | Bypasses ScopedDataAccess |
@@ -1817,7 +1824,7 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
 **Cargowise Lead Management:**
 
 ✅ **Has:** Territory management, advanced routing, lead scoring, duplicate detection
-❌ **Missing in Logic Nexus:** Territory management, duplicate detection
+❌ **Missing in Logic Nexus:** Duplicate detection (territory management exists via LeadRouting.tsx)
 
 **Magaya CRM:**
 
@@ -1827,7 +1834,7 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
 **Salesforce Lead Management:**
 
 ✅ **Has:** AI lead scoring (Einstein), web-to-lead with custom fields, lead assignment queues, duplicate rules, lead conversion workflows, mobile app
-❌ **Missing in Logic Nexus:** AI lead scoring (basic implementation exists but not Einstein-level), web-to-lead forms, assignment queues, mobile app
+❌ **Missing in Logic Nexus:** AI/ML lead scoring (current scoring is rule-based heuristics, not AI), web-to-lead forms, assignment queues, mobile app
 
 **Competitive Feature Matrix:**
 
@@ -1835,11 +1842,11 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
 |---------|-------------|-----------|--------|------------|--------------|
 | Lead Capture (Manual) | ✅ | ✅ | ✅ | ✅ | - |
 | Web-to-Lead Forms | 🟡 Basic | ✅ | ✅ | ✅ | P1 |
-| Lead Scoring | ✅ | ✅ | ✅ | ✅ Einstein | P1 (enhance) |
+| Lead Scoring | 🟡 Rule-based | ✅ | ✅ | ✅ Einstein (AI) | P1 (upgrade to ML) |
 | Auto-Assignment | ✅ Basic | ✅ Advanced | ✅ | ✅ Queues | P1 |
 | Duplicate Detection | ❌ | ✅ | ✅ | ✅ | P0 |
 | Lead Conversion | ✅ | ✅ | ✅ | ✅ | - |
-| Territory Management | ❌ | ✅ | 🟡 | ✅ | P1 |
+| Territory Management | 🟡 Basic | ✅ | 🟡 | ✅ | P1 (enhance) |
 | Lead Nurturing Campaigns | ❌ | 🟡 | ✅ | ✅ | P2 |
 | Mobile Lead Capture | ❌ | ✅ | ✅ | ✅ | P2 |
 | Activity Timeline | ✅ | ✅ | ✅ | ✅ | - |
@@ -2072,10 +2079,10 @@ Each section includes:
 - **Priority**: P0 - Full refactor required (4 weeks estimated)
 
 **2.B.2 Booking System**
-- **Status**: Basic booking tracking exists
-- **Critical Gaps**: No carrier API integration, no capacity management, no amendments workflow
-- **Missing Features**: Real-time availability, automated confirmations, booking documents
-- **Priority**: P1 - Add carrier integrations
+- **Status**: Database `bookings` table exists only — no UI pages, no service layer, no booking workflows implemented
+- **Critical Gaps**: No carrier API integration, no capacity management, no amendments workflow, no UI at all
+- **Missing Features**: Real-time availability, automated confirmations, booking documents, booking creation/management UI
+- **Priority**: P1 - Build booking UI and carrier integrations from scratch
 
 **2.B.3 Shipment Management**
 - **Status**: Comprehensive shipment lifecycle tracking
@@ -2096,8 +2103,8 @@ Each section includes:
 - **Priority**: P1 - Add automation
 
 **2.B.6 Billing & Revenue Recognition**
-- **Status**: Basic billing exists
-- **Critical Gaps**: GAAP/IFRS revenue recognition, accrual accounting, billing cycles
+- **Status**: No dedicated billing/revenue recognition tables exist — `billing_cycles` and `revenue_recognition` tables referenced elsewhere in this doc do NOT exist in the schema
+- **Critical Gaps**: GAAP/IFRS revenue recognition, accrual accounting, billing cycles — all need to be built from scratch
 - **Missing Features**: Payment processing integration, AR automation
 - **Priority**: P1 - Compliance requirements
 
@@ -2135,11 +2142,15 @@ Each section includes:
 ✅ Hazmat handling
 ✅ Container types and sizes
 
+**Existing Features Not Listed Above:**
+✅ CO2 emissions tracking (implemented in shipment workflow)
+✅ Vendor management system (comprehensive)
+
 **Logistics Gaps vs. Cargowise/Magaya:**
 ❌ Vessel schedule integration
 ❌ Container yard management
 ❌ Drayage optimization
-❌ Carbon footprint calculator
+❌ Carbon footprint calculator (basic CO2 tracking exists but not full lifecycle calculator)
 ❌ Demurrage/detention tracking
 ❌ Equipment management
 ❌ Warehouse operations (WMS)
@@ -2239,12 +2250,12 @@ Each section includes:
 | **Lead Management** | ✅ Good | 🟡 Basic | ✅ Good | ✅ Excellent | ✅ Excellent |
 | **Opportunity Mgmt** | ✅ Good | 🟡 Basic | ✅ Good | ✅ Excellent | ✅ Excellent |
 | **Quote Management** | 🟡 Fair | ✅ Excellent | ✅ Good | 🟡 Basic | 🟡 Basic |
-| **Booking/Orders** | 🟡 Basic | ✅ Excellent | ✅ Excellent | ✅ Good | ✅ Good |
+| **Booking/Orders** | ❌ DB table only (no UI) | ✅ Excellent | ✅ Excellent | ✅ Good | ✅ Good |
 | **Shipment Tracking** | ✅ Good | ✅ Excellent | ✅ Excellent | ❌ N/A | ❌ N/A |
 | **Invoicing** | ✅ Good | ✅ Excellent | ✅ Good | 🟡 Basic | ✅ Good |
 | **Email Integration** | 🟡 Basic | 🟡 Basic | 🟡 Basic | ✅ Excellent | ✅ Excellent |
 | **Mobile App** | ❌ None | ✅ Yes | ✅ Yes | ✅ Excellent | ✅ Excellent |
-| **AI/ML Features** | 🟡 Basic | ❌ None | ❌ None | ✅ Einstein | ✅ AI Insights |
+| **AI/ML Features** | ❌ None (rule-based heuristics only) | ❌ None | ❌ None | ✅ Einstein | ✅ AI Insights |
 | **Multi-Tenancy** | ✅ Excellent | 🟡 Fair | 🟡 Fair | ✅ Excellent | ✅ Excellent |
 | **Plugin Ecosystem** | 🟡 Limited | 🟡 Limited | 🟡 Limited | ✅ AppExchange | ✅ AppSource |
 
@@ -2278,7 +2289,7 @@ Each section includes:
    - Deliverable: Maintainable quote codebase with 70%+ test coverage
 
 2. **Hierarchy Enforcement** (Weeks 5-8) 🔴 CRITICAL
-   - Audit all 280+ tables for tenant_id/franchise_id
+   - Audit all tables for tenant_id/franchise_id (489 migrations to review)
    - Standardize RLS policies across all tables
    - Enforce 100% ScopedDataAccess usage
    - Build hierarchy testing framework
@@ -2417,7 +2428,8 @@ Each section includes:
 
 ## Section 7-9: Implementation Specifications, QA, Production Readiness
 
-*(Sections 7-9 would include detailed ERDs, API specifications, testing frameworks, and production checklists using the same comprehensive format as Sections 1-6)*
+> **STATUS: STUB — NOT YET WRITTEN**
+> Sections 7-9 are placeholders only. They contain no actual content. The Table of Contents claims these span pages 186-245 (~60 pages), but nothing has been authored. These sections should include detailed ERDs, API specifications, testing frameworks, and production checklists.
 
 ---
 
@@ -2442,11 +2454,11 @@ This comprehensive strategic analysis has identified:
    - Essential for sales productivity
    - Estimated ROI: 30% improvement in sales response time
 
-## High-Impact Enhancements (Next 6 Months)
+## High-Impact Enhancements (6-12 Months)
 
-4. **Mobile App Development** (12 weeks)
-5. **AI-Powered Features** (16 weeks)
-6. **Plugin Marketplace** (16 weeks)
+4. **AI-Powered Features** (16 weeks — Phase 4, Weeks 49-64)
+5. **Plugin Marketplace** (16 weeks — Phase 3, Weeks 33-48)
+6. **Mobile App Development** (4 weeks — Phase 5, Weeks 77-80; note: 12 weeks more realistic)
 
 ## Long-Term Strategic Initiatives (12-18 Months)
 
@@ -2464,6 +2476,8 @@ This comprehensive strategic analysis has identified:
 
 **Total Investment: ~$2.8M over 80 weeks (18 months)**
 
+> **CORRECTION**: The $2.8M estimate understates realistic costs. When accounting for benefits, overhead, tooling, infrastructure, QA depth, hiring friction, and contingency, a more realistic estimate is **$4.5-5.5M**. Phase estimates above assume fully-loaded senior engineers at ~$200K/year but do not include management overhead, infrastructure costs, or buffer for scope creep.
+
 ## Expected ROI
 
 - 50% faster feature development (maintainability improvements)
@@ -2474,7 +2488,7 @@ This comprehensive strategic analysis has identified:
 
 ---
 
-**Document Status: COMPREHENSIVE ANALYSIS COMPLETE**
+**Document Status: COMPREHENSIVE ANALYSIS — PARTIALLY COMPLETE (Sections 7-9 not written)**
 
 *This strategic analysis provides the foundation for transforming Logic Nexus AI from a logistics-focused CRM into a multi-domain enterprise platform that exceeds the capabilities of both logistics platforms (Cargowise, Magaya) and enterprise CRM platforms (Salesforce, Dynamics 365).*
 

@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Pool } from "https://deno.land/x/postgres@v0.19.3/mod.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth, createServiceClient } from '../_shared/auth.ts';
 
 interface ConnectionConfig {
   host: string;
@@ -47,20 +44,29 @@ interface ExecuteResult {
 }
 
 serve(async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Security Check: Only allow requests with Service Role Key
-  const serviceRoleKey = Deno.env.get("PRIVATE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const authHeader = req.headers.get("Authorization");
-  const isServiceRole = authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey);
-
-  if (!isServiceRole) {
-    return new Response(JSON.stringify({ error: "Unauthorized: Service Role Key required" }), {
+  // Auth validation
+  const { user, error: authError } = await requireAuth(req);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Verify platform_admin role
+  const serviceClient = createServiceClient();
+  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  if (!roleData) {
+    return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 

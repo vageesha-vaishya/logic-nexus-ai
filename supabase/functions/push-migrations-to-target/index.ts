@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { requireAuth, createServiceClient } from '../_shared/auth.ts';
 
 interface MigrationFile {
   name: string;
@@ -155,10 +152,30 @@ function parseConnectionString(connectionString: string): {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   console.log(`[push-migrations-to-target] ${req.method} request received`);
-  
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Auth validation
+  const { user, error: authError } = await requireAuth(req);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Verify platform_admin role
+  const serviceClient = createServiceClient();
+  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  if (!roleData) {
+    return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
