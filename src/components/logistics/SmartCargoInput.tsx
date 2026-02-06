@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 export interface CommoditySelection {
   description: string;
   aes_hts_id?: string;
+  hts_code?: string;
   cargo_type_id?: string;
   unit_value?: number;
   hazmat_class?: string;
@@ -57,7 +58,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       if (!debouncedSearch) return [];
       const { data, error } = await supabase
         .from('master_commodities')
-        .select('id, name, sku, description, aes_hts_id, default_cargo_type_id, unit_value, hazmat_class')
+        .select('id, name, sku, description, aes_hts_id, default_cargo_type_id, unit_value, hazmat_class, aes_hts_codes(hts_code)')
         .or(`name.ilike.%${debouncedSearch}%,sku.ilike.%${debouncedSearch}%`)
         .limit(5);
       
@@ -108,11 +109,13 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     onSelect({
       description: item.name,
       aes_hts_id: item.aes_hts_id,
+      hts_code: item.aes_hts_codes?.hts_code,
       cargo_type_id: item.default_cargo_type_id,
       unit_value: item.unit_value,
       hazmat_class: item.hazmat_class,
       master_commodity_id: item.id,
     });
+    setSearchTerm(item.name);
     setOpen(false);
   };
 
@@ -120,7 +123,9 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     onSelect({
       description: item.description,
       aes_hts_id: item.id,
+      hts_code: item.hts_code,
     });
+    setSearchTerm(`${item.description} - ${item.hts_code}`);
     setOpen(false);
   };
 
@@ -128,9 +133,10 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     onSelect({
       description: selection.description,
       aes_hts_id: selection.id,
+      hts_code: selection.code,
     });
     setBrowserOpen(false);
-    setSearchTerm(selection.code);
+    setSearchTerm(`${selection.description} - ${selection.code}`);
   };
 
   return (
@@ -155,8 +161,26 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
               onValueChange={setSearchTerm}
             />
             <CommandList>
-              <CommandEmpty>
-                {debouncedSearch.length < 2 ? "Type at least 2 characters..." : "No results found."}
+              <CommandEmpty className="py-2 px-4 text-sm">
+                {debouncedSearch.length < 2 ? (
+                  "Type at least 2 characters..."
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-muted-foreground">No results found.</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        onSelect({ description: searchTerm });
+                        setOpen(false);
+                      }}
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      Use "{searchTerm}"
+                    </Button>
+                  </div>
+                )}
               </CommandEmpty>
               
               {masterCommodities && masterCommodities.length > 0 && (

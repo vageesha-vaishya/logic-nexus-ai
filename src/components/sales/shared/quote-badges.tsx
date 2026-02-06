@@ -8,7 +8,8 @@ import {
   ShieldCheck, 
   Ship, 
   Plane, 
-  Truck 
+  Truck,
+  Train
 } from 'lucide-react';
 
 export const getTierBadge = (tier: string) => {
@@ -30,6 +31,7 @@ export const getModeIcon = (mode: string) => {
     const m = mode.toLowerCase();
     if (m.includes('air')) return <Plane className="h-4 w-4" />;
     if (m.includes('road') || m.includes('truck')) return <Truck className="h-4 w-4" />;
+    if (m.includes('rail') || m.includes('train')) return <Train className="h-4 w-4" />;
     return <Ship className="h-4 w-4" />;
 };
 

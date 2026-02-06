@@ -1,11 +1,186 @@
-
-import { useFieldArray, useFormContext } from 'react-hook-form';
+import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Package, Plus, Trash2, Box } from 'lucide-react';
-// import { Separator } from '@/components/ui/separator';
+import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
+import { CargoItem } from '@/types/cargo';
+
+// Wrapper component for individual rows to optimize performance and handle local state mapping
+function QuoteLineItemRow({ index, remove }: { index: number; remove: (index: number) => void }) {
+    const { control, setValue } = useFormContext();
+    
+    // Watch specific fields for this item to construct the CargoItem object
+    const itemValues = useWatch({
+        control,
+        name: `items.${index}`
+    });
+
+    // Construct CargoItem from form state
+    // Note: We map the flat form structure to the nested CargoItem structure
+    const cargoItem: CargoItem = {
+        type: (itemValues?.type as 'loose' | 'container' | 'unit') || 'loose',
+        quantity: itemValues?.quantity || 1,
+        dimensions: {
+            l: itemValues?.attributes?.length || 0,
+            w: itemValues?.attributes?.width || 0,
+            h: itemValues?.attributes?.height || 0,
+            unit: 'cm' // Assuming CM for now, strictly numeric in current form
+        },
+        weight: {
+            value: itemValues?.attributes?.weight || 0,
+            unit: 'kg'
+        },
+        volume: itemValues?.attributes?.volume,
+        commodity: {
+            description: itemValues?.product_name || '',
+            hts_code: itemValues?.attributes?.hs_code,
+            id: itemValues?.commodity_id
+        },
+        hazmat: itemValues?.attributes?.hazmat,
+        stackable: itemValues?.attributes?.stackable,
+        containerDetails: {
+            typeId: itemValues?.container_type_id,
+            sizeId: itemValues?.container_size_id
+        }
+    };
+
+    const handleCargoChange = (newCargo: CargoItem) => {
+        // Update Type
+        if (newCargo.type !== itemValues?.type) {
+            setValue(`items.${index}.type`, newCargo.type);
+        }
+
+        // Update Container Details
+        if (newCargo.type === 'container' && newCargo.containerDetails) {
+            setValue(`items.${index}.container_type_id`, newCargo.containerDetails.typeId);
+            setValue(`items.${index}.container_size_id`, newCargo.containerDetails.sizeId);
+        } else {
+            // Clear container details if not container type
+            setValue(`items.${index}.container_type_id`, undefined);
+            setValue(`items.${index}.container_size_id`, undefined);
+        }
+
+        // Update Stackable & Hazmat
+        setValue(`items.${index}.attributes.stackable`, newCargo.stackable);
+        setValue(`items.${index}.attributes.hazmat`, newCargo.hazmat);
+
+        // Update Commodity/Description
+        if (newCargo.commodity) {
+            // If the description changed, update it
+            if (newCargo.commodity.description !== itemValues?.product_name) {
+                setValue(`items.${index}.product_name`, newCargo.commodity.description);
+                // Also update the description field if it's empty or matches the old product name
+                setValue(`items.${index}.description`, newCargo.commodity.description);
+            }
+            
+            if (newCargo.commodity.id) {
+                setValue(`items.${index}.commodity_id`, newCargo.commodity.id);
+            }
+            if (newCargo.commodity.hts_code) {
+                setValue(`items.${index}.attributes.hs_code`, newCargo.commodity.hts_code);
+                setValue(`items.${index}.aes_hts_id`, newCargo.commodity.id); // Assuming ID maps to aes_hts_id contextually
+            }
+        }
+
+        // Update Physical Attributes
+        setValue(`items.${index}.attributes.length`, newCargo.dimensions.l);
+        setValue(`items.${index}.attributes.width`, newCargo.dimensions.w);
+        setValue(`items.${index}.attributes.height`, newCargo.dimensions.h);
+        setValue(`items.${index}.attributes.weight`, newCargo.weight.value);
+        
+        // Update Volume (auto-calculated by SharedCargoInput)
+        if (newCargo.volume !== undefined) {
+            setValue(`items.${index}.attributes.volume`, newCargo.volume);
+        }
+    };
+
+    return (
+        <div className="relative p-4 border rounded-lg bg-card hover:bg-accent/5 transition-colors group">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                {/* Unified Cargo Input (Commodity + Dimensions + Weight) */}
+                <div className="md:col-span-8 space-y-4">
+                    <div className="space-y-2">
+                        <FormLabel className="text-xs font-medium text-muted-foreground">Commodity & Cargo Details</FormLabel>
+                        <SharedCargoInput 
+                            value={cargoItem}
+                            onChange={handleCargoChange}
+                        />
+                    </div>
+
+                    {/* Additional Description Override */}
+                    <FormField
+                        control={control}
+                        name={`items.${index}.description`}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormControl>
+                                    <Input {...field} placeholder="Additional details or specific instructions..." className="text-sm" />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                {/* Financials / Commercial */}
+                <div className="md:col-span-4 flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-3">
+                         <FormField
+                            control={control}
+                            name={`items.${index}.quantity`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs">Quantity</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" {...field} min={1} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={control}
+                            name={`items.${index}.unit_price`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs">Value (USD)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" {...field} min={0} step="0.01" />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                     <FormField
+                        control={control}
+                        name={`items.${index}.discount_percent`}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-xs">Discount %</FormLabel>
+                                <FormControl>
+                                    <Input type="number" {...field} min={0} max={100} step="0.1" />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                {/* Remove Button */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export function QuoteLineItems() {
   const { control } = useFormContext();
@@ -65,131 +240,7 @@ export function QuoteLineItems() {
         ) : (
             <div className="space-y-4">
                 {fields.map((field, index) => (
-                    <div key={field.id} className="relative p-4 border rounded-lg bg-card hover:bg-accent/5 transition-colors group">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                            {/* Main Info */}
-                            <div className="md:col-span-4 space-y-4">
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.product_name`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">Product / Commodity</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="e.g. Electronics, Furniture" />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.description`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">Description</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="Additional details..." />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.attributes.hs_code`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">HS Code</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="e.g. 8517.12" />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            {/* Qty & Price */}
-                            <div className="md:col-span-3 grid grid-cols-3 gap-2">
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.quantity`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">Qty</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" {...field} min={1} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.unit_price`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">Value (USD)</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" {...field} min={0} step="0.01" />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.discount_percent`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs">Disc %</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" {...field} min={0} max={100} step="0.1" />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            {/* Dimensions */}
-                            <div className="md:col-span-4 grid grid-cols-2 gap-2 p-3 bg-muted/30 rounded-md">
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.attributes.weight`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs text-muted-foreground">Total Weight (kg)</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" {...field} min={0} step="0.1" className="h-8 bg-background" />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={control}
-                                    name={`items.${index}.attributes.volume`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs text-muted-foreground">Total Volume (cbm)</FormLabel>
-                                            <FormControl>
-                                                <Input type="number" {...field} min={0} step="0.01" className="h-8 bg-background" />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            {/* Actions */}
-                            <div className="md:col-span-1 flex items-center justify-end">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => remove(index)}
-                                    className="text-muted-foreground hover:text-destructive transition-colors"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
+                    <QuoteLineItemRow key={field.id} index={index} remove={remove} />
                 ))}
             </div>
         )}

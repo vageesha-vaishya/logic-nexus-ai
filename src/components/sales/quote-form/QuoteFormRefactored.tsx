@@ -15,6 +15,7 @@ import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuoteRepository } from './useQuoteRepository';
 import { useFormDebug } from '@/hooks/useFormDebug';
+import { CatalogSaveDialog } from './CatalogSaveDialog';
 
 interface QuoteFormProps {
   quoteId?: string;
@@ -22,13 +23,24 @@ interface QuoteFormProps {
   onSuccess?: (quoteId: string) => void;
   initialData?: Partial<QuoteFormValues>;
   autoSave?: boolean;
+  initialViewMode?: 'form' | 'composer';
 }
 
-function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave }: QuoteFormProps) {
+function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form' }: QuoteFormProps) {
   const { resolvedTenantId } = useQuoteContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const { saveQuote } = useQuoteRepository();
+  const [showCatalogDialog, setShowCatalogDialog] = useState(false);
+  const [newCatalogItems, setNewCatalogItems] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'form' | 'composer'>(initialViewMode);
+  
+  // Update view mode if prop changes
+  useEffect(() => {
+    if (initialViewMode) {
+        setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
   
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema),
@@ -106,6 +118,20 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
       ); // Log success with metrics
       
       toast.success('Quote saved successfully');
+
+      // Check for new commodities
+      const newItems = data.items?.filter(item => !item.commodity_id && item.product_name) || [];
+      if (newItems.length > 0) {
+          setNewCatalogItems(newItems);
+          toast.message('New Commodities Found', {
+              description: `${newItems.length} items are not in your catalog.`,
+              action: {
+                  label: 'Add to Catalog',
+                  onClick: () => setShowCatalogDialog(true)
+              }
+          });
+      }
+
       if (onSuccess) onSuccess(savedId);
     } catch (error: any) {
       const duration = performance.now() - startTime;
@@ -121,6 +147,11 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-20">
+        <CatalogSaveDialog 
+            open={showCatalogDialog} 
+            onOpenChange={setShowCatalogDialog} 
+            items={newCatalogItems} 
+        />
         
         {/* Sticky Header */}
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 pt-2 -mx-4 px-4 md:-mx-8 md:px-8 mb-6 flex justify-between items-center transition-all duration-200">
@@ -138,6 +169,32 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
                 </div>
             </div>
             <div className="flex gap-3">
+                 {quoteId && (
+                    <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setViewMode(viewMode === 'form' ? 'composer' : 'form')} 
+                        className="gap-2"
+                    >
+                        <LayoutDashboard className="h-4 w-4" />
+                        {viewMode === 'form' ? 'Switch to Composer' : 'Back to Form'}
+                    </Button>
+                 )}
+                 {quoteId && viewMode === 'form' && (
+                     <Button 
+                        type="button" 
+                        variant="secondary"
+                        onClick={form.handleSubmit(async (data) => {
+                            await onSubmit(data);
+                            setViewMode('composer');
+                        })}
+                        disabled={isSubmitting || isHydrating}
+                        className="gap-2"
+                     >
+                        <Save className="h-4 w-4" />
+                        Save & Compose
+                     </Button>
+                 )}
                  <Button type="button" variant="outline" onClick={() => window.history.back()} className="gap-2">
                     <X className="h-4 w-4" />
                     Cancel
@@ -158,6 +215,14 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="text-muted-foreground animate-pulse">Loading quote details...</p>
           </div>
+        ) : viewMode === 'composer' && quoteId ? (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <MultiModalQuoteComposer 
+                    quoteId={quoteId}
+                    versionId={versionId}
+                    tenantId={resolvedTenantId || undefined}
+                />
+            </div>
         ) : (
           <div className="grid grid-cols-1 gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <section className="space-y-4">
@@ -179,31 +244,14 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">3</span>
-                    <h3>Cargo Details</h3>
+                    <h3>Cargo & Commodity Details</h3>
                 </div>
                 <QuoteLineItems />
             </section>
             
-            {/* Keeping MultiModalQuoteComposer as a bridge until Phase 2 */}
-            {quoteId && (
-                <section className="space-y-4">
-                    <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">3</span>
-                        <h3>Route Composer (Advanced)</h3>
-                    </div>
-                    <div className="border rounded-xl p-6 bg-gradient-to-br from-muted/20 to-muted/5 shadow-inner">
-                        <MultiModalQuoteComposer 
-                            quoteId={quoteId}
-                            versionId={versionId}
-                            tenantId={resolvedTenantId || undefined}
-                        />
-                    </div>
-                </section>
-            )}
-
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
-                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">{quoteId ? 4 : 3}</span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">4</span>
                     <h3>Financials</h3>
                 </div>
                 <QuoteFinancials />

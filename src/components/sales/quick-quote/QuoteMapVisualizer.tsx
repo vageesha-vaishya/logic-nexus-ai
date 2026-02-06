@@ -74,6 +74,7 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
                                             {leg.mode.includes('ocean') && <Ship className="w-4 h-4 text-blue-600" />}
                                             {leg.mode.includes('air') && <Plane className="w-4 h-4 text-sky-600" />}
                                             {leg.mode.includes('road') && <Truck className="w-4 h-4 text-amber-600" />}
+                                            {leg.mode.includes('rail') && <Train className="w-4 h-4 text-orange-600" />}
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>

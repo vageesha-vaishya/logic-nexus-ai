@@ -20,10 +20,10 @@ interface BifurcationRule {
  * Rules for mapping charge categories to Leg Types / Modes
  * ORDER MATTERS: Rules are evaluated top-to-bottom.
  */
-const KEYWORD_RULES: BifurcationRule[] = [
+export const KEYWORD_RULES: BifurcationRule[] = [
     // 1. Specific Charge Types (High Priority) - Override positional keywords
     { keywords: ['thc', 'terminal', 'wharfage', 'baf', 'bunker', 'isf', 'ams', 'imo', 'bl fee', 'doc fee'], legType: 'transport', mode: 'ocean' },
-    { keywords: ['air freight', 'fsc', 'myc', 'screening', 'security'], legType: 'transport', mode: 'air' },
+    { keywords: ['air freight', 'fsc', 'fuel surcharge', 'myc', 'screening', 'security'], legType: 'transport', mode: 'air' },
     { keywords: ['rail freight'], legType: 'transport', mode: 'rail' },
     
     // 2. Main Freight Keywords

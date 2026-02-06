@@ -3,11 +3,11 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
-import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast } from '@/components/ui/pagination';
 import { useSort } from '@/hooks/useSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useCRM } from '@/hooks/useCRM';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
@@ -16,8 +16,8 @@ import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Quote, QuoteStatus, statusConfig } from '@/pages/dashboard/quotes-data';
-import { TrendingUp, TrendingDown, DollarSign, Activity, FileText, CheckCircle2, XCircle, Search, Filter, ArrowUpRight, ArrowDownRight, Eye, Pencil, Trash2, MoreHorizontal, Plus, Sparkles } from 'lucide-react';
+import { Quote } from '@/pages/dashboard/quotes-data';
+import { FileText, XCircle, Search, Filter, ArrowUpRight, Eye, Pencil, Trash2, MoreHorizontal, Plus, Sparkles } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
 import { QuickQuoteModal } from '@/components/sales/quick-quote/QuickQuoteModal';
@@ -27,7 +27,7 @@ import { useDebug } from '@/hooks/useDebug';
 
 export default function Quotes() {
   const navigate = useNavigate();
-  const { supabase, context, scopedDb } = useCRM();
+  const { supabase, scopedDb } = useCRM();
   const debug = useDebug('Sales', 'QuotesList');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,19 +36,10 @@ export default function Quotes() {
   // Filters state and helpers
   type TextOp = 'contains' | 'startsWith' | 'equals' | 'endsWith';
 
-  const [quoteNumberOp, setQuoteNumberOp] = useState<TextOp>('contains');
   const [quoteNumberQuery, setQuoteNumberQuery] = useState('');
-
-  const [customerOp, setCustomerOp] = useState<TextOp>('contains');
   const [customerQuery, setCustomerQuery] = useState('');
-
-  const [contactOp, setContactOp] = useState<TextOp>('contains');
   const [contactQuery, setContactQuery] = useState('');
-
-  const [opportunityOp, setOpportunityOp] = useState<TextOp>('contains');
   const [opportunityQuery, setOpportunityQuery] = useState('');
-
-  const [carrierOp, setCarrierOp] = useState<TextOp>('contains');
   const [carrierQuery, setCarrierQuery] = useState('');
 
   const [quoteStatus, setQuoteStatus] = useState<string>('any');
@@ -71,35 +62,49 @@ export default function Quotes() {
         } 
       });
 
+      // Fetch quotes with increased limit to include historical drafts
+      // TODO: Implement server-side pagination for true scalability
       const { data, error } = await scopedDb
         .from('quotes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(1000);
       
       if (error) throw error;
 
-      // Fetch related data separately
-      const quotesWithRelations = await Promise.all(
-        ((data || []) as any[]).map(async (quote) => {
-          const [account, contact, opportunity, carrier, serviceType] = await Promise.all([
-            quote.account_id ? scopedDb.from('accounts').select('name').eq('id', quote.account_id).single() : null,
-            quote.contact_id ? scopedDb.from('contacts').select('first_name, last_name').eq('id', quote.contact_id).single() : null,
-            quote.opportunity_id ? scopedDb.from('opportunities').select('name').eq('id', quote.opportunity_id).single() : null,
-            quote.carrier_id ? scopedDb.from('carriers').select('carrier_name').eq('id', quote.carrier_id).single() : null,
-            quote.service_type_id ? scopedDb.from('service_types').select('name').eq('id', quote.service_type_id).single() : null,
-          ]);
+      const quotesData = (data || []) as any[];
+      
+      // Batch fetch related data to avoid N+1 problem
+      const accountIds = [...new Set(quotesData.map(q => q.account_id).filter(Boolean))];
+      const contactIds = [...new Set(quotesData.map(q => q.contact_id).filter(Boolean))];
+      const opportunityIds = [...new Set(quotesData.map(q => q.opportunity_id).filter(Boolean))];
+      const carrierIds = [...new Set(quotesData.map(q => q.carrier_id).filter(Boolean))];
+      const serviceTypeIds = [...new Set(quotesData.map(q => q.service_type_id).filter(Boolean))];
 
-          return {
-            ...quote,
-            accounts: account?.data || null,
-            contacts: contact?.data || null,
-            opportunities: opportunity?.data || null,
-            carriers: carrier?.data || null,
-            service_types: serviceType?.data || null,
-          };
-        })
-      );
+      const [accountsRes, contactsRes, opportunitiesRes, carriersRes, serviceTypesRes] = await Promise.all([
+        accountIds.length > 0 ? scopedDb.from('accounts').select('id, name').in('id', accountIds) : { data: [] },
+        contactIds.length > 0 ? scopedDb.from('contacts').select('id, first_name, last_name').in('id', contactIds) : { data: [] },
+        opportunityIds.length > 0 ? scopedDb.from('opportunities').select('id, name').in('id', opportunityIds) : { data: [] },
+        carrierIds.length > 0 ? scopedDb.from('carriers').select('id, carrier_name').in('id', carrierIds) : { data: [] },
+        serviceTypeIds.length > 0 ? scopedDb.from('service_types').select('id, name').in('id', serviceTypeIds) : { data: [] },
+      ]);
+
+      // Create lookup maps
+      const accountMap = new Map(accountsRes.data?.map((a: any) => [a.id, a]) || []);
+      const contactMap = new Map(contactsRes.data?.map((c: any) => [c.id, c]) || []);
+      const opportunityMap = new Map(opportunitiesRes.data?.map((o: any) => [o.id, o]) || []);
+      const carrierMap = new Map(carriersRes.data?.map((c: any) => [c.id, c]) || []);
+      const serviceTypeMap = new Map(serviceTypesRes.data?.map((s: any) => [s.id, s]) || []);
+
+      // Map relations to quotes
+      const quotesWithRelations = quotesData.map(quote => ({
+        ...quote,
+        accounts: quote.account_id ? accountMap.get(quote.account_id) : null,
+        contacts: quote.contact_id ? contactMap.get(quote.contact_id) : null,
+        opportunities: quote.opportunity_id ? opportunityMap.get(quote.opportunity_id) : null,
+        carriers: quote.carrier_id ? carrierMap.get(quote.carrier_id) : null,
+        service_types: quote.service_type_id ? serviceTypeMap.get(quote.service_type_id) : null,
+      }));
 
       setQuotes(quotesWithRelations as unknown as Quote[]);
       
@@ -161,15 +166,15 @@ export default function Quotes() {
 
   const filteredQuotes = quotes.filter((q) => {
     const quoteNum = q.quote_number || (q.id ? String(q.id).slice(0, 8) : '');
-    const matchesQuoteNum = matchText(quoteNum, quoteNumberQuery, quoteNumberOp);
+    const matchesQuoteNum = matchText(quoteNum, quoteNumberQuery, 'contains');
     const customerName = (q as any).account?.name || '';
-    const matchesCustomer = matchText(customerName, customerQuery, customerOp);
+    const matchesCustomer = matchText(customerName, customerQuery, 'contains');
     const contactName = (q as any).contact ? `${(q as any).contact.first_name} ${(q as any).contact.last_name}` : '';
-    const matchesContact = matchText(contactName, contactQuery, contactOp);
+    const matchesContact = matchText(contactName, contactQuery, 'contains');
     const opportunityName = (q as any).opportunity?.name || '';
-    const matchesOpportunity = matchText(opportunityName, opportunityQuery, opportunityOp);
+    const matchesOpportunity = matchText(opportunityName, opportunityQuery, 'contains');
     const carrierName = (q as any).carrier?.carrier_name || '';
-    const matchesCarrier = matchText(carrierName, carrierQuery, carrierOp);
+    const matchesCarrier = matchText(carrierName, carrierQuery, 'contains');
     const statusVal = (q.status || '').toLowerCase();
     const matchesStatus = quoteStatus && quoteStatus !== 'any' ? statusVal === quoteStatus.toLowerCase() : true;
     const sell = Number(q.sell_price ?? 0);
@@ -220,12 +225,6 @@ export default function Quotes() {
     canNext,
   } = usePagination(sortedQuotes, { initialPageSize: 20 });
 
-  const chunk = (arr: string[], size: number) => {
-    const out: string[][] = [];
-    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-    return out;
-  };
-
   const deleteQuotes = async (quoteIds: string[]) => {
     if (!quoteIds.length) return;
     setLoading(true);
@@ -259,7 +258,7 @@ export default function Quotes() {
             quoteIds,
             duration: `${duration.toFixed(2)}ms`
         });
-        debug.error('Delete failed:', err, { duration: `${duration.toFixed(2)}ms` });
+        debug.error('Delete failed:', { error: err, duration: `${duration.toFixed(2)}ms` });
         toast.error('Failed to delete quotes', { description: err.message });
         setLoading(false);
     }
@@ -301,7 +300,7 @@ export default function Quotes() {
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">Quote Management</h1>
             <p className="text-muted-foreground">Monitor performance and manage sales proposals.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <ViewToggle
               value={viewMode}
               modes={['pipeline','list','grid']}

@@ -1,20 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle, Plus, Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CargoForm } from '@/components/logistics/CargoForm';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TrackingTimeline } from '@/components/logistics/TrackingTimeline';
+import { ShipmentContainerManager } from '@/components/logistics/ShipmentContainerManager';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
+import { formatContainerSize } from '@/lib/container-utils';
 
 export default function ShipmentDetail() {
   const { id } = useParams();
@@ -40,8 +50,24 @@ export default function ShipmentDetail() {
   
   // Cargo state
   const [cargoItems, setCargoItems] = useState<any[]>([]);
+  const [cargoConfigs, setCargoConfigs] = useState<any[]>([]);
   const [isCargoOpen, setIsCargoOpen] = useState(false);
   const [editingCargo, setEditingCargo] = useState<any>(null);
+
+  const fetchCargoConfigs = useCallback(async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await scopedDb
+              .from('shipment_cargo_configurations' as any)
+              .select('*, container_types(name), container_sizes(name)')
+              .eq('shipment_id', id);
+      
+      if (error) throw error;
+      setCargoConfigs(data || []);
+    } catch (error) {
+      console.error('Failed to load cargo configs:', error);
+    }
+  }, [id, scopedDb]);
 
   const fetchCargo = useCallback(async () => {
     if (!id) return;
@@ -70,7 +96,7 @@ export default function ShipmentDetail() {
     try {
       const { data, error } = await scopedDb
         .from('shipments')
-        .select('*, accounts(name), contacts(first_name, last_name, email)')
+        .select('*, accounts(name), contacts(first_name, last_name, email), carriers(carrier_name, carrier_type)')
         .eq('id', id)
         .single();
 
@@ -145,8 +171,9 @@ export default function ShipmentDetail() {
       fetchShipment();
       fetchAttachments();
       fetchCargo();
+      fetchCargoConfigs();
     }
-  }, [id, fetchShipment, fetchAttachments, fetchCargo]);
+  }, [id, fetchShipment, fetchAttachments, fetchCargo, fetchCargoConfigs]);
 
   const handleDeleteCargo = async (cargoId: string) => {
     if (!confirm('Are you sure you want to delete this cargo item?')) return;
@@ -278,6 +305,25 @@ export default function ShipmentDetail() {
             )}
           </div>
           <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Documents
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Generate Documents</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.open(`/dashboard/shipments/${id}/documents/bill_of_lading`, '_blank')}>
+                  Bill of Lading
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`/dashboard/shipments/${id}/documents/packing_list`, '_blank')}>
+                  Packing List
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
           <Button>
             <Edit className="mr-2 h-4 w-4" />
             Edit
@@ -320,12 +366,55 @@ export default function ShipmentDetail() {
                 </div>
               )}
 
+              {shipment.carriers && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Carrier</p>
+                  <p className="font-medium">{(shipment.carriers as any).carrier_name}</p>
+                </div>
+              )}
+
+              {(shipment.vessel_name || shipment.voyage_number) && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Vessel / Voyage</p>
+                  <p className="font-medium">{[shipment.vessel_name, shipment.voyage_number].filter(Boolean).join(' / ')}</p>
+                </div>
+              )}
+
+              {(shipment.port_of_loading || shipment.port_of_discharge) && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Port Pair</p>
+                  <p className="font-medium">{[shipment.port_of_loading, shipment.port_of_discharge].filter(Boolean).join(' → ')}</p>
+                </div>
+              )}
+
               {shipment.special_instructions && (
                 <div>
                   <p className="text-sm text-muted-foreground">Special Instructions</p>
                   <p className="font-medium">{shipment.special_instructions}</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Customs & Compliance</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">AES ITN</p>
+                  <p className="font-mono font-medium">{shipment.aes_itn || 'Not Filed'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Incoterms</p>
+                  <p className="font-medium">{shipment.incoterms || '-'}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -392,6 +481,70 @@ export default function ShipmentDetail() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Cargo Configurations (Equipment/Units) */}
+        {cargoConfigs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Equipment & Units</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Transport Mode</TableHead>
+                    <TableHead>Type/Size</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Special Handling</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cargoConfigs.map((config) => (
+                    <TableRow key={config.id}>
+                      <TableCell className="capitalize">
+                        <Badge variant="outline">{config.transport_mode}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">
+                          {config.container_types?.name || config.container_type || config.cargo_type}
+                        </div>
+                        {(config.container_sizes?.name || config.container_size) && (
+                          <div className="text-xs text-muted-foreground">
+                            {formatContainerSize(config.container_sizes?.name || config.container_size)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>{config.quantity}</TableCell>
+                      <TableCell className="text-xs">
+                        {config.unit_weight_kg && <div>{config.unit_weight_kg} kg</div>}
+                        {config.unit_volume_cbm && <div>{config.unit_volume_cbm} cbm</div>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {config.is_hazardous && (
+                            <Badge variant="destructive" className="text-[10px] px-1 h-5">HAZMAT</Badge>
+                          )}
+                          {config.is_temperature_controlled && (
+                            <Badge variant="secondary" className="text-[10px] px-1 h-5">
+                              {config.temperature_min}° - {config.temperature_max}° {config.temperature_unit}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Container Management */}
+        <ShipmentContainerManager 
+          shipmentId={id!} 
+          cargoConfigs={cargoConfigs} 
+        />
 
         {/* Cargo Details */}
         <Card>

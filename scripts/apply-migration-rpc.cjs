@@ -14,7 +14,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const migrationFile = path.join(__dirname, '../supabase/migrations/20260128140000_phase_2_5_financials.sql');
+const migrationFile = path.join(__dirname, '../supabase/migrations/20260218100000_add_vessel_info_to_shipments.sql');
 
 if (!fs.existsSync(migrationFile)) {
     console.error(`Migration file not found: ${migrationFile}`);

@@ -78,6 +78,8 @@ CREATE POLICY "Users can create screenings" ON public.compliance_screenings
     );
 
 -- 3. RPC Function for Screening
+DROP FUNCTION IF EXISTS public.screen_restricted_party(TEXT, TEXT, NUMERIC);
+
 CREATE OR REPLACE FUNCTION public.screen_restricted_party(
     p_name TEXT,
     p_country TEXT DEFAULT NULL,

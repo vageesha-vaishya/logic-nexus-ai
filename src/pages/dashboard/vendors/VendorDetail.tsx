@@ -18,6 +18,7 @@ import { Vendor, VendorContract, VendorDocument, VendorPerformanceReview, Vendor
 import { logger } from '@/lib/logger';
 import { auditLogger } from '@/lib/audit';
 import { VendorStatusBadge } from './components/VendorStatusBadge';
+import { VendorPreferredCarriers } from "./components/VendorPreferredCarriers";
 import { RiskBadge } from './components/RiskBadge';
 import { VendorContractDialog } from './components/VendorContractDialog';
 import { VendorDocumentDialog } from './components/VendorDocumentDialog';
@@ -860,7 +861,9 @@ export default function VendorDetail() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          
+          <VendorPreferredCarriers vendorId={id!} />
+        </TabsContent>
 
           {/* Contracts Tab */}
           <TabsContent value="contracts" className="space-y-4">

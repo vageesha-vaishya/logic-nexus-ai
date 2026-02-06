@@ -56,6 +56,7 @@ export const QuoteTransferSchema = z.object({
   containerQty: z.union([z.string(), z.number()]).optional(),
   
   // Compliance
+  commodity_description: z.string().optional(),
   htsCode: z.string().optional(),
   aes_hts_id: z.string().optional(),
   scheduleB: z.string().optional(),

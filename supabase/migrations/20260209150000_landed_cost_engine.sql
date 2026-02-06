@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.duty_rates (
 -- 2. Tax & Fee Definitions (MPF, HMF, VAT)
 CREATE TABLE IF NOT EXISTS public.tax_definitions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT NOT NULL, -- e.g., 'US_MPF', 'US_HMF', 'DE_VAT'
+    code TEXT NOT NULL UNIQUE, -- e.g., 'US_MPF', 'US_HMF', 'DE_VAT'
     name TEXT NOT NULL,
     jurisdiction TEXT NOT NULL,
     
@@ -96,5 +96,7 @@ CREATE TRIGGER update_duty_rates_modtime
 INSERT INTO public.tax_definitions (code, name, jurisdiction, calculation_method, percentage_rate, min_amount, max_amount, currency)
 VALUES 
 ('US_MPF', 'Merchandise Processing Fee', 'US', 'complex_min_max', 0.003464, 31.67, 614.35, 'USD'),
-('US_HMF', 'Harbor Maintenance Fee', 'US', 'percentage', 0.00125, NULL, NULL, 'USD')
-ON CONFLICT DO NOTHING;
+('US_HMF', 'Harbor Maintenance Fee', 'US', 'percentage', 0.00125, NULL, NULL, 'USD'),
+('UK_VAT', 'Value Added Tax', 'UK', 'percentage', 0.20, NULL, NULL, 'GBP'),
+('DE_VAT', 'Value Added Tax', 'DE', 'percentage', 0.19, NULL, NULL, 'EUR')
+ON CONFLICT (code) DO NOTHING;

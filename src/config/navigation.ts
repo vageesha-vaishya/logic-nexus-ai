@@ -104,6 +104,7 @@ export const APP_MENU: MenuModule[] = [
     label: 'Finance',
     items: [
       { name: 'Invoices', path: '/dashboard/finance/invoices', icon: FileText, description: 'Manage invoices', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
+      { name: 'Margin Rules', path: '/dashboard/finance/margin-rules', icon: TrendingUp, description: 'Dynamic pricing rules', roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Tax Jurisdictions', path: '/dashboard/finance/tax-jurisdictions', icon: Landmark, description: 'Manage tax jurisdictions', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
     ],
   },

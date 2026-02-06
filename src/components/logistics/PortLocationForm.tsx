@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { PortsService } from '@/services/PortsService';
 
 // Safely convert Supabase JSON/text to an object record
 const toRecord = (value: any): Record<string, any> => {
@@ -47,6 +48,8 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const portsService = new PortsService(scopedDb);
+
   const form = useForm<z.infer<typeof portLocationSchema>>({
     resolver: zodResolver(portLocationSchema),
     defaultValues: {
@@ -69,12 +72,7 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
       if (!locationId) return;
       setIsLoading(true);
       try {
-        const { data, error } = await scopedDb
-          .from('ports_locations')
-          .select('*')
-          .eq('id', locationId)
-          .single();
-        if (error) throw error;
+        const data = await portsService.getPortById(locationId);
         if (data) {
           const typeOptions = ['seaport', 'airport', 'inland_port', 'warehouse', 'terminal', 'railway_terminal'] as const;
           const typeValue = typeOptions.includes(data.location_type as any)
@@ -127,15 +125,10 @@ export function PortLocationForm({ locationId, onSuccess }: { locationId?: strin
       };
 
       if (locationId) {
-        const { error } = await scopedDb
-          .from('ports_locations')
-          .update(locationData)
-          .eq('id', locationId);
-        if (error) throw error;
+        await portsService.updatePort(locationId, locationData);
         toast.success('Port/Location updated successfully');
       } else {
-        const { error } = await scopedDb.from('ports_locations').insert([locationData]);
-        if (error) throw error;
+        await portsService.createPort(locationData);
         toast.success('Port/Location created successfully');
         form.reset();
       }

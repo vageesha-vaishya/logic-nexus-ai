@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useCRM } from "@/hooks/useCRM";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Trash2, Download, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SwimLane } from "@/components/kanban/SwimLane";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -127,7 +127,7 @@ export default function QuotesPipeline() {
         component: "QuotesPipeline",
         duration: `${duration.toFixed(2)}ms`
       });
-      debug.error("Error fetching quotes:", error, { duration: `${duration.toFixed(2)}ms` });
+      debug.error("Error fetching quotes", { error, duration: `${duration.toFixed(2)}ms` });
       toast({
         title: "Error",
         description: "Failed to fetch quotes",
@@ -282,7 +282,7 @@ export default function QuotesPipeline() {
       });
     } catch (err: any) {
         const duration = performance.now() - startTime;
-        debug.error('Delete failed:', err, { duration: `${duration.toFixed(2)}ms` });
+        debug.error('Delete failed', { error: err, duration: `${duration.toFixed(2)}ms` });
         toast({
           title: "Error",
           description: "Failed to delete quotes",
@@ -359,7 +359,7 @@ export default function QuotesPipeline() {
       )[0];
 
       const htsDisplay = latestVersion?.aes_hts_codes 
-        ? `${latestVersion.aes_hts_codes.code}` 
+        ? `${latestVersion.aes_hts_codes.hts_code}` 
         : 'N/A';
 
       return {
@@ -512,6 +512,11 @@ export default function QuotesPipeline() {
           <div className="flex items-center gap-2">
             <ViewToggle value={viewMode} onChange={setViewMode} modes={['board', 'list', 'analytics']} />
             <QuickQuoteModal />
+            <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20 gap-2 min-w-[140px]">
+                <Plus className="h-4 w-4" /> 
+                <span className="hidden sm:inline">Create Detailed Quote</span>
+                <span className="sm:hidden">Detailed Quote</span>
+            </Button>
           </div>
         </div>
 

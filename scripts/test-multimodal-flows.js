@@ -65,8 +65,19 @@ async function testAiAdvisor() {
   if (airError) console.error('❌ Air Lookup Error:', airError);
   else console.log('✅ Air Lookup Result:', airData?.suggestions?.length > 0 ? 'Success' : 'No results', airData?.suggestions?.[0]);
 
-  // 3. Validate Compliance: Dangerous Goods
-  console.log('3. Testing Compliance Validation (Lithium Batteries via Air)...');
+  // 3. Lookup Codes: Rail (Terminals)
+  console.log('3. Testing Rail Terminal Lookup (Xi\'an)...');
+  const { data: railData, error: railError } = await supabase.functions.invoke('ai-advisor', {
+    body: {
+      action: 'lookup_codes',
+      payload: { query: 'Xi\'an', mode: 'rail' }
+    }
+  });
+  if (railError) console.error('❌ Rail Lookup Error:', railError);
+  else console.log('✅ Rail Lookup Result:', railData?.suggestions?.length > 0 ? 'Success' : 'No results', railData?.suggestions?.[0]);
+
+  // 4. Validate Compliance: Dangerous Goods
+  console.log('4. Testing Compliance Validation (Lithium Batteries via Air)...');
   const { data: complianceData, error: complianceError } = await supabase.functions.invoke('ai-advisor', {
     body: {
       action: 'validate_compliance',
@@ -99,12 +110,11 @@ async function testRateEngine() {
   });
   if (oceanRateError) console.error('❌ Ocean Rate Error:', oceanRateError);
   else {
-    console.log('Ocean Rate Response:', oceanRate);
-    if (oceanRate?.options && Array.isArray(oceanRate.options)) {
-      const marketOption = oceanRate.options.find((r) => r.id === 'mkt_std');
-      console.log('✅ Ocean Rate Result:', marketOption ? `$${marketOption.price}` : 'No market rate');
+    if (oceanRate?.options && Array.isArray(oceanRate.options) && oceanRate.options.length > 0) {
+      const option = oceanRate.options[0];
+      console.log(`✅ Ocean Rate Result: $${option.price} (${option.carrier})`);
     } else {
-      console.error('❌ Ocean Rate is not an array');
+      console.error('❌ Ocean Rate options not found or empty');
     }
   }
 
@@ -120,8 +130,12 @@ async function testRateEngine() {
   });
   if (airRateError) console.error('❌ Air Rate Error:', airRateError);
   else {
-    const marketOption = airRate?.options?.find((r) => r.id === 'mkt_std');
-    console.log('✅ Air Rate Result:', marketOption ? `$${marketOption.price}` : 'No market rate');
+    if (airRate?.options && Array.isArray(airRate.options) && airRate.options.length > 0) {
+      const option = airRate.options[0];
+      console.log(`✅ Air Rate Result: $${option.price} (${option.carrier})`);
+    } else {
+      console.log('❌ Air Rate options not found');
+    }
   }
 
   // 3. Road Rate
@@ -136,8 +150,33 @@ async function testRateEngine() {
   });
   if (roadRateError) console.error('❌ Road Rate Error:', roadRateError);
   else {
-    const marketOption = roadRate?.options?.find((r) => r.id === 'mkt_std');
-    console.log('✅ Road Rate Result:', marketOption ? `$${marketOption.price}` : 'No market rate');
+    if (roadRate?.options && Array.isArray(roadRate.options) && roadRate.options.length > 0) {
+      const option = roadRate.options[0];
+      console.log(`✅ Road Rate Result: $${option.price} (${option.carrier})`);
+    } else {
+      console.log('❌ Road Rate options not found');
+    }
+  }
+
+  // 4. Rail Rate
+  console.log('4. Testing Rail Rate (40ft Container)...');
+  const { data: railRate, error: railRateError } = await supabase.functions.invoke('rate-engine', {
+    body: {
+      origin: 'Berlin',
+      destination: 'Beijing',
+      mode: 'rail',
+      containerQty: 1,
+      containerSize: '40ft'
+    }
+  });
+  if (railRateError) console.error('❌ Rail Rate Error:', railRateError);
+  else {
+    if (railRate?.options && Array.isArray(railRate.options) && railRate.options.length > 0) {
+      const option = railRate.options[0];
+      console.log(`✅ Rail Rate Result: $${option.price} (${option.carrier})`);
+    } else {
+      console.log('❌ Rail Rate options not found');
+    }
   }
 }
 

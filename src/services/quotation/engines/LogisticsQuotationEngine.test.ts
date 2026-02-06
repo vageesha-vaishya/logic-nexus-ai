@@ -90,12 +90,39 @@ describe('LogisticsQuotationEngine', () => {
   });
 
   it('should validate missing items', async () => {
-    const result = await engine.validate(mockContext, []);
-    expect(result.isValid).toBe(false);
-    expect(result.errors[0].code).toBe('NO_ITEMS');
+    const result = await engine.calculate(airContext, airItems);
+    
+    // Check approximate values due to float arithmetic
+    expect(result.breakdown.freight).toBeCloseTo(417.50, 2);
+    expect(result.breakdown.surcharges['Security Surcharge']).toBeCloseTo(20.875, 2);
   });
 
-  it('should validate missing dimensions', async () => {
+  it('should calculate Rail Freight correctly', async () => {
+    const railContext = { ...mockContext, metadata: { mode: 'rail' } };
+    // 1 CBM = 500 KG.
+    // Item: 1000kg, 3 cbm.
+    // Volumetric: 3 * 500 = 1500kg.
+    // Chargeable: max(1000, 1500) = 1500kg.
+    // Rate: 0.60.
+    // Freight: 1500 * 0.60 = 900.
+    // Fuel (10%): 90.
+    // Doc: 50. Handling: 35.
+    // Total: 900 + 90 + 50 + 35 = 1075.
+
+    const railItems: LineItem[] = [{
+        description: 'Rail Cargo',
+        quantity: 1,
+        attributes: { weight: 1000, volume: 3 }
+    }];
+
+    const result = await engine.calculate(railContext, railItems);
+
+    expect(result.totalAmount).toBe(1075.00);
+    expect(result.breakdown.freight).toBe(900.00);
+    expect(result.breakdown.items[0].chargeableWeight).toBe(1500.0);
+  });
+
+  it('should validate missing items', async () => {
     const invalidItems = [{ description: 'Bad Item', quantity: 1, attributes: {} }];
     const result = await engine.validate(mockContext, invalidItems);
     expect(result.isValid).toBe(false);

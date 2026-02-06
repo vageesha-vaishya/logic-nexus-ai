@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { formatContainerSize } from '@/lib/container-utils';
 
 interface BasisConfig {
   tradeDirection: string;
@@ -82,9 +83,11 @@ export function BasisConfigModal({
           <div className="space-y-2">
             <Label>Container Size *</Label>
             <ToggleGroup type="single" value={config.containerSize} onValueChange={(val) => onChange({ containerSize: String(val || '') })} className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {containerSizes.map((cs) => (
+              {containerSizes
+                .filter(cs => !config.containerType || cs.type_id === config.containerType)
+                .map((cs) => (
                 <ToggleGroupItem key={cs.id} value={String(cs.id)} variant="outline" size="lg" className="justify-start">
-                  {cs.name}
+                  {formatContainerSize(cs.name)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>

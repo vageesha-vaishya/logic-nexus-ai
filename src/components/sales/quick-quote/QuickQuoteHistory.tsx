@@ -90,6 +90,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
     switch (mode?.toLowerCase()) {
       case 'air': return <Plane className="h-4 w-4" />;
       case 'ocean': return <Ship className="h-4 w-4" />;
+      case 'rail': return <Train className="h-4 w-4" />;
       case 'road': return <Truck className="h-4 w-4" />;
       default: return <Ship className="h-4 w-4" />;
     }

@@ -21,6 +21,7 @@ export const mapOptionToQuote = (opt: any) => {
     // Normalize input keys to support different source formats (Smart Quote vs Quick Quote)
     const normalized = {
         ...opt,
+        carrier_id: opt.carrier_id || (typeof opt.carrier === 'object' ? opt.carrier?.id : undefined),
         carrier_name: opt.carrier_name || (typeof opt.carrier === 'object' ? opt.carrier?.name : opt.carrier) || 'Unknown Carrier',
         option_name: opt.option_name || opt.name,
         total_amount: safeNumber(opt.total_amount) || safeNumber(opt.price),
@@ -35,6 +36,13 @@ export const mapOptionToQuote = (opt: any) => {
         marginAmount: safeNumber(opt.marginAmount ?? opt.margin_amount),
         marginPercent: safeNumber(opt.marginPercent ?? opt.margin_percent), // Prioritize Margin
         markupPercent: safeNumber(opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage), // Fallback
+        
+        // AI/Source Metadata
+        source: opt.source || 'manual',
+        source_attribution: opt.source_attribution || 'manual',
+        ai_generated: opt.ai_generated === true || opt.source === 'ai_generated' || opt.source_attribution === 'AI Smart Engine',
+        ai_explanation: opt.ai_explanation || null,
+        reliability_score: safeNumber(opt.reliability_score ?? opt.reliability?.score)
     };
     
     // Calculate price breakdown if not present

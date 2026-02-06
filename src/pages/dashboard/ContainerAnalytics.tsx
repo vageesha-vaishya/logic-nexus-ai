@@ -10,6 +10,7 @@ import { Loader2, Package, Scale, Activity, Download, Filter, ChevronRight, Ship
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { formatContainerSize } from '@/lib/container-utils';
 import {
   Table,
   TableBody,
@@ -63,7 +64,7 @@ export default function ContainerAnalytics() {
   }, [selectedClassId, scopedDb]);
 
   const capacityData = classCapacities.map(c => ({
-    name: c.container_sizes?.name || 'Unknown',
+    name: formatContainerSize(c.container_sizes?.name || 'Unknown'),
     max_slots: c.max_slots,
     weight_limit: c.weight_limit_per_slot_kg
   }));
@@ -119,7 +120,7 @@ export default function ContainerAnalytics() {
   }, []);
 
   const sizeData = filteredData.reduce((acc: any[], curr) => {
-    const name = curr.size;
+    const name = formatContainerSize(curr.size);
     const existing = acc.find(i => i.name === name);
     if (existing) {
       existing.value += curr.total_quantity;
@@ -146,7 +147,7 @@ export default function ContainerAnalytics() {
     const headers = ['Category', 'Size', 'ISO Code', 'Status', 'Location', 'Quantity', 'TEU'];
     const rows = filteredData.map(d => [
       d.category,
-      d.size,
+      formatContainerSize(d.size),
       d.iso_code,
       d.status,
       d.location_name,
@@ -374,7 +375,7 @@ export default function ContainerAnalytics() {
                         {filteredData.map((item, i) => (
                           <TableRow key={i}>
                             <TableCell>{item.category}</TableCell>
-                            <TableCell>{item.size}</TableCell>
+                            <TableCell>{formatContainerSize(item.size)}</TableCell>
                             <TableCell><Badge variant="outline">{item.iso_code}</Badge></TableCell>
                             <TableCell>
                               <Badge variant={item.status === 'empty' ? 'secondary' : 'default'}>{item.status}</Badge>
@@ -468,14 +469,14 @@ export default function ContainerAnalytics() {
                                         className="cursor-pointer hover:bg-muted/50 transition-colors"
                                         onClick={() => {
                                             if (item.container_sizes?.name) {
-                                                setSelectedSize(item.container_sizes.name);
+                                                setSelectedSize(formatContainerSize(item.container_sizes.name));
                                                 setActiveTab('inventory');
                                             }
                                         }}
                                     >
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                {item.container_sizes?.name}
+                                                {formatContainerSize(item.container_sizes?.name)}
                                                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
                                             </div>
                                         </TableCell>

@@ -3,7 +3,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useQuoteContext } from './QuoteContext';
-import { Ship, Plane, Truck, MapPin, Anchor, ArrowRight, Settings2, Package, Globe } from 'lucide-react';
+import { Ship, Plane, Truck, Train, MapPin, Anchor, ArrowRight, Settings2, Package, Globe } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 export function QuoteLogistics() {
@@ -16,11 +16,46 @@ export function QuoteLogistics() {
     (s: any) => !serviceTypeId || String(s.service_type_id) === String(serviceTypeId)
   );
 
+  const filteredCarriers = carriers.filter((c: any) => {
+    if (!serviceTypeId) return true;
+
+    const selectedServiceType = serviceTypes.find((st: any) => String(st.id) === String(serviceTypeId));
+    const serviceModeName = selectedServiceType?.name?.toLowerCase() || '';
+
+    if (!serviceModeName) return true;
+    
+    if (serviceModeName.includes('ocean') || serviceModeName.includes('sea')) {
+        return c.carrier_type === 'ocean';
+    }
+    if (serviceModeName.includes('air')) {
+        return c.carrier_type === 'air_cargo';
+    }
+    if (serviceModeName.includes('road') || serviceModeName.includes('truck')) {
+        return c.carrier_type === 'trucking';
+    }
+    if (serviceModeName.includes('rail')) {
+        return c.carrier_type === 'rail';
+    }
+    return true;
+  });
+
   const getServiceIcon = (name: string) => {
     const n = name.toLowerCase();
     if (n.includes('air')) return <Plane className="h-4 w-4" />;
     if (n.includes('road') || n.includes('truck')) return <Truck className="h-4 w-4" />;
+    if (n.includes('rail')) return <Train className="h-4 w-4" />;
     return <Ship className="h-4 w-4" />;
+  };
+
+  const getHeaderIcon = () => {
+    if (!serviceTypeId) return <Ship className="h-5 w-5 text-blue-600" />;
+    const selectedServiceType = serviceTypes.find((st: any) => String(st.id) === String(serviceTypeId));
+    const n = selectedServiceType?.name?.toLowerCase() || '';
+    
+    if (n.includes('air')) return <Plane className="h-5 w-5 text-blue-600" />;
+    if (n.includes('road') || n.includes('truck')) return <Truck className="h-5 w-5 text-blue-600" />;
+    if (n.includes('rail')) return <Train className="h-5 w-5 text-blue-600" />;
+    return <Ship className="h-5 w-5 text-blue-600" />;
   };
 
   return (
@@ -28,7 +63,7 @@ export function QuoteLogistics() {
       <CardHeader>
         <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-500/10 rounded-full">
-                <Ship className="h-5 w-5 text-blue-600" />
+                {getHeaderIcon()}
             </div>
             <div>
                 <CardTitle className="text-xl">Logistics Configuration</CardTitle>
@@ -198,7 +233,7 @@ export function QuoteLogistics() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {carriers.map((c: any) => (
+                    {filteredCarriers.map((c: any) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.carrier_name}
                       </SelectItem>

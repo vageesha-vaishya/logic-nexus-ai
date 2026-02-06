@@ -85,6 +85,7 @@ export function ChargeBreakdown({
         const m = (mode || '').toLowerCase();
         if (m.includes('sea') || m.includes('ocean')) return <Ship className="h-4 w-4" />;
         if (m.includes('air')) return <Plane className="h-4 w-4" />;
+        if (m.includes('rail') || m.includes('train')) return <Train className="h-4 w-4" />;
         return <Truck className="h-4 w-4" />;
     };
 

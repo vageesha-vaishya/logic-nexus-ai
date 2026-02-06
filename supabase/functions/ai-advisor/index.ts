@@ -29,6 +29,12 @@ const KNOWLEDGE_BASE = {
     { code: "PVG", name: "Shanghai Pudong", country: "CN", type: "air" },
     { code: "LHR", name: "London Heathrow", country: "UK", type: "air" },
     { code: "DXB", name: "Dubai Int", country: "AE", type: "air" },
+  ],
+  rail_terminals: [
+    { code: "DEDUI", name: "Duisburg Intermodal Terminal", country: "DE", type: "rail" },
+    { code: "CNXIA", name: "Xi'an International Port", country: "CN", type: "rail" },
+    { code: "PLMAL", name: "Małaszewicze Terminal", country: "PL", type: "rail" },
+    { code: "KZDOZ", name: "Dostyk", country: "KZ", type: "rail" },
   ]
 };
 
@@ -159,6 +165,7 @@ async function lookupCodes(query: string, mode: string) {
     let source: any[] = [];
     if (mode === 'ocean') source = KNOWLEDGE_BASE.ports;
     else if (mode === 'air') source = KNOWLEDGE_BASE.airports;
+    else if (mode === 'rail') source = KNOWLEDGE_BASE.rail_terminals;
     else return { suggestions: [] }; 
     const suggestions = source.filter(item => 
         item.code.toLowerCase().includes(lowerQ) || 

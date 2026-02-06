@@ -68,6 +68,7 @@ import CustomRoles from "./pages/dashboard/CustomRoles";
 import Shipments from "./pages/dashboard/Shipments";
 import ShipmentNew from "./pages/dashboard/ShipmentNew";
 import ShipmentDetail from "./pages/dashboard/ShipmentDetail";
+import ShipmentDocumentViewer from "./pages/dashboard/ShipmentDocumentViewer";
 import ShipmentsPipeline from "./pages/dashboard/ShipmentsPipeline";
 import Warehouses from "./pages/dashboard/Warehouses";
 import WarehouseNew from "./pages/dashboard/WarehouseNew";
@@ -109,6 +110,7 @@ import ContainerTracking from "./pages/dashboard/ContainerTracking";
 import PlatformDomains from "./pages/dashboard/PlatformDomains";
 import PlatformDomainDetail from "./pages/dashboard/PlatformDomainDetail";
 import Invoices from "./pages/dashboard/finance/Invoices";
+import MarginRules from "./pages/dashboard/finance/MarginRules";
 import InvoiceDetail from "./pages/dashboard/finance/InvoiceDetail";
 import TaxJurisdictions from "./pages/dashboard/finance/TaxJurisdictions";
 import TaxJurisdictionDetail from "./pages/dashboard/finance/TaxJurisdictionDetail";
@@ -660,6 +662,7 @@ const App = () => (
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             <Route path="/dashboard/currencies" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Currencies /></ProtectedRoute>} />
             <Route path="/dashboard/finance/invoices" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Invoices /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/margin-rules" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MarginRules /></ProtectedRoute>} />
             <Route path="/dashboard/finance/invoices/:id" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><InvoiceDetail /></ProtectedRoute>} />
             <Route path="/dashboard/finance/tax-jurisdictions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TaxJurisdictions /></ProtectedRoute>} />
             <Route path="/dashboard/finance/tax-jurisdictions/:id" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TaxJurisdictionDetail /></ProtectedRoute>} />
@@ -679,6 +682,7 @@ const App = () => (
             <Route path="/dashboard/shipments/pipeline" element={<ProtectedRoute><ShipmentsPipeline /></ProtectedRoute>} />
             <Route path="/dashboard/customs-clearance/pipeline" element={<ProtectedRoute><CustomsClearancePipeline /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/:id" element={<ProtectedRoute><ShipmentDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/shipments/:id/documents/:type" element={<ProtectedRoute><ShipmentDocumentViewer /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
             <Route path="/dashboard/warehouses/new" element={<ProtectedRoute><WarehouseNew /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles" element={<ProtectedRoute><Vehicles /></ProtectedRoute>} />

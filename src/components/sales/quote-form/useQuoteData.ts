@@ -4,10 +4,11 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebug } from '@/hooks/useDebug';
 import { toast } from 'sonner';
+import { PortsService } from '@/services/PortsService';
 import { quoteKeys } from './queryKeys';
 
 export function useQuoteData() {
-  const { context, supabase } = useCRM();
+  const { context, supabase, scopedDb } = useCRM();
   const { roles } = useAuth();
   const debug = useDebug('Sales', 'useQuoteData');
   
@@ -30,13 +31,10 @@ export function useQuoteData() {
   const { data: ports = [] } = useQuery({
     queryKey: quoteKeys.reference.ports(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ports_locations')
-        .select('id, location_name, location_code, country')
-        .order('location_name')
-        .limit(100);
-      if (error) throw error;
-      return (data || []).map((p: any) => ({
+      const portsService = new PortsService(scopedDb);
+      const data = await portsService.getAllPorts();
+      
+      return data.map((p: any) => ({
         id: p.id,
         name: p.location_name,
         code: p.location_code,
@@ -52,7 +50,7 @@ export function useQuoteData() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('carriers')
-        .select('id, carrier_name, scac')
+        .select('id, carrier_name, scac, carrier_type')
         .eq('is_active', true)
         .order('carrier_name');
       if (error) throw error;

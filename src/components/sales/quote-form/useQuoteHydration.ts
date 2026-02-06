@@ -49,6 +49,16 @@ export function useQuoteHydration(
           console.error('[QuoteHydration] Error fetching items:', itemsError);
         }
 
+        // Fetch Cargo Configurations
+        const { data: cargoConfigs, error: cargoError } = await supabase
+          .from('quote_cargo_configurations')
+          .select('*')
+          .eq('quote_id', quoteId);
+
+        if (cargoError) {
+          console.error('[QuoteHydration] Error fetching cargo configs:', cargoError);
+        }
+
         // Set Tenant Context
         if (quote.tenant_id) {
           setResolvedTenantId(String(quote.tenant_id));
@@ -77,12 +87,37 @@ export function useQuoteHydration(
           items: items ? items.map((item: any) => ({
             line_number: item.line_number,
             product_name: item.product_name,
+            commodity_id: item.commodity_id ? String(item.commodity_id) : '',
+            aes_hts_id: item.aes_hts_id ? String(item.aes_hts_id) : '',
             description: item.description || '',
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent || 0,
             package_category_id: item.package_category_id ? String(item.package_category_id) : '',
             package_size_id: item.package_size_id ? String(item.package_size_id) : '',
+          })) : [],
+          cargo_configurations: cargoConfigs ? cargoConfigs.map((c: any) => ({
+            id: c.id,
+            transport_mode: c.transport_mode,
+            cargo_type: c.cargo_type,
+            container_type: c.container_type || undefined,
+            container_size: c.container_size || undefined,
+            quantity: c.quantity,
+            unit_weight_kg: c.unit_weight_kg || undefined,
+            unit_volume_cbm: c.unit_volume_cbm || undefined,
+            length_cm: c.length_cm || undefined,
+            width_cm: c.width_cm || undefined,
+            height_cm: c.height_cm || undefined,
+            is_hazardous: c.is_hazardous,
+            hazardous_class: c.hazardous_class || undefined,
+            un_number: c.un_number || undefined,
+            is_temperature_controlled: c.is_temperature_controlled,
+            temperature_min: c.temperature_min || undefined,
+            temperature_max: c.temperature_max || undefined,
+            temperature_unit: c.temperature_unit || 'C',
+            package_category_id: c.package_category_id ? String(c.package_category_id) : undefined,
+            package_size_id: c.package_size_id ? String(c.package_size_id) : undefined,
+            remarks: c.remarks || undefined,
           })) : [],
         });
 

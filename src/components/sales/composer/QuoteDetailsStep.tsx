@@ -12,6 +12,8 @@ import { calculateChargeableWeight, formatWeight } from '@/utils/freightCalculat
 import { Plane, Ship, Truck, Sparkles, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
+import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
+import { CargoItem } from '@/types/cargo';
 
 interface QuoteDetailsStepProps {
   quoteData: {
@@ -83,6 +85,7 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, dest
   const airChgWeight = calculateChargeableWeight(weight, volume, 'air');
   const seaChgWeight = calculateChargeableWeight(weight, volume, 'sea');
   const roadChgWeight = calculateChargeableWeight(weight, volume, 'road');
+  const railChgWeight = calculateChargeableWeight(weight, volume, 'rail');
 
   const calculateDaysRemaining = (dateStr: string | undefined) => {
     if (!dateStr) return null;
@@ -162,6 +165,35 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, dest
     }
   };
 
+  const handleCargoChange = (cargo: CargoItem) => {
+    onChange('commodity', cargo.commodity?.description || '');
+    onChange('hts_code', cargo.commodity?.hts_code || '');
+    onChange('total_weight', cargo.weight?.value || 0);
+    onChange('total_volume', cargo.volume || 0);
+    if (cargo.hazmat) {
+        onChange('hazmat_details', cargo.hazmat);
+    }
+    onChange('cargo_details', cargo);
+  };
+
+  const cargoItem: CargoItem = {
+    id: 'quote-cargo-1',
+    type: 'loose',
+    quantity: 1,
+    commodity: {
+      description: quoteData.commodity,
+      hts_code: quoteData.hts_code,
+    },
+    weight: {
+      value: Number(quoteData.total_weight) || 0,
+      unit: 'kg'
+    },
+    volume: Number(quoteData.total_volume) || 0,
+    dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
+    stackable: false,
+    hazmat: (quoteData as any).hazmat_details
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -229,89 +261,45 @@ export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, dest
 
         <div className="pt-4 border-t">
           <h4 className="font-medium mb-4">Logistics Parameters</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="incoterms">Incoterms (2020)</Label>
-              <Select value={quoteData.incoterms} onValueChange={(val) => onChange('incoterms', val)}>
-                <SelectTrigger id="incoterms">
-                  <SelectValue placeholder="Select Incoterms" />
-                </SelectTrigger>
-                <SelectContent>
-                  {INCOTERMS.map((term) => (
-                    <SelectItem key={term} value={term.split(' - ')[0]}>
-                      {term}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="commodity">Commodity / Cargo Type</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="commodity"
-                  value={quoteData.commodity || ''}
-                  onChange={(e) => onChange('commodity', e.target.value)}
-                  placeholder="e.g. Electronics, Textiles"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={handleAiAnalyze}
-                  disabled={aiLoading}
-                  title="Analyze with AI"
-                >
-                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-600" />}
-                </Button>
-              </div>
-            </div>
-            
-            {/* AI Generated Fields */}
-            {(quoteData.hts_code || quoteData.schedule_b) && (
-              <>
-                <div className="animate-in fade-in slide-in-from-top-1">
-                  <Label htmlFor="hts_code">HTS Code</Label>
-                  <Input
-                    id="hts_code"
-                    value={quoteData.hts_code || ''}
-                    onChange={(e) => onChange('hts_code', e.target.value)}
-                    placeholder="Harmonized Tariff Schedule"
-                    className="bg-purple-50/50 border-purple-100"
-                  />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="incoterms">Incoterms (2020)</Label>
+                  <Select value={quoteData.incoterms} onValueChange={(val) => onChange('incoterms', val)}>
+                    <SelectTrigger id="incoterms">
+                      <SelectValue placeholder="Select Incoterms" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INCOTERMS.map((term) => (
+                        <SelectItem key={term} value={term.split(' - ')[0]}>
+                          {term}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="animate-in fade-in slide-in-from-top-1">
-                  <Label htmlFor="schedule_b">Schedule B</Label>
-                  <Input
-                    id="schedule_b"
-                    value={quoteData.schedule_b || ''}
-                    onChange={(e) => onChange('schedule_b', e.target.value)}
-                    placeholder="Export Classification"
-                    className="bg-purple-50/50 border-purple-100"
-                  />
+                
+                <div className="flex items-end pb-1">
+                   <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full gap-2"
+                      onClick={handleAiAnalyze}
+                      disabled={aiLoading}
+                    >
+                      {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-600" />}
+                      Run AI Compliance Check
+                    </Button>
                 </div>
-              </>
-            )}
+            </div>
 
-            <div>
-              <Label htmlFor="total_weight">Total Weight (kg)</Label>
-              <Input
-                id="total_weight"
-                type="number"
-                value={quoteData.total_weight || ''}
-                onChange={(e) => onChange('total_weight', e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <Label htmlFor="total_volume">Total Volume (cbm)</Label>
-              <Input
-                id="total_volume"
-                type="number"
-                value={quoteData.total_volume || ''}
-                onChange={(e) => onChange('total_volume', e.target.value)}
-                placeholder="0.00"
-              />
+            <div className="border rounded-lg p-4 bg-slate-50">
+                <Label className="mb-2 block font-semibold text-slate-700">Cargo Details</Label>
+                <SharedCargoInput 
+                    value={cargoItem} 
+                    onChange={handleCargoChange}
+                    className="bg-white"
+                />
             </div>
           </div>
         </div>

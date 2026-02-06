@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useCRM } from '@/hooks/useCRM';
 import type { Database } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
+import { formatContainerSize } from '@/lib/container-utils';
 
 export default function ContainerTracking() {
   type InventoryRow = Database['public']['Views']['view_container_inventory_summary']['Row'];
@@ -175,7 +176,7 @@ export default function ContainerTracking() {
                 <SelectTrigger><SelectValue placeholder="Select Container Size" /></SelectTrigger>
                 <SelectContent>
                   {sizes.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name} ({s.code})</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>{formatContainerSize(s.name)} ({s.code})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -218,7 +219,7 @@ export default function ContainerTracking() {
               <TableBody>
                 {items.map(it => (
                   <TableRow key={it.id || Math.random().toString()}>
-                    <TableCell>{it.size || '-'}</TableCell>
+                    <TableCell>{(it.size?.match(/(\d+)/)?.[0] || it.size) || '-'}</TableCell>
                     <TableCell>
                       <Input 
                         className="w-24" 

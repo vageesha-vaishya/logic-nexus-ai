@@ -150,16 +150,22 @@ export function useQuoteRepository() {
       const itemsPayload = data.items.map((item, index) => ({
         quote_id: savedId,
         line_number: index + 1,
+        type: item.type || 'loose',
+        container_type_id: item.container_type_id || null,
+        container_size_id: item.container_size_id || null,
         product_name: item.product_name,
+        commodity_id: item.commodity_id || null,
+        aes_hts_id: item.aes_hts_id || null,
         description: item.description || null,
         quantity: item.quantity,
         unit_price: item.unit_price,
         discount_percent: item.discount_percent || 0,
         package_category_id: item.package_category_id || null,
         package_size_id: item.package_size_id || null,
-        // Calculate totals if needed, or let DB handle it?
-        // Usually DB triggers might handle line_total, but let's provide if we can.
-        // For now, minimal fields.
+        // Extension fields
+        weight_kg: item.attributes?.weight || 0,
+        volume_cbm: item.attributes?.volume || 0,
+        attributes: item.attributes || {},
       }));
 
       const { error: itemsError } = await scopedDb
@@ -173,6 +179,58 @@ export function useQuoteRepository() {
     } else {
         // If items is empty array, we should probably clear existing items too
         await scopedDb.from('quote_items').delete().eq('quote_id', savedId);
+    }
+
+    // Save Cargo Configurations
+    if (data.cargo_configurations && data.cargo_configurations.length > 0) {
+      // Clear existing configurations
+      const { error: deleteCargoError } = await scopedDb
+        .from('quote_cargo_configurations')
+        .delete()
+        .eq('quote_id', savedId);
+
+      if (deleteCargoError) {
+        console.error('[QuoteRepository] Error deleting old cargo configs:', deleteCargoError);
+        throw deleteCargoError;
+      }
+
+      const cargoPayload = data.cargo_configurations.map(config => ({
+        quote_id: savedId,
+        tenant_id: finalTenantId,
+        transport_mode: config.transport_mode,
+        cargo_type: config.cargo_type,
+        container_type: config.container_type || null,
+        container_size: config.container_size || null,
+        container_type_id: config.container_type_id || null,
+        container_size_id: config.container_size_id || null,
+        quantity: config.quantity,
+        unit_weight_kg: config.unit_weight_kg || null,
+        unit_volume_cbm: config.unit_volume_cbm || null,
+        length_cm: config.length_cm || null,
+        width_cm: config.width_cm || null,
+        height_cm: config.height_cm || null,
+        is_hazardous: config.is_hazardous || false,
+        hazardous_class: config.hazardous_class || null,
+        un_number: config.un_number || null,
+        is_temperature_controlled: config.is_temperature_controlled || false,
+        temperature_min: config.temperature_min || null,
+        temperature_max: config.temperature_max || null,
+        temperature_unit: config.temperature_unit || 'C',
+        package_category_id: config.package_category_id || null,
+        package_size_id: config.package_size_id || null,
+        remarks: config.remarks || null,
+      }));
+
+      const { error: cargoError } = await scopedDb
+        .from('quote_cargo_configurations')
+        .insert(cargoPayload);
+
+      if (cargoError) {
+        console.error('[QuoteRepository] Error saving cargo configurations:', cargoError);
+        throw cargoError;
+      }
+    } else {
+       await scopedDb.from('quote_cargo_configurations').delete().eq('quote_id', savedId);
     }
 
     return savedId;

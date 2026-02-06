@@ -37,46 +37,82 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
       // Calculate Chargeable Weight / Revenue Tons
       let chargeableWeight = 0;
       let ratePerUnit = 0;
+      let finalLineCost = 0;
+      let unit = '';
 
-      switch (mode.toLowerCase()) {
-        case 'air':
-          // Standard Air conversion: 1 CBM = 167 KG
-          const volumetricWeightAir = volume * 167;
-          chargeableWeight = Math.max(weight, volumetricWeightAir);
-          ratePerUnit = 2.50; // Mock Rate per KG
-          break;
-        case 'road':
-          // Standard Road conversion: 1 CBM = 333 KG
-          const volumetricWeightRoad = volume * 333;
-          chargeableWeight = Math.max(weight, volumetricWeightRoad);
-          ratePerUnit = 0.80; // Mock Rate per KG
-          break;
-        case 'ocean':
-        default:
-          // Ocean: 1 CBM = 1 Ton (1000 KG)
-          // Revenue Ton (w/m)
-          const weightInTons = weight / 1000;
-          chargeableWeight = Math.max(weightInTons, volume);
-          ratePerUnit = 150.00; // Mock Rate per w/m (CBM/Ton)
-          break;
+      // Check for Container/Unit Pricing (FCL/ULD)
+      if (item.attributes?.container_type) {
+          const type = String(item.attributes.container_type).toLowerCase();
+          const size = String(item.attributes.container_size || '').toLowerCase();
+          
+          // Mock Container Rates
+          if (mode.toLowerCase() === 'ocean') {
+             if (size.includes('20')) ratePerUnit = 1200.00; // 20' Container
+             else if (size.includes('40')) ratePerUnit = 2400.00; // 40' Container
+             else ratePerUnit = 1500.00; // Default
+             
+             if (type.includes('reefer')) ratePerUnit *= 1.5; // Reefer surcharge
+          } else if (mode.toLowerCase() === 'air') {
+             // ULD Rates
+             if (type.includes('ld3')) ratePerUnit = 450.00;
+             else if (type.includes('ld7')) ratePerUnit = 1800.00;
+             else ratePerUnit = 500.00;
+          } else {
+             ratePerUnit = 800.00; // Road/Rail per unit
+          }
+
+          finalLineCost = ratePerUnit * quantity;
+          unit = 'unit';
+          chargeableWeight = quantity; // For display
+      } else {
+          // Standard Weight/Volume Calculation (LCL/Breakbulk)
+          switch (mode.toLowerCase()) {
+            case 'air':
+              // Standard Air conversion: 1 CBM = 167 KG
+              const volumetricWeightAir = volume * 167;
+              chargeableWeight = Math.max(weight, volumetricWeightAir);
+              ratePerUnit = 2.50; // Mock Rate per KG
+              unit = 'kg';
+              break;
+            case 'road':
+              // Standard Road conversion: 1 CBM = 333 KG
+              const volumetricWeightRoad = volume * 333;
+              chargeableWeight = Math.max(weight, volumetricWeightRoad);
+              ratePerUnit = 0.80; // Mock Rate per KG
+              unit = 'kg';
+              break;
+            case 'rail':
+              // Standard Rail conversion: 1 CBM = 500 KG
+              const volumetricWeightRail = volume * 500;
+              chargeableWeight = Math.max(weight, volumetricWeightRail);
+              ratePerUnit = 0.60; // Mock Rate per KG (typically cheaper than road)
+              unit = 'kg';
+              break;
+            case 'ocean':
+            default:
+              // Ocean: 1 CBM = 1 Ton (1000 KG)
+              // Revenue Ton (w/m)
+              const weightInTons = weight / 1000;
+              chargeableWeight = Math.max(weightInTons, volume);
+              ratePerUnit = 150.00; // Mock Rate per w/m (CBM/Ton)
+              unit = 'w/m';
+              break;
+          }
+
+          const totalLineWeight = chargeableWeight * quantity;
+          finalLineCost = totalLineWeight * ratePerUnit;
+          chargeableWeight = totalLineWeight;
       }
-
-      const lineTotal = chargeableWeight * ratePerUnit * quantity; // quantity usually 1 for shipment-level, but if items are packages...
-      
-      // If items are packages, we sum them up. 
-      // Assuming 'quantity' is number of packages and weight/volume is PER PACKAGE.
-      const totalLineWeight = chargeableWeight * quantity;
-      const finalLineCost = totalLineWeight * ratePerUnit;
 
       totalFreight += finalLineCost;
 
       itemBreakdowns.push({
         description: item.description,
         quantity,
-        chargeableWeight: totalLineWeight,
+        chargeableWeight: chargeableWeight,
         rate: ratePerUnit,
         total: finalLineCost,
-        unit: mode === 'ocean' ? 'w/m' : 'kg'
+        unit: unit
       });
     }
 

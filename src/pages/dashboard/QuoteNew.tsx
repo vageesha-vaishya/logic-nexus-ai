@@ -17,17 +17,15 @@ import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
-import { matchLegForCharge } from '@/lib/charge-bifurcation';
-import { TransportLeg } from '@/types/quote-breakdown';
 import { QuickQuoteHistory } from '@/components/sales/quick-quote/QuickQuoteHistory';
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
-import { PricingService } from '@/services/pricing.service';
+import { QuoteOptionService } from '@/services/QuoteOptionService';
 
 export default function QuoteNew() {
   const { supabase, context, scopedDb } = useCRM();
   // Cast supabase to any to avoid strict type mismatch, assuming it's a valid client when used
-  const pricingService = new PricingService(supabase as any);
+  const quoteOptionService = new QuoteOptionService(supabase as any);
   const location = useLocation();
   const navigate = useNavigate();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
@@ -40,6 +38,15 @@ export default function QuoteNew() {
 
   const [optionsInserted, setOptionsInserted] = useState(false);
   const [isInsertingOptions, setIsInsertingOptions] = useState(false);
+  const [viewMode, setViewMode] = useState<'form' | 'composer'>('form');
+
+  // Auto-switch to composer when options are inserted
+  useEffect(() => {
+    if (optionsInserted && location.state) {
+        logger.info('[QuoteNew] Options inserted, switching to composer view');
+        setViewMode('composer');
+    }
+  }, [optionsInserted, location.state]);
   const [insertionError, setInsertionError] = useState<string | null>(null);
   const [insertionProgress, setInsertionProgress] = useState({ current: 0, total: 0 });
   const [insertionStartTime, setInsertionStartTime] = useState<number | null>(null);
@@ -221,6 +228,40 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
           }
       }
 
+      // Resolve Cargo Configurations (Containers) -> Unified Items
+      let items: any[] = [];
+      const normalizedMode = (state.mode || 'ocean').toLowerCase();
+      const isContainerized = normalizedMode === 'ocean' || normalizedMode === 'rail';
+
+      if (isContainerized && (state.containerCombos?.length > 0 || (state.containerType && state.containerSize))) {
+          const combos = state.containerCombos?.length > 0 
+              ? state.containerCombos 
+              : [{ type: state.containerType, size: state.containerSize, qty: state.containerQty || 1 }];
+          
+          items = combos.map((c: any) => ({
+              type: 'container',
+              container_type_id: c.type,
+              container_size_id: c.size,
+              quantity: Number(c.qty) || 1,
+              product_name: state.commodity || 'General Cargo',
+              attributes: {
+                  hazmat: state.dangerousGoods ? { is_hazardous: true } : undefined
+              }
+          }));
+      } else if (state.commodity) {
+          // LCL / Loose Cargo Fallback
+          items.push({
+              type: 'loose',
+              product_name: state.commodity,
+              quantity: 1,
+              attributes: {
+                  weight: Number(state.weight) || 0,
+                  volume: Number(state.volume) || 0,
+                  hazmat: state.dangerousGoods ? { is_hazardous: true } : undefined
+              }
+          });
+      }
+
       setTemplateData(prev => ({
         ...prev,
         total_weight: state.weight?.toString(),
@@ -235,8 +276,9 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
         service_type_id: serviceTypeId,
         carrier_id: carrierId,
         shipping_amount: primaryRate?.price?.toString(),
-        // Default Incoterms if usually Export
-        incoterms: tradeDirection === 'export' ? 'CIF' : 'FOB' 
+        incoterms: tradeDirection === 'export' ? 'CIF' : 'FOB',
+        items: items,
+        cargo_configurations: [] // Deprecated in favor of items
       }));
     }
   }, [location.state, masterData]);
@@ -347,432 +389,21 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
         const processRate = async (rawRate: any) => {
             try {
-                // Normalize rate using centralized mapper to ensure consistency with Quick Quote/Smart Quote UI
-                // This handles charge synthesis, balancing charges, and field normalization
-                const rate = mapOptionToQuote(rawRate);
-
-                // Insert Option
-                const sellPrice = rate.total_amount || rate.price || 0;
-                
-                // Use existing financials if available (e.g. from DB or previous step), otherwise calculate default
-                // NOTE: We trust mapOptionToQuote to have already recalculated financials if the total amount changed significantly
-                // from the historical record.
-                let financials;
-                if (rate.buyPrice !== undefined && rate.marginAmount !== undefined) {
-                    financials = { buyPrice: rate.buyPrice, marginAmount: rate.marginAmount, markupPercent: rate.markupPercent };
-                } else {
-                    const pricingService = new PricingService(scopedDb);
-                    // Use default 15% margin as per legacy logic (false = sell price based)
-                    const calc = await pricingService.calculateFinancials(sellPrice, 15, false);
-                    
-                    // Calculate markup for backward compatibility
-                    let markup = 0;
-                    if (calc.buyPrice > 0) {
-                        markup = (calc.marginAmount / calc.buyPrice) * 100;
+                const optionId = await quoteOptionService.addOptionToVersion({
+                    tenantId: resolvedTenantId,
+                    versionId: versionId,
+                    rate: rawRate,
+                    rateMapper: rateMapper,
+                    source: rawRate.source_attribution || state.source || 'quick_quote',
+                    context: {
+                        origin: state.origin,
+                        destination: state.destination,
+                        originDetails: state.originDetails,
+                        destinationDetails: state.destinationDetails
                     }
+                });
 
-                    financials = {
-                        buyPrice: calc.buyPrice,
-                        marginAmount: calc.marginAmount,
-                        markupPercent: Number(markup.toFixed(2))
-                    };
-                }
-                    
-                const { buyPrice, marginAmount, markupPercent } = financials;
-                
-                // FINAL VALIDATION: Ensure financial consistency before insert
-                // If sellPrice is significantly different from what we expect (e.g. mapper fixed it),
-                // warn or adjust.
-                if (Math.abs(sellPrice - (rate.total_amount || 0)) > 0.01) {
-                    console.warn('[QuoteNew] Discrepancy between sellPrice and rate.total_amount', { sellPrice, rateTotal: rate.total_amount });
-                }
-
-                const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rate.id);
-
-                // Calculate total CO2
-                const totalCo2 = rate.co2_kg || (rate.legs?.reduce((acc: number, leg: any) => acc + (Number(leg.co2_emission) || Number(leg.co2) || 0), 0)) || 0;
-
-                const { data: optionData, error: optionError } = await scopedDb
-                  .from('quotation_version_options')
-                  .insert({
-                    tenant_id: resolvedTenantId,
-                    quotation_version_id: versionId,
-                    carrier_rate_id: isUUID ? rate.id : null,
-                    option_name: rate.name || `${rate.carrier} ${rate.tier}`,
-                    carrier_name: rate.carrier,
-                    total_amount: sellPrice,
-                    total_sell: sellPrice,
-                    total_buy: buyPrice,
-                    margin_amount: marginAmount,
-                    margin_percentage: markupPercent,
-                    quote_currency_id: rateMapper.getCurrId(rate.currency || 'USD'),
-                    transit_time: rate.transitTime,
-                    total_transit_days: rate.transitTime ? parseInt(rate.transitTime.match(/\d+/)?.[0] || '0') || null : null,
-                    valid_until: rate.validUntil ? new Date(rate.validUntil).toISOString() : null,
-                    
-                    // New fields for AI/Source tracking
-                    reliability_score: rate.reliability_score || rate.reliability?.score,
-                    ai_generated: rate.ai_generated || rate.source_attribution === 'AI Smart Engine',
-                    ai_explanation: rate.ai_explanation,
-                    source: rate.source_attribution || 'quick_quote',
-                    total_co2_kg: totalCo2,
-                    
-                    status: 'active'
-                  })
-                  .select('id')
-                  .single();
-
-                if (optionError) {
-                   console.error('[QuoteNew] Option Insert Error:', optionError);
-                   throw optionError;
-                }
-                const optionId = optionData.id;
                 newOptionIds.push(optionId);
-
-                // Insert Legs
-                const legsToInsert: any[] = [];
-                const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || 'ocean' }];
-
-                const parseDurationToHours = (duration: string | number | undefined) => {
-                    if (typeof duration === 'number') return duration; 
-                    if (!duration) return null;
-                    const str = String(duration).toLowerCase();
-                    const val = parseFloat(str);
-                    if (isNaN(val)) return null;
-                    if (str.includes('day')) return Math.round(val * 24);
-                    return Math.round(val);
-                };
-
-                // Ensure legs are sorted if they have a sequence number
-                if (rateLegs.length > 1 && rateLegs.every((l: any) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
-                    rateLegs.sort((a: any, b: any) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
-                }
-
-                rateLegs.forEach((leg: any, index: number) => {
-                    const legMode = leg.mode || rate.transport_mode || 'ocean';
-                    const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
-                    const serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
-                    
-                    // Smart location fallback
-                    // Only use main origin/destination for the first/last legs respectively
-                    const isFirstLeg = index === 0;
-                    const isLastLeg = index === rateLegs.length - 1;
-
-                    let origin = leg.from || leg.origin || leg.pol;
-                    if (!origin && isFirstLeg) {
-                        origin = state.originDetails?.formatted_address || state.origin;
-                    }
-
-                    let destination = leg.to || leg.destination || leg.pod;
-                    if (!destination && isLastLeg) {
-                        destination = state.destinationDetails?.formatted_address || state.destination;
-                    }
-
-                    // Validation: If not first leg, try to fill origin from previous leg's destination if missing
-                    if (!origin && !isFirstLeg && legsToInsert[index - 1]?.destination_location) {
-                        origin = legsToInsert[index - 1].destination_location;
-                    }
-                    
-                    // Determine Leg Type dynamically
-                    // Database constraint strictly enforces 'transport' or 'service'
-                    // We rely on the database default ('transport') to avoid any client-side string encoding issues that might trigger the check constraint
-                    // For service legs (future), we will explicitly set 'service'
-                    const legType = 'transport';
-
-                    legsToInsert.push({
-                        quotation_version_option_id: optionId,
-                        tenant_id: tenantId,
-                        mode_id: rateMapper.getModeId(legMode),
-                        mode: legMode,
-                        service_type_id: serviceTypeId,
-                        provider_id: rateMapper.getProviderId(carrierName),
-                        origin_location: origin || (isFirstLeg ? state.origin : null), // Fallback for safety
-                        destination_location: destination || (isLastLeg ? state.destination : null),
-                        sort_order: index + 1,
-                        // leg_type: legType, // Commented out to use DB default ('transport') to fix constraint violation
-                        transit_time_hours: parseDurationToHours(leg.transit_time),
-                        co2_kg: leg.co2_emission || leg.co2 || null,
-                        voyage_number: leg.voyage_number || leg.voyage || null
-                    });
-                });
-
-                const { data: legData, error: legError } = await scopedDb
-                    .from('quotation_version_option_legs')
-                    .insert(legsToInsert)
-                    .select('id, mode_id, leg_type, sort_order, service_type_id');
-
-                if (legError) throw legError;
-
-                // Sort legData by order to ensure correct mapping
-                legData?.sort((a: any, b: any) => a.sort_order - b.sort_order);
-
-                // Create rich leg objects for matching logic (combining DB IDs with Mode strings)
-                const legsForMatching: TransportLeg[] = (legData || []).map((l: any) => {
-                    const original = legsToInsert.find(i => i.sort_order === l.sort_order);
-                    return {
-                        id: l.id,
-                        leg_type: l.leg_type || 'transport',
-                        mode: original?.mode || 'ocean',
-                        origin: original?.origin_location || '',
-                        destination: original?.destination_location || '',
-                        sequence: l.sort_order,
-                        charges: [] // Mock for interface satisfaction
-                    } as TransportLeg;
-                });
-
-                // Determine Main Leg
-                const targetModeId = rateMapper.getModeId(rate.transport_mode || 'ocean');
-                const mainLeg = legData?.find((l: any) => l.mode_id === targetModeId && l.leg_type === 'transport') || legData?.[0];
-                const mainLegId = mainLeg?.id;
-
-                // Insert Charges
-                const chargesToInsert: any[] = [];
-                let totalInsertedSellAmount = 0;
-                
-                const addChargePair = async (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): Promise<boolean> => {
-                    const catId = rateMapper.getCatId(categoryKey);
-                    const basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
-                    const currId = rateMapper.getCurrId(rate.currency || 'USD');
-                    if (!catId) return false;
-                    
-                    // Fallback to mainLegId if targetLegId is null, ensuring we never send null for leg_id
-                    const finalLegId = targetLegId || mainLegId || legData?.[0]?.id;
-                    
-                    if (!finalLegId) {
-                        console.warn('[QuoteNew] Skipping charge insertion: No valid leg ID found', { categoryKey, amount });
-                        return false;
-                    }
-
-                    // Use dynamic margin from financials instead of hardcoded 0.85 (15%)
-                    const marginPercent = Number(rate.marginPercent || rate.margin_percent || 15);
-                    // Use PricingService for centralized calculation (Sell-Based Model: isCostBased = false)
-                    const financials = await pricingService.calculateFinancials(amount, marginPercent, false);
-                    const buyAmount = financials.buyPrice;
-                    const sellAmount = financials.sellPrice;
-
-                    chargesToInsert.push(
-                        { tenant_id: resolvedTenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },
-                        { tenant_id: resolvedTenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: sellSideId, quantity: 1, rate: sellAmount, amount: sellAmount, currency_id: currId, note: note, unit: chargeUnit }
-                    );
-                    
-                    totalInsertedSellAmount += sellAmount;
-                    return true;
-                };
-
-                const getLegIdForCharge = (chargeKey: string, explicitLegIndex?: number) => {
-                    if (!legData?.length) return null;
-                    
-                    // Priority 1: Explicit Index
-                    if (typeof explicitLegIndex === 'number' && legData[explicitLegIndex]) {
-                        return legData[explicitLegIndex].id;
-                    }
-
-                    // Priority 2: Use shared bifurcation logic
-                    // matchLegForCharge uses keywords like 'pickup', 'freight', 'delivery' to find the best leg
-                    const matchedLeg = matchLegForCharge(chargeKey, legsForMatching);
-                    if (matchedLeg) return matchedLeg.id;
-
-                    // Priority 3: Fallback to old hardcoded checks if shared logic misses (unlikely but safe)
-                    const key = chargeKey.toLowerCase();
-                    if (key.includes('pickup') || key.includes('origin') || key.includes('pre_carriage') || key.includes('export')) return legData[0].id;
-                    if (key.includes('delivery') || key.includes('destination') || key.includes('on_carriage') || key.includes('import')) return legData[legData.length - 1].id;
-                    
-                    // Priority 4: Main Leg (Ocean/Air) or First Leg
-                    return mainLegId || legData[0].id;
-                };
-
-                let chargesFound = false;
-
-                // Priority 1: Process Leg-Specific Charges (Highest Fidelity)
-                // This captures charges already allocated to specific legs by the mapper
-                if (rateLegs && rateLegs.length > 0) {
-                     for (const [index, leg] of rateLegs.entries()) {
-                        if (leg.charges && Array.isArray(leg.charges) && leg.charges.length > 0) {
-                            // Find the corresponding DB leg ID. rateLegs matches legData by index because we sorted legData by sort_order
-                            // and inserted based on rateLegs order.
-                            const targetLegId = legData?.[index]?.id; 
-                            
-                            if (targetLegId) {
-                                for (const charge of leg.charges) {
-                                    const amount = Number(charge.amount || charge.price || charge.total || 0);
-                                    if (amount !== 0) {
-                                        const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
-                                        const unit = charge.unit || charge.basis;
-                                        const note = charge.note || desc;
-
-                                        if (await addChargePair(desc, amount, note, targetLegId, unit, unit)) {
-                                            chargesFound = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                     }
-                }
-
-                // Priority 2: Process Global/Remaining Charges
-                // This captures charges that couldn't be allocated to a specific leg (or balancing charges)
-                if (Array.isArray(rate.charges) && rate.charges.length > 0) {
-                    for (const charge of rate.charges) {
-                        const amount = Number(charge.amount || charge.price || charge.total || 0);
-                        if (amount !== 0) {
-                            const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
-                            const legId = getLegIdForCharge(desc); // Try to infer leg or use main leg
-                            const unit = charge.unit || charge.basis;
-                            const note = charge.note || desc;
-                            
-                            if (await addChargePair(desc, amount, note, legId, unit, unit)) {
-                                chargesFound = true;
-                            }
-                        }
-                    }
-                } 
-
-                // Priority 3: Fallback to 'price_breakdown' object (AI/Recursive structure)
-                // Only if no detailed charges were found in legs or global array
-                if (!chargesFound) {
-                    const breakdown = rate.price_breakdown || { base_fare: sellPrice };
-                    
-                    const processCharge = async (key: string, value: any, parentKey: string = '') => {
-                        // 1. GLOBAL FILTER: Skip reserved keys at ANY level
-                        // This prevents double counting when AI returns both itemized charges and their totals
-                        if (['total', 'total_amount', 'total_price', 'subtotal', 'currency', 'currency_code', 'exchange_rate', 'symbol'].includes(key.toLowerCase())) {
-                            return;
-                        }
-
-                        if (typeof value === 'number' && value !== 0) {
-                            const compositeKey = parentKey ? `${parentKey}_${key}` : key;
-                            // Check if parent key implies a specific leg (e.g., legs[0])
-                            let explicitIndex: number | undefined = undefined;
-                            if (parentKey.match(/legs?_?\[?(\d+)\]?/i)) {
-                                const match = parentKey.match(/legs?_?\[?(\d+)\]?/i);
-                                if (match) explicitIndex = parseInt(match[1]);
-                            }
-
-                            const legId = getLegIdForCharge(compositeKey, explicitIndex);
-                            const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                            await addChargePair(key, value, formatNote(compositeKey), legId);
-                            return;
-                        } 
-                        
-                        if (typeof value === 'object' && value !== null) {
-                            // Check if it is a "Charge Object" (has amount + identifier)
-                            const amountKey = ['amount', 'price', 'value', 'total'].find(k => typeof value[k] === 'number');
-                            const codeKey = ['code', 'name', 'type', 'description', 'id', 'charge_code'].find(k => typeof value[k] === 'string');
-    
-                            if (amountKey) {
-                                // It's a charge object!
-                                const amount = value[amountKey];
-                                const code = codeKey ? value[codeKey] : key;
-                                const unitKey = ['unit', 'basis', 'per'].find(k => typeof value[k] === 'string');
-                                const unit = unitKey ? value[unitKey] : undefined;
-                                
-                                // Check for explicit leg assignment in object
-                                const legIndexKey = ['leg_index', 'leg_id', 'segment_index'].find(k => typeof value[k] === 'number');
-                                const explicitIndex = legIndexKey ? value[legIndexKey] : undefined;
-
-                                const compositeKey = parentKey ? `${parentKey}_${code}` : code;
-                                const legId = getLegIdForCharge(compositeKey, explicitIndex);
-                                const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                                
-                                // Use the found code as the category key and pass unit/basis if found
-                                await addChargePair(code, amount, formatNote(compositeKey), legId, unit, unit);
-                                return;
-                            }
-    
-                            // Otherwise recurse
-                            const newParentKey = parentKey ? `${parentKey}_${key}` : key;
-                            for (const [k, v] of Object.entries(value)) {
-                                await processCharge(k, v, newParentKey);
-                            }
-                        }
-                    };
-    
-                    for (const [key, val] of Object.entries(breakdown)) {
-                        await processCharge(key, val);
-                    }
-                }
-
-                // 4. BALANCING CHARGE: Ensure total matches the quoted price
-                // If parts < total, add adjustment. If parts > total, add discount.
-                const discrepancy = sellPrice - totalInsertedSellAmount;
-                // Use tighter threshold (0.01) to catch floating point errors
-                if (Math.abs(discrepancy) > 0.01) {
-                     const chargeName = discrepancy > 0 ? 'Ancillary Fees' : 'Discount / Adjustment';
-                     const chargeNote = discrepancy > 0 ? 'Unitemized surcharges' : 'Bundle discount adjustment';
-                     // Round discrepancy to 2 decimal places
-                     await addChargePair(chargeName, Number(discrepancy.toFixed(2)), chargeNote, mainLegId);
-                     logger.info('[QuoteNew] Added balancing charge', { discrepancy, sellPrice, totalInsertedSellAmount });
-                }
-
-                // Fallback: If no charges found, add total freight
-                if (chargesToInsert.length === 0) await addChargePair('FREIGHT', sellPrice, 'Total Freight', mainLegId);
-
-                if (chargesToInsert.length > 0) {
-                    await scopedDb.from('quote_charges').insert(chargesToInsert);
-
-                    // RECONCILIATION: Update Option Header to match the sum of Line Items
-                    // This fixes rounding errors and ensures data integrity between Header and Lines
-                    const finalTotalBuy = chargesToInsert
-                        .filter((c: any) => c.charge_side_id === buySideId)
-                        .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
-                        
-                    const finalTotalSell = chargesToInsert
-                        .filter((c: any) => c.charge_side_id === sellSideId)
-                        .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
-                        
-                    const finalMargin = finalTotalSell - finalTotalBuy;
-                    const finalMarkup = finalTotalBuy > 0 ? (finalMargin / finalTotalBuy) * 100 : 0;
-                    
-                    await scopedDb
-                        .from('quotation_version_options')
-                        .update({
-                            total_buy: Number(finalTotalBuy.toFixed(2)),
-                            total_sell: Number(finalTotalSell.toFixed(2)),
-                            total_amount: Number(finalTotalSell.toFixed(2)),
-                            margin_amount: Number(finalMargin.toFixed(2)),
-                            margin_percentage: Number(finalMarkup.toFixed(2))
-                        })
-                        .eq('id', optionId);
-
-                    // VALIDATION & RECORDING: Verify Transfer Integrity
-                    const transferDiff = Math.abs(sellPrice - finalTotalSell);
-                    if (transferDiff > 0.01) {
-                        const errorMsg = `[Data Integrity Failure] Transfer Mismatch: Incoming ${sellPrice} vs Stored ${finalTotalSell} (Diff: ${transferDiff})`;
-                        console.error(errorMsg);
-                        logger.error(errorMsg, { optionId, sellPrice, finalTotalSell });
-                        
-                        // Record anomaly to Version level (best effort)
-                        // We fetch current anomalies first to append
-                        const { data: vData } = await scopedDb
-                            .from('quotation_versions')
-                            .select('anomalies')
-                            .eq('id', versionId)
-                            .single();
-                            
-                        const currentAnomalies = Array.isArray(vData?.anomalies) ? vData.anomalies : [];
-                        await scopedDb.from('quotation_versions').update({
-                            anomalies: [...currentAnomalies, {
-                                type: 'TRANSFER_MISMATCH',
-                                severity: 'CRITICAL',
-                                message: errorMsg,
-                                timestamp: new Date().toISOString(),
-                                option_id: optionId
-                            }]
-                        }).eq('id', versionId);
-                    } else {
-                        logger.info(`[QuoteNew] Transfer Validated: Incoming ${sellPrice} === Stored ${finalTotalSell}`);
-                    }
-                        
-                    logger.info('[QuoteNew] Reconciled option financials', { 
-                        optionId, 
-                        originalSell: sellPrice, 
-                        finalSell: finalTotalSell,
-                        diff: finalTotalSell - sellPrice 
-                    });
-                }
-
-                // Update progress
                 setInsertionProgress(prev => ({ ...prev, current: prev.current + 1 }));
 
             } catch (err: any) {
@@ -904,8 +535,11 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
   };
 
   const handleSuccess = (quoteId: string) => {
-    // Instead of navigating immediately, create initial version and show composer inline
+    // Update state with created quote ID
     setCreatedQuoteId(quoteId);
+    
+    // Switch to composer view
+    setViewMode('composer');
 
     // Update AI Quote History if applicable
     if ((location.state as any)?.historyId) {
@@ -1093,13 +727,15 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
           </div>
         )}
 
-        {/* Main Quote Form - Hidden after successful save to focus on Composer */}
-        {!createdQuoteId ? (
+        {/* Main Quote Form or Header Summary */}
+        {viewMode === 'form' ? (
             <QuoteForm 
                 onSuccess={handleSuccess} 
                 initialData={templateData} 
                 autoSave={!!location.state?.selectedRates}
                 versionId={versionId || undefined}
+                quoteId={createdQuoteId || undefined}
+                initialViewMode="form"
             />
         ) : (
             <Card className="border-primary/20 bg-primary/5">
@@ -1113,7 +749,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                             <p className="text-xs text-muted-foreground">You are now in the Route Composer to finalize carrier details.</p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setCreatedQuoteId(null)}>
+                    <Button variant="outline" size="sm" onClick={() => setViewMode('form')}>
                         Edit Header
                     </Button>
                 </CardContent>
@@ -1129,7 +765,7 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
           </DialogContent>
         </Dialog>
         
-        {createdQuoteId && versionId && (!location.state?.selectedRates || optionsInserted) && (
+        {createdQuoteId && versionId && viewMode === 'composer' && (!location.state?.selectedRates || optionsInserted) && (
           <div className="mt-6">
             <MultiModalQuoteComposer 
               quoteId={createdQuoteId} 

@@ -12,7 +12,7 @@ interface RateRequest {
   origin: string // Code (e.g., "LAX") or UUID
   destination: string // Code (e.g., "PVG") or UUID
   weight: number | string
-  mode: 'air' | 'ocean' | 'road'
+  mode: 'air' | 'ocean' | 'road' | 'rail'
   commodity?: string
   unit?: string
   account_id?: string
@@ -56,6 +56,10 @@ const CARRIERS = {
     road: [
         'JB Hunt', 'XPO Logistics', 'Old Dominion', 'YRC Freight', 
         'Estes Express', 'TForce Freight', 'ABF Freight', 'R+L Carriers', 'Saia', 'Southeastern'
+    ],
+    rail: [
+        'CR Express', 'DB Cargo', 'Union Pacific', 'BNSF', 'CSX', 
+        'Norfolk Southern', 'CN (Canadian National)', 'CPKC'
     ]
 };
 
@@ -205,6 +209,14 @@ serve(async (req) => {
             basePrice = mockDistance * ratePerKm;
             if (vehicleType === 'reefer') basePrice *= 1.2;
             baseTransitDays = 1;
+        } else if (mode === 'rail') {
+            const baseRate20 = 4000; // Rail is generally more expensive than ocean but faster
+            const baseRate40 = 7500;
+            const qty = Number(containerQty) || 1;
+            const size = containerSize || '20ft';
+            const base = size.includes('40') ? baseRate40 : baseRate20;
+            basePrice = base * qty;
+            baseTransitDays = 16; // Faster than ocean (25), slower than air (3)
         }
 
         // Generate Simulated Options for Target Carriers
@@ -232,7 +244,10 @@ serve(async (req) => {
             const stops = isExpress ? 0 : 1 + Math.floor(Math.random() * 2);
 
             // CO2 Estimate (Simple Factor)
-            const co2Factor = mode === 'air' ? 0.6 : (mode === 'ocean' ? 0.03 : 0.1); // kg CO2 per kg cargo
+            // kg CO2 per kg cargo
+            const co2Factor = mode === 'air' ? 0.6 : 
+                             (mode === 'ocean' ? 0.03 : 
+                             (mode === 'rail' ? 0.02 : 0.1)); // Rail is very efficient, often better than ocean/road per km/kg depending on grid
             const estimatedCo2 = Math.round((weightKg || 1000) * co2Factor * (1 + (stops * 0.1)));
             
             const originalCost = simulatedPrice;

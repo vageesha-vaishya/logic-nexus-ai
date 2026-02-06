@@ -10,8 +10,8 @@ type PortSeed = {
   is_active: boolean;
 };
 
-export async function seedPortsForTenant(scopedDb: any, tenantId: string): Promise<number> {
-  if (!tenantId) return 0;
+export async function seedPortsForTenant(scopedDb: any): Promise<number> {
+  // Note: tenantId param removed as ports are now global
 
   const seeds: PortSeed[] = [
     // Seaports
@@ -31,7 +31,7 @@ export async function seedPortsForTenant(scopedDb: any, tenantId: string): Promi
   ];
 
   try {
-    // ScopedDataAccess automatically applies tenant_id filter based on context
+    // Check for existing ports globally (ignoring tenant_id)
     const { data: existing, error: exErr } = await scopedDb
       .from('ports_locations')
       .select('location_code');
@@ -39,14 +39,17 @@ export async function seedPortsForTenant(scopedDb: any, tenantId: string): Promi
     if (exErr) throw exErr;
     const rows = (existing ?? []) as { location_code: string | null }[];
     const existingCodes = new Set(rows.map((r) => String(r.location_code)));
+    
+    // Filter out seeds that already exist by code
     const toInsert = seeds.filter((s) => !existingCodes.has(s.location_code));
+    
     if (toInsert.length === 0) return 0;
     
-    // ScopedDataAccess automatically injects tenant_id into inserts
+    // Insert without tenant_id (or letting DB handle defaults)
     const { error } = await scopedDb.from('ports_locations').insert(toInsert);
     if (error) throw error;
     
-    toast.success(`Seeded ${toInsert.length} ports/locations`);
+    toast.success(`Seeded ${toInsert.length} global ports/locations`);
     return toInsert.length;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, Ship, Plane, ArrowRight, Warehouse, MapPin } from 'lucide-react';
+import { Truck, Ship, Plane, ArrowRight, Warehouse, MapPin, Train } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Leg {
@@ -32,7 +32,7 @@ export function QuoteLegsVisualizer({ legs }: QuoteLegsVisualizerProps) {
             case 'ocean': return <Ship className="w-4 h-4 text-blue-600" />;
             case 'air': return <Plane className="w-4 h-4 text-sky-600" />;
             case 'road': return <Truck className="w-4 h-4 text-amber-600" />;
-            case 'rail': return <Truck className="w-4 h-4 text-orange-600" />; // Fallback icon
+            case 'rail': return <Train className="w-4 h-4 text-orange-600" />;
             default: return <ArrowRight className="w-4 h-4 text-gray-400" />;
         }
     };

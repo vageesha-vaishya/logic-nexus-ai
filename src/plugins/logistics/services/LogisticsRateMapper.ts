@@ -83,10 +83,10 @@ export class LogisticsRateMapper {
      const { serviceModes } = this.masterData;
      if (!modeName) return null;
      const normalized = modeName.toLowerCase();
-     // Map common terms
-     const map: Record<string, string> = { 'ocean': 'sea', 'truck': 'road', 'air': 'air' };
-     
-     // 1. Try exact/mapped match
+    // Map common terms
+    const map: Record<string, string> = { 'ocean': 'sea', 'truck': 'road', 'air': 'air', 'rail': 'rail' };
+    
+    // 1. Try exact/mapped match
      let target = map[normalized] || normalized;
      let match = serviceModes?.find((m: any) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
      if (match) return match.id;

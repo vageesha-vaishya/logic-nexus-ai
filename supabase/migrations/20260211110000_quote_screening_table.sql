@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_quote_screening_quote_id ON public.quote_contacts
 -- RLS
 ALTER TABLE public.quote_contacts_screening ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view screenings for their tenant's quotes" ON public.quote_contacts_screening;
 CREATE POLICY "Users can view screenings for their tenant's quotes" ON public.quote_contacts_screening
     FOR SELECT TO authenticated USING (
         EXISTS (
@@ -33,6 +34,7 @@ CREATE POLICY "Users can view screenings for their tenant's quotes" ON public.qu
         )
     );
 
+DROP POLICY IF EXISTS "Users can create/update screenings for their tenant's quotes" ON public.quote_contacts_screening;
 CREATE POLICY "Users can create/update screenings for their tenant's quotes" ON public.quote_contacts_screening
     FOR ALL TO authenticated USING (
         EXISTS (

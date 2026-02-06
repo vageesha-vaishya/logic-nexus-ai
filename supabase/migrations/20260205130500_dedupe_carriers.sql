@@ -1,0 +1,5 @@
+-- Create a unique index on carrier name to prevent future duplicates
+-- Note: This might fail if duplicates already exist. Ideally, we should clean them up first.
+-- For now, we attempt to create it.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_carriers_name_unique 
+ON public.carriers (lower(trim(carrier_name)));

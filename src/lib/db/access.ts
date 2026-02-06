@@ -210,6 +210,11 @@ export class ScopedDataAccess {
       return query;
     }
 
+    // Ports/Locations are a global shared resource, never scoped
+    if (table === 'ports_locations') {
+      return query;
+    }
+
     // Admin Override Logic - Platform Admin with override enabled
     if (ctx.isPlatformAdmin && ctx.adminOverrideEnabled) {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
@@ -274,6 +279,11 @@ export class ScopedDataAccess {
     const shouldInject = !this.context.isPlatformAdmin || (this.context.isPlatformAdmin && this.context.adminOverrideEnabled);
 
     if (shouldInject) {
+      // Ports/Locations are global, do not inject scope
+      if (table === 'ports_locations') {
+        return newValue;
+      }
+
       if (this.context.tenantId && !newValue.tenant_id) {
         newValue.tenant_id = this.context.tenantId;
       }

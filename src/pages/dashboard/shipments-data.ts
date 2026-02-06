@@ -43,6 +43,14 @@ export interface Shipment {
   contacts?: { first_name: string; last_name: string; email: string } | null;
   tenant_id?: string | null;
   franchise_id?: string | null;
+  aes_itn?: string | null;
+  incoterms?: string | null;
+  vessel_name?: string | null;
+  voyage_number?: string | null;
+  port_of_loading?: string | null;
+  port_of_discharge?: string | null;
+  place_of_receipt?: string | null;
+  place_of_delivery?: string | null;
 }
 
 export interface Address {

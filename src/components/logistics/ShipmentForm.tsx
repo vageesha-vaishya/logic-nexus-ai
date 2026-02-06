@@ -36,6 +36,12 @@ const shipmentSchema = z.object({
   account_id: z.string().optional(),
   tenant_id: z.string().optional(),
   franchise_id: z.string().optional(),
+  vessel_name: z.string().optional(),
+  voyage_number: z.string().optional(),
+  port_of_loading: z.string().optional(),
+  port_of_discharge: z.string().optional(),
+  place_of_receipt: z.string().optional(),
+  place_of_delivery: z.string().optional(),
   attachments: z.array(z.any()).default([]),
 });
 
@@ -86,6 +92,12 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
       account_id: initialData?.account_id || '',
       tenant_id: initialData?.tenant_id || '',
       franchise_id: initialData?.franchise_id || '',
+      vessel_name: initialData?.vessel_name || '',
+      voyage_number: initialData?.voyage_number || '',
+      port_of_loading: initialData?.port_of_loading || '',
+      port_of_discharge: initialData?.port_of_discharge || '',
+      place_of_receipt: initialData?.place_of_receipt || '',
+      place_of_delivery: initialData?.place_of_delivery || '',
       attachments: [],
     },
   });
@@ -142,6 +154,64 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
               </FormItem>
             )}
           />
+
+          {/* Ocean/Air Details */}
+          {(form.watch('shipment_type') === 'ocean' || form.watch('shipment_type') === 'air') && (
+            <>
+              <FormField
+                control={form.control}
+                name="vessel_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{form.watch('shipment_type') === 'air' ? 'Flight Number' : 'Vessel Name'}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={form.watch('shipment_type') === 'air' ? 'e.g. EK202' : 'e.g. EVER GIVEN'} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="voyage_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Voyage / Flight No.</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. V12345" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="port_of_loading"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Port of Loading</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Jebel Ali" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="port_of_discharge"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Port of Discharge</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Rotterdam" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
 
           <FormField
             control={form.control}

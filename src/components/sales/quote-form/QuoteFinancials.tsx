@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -13,21 +13,38 @@ import { toast } from 'sonner';
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 import { RequestContext, QuoteResult } from '@/services/quotation/types';
+import { PricingService } from '@/services/pricing.service';
 
 export function QuoteFinancials() {
   const { control, setValue } = useFormContext();
-  // const { supabase } = useCRM();
+  const { supabase } = useCRM();
   
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [serverVerification, setServerVerification] = useState<{ verified: boolean; match: boolean } | null>(null);
   const [calculationResult, setCalculationResult] = useState<QuoteResult | null>(null);
+  
+  // Master Data State
+  const [containerTypes, setContainerTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [containerSizes, setContainerSizes] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    const loadMasterData = async () => {
+        const { data: types } = await supabase.from('container_types').select('id, name');
+        if (types) setContainerTypes(types);
+        
+        const { data: sizes } = await supabase.from('container_sizes').select('id, name');
+        if (sizes) setContainerSizes(sizes);
+    };
+    loadMasterData();
+  }, [supabase]);
 
   // Watch values for real-time calculation preview
   const shippingAmount = useWatch({ control, name: 'shipping_amount' }) || 0;
   const taxPercent = useWatch({ control, name: 'tax_percent' }) || 0;
   
   const formItems = useWatch({ control, name: 'items' });
+  const cargoConfigs = useWatch({ control, name: 'cargo_configurations' });
   const formMode = useWatch({ control, name: 'service_type_id' }); // Assuming this maps to mode temporarily
   const incoterms = useWatch({ control, name: 'incoterms' });
 
@@ -68,18 +85,65 @@ export function QuoteFinancials() {
             }
         }));
 
+        // Add cargo configurations as items for pricing
+        if (cargoConfigs && cargoConfigs.length > 0) {
+            cargoConfigs.forEach((config: any) => {
+                // Resolve names from IDs if available, falling back to stored names
+                const typeName = containerTypes.find(t => t.id === config.container_type_id)?.name || config.container_type || 'Unit';
+                const sizeObj = containerSizes.find(s => s.id === config.container_size_id);
+                const sizeName = sizeObj ? (sizeObj.name.match(/(\d+)/)?.[0] || sizeObj.name) : (config.container_size || '');
+
+                engineItems.push({
+                    description: `${config.transport_mode?.toUpperCase()} - ${config.cargo_type} - ${typeName} ${sizeName ? sizeName : ''}`,
+                    quantity: Number(config.quantity) || 1,
+                    attributes: {
+                        container_type: typeName,
+                        container_size: sizeName,
+                        weight: Number(config.unit_weight_kg) || 0,
+                        volume: Number(config.unit_volume_cbm) || 0
+                    }
+                });
+            });
+        }
+
         if (engineItems.length === 0) {
-            toast.warning('Please add items to calculate charges');
+            toast.warning('Please add items or cargo to calculate charges');
             setIsCalculating(false);
             return;
         }
 
-        const result = await engine.calculate(context, engineItems);
+        let result = await engine.calculate(context, engineItems);
+
+        // Apply Margin Rules via PricingService
+        try {
+            const pricingService = new PricingService(supabase as any);
+            const marginContext = {
+                service_type: formMode, // e.g. 'ocean', 'air'
+            };
+
+            const marginCalc = await pricingService.calculatePriceWithRules(result.totalAmount, marginContext);
+            
+            if (marginCalc.appliedRules.length > 0) {
+                result = {
+                    ...result,
+                    totalAmount: marginCalc.sellPrice,
+                    breakdown: {
+                        ...result.breakdown,
+                        base_cost: marginCalc.buyPrice,
+                        margin_amount: marginCalc.marginAmount,
+                        applied_rules: marginCalc.appliedRules
+                    }
+                };
+                toast.success(`Calculated Estimate: $${result.totalAmount.toFixed(2)} (incl. ${marginCalc.appliedRules.length} rules)`);
+            } else {
+                 toast.success(`Calculated Estimate: $${result.totalAmount.toFixed(2)}`);
+            }
+        } catch (marginErr) {
+            console.error('Failed to apply margin rules:', marginErr);
+            toast.warning('Calculated base price, but failed to apply margin rules.');
+        }
+
         setCalculationResult(result);
-        
-        // Auto-fill shipping amount if empty or user confirms?
-        // For now, let's just show the result and let user apply it
-        toast.success(`Calculated Estimate: $${result.totalAmount.toFixed(2)}`);
 
     } catch (err: any) {
         console.error('Calculation failed:', err);
@@ -269,6 +333,17 @@ export function QuoteFinancials() {
                                   <span className="text-muted-foreground">Base Freight:</span>
                                   <span className="font-medium">${calculationResult.breakdown.freight?.toFixed(2) || '0.00'}</span>
                               </div>
+                              {calculationResult.breakdown.margin_amount > 0 && (
+                                  <div className="flex justify-between text-green-600">
+                                      <span className="text-muted-foreground">Margin:</span>
+                                      <span className="font-medium">+${Number(calculationResult.breakdown.margin_amount).toFixed(2)}</span>
+                                  </div>
+                              )}
+                              {calculationResult.breakdown.applied_rules?.length > 0 && (
+                                  <div className="text-xs text-muted-foreground italic">
+                                      Rules: {calculationResult.breakdown.applied_rules.join(', ')}
+                                  </div>
+                              )}
                               {Object.entries(calculationResult.breakdown.surcharges || {}).map(([key, value]) => (
                                   <div key={key} className="flex justify-between text-xs">
                                       <span className="text-muted-foreground">{key}:</span>

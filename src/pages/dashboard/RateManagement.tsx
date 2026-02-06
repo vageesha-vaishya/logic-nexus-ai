@@ -17,6 +17,7 @@ import {
   Ship, 
   Plane, 
   Truck, 
+  Train,
   Loader2 
 } from 'lucide-react';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
@@ -133,6 +134,9 @@ export default function RateManagement() {
                           </SelectItem>
                           <SelectItem value="road">
                             <div className="flex items-center gap-2"><Truck className="h-4 w-4" /> Road Freight</div>
+                          </SelectItem>
+                          <SelectItem value="rail">
+                            <div className="flex items-center gap-2"><Train className="h-4 w-4" /> Rail Freight</div>
                           </SelectItem>
                         </SelectContent>
                       </Select>

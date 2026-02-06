@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { seedPortsForTenant } from '@/integrations/supabase/seedPortsLocations';
+import { PortsService, PortLocation } from '@/services/PortsService';
 import {
   Table,
   TableBody,
@@ -26,7 +27,7 @@ export default function PortsLocations() {
   const navigate = useNavigate();
   const { supabase, scopedDb, context } = useCRM();
   const { roles } = useAuth();
-  const [ports, setPorts] = useState<any[]>([]);
+  const [ports, setPorts] = useState<PortLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -39,38 +40,30 @@ export default function PortsLocations() {
   const [filterCustoms, setFilterCustoms] = useState<'all' | 'yes' | 'no'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
+  const portsService = new PortsService(scopedDb);
+
   useEffect(() => {
-    if (context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id) {
-      fetchPorts();
-    } else {
-      setLoading(false);
-    }
+    fetchPorts();
   }, [context.isPlatformAdmin, context.tenantId, roles]);
 
   const fetchPorts = async () => {
     try {
-      const { data, error } = await scopedDb
-        .from('ports_locations')
-        .select('*')
-        .order('location_name');
-
-      if (error) throw error;
-      const rows = data || [];
-      setPorts(rows);
+      const data = await portsService.getAllPorts();
+      setPorts(data);
 
       // Dev-only: auto-seed demo ports/locations if none exist
-      const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-      const isPlatform = context.isPlatformAdmin;
-
-      if (!isPlatform && tenantId && rows.length === 0 && import.meta.env.DEV) {
+      // Only run this if we have some context (platform or tenant)
+      const hasContext = context.isPlatformAdmin || context.tenantId || roles?.[0]?.tenant_id;
+      
+      if (hasContext && data.length === 0 && import.meta.env.DEV) {
         try {
-          const count = await seedPortsForTenant(scopedDb, tenantId as string);
-          if (count > 0) toast.success(`Seeded ${count} demo ports/locations`);
-          const { data: seeded } = await scopedDb
-            .from('ports_locations')
-            .select('*')
-            .order('location_name');
-          setPorts(seeded || []);
+          // Use legacy seeder but it will insert globally now due to access.ts changes
+          const count = await seedPortsForTenant(scopedDb);
+          if (count > 0) {
+            toast.success(`Seeded ${count} demo ports/locations`);
+            const seeded = await portsService.getAllPorts();
+            setPorts(seeded);
+          }
         } catch (seedErr: any) {
           console.warn('Ports/locations seed failed:', seedErr?.message || seedErr);
         }
@@ -102,8 +95,7 @@ export default function PortsLocations() {
 
   const onDelete = async (id: string) => {
     try {
-      const { error } = await scopedDb.from('ports_locations').delete().eq('id', id);
-      if (error) throw error;
+      await portsService.deletePort(id);
       toast.success('Port/Location deleted');
       fetchPorts();
     } catch (e: any) {
@@ -148,8 +140,7 @@ export default function PortsLocations() {
             <Button
               variant="outline"
               onClick={async () => {
-                const tenantId = context.tenantId || roles?.[0]?.tenant_id;
-                const count = await seedPortsForTenant(scopedDb, tenantId as string);
+                const count = await seedPortsForTenant(scopedDb);
                 if (count > 0) fetchPorts();
               }}
             >Seed Demo Ports</Button>
@@ -244,7 +235,13 @@ export default function PortsLocations() {
                 <TableBody>
                   {filteredPorts.map((port) => (
                     <TableRow key={port.id}>
-                      <TableCell className="font-medium">{port.location_name}</TableCell>
+                      <TableCell className="font-medium">
+                        {port.location_name || (
+                          <span className="text-muted-foreground italic">
+                            {port.city ? `${port.city} ${port.location_type?.replace('_', ' ') || 'Location'}` : 'Unnamed Location'}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>{port.location_code || 'N/A'}</TableCell>
                       <TableCell>
                         {port.location_type && (

@@ -25,6 +25,7 @@ interface Leg {
   legType?: 'transport' | 'service';
   serviceOnlyCategory?: string;
   carrierName?: string;
+  carrierId?: string;
 }
 
 interface LegsConfigurationStepProps {
@@ -34,6 +35,7 @@ interface LegsConfigurationStepProps {
   onUpdateLeg: (legId: string, updates: Partial<Leg>) => void;
   onRemoveLeg: (legId: string) => void;
   validationErrors?: string[];
+  carriers?: any[];
 }
 
 function LocationAutocomplete({ 
@@ -120,7 +122,8 @@ export function LegsConfigurationStep({
   onAddLeg,
   onUpdateLeg,
   onRemoveLeg,
-  validationErrors = []
+  validationErrors = [],
+  carriers = []
 }: LegsConfigurationStepProps) {
   // Fetch service leg categories
   const { data: serviceCategories } = useQuery({
@@ -204,7 +207,13 @@ export function LegsConfigurationStep({
                         {isServiceLeg ? (
                           <Package className="h-4 w-4 text-muted-foreground" />
                         ) : (
-                          <Truck className="h-4 w-4 text-muted-foreground" />
+                          (() => {
+                            const m = (leg.mode || '').toLowerCase();
+                            if (m.includes('ocean') || m.includes('sea')) return <Ship className="h-4 w-4 text-muted-foreground" />;
+                            if (m.includes('air')) return <Plane className="h-4 w-4 text-muted-foreground" />;
+                            if (m.includes('rail') || m.includes('train')) return <Train className="h-4 w-4 text-muted-foreground" />;
+                            return <Truck className="h-4 w-4 text-muted-foreground" />;
+                          })()
                         )}
                         <CardTitle className="text-base">
                           {isServiceLeg ? 'Service' : 'Leg'} {index + 1} - {
@@ -278,6 +287,44 @@ export function LegsConfigurationStep({
                     ) : (
                       // Transport Leg Fields
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block">Preferred Carrier</Label>
+                          <Select
+                            value={leg.carrierId || ''}
+                            onValueChange={(val) => {
+                               const selectedCarrier = carriers?.find(c => c.id === val);
+                               onUpdateLeg(leg.id, { 
+                                 carrierId: val,
+                                 carrierName: selectedCarrier?.carrier_name 
+                               });
+                            }}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select carrier" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {carriers
+                                .filter(c => {
+                                  // Map leg mode to carrier type
+                                  const modeMap: Record<string, string> = {
+                                    'ocean': 'ocean',
+                                    'air': 'air_cargo',
+                                    'road': 'trucking',
+                                    'rail': 'rail'
+                                  };
+                                  // If mode matches mapped type, or if no specific mode mapping (fallback)
+                                  const targetType = modeMap[leg.mode] || leg.mode;
+                                  return c.carrier_type === targetType;
+                                })
+                                .map((carrier) => (
+                                  <SelectItem key={carrier.id} value={carrier.id}>
+                                    {carrier.carrier_name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
                         <div>
                           <Label className={`text-sm font-medium mb-2 block ${serviceTypeError ? 'text-destructive' : ''}`}>Service Type *</Label>
                           <Select

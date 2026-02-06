@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuotationWorkflowStepper } from './composer/QuotationWorkflowStepper';
 import { QuoteDetailsStep } from './composer/QuoteDetailsStep';
 import { LegsConfigurationStep } from './composer/LegsConfigurationStep';
@@ -30,9 +31,13 @@ import { SaveProgress } from './composer/SaveProgress';
 import { ErrorBoundary } from './composer/ErrorBoundary';
 import { ValidationFeedback } from './composer/ValidationFeedback';
 import { QuoteOptionsOverview } from './composer/QuoteOptionsOverview';
+import { QuoteOptionService } from '@/services/QuoteOptionService';
+import { PluginRegistry } from '@/services/plugins/PluginRegistry';
+import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 import { PricingService } from '@/services/pricing.service';
 import { logger } from '@/lib/logger';
 import { useDebug } from '@/hooks/useDebug';
+import { formatContainerSize } from '@/lib/container-utils';
 
 interface Leg {
   id: string;
@@ -44,6 +49,7 @@ interface Leg {
   legType?: 'transport' | 'service';
   serviceOnlyCategory?: string;
   carrierName?: string;
+  carrierId?: string;
 }
 
 interface MultiModalQuoteComposerProps {
@@ -79,8 +85,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const { toast } = useToast();
   const { invokeAiAdvisor } = useAiAdvisor();
   
-  // Initialize Pricing Service
+  // Initialize Services
   const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
+  const quoteOptionService = useMemo(() => new QuoteOptionService(scopedDb.client), [scopedDb.client]);
+  
   const debounceTimers = useRef(new Map<string, NodeJS.Timeout>());
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -136,6 +144,30 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [containerSizes, setContainerSizes] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
+  const [chargeSides, setChargeSides] = useState<any[]>([]);
+
+  const uniqueByCarrierName = (arr: any[], preferredTenantId?: string | null) => {
+    try {
+      const map: Record<string, any> = {};
+      for (const item of arr || []) {
+        const key = String((item as any)?.carrier_name || '').trim().toLowerCase();
+        if (!key) continue;
+        const existing = map[key];
+        if (!existing) {
+          map[key] = item;
+        } else {
+          const existingTenant = (existing as any)?.tenant_id ?? null;
+          const currentTenant = (item as any)?.tenant_id ?? null;
+          if (preferredTenantId && existingTenant !== preferredTenantId && currentTenant === preferredTenantId) {
+            map[key] = item;
+          }
+        }
+      }
+      return Object.values(map);
+    } catch {
+      return arr || [];
+    }
+  };
 
   // Basis configuration modal
   const [basisModalOpen, setBasisModalOpen] = useState(false);
@@ -156,6 +188,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const [newOptionData, setNewOptionData] = useState({
     option_name: '',
     carrier_name: '',
+    carrier_id: '',
     service_type: '',
     transit_time: '',
     valid_until: ''
@@ -497,7 +530,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           tradeDirections: [] as any[],
           containerTypes: [] as any[],
           containerSizes: [] as any[],
-          carriers: [] as any[]
+          carriers: [] as any[],
+          chargeSides: [] as any[]
         };
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
@@ -545,7 +579,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       setTradeDirections(refData.tradeDirections);
       setContainerTypes(refData.containerTypes);
       setContainerSizes(refData.containerSizes);
-      setCarriers(refData.carriers);
+      setCarriers(uniqueByCarrierName(refData.carriers, resolvedTenantId));
 
       // Set default currency
       if (refData.currencies.length > 0) {
@@ -618,7 +652,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           setViewMode('overview');
         }
         
-        debug.debug('[Composer] Found existing options:', existingOptions.length, 'Selected:', targetId);
+        debug.debug('[Composer] Found existing options:', { count: existingOptions.length, selected: targetId });
         setOptionId(targetId);
         
         // Update URL to include optionId to prevent duplicates on reload
@@ -636,7 +670,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         .from('quotation_version_options')
         .insert({
           quotation_version_id: versionId,
-          tenant_id: resolvedTenantId
+          tenant_id: resolvedTenantId,
+          source: 'composer',
+          source_attribution: 'manual',
+          ai_generated: false
         })
         .select()
         .maybeSingle();
@@ -870,8 +907,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           });
 
           // Resolve references
-          const carrierName = leg.provider_id 
-             ? carriers.find(c => c.id === leg.provider_id)?.carrier_name 
+          const carrierId = leg.carrier_id || leg.provider_id;
+          const carrierName = carrierId 
+             ? carriers.find(c => c.id === carrierId)?.carrier_name 
              : (leg.carrier_name || (leg.leg_type === 'transport' ? optionData?.carrier_name : undefined));
              
           const modeName = leg.mode_id 
@@ -882,6 +920,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             id: leg.id,
             mode: getSafeString(modeName),
             serviceTypeId: leg.service_type_id || '',
+            carrierId: carrierId || undefined,
             carrierName: getSafeString(carrierName),
             origin: getSafeString(leg.origin_location),
             destination: getSafeString(leg.destination_location),
@@ -1273,6 +1312,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const saveBasisConfig = (config: any) => {
     if (!basisTarget) return;
     const size = containerSizes.find(s => s.id === config.containerSize);
+    const sizeName = size ? formatContainerSize(size.name) : '';
 
     if (basisTarget.type === 'leg' && basisTarget.legId) {
       const { legId, chargeIdx } = basisTarget;
@@ -1281,7 +1321,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           const charges = [...leg.charges];
           charges[chargeIdx] = {
             ...charges[chargeIdx],
-            unit: `${config.quantity}x${size?.name || ''}`,
+            unit: `${config.quantity}x${sizeName}`,
             buy: { ...charges[chargeIdx].buy, quantity: config.quantity },
             sell: { ...charges[chargeIdx].sell, quantity: config.quantity },
             basisDetails: config
@@ -1296,7 +1336,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         const next = [...prev];
         next[chargeIdx] = {
           ...next[chargeIdx],
-          unit: `${config.quantity}x${size?.name || ''}`,
+          unit: `${config.quantity}x${sizeName}`,
           buy: { ...(next[chargeIdx].buy || {}), quantity: config.quantity },
           sell: { ...(next[chargeIdx].sell || {}), quantity: config.quantity },
           basisDetails: config
@@ -1360,209 +1400,68 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       const results = aiResponse.data.options;
       const analysis = aiResponse.data.market_analysis;
+      const confidence = aiResponse.data.confidence_score;
 
       // Update market analysis state and persist to version
-      if (analysis) {
-        setMarketAnalysis(analysis);
+      if (analysis || confidence) {
+        if (analysis) setMarketAnalysis(analysis);
+        if (confidence) setConfidenceScore(confidence);
+        
         // Persist analysis to the version header
         await scopedDb
           .from('quotation_versions')
-          .update({ market_analysis: analysis })
+          .update({ 
+            market_analysis: analysis || marketAnalysis,
+            confidence_score: confidence || confidenceScore
+          })
           .eq('id', versionId);
       }
 
-      // Fetch Master Data for resolution
-      const { data: currencies } = await scopedDb.from('currencies').select('id, code');
-      const { data: categories } = await scopedDb.from('charge_categories').select('id, name');
+      // Get Rate Mapper
+      const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
+      if (!logisticsPlugin) {
+        throw new Error('Logistics plugin not initialized');
+      }
 
+      // Fetch Charge Sides for mapper
+      const { data: chargeSides } = await scopedDb.from('charge_sides').select('*');
+
+      const masterData = {
+          currencies: currencies || [],
+          categories: chargeCategories || [],
+          bases: chargeBases || [],
+          serviceTypes: serviceTypes || [],
+          serviceModes: transportModes || [],
+          carriers: carriers || [],
+          sides: chargeSides || []
+      };
+
+      const rateMapper = logisticsPlugin.createRateMapper(masterData);
+
+      // Process options using QuoteOptionService
+      let processedCount = 0;
       for (const result of results) {
-        const mapped = mapOptionToQuote(result);
-        // Use mapped financials if available (preserving source data/logic), otherwise default calculate
-        let financials;
-        if (mapped.buyPrice !== undefined && mapped.marginAmount !== undefined && mapped.buyPrice > 0) {
-            financials = { 
-                buyPrice: mapped.buyPrice, 
-                marginAmount: mapped.marginAmount, 
-                markupPercent: mapped.markupPercent,
-                sellPrice: mapped.total_amount || mapped.sellPrice || 0
-            };
-        } else {
-            // Async Pricing Service Call
-            // Defaults: 15% Margin, Sell-Based (isCostBased=false)
-            const calc = await pricingService.calculateFinancials(mapped.sellPrice, 15, false);
-            
-            // Calculate Markup for backward compatibility (Profit / Cost * 100)
-            let markup = 0;
-            if (calc.buyPrice > 0) {
-                markup = (calc.marginAmount / calc.buyPrice) * 100;
+        try {
+          await quoteOptionService.addOptionToVersion({
+            tenantId,
+            versionId,
+            rate: result,
+            rateMapper,
+            source: 'ai_generated',
+            context: {
+              origin: payload.origin,
+              destination: payload.destination,
             }
-
-            financials = {
-                buyPrice: calc.buyPrice,
-                marginAmount: calc.marginAmount,
-                markupPercent: Number(markup.toFixed(2)),
-                sellPrice: calc.sellPrice
-            };
+          });
+          processedCount++;
+        } catch (optErr) {
+          debug.error('Failed to process smart option:', optErr);
+          // Continue with other options
         }
+      }
 
-        // Resolve Currency (default to USD if not found)
-        const currencyCode = mapped.currency || 'USD';
-        const currencyId = currencies?.find(c => c.code === currencyCode)?.id || currencies?.[0]?.id;
-
-        const { data: optData, error: optError } = await scopedDb
-          .from('quotation_version_options')
-          .insert({
-            quotation_version_id: versionId,
-            tenant_id: tenantId,
-            franchise_id: franchiseId,
-            carrier_name: mapped.carrier,
-            service_type: mapped.serviceType,
-            transit_time: mapped.transitTime,
-            valid_until: mapped.validUntil,
-            option_name: mapped.optionName,
-            reliability_score: mapped.reliability,
-            ai_generated: true,
-            ai_explanation: mapped.aiExplanation,
-            source: 'ai_smart_quote',
-            total_co2_kg: mapped.co2,
-            total_buy: financials.buyPrice,
-            margin_amount: financials.marginAmount,
-            margin_percentage: financials.markupPercent,
-            total_sell: financials.sellPrice,
-            total_amount: financials.sellPrice,
-            quote_currency_id: currencyId
-          })
-          .select()
-          .single();
-
-        if (optError) throw optError;
-
-        // Insert Legs and Charges (Correctly respecting bifurcation)
-        if (mapped.legs && mapped.legs.length > 0) {
-            for (let i = 0; i < mapped.legs.length; i++) {
-                const leg = mapped.legs[i];
-                const legId = crypto.randomUUID();
-                
-                // Determine Service Type ID for leg (if transport)
-                // This is a simplification; ideally we'd look up service types
-                // But for now we rely on the option's service type or generic
-                
-                const { data: legData, error: legError } = await scopedDb
-                  .from('quotation_version_option_legs')
-                  .insert({
-                     id: legId,
-                     quotation_version_option_id: optData.id,
-                     tenant_id: tenantId,
-                     mode: leg.mode || payload.mode,
-                     origin_location: leg.origin || payload.origin,
-                     destination_location: leg.destination || payload.destination,
-                     leg_type: leg.leg_type || 'transport', // mapOptionToQuote now assigns this
-                     carrier_name: leg.carrier || mapped.carrier,
-                     sort_order: i,
-                     transit_time: leg.transit_time
-                  })
-                  .select()
-                  .single();
-
-                if (legError) {
-                    debug.error("Failed to insert leg:", legError);
-                    continue;
-                }
-
-                // Insert Charges for this Leg
-                if (leg.charges && leg.charges.length > 0) {
-                    // Calculate Chargeable Weight for this leg
-                    const weight = Number(quoteData.total_weight) || 0;
-                    const volume = Number(quoteData.total_volume) || 0;
-                    const legMode = (leg.mode || payload.mode || 'ocean').toLowerCase();
-                    
-                    let transportMode: TransportMode = 'ocean';
-                    if (legMode.includes('air')) transportMode = 'air';
-                    else if (legMode.includes('road') || legMode.includes('truck')) transportMode = 'road';
-                    else if (legMode.includes('rail')) transportMode = 'rail';
-                    
-                    const chargeableWeight = calculateChargeableWeight(weight, volume, transportMode);
-
-                    const chargesToInsert = leg.charges.map((c: any) => {
-                        // Resolve Category ID
-                        const cName = (c.name || c.charge_categories?.name || '').toLowerCase();
-                        let category = categories?.find(cat => cat.name.toLowerCase() === cName || cName.includes(cat.name.toLowerCase()));
-                        
-                        // Fallback to 'Freight' or first available category if not found
-                        if (!category && categories && categories.length > 0) {
-                            category = categories.find(cat => cat.name.toLowerCase().includes('freight')) || categories[0];
-                        }
-                        
-                        // Resolve Currency ID
-                        const cCurrency = c.currency || currencyCode;
-                        const cCurrencyId = currencies?.find(cur => cur.code === cCurrency)?.id || currencyId;
-
-                        // Map unit string to basis_id and determine quantity
-                        let basisId = 'fc9fd073-e16b-4064-b915-c0d965351d68'; // Default: Per Shipment
-                        let quantity = 1;
-                        const unitLower = (c.unit || '').toLowerCase();
-                        
-                        if (unitLower.includes('kg') || unitLower.includes('kilogram')) {
-                            basisId = '297dc9e1-b128-4909-a5fc-48ca11f85f3d';
-                            quantity = chargeableWeight;
-                        } else if (unitLower.includes('container') || unitLower.includes('box') || unitLower.includes('teu') || unitLower.includes('feu')) {
-                            basisId = '495e6fc6-e8b3-4d2d-8761-e0135b82b511';
-                            // Default to 1 if container count not available, or parse from quoteData if present
-                            quantity = 1; 
-                        } else if (unitLower.includes('cbm') || unitLower.includes('cubic')) {
-                            basisId = 'ede3ff41-d0d1-40fb-b719-c3ba8fa89d78';
-                            quantity = volume || 1;
-                        } else if (unitLower.includes('mile')) {
-                            basisId = 'fb0e952e-e0be-478b-9616-986528bef6f8';
-                            quantity = 1;
-                        }
-
-                        const rate = c.amount || 0;
-                        const totalAmount = rate * quantity;
-
-                        return {
-                            leg_id: legId,
-                            tenant_id: tenantId,
-                            quote_option_id: optData.id,
-                            category_id: category?.id,
-                            charge_side_id: '0e065e06-1e00-4aa2-8f83-9223abe18a05', // Default to Sell side
-                            basis_id: basisId,
-                            currency_id: cCurrencyId,
-                            unit: c.unit || 'per_shipment',
-                            rate: rate,
-                            quantity: quantity,
-                            amount: totalAmount,
-                            note: c.note || c.name,
-                            sort_order: 0
-                        };
-                    });
-
-                    const { error: chargeError } = await scopedDb
-                        .from('quote_charges')
-                        .insert(chargesToInsert);
-                        
-                    if (chargeError) {
-                         debug.error("Failed to insert leg charges:", chargeError);
-                    }
-                }
-            }
-        } else {
-             // Fallback: Create default leg if mapOptionToQuote failed to produce legs (Unlikely with new logic)
-             const legId = crypto.randomUUID();
-             await scopedDb
-              .from('quotation_version_option_legs')
-              .insert({
-                 id: legId,
-                 quotation_version_option_id: optData.id,
-                 tenant_id: tenantId,
-                 mode: payload.mode,
-                 origin_location: payload.origin,
-                 destination_location: payload.destination,
-                 leg_type: 'transport',
-                 carrier_name: mapped.carrier,
-                 sort_order: 0
-              });
-        }
+      if (processedCount === 0) {
+        throw new Error('Failed to process any of the generated options');
       }
 
       // SYNC: Log to AI Request History
@@ -1744,7 +1643,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             .from('quotation_version_options')
             .insert({
               quotation_version_id: versionId,
-              tenant_id: finalTenantId
+              tenant_id: finalTenantId,
+              source: 'composer',
+              source_attribution: 'manual',
+              ai_generated: false
             })
             .select()
             .maybeSingle();
@@ -1857,7 +1759,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               service_only_category: leg.serviceOnlyCategory || null,
               tenant_id: finalTenantId,
               franchise_id: franchiseId,
-              sort_order: i
+              sort_order: i,
+              carrier_id: leg.carrierId || null,
+              carrier_name: leg.carrierName || null
             })
             .select()
             .single();
@@ -1877,7 +1781,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               // Strict enforcement of leg_type constraint
               leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
               service_only_category: leg.serviceOnlyCategory || null,
-              sort_order: i
+              sort_order: i,
+              carrier_id: leg.carrierId || null,
+              carrier_name: leg.carrierName || null
             })
             .eq('id', legId);
           
@@ -2001,6 +1907,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         const { error: optionError } = await scopedDb
           .from('quotation_version_options')
           .update({
+            carrier_id: quoteData.carrier_id || null,
             carrier_name: quoteData.carrier_name || null,
             service_type: quoteData.service_type || null,
             transit_time: quoteData.transit_time || null,
@@ -2141,6 +2048,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     setNewOptionData({
       option_name: `Option ${options.length + 1}`,
       carrier_name: '',
+      carrier_id: '',
       service_type: '',
       transit_time: '',
       valid_until: ''
@@ -2158,6 +2066,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     setNewOptionData({
       option_name: opt.option_name || '',
       carrier_name: opt.carrier_name || '',
+      carrier_id: opt.carrier_rate_id || '',
       service_type: opt.service_type || '',
       transit_time: opt.transit_time || '',
       valid_until: opt.valid_until ? new Date(opt.valid_until).toISOString().split('T')[0] : ''
@@ -2229,6 +2138,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const payload = {
         option_name: newOptionData.option_name,
         carrier_name: newOptionData.carrier_name,
+        carrier_id: newOptionData.carrier_id || null,
         service_type: newOptionData.service_type,
         transit_time: newOptionData.transit_time,
         valid_until: newOptionData.valid_until || null,
@@ -2263,7 +2173,12 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         // Create new
         const { data, error } = await scopedDb
           .from('quotation_version_options')
-          .insert(payload)
+          .insert({
+            ...payload,
+            source: 'composer',
+            source_attribution: 'manual',
+            ai_generated: false
+          })
           .select()
           .single();
 
@@ -2720,6 +2635,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           onUpdateLeg={updateLeg}
           onRemoveLeg={confirmRemoveLeg}
           validationErrors={validationErrors}
+          carriers={carriers}
         />
       )}
 
@@ -2863,13 +2779,40 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               <Label htmlFor="carrier" className="text-right">
                 Carrier
               </Label>
-              <Input
-                id="carrier"
-                value={newOptionData.carrier_name}
-                onChange={(e) => setNewOptionData({ ...newOptionData, carrier_name: e.target.value })}
-                className="col-span-3"
-                placeholder="e.g. Maersk"
-              />
+              <div className="col-span-3">
+                <Select
+                  value={newOptionData.carrier_id || carriers.find(c => c.carrier_name === newOptionData.carrier_name)?.id || ''}
+                  onValueChange={(val) => {
+                    const selected = carriers.find(c => c.id === val);
+                    if (selected) {
+                      setNewOptionData({ 
+                        ...newOptionData, 
+                        carrier_name: selected.carrier_name,
+                        carrier_id: selected.id 
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={newOptionData.carrier_name || "Select carrier"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {carriers.filter(c => {
+                       const st = (newOptionData.service_type || '').toLowerCase();
+                       if (!st) return true;
+                       if (st.includes('ocean') || st.includes('sea')) return c.carrier_type === 'ocean';
+                       if (st.includes('air')) return c.carrier_type === 'air_cargo';
+                       if (st.includes('road') || st.includes('truck')) return c.carrier_type === 'trucking';
+                       if (st.includes('rail')) return c.carrier_type === 'rail';
+                       return true;
+                    }).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.carrier_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="service" className="text-right">

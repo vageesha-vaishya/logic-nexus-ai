@@ -498,6 +498,35 @@ export default function InvoiceDetail() {
               </CardContent>
               </Card>
             )}
+
+            {/* Shipment Containers (if available) */}
+            {invoice?.metadata?.containers && (invoice.metadata.containers as any[]).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Shipment Containers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Container #</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Size</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(invoice.metadata.containers as any[]).map((c: any, idx: number) => (
+                        <TableRow key={c.container_id || idx}>
+                          <TableCell className="font-mono">{c.container_number}</TableCell>
+                          <TableCell>{c.type || '-'}</TableCell>
+                          <TableCell>{c.size || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

@@ -55,7 +55,8 @@ export class LogisticsPlugin implements IPlugin {
               options: [
                 { label: 'Air Freight', value: 'air' },
                 { label: 'Ocean Freight', value: 'ocean' },
-                { label: 'Road Freight', value: 'road' }
+                { label: 'Road Freight', value: 'road' },
+                { label: 'Rail Freight', value: 'rail' }
               ],
               required: true,
               defaultValue: 'ocean'

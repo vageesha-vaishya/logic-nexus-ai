@@ -40,8 +40,13 @@ import {
     LayoutGrid,
     ListIcon,
     Columns,
+    Ship,
+    Plane,
+    Truck,
+    Train,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatContainerSize } from '@/lib/container-utils';
 
 import { 
     getTierBadge, 
@@ -159,7 +164,7 @@ export function QuoteResultsList({
                                         )}
 
                                     </div>
-                                    <p className="text-sm text-muted-foreground truncate font-medium" title={option.name}>{option.name}</p>
+                                    <p className="text-sm text-muted-foreground truncate font-medium" title={option.name}>{formatContainerSize(option.name)}</p>
                                 </div>
                                 <div className="text-right shrink-0">
                                     <div className="text-xl font-bold text-primary whitespace-nowrap tracking-tight">

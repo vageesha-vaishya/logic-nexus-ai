@@ -22,6 +22,15 @@ export interface PricingResult {
   warnings: string[];
 }
 
+export interface MarginRule {
+  id: string;
+  name: string;
+  condition_json: Record<string, any>;
+  adjustment_type: 'percent' | 'fixed';
+  adjustment_value: number;
+  priority: number;
+}
+
 /**
  * Enterprise Pricing Service
  * Handles complex pricing logic including Tiers, Zones, and Customer Contracts.
@@ -34,6 +43,100 @@ export class PricingService {
 
   static clearCache() {
     PricingService.cache.clear();
+  }
+
+  /**
+   * Fetch Active Margin Rules
+   * Caches rules for 5 minutes.
+   */
+  async getMarginRules(): Promise<MarginRule[]> {
+    const cacheKey = 'margin_rules';
+    const now = Date.now();
+
+    if (PricingService.cache.has(cacheKey)) {
+      const entry = PricingService.cache.get(cacheKey)!;
+      if (now - entry.timestamp < PricingService.CACHE_TTL) {
+        return entry.data;
+      }
+    }
+
+    const { data, error } = await this.supabase
+      .from('margin_rules')
+      .select('*')
+      .order('priority', { ascending: false });
+
+    if (error) {
+      this.debug.error('Failed to fetch margin rules', error);
+      return [];
+    }
+
+    const rules = data || [];
+    PricingService.cache.set(cacheKey, { data: rules, timestamp: now });
+    return rules;
+  }
+
+  /**
+   * Resolve Applicable Margin Rules
+   * Filters rules based on provided context matching condition_json.
+   */
+  async resolveMarginRules(context: Record<string, any>): Promise<MarginRule[]> {
+    const rules = await this.getMarginRules();
+    const applicableRules: MarginRule[] = [];
+
+    for (const rule of rules) {
+      let match = true;
+      for (const [key, value] of Object.entries(rule.condition_json)) {
+        // Simple equality check (can be expanded to support operators like 'gt', 'lt' in future)
+        // If context doesn't have the key, we assume no match (or should we?)
+        // Assuming strict match: context must have key and value must match.
+        if (context[key] != value) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        applicableRules.push(rule);
+      }
+    }
+    return applicableRules;
+  }
+
+  /**
+   * Calculate Price with Dynamic Rules
+   * Applies margin rules to a base cost to determine sell price.
+   * Returns details about applied rules.
+   */
+  async calculatePriceWithRules(cost: number, context: Record<string, any>): Promise<{
+    sellPrice: number;
+    buyPrice: number;
+    marginAmount: number;
+    appliedRules: string[];
+  }> {
+    const rules = await this.resolveMarginRules(context);
+    let sellPrice = cost;
+    const appliedRuleNames: string[] = [];
+
+    // Apply rules (priority ordered)
+    // Logic: Rules add Markup to the Cost/Base
+    for (const rule of rules) {
+      if (rule.adjustment_type === 'percent') {
+         // Percentage Markup on CURRENT accumulated price (compounding) or BASE cost?
+         // Edge function implementation suggests compounding on the running price.
+         sellPrice += sellPrice * (Number(rule.adjustment_value) / 100);
+      } else if (rule.adjustment_type === 'fixed') {
+         sellPrice += Number(rule.adjustment_value);
+      }
+      appliedRuleNames.push(rule.name);
+    }
+    
+    const marginAmount = sellPrice - cost;
+
+    return {
+      sellPrice: Number(sellPrice.toFixed(2)),
+      buyPrice: cost,
+      marginAmount: Number(marginAmount.toFixed(2)),
+      appliedRules: appliedRuleNames
+    };
   }
 
   /**

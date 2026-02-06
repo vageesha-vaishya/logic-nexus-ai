@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useCRM } from '@/hooks/useCRM';
+import { PortsService } from '@/services/PortsService';
 import { Loader2, Upload, FileSpreadsheet, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -22,6 +23,7 @@ interface Rate {
 }
 
 export function RateSheetsTab() {
+  const { supabase, scopedDb } = useCRM();
   const [rates, setRates] = useState<Rate[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -129,7 +131,8 @@ export function RateSheetsTab() {
 
       // Pre-fetch reference data for mapping
       const { data: carriers } = await supabase.from('carriers').select('id, carrier_code, scac, iata');
-      const { data: ports } = await supabase.from('ports_locations').select('id, location_code');
+      const portsService = new PortsService(scopedDb);
+      const ports = await portsService.getAllPorts();
 
       const carrierMap = new Map();
       carriers?.forEach(c => {
