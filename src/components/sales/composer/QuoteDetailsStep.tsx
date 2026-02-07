@@ -1,39 +1,20 @@
-import { supabase } from "@/integrations/supabase/client";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { useState } from 'react';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { calculateChargeableWeight, formatWeight } from '@/utils/freightCalculations';
-import { Plane, Ship, Truck, Sparkles, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { calculateChargeableWeight } from '@/utils/freightCalculations';
+import { Sparkles, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
 import { CargoItem } from '@/types/cargo';
+import { useQuoteStore } from './store/QuoteStore';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-interface QuoteDetailsStepProps {
-  quoteData: {
-    reference?: string;
-    validUntil?: string;
-    notes?: string;
-    currencyId?: string;
-    incoterms?: string;
-    total_weight?: string;
-    total_volume?: string;
-    commodity?: string;
-    hts_code?: string;
-    schedule_b?: string;
-  };
-  currencies: any[];
-  onChange: (field: string, value: any) => void;
-  origin?: string;
-  destination?: string;
-  validationErrors?: string[];
-}
+interface QuoteDetailsStepProps {}
 
 const INCOTERMS = [
   'EXW - Ex Works',
@@ -49,26 +30,22 @@ const INCOTERMS = [
   'CIF - Cost, Insurance and Freight',
 ];
 
-export function QuoteDetailsStep({ quoteData, currencies, onChange, origin, destination, validationErrors = [] }: QuoteDetailsStepProps) {
+export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
+  const { state, dispatch } = useQuoteStore();
+  const { quoteData, validationErrors, referenceData } = state;
+  const { currencies } = referenceData;
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
   const [aiLoading, setAiLoading] = useState(false);
   const [complianceStatus, setComplianceStatus] = useState<{ compliant: boolean; issues: any[] } | null>(null);
 
-  const htsLoader = async (search: string) => {
-    if (!search) return [];
-    const { data } = await supabase
-      .from('aes_hts_codes')
-      .select('id, hts_code, description')
-      .or(`hts_code.ilike.%${search}%,description.ilike.%${search}%`)
-      .limit(20);
-    
-    return (data || []).map(item => ({
-      label: `${item.hts_code} - ${item.description}`,
-      value: item.id,
-      original: item
-    }));
+  const onChange = (field: string, value: any) => {
+    dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { [field]: value } });
   };
+  
+  // Derived values for AI check
+  const origin = quoteData.origin || '';
+  const destination = quoteData.destination || '';
 
   const getFieldError = (field: string) => {
     // Basic mapping of validation errors to fields

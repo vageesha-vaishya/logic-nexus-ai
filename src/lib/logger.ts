@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import * as Sentry from "@sentry/react";
 import { debugStore } from './debug-store';
 
 // Client-side Logger for React/Browser
@@ -247,6 +248,36 @@ class LoggerService {
 
     // Queue for persistence
     this.buffer.push(entry);
+
+    // Sentry Integration for Errors
+    if ([LogLevel.ERROR, LogLevel.CRITICAL, LogLevel.FATAL].includes(level)) {
+      const sentryLevel = (level === LogLevel.CRITICAL ? 'fatal' : level.toLowerCase()) as Sentry.SeverityLevel;
+      Sentry.withScope((scope) => {
+        scope.setLevel(sentryLevel);
+        
+        // Add context data as extras
+        if (entry.context) {
+          scope.setExtras(entry.context);
+        }
+        
+        // Add component tag
+        if (entry.component) {
+          scope.setTag('component', entry.component);
+        }
+
+        // Reconstruct Error object if stack trace is available for better reporting
+        if (entry.context?.stack) {
+          const simulatedError = new Error(entry.message);
+          simulatedError.stack = entry.context.stack;
+          if (entry.context.error_name) {
+            simulatedError.name = entry.context.error_name;
+          }
+          Sentry.captureException(simulatedError);
+        } else {
+          Sentry.captureMessage(entry.message);
+        }
+      });
+    }
 
     // Forward to DebugStore for real-time UI (unless it originated from useDebug)
     // We check both the data object and context for the flag

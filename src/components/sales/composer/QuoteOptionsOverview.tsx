@@ -53,27 +53,30 @@ import {
   getModeIcon,
   getReliabilityColor
 } from '../shared/quote-badges';
+import { useQuoteStore } from './store/QuoteStore';
 import { formatCurrency } from '@/lib/utils';
 
 interface OptionOverviewProps {
-  options: any[];
-  selectedId?: string;
-  onSelect: (id: string) => void;
   onGenerateSmartOptions?: () => void;
-  marketAnalysis?: string | null;
-  confidenceScore?: number | null;
-  anomalies?: any[];
 }
 
 export function QuoteOptionsOverview({ 
-  options, 
-  selectedId, 
-  onSelect, 
   onGenerateSmartOptions,
-  marketAnalysis, 
-  confidenceScore,
-  anomalies 
 }: OptionOverviewProps) {
+  const { state, dispatch } = useQuoteStore();
+  const { 
+    options, 
+    optionId: selectedId, 
+    marketAnalysis, 
+    confidenceScore, 
+    anomalies 
+  } = state;
+
+  const onSelect = (id: string) => {
+    dispatch({ type: 'INITIALIZE', payload: { optionId: id } });
+    dispatch({ type: 'SET_VIEW_MODE', payload: 'composer' });
+  };
+
   const [viewMode, setViewMode] = useState<'card' | 'list' | 'table'>('card');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
@@ -102,7 +105,12 @@ export function QuoteOptionsOverview({
         const pricingService = new PricingService(scopedDb.client);
         
         const enriched = await Promise.all(options.map(async (rawOpt) => {
-            let opt = mapOptionToQuote(rawOpt);
+            // Ensure mode is correctly derived from service_type if not explicit
+            const mode = rawOpt.service_type 
+                ? (rawOpt.service_type.toLowerCase().includes('air') ? 'air' : rawOpt.service_type.toLowerCase().includes('road') ? 'road' : 'sea') 
+                : (rawOpt.mode || 'sea');
+
+            let opt = mapOptionToQuote({ ...rawOpt, mode });
             if (!opt) return null;
 
             // Check if financials are missing (legacy data support)

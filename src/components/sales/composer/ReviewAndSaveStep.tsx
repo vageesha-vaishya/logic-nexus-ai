@@ -2,25 +2,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { DocumentPreview } from './DocumentPreview';
 
-interface Leg {
-  id: string;
-  mode: string;
-  origin: string;
-  destination: string;
-  charges: any[];
-  legType?: 'transport' | 'service';
-  serviceOnlyCategory?: string;
-}
+import { QuoteStoreProvider, useQuoteStore } from './store/QuoteStore';
 
-interface ReviewAndSaveStepProps {
-  legs: Leg[];
-  quoteData: any;
-  currencies: any[];
-  combinedCharges?: any[];
-}
+interface ReviewAndSaveStepProps {}
 
-export function ReviewAndSaveStep({ legs, quoteData, currencies, combinedCharges = [] }: ReviewAndSaveStepProps) {
-  const calculateLegTotal = (leg: Leg, side: 'buy' | 'sell' = 'sell') => {
+
+// Helper to safely render strings
+const getSafeName = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') return val.name || val.code || val.description || '';
+  return String(val);
+};
+
+export function ReviewAndSaveStep({}: ReviewAndSaveStepProps) {
+  const { state } = useQuoteStore();
+  const { legs, quoteData, charges: combinedCharges, referenceData } = state;
+  const { currencies } = referenceData;
+
+  const calculateLegTotal = (leg: any, side: 'buy' | 'sell' = 'sell') => {
     return leg.charges.reduce((acc, charge) => {
       const qty = charge[side]?.quantity || 0;
       const rate = charge[side]?.rate || 0;

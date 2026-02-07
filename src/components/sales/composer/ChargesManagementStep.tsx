@@ -7,71 +7,132 @@ import { Plus, Globe, Loader2 } from 'lucide-react';
 import { VirtualChargesList } from './VirtualChargesList';
 import { ChargeRow } from './ChargeRow';
 import { HelpTooltip } from './HelpTooltip';
-
-interface Leg {
-  id: string;
-  mode: string;
-  serviceTypeId: string;
-  origin: string;
-  destination: string;
-  charges: any[];
-  legType?: 'transport' | 'service';
-  serviceOnlyCategory?: string;
-}
+import { useQuoteStore } from './store/QuoteStore';
+import { Leg } from './store/types';
 
 interface ChargesManagementStepProps {
-  legs: Leg[];
-  combinedCharges?: any[];
-  chargeCategories: any[];
-  chargeBases: any[];
-  currencies: any[];
-  tradeDirections: any[];
-  containerTypes: any[];
-  containerSizes: any[];
-  serviceTypes: any[];
-  autoMargin: boolean;
-  marginPercent: number;
-  onAutoMarginChange: (enabled: boolean) => void;
-  onMarginPercentChange: (percent: number) => void;
-  onAddCharge: (legId: string) => void;
-  onUpdateCharge: (legId: string, chargeIdx: number, field: string, value: any) => void;
-  onRemoveCharge: (legId: string, chargeIdx: number) => void;
-  onConfigureBasis: (legId: string, chargeIdx: number) => void;
-  onAddCombinedCharge?: () => void;
-  onUpdateCombinedCharge?: (chargeIdx: number, field: string, value: any) => void;
-  onRemoveCombinedCharge?: (chargeIdx: number) => void;
-  onConfigureCombinedBasis?: (chargeIdx: number) => void;
+  // Handlers for side effects not in store (e.g., fetching rates)
   onFetchRates?: (legId: string) => void;
-  validationErrors?: string[];
-  isPricingCalculating?: boolean;
+  onConfigureBasis?: (legId: string, chargeIdx: number) => void;
+  onConfigureCombinedBasis?: (chargeIdx: number) => void;
 }
 
 export function ChargesManagementStep({
-  legs,
-  combinedCharges = [],
-  chargeCategories,
-  chargeBases,
-  currencies,
-  tradeDirections,
-  containerTypes,
-  containerSizes,
-  serviceTypes,
-  autoMargin,
-  marginPercent,
-  onAutoMarginChange,
-  onMarginPercentChange,
-  onAddCharge,
-  onUpdateCharge,
-  onRemoveCharge,
-  onConfigureBasis,
-  onAddCombinedCharge,
-  onUpdateCombinedCharge,
-  onRemoveCombinedCharge,
-  onConfigureCombinedBasis,
   onFetchRates,
-  validationErrors = [],
-  isPricingCalculating = false
+  onConfigureBasis,
+  onConfigureCombinedBasis,
 }: ChargesManagementStepProps) {
+  const { state, dispatch } = useQuoteStore();
+  const { 
+    legs, 
+    charges: combinedCharges, 
+    quoteData, 
+    validationErrors,
+    isLoading: isPricingCalculating, // Assuming isLoading covers pricing calc for now, or add specific state
+    referenceData
+  } = state;
+
+  const {
+    chargeCategories,
+    chargeBases,
+    currencies,
+    tradeDirections,
+    containerTypes,
+    containerSizes,
+    serviceTypes
+  } = referenceData;
+
+  const autoMargin = quoteData.autoMargin || false;
+  const marginPercent = quoteData.marginPercent || 15;
+
+  const handleAutoMarginChange = (enabled: boolean) => {
+    dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { autoMargin: enabled } });
+  };
+
+  const handleMarginPercentChange = (percent: number) => {
+    dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { marginPercent: percent } });
+  };
+
+  // Leg Charge Handlers
+  const handleAddCharge = (legId: string) => {
+    const leg = legs.find(l => l.id === legId);
+    if (!leg) return;
+
+    const newCharge = {
+      id: crypto.randomUUID(),
+      category: '',
+      basis: 'Per Shipment',
+      unit: 'Shipment',
+      currency: 'USD',
+      buy: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
+      sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' }
+    };
+
+    const updatedCharges = [...(leg.charges || []), newCharge];
+    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+  };
+
+  const handleUpdateCharge = (legId: string, chargeIdx: number, field: string, value: any) => {
+    const leg = legs.find(l => l.id === legId);
+    if (!leg) return;
+
+    const updatedCharges = [...(leg.charges || [])];
+    if (updatedCharges[chargeIdx]) {
+      updatedCharges[chargeIdx] = { ...updatedCharges[chargeIdx], [field]: value };
+      
+      // Auto-calc amounts if quantity/rate changes
+      // This logic might be complex if nested fields (buy.rate) are passed as field path
+      // But VirtualChargesList usually passes 'buy' or 'sell' object, or top level field.
+      // If VirtualChargesList passes nested updates, we need to handle them.
+      // Based on typical usage, it might be passing the whole modified charge or handling field updates specifically.
+      // Let's assume field is top-level or handled by caller, but if field is 'buy' or 'sell', we might need to recalc totals.
+      // For now, trust the value passed is correct.
+      
+      dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+    }
+  };
+
+  const handleRemoveCharge = (legId: string, chargeIdx: number) => {
+    const leg = legs.find(l => l.id === legId);
+    if (!leg) return;
+
+    const updatedCharges = leg.charges.filter((_, i) => i !== chargeIdx);
+    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+  };
+
+  // Combined Charge Handlers
+  const handleAddCombinedCharge = () => {
+    const newCharge = {
+      id: crypto.randomUUID(),
+      category: '',
+      basis: 'Per Shipment',
+      unit: 'Shipment',
+      currency: 'USD',
+      buy: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
+      sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' }
+    };
+    dispatch({ type: 'ADD_COMBINED_CHARGE', payload: newCharge });
+  };
+
+  const handleUpdateCombinedCharge = (chargeIdx: number, field: string, value: any) => {
+    // We need the current charge to update it
+    const charge = combinedCharges[chargeIdx];
+    if (charge) {
+       const updatedCharge = { ...charge, [field]: value };
+       dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
+    }
+  };
+
+  const handleRemoveCombinedCharge = (chargeIdx: number) => {
+    dispatch({ type: 'REMOVE_COMBINED_CHARGE', payload: chargeIdx });
+  };
+
+  // Helper for rendering
+  const getSafeName = (name: any) => {
+    if (typeof name === 'string') return name;
+    return String(name || '');
+  };
+
   const calculateTotals = (charges: any[]) => {
     return charges.reduce((acc, charge) => ({
       buy: acc.buy + ((charge.buy?.quantity || 0) * (charge.buy?.rate || 0)),
@@ -82,17 +143,14 @@ export function ChargesManagementStep({
   const renderTotals = (totals: { buy: number; sell: number }, margin: number, marginPercent: string) => (
     <div className="bg-muted/30 font-semibold border-t p-2 flex items-center gap-2 text-sm mt-2">
       <div className="flex-1 text-right pr-2">Totals:</div>
-      {/* Align with Buy Amt (approx) */}
       <div className="w-[120px] text-right px-2 border-r border-border/50">
         <span className="text-xs text-muted-foreground mr-1">Buy:</span>
         {totals.buy.toFixed(2)}
       </div>
-      {/* Align with Sell Amt */}
       <div className="w-[120px] text-right px-2 border-r border-border/50">
         <span className="text-xs text-muted-foreground mr-1">Sell:</span>
         {totals.sell.toFixed(2)}
       </div>
-      {/* Align with Margin */}
       <div className={`w-[120px] text-right px-2 ${margin >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
         <span className="text-xs text-muted-foreground mr-1">Margin:</span>
         {margin.toFixed(2)} ({marginPercent}%)
@@ -100,7 +158,7 @@ export function ChargesManagementStep({
     </div>
   );
 
-  if (legs.length === 0) {
+  if (!legs || legs.length === 0) {
     return (
       <Card>
         <CardContent className="py-12">
@@ -128,7 +186,7 @@ export function ChargesManagementStep({
             <input
               type="checkbox"
               checked={autoMargin}
-              onChange={(e) => onAutoMarginChange(e.target.checked)}
+              onChange={(e) => handleAutoMarginChange(e.target.checked)}
               id="auto-margin"
               className="h-4 w-4 rounded border-border"
             />
@@ -149,7 +207,7 @@ export function ChargesManagementStep({
               <Input
                 type="number"
                 value={marginPercent}
-                onChange={(e) => onMarginPercentChange(Number(e.target.value))}
+                onChange={(e) => handleMarginPercentChange(Number(e.target.value))}
                 className="w-20"
                 min={0}
                 max={100}
@@ -180,12 +238,9 @@ export function ChargesManagementStep({
           </TabsList>
 
           {legs.map((leg, legIdx) => {
-            const totals = calculateTotals(leg.charges);
+            const totals = calculateTotals(leg.charges || []);
             const margin = totals.sell - totals.buy;
-            // Calculate Profit Margin % (Profit / Sell) to match Auto-Margin input logic
-            const marginPercent = totals.sell > 0 ? ((margin / totals.sell) * 100).toFixed(2) : '0.00';
-            // Also calculate Markup % (Profit / Cost) for reference if needed, but display Margin % as primary
-            const markupPercent = totals.buy > 0 ? ((margin / totals.buy) * 100).toFixed(2) : '0.00';
+            const marginPercentVal = totals.sell > 0 ? ((margin / totals.sell) * 100).toFixed(2) : '0.00';
 
             const serviceType = serviceTypes.find((st) =>
               st.id === leg.serviceTypeId ||
@@ -212,26 +267,26 @@ export function ChargesManagementStep({
                         Fetch Rates
                       </Button>
                     )}
-                    <Button onClick={() => onAddCharge(leg.id)} size="sm">
+                    <Button onClick={() => handleAddCharge(leg.id)} size="sm">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Charge
                     </Button>
                   </div>
                 </div>
 
-                {leg.charges.length > 0 ? (
+                {leg.charges && leg.charges.length > 0 ? (
                   <div>
                     <VirtualChargesList
                       charges={leg.charges}
                       categories={chargeCategories}
                       bases={chargeBases}
                       currencies={currencies}
-                      onUpdate={(idx, field, value) => onUpdateCharge(leg.id, idx, field, value)}
-                      onRemove={(idx) => onRemoveCharge(leg.id, idx)}
-                      onConfigureBasis={(idx) => onConfigureBasis(leg.id, idx)}
+                      onUpdate={(idx, field, value) => handleUpdateCharge(leg.id, idx, field, value)}
+                      onRemove={(idx) => handleRemoveCharge(leg.id, idx)}
+                      onConfigureBasis={(idx) => onConfigureBasis?.(leg.id, idx)}
                       height={400}
                     />
-                    {renderTotals(totals, margin, marginPercent)}
+                    {renderTotals(totals, margin, marginPercentVal)}
                   </div>
                 ) : (
                   <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">
@@ -243,82 +298,80 @@ export function ChargesManagementStep({
               </TabsContent>
             );
           })}
-      </Tabs>
+        </Tabs>
 
-      {/* Combined Charges */}
-      <Card className="mt-6 border-2">
-        <CardHeader className="bg-muted/20">
-          <CardTitle>Combined Charges</CardTitle>
-          <CardDescription>Charges applicable across all legs (e.g., documentation, insurance)</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">These charges apply to the entire shipment</p>
-            </div>
-            {onAddCombinedCharge && (
-              <Button onClick={() => onAddCombinedCharge?.()} size="sm" variant="outline">
+        {/* Combined Charges */}
+        <Card className="mt-6 border-2">
+          <CardHeader className="bg-muted/20">
+            <CardTitle>Combined Charges</CardTitle>
+            <CardDescription>Charges applicable across all legs (e.g., documentation, insurance)</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">These charges apply to the entire shipment</p>
+              </div>
+              <Button onClick={handleAddCombinedCharge} size="sm" variant="outline">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Combined Charge
               </Button>
-            )}
-          </div>
+            </div>
 
-          {combinedCharges.length > 0 ? (
-            <div className="overflow-x-auto border rounded-lg shadow-sm">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="p-3 text-left font-semibold">Category</th>
-                    <th className="p-3 text-left font-semibold">Basis</th>
-                    <th className="p-3 text-left font-semibold">Unit</th>
-                    <th className="p-3 text-left font-semibold">Currency</th>
-                    <th className="p-3 text-right font-semibold">Buy Qty</th>
-                    <th className="p-3 text-right font-semibold">Buy Rate</th>
-                    <th className="p-3 text-right font-semibold">Buy Amt</th>
-                    <th className="p-3 text-center font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {combinedCharges.map((charge, idx) => (
-                    <ChargeRow
-                      key={charge.id || `combined-${idx}`}
-                      charge={charge}
-                      categories={chargeCategories}
-                      bases={chargeBases}
-                      currencies={currencies}
-                      onUpdate={(field, value) => onUpdateCombinedCharge?.(idx, field, value)}
-                      onRemove={() => onRemoveCombinedCharge?.(idx)}
-                      onConfigureBasis={() => onConfigureCombinedBasis?.(idx)}
-                      showBuySell={true}
-                    />
-                  ))}
-                </tbody>
-                <tfoot className="bg-muted/30 font-semibold border-t-2">
-                  <tr>
-                    <td colSpan={6} className="p-3 text-right">Totals:</td>
-                    <td className="p-3 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
-                    <td colSpan={2} className="p-3"></td>
-                    <td className="p-3 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
-                    <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                      {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
-                      {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">
-              <Plus className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-base font-medium">No combined charges yet</p>
-              <p className="text-sm mt-1">Add charges that apply to the entire shipment</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </CardContent>
-  </Card>
+            {combinedCharges && combinedCharges.length > 0 ? (
+              <div className="overflow-x-auto border rounded-lg shadow-sm">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="p-3 text-left font-semibold">Category</th>
+                      <th className="p-3 text-left font-semibold">Basis</th>
+                      <th className="p-3 text-left font-semibold">Unit</th>
+                      <th className="p-3 text-left font-semibold">Currency</th>
+                      <th className="p-3 text-right font-semibold">Buy Qty</th>
+                      <th className="p-3 text-right font-semibold">Buy Rate</th>
+                      <th className="p-3 text-right font-semibold">Buy Amt</th>
+                      <th className="p-3 text-center font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {combinedCharges.map((charge, idx) => (
+                      <ChargeRow
+                        key={charge.id || `combined-${idx}`}
+                        charge={charge}
+                        categories={chargeCategories}
+                        bases={chargeBases}
+                        currencies={currencies}
+                        onUpdate={(field, value) => handleUpdateCombinedCharge(idx, field, value)}
+                        onRemove={() => handleRemoveCombinedCharge(idx)}
+                        onConfigureBasis={() => onConfigureCombinedBasis?.(idx)}
+                        showBuySell={true}
+                      />
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-muted/30 font-semibold border-t-2">
+                    <tr>
+                      <td colSpan={6} className="p-3 text-right">Totals:</td>
+                      <td className="p-3 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
+                      <td colSpan={2} className="p-3"></td>
+                      <td className="p-3 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
+                      <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                        {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
+                        {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">
+                <Plus className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-base font-medium">No combined charges yet</p>
+                <p className="text-sm mt-1">Add charges that apply to the entire shipment</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </CardContent>
+    </Card>
   );
 }

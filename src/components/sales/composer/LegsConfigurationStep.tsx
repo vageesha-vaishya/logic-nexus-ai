@@ -4,39 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, MapPin, Package, Truck, Loader2 } from 'lucide-react';
+import { Trash2, MapPin, Package, Truck, Loader2, Train, Ship, Plane } from 'lucide-react';
 import { TransportModeSelector } from './TransportModeSelector';
 import { HelpTooltip } from './HelpTooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useQuoteStore } from './store/QuoteStore';
+import { Leg } from './store/types';
+import { useCRM } from '@/hooks/useCRM';
 
-interface Leg {
-  id: string;
-  mode: string;
-  serviceTypeId: string;
-  origin: string;
-  destination: string;
-  charges: any[];
-  legType?: 'transport' | 'service';
-  serviceOnlyCategory?: string;
-  carrierName?: string;
-  carrierId?: string;
-}
-
-interface LegsConfigurationStepProps {
-  legs: Leg[];
-  serviceTypes: any[];
-  onAddLeg: (mode: string) => void;
-  onUpdateLeg: (legId: string, updates: Partial<Leg>) => void;
-  onRemoveLeg: (legId: string) => void;
-  validationErrors?: string[];
-  carriers?: any[];
-}
+interface LegsConfigurationStepProps {}
 
 function LocationAutocomplete({ 
   value, 
@@ -116,20 +97,38 @@ function LocationAutocomplete({
   );
 }
 
-export function LegsConfigurationStep({
-  legs,
-  serviceTypes,
-  onAddLeg,
-  onUpdateLeg,
-  onRemoveLeg,
-  validationErrors = [],
-  carriers = []
-}: LegsConfigurationStepProps) {
+export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
+  const { state, dispatch } = useQuoteStore();
+  const { legs, validationErrors, referenceData } = state;
+  const { serviceTypes = [], carriers = [] } = referenceData || {};
+  const { scopedDb } = useCRM();
+
+  const onAddLeg = (mode: string) => {
+    const newLeg: Leg = {
+      id: crypto.randomUUID(),
+      mode,
+      serviceTypeId: '',
+      origin: '',
+      destination: '',
+      charges: [],
+      legType: 'transport'
+    };
+    dispatch({ type: 'ADD_LEG', payload: newLeg });
+  };
+
+  const onUpdateLeg = (id: string, updates: Partial<Leg>) => {
+    dispatch({ type: 'UPDATE_LEG', payload: { id, updates } });
+  };
+
+  const onRemoveLeg = (id: string) => {
+    dispatch({ type: 'REMOVE_LEG', payload: id });
+  };
+
   // Fetch service leg categories
   const { data: serviceCategories } = useQuery({
     queryKey: ['service-leg-categories'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from('service_leg_categories')
         .select('*')
         .eq('is_active', true)
@@ -194,10 +193,7 @@ export function LegsConfigurationStep({
               const legErrors = getLegErrors(index);
               const hasError = legErrors.length > 0;
               
-              const originError = legErrors.find(e => e.includes('Origin'));
-              const destError = legErrors.find(e => e.includes('Destination'));
               const serviceTypeError = legErrors.find(e => e.includes('Service Type'));
-              const serviceCategoryError = legErrors.find(e => e.includes('Service Category'));
               
               return (
                 <Card key={leg.id} className={`border-2 ${hasError ? 'border-destructive/50' : ''}`}>

@@ -39,18 +39,8 @@ import { logger } from '@/lib/logger';
 import { useDebug } from '@/hooks/useDebug';
 import { formatContainerSize } from '@/lib/container-utils';
 
-interface Leg {
-  id: string;
-  mode: string;
-  serviceTypeId: string;
-  origin: string;
-  destination: string;
-  charges: any[];
-  legType?: 'transport' | 'service';
-  serviceOnlyCategory?: string;
-  carrierName?: string;
-  carrierId?: string;
-}
+import { QuoteStoreProvider, useQuoteStore } from './composer/store/QuoteStore';
+import { Leg } from './composer/store/types';
 
 interface MultiModalQuoteComposerProps {
   quoteId: string;
@@ -79,11 +69,22 @@ const getSafeString = (val: any, fallback: string = '') => {
   return String(val);
 };
 
-export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId }: MultiModalQuoteComposerProps) {
+export function MultiModalQuoteComposer(props: MultiModalQuoteComposerProps) {
+  return (
+    <QuoteStoreProvider>
+      <MultiModalQuoteComposerContent {...props} />
+    </QuoteStoreProvider>
+  );
+}
+
+function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId }: MultiModalQuoteComposerProps) {
   const { scopedDb, context } = useCRM();
   const debug = useDebug('Sales', 'QuoteComposer');
   const { toast } = useToast();
   const { invokeAiAdvisor } = useAiAdvisor();
+  
+  // Initialize Store
+  const { state: storeState, dispatch } = useQuoteStore();
   
   // Initialize Services
   const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
@@ -91,25 +92,35 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   
   const debounceTimers = useRef(new Map<string, NodeJS.Timeout>());
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
+  // State Migration: currentStep is now managed by the store
+  const currentStep = storeState.currentStep;
+  const setCurrentStep = (step: number) => dispatch({ type: 'SET_STEP', payload: step });
+
+  // Map store state to local variables for compatibility
+  const { 
+    tenantId, 
+    optionId, 
+    isSaving: saving, 
+    isLoading: loading,
+    quoteData,
+    legs,
+    charges: combinedCharges,
+    validationErrors,
+    validationWarnings,
+    autoMargin,
+    marginPercent,
+    marketAnalysis,
+    confidenceScore,
+    anomalies,
+    options,
+    viewMode
+  } = storeState;
+
   const [connectionStatus, setConnectionStatus] = useState<'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('SUBSCRIBED');
   const [pricingRequestsCount, setPricingRequestsCount] = useState(0);
   const isPricingCalculating = pricingRequestsCount > 0;
-  const [saving, setSaving] = useState(false);
-  const [optionId, setOptionId] = useState<string | null>(initialOptionId || null);
-  const [legs, setLegs] = useState<Leg[]>([]);
-  const [combinedCharges, setCombinedCharges] = useState<any[]>([]);
-  const [quoteData, setQuoteData] = useState<any>({});
-  const [autoMargin, setAutoMargin] = useState(false);
-  const [marginPercent, setMarginPercent] = useState(15);
-  const [tenantId, setTenantId] = useState<string | null>(null);
-  const [franchiseId, setFranchiseId] = useState<string | null>(null);
-  const [options, setOptions] = useState<any[]>([]); // Store all available options
-  const [viewMode, setViewMode] = useState<'overview' | 'composer'>('composer');
-  const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
-  const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
-  const [anomalies, setAnomalies] = useState<any[]>([]);
+  
+  // Local state for UI interactions not persisted in store
   const [isGeneratingSmart, setIsGeneratingSmart] = useState(false);
   
   // Track charges to delete
@@ -131,21 +142,6 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     steps: []
   });
   
-  // Validation feedback
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
-
-  // Reference data
-  const [serviceTypes, setServiceTypes] = useState<any[]>([]);
-  const [chargeCategories, setChargeCategories] = useState<any[]>([]);
-  const [chargeBases, setChargeBases] = useState<any[]>([]);
-  const [currencies, setCurrencies] = useState<any[]>([]);
-  const [tradeDirections, setTradeDirections] = useState<any[]>([]);
-  const [containerTypes, setContainerTypes] = useState<any[]>([]);
-  const [containerSizes, setContainerSizes] = useState<any[]>([]);
-  const [carriers, setCarriers] = useState<any[]>([]);
-  const [chargeSides, setChargeSides] = useState<any[]>([]);
-
   const uniqueByCarrierName = (arr: any[], preferredTenantId?: string | null) => {
     try {
       const map: Record<string, any> = {};
@@ -179,8 +175,19 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   });
   const [basisTarget, setBasisTarget] = useState<{ type: 'leg' | 'combined'; legId?: string; chargeIdx: number } | null>(null);
 
-  // Transport modes for mode-to-service-type mapping
-  const [transportModes, setTransportModes] = useState<any[]>([]);
+  // Access reference data from store
+  const {
+    serviceTypes,
+    transportModes,
+    chargeCategories,
+    chargeBases,
+    currencies,
+    tradeDirections,
+    containerTypes,
+    containerSizes,
+    carriers,
+    chargeSides
+  } = storeState.referenceData;
 
   // Option management state
   const [optionDialogOpen, setOptionDialogOpen] = useState(false);
@@ -273,7 +280,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   const loadInitialData = async () => {
     debug.debug('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
     
     const errors: string[] = [];
     
@@ -330,7 +337,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         debug.error('[Composer] Failed to resolve tenant ID after all attempts');
         errors.push('Could not determine tenant context');
       } else {
-        setTenantId(resolvedTenantId);
+        dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
       }
 
       // Always fetch quote details if quoteId is present to populate context
@@ -404,14 +411,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
               if (resolvedTenantId) {
                  debug.log('[Composer] Resolved tenant from full quote load:', resolvedTenantId);
-                 setTenantId(resolvedTenantId);
+                 dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
               }
             }
             
-            if ((quoteRow as any)?.franchise_id) {
-              setFranchiseId((quoteRow as any).franchise_id);
-            }
-
             // Normalize quote data for consumption
             const raw = quoteRow as any;
             const cargoDetails = raw.cargo_details;
@@ -439,10 +442,11 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 commodity: getSafeString(validCargoDetails?.commodity) || derivedCommodity || '',
                 mode: raw.transport_mode || 'ocean',
                 total_weight: calculatedTotalWeight,
-                total_volume: calculatedTotalVolume
+                total_volume: calculatedTotalVolume,
+                franchiseId: (quoteRow as any)?.franchise_id // Include franchiseId in quoteData
             };
 
-            setQuoteData(normalizedQuote);
+            dispatch({ type: 'UPDATE_QUOTE_DATA', payload: normalizedQuote });
           }
         } catch (error: any) {
           debug.error('[Composer] Exception fetching quote', { 
@@ -468,19 +472,27 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           } else if (versionRow) {
             if (!resolvedTenantId && (versionRow as any)?.tenant_id) {
                 resolvedTenantId = (versionRow as any).tenant_id;
-                setTenantId(resolvedTenantId);
+                dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
             }
-            setMarketAnalysis((versionRow as any)?.market_analysis ?? null);
-            setConfidenceScore((versionRow as any)?.confidence_score ?? null);
-            setAnomalies((versionRow as any)?.anomalies ?? []);
+            
+            dispatch({ 
+              type: 'INITIALIZE', 
+              payload: {
+                marketAnalysis: (versionRow as any)?.market_analysis ?? null,
+                confidenceScore: (versionRow as any)?.confidence_score ?? null,
+                anomalies: (versionRow as any)?.anomalies ?? []
+              } 
+            });
 
             // Load HTS/AES data if present
             if ((versionRow as any).aes_hts_id) {
-              setQuoteData((prev: any) => ({
-                ...prev,
-                aes_hts_id: (versionRow as any).aes_hts_id,
-                hts_code: (versionRow as any).aes_hts_codes?.hts_code
-              }));
+              dispatch({ 
+                type: 'UPDATE_QUOTE_DATA', 
+                payload: {
+                  aes_hts_id: (versionRow as any).aes_hts_id,
+                  hts_code: (versionRow as any).aes_hts_codes?.hts_code
+                } 
+              });
             }
           }
         } catch (error: any) {
@@ -505,7 +517,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             logger.error('[Composer] Error fetching option', { error: optionError, component: 'MultiModalQuoteComposer' });
           } else if (optionRow) {
             resolvedTenantId = (optionRow as any)?.tenant_id ?? null;
-            if (resolvedTenantId) setTenantId(resolvedTenantId);
+            if (resolvedTenantId) dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
             debug.debug('[Composer] Resolved tenant from option:', resolvedTenantId);
           }
         } catch (error: any) {
@@ -570,20 +582,27 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       };
 
       const refData = await loadReferenceData();
-      
-      setServiceTypes(refData.serviceTypes);
-      setTransportModes(refData.transportModes);
-      setChargeCategories(refData.chargeCategories);
-      setChargeBases(refData.chargeBases);
-      setCurrencies(refData.currencies);
-      setTradeDirections(refData.tradeDirections);
-      setContainerTypes(refData.containerTypes);
-      setContainerSizes(refData.containerSizes);
-      setCarriers(uniqueByCarrierName(refData.carriers, resolvedTenantId));
+      const uniqueCarriers = uniqueByCarrierName(refData.carriers, resolvedTenantId);
+
+      dispatch({
+        type: 'SET_REFERENCE_DATA',
+        payload: {
+          serviceTypes: refData.serviceTypes,
+          transportModes: refData.transportModes,
+          chargeCategories: refData.chargeCategories,
+          chargeBases: refData.chargeBases,
+          currencies: refData.currencies,
+          tradeDirections: refData.tradeDirections,
+          containerTypes: refData.containerTypes,
+          containerSizes: refData.containerSizes,
+          carriers: uniqueCarriers,
+          chargeSides: refData.chargeSides
+        }
+      });
 
       // Set default currency
       if (refData.currencies.length > 0) {
-        setQuoteData((prev: any) => ({ ...prev, currencyId: refData.currencies[0].id }));
+        dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { currencyId: refData.currencies[0].id } });
         debug.debug('[Composer] Set default currency:', refData.currencies[0].id);
       }
 
@@ -605,7 +624,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       debug.error('[Composer] Critical error in loadInitialData:', error);
       toast({ title: 'Error', description: 'Failed to initialize composer: ' + error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -633,7 +652,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
 
       if (existingOptions && existingOptions.length > 0) {
-        setOptions(existingOptions);
+        dispatch({ type: 'SET_OPTIONS', payload: existingOptions });
         
         // If initialOptionId is provided, use it.
         // Otherwise, if current optionId exists in list, keep it.
@@ -642,18 +661,18 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         
         if (initialOptionId && existingOptions.some((o: any) => o.id === initialOptionId)) {
           targetId = initialOptionId;
-          setViewMode('composer');
+          dispatch({ type: 'SET_VIEW_MODE', payload: 'composer' });
         } else if (optionId && existingOptions.some((o: any) => o.id === optionId)) {
           targetId = optionId;
           // If we have data, default to overview unless explicitly editing?
           // Let's default to overview for now to show off the new UI
-          setViewMode('overview');
+          dispatch({ type: 'SET_VIEW_MODE', payload: 'overview' });
         } else {
-          setViewMode('overview');
+          dispatch({ type: 'SET_VIEW_MODE', payload: 'overview' });
         }
         
         debug.debug('[Composer] Found existing options:', { count: existingOptions.length, selected: targetId });
-        setOptionId(targetId);
+        dispatch({ type: 'INITIALIZE', payload: { optionId: targetId } });
         
         // Update URL to include optionId to prevent duplicates on reload
         const url = new URL(window.location.href);
@@ -691,9 +710,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         if (retry?.id) {
           debug.debug('[Composer] Option found on retry:', retry.id);
-          setOptionId(retry.id);
-          setOptions([retry]);
-          setViewMode('composer');
+          dispatch({ type: 'INITIALIZE', payload: { optionId: retry.id } });
+          dispatch({ type: 'SET_OPTIONS', payload: [retry] });
+          dispatch({ type: 'SET_VIEW_MODE', payload: 'composer' });
           
           // Update URL
           const url = new URL(window.location.href);
@@ -705,9 +724,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
       if (newOption?.id) {
         debug.debug('[Composer] Created new option:', newOption.id);
-        setOptionId(newOption.id);
-        setOptions([newOption]);
-        setViewMode('composer');
+        dispatch({ type: 'INITIALIZE', payload: { optionId: newOption.id } });
+        dispatch({ type: 'SET_OPTIONS', payload: [newOption] });
+        dispatch({ type: 'SET_VIEW_MODE', payload: 'composer' });
         
         // Update URL with new optionId
         const url = new URL(window.location.href);
@@ -750,7 +769,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .maybeSingle();
         resolved = (o as any)?.tenant_id ?? null;
       }
-      if (resolved) setTenantId(resolved);
+      if (resolved) dispatch({ type: 'INITIALIZE', payload: { tenantId: resolved } });
       return resolved;
     } catch {
       return null;
@@ -761,7 +780,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     if (!optionId || !tenantId) return;
 
     debug.debug('[Composer] Loading option data for:', { optionId, tenantId });
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
       // Parallel fetch of legs, global charges, and option details
       const [legResult, chargeResult, optionResult] = await Promise.all([
@@ -807,20 +826,19 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (chargeError) throw chargeError;
       // optionError might occur if option deleted, but less likely here. Ignore if just missing (handled by if check)
 
-      debug.debug('[Composer] Loaded legs:', legData?.length, 'Global charges:', chargeData?.length);
+      debug.debug(`[Composer] Loaded legs: ${legData?.length}, Global charges: ${chargeData?.length}`);
 
       // Always update quoteData with option specifics to ensure UI reflects current option
       if (optionData) {
-        setQuoteData(prev => ({
-          ...prev,
+        dispatch({ type: 'UPDATE_QUOTE_DATA', payload: {
           carrier_name: getSafeString(optionData.carrier_name),
           service_type: getSafeString(optionData.service_type),
           transit_time: getSafeString(optionData.transit_time),
-          validUntil: optionData.valid_until ? new Date(optionData.valid_until).toISOString().split('T')[0] : prev.validUntil,
-          currencyId: optionData.quote_currency_id || prev.currencyId,
+          validUntil: optionData.valid_until ? new Date(optionData.valid_until).toISOString().split('T')[0] : quoteData.validUntil,
+          currencyId: optionData.quote_currency_id || quoteData.currencyId,
           option_name: getSafeString(optionData.option_name),
           ai_generated: optionData.ai_generated || false
-        }));
+        }});
       }
 
       // Process global charges
@@ -862,9 +880,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           }
         });
         
-        setCombinedCharges(Array.from(globalChargesMap.values()));
+        dispatch({ type: 'SET_CHARGES', payload: Array.from(globalChargesMap.values()) });
       } else {
-        setCombinedCharges([]);
+        dispatch({ type: 'SET_CHARGES', payload: [] });
       }
 
       if (legData && legData.length > 0) {
@@ -931,15 +949,15 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           };
         });
 
-        setLegs(legsWithCharges);
+        dispatch({ type: 'SET_LEGS', payload: legsWithCharges });
       } else {
-        setLegs([]);
+        dispatch({ type: 'SET_LEGS', payload: [] });
       }
     } catch (error: any) {
       debug.error('[Composer] Error loading option data:', error);
       toast({ title: 'Error loading data', description: error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -967,7 +985,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       charges: [],
       legType: 'transport',
     };
-    setLegs([...legs, newLeg]);
+    dispatch({ type: 'ADD_LEG', payload: newLeg });
     
     // Show toast if service type was auto-selected
     if (defaultServiceType) {
@@ -979,38 +997,38 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const updateLeg = (legId: string, updates: Partial<Leg>) => {
-    setLegs(legs.map(leg => {
-      if (leg.id === legId) {
-        const updatedLeg = { ...leg, ...updates };
+    // If mode changed, recalculate chargeable weight for weight-based charges
+    let finalUpdates = { ...updates };
+    
+    if (updates.mode) {
+      const leg = legs.find(l => l.id === legId);
+      if (leg && updates.mode !== leg.mode) {
+        const weight = Number(quoteData.total_weight) || 0;
+        const volume = Number(quoteData.total_volume) || 0;
+        const newChargeableWeight = calculateChargeableWeight(weight, volume, updates.mode as TransportMode);
+        const quantity = newChargeableWeight > 0 ? newChargeableWeight : 1;
         
-        // If mode changed, recalculate chargeable weight for weight-based charges
-        if (updates.mode && updates.mode !== leg.mode) {
-          const weight = Number(quoteData.total_weight) || 0;
-          const volume = Number(quoteData.total_volume) || 0;
-          const newChargeableWeight = calculateChargeableWeight(weight, volume, updates.mode as TransportMode);
-          const quantity = newChargeableWeight > 0 ? newChargeableWeight : 1;
+        const updatedCharges = leg.charges.map(charge => {
+          // Check if charge is weight-based
+          const basis = chargeBases.find(b => b.id === charge.basis_id);
+          const code = basis?.code?.toLowerCase() || '';
+          const isWeightBased = !charge.basis_id || ['kg', 'lb', 'cbm', 'wm', 'chg_wt', 'ton', 'w/m'].some(c => code.includes(c));
           
-          updatedLeg.charges = leg.charges.map(charge => {
-            // Check if charge is weight-based
-            const basis = chargeBases.find(b => b.id === charge.basis_id);
-            const code = basis?.code?.toLowerCase() || '';
-            const isWeightBased = !charge.basis_id || ['kg', 'lb', 'cbm', 'wm', 'chg_wt', 'ton', 'w/m'].some(c => code.includes(c));
-            
-            if (isWeightBased) {
-              return {
-                ...charge,
-                buy: { ...charge.buy, quantity },
-                sell: { ...charge.sell, quantity }
-              };
-            }
-            return charge;
-          });
-        }
+          if (isWeightBased) {
+            return {
+              ...charge,
+              buy: { ...charge.buy, quantity },
+              sell: { ...charge.sell, quantity }
+            };
+          }
+          return charge;
+        });
         
-        return updatedLeg;
+        finalUpdates.charges = updatedCharges;
       }
-      return leg;
-    }));
+    }
+    
+    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: finalUpdates } });
   };
 
   const confirmRemoveLeg = (legId: string) => {
@@ -1044,7 +1062,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }
     }
     
-    setLegs(legs.filter(leg => leg.id !== legId));
+    dispatch({ type: 'REMOVE_LEG', payload: legId });
     setDeleteDialog({ open: false, type: 'leg' });
     
     const duration = performance.now() - startTime;
@@ -1052,8 +1070,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   };
 
   const addCharge = (legId: string) => {
-    setLegs(legs.map(leg => {
-      if (leg.id === legId) {
+    const leg = legs.find(l => l.id === legId);
+    if (leg) {
         // Calculate chargeable weight based on leg mode and quote details
         const weight = Number(quoteData.total_weight) || 0;
         const volume = Number(quoteData.total_volume) || 0;
@@ -1062,45 +1080,39 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         // Default quantity to chargeable weight if available, otherwise 1
         const defaultQuantity = chargeableWeight > 0 ? chargeableWeight : 1;
 
-        return {
-          ...leg,
-          charges: [
-            ...leg.charges,
-            {
-              id: `charge-${Date.now()}`,
-              category_id: '',
-              basis_id: '',
-              unit: '',
-              currency_id: currencies[0]?.id || '',
-              buy: { quantity: defaultQuantity, rate: 0, dbChargeId: null },
-              sell: { quantity: defaultQuantity, rate: 0, dbChargeId: null },
-              note: ''
-            }
-          ]
+        const newCharge = {
+          id: `charge-${Date.now()}`,
+          category_id: '',
+          basis_id: '',
+          unit: '',
+          currency_id: currencies[0]?.id || '',
+          buy: { quantity: defaultQuantity, rate: 0, dbChargeId: null },
+          sell: { quantity: defaultQuantity, rate: 0, dbChargeId: null },
+          note: ''
         };
-      }
-      return leg;
-    }));
+
+        const updatedCharges = [...leg.charges, newCharge];
+        dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+    }
   };
 
   const updateCharge = (legId: string, chargeIdx: number, field: string, value: any) => {
     // 1. Sync Update
-    setLegs(legs.map(leg => {
-      if (leg.id === legId) {
-        const charges = [...leg.charges];
-        const charge = { ...charges[chargeIdx] };
+    const leg = legs.find(l => l.id === legId);
+    if (!leg) return;
 
-        if (field.includes('.')) {
-          const [parent, child] = field.split('.');
-          charge[parent] = { ...(charge[parent] || {}), [child]: value };
-        } else {
-          charge[field] = value;
-        }
-        charges[chargeIdx] = charge;
-        return { ...leg, charges };
-      }
-      return leg;
-    }));
+    const charges = [...leg.charges];
+    const charge = { ...charges[chargeIdx] };
+
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      charge[parent] = { ...(charge[parent] || {}), [child]: value };
+    } else {
+      charge[field] = value;
+    }
+    charges[chargeIdx] = charge;
+    
+    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges } } });
 
     // 2. Async Pricing Calculation (Debounced)
     if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
@@ -1119,9 +1131,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             setPricingRequestsCount(prev => prev + 1);
             pricingService.calculateFinancials(buyRate, marginPercent, true)
             .then(result => {
-                setLegs(currentLegs => currentLegs.map(l => {
-                if (l.id === legId) {
-                    const newCharges = [...l.charges];
+                const latestLeg = legs.find(l => l.id === legId);
+                if (latestLeg) {
+                    const newCharges = [...latestLeg.charges];
                     if (newCharges[chargeIdx]) {
                     newCharges[chargeIdx] = {
                         ...newCharges[chargeIdx],
@@ -1132,10 +1144,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                         }
                     };
                     }
-                    return { ...l, charges: newCharges };
+                    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: newCharges } } });
                 }
-                return l;
-                }));
             })
             .catch(err => logger.error('Pricing calculation failed', { error: err }))
             .finally(() => {
@@ -1159,27 +1169,24 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const removeCharge = (legId: string, chargeIdx: number) => {
     const startTime = performance.now();
     debug.info('Removing charge', { legId, chargeIdx });
-    setLegs(legs.map(leg => {
-      if (leg.id === legId) {
-        const chargeToRemove = leg.charges[chargeIdx];
-        
-        // Track DB charge IDs for deletion
-        if (chargeToRemove) {
-          const idsToDelete: string[] = [];
-          if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
-          if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
-          if (idsToDelete.length > 0) {
-            setChargesToDelete(prev => [...prev, ...idsToDelete]);
-          }
+    
+    const leg = legs.find(l => l.id === legId);
+    if (leg) {
+      const chargeToRemove = leg.charges[chargeIdx];
+      
+      // Track DB charge IDs for deletion
+      if (chargeToRemove) {
+        const idsToDelete: string[] = [];
+        if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
+        if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
+        if (idsToDelete.length > 0) {
+          setChargesToDelete(prev => [...prev, ...idsToDelete]);
         }
-        
-        return {
-          ...leg,
-          charges: leg.charges.filter((_, idx) => idx !== chargeIdx)
-        };
       }
-      return leg;
-    }));
+      
+      const updatedCharges = leg.charges.filter((_, idx) => idx !== chargeIdx);
+      dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+    }
     
     setDeleteDialog({ open: false, type: 'charge' });
     
@@ -1189,35 +1196,29 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
   // Combined charges handlers
   const addCombinedCharge = () => {
-    setCombinedCharges(prev => ([
-      ...prev,
-      {
-        id: `combined-${Date.now()}`,
-        category_id: '',
-        basis_id: '',
-        unit: '',
-        currency_id: currencies[0]?.id || '',
-        buy: { quantity: 1, rate: 0, dbChargeId: null },
-        sell: { quantity: 1, rate: 0, dbChargeId: null },
-        note: ''
-      }
-    ]));
+    const newCharge = {
+      id: `combined-${Date.now()}`,
+      category_id: '',
+      basis_id: '',
+      unit: '',
+      currency_id: currencies[0]?.id || '',
+      buy: { quantity: 1, rate: 0, dbChargeId: null },
+      sell: { quantity: 1, rate: 0, dbChargeId: null },
+      note: ''
+    };
+    dispatch({ type: 'ADD_COMBINED_CHARGE', payload: newCharge });
   };
 
   const updateCombinedCharge = (chargeIdx: number, field: string, value: any) => {
     // 1. Sync Update
-    setCombinedCharges(prev => {
-      const next = [...prev];
-      const charge = { ...next[chargeIdx] };
-      if (field.includes('.')) {
-        const [parent, child] = field.split('.');
-        charge[parent] = { ...(charge[parent] || {}), [child]: value };
-      } else {
-        charge[field] = value;
-      }
-      next[chargeIdx] = charge;
-      return next;
-    });
+    const charge = { ...combinedCharges[chargeIdx] };
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      charge[parent] = { ...(charge[parent] || {}), [child]: value };
+    } else {
+      charge[field] = value;
+    }
+    dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge } });
 
     // 2. Async Pricing Calculation (Debounced)
     if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
@@ -1232,20 +1233,15 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             setPricingRequestsCount(prev => prev + 1);
             pricingService.calculateFinancials(buyRate, marginPercent, true)
             .then(result => {
-                setCombinedCharges(curr => {
-                const next = [...curr];
-                if (next[chargeIdx]) {
-                    next[chargeIdx] = {
-                    ...next[chargeIdx],
-                    sell: {
-                        ...next[chargeIdx].sell,
-                        quantity: next[chargeIdx].buy?.quantity || 1,
+                if (combinedCharges[chargeIdx]) {
+                    const updatedCharge = { ...combinedCharges[chargeIdx] };
+                    updatedCharge.sell = {
+                        ...updatedCharge.sell,
+                        quantity: updatedCharge.buy?.quantity || 1,
                         rate: result.sellPrice
-                        }
                     };
+                    dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
                 }
-                return next;
-                });
             })
             .catch(err => debug.error('Combined charge pricing failed', { error: err }))
             .finally(() => {
@@ -1269,22 +1265,20 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const removeCombinedCharge = (chargeIdx: number) => {
     const startTime = performance.now();
     debug.info('Removing combined charge', { chargeIdx });
-    setCombinedCharges(prev => {
-      const chargeToRemove = prev[chargeIdx];
-      
-      // Track DB charge IDs for deletion
-      if (chargeToRemove) {
-        const idsToDelete: string[] = [];
-        if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
-        if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
-        if (idsToDelete.length > 0) {
-          setChargesToDelete(prevIds => [...prevIds, ...idsToDelete]);
-        }
-      }
-      
-      return prev.filter((_, idx) => idx !== chargeIdx);
-    });
     
+    const chargeToRemove = combinedCharges[chargeIdx];
+      
+    // Track DB charge IDs for deletion
+    if (chargeToRemove) {
+      const idsToDelete: string[] = [];
+      if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
+      if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
+      if (idsToDelete.length > 0) {
+        setChargesToDelete(prevIds => [...prevIds, ...idsToDelete]);
+      }
+    }
+    
+    dispatch({ type: 'REMOVE_COMBINED_CHARGE', payload: chargeIdx });
     setDeleteDialog({ open: false, type: 'combinedCharge' });
     
     const duration = performance.now() - startTime;
@@ -1316,9 +1310,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
     if (basisTarget.type === 'leg' && basisTarget.legId) {
       const { legId, chargeIdx } = basisTarget;
-      setLegs(legs.map(leg => {
-        if (leg.id === legId) {
-          const charges = [...leg.charges];
+      const leg = legs.find(l => l.id === legId);
+      if (leg) {
+        const charges = [...leg.charges];
+        if (charges[chargeIdx]) {
           charges[chargeIdx] = {
             ...charges[chargeIdx],
             unit: `${config.quantity}x${sizeName}`,
@@ -1326,23 +1321,22 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             sell: { ...charges[chargeIdx].sell, quantity: config.quantity },
             basisDetails: config
           };
-          return { ...leg, charges };
+          dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges } } });
         }
-        return leg;
-      }));
+      }
     } else if (basisTarget.type === 'combined') {
       const { chargeIdx } = basisTarget;
-      setCombinedCharges(prev => {
-        const next = [...prev];
-        next[chargeIdx] = {
-          ...next[chargeIdx],
+      const currentCharge = combinedCharges[chargeIdx];
+      if (currentCharge) {
+        const updatedCharge = {
+          ...currentCharge,
           unit: `${config.quantity}x${sizeName}`,
-          buy: { ...(next[chargeIdx].buy || {}), quantity: config.quantity },
-          sell: { ...(next[chargeIdx].sell || {}), quantity: config.quantity },
+          buy: { ...(currentCharge.buy || {}), quantity: config.quantity },
+          sell: { ...(currentCharge.sell || {}), quantity: config.quantity },
           basisDetails: config
         };
-        return next;
-      });
+        dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
+      }
     }
 
     setBasisModalOpen(false);
@@ -1364,7 +1358,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       .order('created_at', { ascending: false });
 
     if (!queryError && existingOptions) {
-      setOptions(existingOptions);
+      dispatch({ type: 'SET_OPTIONS', payload: existingOptions });
     }
   };
 
@@ -1401,18 +1395,26 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       const results = aiResponse.data.options;
       const analysis = aiResponse.data.market_analysis;
       const confidence = aiResponse.data.confidence_score;
+      const anomalies = aiResponse.data.anomalies;
 
       // Update market analysis state and persist to version
-      if (analysis || confidence) {
-        if (analysis) setMarketAnalysis(analysis);
-        if (confidence) setConfidenceScore(confidence);
+      if (analysis || confidence || anomalies) {
+        dispatch({ 
+            type: 'SET_ANALYSIS_DATA', 
+            payload: { 
+              marketAnalysis: analysis, 
+              confidenceScore: confidence,
+              anomalies: anomalies || []
+            } 
+        });
         
         // Persist analysis to the version header
         await scopedDb
           .from('quotation_versions')
           .update({ 
             market_analysis: analysis || marketAnalysis,
-            confidence_score: confidence || confidenceScore
+            confidence_score: confidence || confidenceScore,
+            anomalies: anomalies || []
           })
           .eq('id', versionId);
       }
@@ -1565,8 +1567,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   const saveQuotation = async () => {
     // Validate first
     const validation = validateQuotation();
-    setValidationErrors(validation.errors);
-    setValidationWarnings(validation.warnings);
+    dispatch({ type: 'SET_VALIDATION', payload: validation });
     
     if (validation.errors.length > 0) {
       toast({
@@ -1577,7 +1578,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       return;
     }
 
-    setSaving(true);
+    dispatch({ type: 'SET_SAVING', payload: true });
     const startTime = performance.now();
     debug.info('Starting quotation save...', { 
       versionId, 
@@ -1612,7 +1613,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           description: 'Tenant ID not found. Please ensure the quote belongs to a tenant or your user has a tenant assigned.',
           variant: 'destructive'
         });
-        setSaving(false);
+        dispatch({ type: 'SET_SAVING', payload: false });
         setSaveProgress({ show: false, steps: [] });
         return;
       }
@@ -1635,7 +1636,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         if (existingOptions && existingOptions.length > 0) {
           currentOptionId = existingOptions[0].id;
-          setOptionId(currentOptionId);
+          dispatch({ type: 'INITIALIZE', payload: { optionId: currentOptionId } });
           debug.debug('[Composer] Using existing option:', currentOptionId);
         } else {
           debug.debug('[Composer] Creating new option during save');
@@ -1658,7 +1659,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           
           if (newOption?.id) {
             currentOptionId = newOption.id;
-            setOptionId(currentOptionId);
+            dispatch({ type: 'INITIALIZE', payload: { optionId: currentOptionId } });
             debug.debug('[Composer] Created option:', currentOptionId);
           }
         }
@@ -1758,7 +1759,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
               leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
               service_only_category: leg.serviceOnlyCategory || null,
               tenant_id: finalTenantId,
-              franchise_id: franchiseId,
+              franchise_id: context.franchiseId,
               sort_order: i,
               carrier_id: leg.carrierId || null,
               carrier_name: leg.carrierName || null
@@ -1801,7 +1802,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
             unit: charge.unit || null,
             note: charge.note || null,
             tenant_id: finalTenantId,
-            franchise_id: franchiseId
+            franchise_id: context.franchiseId
           };
 
           // Handle buy side
@@ -2015,8 +2016,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       setChargesToDelete([]);
       
       // Clear validation feedback
-      setValidationErrors([]);
-      setValidationWarnings([]);
+      dispatch({ type: 'SET_VALIDATION', payload: { errors: [], warnings: [] } });
       
       updateProgress(5); // Complete
       
@@ -2027,7 +2027,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       
     } catch (error: any) {
       const duration = performance.now() - startTime;
-      debug.error('Save quotation error:', error, { duration: `${duration.toFixed(2)}ms` });
+      debug.error('Save quotation error:', { error, duration: `${duration.toFixed(2)}ms` });
       const errorMessage = error.message || 'Failed to save quotation';
       
       // Hide progress on error
@@ -2039,7 +2039,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         variant: 'destructive' 
       });
     } finally {
-      setSaving(false);
+      dispatch({ type: 'SET_SAVING', payload: false });
     }
   };
 
@@ -2082,7 +2082,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     
     if (!confirm('Are you sure you want to delete this option? This action cannot be undone.')) return;
 
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
     const startTime = performance.now();
     debug.info('Deleting quote option', { optionId: id });
 
@@ -2095,9 +2095,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       if (error) throw error;
 
       const newOptions = options.filter(o => o.id !== id);
-      setOptions(newOptions);
+      dispatch({ type: 'SET_OPTIONS', payload: newOptions });
       if (optionId === id) {
-        setOptionId(newOptions[0].id);
+        dispatch({ type: 'INITIALIZE', payload: { optionId: newOptions[0].id } });
       }
       
       const duration = performance.now() - startTime;
@@ -2110,10 +2110,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       toast({ title: 'Success', description: 'Option deleted successfully.' });
     } catch (error: any) {
       const duration = performance.now() - startTime;
-      debug.error('Error deleting option:', error, { duration: `${duration.toFixed(2)}ms` });
+      debug.error('Error deleting option:', { error, duration: `${duration.toFixed(2)}ms` });
       toast({ title: 'Error', description: 'Failed to delete option: ' + error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -2123,7 +2123,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       return;
     }
 
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
     const startTime = performance.now();
     debug.info('Saving option details', { 
       isNew: !editingOption, 
@@ -2156,18 +2156,20 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           .single();
 
         if (error) throw error;
-
-        setOptions(prev => prev.map(o => o.id === editingOption.id ? data : o));
+        
+        dispatch({ type: 'SET_OPTIONS', payload: options.map(o => o.id === editingOption.id ? data : o) });
         if (optionId === editingOption.id) {
           // Refresh quote data if we edited the current option
-          setQuoteData(prev => ({
-             ...prev,
+          dispatch({ 
+            type: 'UPDATE_QUOTE_DATA', 
+            payload: {
              carrier_name: data.carrier_name,
              service_type: data.service_type,
              transit_time: data.transit_time,
-             validUntil: data.valid_until ? new Date(data.valid_until).toISOString().split('T')[0] : prev.validUntil,
+             validUntil: data.valid_until ? new Date(data.valid_until).toISOString().split('T')[0] : quoteData.validUntil,
              option_name: data.option_name
-          }));
+            }
+          });
         }
       } else {
         // Create new
@@ -2184,8 +2186,8 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
 
         if (error) throw error;
 
-        setOptions(prev => [...prev, data]);
-        setOptionId(data.id);
+        dispatch({ type: 'SET_OPTIONS', payload: [...options, data] });
+        dispatch({ type: 'INITIALIZE', payload: { optionId: data.id } });
       }
 
       const duration = performance.now() - startTime;
@@ -2199,10 +2201,10 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       toast({ title: 'Success', description: `Option ${editingOption ? 'updated' : 'created'} successfully.` });
     } catch (error: any) {
       const duration = performance.now() - startTime;
-      debug.error('Error saving option:', error, { duration: `${duration.toFixed(2)}ms` });
+      debug.error('Error saving option:', { error, duration: `${duration.toFixed(2)}ms` });
       toast({ title: 'Error', description: 'Failed to save option: ' + error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -2210,7 +2212,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
     const leg = legs.find(l => l.id === legId);
     if (!leg) return;
 
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: true });
     toast({
       title: "Fetching AI Rates",
       description: "Consulting AI Smart Advisor for real-time market rates...",
@@ -2347,7 +2349,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       }));
 
       // 6. Update State (using smart merge)
-      setLegs(currentLegs => currentLegs.map(l => {
+      const updatedLegs = legs.map(l => {
         if (l.id === legId) {
           // Merge new charges with existing ones to prevent duplicates
           const updatedCharges = [...l.charges];
@@ -2391,7 +2393,9 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
           return { ...l, charges: updatedCharges };
         }
         return l;
-      }));
+      });
+
+      dispatch({ type: 'SET_LEGS', payload: updatedLegs });
 
       toast({
         title: "Rates Fetched",
@@ -2406,27 +2410,25 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const handleNext = () => {
     // Clear validation on navigation
-    setValidationErrors([]);
-    setValidationWarnings([]);
+    dispatch({ type: 'SET_VALIDATION', payload: { errors: [], warnings: [] } });
     
     if (currentStep < 4) {
-      setCurrentStep(currentStep + 1);
+      dispatch({ type: 'SET_STEP', payload: currentStep + 1 });
     }
   };
 
   const handleBack = () => {
     // Clear validation on navigation
-    setValidationErrors([]);
-    setValidationWarnings([]);
+    dispatch({ type: 'SET_VALIDATION', payload: { errors: [], warnings: [] } });
     
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      dispatch({ type: 'SET_STEP', payload: currentStep - 1 });
     }
   };
 
@@ -2482,19 +2484,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
   if (viewMode === 'overview') {
           return (
             <QuoteOptionsOverview 
-              options={options.map(opt => ({
-                ...opt,
-                mode: opt.service_type ? (opt.service_type.toLowerCase().includes('air') ? 'air' : opt.service_type.toLowerCase().includes('road') ? 'road' : 'sea') : 'sea'
-              }))}
-              selectedId={optionId || undefined}
-              onSelect={(id) => {
-                setOptionId(id);
-                setViewMode('composer');
-              }}
               onGenerateSmartOptions={handleGenerateSmartOptions}
-              marketAnalysis={marketAnalysis}
-              confidenceScore={confidenceScore}
-              anomalies={anomalies}
             />
           );
         }
@@ -2514,7 +2504,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                 variant="outline" 
                 size="sm" 
                 className="h-9 px-2 gap-2"
-                onClick={() => setViewMode('overview')}
+                onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'overview' })}
             >
                 <ArrowLeft className="h-3 w-3" />
                 Back to Overview
@@ -2538,7 +2528,7 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
                   <Button
                     variant={optionId === opt.id ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => setOptionId(opt.id)}
+                    onClick={() => dispatch({ type: 'INITIALIZE', payload: { optionId: opt.id } })}
                     className={`h-9 text-xs pr-8 ${optionId === opt.id ? 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20' : 'text-muted-foreground border border-transparent'}`}
                     title={`Service: ${opt.service_type || 'N/A'}\nTransit: ${opt.transit_time || 'N/A'}\nValid Until: ${opt.valid_until ? new Date(opt.valid_until).toLocaleDateString() : 'N/A'}`}
                   >
@@ -2588,93 +2578,23 @@ export function MultiModalQuoteComposer({ quoteId, versionId, optionId: initialO
       </Card>
 
       {currentStep === 1 && (
-        <QuoteDetailsStep
-          quoteData={quoteData}
-          currencies={currencies}
-          origin={legs.length > 0 ? legs[0].origin : undefined}
-          destination={legs.length > 0 ? legs[legs.length - 1].destination : undefined}
-          validationErrors={validationErrors}
-          onChange={(field, value) => {
-            setQuoteData((prev: any) => ({ ...prev, [field]: value }));
-            
-            // Recalculate charges if weight/volume changes
-            if (field === 'total_weight' || field === 'total_volume') {
-              const weight = field === 'total_weight' ? Number(value) : Number(quoteData.total_weight) || 0;
-              const volume = field === 'total_volume' ? Number(value) : Number(quoteData.total_volume) || 0;
-              
-              setLegs(currentLegs => currentLegs.map(leg => {
-                const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
-                const quantity = chargeableWeight > 0 ? chargeableWeight : 1;
-                
-                const updatedCharges = leg.charges.map(charge => {
-                  const basis = chargeBases.find(b => b.id === charge.basis_id);
-                  const code = basis?.code?.toLowerCase() || '';
-                  const isWeightBased = !charge.basis_id || ['kg', 'lb', 'cbm', 'wm', 'chg_wt', 'ton', 'w/m'].some(c => code.includes(c));
-                  
-                  if (isWeightBased) {
-                    return {
-                      ...charge,
-                      buy: { ...charge.buy, quantity },
-                      sell: { ...charge.sell, quantity }
-                    };
-                  }
-                  return charge;
-                });
-                return { ...leg, charges: updatedCharges };
-              }));
-            }
-          }}
-        />
+        <QuoteDetailsStep />
       )}
 
       {currentStep === 2 && (
-        <LegsConfigurationStep
-          legs={legs}
-          serviceTypes={serviceTypes}
-          onAddLeg={addLeg}
-          onUpdateLeg={updateLeg}
-          onRemoveLeg={confirmRemoveLeg}
-          validationErrors={validationErrors}
-          carriers={carriers}
-        />
+        <LegsConfigurationStep />
       )}
 
       {currentStep === 3 && (
         <ChargesManagementStep
-          legs={legs}
-          combinedCharges={combinedCharges}
-          chargeCategories={chargeCategories}
-          chargeBases={chargeBases}
-          currencies={currencies}
-          tradeDirections={tradeDirections}
-          containerTypes={containerTypes}
-          containerSizes={containerSizes}
-          serviceTypes={serviceTypes}
-          autoMargin={autoMargin}
-          marginPercent={marginPercent}
-          onAutoMarginChange={setAutoMargin}
-          onMarginPercentChange={setMarginPercent}
-          onAddCharge={addCharge}
-          onUpdateCharge={updateCharge}
-          onRemoveCharge={confirmRemoveCharge}
           onConfigureBasis={openBasisModal}
-          onAddCombinedCharge={addCombinedCharge}
-          onUpdateCombinedCharge={updateCombinedCharge}
-          onRemoveCombinedCharge={confirmRemoveCombinedCharge}
           onConfigureCombinedBasis={openCombinedBasisModal}
           onFetchRates={handleFetchRates}
-          validationErrors={validationErrors}
-          isPricingCalculating={isPricingCalculating}
         />
       )}
 
       {currentStep === 4 && (
-        <ReviewAndSaveStep
-          legs={legs}
-          quoteData={quoteData}
-          currencies={currencies}
-          combinedCharges={combinedCharges}
-        />
+        <ReviewAndSaveStep />
       )}
 
       {/* Navigation */}

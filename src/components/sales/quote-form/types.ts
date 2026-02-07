@@ -98,3 +98,55 @@ export type CarrierQuote = {
   buying_charges: Charge[];
   selling_charges: Charge[];
 };
+
+// --- Reference-data option types (used by useQuoteRepository) ---
+
+export interface PortOption {
+  id: string;
+  name: string;
+  code: string;
+  country_code: string;
+}
+
+export interface CarrierOption {
+  id: string;
+  carrier_name: string;
+  scac: string;
+  carrier_type: string;
+}
+
+export interface AccountOption {
+  id: string;
+  name: string;
+}
+
+export interface ContactOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+  account_id: string | null;
+}
+
+export interface OpportunityOption {
+  id: string;
+  name: string;
+  account_id: string | null;
+  contact_id: string | null;
+  stage?: string;
+  amount?: number;
+  probability?: number;
+}
+
+export interface ServiceOption {
+  id: string;
+  service_name: string;
+  service_type_id: string;
+  is_default: boolean;
+  priority: number;
+}
+
+export interface ServiceTypeOption {
+  id: string;
+  code: string;
+  name: string;
+}
