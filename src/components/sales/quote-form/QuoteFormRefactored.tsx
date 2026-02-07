@@ -8,12 +8,11 @@ import { QuoteLogistics } from './QuoteLogistics';
 import { QuoteLineItems } from './QuoteLineItems';
 import { QuoteFinancials } from './QuoteFinancials';
 import { quoteSchema, QuoteFormValues } from './types';
-import { useQuoteHydration } from './useQuoteHydration';
 import { QuoteErrorBoundary } from './QuoteErrorBoundary';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
-import { useQuoteRepository } from './useQuoteRepository';
+import { useQuoteRepositoryForm } from './useQuoteRepository';
 import { useFormDebug } from '@/hooks/useFormDebug';
 import { CatalogSaveDialog } from './CatalogSaveDialog';
 
@@ -30,7 +29,6 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
   const { resolvedTenantId } = useQuoteContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
-  const { saveQuote } = useQuoteRepository();
   const [showCatalogDialog, setShowCatalogDialog] = useState(false);
   const [newCatalogItems, setNewCatalogItems] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'form' | 'composer'>(initialViewMode);
@@ -58,6 +56,8 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
       ...initialData,
     },
   });
+
+  const { saveQuote, isHydrating } = useQuoteRepositoryForm({ form, quoteId });
 
   // Debugging hook for form
   const formValues = form.watch();
@@ -100,8 +100,6 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
       return () => clearTimeout(timer);
     }
   }, [autoSave, hasAutoSaved, quoteId, initialData, form]);
-
-  const { isHydrating } = useQuoteHydration(form, quoteId);
 
   const onSubmit = async (data: QuoteFormValues) => {
     setIsSubmitting(true);

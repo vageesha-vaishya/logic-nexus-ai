@@ -200,6 +200,7 @@ export function useQuoteData() {
     setResolvedServiceLabels,
     setResolvedCarrierLabels,
     setResolvedTenantId,
+    resolvedTenantId,
     refetchAccounts,
     
     // Injection methods
