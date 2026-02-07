@@ -8,11 +8,9 @@ import { Trash2, MapPin, Package, Truck, Loader2, Train, Ship, Plane } from 'luc
 import { TransportModeSelector } from './TransportModeSelector';
 import { HelpTooltip } from './HelpTooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useQuery } from '@tanstack/react-query';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
-import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { useQuoteStore } from './store/QuoteStore';
 import { Leg } from './store/types';
 import { useCRM } from '@/hooks/useCRM';
@@ -123,21 +121,6 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const onRemoveLeg = (id: string) => {
     dispatch({ type: 'REMOVE_LEG', payload: id });
   };
-
-  // Fetch service leg categories
-  const { data: serviceCategories } = useQuery({
-    queryKey: ['service-leg-categories'],
-    queryFn: async () => {
-      const { data, error } = await scopedDb
-        .from('service_leg_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
-      
-      if (error) throw error;
-      return data || [];
-    }
-  });
 
   // Ensure legType is valid
   useEffect(() => {

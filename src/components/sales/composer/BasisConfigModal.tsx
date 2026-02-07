@@ -4,36 +4,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatContainerSize } from '@/lib/container-utils';
+import { useQuoteStore } from './store/QuoteStore';
 
-interface BasisConfig {
-  tradeDirection: string;
-  containerType: string;
-  containerSize: string;
-  quantity: number;
-}
+export function BasisConfigModal() {
+  const { state, dispatch } = useQuoteStore();
+  const { 
+    isOpen, 
+    config, 
+    target 
+  } = state.basisModal;
+  
+  const {
+    tradeDirections,
+    containerTypes,
+    containerSizes
+  } = state.referenceData;
 
-interface BasisConfigModalProps {
-  open: boolean;
-  onClose: () => void;
-  onSave: (config: BasisConfig) => void;
-  config: BasisConfig;
-  onChange: (updates: Partial<BasisConfig>) => void;
-  tradeDirections: any[];
-  containerTypes: any[];
-  containerSizes: any[];
-}
+  const onClose = () => dispatch({ type: 'CLOSE_BASIS_MODAL' });
+  
+  const onChange = (updates: any) => {
+    dispatch({ type: 'UPDATE_BASIS_CONFIG', payload: updates });
+  };
 
-export function BasisConfigModal({
-  open,
-  onClose,
-  onSave,
-  config,
-  onChange,
-  tradeDirections,
-  containerTypes,
-  containerSizes
-}: BasisConfigModalProps) {
   const handleSave = () => {
+    if (!target) return;
+
     const finalTradeDirection = config.tradeDirection || String(tradeDirections[0]?.id || '');
     const finalContainerType = config.containerType || String(containerTypes[0]?.id || '');
     const finalContainerSize = config.containerSize || String(containerSizes[0]?.id || '');
@@ -44,16 +39,53 @@ export function BasisConfigModal({
       return;
     }
 
-    onSave({
+    const size = containerSizes.find(s => s.id === finalContainerSize);
+    const sizeName = size ? formatContainerSize(size.name) : '';
+    
+    // Create the updated config object
+    const basisConfig = {
       tradeDirection: finalTradeDirection,
       containerType: finalContainerType,
       containerSize: finalContainerSize,
       quantity: finalQuantity,
-    });
+    };
+
+    if (target.type === 'leg' && target.legId) {
+      const { legId, chargeIdx } = target;
+      const leg = state.legs.find(l => l.id === legId);
+      
+      if (leg && leg.charges[chargeIdx]) {
+        const charges = [...leg.charges];
+        charges[chargeIdx] = {
+          ...charges[chargeIdx],
+          unit: `${finalQuantity}x${sizeName}`,
+          buy: { ...charges[chargeIdx].buy, quantity: finalQuantity },
+          sell: { ...charges[chargeIdx].sell, quantity: finalQuantity },
+          basisDetails: basisConfig
+        };
+        dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges } } });
+      }
+    } else if (target.type === 'combined') {
+      const { chargeIdx } = target;
+      const currentCharge = state.charges[chargeIdx];
+      
+      if (currentCharge) {
+        const updatedCharge = {
+          ...currentCharge,
+          unit: `${finalQuantity}x${sizeName}`,
+          buy: { ...(currentCharge.buy || {}), quantity: finalQuantity },
+          sell: { ...(currentCharge.sell || {}), quantity: finalQuantity },
+          basisDetails: basisConfig
+        };
+        dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
+      }
+    }
+
+    onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Container Basis Configuration</DialogTitle>

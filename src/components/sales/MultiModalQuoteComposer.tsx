@@ -113,18 +113,15 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     confidenceScore,
     anomalies,
     options,
-    viewMode
+    viewMode,
+    deletedLegIds,
+    deletedChargeIds,
+    isGeneratingSmart
   } = storeState;
 
   const [connectionStatus, setConnectionStatus] = useState<'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('SUBSCRIBED');
   const [pricingRequestsCount, setPricingRequestsCount] = useState(0);
   const isPricingCalculating = pricingRequestsCount > 0;
-  
-  // Local state for UI interactions not persisted in store
-  const [isGeneratingSmart, setIsGeneratingSmart] = useState(false);
-  
-  // Track charges to delete
-  const [chargesToDelete, setChargesToDelete] = useState<string[]>([]);
   
   // Delete confirmation state
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -164,16 +161,6 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       return arr || [];
     }
   };
-
-  // Basis configuration modal
-  const [basisModalOpen, setBasisModalOpen] = useState(false);
-  const [currentBasisConfig, setCurrentBasisConfig] = useState<any>({
-    tradeDirection: '',
-    containerType: '',
-    containerSize: '',
-    quantity: 1
-  });
-  const [basisTarget, setBasisTarget] = useState<{ type: 'leg' | 'combined'; legId?: string; chargeIdx: number } | null>(null);
 
   // Access reference data from store
   const {
@@ -543,7 +530,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           containerTypes: [] as any[],
           containerSizes: [] as any[],
           carriers: [] as any[],
-          chargeSides: [] as any[]
+          chargeSides: [] as any[],
+          serviceLegCategories: [] as any[]
         };
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
@@ -575,7 +563,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           fetchRef('trade_directions', 'tradeDirections', 'Failed to load trade directions'),
           fetchRef('container_types', 'containerTypes', 'Failed to load container types'),
           fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes'),
-          fetchRef('carriers', 'carriers', 'Failed to load carriers')
+          fetchRef('carriers', 'carriers', 'Failed to load carriers'),
+          fetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order')
         ]);
 
         return results;
@@ -596,7 +585,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           containerTypes: refData.containerTypes,
           containerSizes: refData.containerSizes,
           carriers: uniqueCarriers,
-          chargeSides: refData.chargeSides
+          chargeSides: refData.chargeSides,
+          serviceLegCategories: refData.serviceLegCategories
         }
       });
 
@@ -1049,18 +1039,6 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
   const removeLeg = (legId: string) => {
     const startTime = performance.now();
     debug.info('Removing leg', { legId });
-    // Track charges that need to be deleted from DB
-    const legToRemove = legs.find(leg => leg.id === legId);
-    if (legToRemove) {
-      const chargeIdsToDelete: string[] = [];
-      legToRemove.charges.forEach(charge => {
-        if (charge.buy?.dbChargeId) chargeIdsToDelete.push(charge.buy.dbChargeId);
-        if (charge.sell?.dbChargeId) chargeIdsToDelete.push(charge.sell.dbChargeId);
-      });
-      if (chargeIdsToDelete.length > 0) {
-        setChargesToDelete(prev => [...prev, ...chargeIdsToDelete]);
-      }
-    }
     
     dispatch({ type: 'REMOVE_LEG', payload: legId });
     setDeleteDialog({ open: false, type: 'leg' });
@@ -1170,23 +1148,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     const startTime = performance.now();
     debug.info('Removing charge', { legId, chargeIdx });
     
-    const leg = legs.find(l => l.id === legId);
-    if (leg) {
-      const chargeToRemove = leg.charges[chargeIdx];
-      
-      // Track DB charge IDs for deletion
-      if (chargeToRemove) {
-        const idsToDelete: string[] = [];
-        if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
-        if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
-        if (idsToDelete.length > 0) {
-          setChargesToDelete(prev => [...prev, ...idsToDelete]);
-        }
-      }
-      
-      const updatedCharges = leg.charges.filter((_, idx) => idx !== chargeIdx);
-      dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
-    }
+    dispatch({ type: 'REMOVE_LEG_CHARGE', payload: { legId, chargeIdx } });
     
     setDeleteDialog({ open: false, type: 'charge' });
     
@@ -1266,81 +1228,11 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     const startTime = performance.now();
     debug.info('Removing combined charge', { chargeIdx });
     
-    const chargeToRemove = combinedCharges[chargeIdx];
-      
-    // Track DB charge IDs for deletion
-    if (chargeToRemove) {
-      const idsToDelete: string[] = [];
-      if (chargeToRemove.buy?.dbChargeId) idsToDelete.push(chargeToRemove.buy.dbChargeId);
-      if (chargeToRemove.sell?.dbChargeId) idsToDelete.push(chargeToRemove.sell.dbChargeId);
-      if (idsToDelete.length > 0) {
-        setChargesToDelete(prevIds => [...prevIds, ...idsToDelete]);
-      }
-    }
-    
     dispatch({ type: 'REMOVE_COMBINED_CHARGE', payload: chargeIdx });
     setDeleteDialog({ open: false, type: 'combinedCharge' });
     
     const duration = performance.now() - startTime;
     debug.log(`Combined charge removed: ${chargeIdx}`, { duration: `${duration.toFixed(2)}ms` });
-  };
-
-  const openBasisModal = (legId: string, chargeIdx: number) => {
-    setBasisTarget({ type: 'leg', legId, chargeIdx });
-    const tdId = String(tradeDirections?.[0]?.id ?? '');
-    const ctId = String(containerTypes?.[0]?.id ?? '');
-    const csId = String(containerSizes?.[0]?.id ?? '');
-    setCurrentBasisConfig({ tradeDirection: tdId, containerType: ctId, containerSize: csId, quantity: 1 });
-    setBasisModalOpen(true);
-  };
-
-  const openCombinedBasisModal = (chargeIdx: number) => {
-    setBasisTarget({ type: 'combined', chargeIdx });
-    const tdId = String(tradeDirections?.[0]?.id ?? '');
-    const ctId = String(containerTypes?.[0]?.id ?? '');
-    const csId = String(containerSizes?.[0]?.id ?? '');
-    setCurrentBasisConfig({ tradeDirection: tdId, containerType: ctId, containerSize: csId, quantity: 1 });
-    setBasisModalOpen(true);
-  };
-
-  const saveBasisConfig = (config: any) => {
-    if (!basisTarget) return;
-    const size = containerSizes.find(s => s.id === config.containerSize);
-    const sizeName = size ? formatContainerSize(size.name) : '';
-
-    if (basisTarget.type === 'leg' && basisTarget.legId) {
-      const { legId, chargeIdx } = basisTarget;
-      const leg = legs.find(l => l.id === legId);
-      if (leg) {
-        const charges = [...leg.charges];
-        if (charges[chargeIdx]) {
-          charges[chargeIdx] = {
-            ...charges[chargeIdx],
-            unit: `${config.quantity}x${sizeName}`,
-            buy: { ...charges[chargeIdx].buy, quantity: config.quantity },
-            sell: { ...charges[chargeIdx].sell, quantity: config.quantity },
-            basisDetails: config
-          };
-          dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges } } });
-        }
-      }
-    } else if (basisTarget.type === 'combined') {
-      const { chargeIdx } = basisTarget;
-      const currentCharge = combinedCharges[chargeIdx];
-      if (currentCharge) {
-        const updatedCharge = {
-          ...currentCharge,
-          unit: `${config.quantity}x${sizeName}`,
-          buy: { ...(currentCharge.buy || {}), quantity: config.quantity },
-          sell: { ...(currentCharge.sell || {}), quantity: config.quantity },
-          basisDetails: config
-        };
-        dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
-      }
-    }
-
-    setBasisModalOpen(false);
-    setCurrentBasisConfig({ tradeDirection: '', containerType: '', containerSize: '', quantity: 1 });
   };
 
   const refreshOptionsList = async () => {
@@ -1368,7 +1260,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       return;
     }
 
-    setIsGeneratingSmart(true);
+    dispatch({ type: 'SET_GENERATING_SMART', payload: true });
     try {
       const payload = {
         origin: quoteData.origin,
@@ -1489,7 +1381,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       debug.error('Smart Quote Error:', error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
-      setIsGeneratingSmart(false);
+      dispatch({ type: 'SET_GENERATING_SMART', payload: false });
     }
   };
 
@@ -1670,19 +1562,16 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       updateProgress(1); // Option created
 
       // Delete tracked charges first
-      if (chargesToDelete.length > 0) {
+      if (deletedChargeIds.length > 0) {
         const { error: deleteError } = await scopedDb
           .from('quote_charges')
           .delete()
-          .in('id', chargesToDelete);
+          .in('id', deletedChargeIds);
         
         if (deleteError) {
           debug.error('Error deleting charges:', deleteError);
           throw new Error(`Failed to delete charges: ${deleteError.message}`);
         }
-        
-        // Clear the deletion queue
-        setChargesToDelete([]);
       }
 
       // Get charge side IDs
@@ -2013,7 +1902,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       }
       
       // Clear deletion queue after successful save
-      setChargesToDelete([]);
+      dispatch({ type: 'CLEAR_DELETIONS' });
       
       // Clear validation feedback
       dispatch({ type: 'SET_VALIDATION', payload: { errors: [], warnings: [] } });
@@ -2208,212 +2097,6 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     }
   };
 
-  const handleFetchRates = async (legId: string) => {
-    const leg = legs.find(l => l.id === legId);
-    if (!leg) return;
-
-    dispatch({ type: 'SET_LOADING', payload: true });
-    toast({
-      title: "Fetching AI Rates",
-      description: "Consulting AI Smart Advisor for real-time market rates...",
-    });
-
-    try {
-      // 1. Prepare Payload for AI
-      // We treat this leg as a mini-shipment to get specific rates
-      const payload = {
-        origin: leg.origin,
-        destination: leg.destination,
-        commodity: quoteData.commodity || 'General Cargo',
-        mode: leg.mode.toLowerCase(),
-        // Add context if available
-        container_type: quoteData.container_type,
-        weight: quoteData.total_weight,
-        volume: quoteData.total_volume
-      };
-
-      // 2. Invoke AI Advisor
-      const aiResponse = await invokeAiAdvisor({
-        action: 'generate_smart_quotes',
-        payload
-      });
-
-      if (aiResponse.error) {
-        throw new Error(aiResponse.error.message || 'AI Advisor failed');
-      }
-
-      if (!aiResponse.data?.options || aiResponse.data.options.length === 0) {
-        throw new Error('No rates found for this route');
-      }
-
-      // 3. Process Result
-      // We take the first (best) option returned by AI
-      const bestOption = aiResponse.data.options[0];
-      const mapped = mapOptionToQuote(bestOption);
-
-      if (!mapped) throw new Error('Failed to process AI rates');
-
-      // 4. Extract Charges
-      // Collect charges from all returned legs (in case AI broke it down) and global charges
-      let extractedCharges: any[] = [];
-      
-      if (mapped.legs) {
-        mapped.legs.forEach((l: any) => {
-          if (l.charges) extractedCharges = [...extractedCharges, ...l.charges];
-        });
-      }
-      if (mapped.charges) {
-        extractedCharges = [...extractedCharges, ...mapped.charges];
-      }
-
-      if (extractedCharges.length === 0) {
-        // Fallback: If AI returned a total but no details, create a lump sum
-        if (mapped.total_amount > 0) {
-            extractedCharges.push({
-                name: 'Freight Charges',
-                amount: mapped.total_amount,
-                currency: mapped.currency || 'USD',
-                unit: 'per_shipment'
-            });
-        }
-      }
-
-      const weight = Number(quoteData.total_weight) || 0;
-      const volume = Number(quoteData.total_volume) || 0;
-      const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
-
-      // 5. Map to Composer Charge Format
-      const newCharges = await Promise.all(extractedCharges.map(async (chg) => {
-        // Find matching IDs from master data
-        const catName = chg.category || chg.name || 'Freight';
-        const cat = chargeCategories.find(c => 
-          (c.name && c.name.toLowerCase() === catName.toLowerCase()) || 
-          (c.code && c.code.toLowerCase() === catName.toLowerCase())
-        ) || chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
-
-        // Basis mapping
-        const basisName = chg.unit || 'per_shipment';
-        // Try to match basis code or name
-        let basis = chargeBases.find(b => 
-          (b.code && b.code.toLowerCase() === basisName.toLowerCase()) ||
-          (b.name && b.name.toLowerCase() === basisName.toLowerCase())
-        );
-        
-        // Fallback for common units
-        if (!basis) {
-            if (basisName.includes('kg')) basis = chargeBases.find(b => b.code === 'kg');
-            else if (basisName.includes('cbm')) basis = chargeBases.find(b => b.code === 'cbm');
-            else if (basisName.includes('cont') || basisName.includes('box')) basis = chargeBases.find(b => b.code === 'container');
-            else basis = chargeBases.find(b => b.code === 'shipment'); // Default
-        }
-
-        const curr = currencies.find(c => c.code === (chg.currency || 'USD')) || currencies[0];
-        
-        // Calculate Buy/Sell
-        // If AI provides specific buy/sell, use them. Otherwise use standard margin logic.
-        const sellRate = Number(chg.amount || chg.rate || 0);
-        let buyRate = Number(chg.buyRate || chg.cost || 0);
-        
-        if (buyRate === 0 && sellRate > 0) {
-            // Reverse calculate buy rate assuming 15% margin if not provided
-            // Use PricingService for consistent financial logic
-            const financials = await pricingService.calculateFinancials(sellRate, 15, false);
-            buyRate = financials.buyPrice;
-        }
-
-        // Determine quantity
-        let quantity = Number(chg.quantity || 1);
-        // Adjust quantity based on basis if needed (similar to original logic)
-        if (basis?.code?.toLowerCase().includes('kg') || basis?.code?.toLowerCase().includes('cbm')) {
-             quantity = chargeableWeight > 0 ? chargeableWeight : 1;
-        }
-
-        return {
-          id: `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          category_id: cat?.id || '',
-          basis_id: basis?.id || '',
-          unit: basis?.code || 'shipment',
-          currency_id: curr?.id || '',
-          buy: {
-            quantity,
-            rate: buyRate,
-            dbChargeId: null
-          },
-          sell: {
-            quantity,
-            rate: sellRate,
-            dbChargeId: null
-          },
-          note: chg.note || `AI Rate: ${chg.name || catName}`
-        };
-      }));
-
-      // 6. Update State (using smart merge)
-      const updatedLegs = legs.map(l => {
-        if (l.id === legId) {
-          // Merge new charges with existing ones to prevent duplicates
-          const updatedCharges = [...l.charges];
-          
-          newCharges.forEach(newCharge => {
-            const existingIndex = updatedCharges.findIndex(c => 
-              c.category_id === newCharge.category_id && 
-              // Strict matching to prevent duplication
-              ((!c.basis_id && !newCharge.basis_id) || c.basis_id === newCharge.basis_id) &&
-              ((!c.unit && !newCharge.unit) || c.unit === newCharge.unit)
-            );
-
-            if (existingIndex >= 0) {
-              // Update existing charge
-              const existing = updatedCharges[existingIndex];
-              
-              updatedCharges[existingIndex] = {
-                ...existing,
-                unit: newCharge.unit || existing.unit,
-                currency_id: newCharge.currency_id,
-                buy: { 
-                    ...existing.buy, 
-                    rate: newCharge.buy.rate,
-                    quantity: (existing.buy.quantity === 0 || existing.buy.quantity === 1) ? newCharge.buy.quantity : existing.buy.quantity,
-                    amount: ((existing.buy.quantity === 0 || existing.buy.quantity === 1) ? newCharge.buy.quantity : existing.buy.quantity) * newCharge.buy.rate
-                },
-                sell: { 
-                    ...existing.sell, 
-                    rate: newCharge.sell.rate, 
-                    quantity: (existing.sell.quantity === 0 || existing.sell.quantity === 1) ? newCharge.sell.quantity : existing.sell.quantity,
-                    amount: ((existing.sell.quantity === 0 || existing.sell.quantity === 1) ? newCharge.sell.quantity : existing.sell.quantity) * newCharge.sell.rate
-                },
-                note: newCharge.note || existing.note
-              };
-            } else {
-              // Add new charge
-              updatedCharges.push(newCharge);
-            }
-          });
-
-          return { ...l, charges: updatedCharges };
-        }
-        return l;
-      });
-
-      dispatch({ type: 'SET_LEGS', payload: updatedLegs });
-
-      toast({
-        title: "Rates Fetched",
-        description: `Successfully retrieved ${newCharges.length} AI rates.`,
-      });
-
-    } catch (error: any) {
-      debug.error('Error fetching rates:', error);
-      toast({
-        title: "Rate Fetch Failed",
-        description: error.message || "Could not retrieve AI rates.",
-        variant: "destructive"
-      });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  };
-
   const handleNext = () => {
     // Clear validation on navigation
     dispatch({ type: 'SET_VALIDATION', payload: { errors: [], warnings: [] } });
@@ -2586,11 +2269,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       )}
 
       {currentStep === 3 && (
-        <ChargesManagementStep
-          onConfigureBasis={openBasisModal}
-          onConfigureCombinedBasis={openCombinedBasisModal}
-          onFetchRates={handleFetchRates}
-        />
+        <ChargesManagementStep />
       )}
 
       {currentStep === 4 && (
@@ -2632,17 +2311,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         </CardContent>
       </Card>
 
-      {/* Basis Configuration Modal */}
-      <BasisConfigModal
-        open={basisModalOpen}
-        onClose={() => setBasisModalOpen(false)}
-        onSave={saveBasisConfig}
-        config={currentBasisConfig}
-        onChange={(updates) => setCurrentBasisConfig({ ...currentBasisConfig, ...updates })}
-        tradeDirections={tradeDirections}
-        containerTypes={containerTypes}
-        containerSizes={containerSizes}
-      />
+  // Basis Configuration Modal
+      <BasisConfigModal />
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog

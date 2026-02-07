@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { calculateChargeableWeight } from '@/utils/freightCalculations';
 import { Sparkles, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
@@ -47,22 +46,8 @@ export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
   const origin = quoteData.origin || '';
   const destination = quoteData.destination || '';
 
-  const getFieldError = (field: string) => {
-    // Basic mapping of validation errors to fields
-    if (field === 'commodity' && validationErrors.some(e => e.toLowerCase().includes('commodity'))) return true;
-    if (field === 'incoterms' && validationErrors.some(e => e.toLowerCase().includes('incoterm'))) return true;
-    if (field === 'validUntil' && validationErrors.some(e => e.toLowerCase().includes('valid until'))) return true;
-    if (field === 'currency' && validationErrors.some(e => e.toLowerCase().includes('currency'))) return true;
-    return false;
-  };
-
   const weight = Number(quoteData.total_weight) || 0;
   const volume = Number(quoteData.total_volume) || 0;
-
-  const airChgWeight = calculateChargeableWeight(weight, volume, 'air');
-  const seaChgWeight = calculateChargeableWeight(weight, volume, 'sea');
-  const roadChgWeight = calculateChargeableWeight(weight, volume, 'road');
-  const railChgWeight = calculateChargeableWeight(weight, volume, 'rail');
 
   const calculateDaysRemaining = (dateStr: string | undefined) => {
     if (!dateStr) return null;

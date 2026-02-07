@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,41 +10,251 @@ import { ChargeRow } from './ChargeRow';
 import { HelpTooltip } from './HelpTooltip';
 import { useQuoteStore } from './store/QuoteStore';
 import { Leg } from './store/types';
+import { useCRM } from '@/hooks/useCRM';
+import { useAiAdvisor } from '@/hooks/useAiAdvisor';
+import { useToast } from '@/hooks/use-toast';
+import { PricingService } from '@/services/pricing.service';
+import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
+import { logger } from '@/lib/logger';
 
-interface ChargesManagementStepProps {
-  // Handlers for side effects not in store (e.g., fetching rates)
-  onFetchRates?: (legId: string) => void;
-  onConfigureBasis?: (legId: string, chargeIdx: number) => void;
-  onConfigureCombinedBasis?: (chargeIdx: number) => void;
-}
+interface ChargesManagementStepProps {}
 
-export function ChargesManagementStep({
-  onFetchRates,
-  onConfigureBasis,
-  onConfigureCombinedBasis,
-}: ChargesManagementStepProps) {
+export function ChargesManagementStep({}: ChargesManagementStepProps) {
   const { state, dispatch } = useQuoteStore();
+  const { scopedDb } = useCRM();
+  const { invokeAiAdvisor } = useAiAdvisor();
+  const { toast } = useToast();
+  const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
+  
+  const [fetchingRatesFor, setFetchingRatesFor] = useState<string | null>(null);
+
   const { 
     legs, 
     charges: combinedCharges, 
     quoteData, 
     validationErrors,
-    isLoading: isPricingCalculating, // Assuming isLoading covers pricing calc for now, or add specific state
+    isLoading: isGlobalLoading,
     referenceData
   } = state;
+
+  const isPricingCalculating = isGlobalLoading || fetchingRatesFor !== null;
 
   const {
     chargeCategories,
     chargeBases,
     currencies,
-    tradeDirections,
-    containerTypes,
-    containerSizes,
     serviceTypes
   } = referenceData;
 
   const autoMargin = quoteData.autoMargin || false;
   const marginPercent = quoteData.marginPercent || 15;
+
+  const handleFetchRates = async (legId: string) => {
+    const leg = legs.find(l => l.id === legId);
+    if (!leg) return;
+
+    setFetchingRatesFor(legId);
+    dispatch({ type: 'SET_LOADING', payload: true });
+    toast({
+      title: "Fetching AI Rates",
+      description: "Consulting AI Smart Advisor for real-time market rates...",
+    });
+
+    try {
+      // 1. Prepare Payload for AI
+      // We treat this leg as a mini-shipment to get specific rates
+      const payload = {
+        origin: leg.origin,
+        destination: leg.destination,
+        commodity: quoteData.commodity || 'General Cargo',
+        mode: leg.mode.toLowerCase(),
+        // Add context if available
+        container_type: quoteData.container_type,
+        weight: quoteData.total_weight,
+        volume: quoteData.total_volume
+      };
+
+      // 2. Invoke AI Advisor
+      const aiResponse = await invokeAiAdvisor({
+        action: 'generate_smart_quotes',
+        payload
+      });
+
+      if (aiResponse.error) {
+        throw new Error(aiResponse.error.message || 'AI Advisor failed');
+      }
+
+      if (!aiResponse.data?.options || aiResponse.data.options.length === 0) {
+        throw new Error('No rates found for this route');
+      }
+
+      // 3. Process Result
+      // We take the first (best) option returned by AI
+      const bestOption = aiResponse.data.options[0];
+      const mapped = mapOptionToQuote(bestOption);
+
+      if (!mapped) throw new Error('Failed to process AI rates');
+
+      // 4. Extract Charges
+      // Collect charges from all returned legs (in case AI broke it down) and global charges
+      let extractedCharges: any[] = [];
+      
+      if (mapped.legs) {
+        mapped.legs.forEach((l: any) => {
+          if (l.charges) extractedCharges = [...extractedCharges, ...l.charges];
+        });
+      }
+      if (mapped.charges) {
+        extractedCharges = [...extractedCharges, ...mapped.charges];
+      }
+
+      if (extractedCharges.length === 0) {
+        // Fallback: If AI returned a total but no details, create a lump sum
+        if (mapped.total_amount > 0) {
+            extractedCharges.push({
+                name: 'Freight Charges',
+                amount: mapped.total_amount,
+                currency: mapped.currency || 'USD',
+                unit: 'per_shipment'
+            });
+        }
+      }
+
+      const weight = Number(quoteData.total_weight) || 0;
+      const volume = Number(quoteData.total_volume) || 0;
+      const chargeableWeight = calculateChargeableWeight(weight, volume, leg.mode as TransportMode);
+
+      // 5. Map to Composer Charge Format
+      const newCharges = await Promise.all(extractedCharges.map(async (chg) => {
+        // Find matching IDs from master data
+        const catName = chg.category || chg.name || 'Freight';
+        const cat = chargeCategories.find(c => 
+          (c.name && c.name.toLowerCase() === catName.toLowerCase()) || 
+          (c.code && c.code.toLowerCase() === catName.toLowerCase())
+        ) || chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
+
+        // Basis mapping
+        const basisName = chg.unit || 'per_shipment';
+        // Try to match basis code or name
+        let basis = chargeBases.find(b => 
+          (b.code && b.code.toLowerCase() === basisName.toLowerCase()) ||
+          (b.name && b.name.toLowerCase() === basisName.toLowerCase())
+        );
+        
+        // Fallback for common units
+        if (!basis) {
+            if (basisName.includes('kg')) basis = chargeBases.find(b => b.code === 'kg');
+            else if (basisName.includes('cbm')) basis = chargeBases.find(b => b.code === 'cbm');
+            else if (basisName.includes('cont') || basisName.includes('box')) basis = chargeBases.find(b => b.code === 'container');
+            else basis = chargeBases.find(b => b.code === 'shipment'); // Default
+        }
+
+        const curr = currencies.find(c => c.code === (chg.currency || 'USD')) || currencies[0];
+        
+        // Calculate Buy/Sell
+        // If AI provides specific buy/sell, use them. Otherwise use standard margin logic.
+        const sellRate = Number(chg.amount || chg.rate || 0);
+        let buyRate = Number(chg.buyRate || chg.cost || 0);
+        
+        if (buyRate === 0 && sellRate > 0) {
+            // Reverse calculate buy rate assuming 15% margin if not provided
+            // Use PricingService for consistent financial logic
+            const financials = await pricingService.calculateFinancials(sellRate, 15, false);
+            buyRate = financials.buyPrice;
+        }
+
+        // Determine quantity
+        let quantity = Number(chg.quantity || 1);
+        // Adjust quantity based on basis if needed (similar to original logic)
+        if (basis?.code?.toLowerCase().includes('kg') || basis?.code?.toLowerCase().includes('cbm')) {
+             quantity = chargeableWeight > 0 ? chargeableWeight : 1;
+        }
+
+        return {
+          id: `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          category_id: cat?.id || '',
+          basis_id: basis?.id || '',
+          unit: basis?.code || 'shipment',
+          currency_id: curr?.id || '',
+          buy: {
+            quantity,
+            rate: buyRate,
+            dbChargeId: null
+          },
+          sell: {
+            quantity,
+            rate: sellRate,
+            dbChargeId: null
+          },
+          note: chg.note || `AI Rate: ${chg.name || catName}`
+        };
+      }));
+
+      // 6. Update State (using smart merge)
+      const updatedLegs = legs.map(l => {
+        if (l.id === legId) {
+          // Merge new charges with existing ones to prevent duplicates
+          const updatedCharges = [...l.charges];
+          
+          newCharges.forEach(newCharge => {
+            const existingIndex = updatedCharges.findIndex(c => 
+              c.category_id === newCharge.category_id && 
+              // Strict matching to prevent duplication
+              ((!c.basis_id && !newCharge.basis_id) || c.basis_id === newCharge.basis_id) &&
+              ((!c.unit && !newCharge.unit) || c.unit === newCharge.unit)
+            );
+
+            if (existingIndex >= 0) {
+              // Update existing charge
+              const existing = updatedCharges[existingIndex];
+              
+              updatedCharges[existingIndex] = {
+                ...existing,
+                buy: {
+                  ...existing.buy,
+                  rate: newCharge.buy.rate > 0 ? newCharge.buy.rate : existing.buy.rate
+                },
+                sell: {
+                  ...existing.sell,
+                  rate: newCharge.sell.rate > 0 ? newCharge.sell.rate : existing.sell.rate
+                },
+                note: existing.note || newCharge.note
+              };
+            } else {
+              // Add new charge
+              updatedCharges.push(newCharge);
+            }
+          });
+          
+          return { ...l, charges: updatedCharges };
+        }
+        return l;
+      });
+
+      // Update all legs at once (though we only modified one)
+      const targetLeg = updatedLegs.find(l => l.id === legId);
+      if (targetLeg) {
+         dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: targetLeg.charges } } });
+      }
+
+      toast({
+        title: "Rates Updated",
+        description: `Successfully fetched and applied ${newCharges.length} rate(s) for this leg.`,
+      });
+
+    } catch (error: any) {
+      logger.error('Error fetching rates:', error);
+      toast({
+        title: "Rate Fetch Failed",
+        description: error.message || "Could not retrieve rates at this time.",
+        variant: "destructive"
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      setFetchingRatesFor(null);
+    }
+  };
 
   const handleAutoMarginChange = (enabled: boolean) => {
     dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { autoMargin: enabled } });
@@ -93,11 +304,7 @@ export function ChargesManagementStep({
   };
 
   const handleRemoveCharge = (legId: string, chargeIdx: number) => {
-    const leg = legs.find(l => l.id === legId);
-    if (!leg) return;
-
-    const updatedCharges = leg.charges.filter((_, i) => i !== chargeIdx);
-    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+    dispatch({ type: 'REMOVE_LEG_CHARGE', payload: { legId, chargeIdx } });
   };
 
   // Combined Charge Handlers
@@ -261,12 +468,24 @@ export function ChargesManagementStep({
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    {onFetchRates && (
-                      <Button onClick={() => onFetchRates(leg.id)} size="sm" variant="outline">
-                        <Globe className="mr-2 h-4 w-4" />
-                        Fetch Rates
-                      </Button>
-                    )}
+                    <Button 
+                      onClick={() => handleFetchRates(leg.id)} 
+                      size="sm" 
+                      variant="outline"
+                      disabled={fetchingRatesFor === leg.id}
+                    >
+                      {fetchingRatesFor === leg.id ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Fetching...
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="mr-2 h-4 w-4" />
+                          Fetch Rates
+                        </>
+                      )}
+                    </Button>
                     <Button onClick={() => handleAddCharge(leg.id)} size="sm">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Charge
@@ -283,7 +502,7 @@ export function ChargesManagementStep({
                       currencies={currencies}
                       onUpdate={(idx, field, value) => handleUpdateCharge(leg.id, idx, field, value)}
                       onRemove={(idx) => handleRemoveCharge(leg.id, idx)}
-                      onConfigureBasis={(idx) => onConfigureBasis?.(leg.id, idx)}
+                      onConfigureBasis={(idx) => dispatch({ type: 'OPEN_BASIS_MODAL', payload: { target: { type: 'leg', legId: leg.id, chargeIdx: idx } } })}
                       height={400}
                     />
                     {renderTotals(totals, margin, marginPercentVal)}
@@ -342,7 +561,7 @@ export function ChargesManagementStep({
                         currencies={currencies}
                         onUpdate={(field, value) => handleUpdateCombinedCharge(idx, field, value)}
                         onRemove={() => handleRemoveCombinedCharge(idx)}
-                        onConfigureBasis={() => onConfigureCombinedBasis?.(idx)}
+                        onConfigureBasis={() => dispatch({ type: 'OPEN_BASIS_MODAL', payload: { target: { type: 'combined', chargeIdx: idx } } })}
                         showBuySell={true}
                       />
                     ))}
