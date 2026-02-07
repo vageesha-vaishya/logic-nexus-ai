@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen } from 'lucide-react';
 import type { Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -64,6 +64,7 @@ export const APP_MENU: MenuModule[] = [
   {
     label: 'Logistics',
     items: [
+      { name: 'Bookings', path: '/dashboard/bookings', icon: BookOpen, description: 'Manage bookings' },
       { name: 'Shipments', path: '/dashboard/shipments/pipeline', icon: Package, description: 'Track shipments' },
       { name: 'Warehouses', path: '/dashboard/warehouses', icon: Warehouse, description: 'Manage warehouses' },
       { name: 'Vehicles', path: '/dashboard/vehicles', icon: Truck, description: 'Fleet management' },

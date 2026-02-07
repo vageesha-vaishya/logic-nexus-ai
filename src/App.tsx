@@ -71,6 +71,9 @@ const More = lazy(() => import("./pages/dashboard/More"));
 const PermissionsMatrix = lazy(() => import("./pages/dashboard/PermissionsMatrix"));
 const AuditLogs = lazy(() => import("./pages/dashboard/AuditLogs"));
 const CustomRoles = lazy(() => import("./pages/dashboard/CustomRoles"));
+const Bookings = lazy(() => import("./pages/dashboard/Bookings"));
+const BookingNew = lazy(() => import("./pages/dashboard/BookingNew"));
+const BookingDetail = lazy(() => import("./pages/dashboard/BookingDetail"));
 const Shipments = lazy(() => import("./pages/dashboard/Shipments"));
 const ShipmentNew = lazy(() => import("./pages/dashboard/ShipmentNew"));
 const ShipmentDetail = lazy(() => import("./pages/dashboard/ShipmentDetail"));
@@ -682,6 +685,9 @@ const App = () => (
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             {/* Logistics Routes */}
+            <Route path="/dashboard/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
+            <Route path="/dashboard/bookings/new" element={<ProtectedRoute><BookingNew /></ProtectedRoute>} />
+            <Route path="/dashboard/bookings/:id" element={<ProtectedRoute><BookingDetail /></ProtectedRoute>} />
             <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/pipeline" element={<ProtectedRoute><ShipmentsPipeline /></ProtectedRoute>} />

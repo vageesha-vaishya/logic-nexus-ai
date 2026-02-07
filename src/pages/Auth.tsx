@@ -76,6 +76,10 @@ export default function Auth() {
         }
       } else if (error.message.includes('Email not confirmed')) {
         toast.error('Please verify your email address');
+      } else if (error.message.includes('Failed to fetch')) {
+        toast.error('Connection Error', { 
+          description: 'Could not connect to the server. Please check your internet connection or VPN.' 
+        });
       } else {
         toast.error(error.message);
       }
