@@ -25,7 +25,7 @@ This comprehensive analysis provides a complete assessment of the Logic Nexus AI
 5. **Domain Expansion**: Prepare architecture for multi-vertical platform (Logistics, Banking, Telecom, etc.)
 
 **Critical Findings Summary:**
-- ✅ **Strengths**: Multi-domain plugin architecture (8 domains), 35 platform features (16 fully implemented), 8 AI Edge Functions, established 3-tier hierarchy, 347 RLS policies across 145 tables, 46 Edge Functions with auth hardening, dual-layer data isolation (RLS + ScopedDataAccess)
+- ✅ **Strengths**: Multi-domain plugin architecture (8 domains), 161 dashboard pages spanning 47 features (26 fully implemented) + 8 AI Edge Functions + 20+ master data pages + 6 Kanban pipeline views, established 3-tier hierarchy, 347 RLS policies across 145 tables, 46 Edge Functions with auth hardening, dual-layer data isolation (RLS + ScopedDataAccess)
 - ⚠️ **Technical Debt**: Quote system maintainability (30+ files), TypeScript strict mode disabled, no code coverage tooling, 46 failing tests, no pre-commit hooks
 - 🔴 **Critical Gaps**: Credentials in git history need rotation, ~22% production readiness score, no APM/distributed tracing, no mobile app, rule-based heuristics only (no ML)
 - 🎯 **Priority**: Phase 1 must address credential rotation, monitoring, TypeScript strictness, and testing infrastructure before expanding features
@@ -41,6 +41,7 @@ This comprehensive analysis provides a complete assessment of the Logic Nexus AI
 - 1.3 Database Architecture & Tenant Isolation
 - 1.4 Plugin System Design Patterns
 - 1.5 Multi-Tenant Access Control Analysis
+- 1.6 Enterprise Readiness Assessment
 
 **Section 2: Complete Business Workflow Analysis**
 - 2.A Pre-Quotation (CRM) Workflows
@@ -73,13 +74,15 @@ This comprehensive analysis provides a complete assessment of the Logic Nexus AI
   - 3.4.2 Partially Implemented / Simulated Features (5 features)
   - 3.4.3 Placeholder / Coming-Soon Features (6 features)
   - 3.4.4 AI & Intelligence Edge Functions (8 functions)
-  - 3.4.5 Platform Feature Completeness Summary
+  - 3.4.5 Operational & Administrative Features (10 features)
+  - 3.4.6 Master Data & Reference Pages (20+ pages)
+  - 3.4.7 Platform Feature Completeness Summary
 
 **Section 4: Multi-Domain Capability Gap Analysis** _(Pages 111-125)_
 
 **Section 5: Competitive Benchmarking** _(Pages 126-160)_
 
-**Section 6: Technical Enhancement Roadmap** _(Pages 161-185)_
+**Section 6: Enterprise Implementation Roadmap** _(Pages 161-185)_
 
 **Section 7: Technical Specifications**
 - 7.1 System Architecture (Frontend, Backend, State Management, Bundle Optimization)
@@ -3740,8 +3743,9 @@ While 2.B.5 handles the *transactional* cash flow, 2.B.6 manages the *accounting
 
 #### 2.B.6.1 Current Architecture & Implementation Status
 
-**Current State:** 🔴 **Non-Existent**
-*   **GL Structure:** No `chart_of_accounts` or `gl_codes` tables exist.
+**Current State:** 🟡 **Partially Implemented (Journal Entries Only)**
+*   **GL Structure:** No `chart_of_accounts` or `gl_codes` tables exist. However, `finance.journal_entries` table EXISTS in the `finance` schema with columns for `tenant_id`, `reference_id`, `reference_type`, `sync_status`, `retry_count`, `synced_at`, `external_id`.
+*   **GL Sync Service:** `src/services/gl/GLSyncService.ts` implements transaction sync with retry logic. Creates journal entry records, tracks status (PENDING → SYNCED / FAILED), includes retry count tracking. External connector is mocked (awaits Xero/QBO/SAP integration).
 *   **Revenue Recognition:** System currently operates on a "Cash-Basis approximation" (Revenue = Invoice Date), which is incorrect for freight forwarding.
 *   **WIP:** No concept of "Unbilled Revenue" or "Accrued Expenses".
 
@@ -3781,7 +3785,7 @@ CREATE TABLE journal_entry_lines (
 | Feature | Logic Nexus (Current) | Market Standard (Cargowise) | Gap Severity |
 | :--- | :--- | :--- | :--- |
 | **Accruals** | ❌ None | ✅ Auto-accrue on ETD/ETA | 🔥 **Critical** |
-| **GL Mapping** | ❌ None | ✅ Charge Code -> GL Code | 🔥 **Critical** |
+| **GL Mapping** | 🟡 Journal entries exist, no COA mapping | ✅ Charge Code -> GL Code | 🔴 High |
 | **Period Closing** | ❌ None | ✅ Soft/Hard Close | 🔴 High |
 | **Financial Reports** | ❌ None | ✅ Trial Balance / P&L | 🔴 High |
 
@@ -3827,8 +3831,9 @@ While 2.B.6 establishes the *internal* ledger, 2.B.7 manages the bridge to *exte
 
 #### 2.B.7.1 Current Architecture & Implementation Status
 
-**Current State:** 🔴 **Non-Existent**
-*   **Infrastructure:** No integration tables or service classes exist.
+**Current State:** 🟡 **Foundation Exists (Simulated Sync)**
+*   **Infrastructure:** `GLSyncService` (`src/services/gl/GLSyncService.ts`) provides the sync pipeline framework. Creates `finance.journal_entries` records with `sync_status` (PENDING/SYNCED/FAILED), `retry_count`, `synced_at`, and `external_id`. Type definitions in `src/services/gl/types.ts`. Unit tests in `GLSyncService.test.ts`.
+*   **Mock Connector:** External API call is simulated (`mockExternalSync`) — no real Xero/QBO/NetSuite connector is wired.
 *   **Placeholders:** The `invoices` table has a `metadata` column intended for external IDs (e.g., `xero_id`), but no logic populates it.
 *   **Manual Process:** Users currently export PDF invoices and manually re-key them into their accounting software.
 
@@ -3873,7 +3878,7 @@ CREATE TABLE sync_logs (
 | **QBO/Xero Sync** | ❌ None | ✅ Native Plug-in | 🔥 **Critical** |
 | **Tax Code Mapping** | ❌ None | ✅ Auto-map Tax Rates | 🔴 High |
 | **Payment Sync** | ❌ None | ✅ Two-way Sync | 🔴 High |
-| **Error Handling** | ❌ None | ✅ Retry Queue | 🟡 Medium |
+| **Error Handling** | 🟡 GLSyncService has retry count tracking | ✅ Retry Queue | 🟡 Low |
 
 **Critical Risks:**
 1.  **Data Discrepancy:** Manual entry leads to typing errors, causing the Operational System and Financial System to disagree.
@@ -4219,16 +4224,55 @@ These Edge Functions provide AI/ML capabilities but are not directly surfaced as
 | `analyze-cargo-damage` | AI cargo damage assessment | Vision API | Shipment detail |
 | `extract-invoice-items` | OCR invoice line items | OpenAI API | Invoice creation |
 
-#### 3.4.5 Platform Feature Completeness Summary
+#### 3.4.5 Operational & Administrative Features
+
+These pages provide core operational workflows and admin capabilities:
+
+| # | Feature | Status | Key Files | Description |
+|---|---------|--------|-----------|-------------|
+| 1 | **Customs Clearance Pipeline** | ✅ 100% | `CustomsClearancePipeline.tsx` | Kanban-style pipeline for customs clearance stages. Drag-and-drop workflow management. |
+| 2 | **Rate Management** | ✅ 100% | `RateManagement.tsx`, `RateSheetsTab` | Rate sheet analysis and management with AI advisor integration (`useAiAdvisor` hook). |
+| 3 | **Security Overview** | ✅ 100% | `SecurityOverview.tsx` | Admin security dashboard: RLS policy viewer, SQL query capability, data management. |
+| 4 | **Subscription Management** | ✅ 100% | `SubscriptionManagement.tsx`, `MasterDataSubscriptionPlans.tsx`, `MasterDataSubscriptions.tsx`, `TenantSubscription.tsx` | Tenant subscription lifecycle: plan management, subscription instances, usage metrics. |
+| 5 | **Queue Management** | ✅ 100% | `QueueManagement.tsx` | Email queue management with round-robin and holding queue types. |
+| 6 | **Domain Management** | ✅ 100% | `DomainManagement.tsx`, `PlatformDomains.tsx`, `PlatformDomainDetail.tsx` | Platform domain configuration, plugin activation per domain. |
+| 7 | **System Logs Dashboard** | ✅ 100% | `SystemLogs.tsx` | Real-time system event logging with time-series charts, severity filtering, date range picker, export, and Recharts visualizations. |
+| 8 | **Custom Roles** | ✅ 100% | `CustomRoles.tsx`, `RolesPermissions.tsx` | Custom role creation and management beyond the 4 base roles. |
+| 9 | **Pipeline Views** | ✅ 100% | `OpportunitiesPipeline.tsx`, `ShipmentsPipeline.tsx`, `QuotesPipeline.tsx`, `AccountsPipeline.tsx`, `ContactsPipeline.tsx`, `LeadsPipeline.tsx` | Kanban boards for all major entities (drag-and-drop stage progression). |
+| 10 | **Shipment Document Viewer** | ✅ 100% | `ShipmentDocumentViewer.tsx` | Document viewer for shipment-related documents with preview/download. |
+
+#### 3.4.6 Master Data & Reference Pages
+
+The platform includes 20+ master data management pages for reference data:
+
+| Category | Pages | Description |
+|----------|-------|-------------|
+| **Commodity Data** | `Commodities.tsx`, `CommodityDetail.tsx` | Product/commodity master data with search, filter, and detail views |
+| **Tariff & Classification** | `MasterDataHTS.tsx`, `AESHTSCodeManager`, `VisualHTSBrowser` | Harmonized Tariff Schedule code browser with hierarchical visualization |
+| **Geography** | `MasterDataGeography.tsx`, `PortsLocations.tsx` | Continents, countries, states, cities, and port locations with import/seed capabilities |
+| **Container References** | `ContainerSizes.tsx`, `ContainerTypes.tsx`, `VesselClasses.tsx`, `VesselTypes.tsx`, `Vessels.tsx` | Container dimensions, vessel specifications, and fleet data |
+| **Logistics References** | `Carriers.tsx`, `Services.tsx`, `ServiceTypes.tsx`, `ServiceTypeMappings.tsx`, `TransportModes.tsx`, `Incoterms.tsx` | Carrier registry, service catalogs, transport mode configuration |
+| **Financial References** | `Currencies.tsx`, `ChargeCategories.tsx`, `ChargeBases.tsx`, `ChargeSides.tsx` | Currency master, charge classification taxonomy |
+| **Packaging** | `PackageCategories.tsx`, `PackageSizes.tsx`, `CargoTypes.tsx`, `CargoDetails.tsx` | Package dimensions, cargo classification |
+| **Vehicle & Warehouse** | `Vehicles.tsx`, `VehicleNew.tsx`, `Warehouses.tsx`, `WarehouseNew.tsx` | Fleet and warehouse management |
+| **System Config** | `Settings.tsx`, `QuoteNumberSettings.tsx`, `QuoteTemplates.tsx` | Platform settings, document numbering, quote templates |
+| **User & Tenant Admin** | `Users.tsx`, `UserNew.tsx`, `UserDetail.tsx`, `Tenants.tsx`, `TenantNew.tsx`, `TenantDetail.tsx`, `Franchises.tsx`, `FranchiseNew.tsx`, `FranchiseDetail.tsx` | Multi-tier user and organization administration |
+| **Dev/QA Utilities** | `UIDemoAdvanced.tsx`, `UIDemoForms.tsx`, `LogTest.tsx`, `More.tsx`, `DataManagement.tsx` | Internal dev tools, UI showcases, and utility pages |
+
+#### 3.4.7 Platform Feature Completeness Summary
 
 ```
-Fully Implemented (100%)     ████████████████░░░░  16 features
-Partially Implemented (30-60%) ████░░░░░░░░░░░░░░░░   5 features
-Placeholder / Stub (0-10%)   ██████░░░░░░░░░░░░░░   6 features
-AI Edge Functions            ████████░░░░░░░░░░░░   8 functions
+Fully Implemented (100%)       ██████████████████████████░░  26 features
+Partially Implemented (30-60%) ████░░░░░░░░░░░░░░░░░░░░░░░░   5 features
+Placeholder / Stub (0-10%)     ██████░░░░░░░░░░░░░░░░░░░░░░   6 features
+AI Edge Functions              ████████░░░░░░░░░░░░░░░░░░░░   8 functions
+Master Data Pages              ████████████████████░░░░░░░░  20+ pages
+Pipeline/Kanban Views          ██████░░░░░░░░░░░░░░░░░░░░░░   6 views
+Admin Pages                    █████████░░░░░░░░░░░░░░░░░░░   9 pages
 
-Total Feature Surface Area: 35 distinct features + 8 AI functions
-Implementation Coverage:     ~65% of feature surface area is production-ready
+Total Dashboard Pages: 161 .tsx files
+Total Feature Surface Area: 47 distinct features + 8 AI functions + 20+ master data pages
+Implementation Coverage:     ~70% of feature surface area is production-ready
 ```
 
 ---
@@ -5525,7 +5569,7 @@ Logic Nexus AI is positioned to occupy a unique strategic niche: **the only plat
 | **Architecture** | Solid multi-tenant with plugin system | Fully domain-agnostic, enterprise-scale | Plugin completion, API gateway, rate limiting |
 | **Testing** | 339 tests (293 passing), 76 test files | 80% coverage, full E2E suite, CI gates | Coverage tooling, pre-commit hooks, TypeScript strict |
 | **Operations** | Docker-based, GitHub Actions CI | Automated deploy, monitoring, incident response | APM, alerting, runbooks, on-call rotation |
-| **Features** | 35 features (16 complete, 5 partial, 6 placeholder) + 8 AI functions | Industry-leading quote-to-cash workflow | Mobile app, real-time tracking API, EDI connectivity, ML models |
+| **Features** | 161 dashboard pages, 47 features (26 complete, 5 partial, 6 placeholder) + 8 AI functions + 20+ master data pages | Industry-leading quote-to-cash workflow | Mobile app, real-time tracking API, EDI connectivity, ML models |
 | **Production** | ~22% ready (weighted score) | >90% ready | 8-12 weeks focused effort |
 
 **Critical Path to Production (Priority Order):**
