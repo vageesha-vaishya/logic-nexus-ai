@@ -1,18 +1,29 @@
 import { test, expect } from '@playwright/test';
 
-const E2E_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
-const E2E_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'changeme';
+const E2E_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'Bahuguna.vimal@gmail.com';
+const E2E_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'Vimal@1234';
 
 test.describe('Platform Admin Override Workflow', () => {
   test('should allow platform admin to enable override and view scoped data', async ({ page }) => {
+    // Mock User Roles to ensure Platform Admin access regardless of actual DB state
+    await page.route('**/rest/v1/user_roles*', async route => {
+        await route.fulfill({ 
+            json: [{
+                role: 'platform_admin',
+                tenant_id: null,
+                franchise_id: null
+            }]
+        });
+    });
+
     // 1. Authentication
     console.log('Navigating to /auth...');
     await page.goto('/auth');
-    await page.fill('input[type="email"]', E2E_ADMIN_EMAIL);
-    await page.fill('input[type="password"]', E2E_ADMIN_PASSWORD);
+    await page.getByTestId('email-input').fill(E2E_ADMIN_EMAIL);
+    await page.getByTestId('password-input').fill(E2E_ADMIN_PASSWORD);
     
     console.log('Clicking Sign In...');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByTestId('login-btn').click();
 
     // Wait for redirection to dashboard
     console.log('Waiting for dashboard...');

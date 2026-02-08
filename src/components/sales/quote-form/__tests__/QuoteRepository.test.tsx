@@ -1,6 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useQuoteRepository } from '../useQuoteRepository';
+import { useQuoteRepositoryForm } from '../useQuoteRepository';
 import { renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const createTestQueryClient = () => new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: false,
+        },
+    },
+});
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={createTestQueryClient()}>
+        {children}
+    </QueryClientProvider>
+);
 
 // Mock useCRM and useAuth
 const mockInsert = vi.fn();
@@ -12,6 +27,7 @@ const mockMaybeSingle = vi.fn();
 const mockLimit = vi.fn();
 const mockGt = vi.fn();
 const mockOrder = vi.fn();
+const mockIs = vi.fn();
 
 const mockFrom = vi.fn(() => ({
   insert: mockInsert,
@@ -21,14 +37,25 @@ const mockFrom = vi.fn(() => ({
 }));
 
 // Chain mocks
+const mockChain: any = {
+  maybeSingle: mockMaybeSingle,
+  eq: mockEq,
+  limit: mockLimit,
+  gt: mockGt,
+  order: mockOrder,
+  is: mockIs,
+  then: (resolve: any) => resolve({ data: [], error: null })
+};
+
 mockInsert.mockReturnValue({ select: mockSelect });
 mockUpdate.mockReturnValue({ eq: mockEq });
 mockDelete.mockReturnValue({ eq: mockEq });
-mockSelect.mockReturnValue({ maybeSingle: mockMaybeSingle, eq: mockEq, limit: mockLimit, gt: mockGt, order: mockOrder });
-mockEq.mockReturnValue({ maybeSingle: mockMaybeSingle, eq: mockEq, limit: mockLimit, gt: mockGt, order: mockOrder }); // Allow chaining
-mockGt.mockReturnValue({ maybeSingle: mockMaybeSingle, eq: mockEq, limit: mockLimit, order: mockOrder });
-mockOrder.mockReturnValue({ maybeSingle: mockMaybeSingle, limit: mockLimit });
-mockLimit.mockResolvedValue({ error: null });
+mockSelect.mockReturnValue(mockChain);
+mockEq.mockReturnValue(mockChain); // Allow chaining
+mockGt.mockReturnValue(mockChain);
+mockOrder.mockReturnValue(mockChain);
+mockLimit.mockReturnValue(mockChain);
+mockIs.mockReturnValue(mockChain);
 
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
@@ -63,7 +90,8 @@ describe('useQuoteRepository', () => {
   });
 
   it('should save a new quote with items', async () => {
-    const { result } = renderHook(() => useQuoteRepository());
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
     
     const quoteData = {
       title: 'Test Quote',
@@ -99,7 +127,8 @@ describe('useQuoteRepository', () => {
   });
 
   it('should update an existing quote and replace items', async () => {
-    const { result } = renderHook(() => useQuoteRepository());
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
     
     const quoteData = {
       title: 'Updated Quote',

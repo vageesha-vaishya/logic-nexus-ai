@@ -466,7 +466,7 @@ export default function OpportunityDetail() {
             <Card>
               <CardHeader className="flex items-center justify-between">
                 <CardTitle>Quotes</CardTitle>
-                <Button size="sm" onClick={() => navigate(`/dashboard/quotes/new?opportunityId=${id}`)}>New Quote</Button>
+                <Button size="sm" onClick={() => navigate(`/dashboard/quotes/new?opportunityId=${id}`)} data-testid="new-quote-btn">New Quote</Button>
               </CardHeader>
               <CardContent>
                 {quotesLoading ? (
@@ -490,14 +490,14 @@ export default function OpportunityDetail() {
                                 <SelectItem value="endsWith">Ends With</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Input placeholder="Search number" value={quoteNumberQuery} onChange={(e) => setQuoteNumberQuery(e.target.value)} />
+                            <Input placeholder="Search number" value={quoteNumberQuery} onChange={(e) => setQuoteNumberQuery(e.target.value)} data-testid="quote-search-input" />
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <Label>Status</Label>
                           <Select value={quoteStatus} onValueChange={setQuoteStatus}>
-                            <SelectTrigger><SelectValue placeholder="Any status" /></SelectTrigger>
+                            <SelectTrigger data-testid="quote-status-filter"><SelectValue placeholder="Any status" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="draft">Draft</SelectItem>

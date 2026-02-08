@@ -22,3 +22,5 @@ export function useQuoteContext() {
   }
   return context;
 }
+
+export type QuoteContextType = ReturnType<typeof useQuoteData>;

@@ -164,7 +164,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
               <FormItem>
                 <FormLabel>Opportunity Name *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter opportunity name" {...field} />
+                  <Input placeholder="Enter opportunity name" {...field} data-testid="opportunity-name-input" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -187,7 +187,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
                   defaultValue={field.value}
                 >
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger data-testid="stage-select-trigger">
                       <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                   </FormControl>
@@ -239,7 +239,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
               <FormItem>
                 <FormLabel>Expected Close Date</FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} />
+                  <Input type="date" {...field} data-testid="close-date-input" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -484,7 +484,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">Save Opportunity</Button>
+          <Button type="submit" data-testid="save-opportunity-btn">Save Opportunity</Button>
         </div>
       </form>
     </Form>

@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useQuoteContext } from './QuoteContext';
+import { QuoteContextType, useQuoteContext } from './QuoteContext';
+import { DateField } from '@/components/forms/AdvancedFields';
 import { FileText, Building2, User, Briefcase, Info, X, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -28,7 +29,7 @@ import { Label } from "@/components/ui/label";
 
 export function QuoteHeader() {
   const { control, setValue, register, watch } = useFormContext();
-  const { opportunities, accounts, contacts, isLoadingOpportunities } = useQuoteContext();
+  const { opportunities, accounts, contacts, isLoadingOpportunities } = useQuoteContext() as QuoteContextType;
   const [open, setOpen] = useState(false);
 
   const opportunityId = useWatch({ control, name: 'opportunity_id' });
@@ -123,7 +124,7 @@ export function QuoteHeader() {
                     <FormItem>
                         <FormLabel>Quote Title</FormLabel>
                         <FormControl>
-                        <Input placeholder="e.g. Q4 Logistics Proposal for Acme Corp" className="text-lg font-medium" {...field} />
+                        <Input placeholder="e.g. Q4 Logistics Proposal for Acme Corp" className="text-lg font-medium" {...field} data-testid="quote-title-input" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -155,6 +156,52 @@ export function QuoteHeader() {
                     )}
                 />
             </div>
+        </div>
+
+        {/* Date Fields Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <DateField
+                control={control}
+                name="pickup_date"
+                label="Pickup Date"
+                placeholder="Select pickup date"
+            />
+            <DateField
+                control={control}
+                name="delivery_deadline"
+                label="Delivery Deadline"
+                placeholder="Select delivery deadline"
+            />
+        </div>
+
+        {/* Logistics Details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <FormField
+                control={control}
+                name="vehicle_type"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Vehicle Type</FormLabel>
+                    <FormControl>
+                    <Input placeholder="e.g. 53' Dry Van, Flatbed" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+             <FormField
+                control={control}
+                name="special_handling"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Special Handling</FormLabel>
+                    <FormControl>
+                    <Input placeholder="e.g. Liftgate, Hazmat" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
         </div>
 
         <FormField

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
 import { useDebug } from '@/hooks/useDebug';
+import { Button } from "@/components/ui/button";
 
 export default function QuoteDetail() {
   const { id } = useParams();
@@ -195,9 +196,20 @@ export default function QuoteDetail() {
           </Breadcrumb>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">Edit Quote</h1>
-            {resolvedId && (
-              <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
-            )}
+            <div className="flex gap-2">
+              {resolvedId && (
+                <>
+                  <Button 
+                      variant="outline" 
+                      onClick={() => navigate(`/dashboard/bookings/new?quoteId=${resolvedId}`)}
+                      data-testid="convert-booking-btn"
+                  >
+                      Convert to Booking
+                  </Button>
+                  <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
+                </>
+              )}
+            </div>
           </div>
         </div>
         <QuoteForm 
@@ -205,7 +217,10 @@ export default function QuoteDetail() {
             versionId={versionId || undefined}
             onSuccess={handleSuccess} 
         />
-        <QuotationVersionHistory quoteId={resolvedId ?? id as string} />
+        <QuotationVersionHistory 
+            quoteId={resolvedId ?? id as string} 
+            key={versionId} // Force reload when version is resolved/created
+        />
         
       </div>
     </DashboardLayout>

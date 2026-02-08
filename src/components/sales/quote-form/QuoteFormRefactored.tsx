@@ -101,7 +101,7 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
     }
   }, [autoSave, hasAutoSaved, quoteId, initialData, form]);
 
-  const onSubmit = async (data: QuoteFormValues) => {
+  const onSubmit = async (data: QuoteFormValues): Promise<boolean> => {
     setIsSubmitting(true);
     const startTime = performance.now();
     formDebug.logSubmit(data); // Log submission start
@@ -131,12 +131,14 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
       }
 
       if (onSuccess) onSuccess(savedId);
+      return true;
     } catch (error: any) {
       const duration = performance.now() - startTime;
       console.error('Submission error:', error);
       formDebug.logError(error, { duration: `${duration.toFixed(2)}ms` }); // Log error with metrics
       const description = error?.message || 'Unexpected error during save';
       toast.error('Failed to save quote', { description });
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -183,8 +185,10 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
                         type="button" 
                         variant="secondary"
                         onClick={form.handleSubmit(async (data) => {
-                            await onSubmit(data);
-                            setViewMode('composer');
+                            const success = await onSubmit(data);
+                            if (success) {
+                                setViewMode('composer');
+                            }
                         })}
                         disabled={isSubmitting || isHydrating}
                         className="gap-2"
@@ -197,7 +201,7 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
                     <X className="h-4 w-4" />
                     Cancel
                  </Button>
-                 <Button type="submit" disabled={isSubmitting || isHydrating} className="gap-2 shadow-sm">
+                 <Button type="submit" disabled={isSubmitting || isHydrating} className="gap-2 shadow-sm" data-testid="save-quote-btn">
                     {isSubmitting ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (

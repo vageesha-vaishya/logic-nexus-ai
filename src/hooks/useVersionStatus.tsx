@@ -48,6 +48,28 @@ export function useVersionStatus() {
         return false;
       }
 
+      // If status is 'accepted', also update the parent quote status
+      if (newStatus === 'accepted') {
+        // First get the quote_id from the version
+        const { data: versionData } = await scopedDb
+          .from('quotation_versions')
+          .select('quote_id')
+          .eq('id', versionId)
+          .single();
+
+        if (versionData?.quote_id) {
+           const { error: quoteError } = await scopedDb
+             .from('quotes')
+             .update({ status: 'accepted' })
+             .eq('id', versionData.quote_id);
+           
+           if (quoteError) {
+             console.error('Error updating parent quote status:', quoteError);
+             toast.error('Failed to update parent quote status');
+           }
+        }
+      }
+
       toast.success('Status Updated', {
         description: `Version status changed to ${newStatus}`,
       });

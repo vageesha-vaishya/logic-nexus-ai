@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Printer, FileText, Package, Box, Calculator } from 'lucide-react';
 import { LandedCostService, LandedCostResult } from '@/services/quotation/LandedCostService';
@@ -126,6 +126,9 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [] }: Docum
         `}</style>
         <DialogHeader className="no-print">
           <DialogTitle>Document Preview</DialogTitle>
+          <DialogDescription className="sr-only">
+            Preview of the generated quotation document including details, legs, and charges.
+          </DialogDescription>
         </DialogHeader>
         
         <Tabs defaultValue="quote" className="w-full">

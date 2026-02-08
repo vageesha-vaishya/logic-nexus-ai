@@ -368,7 +368,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   };
 
   return (
-    <Card>
+    <Card data-testid="quotation-version-history">
       <CardHeader>
         <CardTitle>Quotation Versions</CardTitle>
       </CardHeader>
