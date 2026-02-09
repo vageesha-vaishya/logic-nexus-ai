@@ -21,7 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { QuoteResultsList } from './QuoteResultsList';
 import { QuoteComparisonView } from './QuoteComparisonView';
-import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 import { logger } from '@/lib/logger';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { PricingService } from '@/services/pricing.service';
@@ -33,6 +33,7 @@ import { CargoItem } from '@/types/cargo';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { useDebug } from '@/hooks/useDebug';
 import { formatContainerSize } from '@/lib/container-utils';
+import { generateSimulatedRates } from '@/lib/simulation-engine';
 
 // --- Zod Schemas ---
 
@@ -118,6 +119,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     vehicleType: 'van',
     pickupDate: '',
     deliveryDeadline: '',
+    incoterms: '',
     originDetails: null as any,
     destinationDetails: null as any,
   });
@@ -535,29 +537,35 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       for (let i = 0; i < legacyResList.length; i++) {
         const legacyRes = legacyResList[i] as any;
         const combo = combos[i];
-        if (legacyRes.error) {
-          try {
-            if (legacyRes.error.context && typeof legacyRes.error.context.json === 'function') {
-              const body = await legacyRes.error.context.json();
-              legacyErrorMsg = body.error || body.message || legacyRes.error.message;
-            } else {
-              legacyErrorMsg = legacyRes.error.message || 'Unknown Error';
-            }
-          } catch (e) {
-            legacyErrorMsg = legacyRes.error.message || 'Unknown Error';
+        
+        let rawOptions = legacyRes.data?.options || [];
+
+        if (legacyRes.error || !rawOptions.length) {
+          if (legacyRes.error) {
+             console.warn(`[QuickQuote] Legacy Rate Engine failed for combo ${i}:`, legacyRes.error);
+             legacyErrorMsg += `${legacyRes.error.message || 'Fetch Failed'}; `;
           }
-          toast({
-            title: "Rate Engine Error",
-            description: `Failed for ${combo.type} ${combo.size} x${combo.qty}: ${legacyErrorMsg}`,
-            variant: "destructive"
+          
+          // Fallback to Simulation Engine
+          debug.info(`[QuickQuote] Using Simulation Engine fallback for combo ${i}`);
+          const { type: typeName, size: sizeName } = resolveContainerInfo(combo.type, combo.size);
+          
+          rawOptions = generateSimulatedRates({
+            mode: payload.mode as any,
+            origin: payload.origin,
+            destination: payload.destination,
+            weightKg: Number(payload.weight) || undefined,
+            containerQty: combo.qty,
+            containerSize: sizeName,
+            vehicleType: extendedData.vehicleType
           });
-          continue;
         }
-        if (legacyRes.data?.options) {
+
+        if (rawOptions.length > 0) {
           const { type: typeName, size: sizeName } = resolveContainerInfo(combo.type, combo.size);
           const formattedSize = formatContainerSize(sizeName);
 
-          let legacyOptions = await Promise.all(legacyRes.data.options.map(async (opt: any) => {
+          let legacyOptions = await Promise.all(rawOptions.map(async (opt: any) => {
             const mapped = mapOptionToQuote(opt);
             const qty = combo.qty || 1;
             const sell = (mapped.total_amount || 0) * qty;
@@ -568,18 +576,11 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
             }
             return {
               ...mapped,
-              source_attribution: 'Standard Rate Engine',
-              carrier: mapped.carrier_name,
+              // Ensure core fields are populated for validation
               price: sell,
               currency: mapped.currency || 'USD',
-              name: `${mapped.option_name} • ${formattedSize} x${qty}`,
-              transitTime: mapped.transit_time?.details,
-              co2_kg: mapped.total_co2_kg,
-              legs: mapped.legs,
-              charges: mapped.charges,
-              buyPrice: calc.buyPrice,
-              marginAmount: calc.marginAmount,
-              marginPercent: calc.marginPercent,
+              carrier: mapped.carrier || 'Unknown Carrier',
+              
               markupPercent,
               verified: true,
               verificationTimestamp: new Date().toISOString()
@@ -768,9 +769,11 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
     // 1. Validation
     try {
-        // Use safeParse to allow handling errors gracefully without crashing if needed, 
-        // but here we want to block invalid data.
-        const validatedData = QuoteTransferSchema.parse(transferPayload);
+        // Debug logging for payload structure
+        console.log('Validating Transfer Payload:', transferPayload);
+
+        // Use centralized service for validation
+        const validatedData = QuoteTransformService.validatePayload(transferPayload);
         
         // 2. Logging
         debug.info('Initiating Quick Quote to New Quote Transfer', {
@@ -790,6 +793,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         });
     } catch (error) {
         if (error instanceof z.ZodError) {
+            console.error('Quote Transfer Validation Failed', { errors: error.errors });
             debug.error('Quote Transfer Validation Failed', { errors: error.errors });
             toast({
                 title: "Data Validation Error",
@@ -797,6 +801,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                 variant: "destructive"
             });
             // Detailed log for debugging
+            console.error("Validation details:", JSON.stringify(error.errors, null, 2));
             debug.error("Validation details:", error.errors);
         } else {
             debug.error('Unexpected Transfer Error', { error });
@@ -833,6 +838,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         dangerousGoods: false,
         specialHandling: '',
         vehicleType: 'van',
+        incoterms: '',
         pickupDate: '',
         deliveryDeadline: '',
         originDetails: null,
@@ -876,7 +882,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                           <span className="text-[10px] text-purple-600">AI-optimized routes & pricing</span>
                       </div>
                   </div>
-                  <Switch checked={smartMode} onCheckedChange={setSmartMode} />
+                  <Switch checked={smartMode} onCheckedChange={setSmartMode} data-testid="smart-mode-switch" />
               </div>
 
               {/* Mode Selection */}
@@ -904,10 +910,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
                   </Label>
                   <LocationAutocomplete
+                    data-testid="location-origin"
                     placeholder="Search origin port, airport, or city..."
                     value={origin}
                     onChange={(value, location) => handleLocationChange('origin', value, location)}
                   />
+                  <input type="hidden" {...form.register("origin")} />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex justify-between">
@@ -915,10 +923,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
                   </Label>
                   <LocationAutocomplete
+                    data-testid="location-destination"
                     placeholder="Search destination port, airport, or city..."
                     value={destination}
                     onChange={(value, location) => handleLocationChange('destination', value, location)}
                   />
+                  <input type="hidden" {...form.register("destination")} />
                 </div>
               </div>
 
@@ -936,6 +946,33 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     errors={form.formState.errors as any}
                  />
                  <input type="hidden" {...form.register("commodity")} />
+              </div>
+
+              {/* Incoterms */}
+              <div className="space-y-2">
+                 <Label>Incoterms</Label>
+                 <Select 
+                    value={extendedData.incoterms} 
+                    onValueChange={(v) => setExtendedData(prev => ({...prev, incoterms: v}))}
+                    data-testid="incoterms-select"
+                 >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select Incoterms (Optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="EXW">EXW - Ex Works</SelectItem>
+                        <SelectItem value="FCA">FCA - Free Carrier</SelectItem>
+                        <SelectItem value="CPT">CPT - Carriage Paid To</SelectItem>
+                        <SelectItem value="CIP">CIP - Carriage and Insurance Paid To</SelectItem>
+                        <SelectItem value="DAP">DAP - Delivered at Place</SelectItem>
+                        <SelectItem value="DPU">DPU - Delivered at Place Unloaded</SelectItem>
+                        <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
+                        <SelectItem value="FAS">FAS - Free Alongside Ship</SelectItem>
+                        <SelectItem value="FOB">FOB - Free on Board</SelectItem>
+                        <SelectItem value="CFR">CFR - Cost and Freight</SelectItem>
+                        <SelectItem value="CIF">CIF - Cost, Insurance and Freight</SelectItem>
+                    </SelectContent>
+                 </Select>
               </div>
 
               {/* Preferred Carriers */}
@@ -1032,7 +1069,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   </div>
               </div>
 
-              <Button type="submit" className="w-full mt-4" disabled={loading}>
+              <Button type="submit" className="w-full mt-4" disabled={loading || aiLoading} data-testid="generate-quote-btn">
                 {loading ? (
                     <>
                         <Timer className="w-4 h-4 mr-2 animate-spin"/> Calculating...

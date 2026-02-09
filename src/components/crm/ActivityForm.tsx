@@ -79,6 +79,7 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
   });
 
   const { isSubmitting, isValid, errors } = form.formState;
+  console.log('ActivityForm State:', { isSubmitting, isValid, errors, step });
   const activityType = form.watch('activity_type');
 
   // Smart defaults based on type

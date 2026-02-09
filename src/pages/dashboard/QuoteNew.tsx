@@ -21,6 +21,7 @@ import { QuickQuoteHistory } from '@/components/sales/quick-quote/QuickQuoteHist
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 
 export default function QuoteNew() {
   const { supabase, context, scopedDb } = useCRM();
@@ -156,130 +157,57 @@ export default function QuoteNew() {
 
   useEffect(() => {
     if (location.state) {
-      let state = location.state as any;
       try {
-          // Attempt to validate, but don't block execution to support legacy data/partial states
-          const validated = QuoteTransferSchema.safeParse(location.state);
-          if (validated.success) {
-             state = validated.data;
-             logger.info('QuoteNew received valid transfer data', { origin: state.origin, mode: state.mode });
-          } else {
-             logger.warn('QuoteNew received transfer data with validation issues', { errors: validated.error.errors });
-             // We proceed with 'any' cast state but log the warning
-          }
-      } catch (e) {
-          console.error("Validation crash:", e);
-      }
+        const transformedData = QuoteTransformService.transformToQuoteForm(
+            location.state as any, 
+            masterData
+        );
+        
+        setTemplateData(prev => ({
+            ...prev,
+            ...transformedData
+        }));
+        
+        logger.info('[QuoteNew] Transformed Quick Quote state to form values', { 
+            itemsCount: transformedData.items?.length,
+            serviceTypeId: transformedData.service_type_id
+        });
 
-      const selectedRates = state.selectedRates || (state.selectedRate ? [state.selectedRate] : []);
-      
-      let notesContent = `Quick Quote Conversion:
-Origin: ${state.origin}
-Destination: ${state.destination}
-Mode: ${state.mode}`;
+        // Audit Log: Transformation Success
+        supabase.auth.getUser().then(({ data }) => {
+            if (data.user) {
+                QuoteTransformService.logTransferEvent(supabase, {
+                    action: 'quote_transform_success',
+                    status: 'success',
+                    userId: data.user.id,
+                    details: {
+                        source: 'quick_quote',
+                        itemCount: transformedData.items?.length,
+                        serviceType: transformedData.service_type_id
+                    }
+                });
+            }
+        });
 
-      if (selectedRates.length > 0) {
-        notesContent += `\n\nSelected Options (${selectedRates.length}):`;
-        selectedRates.forEach((rate: any, index: number) => {
-             notesContent += `\n\nOption ${index + 1}: ${rate.carrier} - ${rate.name}
-Price: ${rate.price} (${rate.currency})
-Tier: ${rate.tier?.toUpperCase() || 'N/A'}
-Transit: ${rate.transitTime}
-Route: ${rate.route_type || 'Standard'}
-CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
+      } catch (error) {
+        logger.error('[QuoteNew] Failed to transform Quick Quote state', { error });
+        toast.error('Failed to load quote details. Please verify the data.');
+
+        // Audit Log: Transformation Failure
+        supabase.auth.getUser().then(({ data }) => {
+            if (data.user) {
+                QuoteTransformService.logTransferEvent(supabase, {
+                    action: 'quote_transform_failure',
+                    status: 'failure',
+                    userId: data.user.id,
+                    details: {
+                        source: 'quick_quote',
+                        error: error instanceof Error ? error.message : String(error)
+                    }
+                });
+            }
         });
       }
-
-      // Determine Trade Direction (heuristic)
-      let tradeDirection: 'export' | 'import' | undefined = 'export';
-      if (state.trade_direction) {
-          tradeDirection = state.trade_direction;
-      }
-
-      // Resolve IDs
-      const modeMap: Record<string, string> = {
-          'ocean': 'Sea',
-          'sea': 'Sea',
-          'air': 'Air',
-          'road': 'Road',
-          'truck': 'Road',
-          'rail': 'Rail'
-      };
-      
-      const targetMode = modeMap[state.mode?.toLowerCase()] || state.mode;
-      const serviceTypeId = masterData.serviceTypes?.length > 0 ? masterData.serviceTypes.find(
-          st => st.name.toLowerCase().includes(targetMode?.toLowerCase()) || 
-                st.code.toLowerCase() === targetMode?.toLowerCase()
-      )?.id : undefined;
-
-      const primaryRate = selectedRates[0];
-      let carrierId = undefined;
-
-      // Robust Carrier Matching Logic
-      if (primaryRate && masterData.carriers?.length > 0) {
-          const searchName = (primaryRate.carrier || primaryRate.carrier_name || '');
-          carrierId = findCarrierId(searchName, masterData.carriers);
-          
-          if (carrierId) {
-             const matchedCarrier = masterData.carriers.find(c => c.id === carrierId);
-             console.log(`[QuoteNew] Matched carrier '${searchName}' to '${matchedCarrier?.carrier_name}' (ID: ${carrierId})`);
-          } else {
-             console.warn(`[QuoteNew] Failed to match carrier '${searchName}' against ${masterData.carriers.length} records.`);
-          }
-      }
-
-      // Resolve Cargo Configurations (Containers) -> Unified Items
-      let items: any[] = [];
-      const normalizedMode = (state.mode || 'ocean').toLowerCase();
-      const isContainerized = normalizedMode === 'ocean' || normalizedMode === 'rail';
-
-      if (isContainerized && (state.containerCombos?.length > 0 || (state.containerType && state.containerSize))) {
-          const combos = state.containerCombos?.length > 0 
-              ? state.containerCombos 
-              : [{ type: state.containerType, size: state.containerSize, qty: state.containerQty || 1 }];
-          
-          items = combos.map((c: any) => ({
-              type: 'container',
-              container_type_id: c.type,
-              container_size_id: c.size,
-              quantity: Number(c.qty) || 1,
-              product_name: state.commodity || 'General Cargo',
-              attributes: {
-                  hazmat: state.dangerousGoods ? { is_hazardous: true } : undefined
-              }
-          }));
-      } else if (state.commodity) {
-          // LCL / Loose Cargo Fallback
-          items.push({
-              type: 'loose',
-              product_name: state.commodity,
-              quantity: 1,
-              attributes: {
-                  weight: Number(state.weight) || 0,
-                  volume: Number(state.volume) || 0,
-                  hazmat: state.dangerousGoods ? { is_hazardous: true } : undefined
-              }
-          });
-      }
-
-      setTemplateData(prev => ({
-        ...prev,
-        total_weight: state.weight?.toString(),
-        commodity: state.commodity,
-        account_id: state.accountId,
-        valid_until: primaryRate?.validUntil ? new Date(primaryRate.validUntil).toISOString().split('T')[0] : undefined,
-        notes: notesContent,
-        title: `Quote for ${state.commodity || 'General Cargo'} (${state.origin} -> ${state.destination})`,
-        trade_direction: tradeDirection,
-        origin_port_id: state.originId || state.originDetails?.id,
-        destination_port_id: state.destinationId || state.destinationDetails?.id,
-        service_type_id: serviceTypeId,
-        carrier_id: carrierId,
-        shipping_amount: primaryRate?.price?.toString(),
-        incoterms: tradeDirection === 'export' ? 'CIF' : 'FOB',
-        items: items,
-        cargo_configurations: [] // Deprecated in favor of items
-      }));
     }
   }, [location.state, masterData]);
 
@@ -389,19 +317,21 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
 
         const processRate = async (rawRate: any) => {
             try {
-                const optionId = await quoteOptionService.addOptionToVersion({
-                    tenantId: resolvedTenantId,
-                    versionId: versionId,
-                    rate: rawRate,
-                    rateMapper: rateMapper,
-                    source: rawRate.source_attribution || state.source || 'quick_quote',
-                    context: {
-                        origin: state.origin,
-                        destination: state.destination,
-                        originDetails: state.originDetails,
-                        destinationDetails: state.destinationDetails
-                    }
-                });
+                const optionId = await QuoteTransformService.retryOperation(async () => {
+                    return await quoteOptionService.addOptionToVersion({
+                        tenantId: resolvedTenantId,
+                        versionId: versionId,
+                        rate: rawRate,
+                        rateMapper: rateMapper,
+                        source: rawRate.source_attribution || state.source || 'quick_quote',
+                        context: {
+                            origin: state.origin,
+                            destination: state.destination,
+                            originDetails: state.originDetails,
+                            destinationDetails: state.destinationDetails
+                        }
+                    });
+                }, { maxAttempts: 3, backoffFactor: 1.5 });
 
                 newOptionIds.push(optionId);
                 setInsertionProgress(prev => ({ ...prev, current: prev.current + 1 }));
@@ -551,6 +481,22 @@ CO2: ${rate.co2_kg ? rate.co2_kg + ' kg' : 'N/A'}`;
                 else logger.info('[QuoteNew] Updated history status to converted', { historyId: (location.state as any).historyId });
             });
     }
+
+    // Audit Log: Quote Created
+    supabase.auth.getUser().then(({ data }) => {
+        if (data.user) {
+            QuoteTransformService.logTransferEvent(supabase, {
+                action: 'quote_created',
+                status: 'success',
+                userId: data.user.id,
+                resourceId: quoteId,
+                details: {
+                    source: location.state ? 'quick_quote' : 'manual',
+                    historyId: (location.state as any)?.historyId
+                }
+            });
+        }
+    });
 
     // Fetch tenant_id for the created quote to ensure version insert works
     (async () => {

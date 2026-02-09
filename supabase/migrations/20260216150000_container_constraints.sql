@@ -6,13 +6,21 @@ BEGIN;
 
 -- 1. Container Types Constraints
 -- Ensure name is unique to prevent duplicate types like "Dry Standard" vs "Dry"
-ALTER TABLE public.container_types
-ADD CONSTRAINT container_types_name_key UNIQUE (name);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'container_types_name_key') THEN
+        ALTER TABLE public.container_types
+        ADD CONSTRAINT container_types_name_key UNIQUE (name);
+    END IF;
+END $$;
 
 -- 2. Container Sizes Constraints
 -- Ensure size names are unique within a type (e.g., can't have two "20ft" for "Dry Standard")
-ALTER TABLE public.container_sizes
-ADD CONSTRAINT container_sizes_type_id_name_key UNIQUE (type_id, name);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'container_sizes_type_id_name_key') THEN
+        ALTER TABLE public.container_sizes
+        ADD CONSTRAINT container_sizes_type_id_name_key UNIQUE (type_id, name);
+    END IF;
+END $$;
 
 -- Ensure ISO codes are unique where provided (global standard)
 -- Note: Using partial index for non-null ISO codes

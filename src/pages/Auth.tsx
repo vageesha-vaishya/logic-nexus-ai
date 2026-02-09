@@ -109,6 +109,7 @@ export default function Auth() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                data-testid="email-input"
                 type="email"
                 placeholder="admin@example.com"
                 value={email}
@@ -121,6 +122,7 @@ export default function Auth() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                data-testid="password-input"
                 type="password"
                 placeholder="••••••••"
                 value={password}
@@ -129,7 +131,7 @@ export default function Auth() {
                 disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading} data-testid="login-btn">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

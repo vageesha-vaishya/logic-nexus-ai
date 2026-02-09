@@ -86,7 +86,7 @@ export function QuoteLogistics() {
                 </FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="bg-background" data-testid="service-type-select-trigger">
                       <SelectValue placeholder="Select service type" />
                     </SelectTrigger>
                   </FormControl>
@@ -114,7 +114,7 @@ export function QuoteLogistics() {
                 <FormLabel>Service Level</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} disabled={!serviceTypeId}>
                   <FormControl>
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="bg-background" data-testid="service-level-select-trigger">
                       <SelectValue placeholder={!serviceTypeId ? "Select Type First" : "Select Service"} />
                     </SelectTrigger>
                   </FormControl>
@@ -155,7 +155,7 @@ export function QuoteLogistics() {
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger data-testid="origin-select-trigger">
                         <SelectValue placeholder="Select origin" />
                         </SelectTrigger>
                     </FormControl>
@@ -192,7 +192,7 @@ export function QuoteLogistics() {
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger data-testid="destination-select-trigger">
                         <SelectValue placeholder="Select destination" />
                         </SelectTrigger>
                     </FormControl>

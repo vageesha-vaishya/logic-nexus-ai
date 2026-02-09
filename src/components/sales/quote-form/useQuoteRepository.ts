@@ -341,6 +341,10 @@ export function useQuoteRepositoryForm(opts: {
       contact_id: quote.contact_id ? String(quote.contact_id) : '',
       opportunity_id: quote.opportunity_id ? String(quote.opportunity_id) : '',
       valid_until: quote.valid_until || '',
+      pickup_date: quote.pickup_date || '',
+      delivery_deadline: quote.delivery_deadline || '',
+      vehicle_type: quote.vehicle_type || '',
+      special_handling: quote.special_handling || '',
       tax_percent: quote.tax_percent ? String(quote.tax_percent) : '0',
       shipping_amount: quote.shipping_amount ? String(quote.shipping_amount) : '0',
       terms_conditions: quote.terms_conditions || '',
@@ -508,6 +512,10 @@ export function useQuoteRepositoryForm(opts: {
         opportunity_id: opportunityId || null,
         status: data.status || 'draft',
         valid_until: data.valid_until || null,
+        pickup_date: data.pickup_date || null,
+        delivery_deadline: data.delivery_deadline || null,
+        vehicle_type: data.vehicle_type || null,
+        special_handling: data.special_handling || null,
         tax_percent: data.tax_percent ? Number(data.tax_percent) : 0,
         shipping_amount: data.shipping_amount ? Number(data.shipping_amount) : 0,
         terms_conditions: data.terms_conditions || null,
@@ -557,6 +565,9 @@ export function useQuoteRepositoryForm(opts: {
         }
       }
 
+      // Track if we created a new quote to enable rollback
+      let isNewCreation = false;
+
       if (savedId) {
         const { error: updateError } = await scopedDb
           .from('quotes')
@@ -571,87 +582,108 @@ export function useQuoteRepositoryForm(opts: {
           .maybeSingle();
         if (insertError) throw insertError;
         savedId = String((inserted as any)?.id);
+        isNewCreation = true;
       }
 
       if (!savedId) throw new Error('Quote save did not return an id');
 
-      // Save line items (delete-then-insert)
-      if (data.items && data.items.length > 0) {
-        const { error: deleteError } = await scopedDb
-          .from('quote_items')
-          .delete()
-          .eq('quote_id', savedId);
-        if (deleteError) throw deleteError;
+      try {
+        // Save line items (delete-then-insert)
+        if (data.items && data.items.length > 0) {
+          const { error: deleteError } = await scopedDb
+            .from('quote_items')
+            .delete()
+            .eq('quote_id', savedId);
+          if (deleteError) throw deleteError;
 
-        const itemsPayload = data.items.map((item, index) => ({
-          quote_id: savedId,
-          line_number: index + 1,
-          type: item.type || 'loose',
-          container_type_id: item.container_type_id || null,
-          container_size_id: item.container_size_id || null,
-          product_name: item.product_name,
-          commodity_id: item.commodity_id || null,
-          aes_hts_id: item.aes_hts_id || null,
-          description: item.description || null,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          discount_percent: item.discount_percent || 0,
-          package_category_id: item.package_category_id || null,
-          package_size_id: item.package_size_id || null,
-          weight_kg: item.attributes?.weight || 0,
-          volume_cbm: item.attributes?.volume || 0,
-          attributes: item.attributes || {},
-        }));
+          const itemsPayload = data.items.map((item, index) => {
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.unit_price) || 0;
+            const discountPct = Number(item.discount_percent) || 0;
+            const discountAmt = (qty * price * discountPct) / 100;
+            // Calculate line total: (Qty * Price) - Discount
+            const lineTotal = (qty * price) - discountAmt;
 
-        const { error: itemsError } = await scopedDb
-          .from('quote_items')
-          .insert(itemsPayload);
-        if (itemsError) throw itemsError;
-      } else {
-        await scopedDb.from('quote_items').delete().eq('quote_id', savedId);
-      }
+            return {
+              quote_id: savedId,
+              line_number: index + 1,
+              type: item.type || 'loose',
+              container_type_id: item.container_type_id || null,
+              container_size_id: item.container_size_id || null,
+              product_name: item.product_name,
+              commodity_id: item.commodity_id || null,
+              aes_hts_id: item.aes_hts_id || null,
+              description: item.description || null,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              discount_percent: item.discount_percent || 0,
+              discount_amount: discountAmt,
+              line_total: lineTotal,
+              package_category_id: item.package_category_id || null,
+              package_size_id: item.package_size_id || null,
+              weight_kg: item.attributes?.weight || 0,
+              volume_cbm: item.attributes?.volume || 0,
+              attributes: item.attributes || {},
+            };
+          });
 
-      // Save cargo configurations (delete-then-insert)
-      if (data.cargo_configurations && data.cargo_configurations.length > 0) {
-        const { error: deleteCargoError } = await scopedDb
-          .from('quote_cargo_configurations')
-          .delete()
-          .eq('quote_id', savedId);
-        if (deleteCargoError) throw deleteCargoError;
+          const { error: itemsError } = await scopedDb
+            .from('quote_items')
+            .insert(itemsPayload);
+          if (itemsError) throw itemsError;
+        } else {
+          await scopedDb.from('quote_items').delete().eq('quote_id', savedId);
+        }
 
-        const cargoPayload = data.cargo_configurations.map((config) => ({
-          quote_id: savedId,
-          tenant_id: finalTenantId,
-          transport_mode: config.transport_mode,
-          cargo_type: config.cargo_type,
-          container_type: config.container_type || null,
-          container_size: config.container_size || null,
-          container_type_id: config.container_type_id || null,
-          container_size_id: config.container_size_id || null,
-          quantity: config.quantity,
-          unit_weight_kg: config.unit_weight_kg || null,
-          unit_volume_cbm: config.unit_volume_cbm || null,
-          length_cm: config.length_cm || null,
-          width_cm: config.width_cm || null,
-          height_cm: config.height_cm || null,
-          is_hazardous: config.is_hazardous || false,
-          hazardous_class: config.hazardous_class || null,
-          un_number: config.un_number || null,
-          is_temperature_controlled: config.is_temperature_controlled || false,
-          temperature_min: config.temperature_min || null,
-          temperature_max: config.temperature_max || null,
-          temperature_unit: config.temperature_unit || 'C',
-          package_category_id: config.package_category_id || null,
-          package_size_id: config.package_size_id || null,
-          remarks: config.remarks || null,
-        }));
+        // Save cargo configurations (delete-then-insert)
+        if (data.cargo_configurations && data.cargo_configurations.length > 0) {
+          const { error: deleteCargoError } = await scopedDb
+            .from('quote_cargo_configurations')
+            .delete()
+            .eq('quote_id', savedId);
+          if (deleteCargoError) throw deleteCargoError;
 
-        const { error: cargoError } = await scopedDb
-          .from('quote_cargo_configurations')
-          .insert(cargoPayload);
-        if (cargoError) throw cargoError;
-      } else {
-        await scopedDb.from('quote_cargo_configurations').delete().eq('quote_id', savedId);
+          const cargoPayload = data.cargo_configurations.map((config) => ({
+            quote_id: savedId,
+            tenant_id: finalTenantId,
+            transport_mode: config.transport_mode,
+            cargo_type: config.cargo_type,
+            container_type: config.container_type || null,
+            container_size: config.container_size || null,
+            container_type_id: config.container_type_id || null,
+            container_size_id: config.container_size_id || null,
+            quantity: config.quantity,
+            unit_weight_kg: config.unit_weight_kg || null,
+            unit_volume_cbm: config.unit_volume_cbm || null,
+            length_cm: config.length_cm || null,
+            width_cm: config.width_cm || null,
+            height_cm: config.height_cm || null,
+            is_hazardous: config.is_hazardous || false,
+            hazardous_class: config.hazardous_class || null,
+            un_number: config.un_number || null,
+            is_temperature_controlled: config.is_temperature_controlled || false,
+            temperature_min: config.temperature_min || null,
+            temperature_max: config.temperature_max || null,
+            temperature_unit: config.temperature_unit || 'C',
+            package_category_id: config.package_category_id || null,
+            package_size_id: config.package_size_id || null,
+            remarks: config.remarks || null,
+          }));
+
+          const { error: cargoError } = await scopedDb
+            .from('quote_cargo_configurations')
+            .insert(cargoPayload);
+          if (cargoError) throw cargoError;
+        } else {
+          await scopedDb.from('quote_cargo_configurations').delete().eq('quote_id', savedId);
+        }
+      } catch (error) {
+        // Rollback: If we created a new quote and subsequent saves failed, delete the quote.
+        if (isNewCreation && savedId) {
+          console.warn(`[QuoteRepository] Rolling back creation of quote ${savedId} due to error`, error);
+          await scopedDb.from('quotes').delete().eq('id', savedId);
+        }
+        throw error;
       }
 
       return savedId;

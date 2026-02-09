@@ -193,6 +193,11 @@ export function useQuoteData() {
     
     // Legacy support
     isLoading: serviceQuery.isLoading,
+    isLoadingOpportunities,
+    setAccounts: setInjectedAccounts,
+    setContacts: setInjectedContacts,
+    setOpportunities: setInjectedOpportunities,
+    setServices: setInjectedServices,
     resolvedContactLabels,
     resolvedServiceLabels,
     resolvedCarrierLabels,

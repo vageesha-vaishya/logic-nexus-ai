@@ -5,10 +5,21 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Database } from '@/integrations/supabase/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   carriers: { name: string } | null;
@@ -72,6 +83,39 @@ export default function BookingDetail() {
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/bookings/${id}/edit`)}>
+              <Edit className="mr-2 h-4 w-4" /> Edit
+            </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the booking.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {
+                    scopedDb.from('bookings').delete().eq('id', id!).then(({ error }) => {
+                      if (error) {
+                        toast.error('Failed to delete booking');
+                      } else {
+                        toast.success('Booking deleted');
+                        navigate('/dashboard/bookings');
+                      }
+                    });
+                  }}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Badge variant="outline" className="text-lg py-1">{booking.status}</Badge>
             <Badge variant={booking.carrier_booking_status === 'confirmed' ? 'default' : 'secondary'} className="text-lg py-1">
                {booking.carrier_booking_status}

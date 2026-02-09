@@ -198,8 +198,8 @@ const QuoteStoreContext = createContext<{
   dispatch: React.Dispatch<QuoteAction>;
 } | null>(null);
 
-export function QuoteStoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(quoteReducer, initialState);
+export function QuoteStoreProvider({ children, initialState: customInitialState }: { children: ReactNode, initialState?: Partial<QuoteState> }) {
+  const [state, dispatch] = useReducer(quoteReducer, { ...initialState, ...customInitialState });
   
   const value = useMemo(() => ({ state, dispatch }), [state]);
 

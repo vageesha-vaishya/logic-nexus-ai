@@ -318,6 +318,12 @@ export default function ShipmentDetail() {
                 <DropdownMenuItem onClick={() => window.open(`/dashboard/shipments/${id}/documents/bill_of_lading`, '_blank')}>
                   Bill of Lading
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`/dashboard/shipments/${id}/documents/house_bill_of_lading`, '_blank')}>
+                  House Bill of Lading
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`/dashboard/shipments/${id}/documents/air_waybill`, '_blank')}>
+                  Air Waybill
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => window.open(`/dashboard/shipments/${id}/documents/packing_list`, '_blank')}>
                   Packing List
                 </DropdownMenuItem>

@@ -28,27 +28,31 @@ export const initNetworkLogger = () => {
     }
 
     // Inject Correlation ID into headers for distributed tracing
+    // SKIP Supabase Edge Functions to avoid CORS preflight errors (X-Correlation-ID not allowed)
+    const isSupabaseFunction = url.includes('/functions/v1/');
     const correlationId = logger.getCorrelationId();
     let newArgs = args;
     let requestHeaders: HeadersInit = {};
     
-    // Handle different fetch arguments (resource, init)
-    if (args.length > 1 && typeof args[1] === 'object') {
-      const init = args[1] as RequestInit;
-      const headers = new Headers(init.headers);
-      headers.set('X-Correlation-ID', correlationId);
-      newArgs = [args[0], { ...init, headers }];
-      requestHeaders = init.headers || {};
-    } else if (args.length === 1 && typeof args[0] === 'object' && args[0] instanceof Request) {
-        // Clone the request to modify headers
-        const req = args[0] as Request;
-        const headers = new Headers(req.headers);
+    if (!isSupabaseFunction) {
+      // Handle different fetch arguments (resource, init)
+      if (args.length > 1 && typeof args[1] === 'object') {
+        const init = args[1] as RequestInit;
+        const headers = new Headers(init.headers);
         headers.set('X-Correlation-ID', correlationId);
-        newArgs = [new Request(req, { headers })];
-        requestHeaders = req.headers;
-    } else {
-        // Simple url string case, add init object
-        newArgs = [args[0], { headers: { 'X-Correlation-ID': correlationId } }];
+        newArgs = [args[0], { ...init, headers }];
+        requestHeaders = init.headers || {};
+      } else if (args.length === 1 && typeof args[0] === 'object' && args[0] instanceof Request) {
+          // Clone the request to modify headers
+          const req = args[0] as Request;
+          const headers = new Headers(req.headers);
+          headers.set('X-Correlation-ID', correlationId);
+          newArgs = [new Request(req, { headers })];
+          requestHeaders = req.headers;
+      } else {
+          // Simple url string case, add init object
+          newArgs = [args[0], { headers: { 'X-Correlation-ID': correlationId } }];
+      }
     }
 
     // --- Request Capture ---

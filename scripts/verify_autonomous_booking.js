@@ -170,7 +170,7 @@ async function verifyAutonomousBooking() {
 
   // 7. Execute Booking
   console.log('🔄 Executing Booking via RPC...');
-  const { data: shipmentId, error: rpcError } = await supabase
+  const { data: bookingId, error: rpcError } = await supabase
     .rpc('execute_booking', {
       p_agent_id: agent.id,
       p_quote_id: quote.id
@@ -180,7 +180,7 @@ async function verifyAutonomousBooking() {
     console.error('❌ execute_booking RPC failed:', rpcError.message);
     process.exit(1);
   }
-  console.log(`✅ Booking Executed! Shipment ID: ${shipmentId}`);
+  console.log(`✅ Booking Executed! Booking ID: ${bookingId}`);
 
   // 8. Verify Results
   // Check Execution Log
@@ -223,7 +223,7 @@ async function verifyAutonomousBooking() {
   console.log('🧹 Cleaning up test data...');
   await supabase.from('booking_executions').delete().eq('agent_id', agent.id);
   await supabase.from('booking_agents').delete().eq('id', agent.id);
-  await supabase.from('shipments').delete().eq('id', shipmentId);
+  await supabase.from('bookings').delete().eq('id', bookingId);
   await supabase.from('quotes').delete().eq('id', quote.id); // Cascades to versions/options/selections
 
   // =========================================================================
@@ -305,7 +305,7 @@ async function verifyAutonomousBooking() {
 
   // 5. Execute
   console.log('🔄 Executing Fast Booking...');
-  const { data: shipmentFastId, error: rpcFastError } = await supabase
+  const { data: bookingFastId, error: rpcFastError } = await supabase
     .rpc('execute_booking', {
       p_agent_id: agentFast.id,
       p_quote_id: quoteFast.id
@@ -315,7 +315,7 @@ async function verifyAutonomousBooking() {
       console.error('❌ execute_booking (Fast) failed:', rpcFastError.message);
       process.exit(1);
   }
-  console.log(`✅ Booking Executed! Shipment ID: ${shipmentFastId}`);
+  console.log(`✅ Booking Executed! Booking ID: ${bookingFastId}`);
 
   // 6. Verify
   const { data: selectionFast } = await supabase
@@ -336,7 +336,7 @@ async function verifyAutonomousBooking() {
   console.log('🧹 Cleaning up fast test data...');
   await supabase.from('booking_executions').delete().eq('agent_id', agentFast.id);
   await supabase.from('booking_agents').delete().eq('id', agentFast.id);
-  await supabase.from('shipments').delete().eq('id', shipmentFastId);
+  await supabase.from('bookings').delete().eq('id', bookingFastId);
   await supabase.from('quotes').delete().eq('id', quoteFast.id);
 
   console.log('✨ Verification Complete!');

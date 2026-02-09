@@ -48,6 +48,7 @@ interface MultiModalQuoteComposerProps {
   optionId?: string;
   lastSyncTimestamp?: number;
   tenantId?: string;
+  initialState?: any;
 }
 
 const STEPS = [
@@ -71,7 +72,7 @@ const getSafeString = (val: any, fallback: string = '') => {
 
 export function MultiModalQuoteComposer(props: MultiModalQuoteComposerProps) {
   return (
-    <QuoteStoreProvider>
+    <QuoteStoreProvider initialState={props.initialState}>
       <MultiModalQuoteComposerContent {...props} />
     </QuoteStoreProvider>
   );
@@ -357,16 +358,25 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
             let derivedCommodity = '';
 
             try {
-              const { data: items, error: itemsError } = await scopedDb
+              let itemsQuery = scopedDb
                 .from('quote_items')
                 .select('weight_kg, volume_cbm, quantity, product_name, description')
                 .eq('quote_id', quoteId);
 
+              // Removed tenant_id filter as quote_items table relies on quote_id relationship
+              // and does not store tenant_id directly in the view/table in some cases.
+              // if (resolvedTenantId) {
+              //   itemsQuery = itemsQuery.eq('tenant_id', resolvedTenantId);
+              // }
+
+              const { data: items, error: itemsError } = await itemsQuery;
+
               if (itemsError) {
                  debug.error('[Composer] Error fetching quote items:', itemsError);
+                 console.error('[Composer] Full quote items error:', itemsError);
                  toast({
                    title: "Warning",
-                   description: "Could not load cargo items. Totals may be zero.",
+                   description: `Could not load cargo items: ${itemsError.message || JSON.stringify(itemsError)}`,
                    variant: "destructive"
                  });
               }
@@ -1768,7 +1778,39 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       if (versionError) {
         debug.error('Error updating version:', versionError);
-        // Non-critical, but good to know
+      }
+
+      // SYNC: Update Parent Quote Header with Totals and Status
+      // This ensures the "Form" view reflects the latest calculations from Composer
+      if (quoteId) {
+          const parentUpdatePayload: any = {
+              total_weight: quoteData.total_weight ? Number(quoteData.total_weight) : null,
+              total_volume: quoteData.total_volume ? Number(quoteData.total_volume) : null,
+              incoterms: quoteData.incoterms || null,
+              // If we have a valid until date, sync it
+              valid_until: quoteData.validUntil || null,
+          };
+
+          // If we have a calculated total (Sell Price), update shipping_amount
+          // We calculate this from the current state's legs and charges
+          const currentTotalSell = legs.reduce((acc, leg) => {
+              return acc + leg.charges.reduce((sum, c) => sum + ((c.sell?.quantity || 0) * (c.sell?.rate || 0)), 0);
+          }, 0) + combinedCharges.reduce((acc, c) => acc + ((c.sell?.quantity || 0) * (c.sell?.rate || 0)), 0);
+
+          if (currentTotalSell > 0) {
+              parentUpdatePayload.shipping_amount = currentTotalSell;
+          }
+
+          const { error: parentError } = await scopedDb
+              .from('quotes')
+              .update(parentUpdatePayload)
+              .eq('id', quoteId);
+
+          if (parentError) {
+              debug.warn('[Composer] Failed to sync parent quote header:', parentError);
+          } else {
+              debug.log('[Composer] Synced parent quote header with new totals');
+          }
       }
 
       // Update Current Option Details
