@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Reply, 
   Forward, 
@@ -12,7 +13,8 @@ import {
   ChevronUp,
   Printer,
   FolderInput,
-  UserPlus
+  UserPlus,
+  ShieldAlert
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +32,7 @@ import { EmailToLeadDialog } from "./EmailToLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 import { Email } from "@/types/email";
 
@@ -150,6 +153,22 @@ function EmailMessage({
 
   return (
     <div className="w-full">
+      {email.threat_level && email.threat_level !== 'safe' && (
+        <Alert variant={email.threat_level === 'malicious' ? "destructive" : "default"} className={cn("mb-4", email.threat_level === 'suspicious' && "border-yellow-500 bg-yellow-50 text-yellow-900")}>
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle className="capitalize">{email.threat_level} Email Detected</AlertTitle>
+          <AlertDescription>
+            This email has been flagged as <strong>{email.threat_level}</strong> by our AI security system.
+            {email.threat_score && ` (Threat Score: ${email.threat_score})`}
+            {email.threat_details?.reasoning && (
+              <div className="mt-1 text-xs opacity-90">
+                Reason: {email.threat_details.reasoning}
+              </div>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h2 className="text-2xl mb-2 break-words overflow-x-hidden">{email.subject}</h2>
@@ -157,6 +176,35 @@ function EmailMessage({
             <span className="font-medium">{email.from_name || email.from_email}</span>
             <span>•</span>
             <span>{format(new Date(email.received_at), "MMM d, yyyy 'at' h:mm a")}</span>
+            
+            {email.ai_urgency && email.ai_urgency !== 'low' && (
+              <Badge 
+                variant="outline" 
+                className={cn("text-[10px] h-4 px-1 ml-2", 
+                  email.ai_urgency === 'high' ? "border-red-500 text-red-600 bg-red-50" : 
+                  email.ai_urgency === 'medium' ? "border-orange-500 text-orange-600 bg-orange-50" : ""
+                )}
+              >
+                <Flame className="h-3 w-3 mr-1" />
+                {email.ai_urgency.charAt(0).toUpperCase() + email.ai_urgency.slice(1)}
+              </Badge>
+            )}
+            
+            {email.ai_sentiment && (
+              <Badge 
+                variant="outline" 
+                className={cn("text-[10px] h-4 px-1", 
+                  email.ai_sentiment === 'positive' ? "border-green-500 text-green-600 bg-green-50" : 
+                  email.ai_sentiment === 'negative' ? "border-red-500 text-red-600 bg-red-50" : 
+                  "border-gray-400 text-gray-600 bg-gray-50"
+                )}
+              >
+                {email.ai_sentiment === 'positive' ? <Smile className="h-3 w-3 mr-1" /> :
+                 email.ai_sentiment === 'negative' ? <Frown className="h-3 w-3 mr-1" /> :
+                 <Meh className="h-3 w-3 mr-1" />}
+                {email.ai_sentiment.charAt(0).toUpperCase() + email.ai_sentiment.slice(1)}
+              </Badge>
+            )}
           </div>
         </div>
         <div className="flex gap-2">

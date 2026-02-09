@@ -101,6 +101,79 @@ export interface Database {
       user_roles: { Row: any; Insert: any; Update: any }
       ports_locations: { Row: any; Insert: any; Update: any }
       carriers: { Row: { id: string; name: string }; Insert: any; Update: any }
+      email_account_delegations: {
+        Row: {
+          id: string
+          email_account_id: string
+          delegate_user_id: string
+          permissions: string[]
+          requires_mfa: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          email_account_id: string
+          delegate_user_id: string
+          permissions?: string[]
+          requires_mfa?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email_account_id?: string
+          delegate_user_id?: string
+          permissions?: string[]
+          requires_mfa?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      tenant_domains: {
+        Row: {
+          id: string
+          tenant_id: string
+          domain_name: string
+          provider_metadata: any
+          is_verified: boolean
+          spf_verified: boolean
+          dkim_verified: boolean
+          dmarc_verified: boolean
+          spf_record: string | null
+          dmarc_record: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          domain_name: string
+          provider_metadata?: any
+          is_verified?: boolean
+          spf_verified?: boolean
+          dkim_verified?: boolean
+          dmarc_verified?: boolean
+          spf_record?: string | null
+          dmarc_record?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          domain_name?: string
+          provider_metadata?: any
+          is_verified?: boolean
+          spf_verified?: boolean
+          dkim_verified?: boolean
+          dmarc_verified?: boolean
+          spf_record?: string | null
+          dmarc_record?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       // Add other tables to satisfy keyof Database['public']['Tables']
       [key: string]: {
         Row: any
@@ -130,3 +203,7 @@ export interface Database {
     }
   }
 }
+
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
+export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
+export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']

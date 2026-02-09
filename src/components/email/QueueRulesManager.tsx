@@ -122,7 +122,7 @@ export function QueueRulesManager() {
     await updateRule(rule.id, { is_active: !rule.is_active });
   };
 
-  const updateCriteria = (key: keyof QueueRuleCriteria, value: string) => {
+  const updateCriteria = (key: keyof QueueRuleCriteria, value: any) => {
     setFormData((prev) => ({
       ...prev,
       criteria: {
@@ -132,12 +132,41 @@ export function QueueRulesManager() {
     }));
   };
 
+  const addHeaderRule = () => {
+    const currentHeaders = formData.criteria.header_contains || {};
+    updateCriteria('header_contains', { ...currentHeaders, '': '' });
+  };
+
+  const updateHeaderRule = (oldKey: string, newKey: string, newValue: string) => {
+    const currentHeaders = { ...(formData.criteria.header_contains || {}) };
+    if (oldKey !== newKey) {
+      delete currentHeaders[oldKey];
+    }
+    currentHeaders[newKey] = newValue;
+    updateCriteria('header_contains', currentHeaders);
+  };
+
+  const removeHeaderRule = (key: string) => {
+    const currentHeaders = { ...(formData.criteria.header_contains || {}) };
+    delete currentHeaders[key];
+    updateCriteria('header_contains', Object.keys(currentHeaders).length > 0 ? currentHeaders : undefined);
+  };
+
   const getCriteriaDisplay = (criteria: QueueRuleCriteria) => {
     const parts: string[] = [];
     if (criteria.subject_contains) parts.push(`Subject: "${criteria.subject_contains}"`);
     if (criteria.from_email) parts.push(`From: ${criteria.from_email}`);
     if (criteria.from_domain) parts.push(`Domain: @${criteria.from_domain}`);
     if (criteria.body_contains) parts.push(`Body: "${criteria.body_contains}"`);
+    if (criteria.header_contains) {
+      const headers = Object.entries(criteria.header_contains)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
+      parts.push(`Headers: [${headers}]`);
+    }
+    if (criteria.metadata_flags && criteria.metadata_flags.length > 0) {
+      parts.push(`Flags: [${criteria.metadata_flags.join(', ')}]`);
+    }
     if (criteria.priority) parts.push(`Priority: ${criteria.priority}`);
     if (criteria.ai_category) parts.push(`Category: ${criteria.ai_category}`);
     if (criteria.ai_sentiment) parts.push(`Sentiment: ${criteria.ai_sentiment}`);
@@ -307,6 +336,56 @@ export function QueueRulesManager() {
                         <SelectItem value="very_negative">Very Negative</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-4 border-t pt-4">
+                  <h5 className="text-sm font-medium text-muted-foreground">Advanced Context Routing</h5>
+                  
+                  {/* Header Rules */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Header Checks (e.g., X-Priority, X-Spam-Score)</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addHeaderRule}>
+                        <Plus className="h-3 w-3 mr-1" /> Add Header
+                      </Button>
+                    </div>
+                    {formData.criteria.header_contains && Object.entries(formData.criteria.header_contains).map(([key, value], index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input 
+                          placeholder="Header Name" 
+                          value={key} 
+                          onChange={(e) => updateHeaderRule(key, e.target.value, value)}
+                          className="flex-1"
+                        />
+                        <span className="text-muted-foreground">=</span>
+                        <Input 
+                          placeholder="Value Contains" 
+                          value={value} 
+                          onChange={(e) => updateHeaderRule(key, key, e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeHeaderRule(key)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(!formData.criteria.header_contains || Object.keys(formData.criteria.header_contains).length === 0) && (
+                      <div className="text-xs text-muted-foreground italic">No header rules defined</div>
+                    )}
+                  </div>
+
+                  {/* Metadata Flags */}
+                  <div className="space-y-2">
+                    <Label>Metadata Flags (comma separated)</Label>
+                    <Input
+                      value={formData.criteria.metadata_flags?.join(', ') || ''}
+                      onChange={(e) => updateCriteria('metadata_flags', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      placeholder="e.g., urgent, vip-client, campaign-x"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Checks if the email metadata contains these specific flag keys
+                    </p>
                   </div>
                 </div>
               </div>

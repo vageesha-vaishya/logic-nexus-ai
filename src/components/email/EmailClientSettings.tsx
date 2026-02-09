@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/use-toast";
+import { DomainManagement } from "./DomainManagement";
+import { EmailAccountDialog } from "./EmailAccountDialog";
 
 type ProviderPreset = "gmail" | "office365" | "yahoo" | "zoho" | "custom";
 
@@ -108,6 +110,8 @@ export const EmailClientSettings: React.FC = () => {
   const [verification, setVerification] = useState<Record<string, { verified: boolean; method?: string; checkedAt?: string }>>({});
   const [form, setForm] = useState<EmailAccountForm>(emptyForm());
   const [targetAccountId, setTargetAccountId] = useState<string | null>(null);
+  const [showAccountDialog, setShowAccountDialog] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [clientSettings, setClientSettings] = useState<ClientSettings>({
     compose_default_font: "Calibri, Segoe UI, Arial, sans-serif",
     compose_default_size_pt: 11,
@@ -147,7 +151,7 @@ export const EmailClientSettings: React.FC = () => {
       }));
     };
     loadAccounts();
-  }, [scopedDb]);
+  }, [scopedDb, refreshTrigger]);
 
   useEffect(() => {
     // Apply preset when changed
@@ -268,6 +272,18 @@ export const EmailClientSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {canEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Domain Management</CardTitle>
+            <CardDescription>Manage verified domains for sending emails via high-deliverability infrastructure.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DomainManagement />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>SMTP/IMAP Email Client</CardTitle>
@@ -551,6 +567,14 @@ export const EmailClientSettings: React.FC = () => {
         )}
       </CardContent>
       </Card>
+      <EmailAccountDialog 
+        open={showAccountDialog} 
+        onOpenChange={setShowAccountDialog} 
+        onSuccess={() => {
+          setRefreshTrigger(prev => prev + 1);
+          setShowAccountDialog(false);
+        }}
+      />
     </div>
   );
 };

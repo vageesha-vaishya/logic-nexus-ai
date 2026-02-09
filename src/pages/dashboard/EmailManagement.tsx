@@ -6,9 +6,13 @@ import { EmailAccounts } from "@/components/email/EmailAccounts";
 import { EmailFilters } from "@/components/email/EmailFilters";
 import { EmailTemplates } from "@/components/email/EmailTemplates";
 import { OAuthSettings } from "@/components/email/OAuthSettings";
-import { Mail, Settings, Filter, FileText, Key, Inbox, Server, Link as LinkIcon, Copy } from "lucide-react";
+import { ComplianceSettings } from "@/components/email/ComplianceSettings";
+import { QueueRulesManager } from "@/components/email/QueueRulesManager";
+import { SequencesList } from "@/components/email/SequencesList";
+import { Mail, Settings, Filter, FileText, Key, Inbox, Server, Link as LinkIcon, Copy, Globe, ShieldCheck, ListOrdered, GitBranch } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmailClientSettings } from "@/components/email/EmailClientSettings";
+import { DomainHealth } from "@/components/email/DomainHealth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,11 +84,39 @@ export default function EmailManagement() {
                   <span className="font-medium">Accounts</span>
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="clients" 
+                  value="templates" 
                   className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
                 >
-                  <Server className="w-4 h-4" />
-                  <span className="font-medium">Client Settings</span>
+                  <FileText className="w-4 h-4" />
+                  <span className="font-medium">Templates</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sequences" 
+                  className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
+                >
+                  <ListOrdered className="w-4 h-4" />
+                  <span className="font-medium">Sequences</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="domains" 
+                  className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span className="font-medium">Domains</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="compliance" 
+                  className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="font-medium">Compliance</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="routing" 
+                  className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  <span className="font-medium">Routing Rules</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="oauth" 
@@ -128,6 +160,22 @@ export default function EmailManagement() {
 
               <TabsContent value="clients" className="mt-0">
                 <EmailClientSettings />
+              </TabsContent>
+
+              <TabsContent value="sequences" className="mt-0">
+                <SequencesList />
+              </TabsContent>
+
+              <TabsContent value="domains" className="mt-0">
+                <DomainHealth />
+              </TabsContent>
+
+              <TabsContent value="compliance" className="mt-0">
+                <ComplianceSettings />
+              </TabsContent>
+
+              <TabsContent value="routing" className="mt-0">
+                <QueueRulesManager />
               </TabsContent>
 
               <TabsContent value="oauth" className="mt-0">

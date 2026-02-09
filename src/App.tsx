@@ -70,6 +70,7 @@ const CRMWorkspace = lazy(() => import("./pages/dashboard/CRMWorkspace"));
 const More = lazy(() => import("./pages/dashboard/More"));
 const PermissionsMatrix = lazy(() => import("./pages/dashboard/PermissionsMatrix"));
 const AuditLogs = lazy(() => import("./pages/dashboard/AuditLogs"));
+const SecurityIncidents = lazy(() => import("./pages/dashboard/SecurityIncidents"));
 const CustomRoles = lazy(() => import("./pages/dashboard/CustomRoles"));
 const Bookings = lazy(() => import("./pages/dashboard/Bookings"));
 const BookingNew = lazy(() => import("./pages/dashboard/BookingNew"));
@@ -560,7 +561,7 @@ const App = () => (
             <Route 
               path="/dashboard/email-management" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredPermissions={["email.manage"]}>
                   <EmailManagement />
                 </ProtectedRoute>
               } 
@@ -665,6 +666,7 @@ const App = () => (
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PermissionsMatrix /></ProtectedRoute>} />
             <Route path="/dashboard/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+            <Route path="/dashboard/security-incidents" element={<ProtectedRoute><SecurityIncidents /></ProtectedRoute>} />
             <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />

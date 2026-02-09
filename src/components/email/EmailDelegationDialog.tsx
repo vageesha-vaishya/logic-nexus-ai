@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Trash2, UserPlus, ShieldAlert } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface EmailAccount {
   id: string;
@@ -25,6 +28,7 @@ interface Delegate {
   id: string;
   user_id: string;
   permissions: string[];
+  requires_mfa: boolean;
   user: {
     first_name: string;
     last_name: string;
@@ -41,16 +45,13 @@ interface User {
   avatar_url?: string;
 }
 
-interface DelegationRow {
-  id: string;
-  delegate_user_id: string;
-  permissions: string[];
-}
+type DelegationRow = Pick<Tables<"email_account_delegations">, "id" | "delegate_user_id" | "permissions" | "requires_mfa">;
 
 export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDelegationDialogProps) {
   const [delegates, setDelegates] = useState<Delegate[]>([]);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [requireMFA, setRequireMFA] = useState(false);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const { toast } = useToast();
@@ -66,15 +67,15 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
     if (!account) return;
     setLoading(true);
     try {
-      // Fetch existing delegations using raw query since types may not be regenerated yet
+      // Fetch existing delegations
       const { data: delegationsRaw, error: delError } = await supabase
-        .from("email_account_delegations" as any)
-        .select(`id, delegate_user_id, permissions`)
-        .eq("account_id", account.id);
+        .from("email_account_delegations")
+        .select(`id, delegate_user_id, permissions, requires_mfa`)
+        .eq("email_account_id", account.id);
 
       if (delError) throw delError;
 
-      const delegations = (delegationsRaw || []) as unknown as DelegationRow[];
+      const delegations = (delegationsRaw || []) as DelegationRow[];
 
       // Get user details for delegates
       const delegateUserIds = delegations.map(d => d.delegate_user_id);
@@ -92,7 +93,8 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
           id: d.id,
           user_id: d.delegate_user_id,
           permissions: d.permissions as string[],
-          user: users?.find(u => u.id === d.delegate_user_id) || { first_name: 'Unknown', last_name: 'User', email: '' }
+          requires_mfa: d.requires_mfa,
+          user: users?.find((u: any) => u.id === d.delegate_user_id) || { first_name: 'Unknown', last_name: 'User', email: '' }
         }));
       }
 
@@ -106,13 +108,13 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
           .from("user_roles")
           .select("user_id")
           .eq("franchise_id", context.franchiseId);
-        scopeUserIds = roles?.map(r => r.user_id) || [];
+        scopeUserIds = (roles as any[])?.map(r => r.user_id) || [];
       } else if (context.tenantId) {
          const { data: roles } = await supabase
           .from("user_roles")
           .select("user_id")
           .eq("tenant_id", context.tenantId);
-        scopeUserIds = roles?.map(r => r.user_id) || [];
+        scopeUserIds = (roles as any[])?.map(r => r.user_id) || [];
       }
 
       let userQuery = supabase
@@ -149,13 +151,14 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
     if (!account || !selectedUserId) return;
     setAdding(true);
     try {
-      const { error } = await supabase
-        .from("email_account_delegations" as any)
+      const { error } = await (supabase
+        .from("email_account_delegations") as any)
         .insert({
-          account_id: account.id,
+          email_account_id: account.id,
           delegate_user_id: selectedUserId,
-          permissions: ["read", "send"]
-        } as any);
+          permissions: ["read", "send"],
+          requires_mfa: requireMFA
+        });
 
       if (error) throw error;
 
@@ -165,6 +168,7 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
       });
       
       setSelectedUserId("");
+      setRequireMFA(false);
       fetchData();
     } catch (error: any) {
       toast({
@@ -177,10 +181,40 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
     }
   };
 
+  const handleToggleMFA = async (delegationId: string, currentValue: boolean) => {
+    try {
+      const { error } = await (supabase
+        .from("email_account_delegations") as any)
+        .update({ requires_mfa: !currentValue })
+        .eq("id", delegationId);
+
+      if (error) throw error;
+
+      // Optimistic update
+      setDelegates(prev => prev.map(d => 
+        d.id === delegationId ? { ...d, requires_mfa: !currentValue } : d
+      ));
+
+      toast({
+        title: !currentValue ? "MFA Enabled" : "MFA Disabled",
+        description: !currentValue 
+          ? "This user will now be required to use MFA to access this inbox." 
+          : "MFA requirement removed for this user.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error updating settings",
+        description: error.message,
+        variant: "destructive",
+      });
+      fetchData(); // Revert on error
+    }
+  };
+
   const handleRemoveDelegate = async (delegationId: string) => {
     try {
-      const { error } = await supabase
-        .from("email_account_delegations" as any)
+      const { error } = await (supabase
+        .from("email_account_delegations") as any)
         .delete()
         .eq("id", delegationId);
 
@@ -213,28 +247,38 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
         <div className="space-y-6 py-4">
           <div className="space-y-4">
             <Label>Add People</Label>
-            <div className="flex gap-2">
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select a user..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={user.avatar_url} />
-                          <AvatarFallback>{user.first_name?.[0]}{user.last_name?.[0]}</AvatarFallback>
-                        </Avatar>
-                        <span>{user.first_name} {user.last_name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                  {availableUsers.length === 0 && (
-                    <div className="p-2 text-sm text-muted-foreground text-center">No users available</div>
-                  )}
-                </SelectContent>
-              </Select>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-2">
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a user..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={user.avatar_url} />
+                            <AvatarFallback>{user.first_name?.[0]}{user.last_name?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <span>{user.first_name} {user.last_name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    {availableUsers.length === 0 && (
+                      <div className="p-2 text-sm text-muted-foreground text-center">No users available</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2 pb-2">
+                <Switch 
+                  id="new-mfa" 
+                  checked={requireMFA} 
+                  onCheckedChange={setRequireMFA} 
+                />
+                <Label htmlFor="new-mfa" className="cursor-pointer text-xs">Require MFA</Label>
+              </div>
               <Button onClick={handleAddDelegate} disabled={!selectedUserId || adding}>
                 {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               </Button>
@@ -262,17 +306,33 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium">{delegate.user.first_name} {delegate.user.last_name}</p>
-                        <p className="text-xs text-muted-foreground">{delegate.user.email}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{delegate.user.email}</span>
+                          {delegate.requires_mfa && (
+                            <Badge variant="outline" className="h-5 gap-1 bg-yellow-50 text-yellow-700 border-yellow-200">
+                              <ShieldAlert className="h-3 w-3" /> MFA
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveDelegate(delegate.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mr-2">
+                        <Switch 
+                          checked={delegate.requires_mfa} 
+                          onCheckedChange={(checked) => handleToggleMFA(delegate.id, !checked)} 
+                        />
+                        <span className="text-xs text-muted-foreground">MFA</span>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveDelegate(delegate.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

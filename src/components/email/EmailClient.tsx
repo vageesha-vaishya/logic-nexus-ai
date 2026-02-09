@@ -177,7 +177,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       console.error("Error fetching emails:", error);
       toast({
         title: "Error fetching emails",
-        description: "Could not load emails. Please try again.",
+        description: (error as any)?.message || "Could not load emails. Please try again.",
         variant: "destructive",
       });
     } finally {

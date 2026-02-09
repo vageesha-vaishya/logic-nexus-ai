@@ -48,6 +48,11 @@ export interface Email {
   intent?: string;
   ai_sentiment?: string;
   ai_urgency?: string;
+
+  // AI Threat Detection (Phase 2)
+  threat_level?: 'safe' | 'suspicious' | 'malicious';
+  threat_score?: number;
+  threat_details?: any;
 }
 
 export interface EmailAccount {

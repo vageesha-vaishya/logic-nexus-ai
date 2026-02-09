@@ -32,6 +32,52 @@ export async function invokeFunction<T = any>(
      });
 
     if (error) {
+      // Check if it's a "Failed to send a request" error (FunctionsFetchError)
+      // This often happens due to Ad Blockers or browser network restrictions
+      const isFetchError = error.name === 'FunctionsFetchError' || error.message === 'Failed to send a request to the Edge Function';
+      
+      if (isFetchError) {
+        console.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+            
+            // In development, use relative path to trigger Vite proxy which bypasses CORS
+            // In production, use full URL
+            let functionUrl;
+            if (import.meta.env.DEV) {
+                functionUrl = `/functions/v1/${functionName}`;
+            } else {
+                const projectUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || "https://gzhxgoigflftharcmdqj.supabase.co";
+                functionUrl = `${projectUrl}/functions/v1/${functionName}`;
+            }
+            
+            const response = await fetch(functionUrl, {
+                method: options.method || 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    ...(options.headers || {})
+                },
+                body: options.body ? JSON.stringify(options.body) : undefined
+            });
+            
+            if (!response.ok) {
+                const text = await response.text();
+                let errorData;
+                try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
+                return { data: null, error: new Error(errorData.message || `Function returned ${response.status}`) };
+            }
+            
+            const data = await response.json();
+            return { data, error: null };
+        } catch (manualError: any) {
+             console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
+             // Enhance the original error message
+             error.message = `${error.message} (Check for Ad Blockers or Network Firewall)`;
+        }
+      }
+
       // Check if it's a 401 and we haven't retried yet (though supabase-js usually handles this)
       // We can add a layer of safety here if needed, but usually the client is sufficient.
       // If the error is a FunctionsHttpError, it has a context property

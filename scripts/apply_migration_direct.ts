@@ -29,7 +29,8 @@ async function applyMigration() {
     await client.connect();
     console.log('Connected to database.');
 
-    const migrationFile = path.resolve(__dirname, '../supabase/migrations/20260216160000_add_source_attribution.sql');
+    const migrationPath = process.argv[2] || '../supabase/migrations/20260216160000_add_source_attribution.sql';
+    const migrationFile = path.resolve(process.cwd(), migrationPath);
     const sql = fs.readFileSync(migrationFile, 'utf8');
 
     console.log(`Applying migration: ${path.basename(migrationFile)}`);

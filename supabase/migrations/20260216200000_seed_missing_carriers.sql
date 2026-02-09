@@ -5,6 +5,7 @@ INSERT INTO public.carriers (
   carrier_type,
   scac,
   iata,
+  mode,
   is_active
 )
 SELECT 
@@ -13,28 +14,29 @@ SELECT
   c.carrier_type,
   c.scac,
   c.iata,
+  c.mode,
   true as is_active
 FROM public.tenants t
 CROSS JOIN (
   VALUES
     -- Ocean
-    ('Maersk', 'ocean', 'MAEU', NULL),
-    ('MSC', 'ocean', 'MSCU', NULL),
-    ('CMA CGM', 'ocean', 'CMACGM', NULL),
+    ('Maersk', 'ocean', 'MAEU', NULL, 'ocean'),
+    ('MSC', 'ocean', 'MSCU', NULL, 'ocean'),
+    ('CMA CGM', 'ocean', 'CMACGM', NULL, 'ocean'),
     -- Air Cargo
-    ('Lufthansa Cargo', 'air_cargo', NULL, 'LH'),
-    ('Emirates SkyCargo', 'air_cargo', NULL, 'EK'),
-    ('FedEx Express', 'air_cargo', NULL, 'FX'),
+    ('Lufthansa Cargo', 'air_cargo', NULL, 'LH', 'air'),
+    ('Emirates SkyCargo', 'air_cargo', NULL, 'EK', 'air'),
+    ('FedEx Express', 'air_cargo', NULL, 'FX', 'air'),
     -- Trucking
-    ('J.B. Hunt', 'trucking', 'JBHT', NULL),
-    ('XPO Logistics', 'trucking', 'XPO', NULL),
+    ('J.B. Hunt', 'trucking', 'JBHT', NULL, 'road'),
+    ('XPO Logistics', 'trucking', 'XPO', NULL, 'road'),
     -- Courier
-    ('DHL Express', 'courier', NULL, 'DHL'),
-    ('FedEx Ground', 'courier', NULL, 'FDXG'),
+    ('DHL Express', 'courier', NULL, 'DHL', 'air'),
+    ('FedEx Ground', 'courier', NULL, 'FDXG', 'road'),
     -- Rail
-    ('Union Pacific', 'rail', NULL, NULL),
-    ('CSX', 'rail', NULL, NULL)
-) AS c(carrier_name, carrier_type, scac, iata)
+    ('Union Pacific', 'rail', NULL, NULL, 'rail'),
+    ('CSX', 'rail', NULL, NULL, 'rail')
+) AS c(carrier_name, carrier_type, scac, iata, mode)
 WHERE NOT EXISTS (
   SELECT 1 FROM public.carriers 
   WHERE carriers.carrier_name = c.carrier_name 

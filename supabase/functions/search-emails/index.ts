@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(
         JSON.stringify({ success: false, error: "Invalid JSON body", code: "BAD_REQUEST" }),
-        { status: 200, headers: { ...headers, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...headers, "Content-Type": "application/json" } }
       );
     }
 
@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
     if (!email && groupBy !== "conversation") {
       return new Response(
         JSON.stringify({ success: false, error: "Missing required field: email", code: "BAD_REQUEST" }),
-        { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...headers, "Content-Type": "application/json" }, status: 400 }
       );
     }
 

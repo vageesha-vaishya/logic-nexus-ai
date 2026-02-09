@@ -9,11 +9,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { 
   Mail, Search, RefreshCw, Star, Archive, Trash2, 
-  Plus, Reply, Forward, MoreVertical, Paperclip, Flag, Circle, ArrowUpDown
+  Plus, Reply, Forward, MoreVertical, Paperclip, Flag, Circle, ArrowUpDown,
+  Flame, Smile, Frown, Meh, Shield, ShieldAlert, ShieldCheck
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invokeFunction } from "@/lib/supabase-functions";
 import { EmailComposeDialog } from "./EmailComposeDialog";
@@ -34,6 +36,10 @@ interface Email {
   labels: any;
   priority?: string;
   importance?: string;
+  ai_sentiment?: string;
+  ai_urgency?: string;
+  security_status?: 'pending' | 'scanning' | 'clean' | 'suspicious' | 'malicious';
+  quarantine_reason?: string;
 }
 
 export function EmailInbox() {
@@ -53,6 +59,45 @@ export function EmailInbox() {
   const [threads, setThreads] = useState<any[]>([]);
   const { toast } = useToast();
   const { roles } = useAuth();
+
+  const renderSecurityBadge = (email: Email) => {
+    if (!email.security_status || email.security_status === 'pending') return null;
+    
+    const status = email.security_status;
+    if (status === 'clean') {
+       return (
+          <Badge variant="outline" className="text-[10px] h-4 px-1 border-green-500 text-green-600 bg-green-50">
+            <ShieldCheck className="h-3 w-3 mr-1" />
+            Clean
+          </Badge>
+       );
+    }
+    if (status === 'suspicious') {
+       return (
+          <Badge variant="outline" className="text-[10px] h-4 px-1 border-orange-500 text-orange-600 bg-orange-50">
+            <Shield className="h-3 w-3 mr-1" />
+            Suspicious
+          </Badge>
+       );
+    }
+    if (status === 'malicious') {
+       return (
+          <Badge variant="outline" className="text-[10px] h-4 px-1 border-red-500 text-red-600 bg-red-50">
+            <ShieldAlert className="h-3 w-3 mr-1" />
+            Malicious
+          </Badge>
+       );
+    }
+    if (status === 'scanning') {
+       return (
+          <Badge variant="outline" className="text-[10px] h-4 px-1 border-blue-500 text-blue-600 bg-blue-50">
+            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+            Scanning
+          </Badge>
+       );
+    }
+    return null;
+  };
 
   const autoSyncedRef = useRef<Record<string, boolean>>({});
 
@@ -115,7 +160,7 @@ export function EmailInbox() {
         });
         setEmails(sorted);
       } else {
-        let query = supabase
+        let query = (supabase as any)
           .from("emails")
           .select("*")
           .eq("folder", selectedFolder)
@@ -142,6 +187,7 @@ export function EmailInbox() {
             title: "Error fetching emails",
             description: error.message,
             variant: "destructive",
+            action: <ToastAction altText="Retry" onClick={fetchEmails}>Retry</ToastAction>,
           });
       }
     } finally {
@@ -155,7 +201,7 @@ export function EmailInbox() {
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("email_accounts")
         .select("id, email_address, provider, is_primary")
         .eq("is_active", true)
@@ -178,10 +224,11 @@ export function EmailInbox() {
 
   const markAsRead = async (emailId: string) => {
     try {
-      const { error } = await supabase
+      const response: any = await (supabase as any)
         .from("emails")
         .update({ is_read: true })
         .eq("id", emailId);
+      const { error } = response;
 
       if (error) throw error;
       fetchEmails();
@@ -196,7 +243,7 @@ export function EmailInbox() {
 
   const toggleStar = async (emailId: string, isStarred: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("emails")
         .update({ is_starred: !isStarred })
         .eq("id", emailId);
@@ -214,7 +261,7 @@ export function EmailInbox() {
 
   const moveToFolder = async (emailId: string, folder: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("emails")
         .update({ folder })
         .eq("id", emailId);
@@ -311,11 +358,13 @@ export function EmailInbox() {
       const userId = authData.user?.id;
       if (!userId) throw new Error("Not authenticated");
 
-      const { data: userAccounts, error: accErr } = await supabase
+      const response: any = await (supabase as any)
         .from("email_accounts")
         .select("id")
         .eq("user_id", userId)
         .eq("is_active", true);
+      const { data: userAccounts, error: accErr } = response;
+      
       if (accErr) throw accErr;
       if (!userAccounts || userAccounts.length === 0) {
         toast({ title: "No accounts", description: "Add an email account first.", variant: "destructive" });
@@ -354,12 +403,39 @@ export function EmailInbox() {
     }
   };
 
+  const scanEmail = async (emailId: string) => {
+    try {
+      toast({ title: "Scanning email...", description: "Please wait while we check for threats." });
+      
+      // Optimistic update
+      setEmails(prev => prev.map(e => e.id === emailId ? { ...e, security_status: 'scanning' } : e));
+
+      const { data, error } = await invokeFunction("email-scan", {
+        body: { email_id: emailId },
+      });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Scan Complete",
+        description: `Status: ${data?.scan_result?.security_status || 'Unknown'}`,
+        variant: data?.scan_result?.security_status === 'clean' ? "default" : "destructive"
+      });
+      
+      fetchEmails();
+    } catch (error: any) {
+      toast({ title: "Scan Failed", description: error.message, variant: "destructive" });
+      fetchEmails(); // Revert optimistic update
+    }
+  };
+
   const updateEmailPriority = async (emailId: string, priority: string) => {
     try {
-      const { error } = await supabase
+      const response: any = await (supabase as any)
         .from("emails")
         .update({ priority })
         .eq("id", emailId);
+      const { error } = response;
       if (error) throw error;
       setEmails((prev) => prev.map((e) => (e.id === emailId ? { ...e, priority } : e)));
     } catch (error: any) {
@@ -435,6 +511,7 @@ export function EmailInbox() {
               <TabsTrigger value="drafts">Drafts</TabsTrigger>
               <TabsTrigger value="archive">Archive</TabsTrigger>
               <TabsTrigger value="trash">Trash</TabsTrigger>
+              <TabsTrigger value="quarantine" className="text-red-500 data-[state=active]:text-red-600">Quarantine</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -499,6 +576,34 @@ export function EmailInbox() {
                               <span className={`font-medium ${!latest.is_read ? "font-bold" : ""} break-words whitespace-normal lg:truncate`}>
                                 {latest.subject || "(No Subject)"}
                               </span>
+                              {latest.ai_urgency && latest.ai_urgency !== 'low' && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-[10px] h-4 px-1 ${
+                                    latest.ai_urgency === 'high' ? "border-red-500 text-red-600 bg-red-50" : 
+                                    latest.ai_urgency === 'medium' ? "border-orange-500 text-orange-600 bg-orange-50" : ""
+                                  }`}
+                                >
+                                  <Flame className="h-3 w-3 mr-1" />
+                                  {latest.ai_urgency.charAt(0).toUpperCase() + latest.ai_urgency.slice(1)}
+                                </Badge>
+                              )}
+                              {latest.ai_sentiment && (
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-[10px] h-4 px-1 ${
+                                    latest.ai_sentiment === 'positive' ? "border-green-500 text-green-600 bg-green-50" : 
+                                    latest.ai_sentiment === 'negative' ? "border-red-500 text-red-600 bg-red-50" : 
+                                    "border-gray-400 text-gray-600 bg-gray-50"
+                                  }`}
+                                >
+                                  {latest.ai_sentiment === 'positive' ? <Smile className="h-3 w-3 mr-1" /> :
+                                   latest.ai_sentiment === 'negative' ? <Frown className="h-3 w-3 mr-1" /> :
+                                   <Meh className="h-3 w-3 mr-1" />}
+                                  {latest.ai_sentiment.charAt(0).toUpperCase() + latest.ai_sentiment.slice(1)}
+                                </Badge>
+                              )}
+                              {renderSecurityBadge(latest)}
                             </div>
                             <span className="text-xs text-muted-foreground">{format(new Date(latest.received_at), "MMM d, h:mm a")}</span>
                           </div>
@@ -595,6 +700,34 @@ export function EmailInbox() {
                             {email.from_name || email.from_email}
                           </span>
                           {email.has_attachments && <Paperclip className="w-4 h-4 text-muted-foreground" />}
+                          {email.ai_urgency && email.ai_urgency !== 'low' && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] h-4 px-1 ${
+                                email.ai_urgency === 'high' ? "border-red-500 text-red-600 bg-red-50" : 
+                                email.ai_urgency === 'medium' ? "border-orange-500 text-orange-600 bg-orange-50" : ""
+                              }`}
+                            >
+                              <Flame className="h-3 w-3 mr-1" />
+                              {email.ai_urgency.charAt(0).toUpperCase() + email.ai_urgency.slice(1)}
+                            </Badge>
+                          )}
+                          {email.ai_sentiment && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] h-4 px-1 ${
+                                email.ai_sentiment === 'positive' ? "border-green-500 text-green-600 bg-green-50" : 
+                                email.ai_sentiment === 'negative' ? "border-red-500 text-red-600 bg-red-50" : 
+                                "border-gray-400 text-gray-600 bg-gray-50"
+                              }`}
+                            >
+                              {email.ai_sentiment === 'positive' ? <Smile className="h-3 w-3 mr-1" /> :
+                               email.ai_sentiment === 'negative' ? <Frown className="h-3 w-3 mr-1" /> :
+                               <Meh className="h-3 w-3 mr-1" />}
+                                  {email.ai_sentiment.charAt(0).toUpperCase() + email.ai_sentiment.slice(1)}
+                                </Badge>
+                              )}
+                              {renderSecurityBadge(email)}
                         </div>
                         <span className="text-xs text-muted-foreground">{format(new Date(email.received_at), "MMM d, h:mm a")}</span>
                       </div>
@@ -629,6 +762,17 @@ export function EmailInbox() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Scan for threats"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          scanEmail(email.id);
+                        }}
+                      >
+                        <Shield className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

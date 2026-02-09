@@ -45,6 +45,7 @@ export type Permission =
   | 'groups.manage'
   | 'calendar.view'
   | 'calendar.manage'
+  | 'email.manage'
   | 'admin.tenants.manage'
   | 'admin.franchises.manage'
   | 'admin.users.manage'
@@ -89,6 +90,7 @@ export const ROLE_PERMISSIONS: Record<
     'chatter.view','chatter.post','chatter.moderate',
     'groups.view','groups.manage',
     'calendar.view','calendar.manage',
+    'email.manage',
     'admin.tenants.manage','admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
     'shipments.view','shipments.create','shipments.edit','shipments.delete',
     'vendors.view','vendors.create','vendors.edit','vendors.delete',
@@ -114,6 +116,7 @@ export const ROLE_PERMISSIONS: Record<
     'chatter.view','chatter.post','chatter.moderate',
     'groups.view','groups.manage',
     'calendar.view','calendar.manage',
+    'email.manage',
     'admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
     'shipments.view','shipments.create','shipments.edit','shipments.delete',
     'vendors.view','vendors.create','vendors.edit','vendors.delete',
@@ -137,6 +140,7 @@ export const ROLE_PERMISSIONS: Record<
     'chatter.view','chatter.post',
     'groups.view',
     'calendar.view',
+    'email.manage',
     'admin.lead_assignment.manage',
     'shipments.view','shipments.create','shipments.edit',
     'shipments.approvals.view',
@@ -157,6 +161,7 @@ export const ROLE_PERMISSIONS: Record<
     'chatter.view','chatter.post',
     'groups.view',
     'calendar.view',
+    'email.manage',
     'shipments.view',
   ],
 };

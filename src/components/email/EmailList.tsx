@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, Paperclip, Star, Filter, ArrowUpDown } from "lucide-react";
+import { Search, RefreshCw, Paperclip, Star, Filter, ArrowUpDown, ShieldAlert, Brain, Flame, Smile, Frown, Meh } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -333,6 +333,50 @@ export function EmailList({
                   {email.snippet}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
+                  {email.threat_level === 'suspicious' && (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1 border-yellow-500 text-yellow-600 bg-yellow-50">
+                      <ShieldAlert className="h-3 w-3 mr-1" />
+                      Suspicious
+                    </Badge>
+                  )}
+                  {email.threat_level === 'malicious' && (
+                    <Badge variant="destructive" className="text-[10px] h-4 px-1">
+                      <ShieldAlert className="h-3 w-3 mr-1" />
+                      Malicious
+                    </Badge>
+                  )}
+
+                  {/* AI Insights */}
+                  {email.ai_urgency && email.ai_urgency !== 'low' && (
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-[10px] h-4 px-1",
+                        email.ai_urgency === 'high' ? "border-red-500 text-red-600 bg-red-50" : 
+                        email.ai_urgency === 'medium' ? "border-orange-500 text-orange-600 bg-orange-50" : ""
+                      )}
+                    >
+                      <Flame className="h-3 w-3 mr-1" />
+                      {email.ai_urgency.charAt(0).toUpperCase() + email.ai_urgency.slice(1)}
+                    </Badge>
+                  )}
+                  {email.ai_sentiment && (
+                     <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-[10px] h-4 px-1",
+                        email.ai_sentiment === 'positive' ? "border-green-500 text-green-600 bg-green-50" : 
+                        email.ai_sentiment === 'negative' ? "border-red-500 text-red-600 bg-red-50" : 
+                        "border-gray-400 text-gray-600 bg-gray-50"
+                      )}
+                    >
+                      {email.ai_sentiment === 'positive' ? <Smile className="h-3 w-3 mr-1" /> :
+                       email.ai_sentiment === 'negative' ? <Frown className="h-3 w-3 mr-1" /> :
+                       <Meh className="h-3 w-3 mr-1" />}
+                      {email.ai_sentiment.charAt(0).toUpperCase() + email.ai_sentiment.slice(1)}
+                    </Badge>
+                  )}
+
                   {email.has_attachments && <Paperclip className="h-3 w-3 text-muted-foreground" />}
                   {email.is_starred && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
                   {email.folder && (

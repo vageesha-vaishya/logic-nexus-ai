@@ -1,14 +1,29 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
   server: {
     host: "0.0.0.0",
     port: 8081,
     strictPort: true,
+    proxy: {
+      '/functions/v1': {
+        target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            // Remove Origin header to bypass CORS checks on Supabase
+            proxyReq.removeHeader('Origin');
+          });
+        },
+      },
+    },
     headers: {
       "Permissions-Policy": [
         "browsing-topics=()",
@@ -57,4 +72,4 @@ export default defineConfig(({ mode }) => ({
     },
   },
   // Automated testing configuration was removed; see TESTING.md for restoration notes.
-}));
+}});

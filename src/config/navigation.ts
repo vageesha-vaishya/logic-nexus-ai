@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail } from 'lucide-react';
 import type { Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -92,6 +92,7 @@ export const APP_MENU: MenuModule[] = [
     label: 'Compliance',
     items: [
       { name: 'Restricted Party Screening', path: '/dashboard/restricted-party-screening', icon: FileCheck, description: 'Screen entities against watchlists' },
+      { name: 'Security Incidents', path: '/dashboard/security-incidents', icon: ShieldAlert, description: 'Monitor security threats and incidents' },
     ],
   },
   {
@@ -122,6 +123,7 @@ export const APP_MENU: MenuModule[] = [
     label: 'Settings',
     items: [
       { name: 'System Settings', path: '/dashboard/settings', icon: Cog, description: 'Account and app settings' },
+      { name: 'Email Management', path: '/dashboard/email-management', icon: Mail, description: 'Manage emails', permissions: ['email.manage'] },
       { name: 'Roles & Permissions', path: '/dashboard/settings/permissions', icon: Cog, description: 'Configure access control', permissions: ['admin.settings.manage'] },
       { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme' },
       { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage' },

@@ -516,6 +516,20 @@ function normalizeInnerHtml(body: string) {
   return escapeHtml(raw).replace(/\n/g, "<br>");
 }
 
+function rewriteLinks(html: string, trackingBase: string, emailId: string): string {
+  if (!trackingBase || !emailId) return html;
+  const baseUrl = trackingBase.replace(/\/$/, "");
+  
+  return html.replace(/<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1/gi, (match, quote, url) => {
+    // Skip anchors, mailto, tel, and already tracked links
+    if (url.startsWith("#") || url.startsWith("mailto:") || url.startsWith("tel:") || url.startsWith(baseUrl)) {
+      return match;
+    }
+    const trackingUrl = `${baseUrl}/click?id=${encodeURIComponent(emailId)}&url=${encodeURIComponent(url)}`;
+    return match.replace(url, trackingUrl);
+  });
+}
+
 function renderBrandedEmail(params: {
   subject: string;
   innerHtml: string;
@@ -524,7 +538,7 @@ function renderBrandedEmail(params: {
   fromLabel?: string;
   replyTo?: string;
   variables?: Record<string, string>;
-  trackingId?: string;
+  emailId?: string;
 }) {
   const brandName = Deno.env.get("EMAIL_BRAND_NAME") || "SOS Logistics";
   const logoUrl = Deno.env.get("EMAIL_BRAND_LOGO_URL") || "";
@@ -542,7 +556,7 @@ function renderBrandedEmail(params: {
   const signatureTitle = params.variables?.sender_title || "";
 
   const preheaderText = params.innerText.slice(0, 120).replace(/\s+/g, " ").trim();
-  const trackingPixelUrl = trackingBase && params.trackingId ? `${trackingBase.replace(/\/$/, "")}?tid=${encodeURIComponent(params.trackingId)}` : "";
+  const trackingPixelUrl = trackingBase && params.emailId ? `${trackingBase.replace(/\/$/, "")}/open?id=${encodeURIComponent(params.emailId)}` : "";
 
   const footerLines: string[] = [];
   footerLines.push(`${brandName}`);
@@ -568,7 +582,7 @@ function renderBrandedEmail(params: {
     ? `<a href="${escapeHtml(brandUrl)}" style="text-decoration:none;"><img src="${escapeHtml(logoUrl)}" width="160" alt="${escapeHtml(brandName)}" style="display:block;border:0;outline:none;text-decoration:none;height:auto;max-width:160px;" /></a>`
     : `<a href="${escapeHtml(brandUrl)}" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:18px;line-height:24px;">${escapeHtml(brandName)}</a>`;
 
-  const html = `<!doctype html>
+  let html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -623,6 +637,11 @@ function renderBrandedEmail(params: {
   ${trackingPixelUrl ? `<img src="${escapeHtml(trackingPixelUrl)}" width="1" height="1" alt="" style="display:none;opacity:0;" />` : ""}
 </body>
 </html>`;
+
+  // Rewrite links if tracking is enabled
+  if (params.emailId && trackingBase) {
+    html = rewriteLinks(html, trackingBase, params.emailId);
+  }
 
   return { html, text, unsubscribeUrl, unsubscribeEmail };
 }
@@ -696,7 +715,9 @@ serve(async (req: Request) => {
     let renderedText = "";
     let unsubscribeUrl = "";
     let unsubscribeEmail = "";
-    const trackingId = (Deno.env.get("EMAIL_TRACKING_PIXEL_BASE_URL") ? crypto.randomUUID() : "");
+    // Generate ID upfront for tracking consistency
+    const emailId = crypto.randomUUID(); 
+    
     try {
       const innerHtml = normalizeInnerHtml(body);
       const innerText = stripHtmlToText(body);
@@ -707,7 +728,7 @@ serve(async (req: Request) => {
         to: Array.isArray(to) ? to : [to],
         replyTo: reply_to,
         variables,
-        trackingId: trackingId || undefined,
+        emailId, // Pass emailId for pixel/link rewriting
       });
       renderedHtml = rendered.html;
       renderedText = rendered.text;
@@ -796,6 +817,7 @@ serve(async (req: Request) => {
     if (account && response.success) {
       const normalizeEmail = (v: string) => String(v || "").trim().toLowerCase();
       await supabase.from("emails").insert({
+        id: emailId, // Use the pre-generated ID
         account_id: account.id,
         tenant_id: account.tenant_id,
         franchise_id: account.franchise_id,
@@ -815,7 +837,7 @@ serve(async (req: Request) => {
         raw_headers: {
           reply_to: reply_to || null,
           list_unsubscribe: unsubscribeUrl ? { url: unsubscribeUrl, mailto: unsubscribeEmail } : { mailto: unsubscribeEmail },
-          tracking_id: trackingId || null,
+          tracking_id: emailId,
         },
       });
     }
