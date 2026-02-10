@@ -7,6 +7,7 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 import nodemailer from "npm:nodemailer@6.9.7";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { Logger, LogLevel } from "../_shared/logger.ts";
 
 export interface EmailRequest {
   to: string[];
@@ -25,6 +26,8 @@ export interface EmailRequest {
   replyTo?: string;
   templateId?: string;
   variables?: Record<string, string>;
+  priority?: 'high' | 'normal' | 'low';
+  isVip?: boolean;
 }
 
 export interface EmailResponse {
@@ -45,6 +48,38 @@ export interface ProviderConfig {
 export abstract class EmailProvider {
   constructor(protected config: ProviderConfig) {}
   abstract send(req: EmailRequest): Promise<EmailResponse>;
+
+  protected async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    req: EmailRequest
+  ): Promise<T> {
+    const maxRetries = req.isVip || req.priority === 'high' ? 5 : 3;
+    const baseDelay = 1000;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        if (attempt === maxRetries || !this.isRetryable(error)) {
+          throw error;
+        }
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`Attempt ${attempt} failed. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    throw new Error("Max retries exceeded");
+  }
+
+  protected isRetryable(error: any): boolean {
+    const msg = (error.message || "").toLowerCase();
+    // Common HTTP/Network errors
+    if (msg.includes("429") || msg.includes("too many requests")) return true;
+    if (msg.includes("500") || msg.includes("502") || msg.includes("503") || msg.includes("504")) return true;
+    if (msg.includes("etimedout") || msg.includes("econnreset") || msg.includes("socket hang up")) return true;
+    if (msg.includes("network error") || msg.includes("fetch failed")) return true;
+    return false;
+  }
 }
 
 // --- Resend Provider (System/Transactional) ---
@@ -54,45 +89,68 @@ export class ResendProvider extends EmailProvider {
     if (!apiKey) throw new Error("Missing RESEND_API_KEY");
 
     console.log("Sending via Resend API (System)");
+    
+    const maxRetries = req.isVip || req.priority === 'high' ? 5 : 3;
+    const baseDelay = 1000;
 
-    const sendEmail = async (fromEmail: string) => {
-        const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-            from: fromEmail,
-            to: req.to,
-            cc: req.cc,
-            bcc: req.bcc,
-            subject: req.subject,
-            html: req.body,
-            text: req.text,
-            reply_to: req.replyTo,
-            attachments: req.attachments?.map(a => ({
-            filename: a.filename,
-            content: a.content,
-            })),
-        }),
-        });
-        return res;
+    const performSend = async (currentAttempt: number): Promise<any> => {
+        try {
+            const sendEmail = async (fromEmail: string) => {
+                const res = await fetch("https://api.resend.com/emails", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${apiKey}`,
+                    },
+                    body: JSON.stringify({
+                        from: fromEmail,
+                        to: req.to,
+                        cc: req.cc,
+                        bcc: req.bcc,
+                        subject: req.subject,
+                        html: req.body,
+                        text: req.text,
+                        reply_to: req.replyTo,
+                        attachments: req.attachments?.map(a => ({
+                            filename: a.filename,
+                            content: a.content,
+                        })),
+                    }),
+                });
+                return res;
+            };
+
+            let res = await sendEmail(req.from || "SOS Logistics <notifications@soslogistics.pro>");
+            let data = await res.json();
+
+            // Fallback for unverified domains: Try onboarding@resend.dev
+            if (!res.ok && data.message?.includes("domain is not verified")) {
+                console.warn("Domain not verified. Retrying with onboarding@resend.dev");
+                res = await sendEmail("SOS Logistics <onboarding@resend.dev>");
+                data = await res.json();
+            }
+
+            if (!res.ok) {
+                 // Check if it's a rate limit or server error (retryable)
+                 if (res.status >= 500 || res.status === 429) {
+                     throw new Error(`Retryable Error: ${data.message || res.statusText}`);
+                 }
+                 throw new Error(data.message || "Failed to send via Resend");
+            }
+            return data;
+
+        } catch (error: any) {
+             if (currentAttempt < maxRetries && error.message.includes('Retryable')) {
+                 const delay = baseDelay * Math.pow(2, currentAttempt - 1);
+                 console.log(`Attempt ${currentAttempt} failed. Retrying in ${delay}ms...`);
+                 await new Promise(resolve => setTimeout(resolve, delay));
+                 return performSend(currentAttempt + 1);
+             }
+             throw error;
+        }
     };
 
-    let res = await sendEmail(req.from || "SOS Logistics <notifications@soslogistics.pro>");
-    let data = await res.json();
-
-    // Fallback for unverified domains: Try onboarding@resend.dev
-    if (!res.ok && data.message?.includes("domain is not verified")) {
-        console.warn("Domain not verified. Retrying with onboarding@resend.dev");
-        res = await sendEmail("SOS Logistics <onboarding@resend.dev>");
-        data = await res.json();
-    }
-
-    if (!res.ok) {
-      throw new Error(data.message || "Failed to send via Resend");
-    }
+    const data = await performSend(1);
 
     return {
       success: true,
@@ -240,21 +298,23 @@ export class GmailProvider extends EmailProvider {
       .replace(/\//g, '_')
       .replace(/=+$/, '');
 
-    const gmailRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ raw: encodedMessage }),
-    });
+    const gmailData = await this.executeWithRetry(async () => {
+        const gmailRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ raw: encodedMessage }),
+        });
 
-    if (!gmailRes.ok) {
-      const txt = await gmailRes.text();
-      throw new Error(`Gmail API Error: ${txt}`);
-    }
+        if (!gmailRes.ok) {
+            const txt = await gmailRes.text();
+            throw new Error(`Gmail API Error: ${gmailRes.status} ${txt}`);
+        }
+        return await gmailRes.json();
+    }, req);
 
-    const gmailData = await gmailRes.json();
     return {
       success: true,
       messageId: gmailData.id,
@@ -291,22 +351,24 @@ export class SMTPProvider extends EmailProvider {
     const from = req.from || (account.display_name ? `"${account.display_name}" <${senderEmail}>` : senderEmail);
 
     try {
-      const info = await transporter.sendMail({
-        from: from,
-        to: req.to,
-        cc: req.cc,
-        bcc: req.bcc,
-        replyTo: req.replyTo,
-        subject: req.subject,
-        text: req.text,
-        html: req.body,
-        attachments: req.attachments?.map(a => ({
-          filename: a.filename,
-          content: a.content,
-          encoding: 'base64',
-          contentType: a.contentType
-        }))
-      });
+      const info = await this.executeWithRetry(async () => {
+        return await transporter.sendMail({
+          from: from,
+          to: req.to,
+          cc: req.cc,
+          bcc: req.bcc,
+          replyTo: req.replyTo,
+          subject: req.subject,
+          text: req.text,
+          html: req.body,
+          attachments: req.attachments?.map(a => ({
+            filename: a.filename,
+            content: a.content,
+            encoding: 'base64',
+            contentType: a.contentType
+          }))
+        });
+      }, req);
 
       console.log("SMTP sent:", info.messageId);
 
@@ -395,19 +457,21 @@ export class Office365Provider extends EmailProvider {
       saveToSentItems: true,
     };
 
-    const graphRes = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(sendBody),
-    });
+    await this.executeWithRetry(async () => {
+        const graphRes = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(sendBody),
+        });
 
-    if (!graphRes.ok) {
-      const txt = await graphRes.text();
-      throw new Error(`Office 365 API Error: ${txt}`);
-    }
+        if (!graphRes.ok) {
+            const txt = await graphRes.text();
+            throw new Error(`Office 365 API Error: ${graphRes.status} ${txt}`);
+        }
+    }, req);
 
     return {
       success: true,
@@ -788,26 +852,68 @@ serve(async (req: Request) => {
     let response: EmailResponse | null = null;
     let lastError: Error | null = null;
 
+    // Retry Configuration
+    // Target specific user for high reliability as requested
+    const isHighPriorityTarget = (Array.isArray(to) ? to : [to]).some(email => 
+        String(email).toLowerCase().includes('bahuguna.vimal@gmail.com')
+    );
+    const maxRetries = isHighPriorityTarget ? 3 : 0;
+    
+    // Initialize Logger
+    const logger = new Logger(supabase, { 
+        component: 'send-email', 
+        context: { accountId, to, subject: reqSubject } 
+    });
+
     for (const provider of providers) {
-      try {
-        response = await provider.send({
-          to: Array.isArray(to) ? to : [to],
-          cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
-          bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
-          subject,
-          body: renderedHtml,
-          text: renderedText,
-          from,
-          replyTo: finalReplyTo,
-          variables,
-          attachments: processedAttachments
-        });
-        if (response.success) break; // Success, stop trying
-      } catch (e: any) {
-        console.error("Provider send failed:", e);
-        lastError = e;
-        // Continue to next provider if available
+      let attempts = 0;
+      let success = false;
+
+      while (attempts <= maxRetries && !success) {
+        try {
+            if (attempts > 0) {
+                await logger.info(`[Retry] Attempt ${attempts}/${maxRetries} for provider...`);
+            }
+
+            response = await provider.send({
+                to: Array.isArray(to) ? to : [to],
+                cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
+                bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
+                subject,
+                body: renderedHtml,
+                text: renderedText,
+                from,
+                replyTo: finalReplyTo,
+                variables,
+                attachments: processedAttachments
+            });
+            
+            if (response.success) {
+                success = true;
+                break; // Break retry loop
+            }
+        } catch (e: any) {
+            await logger.warn(`Provider send failed (Attempt ${attempts + 1}): ${e.message}`, { error: e });
+            lastError = e;
+            
+            attempts++;
+            if (attempts <= maxRetries) {
+                // Exponential backoff: 2s, 4s, 8s
+                const delay = Math.pow(2, attempts) * 1000; 
+                await logger.info(`Waiting ${delay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else if (isHighPriorityTarget) {
+                // Automatic Escalation for VIP Target
+                await logger.critical(`FAILED DELIVERY TO VIP: ${to}. Attempts exhausted.`, {
+                    error: e.message,
+                    provider: provider.constructor.name,
+                    attempts: attempts
+                });
+            }
+        }
       }
+
+      if (success && response?.success) break; // Break provider loop if successful
     }
 
     if (!response && lastError) throw lastError;

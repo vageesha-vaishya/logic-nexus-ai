@@ -10,6 +10,8 @@ export const RateOptionSchema = z.object({
   price: z.number().optional(),
   total_amount: z.number().optional(),
   currency: z.string().optional(),
+  mode: z.string().optional(),
+  transport_mode: z.string().optional(),
   transitTime: z.string().optional(),
   transit_time: z.any().optional(),
   tier: z.string().optional(),

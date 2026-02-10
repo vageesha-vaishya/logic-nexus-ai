@@ -7,6 +7,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 interface MasterData {
     serviceTypes: { id: string; name: string; code: string }[];
     carriers: { id: string; carrier_name: string; scac?: string }[];
+    containerTypes?: { id: string; name: string; code: string }[];
+    containerSizes?: { id: string; name: string; code: string }[];
 }
 
 interface RetryOptions {
@@ -117,7 +119,7 @@ export class QuoteTransformService {
         const carrierId = this.resolveCarrierId(primaryRate, masterData.carriers);
         
         // Pass normalized rates to helpers
-        const items = this.generateQuoteItems(data, primaryRate);
+        const items = this.generateQuoteItems(data, primaryRate, masterData);
         const notes = this.generateStructuredNotes({ ...data, selectedRates: rates });
 
         return {
@@ -207,7 +209,7 @@ export class QuoteTransformService {
         return match?.id;
     }
 
-    private static generateQuoteItems(data: QuoteTransferData, primaryRate: RateOption | undefined): QuoteItem[] {
+    private static generateQuoteItems(data: QuoteTransferData, primaryRate: RateOption | undefined, masterData?: MasterData): QuoteItem[] {
         let items: QuoteItem[] = [];
         const normalizedMode = (data.mode || 'ocean').toLowerCase();
         const isContainerized = normalizedMode === 'ocean' || normalizedMode === 'rail';
@@ -218,17 +220,60 @@ export class QuoteTransformService {
                 ? data.containerCombos 
                 : [{ type: data.containerType!, size: data.containerSize!, qty: data.containerQty || 1 }];
             
-            items = combos.map((c) => ({
-                type: 'container',
-                container_type_id: c.type,
-                container_size_id: c.size,
-                quantity: Number(c.qty) || 1,
-                product_name: data.commodity || 'General Cargo',
-                unit_price: 0, // Calculated below
-                attributes: {
-                    hazmat: data.dangerousGoods ? { is_hazardous: true } : undefined
+            items = combos.map((c) => {
+                // Resolve container type ID and Name
+                let resolvedContainerTypeId = c.type;
+                let resolvedContainerSizeId = c.size;
+                let containerTypeName = '';
+
+                if (masterData?.containerTypes) {
+                    // Try to find by ID first
+                    let typeMatch = masterData.containerTypes.find(t => t.id === c.type);
+                    
+                    // If not found, try by code (assuming c.type might be a code)
+                    if (!typeMatch) {
+                        typeMatch = masterData.containerTypes.find(t => t.code === c.type);
+                    }
+                    
+                    if (typeMatch) {
+                        resolvedContainerTypeId = typeMatch.id;
+                        containerTypeName = typeMatch.name;
+                    }
                 }
-            }));
+
+                if (masterData?.containerSizes) {
+                    // Try to find by ID first
+                    let sizeMatch = masterData.containerSizes.find(s => s.id === c.size);
+                    
+                    // If not found, try by name (assuming c.size might be '20', '40' etc.)
+                    if (!sizeMatch) {
+                        // Strict check for name match (e.g. '20', '40', '40HC')
+                        sizeMatch = masterData.containerSizes.find(s => s.name === c.size || s.code === c.size);
+                    }
+                    
+                    if (sizeMatch) {
+                        resolvedContainerSizeId = sizeMatch.id;
+                    }
+                }
+
+                const productName = [
+                    containerTypeName,
+                    data.commodity || 'General Cargo'
+                ].filter(Boolean).join(' - ');
+
+                return {
+                    type: 'container',
+                    container_type_id: resolvedContainerTypeId,
+                    container_size_id: resolvedContainerSizeId,
+                    quantity: Number(c.qty) || 1,
+                    product_name: productName,
+                    unit_price: 0, // Calculated below
+                    attributes: {
+                        hazmat: data.dangerousGoods ? { is_hazardous: true } : undefined,
+                        hs_code: data.htsCode
+                    }
+                };
+            });
         } 
         // B. Loose / Air / LCL Cargo
         else {

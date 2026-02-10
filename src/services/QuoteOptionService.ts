@@ -126,7 +126,7 @@ export class QuoteOptionService {
 
     private async insertLegs(tenantId: string, optionId: string, rate: any, rateMapper: any, context: any) {
         const legsToInsert: any[] = [];
-        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || 'ocean' }];
+        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || rate.mode || 'ocean' }];
 
         const parseDurationToHours = (duration: string | number | undefined) => {
             if (typeof duration === 'number') return duration; 
@@ -143,7 +143,7 @@ export class QuoteOptionService {
         }
 
         rateLegs.forEach((leg: any, index: number) => {
-            const legMode = leg.mode || rate.transport_mode || 'ocean';
+            const legMode = leg.mode || rate.transport_mode || rate.mode || 'ocean';
             const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
             const serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
             

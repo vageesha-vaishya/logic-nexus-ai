@@ -12,17 +12,17 @@ async function run() {
   try {
     await client.connect();
     
-    console.log("--- email_accounts schema ---");
+    console.log("--- oauth_configurations schema ---");
     const res = await client.query(`
       SELECT column_name, data_type, is_nullable 
       FROM information_schema.columns 
-      WHERE table_name = 'email_accounts'
+      WHERE table_name = 'oauth_configurations'
     `);
     console.table(res.rows);
 
-    console.log("--- existing users ---");
-    const users = await client.query(`SELECT id, email FROM auth.users LIMIT 5`);
-    console.table(users.rows);
+    console.log("--- existing oauth configs ---");
+    const oauth = await client.query(`SELECT id, provider, is_active, user_id, tenant_id FROM public.oauth_configurations LIMIT 5`);
+    console.table(oauth.rows);
 
     await client.end();
   } catch (e) {

@@ -1,0 +1,1 @@
+SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'quotation_version_option_legs';

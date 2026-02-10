@@ -9,20 +9,34 @@ interface OAuthConfig {
 
 export async function initiateGoogleOAuth(userId: string) {
   try {
-    // Fetch OAuth configuration
-    const { data: config, error } = await supabase
+    // 1. Try to fetch User-specific OAuth configuration from DB
+    const { data: config } = await supabase
       .from("oauth_configurations" as any)
       .select("*")
       .eq("user_id", userId)
       .eq("provider", "gmail")
       .eq("is_active", true)
-      .single();
+      .maybeSingle(); // Use maybeSingle to avoid error if not found
 
-    if (error || !config) {
-      throw new Error("Gmail OAuth not configured. Please configure OAuth settings first.");
+    // 2. Determine Client ID and Redirect URI
+    let clientId = config ? config.client_id : undefined;
+    let redirectUri = config ? config.redirect_uri : undefined;
+
+    // 3. Fallback to System Environment Variables if DB config is missing
+    if (!clientId) {
+      clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      // Default redirect URI for system config
+      redirectUri = `${window.location.origin}/oauth/callback`;
     }
 
-    const oauthConfig = config as any as OAuthConfig;
+    if (!clientId) {
+      throw new Error("Gmail OAuth not configured. System administrator must set VITE_GOOGLE_CLIENT_ID or User must provide custom configuration.");
+    }
+    
+    // Ensure redirectUri is defined (should be from DB or constructed above)
+    if (!redirectUri) {
+       redirectUri = `${window.location.origin}/oauth/callback`;
+    }
 
     // Generate state parameter for security
     const state = crypto.randomUUID();
@@ -31,8 +45,8 @@ export async function initiateGoogleOAuth(userId: string) {
 
     // Build Google OAuth URL
     const params = new URLSearchParams({
-      client_id: oauthConfig.client_id,
-      redirect_uri: oauthConfig.redirect_uri,
+      client_id: clientId,
+      redirect_uri: redirectUri,
       response_type: "code",
       scope: [
         "https://www.googleapis.com/auth/gmail.readonly",
@@ -57,20 +71,35 @@ export async function initiateGoogleOAuth(userId: string) {
 
 export async function initiateMicrosoftOAuth(userId: string) {
   try {
-    // Fetch OAuth configuration
-    const { data: config, error } = await supabase
+    // 1. Try to fetch User-specific OAuth configuration
+    const { data: config } = await supabase
       .from("oauth_configurations" as any)
       .select("*")
       .eq("user_id", userId)
       .eq("provider", "office365")
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
-    if (error || !config) {
-      throw new Error("Office 365 OAuth not configured. Please configure OAuth settings first.");
+    // 2. Determine Client ID and Redirect URI
+    let clientId = config ? config.client_id : undefined;
+    let redirectUri = config ? config.redirect_uri : undefined;
+    let tenantIdProvider = config ? config.tenant_id_provider : undefined;
+
+    // 3. Fallback to System Environment Variables
+    if (!clientId) {
+      clientId = import.meta.env.VITE_MICROSOFT_CLIENT_ID;
+      redirectUri = `${window.location.origin}/oauth/callback`;
+      // Default to common for system app unless specified
+      tenantIdProvider = "common";
     }
 
-    const oauthConfig = config as any as OAuthConfig;
+    if (!clientId) {
+      throw new Error("Office 365 OAuth not configured. System administrator must set VITE_MICROSOFT_CLIENT_ID or User must provide custom configuration.");
+    }
+
+    if (!redirectUri) {
+        redirectUri = `${window.location.origin}/oauth/callback`;
+    }
 
     // Generate state parameter for security
     const state = crypto.randomUUID();
@@ -81,12 +110,12 @@ export async function initiateMicrosoftOAuth(userId: string) {
   const hintEmail = sessionStorage.getItem("oauth_hint_email") || "";
   const lowerEmail = hintEmail.toLowerCase();
   const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
-  const tenantId = isMSA ? "consumers" : (oauthConfig.tenant_id_provider || "common");
+  const tenantId = isMSA ? "consumers" : (tenantIdProvider || "common");
 
   // Build Microsoft OAuth URL
   const params = new URLSearchParams({
-    client_id: oauthConfig.client_id,
-    redirect_uri: oauthConfig.redirect_uri,
+    client_id: clientId,
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: [
       "https://graph.microsoft.com/Mail.Read",

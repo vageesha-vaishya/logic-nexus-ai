@@ -53,10 +53,38 @@ serve(async (req) => {
       .eq("user_id", userId)
       .eq("provider", provider)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
-    if (configError || !config) {
-      throw new Error("OAuth configuration not found");
+    // Determine credentials (DB vs Env Var Fallback)
+    let clientId = config?.client_id;
+    let clientSecret = config?.client_secret;
+    let redirectUri = config?.redirect_uri;
+    let tenantIdProvider = config?.tenant_id_provider;
+
+    // Fallback to Env Vars if not in DB
+    if (!clientId || !clientSecret) {
+      if (provider === "gmail") {
+        clientId = Deno.env.get("GOOGLE_CLIENT_ID");
+        clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+        // Default redirect URI for system config if not provided
+        if (!redirectUri) redirectUri = `${req.headers.get("origin") || "http://localhost:8081"}/oauth/callback`;
+      } else if (provider === "office365") {
+        clientId = Deno.env.get("MICROSOFT_CLIENT_ID");
+        clientSecret = Deno.env.get("MICROSOFT_CLIENT_SECRET");
+        if (!redirectUri) redirectUri = `${req.headers.get("origin") || "http://localhost:8081"}/oauth/callback`;
+        // Default tenant
+        if (!tenantIdProvider) tenantIdProvider = "common";
+      }
+    }
+
+    if (!clientId || !clientSecret) {
+      console.error(`Missing OAuth credentials for ${provider}. DB Config: ${!!config}, Env Vars Present: ${!!Deno.env.get("GOOGLE_CLIENT_ID")}`);
+      throw new Error(`OAuth credentials not configured for ${provider}. System admin must set environment variables or user must have custom config.`);
+    }
+
+    // Ensure redirectUri is defined
+    if (!redirectUri) {
+         redirectUri = `${req.headers.get("origin") || "http://localhost:8081"}/oauth/callback`;
     }
 
     // Exchange authorization code for tokens
@@ -67,25 +95,25 @@ serve(async (req) => {
       tokenUrl = "https://oauth2.googleapis.com/token";
       tokenBody = {
         code,
-        client_id: config.client_id,
-        client_secret: config.client_secret,
-        redirect_uri: config.redirect_uri,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
         grant_type: "authorization_code",
       };
     } else if (provider === "office365") {
       // Detect Microsoft personal accounts (MSA) and use "consumers" tenant
       const lowerEmail = String(emailAddress || "").toLowerCase();
       const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
-      const tenantId = isMSA ? "consumers" : (config.tenant_id_provider || "common");
+      const tenantId = isMSA ? "consumers" : (tenantIdProvider || "common");
       
       console.log(`Exchanging token for ${emailAddress} using tenant: ${tenantId}`);
       
       tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
       tokenBody = {
         code,
-        client_id: config.client_id,
-        client_secret: config.client_secret,
-        redirect_uri: config.redirect_uri,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
         grant_type: "authorization_code",
         scope: [
           "https://graph.microsoft.com/Mail.Read",

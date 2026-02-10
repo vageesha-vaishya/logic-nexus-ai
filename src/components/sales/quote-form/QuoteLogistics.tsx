@@ -1,5 +1,6 @@
 import { useFormContext, useWatch } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useQuoteContext } from './QuoteContext';
@@ -11,6 +12,9 @@ export function QuoteLogistics() {
   const { serviceTypes, services, carriers, ports } = useQuoteContext();
   
   const serviceTypeId = useWatch({ control, name: 'service_type_id' });
+  const options = useWatch({ control, name: 'options' });
+  const primaryOption = options?.find((o: any) => o.is_primary) || options?.[0];
+  const legs = primaryOption?.legs || [];
 
   const filteredServices = services.filter(
     (s: any) => !serviceTypeId || String(s.service_type_id) === String(serviceTypeId)
@@ -57,6 +61,14 @@ export function QuoteLogistics() {
     if (n.includes('rail')) return <Train className="h-5 w-5 text-blue-600" />;
     return <Ship className="h-5 w-5 text-blue-600" />;
   };
+
+  // Resolve placeholders for blank fields if we have leg data
+  const mainLeg = legs.find((l: any) => l.transport_mode === 'ocean' || l.transport_mode === 'air') || legs[0];
+  const firstLeg = legs[0];
+  const lastLeg = legs[legs.length - 1];
+
+  const derivedOriginName = firstLeg?.origin_location_name || firstLeg?.origin;
+  const derivedDestName = lastLeg?.destination_location_name || lastLeg?.destination;
 
   return (
     <Card className="shadow-sm border-t-4 border-t-blue-500">
@@ -156,7 +168,7 @@ export function QuoteLogistics() {
                     <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                         <SelectTrigger data-testid="origin-select-trigger">
-                        <SelectValue placeholder="Select origin" />
+                        <SelectValue placeholder={derivedOriginName ? `${derivedOriginName} (Derived)` : "Select origin"} />
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -193,7 +205,7 @@ export function QuoteLogistics() {
                     <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                         <SelectTrigger data-testid="destination-select-trigger">
-                        <SelectValue placeholder="Select destination" />
+                        <SelectValue placeholder={derivedDestName ? `${derivedDestName} (Derived)` : "Select destination"} />
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -212,6 +224,66 @@ export function QuoteLogistics() {
                 )}
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FormField
+                control={control}
+                name="pickup_date"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Pickup Date</FormLabel>
+                        <FormControl>
+                            <Input type="date" {...field} value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            <FormField
+                control={control}
+                name="delivery_deadline"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Delivery Deadline</FormLabel>
+                        <FormControl>
+                            <Input type="date" {...field} value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            <FormField
+                control={control}
+                name="vehicle_type"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Vehicle Type</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g. 53ft Trailer" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+        </div>
+
+        <div className="mt-4">
+            <FormField
+                control={control}
+                name="special_handling"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Special Handling Instructions</FormLabel>
+                        <FormControl>
+                            <Input placeholder="e.g. Fragile, Keep Dry" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
         </div>
 
         <Separator className="my-2" />
@@ -296,7 +368,254 @@ export function QuoteLogistics() {
             )}
           />
         </div>
-      </CardContent>
-    </Card>
-  );
+
+        {legs.length > 0 && (
+            <div className="space-y-4">
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Multi-Leg Route Details</span>
+                    </div>
+                </div>
+                <div className="grid gap-4">
+                    {legs.map((leg: any, index: number) => {
+                         const activeOptionIndex = options?.findIndex((o: any) => o.is_primary) !== -1 
+                             ? options?.findIndex((o: any) => o.is_primary) 
+                             : 0;
+                         
+                         const prefix = `options.${activeOptionIndex}.legs.${index}`;
+
+                         // Filter carriers for this leg's mode
+                         const watchedMode = useWatch({ control, name: `${prefix}.transport_mode` });
+                         const legMode = (watchedMode || leg.transport_mode || '').toLowerCase();
+                         const isAir = legMode.includes('air');
+                         const isOcean = legMode.includes('ocean') || legMode.includes('sea');
+                         
+                         const legCarriers = carriers.filter((c: any) => {
+                             if (!legMode) return true;
+                             if (isOcean) return c.carrier_type === 'ocean';
+                             if (isAir) return c.carrier_type === 'air_cargo';
+                             if (legMode.includes('road') || legMode.includes('truck')) return c.carrier_type === 'trucking';
+                             if (legMode.includes('rail')) return c.carrier_type === 'rail';
+                             return true;
+                         });
+
+                         const departureDate = useWatch({ control, name: `${prefix}.departure_date` });
+                         const arrivalDate = useWatch({ control, name: `${prefix}.arrival_date` });
+                         const dateError = departureDate && arrivalDate && new Date(arrivalDate) <= new Date(departureDate);
+
+                         return (
+                           <div key={leg.id || index} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-muted/20 rounded-lg border items-start">
+                               {/* Mode */}
+                               <div className="md:col-span-2">
+                                    <FormField
+                                       control={control}
+                                       name={`${prefix}.transport_mode`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Mode</FormLabel>
+                                               <Select onValueChange={field.onChange} value={field.value}>
+                                                   <FormControl>
+                                                       <SelectTrigger className="h-9 bg-background">
+                                                           <SelectValue />
+                                                       </SelectTrigger>
+                                                   </FormControl>
+                                                   <SelectContent>
+                                                       <SelectItem value="ocean">Ocean</SelectItem>
+                                                       <SelectItem value="air">Air</SelectItem>
+                                                       <SelectItem value="road">Road</SelectItem>
+                                                       <SelectItem value="rail">Rail</SelectItem>
+                                                   </SelectContent>
+                                               </Select>
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+
+                               {/* Origin */}
+                               <div className="md:col-span-3">
+                                    <FormField
+                                       control={control}
+                                       name={`${prefix}.origin_location_id`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Origin</FormLabel>
+                                               <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                   <FormControl>
+                                                       <SelectTrigger className="h-9 bg-background">
+                                                           <SelectValue placeholder="Origin" />
+                                                       </SelectTrigger>
+                                                   </FormControl>
+                                                   <SelectContent>
+                                                       {ports.map((p: any) => (
+                                                           <SelectItem key={p.id} value={String(p.id)}>
+                                                               {p.name || p.location_name}
+                                                           </SelectItem>
+                                                       ))}
+                                                   </SelectContent>
+                                               </Select>
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+
+                               {/* Destination */}
+                               <div className="md:col-span-3">
+                                    <FormField
+                                       control={control}
+                                       name={`${prefix}.destination_location_id`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Destination</FormLabel>
+                                               <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                   <FormControl>
+                                                       <SelectTrigger className="h-9 bg-background">
+                                                           <SelectValue placeholder="Destination" />
+                                                       </SelectTrigger>
+                                                   </FormControl>
+                                                   <SelectContent>
+                                                       {ports.map((p: any) => (
+                                                           <SelectItem key={p.id} value={String(p.id)}>
+                                                               {p.name || p.location_name}
+                                                           </SelectItem>
+                                                       ))}
+                                                   </SelectContent>
+                                               </Select>
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+
+                               {/* Carrier */}
+                               <div className="md:col-span-3">
+                                   <FormField
+                                       control={control}
+                                       name={`${prefix}.carrier_id`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Carrier</FormLabel>
+                                               <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                   <FormControl>
+                                                       <SelectTrigger className="h-9 bg-background">
+                                                           <SelectValue placeholder="Carrier" />
+                                                       </SelectTrigger>
+                                                   </FormControl>
+                                                   <SelectContent>
+                                                       {legCarriers.map((c: any) => (
+                                                           <SelectItem key={c.id} value={String(c.id)}>
+                                                               {c.carrier_name}
+                                                           </SelectItem>
+                                                       ))}
+                                                   </SelectContent>
+                                               </Select>
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+
+                               {/* Transit Time */}
+                               <div className="md:col-span-1">
+                                   <FormField
+                                       control={control}
+                                       name={`${prefix}.transit_time_days`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Days</FormLabel>
+                                               <FormControl>
+                                                   <Input {...field} className="h-9" type="number" min={0} placeholder="0" />
+                                               </FormControl>
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+
+                               {/* Row 2: Flight/Voyage & Dates */}
+                               {isAir && (
+                                   <div className="md:col-span-3">
+                                       <FormField
+                                           control={control}
+                                           name={`${prefix}.flight_number`}
+                                           render={({ field }) => (
+                                               <FormItem>
+                                                   <FormLabel className="text-xs">Flight #</FormLabel>
+                                                   <FormControl>
+                                                       <Input {...field} className="h-9" placeholder="e.g. EK202" />
+                                                   </FormControl>
+                                               </FormItem>
+                                           )}
+                                       />
+                                   </div>
+                               )}
+                               
+                               {isOcean && (
+                                   <div className="md:col-span-3">
+                                       <FormField
+                                           control={control}
+                                           name={`${prefix}.voyage_number`}
+                                           render={({ field }) => (
+                                               <FormItem>
+                                                   <FormLabel className="text-xs">Voyage #</FormLabel>
+                                                   <FormControl>
+                                                       <Input {...field} className="h-9" placeholder="e.g. V001" />
+                                                   </FormControl>
+                                               </FormItem>
+                                           )}
+                                       />
+                                   </div>
+                               )}
+                               
+                               <div className="md:col-span-3">
+                                   <FormField
+                                       control={control}
+                                       name={`${prefix}.departure_date`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Departure</FormLabel>
+                                               <FormControl>
+                                                   <Input 
+                                                       {...field} 
+                                                       className="h-9" 
+                                                       type="datetime-local" 
+                                                       value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
+                                                       onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
+                                                   />
+                                               </FormControl>
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+                               <div className="md:col-span-3">
+                                   <FormField
+                                       control={control}
+                                       name={`${prefix}.arrival_date`}
+                                       render={({ field }) => (
+                                           <FormItem>
+                                               <FormLabel className="text-xs">Arrival</FormLabel>
+                                               <FormControl>
+                                                   <Input 
+                                                       {...field} 
+                                                       className={`h-9 ${dateError ? 'border-red-500' : ''}`}
+                                                       type="datetime-local" 
+                                                       value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
+                                                       onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
+                                                   />
+                                               </FormControl>
+                                               {dateError && <span className="text-[10px] text-red-500">Must be after departure</span>}
+                                           </FormItem>
+                                       )}
+                                   />
+                               </div>
+
+                           </div>
+                        );
+                   })}
+               </div>
+           </div>
+       )}
+
+     </CardContent>
+   </Card>
+ );
 }

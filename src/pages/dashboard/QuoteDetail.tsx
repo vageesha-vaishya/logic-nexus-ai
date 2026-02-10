@@ -8,6 +8,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
+import { SendQuoteDialog } from '@/components/sales/SendQuoteDialog';
 import { useDebug } from '@/hooks/useDebug';
 import { Button } from "@/components/ui/button";
 
@@ -207,6 +208,11 @@ export default function QuoteDetail() {
                       Convert to Booking
                   </Button>
                   <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
+                  <SendQuoteDialog 
+                      quoteId={resolvedId} 
+                      quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
+                      versionId={versionId || ''}
+                  />
                 </>
               )}
             </div>

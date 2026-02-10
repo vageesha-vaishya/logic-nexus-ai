@@ -34,6 +34,21 @@ function deduplicateById<T extends { id: string }>(injected: T[], queried: T[]):
   });
 }
 
+function parseTransitTime(val: string | number | undefined): number | null {
+    if (!val) return null;
+    const strVal = String(val).toLowerCase();
+    let hours = 0;
+    const numberPart = parseInt(strVal.match(/\d+/)?.[0] || '0');
+
+    if ((strVal.includes('day') || strVal.includes(' d')) && !strVal.includes('hour')) {
+        hours = numberPart * 24;
+    } else {
+        hours = numberPart;
+    }
+
+    return (!isNaN(hours) && hours > 0) ? hours : null;
+}
+
 // ---------------------------------------------------------------------------
 // Return types
 // ---------------------------------------------------------------------------
@@ -90,6 +105,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     queryFn: async () => {
       const portsService = new PortsService(scopedDb);
       const data = await portsService.getAllPorts();
+      console.log(`[useQuoteRepository] Ports loaded: ${data.length}`);
       return data.map((p: any) => ({
         id: p.id,
         name: p.location_name,
@@ -97,7 +113,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         country_code: p.country,
       }));
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: 0, // Force refetch to ensure global ports are loaded
   });
 
   // 2. Carriers
@@ -112,7 +128,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
       if (error) throw error;
       return (data || []) as CarrierOption[];
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: 0,
   });
 
   // 3. Accounts
@@ -158,7 +174,8 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         .order('priority', { ascending: false });
 
       if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
+        // Fetch mappings for this tenant OR global mappings
+        query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
       } else {
         query = query.is('tenant_id', null);
       }
@@ -230,7 +247,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
 
       return { services: servicesForDropdown, serviceTypes: serviceTypesForDropdown };
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0, // Force refetch to ensure mappings are updated
   });
   const serviceData = serviceQuery.data ?? { services: [], serviceTypes: [] };
 
@@ -280,6 +297,7 @@ export function useQuoteRepositoryForm(opts: {
   const { form, quoteId } = opts;
   const { supabase, scopedDb, context } = useCRM();
   const { roles } = useAuth();
+  const debug = useDebug('Sales', 'useQuoteRepositoryForm');
   const queryClient = useQueryClient();
   const {
     resolvedTenantId,
@@ -291,6 +309,7 @@ export function useQuoteRepositoryForm(opts: {
     accounts,
     contacts,
     opportunities,
+    serviceTypes,
   } = useQuoteContext();
 
   // --- Hydration: fetch existing quote via React Query ---
@@ -298,17 +317,50 @@ export function useQuoteRepositoryForm(opts: {
   const hydrationQuery = useQuery({
     queryKey: quoteKeys.hydration(quoteId!),
     queryFn: async () => {
-      const [quoteResult, itemsResult, cargoResult] = await Promise.all([
+      const [quoteResult, itemsResult, cargoResult, versionResult] = await Promise.all([
         supabase.from('quotes').select('*').eq('id', quoteId!).maybeSingle(),
         supabase.from('quote_items').select('*').eq('quote_id', quoteId!).order('line_number', { ascending: true }),
         supabase.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId!),
+        supabase.from('quotation_versions')
+            .select(`
+                id, 
+                version_number, 
+                quotation_version_options (
+                    id, 
+                    is_selected, 
+                    total_amount, 
+                    quote_currency:quote_currency_id (code),
+                    total_transit_days, 
+                    quotation_version_option_legs (
+                        id,
+                        sort_order,
+                        mode,
+                        provider_id,
+                        origin_location,
+                        destination_location,
+                        origin_location_id,
+                        destination_location_id,
+                        transit_time_hours,
+                        flight_number,
+                        voyage_number,
+                        departure_date,
+                        arrival_date
+                    )
+                )
+            `)
+            .eq('quote_id', quoteId!)
+            .order('version_number', { ascending: false })
+            .limit(1)
+            .maybeSingle()
       ]);
       if (quoteResult.error) throw quoteResult.error;
       if (!quoteResult.data) return null;
+      
       return {
         quote: quoteResult.data,
         items: itemsResult.data ?? [],
         cargoConfigs: cargoResult.data ?? [],
+        latestVersion: versionResult.data
       };
     },
     enabled: !!quoteId,
@@ -320,17 +372,70 @@ export function useQuoteRepositoryForm(opts: {
 
   useEffect(() => {
     if (!hydrationQuery.data) return;
-    const { quote, items, cargoConfigs } = hydrationQuery.data;
+    const { quote, items, cargoConfigs, latestVersion } = hydrationQuery.data;
 
     if (quote.tenant_id) {
       setResolvedTenantId(String(quote.tenant_id));
+    }
+
+    debug.log('[useQuoteRepository] Hydrating form with quote data:', {
+      id: quote.id,
+      service_type_id: quote.service_type_id,
+      service_id: quote.service_id,
+      origin_port_id: quote.origin_port_id,
+      destination_port_id: quote.destination_port_id,
+      pickup_date: quote.pickup_date,
+      vehicle_type: quote.vehicle_type,
+      special_handling: quote.special_handling,
+      version: latestVersion?.version_number
+    });
+
+    // Map Options and Legs
+    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => ({
+        id: opt.id,
+        is_primary: opt.is_selected, // Map is_selected to is_primary
+        total_amount: opt.total_amount,
+        currency: opt.quote_currency?.code || 'USD',
+        transit_time_days: opt.total_transit_days,
+        legs: opt.quotation_version_option_legs?.map((leg: any) => ({
+            id: leg.id,
+            sequence_number: leg.sort_order, // Map sort_order to sequence_number
+            transport_mode: leg.mode, // Map mode to transport_mode
+            carrier_id: leg.provider_id ? String(leg.provider_id) : undefined, // Map provider_id to carrier_id
+            origin_location_name: leg.origin_location, // Store as name since it might be string
+            destination_location_name: leg.destination_location, // Store as name
+            origin: leg.origin_location, // Fallback
+            destination: leg.destination_location, // Fallback
+            flight_number: leg.flight_number,
+            voyage_number: leg.voyage_number,
+            departure_date: leg.departure_date,
+            arrival_date: leg.arrival_date,
+            transit_time_days: leg.transit_time_hours ? Math.ceil(leg.transit_time_hours / 24) : undefined,
+        })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
+    })) || [];
+
+    const primaryOption = mappedOptions.find((o: any) => o.is_primary) || mappedOptions[0];
+    const initialShippingAmount = primaryOption?.total_amount 
+        ? String(primaryOption.total_amount) 
+        : (quote.shipping_amount ? String(quote.shipping_amount) : '0');
+
+    // Resolve Service Type ID from Option if missing
+    let resolvedServiceTypeId = quote.service_type_id ? String(quote.service_type_id) : '';
+    if (!resolvedServiceTypeId && primaryOption && primaryOption.legs.length > 0) {
+        const mainMode = primaryOption.legs.find((l: any) => l.transport_mode === 'ocean' || l.transport_mode === 'air')?.transport_mode || primaryOption.legs[0].transport_mode;
+        if (mainMode && serviceTypes) {
+             const foundType = serviceTypes.find((st: any) => st.name?.toLowerCase().includes(mainMode.toLowerCase()) || st.code?.toLowerCase() === mainMode.toLowerCase());
+             if (foundType) {
+                 resolvedServiceTypeId = String(foundType.id);
+             }
+        }
     }
 
     form.reset({
       title: quote.title,
       description: quote.description || '',
       status: quote.status,
-      service_type_id: quote.service_type_id ? String(quote.service_type_id) : '',
+      service_type_id: resolvedServiceTypeId,
       service_id: quote.service_id ? String(quote.service_id) : '',
       incoterms: quote.incoterms || '',
       trade_direction: (quote.regulatory_data as any)?.trade_direction,
@@ -344,11 +449,12 @@ export function useQuoteRepositoryForm(opts: {
       pickup_date: quote.pickup_date || '',
       delivery_deadline: quote.delivery_deadline || '',
       vehicle_type: quote.vehicle_type || '',
-      special_handling: quote.special_handling || '',
+      special_handling: Array.isArray(quote.special_handling) ? quote.special_handling.join(', ') : (quote.special_handling || ''),
       tax_percent: quote.tax_percent ? String(quote.tax_percent) : '0',
-      shipping_amount: quote.shipping_amount ? String(quote.shipping_amount) : '0',
+      shipping_amount: initialShippingAmount,
       terms_conditions: quote.terms_conditions || '',
       notes: quote.notes || '',
+      options: mappedOptions,
       items: items
         ? items.map((item: any) => ({
             line_number: item.line_number,
@@ -361,6 +467,16 @@ export function useQuoteRepositoryForm(opts: {
             discount_percent: item.discount_percent || 0,
             package_category_id: item.package_category_id ? String(item.package_category_id) : '',
             package_size_id: item.package_size_id ? String(item.package_size_id) : '',
+            attributes: {
+                weight: item.weight_kg || 0,
+                volume: item.volume_cbm || 0,
+                length: item.attributes?.length || 0,
+                width: item.attributes?.width || 0,
+                height: item.attributes?.height || 0,
+                hs_code: item.hs_code || '',
+                stackable: item.stackable || false,
+                hazmat: item.hazmat_details || undefined,
+            }
           }))
         : [],
       cargo_configurations: cargoConfigs
@@ -395,13 +511,19 @@ export function useQuoteRepositoryForm(opts: {
       if (quote.service_id) {
         const { data: svc } = await supabase
           .from('services')
-          .select('id, service_name')
+          .select('id, service_name, service_type_id')
           .eq('id', quote.service_id)
           .maybeSingle();
         if (svc) {
           setServices((prev) => {
             if (prev.find((s) => String(s.id) === String(svc.id))) return prev;
-            return [...prev, { ...svc, id: String(svc.id), service_type_id: '', is_default: false, priority: 0 }];
+            return [...prev, { 
+              ...svc, 
+              id: String(svc.id), 
+              service_type_id: svc.service_type_id ? String(svc.service_type_id) : '', 
+              is_default: false, 
+              priority: 0 
+            }];
           });
         }
       }
@@ -497,115 +619,47 @@ export function useQuoteRepositoryForm(opts: {
         }
       }
 
+      // Prepare payload for RPC
       const payload: any = {
-        title: data.title,
-        description: data.description || null,
-        service_type_id: data.service_type_id || null,
-        service_id: data.service_id || null,
-        incoterms: data.incoterms || null,
-        carrier_id: data.carrier_id || null,
-        consignee_id: data.consignee_id || null,
-        origin_port_id: data.origin_port_id || null,
-        destination_port_id: data.destination_port_id || null,
-        account_id: accountId || null,
-        contact_id: contactId || null,
-        opportunity_id: opportunityId || null,
-        status: data.status || 'draft',
-        valid_until: data.valid_until || null,
-        pickup_date: data.pickup_date || null,
-        delivery_deadline: data.delivery_deadline || null,
-        vehicle_type: data.vehicle_type || null,
-        special_handling: data.special_handling || null,
-        tax_percent: data.tax_percent ? Number(data.tax_percent) : 0,
-        shipping_amount: data.shipping_amount ? Number(data.shipping_amount) : 0,
-        terms_conditions: data.terms_conditions || null,
-        notes: data.notes || null,
-        billing_address: data.billing_address || {},
-        shipping_address: data.shipping_address || {},
-        tenant_id: finalTenantId,
-        regulatory_data: {
-          trade_direction: data.trade_direction || null,
+        quote: {
+            id: saveQuoteId || undefined,
+            title: data.title,
+            description: data.description || null,
+            service_type_id: data.service_type_id || null,
+            service_id: data.service_id || null,
+            incoterms: data.incoterms || null,
+            carrier_id: data.carrier_id || null,
+            consignee_id: data.consignee_id || null,
+            origin_port_id: data.origin_port_id || null,
+            destination_port_id: data.destination_port_id || null,
+            account_id: accountId || null,
+            contact_id: contactId || null,
+            opportunity_id: opportunityId || null,
+            status: data.status || 'draft',
+            valid_until: data.valid_until || null,
+            pickup_date: data.pickup_date || null,
+            delivery_deadline: data.delivery_deadline || null,
+            vehicle_type: data.vehicle_type || null,
+            special_handling: data.special_handling || null,
+            tax_percent: data.tax_percent ? Number(data.tax_percent) : 0,
+            shipping_amount: data.shipping_amount ? Number(data.shipping_amount) : 0,
+            terms_conditions: data.terms_conditions || null,
+            notes: data.notes || null,
+            billing_address: data.billing_address || {},
+            shipping_address: data.shipping_address || {},
+            tenant_id: finalTenantId,
+            regulatory_data: {
+              trade_direction: data.trade_direction || null,
+            },
         },
-      };
-
-      const { error: connectivityError } = await scopedDb
-        .from('quotes')
-        .select('id')
-        .limit(1);
-      if (connectivityError) throw connectivityError;
-
-      let savedId = saveQuoteId || '';
-
-      // Draft detection
-      if (!savedId) {
-        try {
-          let query = scopedDb
-            .from('quotes')
-            .select('id')
-            .eq('tenant_id', finalTenantId)
-            .eq('status', 'draft')
-            .gt('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (payload.title) query = query.eq('title', payload.title);
-          if (payload.account_id) query = query.eq('account_id', payload.account_id);
-          else query = query.is('account_id', null);
-          if (payload.origin_port_id) query = query.eq('origin_port_id', payload.origin_port_id);
-          else query = query.is('origin_port_id', null);
-          if (payload.destination_port_id) query = query.eq('destination_port_id', payload.destination_port_id);
-          else query = query.is('destination_port_id', null);
-
-          const { data: existing } = await query;
-          if (existing && existing.length > 0) {
-            savedId = existing[0].id;
-          }
-        } catch (checkError) {
-          console.warn('[QuoteRepository] Error checking for existing drafts:', checkError);
-        }
-      }
-
-      // Track if we created a new quote to enable rollback
-      let isNewCreation = false;
-
-      if (savedId) {
-        const { error: updateError } = await scopedDb
-          .from('quotes')
-          .update({ ...payload, updated_at: new Date().toISOString() })
-          .eq('id', savedId);
-        if (updateError) throw updateError;
-      } else {
-        const { data: inserted, error: insertError } = await scopedDb
-          .from('quotes')
-          .insert(payload)
-          .select('id')
-          .maybeSingle();
-        if (insertError) throw insertError;
-        savedId = String((inserted as any)?.id);
-        isNewCreation = true;
-      }
-
-      if (!savedId) throw new Error('Quote save did not return an id');
-
-      try {
-        // Save line items (delete-then-insert)
-        if (data.items && data.items.length > 0) {
-          const { error: deleteError } = await scopedDb
-            .from('quote_items')
-            .delete()
-            .eq('quote_id', savedId);
-          if (deleteError) throw deleteError;
-
-          const itemsPayload = data.items.map((item, index) => {
+        items: data.items?.map((item, index) => {
             const qty = Number(item.quantity) || 0;
             const price = Number(item.unit_price) || 0;
             const discountPct = Number(item.discount_percent) || 0;
             const discountAmt = (qty * price * discountPct) / 100;
-            // Calculate line total: (Qty * Price) - Discount
             const lineTotal = (qty * price) - discountAmt;
 
             return {
-              quote_id: savedId,
               line_number: index + 1,
               type: item.type || 'loose',
               container_type_id: item.container_type_id || null,
@@ -625,27 +679,8 @@ export function useQuoteRepositoryForm(opts: {
               volume_cbm: item.attributes?.volume || 0,
               attributes: item.attributes || {},
             };
-          });
-
-          const { error: itemsError } = await scopedDb
-            .from('quote_items')
-            .insert(itemsPayload);
-          if (itemsError) throw itemsError;
-        } else {
-          await scopedDb.from('quote_items').delete().eq('quote_id', savedId);
-        }
-
-        // Save cargo configurations (delete-then-insert)
-        if (data.cargo_configurations && data.cargo_configurations.length > 0) {
-          const { error: deleteCargoError } = await scopedDb
-            .from('quote_cargo_configurations')
-            .delete()
-            .eq('quote_id', savedId);
-          if (deleteCargoError) throw deleteCargoError;
-
-          const cargoPayload = data.cargo_configurations.map((config) => ({
-            quote_id: savedId,
-            tenant_id: finalTenantId,
+        }) || [],
+        cargo_configurations: data.cargo_configurations?.map((config) => ({
             transport_mode: config.transport_mode,
             cargo_type: config.cargo_type,
             container_type: config.container_type || null,
@@ -668,25 +703,37 @@ export function useQuoteRepositoryForm(opts: {
             package_category_id: config.package_category_id || null,
             package_size_id: config.package_size_id || null,
             remarks: config.remarks || null,
-          }));
+        })) || [],
+        options: data.options?.map((option) => ({
+            id: option.id,
+            is_selected: option.is_primary,
+            legs: option.legs?.map((leg: any) => ({
+                id: leg.id,
+                carrier_id: leg.carrier_id,
+                transport_mode: leg.transport_mode,
+                origin_location_name: leg.origin_location_name,
+                destination_location_name: leg.destination_location_name,
+                transit_time_hours: leg.transit_time_days 
+                    ? leg.transit_time_days * 24 
+                    : (leg.transit_time ? parseTransitTime(leg.transit_time) : null),
+                flight_number: leg.flight_number,
+                voyage_number: leg.voyage_number,
+                departure_date: leg.departure_date,
+                arrival_date: leg.arrival_date
+            })) || []
+        })) || []
+      };
 
-          const { error: cargoError } = await scopedDb
-            .from('quote_cargo_configurations')
-            .insert(cargoPayload);
-          if (cargoError) throw cargoError;
-        } else {
-          await scopedDb.from('quote_cargo_configurations').delete().eq('quote_id', savedId);
-        }
-      } catch (error) {
-        // Rollback: If we created a new quote and subsequent saves failed, delete the quote.
-        if (isNewCreation && savedId) {
-          console.warn(`[QuoteRepository] Rolling back creation of quote ${savedId} due to error`, error);
-          await scopedDb.from('quotes').delete().eq('id', savedId);
-        }
-        throw error;
+      const { data: savedId, error } = await scopedDb.rpc('save_quote_atomic', { p_payload: payload });
+
+      if (error) {
+          console.error('[QuoteRepository] RPC save failed:', error);
+          throw error;
       }
+      
+      if (!savedId) throw new Error('Quote save did not return an id');
 
-      return savedId;
+      return String(savedId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: quoteKeys.all });

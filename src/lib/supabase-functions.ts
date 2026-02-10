@@ -1,5 +1,64 @@
 import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * Invokes a Supabase Edge Function anonymously (using the ANON/Public key).
+ * 
+ * This bypasses the Supabase Client's auth state and User Session, ensuring
+ * that "Invalid JWT" errors do not occur for public functions.
+ * 
+ * @param functionName The name of the Edge Function to invoke.
+ * @param body The body of the request.
+ * @returns The response data.
+ * @throws Error if the request fails.
+ */
+export async function invokeAnonymous<T = any>(functionName: string, body: any): Promise<T> {
+    const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "https://gzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    // Use relative URL in development to leverage Vite proxy (avoids CORS)
+    // Use absolute URL in production
+    let functionUrl;
+    if (import.meta.env.DEV) {
+        functionUrl = `/functions/v1/${functionName}`;
+    } else {
+        functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+    }
+
+    console.log(`[invokeAnonymous] Calling ${functionName} at ${functionUrl}`);
+
+    try {
+        const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseAnonKey}`
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            let errorMsg = text;
+            try { 
+                const json = JSON.parse(text);
+                errorMsg = json.error || json.message || text;
+            } catch {}
+            console.error(`[invokeAnonymous] Failed: ${errorMsg}`);
+            throw new Error(errorMsg);
+        }
+
+        return response.json();
+    } catch (error: any) {
+        console.error(`[invokeAnonymous] Fetch error:`, error);
+        // If we failed with relative URL in dev, maybe try absolute as fallback? 
+        // Or just return clearer error.
+        if (error.message === 'Failed to fetch' && import.meta.env.DEV) {
+             throw new Error("Network error. Check if Supabase Edge Functions are running or if CORS is blocking requests.");
+        }
+        throw error;
+    }
+}
+
 export type InvokeOptions = {
   body?: any;
   headers?: { [key: string]: string };
@@ -111,30 +170,61 @@ export async function invokeFunction<T = any>(
           retryError = result.error;
         }
 
-        // Check if retry is still 401 (or if refresh failed)
-        const isStill401 = retryError && ((retryError as any)?.context?.status === 401 || 
-                    retryError.message?.includes('Invalid JWT') || 
-                    retryError.message?.includes('jwt expired'));
+          // Check if retry is still 401 (or if refresh failed)
+        const isStill401 = (retryError || error) && (
+            (retryError || error)?.context?.status === 401 || 
+            (retryError || error).message?.includes('Invalid JWT') || 
+            (retryError || error).message?.includes('jwt expired')
+        );
 
-        // Step 2: Fallback to ANON key if User Token fails
-        if (isStill401) {
-            console.warn(`[Supabase Function] Still 401 after refresh. Fallback to ANON key for ${functionName}...`);
-            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            
-            if (anonKey) {
-                 const { Authorization, authorization, ...baseHeaders } = options.headers || {};
-                 const anonResult = await supabase.functions.invoke(functionName, {
-                    body: options.body,
-                    headers: {
-                      ...baseHeaders,
-                      Authorization: `Bearer ${anonKey}`
-                    },
-                    method: options.method || 'POST',
-                 });
-                 retryData = anonResult.data;
-                 retryError = anonResult.error;
-            }
-        }
+          // Step 2: Fallback to ANON key if User Token fails
+          if (isStill401) {
+              console.warn(`[Supabase Function] Still 401 after refresh. Fallback to ANON key for ${functionName}...`);
+              // Try VITE_SUPABASE_ANON_KEY first, then VITE_SUPABASE_PUBLISHABLE_KEY
+              const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+              
+              if (anonKey) {
+                   // Use direct fetch to ensure we control the Authorization header completely
+                   // avoiding any potential interference from the supabase client's auto-auth
+                   
+                   // ALWAYS use the absolute URL to avoid local proxy issues and ensure we hit the correct project
+                   const projectUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || "https://gzhxgoigflftharcmdqj.supabase.co";
+                   const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
+
+                   console.log(`[Supabase Function] Fallback fetching: ${functionUrl}`);
+
+                   const { Authorization, authorization, ...baseHeaders } = options.headers || {};
+                   
+                   try {
+                       const response = await fetch(functionUrl, {
+                           method: options.method || 'POST',
+                           headers: {
+                               'Content-Type': 'application/json',
+                               'Authorization': `Bearer ${anonKey}`,
+                               ...baseHeaders
+                           },
+                           body: options.body ? JSON.stringify(options.body) : undefined
+                       });
+
+                       if (!response.ok) {
+                           const text = await response.text();
+                           let errorData;
+                           try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
+                           console.error(`[Supabase Function] Fallback failed with ${response.status}:`, text);
+                           retryData = null;
+                           retryError = new Error(errorData.message || `Function returned ${response.status}`);
+                       } else {
+                           retryData = await response.json();
+                           retryError = null;
+                       }
+                   } catch (fetchErr) {
+                       console.error(`[Supabase Function] Fallback fetch error:`, fetchErr);
+                       retryError = fetchErr;
+                   }
+              } else {
+                  console.warn("[Supabase Function] No ANON key found for fallback.");
+              }
+          }
 
         // If we have a successful retry (or a different error), return it
         if (!retryError) {

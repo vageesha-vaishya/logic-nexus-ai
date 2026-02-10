@@ -12,22 +12,22 @@ const TEST_EMAILS = [
   {
     email: 'Bahuguna.vimal@outlook.com',
     password: '#SOS@beegee@1234',
-    provider: 'outlook'
+    provider: 'office365'
   },
   {
     email: 'vimal_s390@hotmail.com',
     password: 'vcbbeegee@1234',
-    provider: 'outlook'
+    provider: 'office365'
   },
   {
     email: 'bahuguna.vimal@gmail.com',
     password: 'SOS@July@2024',
-    provider: 'google'
+    provider: 'gmail'
   },
   {
     email: 'dinusaundarya@gmail.com',
     password: 'Dinu1234',
-    provider: 'google'
+    provider: 'gmail'
   }
 ];
 

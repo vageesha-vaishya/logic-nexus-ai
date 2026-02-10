@@ -16,6 +16,7 @@ import { ThemeProvider } from "./hooks/useTheme";
 // Eager: shell pages (needed immediately)
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import OAuthCallback from "./pages/OAuthCallback";
 import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -92,7 +93,13 @@ const Quotes = lazy(() => import("./pages/dashboard/Quotes"));
 const QuoteTemplates = lazy(() => import("./pages/dashboard/QuoteTemplates"));
 const QuoteNew = lazy(() => import("./pages/dashboard/QuoteNew"));
 const QuoteDetail = lazy(() => import("./pages/dashboard/QuoteDetail"));
-const QuotesPipeline = lazy(() => import("./pages/dashboard/QuotesPipeline"));
+const QuotesPipeline = lazy(() => 
+  import("./pages/dashboard/QuotesPipeline").catch(() => {
+    // Retry once after 1s in case of network glitch
+    return new Promise(resolve => setTimeout(resolve, 1000))
+      .then(() => import("./pages/dashboard/QuotesPipeline"));
+  })
+);
 const MultiModalQuote = lazy(() => import("./pages/dashboard/MultiModalQuote"));
 const Carriers = lazy(() => import("./pages/dashboard/Carriers"));
 const Vendors = lazy(() => import("./pages/dashboard/Vendors"));
@@ -178,6 +185,7 @@ const App = () => (
                 <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route 

@@ -30,6 +30,12 @@ export default function QuotesPipeline() {
   const { toast } = useToast();
   const { scopedDb, supabase } = useCRM();
   const debug = useDebug('Sales', 'QuotesPipeline');
+  
+  // Force re-render on mount to ensure fresh data
+  useEffect(() => {
+    debug.info('QuotesPipeline mounted');
+  }, []);
+
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -198,7 +204,7 @@ export default function QuotesPipeline() {
       });
     } catch (error) {
       const duration = performance.now() - startTime;
-      debug.error("Error updating quote status:", error, { duration: `${duration.toFixed(2)}ms` });
+      debug.error("Error updating quote status:", { error, duration: `${duration.toFixed(2)}ms` });
       toast({
         title: "Error",
         description: "Failed to update quote status",

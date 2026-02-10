@@ -128,10 +128,11 @@ export default function QuoteNew() {
     }
   }, [isInsertingOptions, insertionStartTime]);
   
-  // Cache for master data to populate form
   const [masterData, setMasterData] = useState<{
     serviceTypes: any[];
     carriers: any[];
+    containerTypes?: any[];
+    containerSizes?: any[];
   }>({ serviceTypes: [], carriers: [] });
 
   // Fetch master data on mount
@@ -144,9 +145,17 @@ export default function QuoteNew() {
             const { data: c, error: cError } = await scopedDb.from('carriers').select('id, carrier_name, scac');
             if (cError) console.error('[QuoteNew] Error fetching carriers:', cError);
 
+            const { data: ct, error: ctError } = await scopedDb.from('container_types').select('id, name, code');
+            if (ctError) console.error('[QuoteNew] Error fetching container types:', ctError);
+
+            const { data: cs, error: csError } = await scopedDb.from('container_sizes').select('id, name, code');
+            if (csError) console.error('[QuoteNew] Error fetching container sizes:', csError);
+
             setMasterData({
                 serviceTypes: st || [],
-                carriers: c || []
+                carriers: c || [],
+                containerTypes: ct || [],
+                containerSizes: cs || []
             });
         } catch (error) {
             console.error('[QuoteNew] Unexpected error fetching master data:', error);

@@ -94,8 +94,95 @@ export function generateSimulatedRates(params: SimulationParams): RateOption[] {
         
         const originalCost = simulatedPrice;
 
+        // Generate Multi-Leg Structure
+        const legs = [];
+        const startDate = new Date();
+        
+        // Distribute cost across legs
+        const pickupCost = Math.round(simulatedPrice * 0.10 * 100) / 100;
+        const deliveryCost = Math.round(simulatedPrice * 0.10 * 100) / 100;
+        const mainLegCost = Math.round(simulatedPrice * 0.70 * 100) / 100;
+        const surchargeCost = Math.round((simulatedPrice - pickupCost - deliveryCost - mainLegCost) * 100) / 100;
+
+        if (mode === 'ocean' || mode === 'rail') {
+            // Leg 1: Pre-Carriage (Road)
+            legs.push({
+                id: `leg_1_${index}_${Date.now()}`,
+                sequence_number: 1,
+                transport_mode: 'road',
+                mode: 'road',
+                origin: params.origin,
+                destination: `${params.origin} Port/Ramp`,
+                carrier_name: 'Local Trucking',
+                transit_time: '1 Day',
+                departure_date: startDate.toISOString(),
+                arrival_date: new Date(startDate.getTime() + 86400000).toISOString(),
+                charges: [
+                    { name: 'Pickup Charge', amount: pickupCost, currency: 'USD' }
+                ]
+            });
+
+            // Leg 2: Main Leg
+            const mainLegDuration = Math.max(1, simulatedTransit - 2);
+            legs.push({
+                id: `leg_2_${index}_${Date.now()}`,
+                sequence_number: 2,
+                transport_mode: mode,
+                mode: mode,
+                origin: `${params.origin} Port/Ramp`,
+                destination: `${params.destination} Port/Ramp`,
+                carrier_name: carrierName,
+                transit_time: `${mainLegDuration} Days`,
+                departure_date: new Date(startDate.getTime() + 86400000).toISOString(),
+                arrival_date: new Date(startDate.getTime() + (mainLegDuration + 1) * 86400000).toISOString(),
+                charges: [
+                    { name: 'Base Freight', amount: mainLegCost, currency: 'USD' },
+                    { name: 'Bunker Surcharge', amount: surchargeCost, currency: 'USD' }
+                ]
+            });
+
+            // Leg 3: On-Carriage (Road)
+            legs.push({
+                id: `leg_3_${index}_${Date.now()}`,
+                sequence_number: 3,
+                transport_mode: 'road',
+                mode: 'road',
+                origin: `${params.destination} Port/Ramp`,
+                destination: params.destination,
+                carrier_name: 'Local Trucking',
+                transit_time: '1 Day',
+                departure_date: new Date(startDate.getTime() + (mainLegDuration + 1) * 86400000).toISOString(),
+                arrival_date: new Date(startDate.getTime() + (mainLegDuration + 2) * 86400000).toISOString(),
+                charges: [
+                    { name: 'Delivery Charge', amount: deliveryCost, currency: 'USD' }
+                ]
+            });
+        } else {
+            // Single Leg for Air/Road
+            const base = Math.round(simulatedPrice * 0.9 * 100) / 100;
+            const extra = Math.round((simulatedPrice - base) * 100) / 100;
+            legs.push({
+                id: `leg_1_${index}_${Date.now()}`,
+                sequence_number: 1,
+                transport_mode: mode,
+                mode: mode,
+                origin: params.origin,
+                destination: params.destination,
+                carrier_name: carrierName,
+                transit_time: `${simulatedTransit} Days`,
+                departure_date: startDate.toISOString(),
+                arrival_date: new Date(startDate.getTime() + simulatedTransit * 86400000).toISOString(),
+                charges: [
+                    { name: 'Base Freight', amount: base, currency: 'USD' },
+                    { name: 'Security/Fuel', amount: extra, currency: 'USD' }
+                ]
+            });
+        }
+
         options.push({
             id: `sim_${mode}_${index}_${Date.now()}`,
+            mode: mode,
+            transport_mode: mode,
             tier: 'market',
             option_name: `${carrierName} ${isExpress ? 'Express' : 'Standard'}`, // Map to option_name expected by UI
             carrier_name: carrierName, // Map to carrier_name expected by UI
@@ -104,7 +191,7 @@ export function generateSimulatedRates(params: SimulationParams): RateOption[] {
             transit_time: { details: `${simulatedTransit} Days` }, // Map to complex object
             valid_to: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             source_attribution: 'Simulation Engine (Fallback)',
-            legs: [],
+            legs: legs,
             charges: [],
             total_co2_kg: estimatedCo2,
             meta: {

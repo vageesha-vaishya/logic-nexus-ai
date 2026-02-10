@@ -26,6 +26,7 @@ export const mapOptionToQuote = (opt: any) => {
         option_name: opt.option_name || opt.name,
         total_amount: safeNumber(opt.total_amount) || safeNumber(opt.price),
         mode: opt.mode || opt.transport_mode || opt.name, // Fallback chain
+        transport_mode: opt.transport_mode || opt.mode || (['air', 'ocean', 'road', 'rail'].includes((opt.name || '').toLowerCase()) ? opt.name.toLowerCase() : undefined),
         transit_time: typeof opt.transitTime === 'string' ? { details: opt.transitTime } : (opt.transit_time || {}),
         currency: typeof opt.currency === 'object' ? opt.currency?.code : opt.currency,
         // Financial mappings (DB -> App)

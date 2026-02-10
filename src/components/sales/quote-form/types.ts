@@ -81,6 +81,45 @@ export const quoteSchema = z.object({
     package_size_id: z.string().optional(),
     remarks: z.string().optional(),
   })).optional().default([]),
+  options: z.array(z.object({
+    id: z.string().optional(),
+    is_primary: z.boolean().default(false),
+    total_amount: z.coerce.number().optional(),
+    currency: z.string().default('USD'),
+    transit_time_days: z.number().optional(),
+    legs: z.array(z.object({
+      id: z.string().optional(),
+      sequence_number: z.number(),
+      transport_mode: z.enum(['ocean', 'air', 'road', 'rail']),
+      carrier_id: z.string().optional(),
+      origin_location_id: z.string().optional(),
+      destination_location_id: z.string().optional(),
+      origin_location_name: z.string().optional(),
+      destination_location_name: z.string().optional(),
+      transit_time: z.string().optional(),
+      transit_time_days: z.coerce.number().min(0, "Transit days cannot be negative").optional(),
+      voyage_number: z.string().optional(),
+      flight_number: z.string().optional(),
+      arrival_date: z.string().optional(),
+      departure_date: z.string().optional(),
+    }).refine((data) => {
+        if (data.departure_date && data.arrival_date) {
+            return new Date(data.arrival_date) > new Date(data.departure_date);
+        }
+        return true;
+    }, {
+        message: "Arrival date must be after departure date",
+        path: ["arrival_date"]
+    }).refine((data) => {
+        if (data.transport_mode === 'air' && data.flight_number && !/^[A-Z0-9]{2,3}\s?\d{1,4}[A-Z]?$/i.test(data.flight_number)) {
+            return false;
+        }
+        return true;
+    }, {
+        message: "Invalid flight number format (e.g. EK202)",
+        path: ["flight_number"]
+    })).optional().default([]),
+  })).optional().default([]),
 });
 
 export type QuoteFormValues = z.infer<typeof quoteSchema>;

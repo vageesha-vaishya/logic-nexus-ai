@@ -18,7 +18,10 @@ export class PortsService {
    * Uses global scope bypass to ensure visibility across all contexts.
    */
   async getAllPorts(): Promise<PortLocation[]> {
-    const { data, error } = await this.db.from('ports_locations', true)
+    console.log('[PortsService] Fetching all ports (global scope)...');
+    // Use raw client to ensure no scoping interference for this global table
+    const { data, error } = await this.db.client
+      .from('ports_locations')
       .select('*')
       .order('location_name');
       
@@ -27,6 +30,7 @@ export class PortsService {
       throw error;
     }
     
+    console.log(`[PortsService] Fetched ${data?.length || 0} ports.`);
     return data || [];
   }
 
