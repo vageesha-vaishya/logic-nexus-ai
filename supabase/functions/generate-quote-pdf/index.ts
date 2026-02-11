@@ -10,13 +10,23 @@ serveWithLogger(async (req, logger, supabaseClient) => {
       return new Response("ok", { headers: getCorsHeaders(req) });
     }
 
-    const { quoteId, versionId, templateId } = await req.json();
+    const traceLogs: string[] = [];
+    const log = async (msg: string) => {
+        traceLogs.push(msg);
+        await logger.info(msg);
+    };
+    const logWarn = async (msg: string) => {
+        traceLogs.push(`WARN: ${msg}`);
+        await logger.warn(msg);
+    };
+
+    let { quoteId, versionId, templateId, template } = await req.json();
 
     if (!quoteId) {
       throw new Error("Missing quoteId");
     }
 
-    await logger.info(`Generating PDF for Quote: ${quoteId}, Version: ${versionId}, Template: ${templateId}`);
+    await log(`Generating PDF for Quote: ${quoteId}, Version: ${versionId}, Template: ${templateId}`);
 
     // Fetch Template
     let templateContent = null;
@@ -37,12 +47,12 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     // Default fallback template
     if (!templateContent) {
          templateContent = {
-          layout: "standard",
+          layout: "mgl_granular",
           header: { show_logo: true, company_info: true, title: "QUOTATION" },
           sections: [
-              { type: "customer_info", title: "Customer Information" },
-              { type: "shipment_info", title: "Shipment Details" },
-              { type: "rates_table", title: "Freight Charges" },
+              { type: "customer_matrix_header", title: "Customer Information" },
+              { type: "shipment_matrix_details", title: "Details (with Equipment/QTY)" },
+              { type: "rates_matrix", title: "Freight Charges Matrix" },
               { type: "terms", title: "Terms & Conditions" }
           ],
           footer: { text: "Thank you for your business." }
@@ -52,6 +62,7 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     // Fetch Charge Sides for Filtering
     const { data: sides } = await supabaseClient.from("charge_sides").select("id, code, name");
     const sellSideId = sides?.find((s: any) => s.code === 'sell' || s.name === 'Sell')?.id;
+    await logger.info(`Sell Side ID: ${sellSideId}`);
 
     // Fetch Quote Data (without embedding items to avoid view relationship issues)
     const { data: quote, error: quoteError } = await supabaseClient
@@ -80,10 +91,31 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     
     if (itemsError) throw new Error(`Error fetching items: ${itemsError.message}`);
     quote.items = items || [];
+    
+    await logger.info(`Fetched ${quote.items.length} quote items. First item sizes: ${JSON.stringify(quote.items[0]?.container_sizes)}`);
 
-    // Fetch Version Data (if provided)
+    // Fetch Version Data (if provided or default to latest)
     let version = null;
     let options = [];
+    
+    if (!versionId) {
+        // Try to find the latest active version
+        const { data: latestVersion, error: latestError } = await supabaseClient
+            .from("quotation_versions")
+            .select("*")
+            .eq("quote_id", quoteId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+            
+        if (latestVersion) {
+            versionId = latestVersion.id;
+            await logger.info(`No versionId provided, using latest version: ${versionId}`);
+        } else {
+             await logger.warn(`No versionId provided and no version found for quote ${quoteId}`);
+        }
+    }
+
     if (versionId) {
       const { data: vData, error: vError } = await supabaseClient
         .from("quotation_versions")
@@ -111,6 +143,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
       }
       
       options = oData || [];
+      await logger.info(`Fetched ${options.length} options for version ${versionId}`);
+
 
       // Fetch Legs and Charges for each option
       for (const opt of options) {
@@ -141,6 +175,12 @@ serveWithLogger(async (req, logger, supabaseClient) => {
           
           if (chargesError) await logger.warn(`Error fetching charges for option ${opt.id}: ${chargesError.message}`);
           opt.charges = charges || [];
+          await logger.info(`Option ${opt.id}: ${opt.legs.length} legs, ${opt.charges.length} charges. SellSideId: ${sellSideId}`);
+          if (opt.charges.length > 0) {
+             await logger.info(`First Charge: LegID=${opt.charges[0].leg_id}, SideID=${opt.charges[0].charge_side_id}, Amount=${opt.charges[0].amount}, Note=${opt.charges[0].note}`);
+          } else {
+             await logger.warn(`No charges found for option ${opt.id}`);
+          }
       }
     }
 
@@ -162,20 +202,20 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     let y = height - 50;
 
     // Helper
-    const drawText = (text: string, x: number, y: number, size = 10, isBold = false, color = black) => {
-        page.drawText(String(text || ''), { x, y, size, font: isBold ? boldFont : font, color });
+    const drawText = (text: string, x: number, y: number, size = 10, isBold = false, color = black, targetPage = page) => {
+        targetPage.drawText(String(text || ''), { x, y, size, font: isBold ? boldFont : font, color });
     };
 
-    const drawRect = (x: number, y: number, w: number, h: number, color = black, filled = false) => {
+    const drawRect = (x: number, y: number, w: number, h: number, color = black, filled = false, targetPage = page) => {
         if (filled) {
-            page.drawRectangle({ x, y, width: w, height: h, color: color });
+            targetPage.drawRectangle({ x, y, width: w, height: h, color: color });
         } else {
-            page.drawRectangle({ x, y, width: w, height: h, borderColor: color, borderWidth: 1 });
+            targetPage.drawRectangle({ x, y, width: w, height: h, borderColor: color, borderWidth: 1 });
         }
     };
 
-    const drawLine = (x1: number, y1: number, x2: number, y2: number, color = black) => {
-        page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, color, thickness: 1 });
+    const drawLine = (x1: number, y1: number, x2: number, y2: number, color = black, targetPage = page) => {
+        targetPage.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, color, thickness: 1 });
     };
 
     // --- RENDERER ---
@@ -183,6 +223,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     // MGL Layout Logic
     const isMGL = templateContent.layout === "mgl_matrix";
     const isMGLGranular = templateContent.layout === "mgl_granular";
+    
+    await log(`Layout Mode: MGL=${isMGL}, Granular=${isMGLGranular}`);
 
     if (isMGL || isMGLGranular) {
         // MGL Header
@@ -310,7 +352,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                  drawText("Below rates are for per CONTR/UNIT only", 40, y, 9, true);
                  y -= 15;
             }
-            else if (section.type === "rates_matrix") {
+            if (section.type === "rates_matrix" || section.type === "rates_table") {
+                 await log(`Rendering Rates Matrix. Options count: ${options.length}`);
                  // Matrix Logic: Group by Carrier
                  const carriers: Record<string, any[]> = {};
                  options.forEach((opt: any) => {
@@ -320,6 +363,7 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                  });
 
                  for (const [carrierName, opts] of Object.entries(carriers)) {
+                     await log(`Rendering Carrier: ${carrierName}, Options: ${opts.length}`);
                      const carrierOptions = opts as any[];
                      
                      if (y < 150) { page = pdfDoc.addPage(); y = height - 50; }
@@ -354,8 +398,20 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                          sizeMap.get(key).push(opt);
                      });
                      
-                     const columns = Array.from(sizeMap.keys());
-                     const colCount = columns.length;
+                     const columns = Array.from(sizeMap.keys()).sort((a, b) => {
+                        // Sort logic: 20' < 40' < 45', then alphabetical
+                        const getVal = (s: string) => {
+                            if (s.includes("20")) return 1;
+                            if (s.includes("40")) return 2;
+                            if (s.includes("45")) return 3;
+                            return 9;
+                        };
+                        const va = getVal(a);
+                        const vb = getVal(b);
+                        if (va !== vb) return va - vb;
+                        return a.localeCompare(b);
+                    });
+                    const colCount = columns.length;
                      
                      const descW = 90;
                      const remW = 90;
@@ -382,83 +438,117 @@ serveWithLogger(async (req, logger, supabaseClient) => {
 
                      // --- GRANULAR MODE LOGIC ---
                      if (isMGLGranular) {
-                         // Find all unique legs across options (assuming options for same carrier have same legs structure)
-                         // We'll take the first option's legs as the "template"
-                         const refLegs = carrierOptions[0]?.legs || [];
-                         // Sort by sequence or just usage
-                         // refLegs.sort((a,b) => a.leg_number - b.leg_number); // Assuming leg_number exists
+                         // Collect all unique legs across ALL options in this carrier group
+                         const uniqueLegsMap = new Map<string, any>();
+                         
+                         carrierOptions.forEach(opt => {
+                             opt.legs?.forEach((l: any) => {
+                                 const key = `${l.sort_order}-${l.mode}-${l.origin_location_id}`;
+                                 if (!uniqueLegsMap.has(key)) {
+                                     uniqueLegsMap.set(key, l);
+                                 }
+                             });
+                         });
+
+                         const refLegs = Array.from(uniqueLegsMap.values());
+                         await log(`Granular Mode: Unique legs count = ${refLegs.length}`);
+                         
+                         // Sort by sort_order
+                        refLegs.sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
 
                          // For each leg, we render a sub-header and then charges
-                         for (const leg of refLegs) {
-                             const legLabel = `${leg.transport_mode || 'Transport'} (${leg.origin?.location_name || 'Origin'} -> ${leg.destination?.location_name || 'Dest'})`;
-                             
-                             // Sub-header for Leg
-                             drawRect(40, y - 20, 510, 20, rgb(0.95, 0.95, 0.95), true); // Very light gray
-                             drawRect(40, y - 20, 510, 20); // Border
-                             drawText(legLabel, 45, y - 14, 9, true, gray);
-                             y -= 20;
+                        for (const leg of refLegs) {
+                            const legLabel = `${leg.transport_mode || leg.mode || 'Transport'} (${leg.origin?.location_name || 'Origin'} -> ${leg.destination?.location_name || 'Dest'})`;
+                            await log(`Processing Leg: ${legLabel} at y=${y}`);
+                            
+                            // Page break check for Leg Header
+                            if (y < 50) { page = pdfDoc.addPage(); y = height - 50; }
 
-                             // Find charges for this leg across all options
-                             const legChargeNames = new Set<string>();
-                             columns.forEach(colKey => {
-                                 const optsForCol = sizeMap.get(colKey);
-                                 optsForCol?.forEach((o: any) => {
-                                     // Find leg in this option that matches the ref leg (by index or ID matching if possible)
-                                     // Since options are copies, IDs differ. We match by leg_number usually.
-                                     // Fallback: match by logic or assumption. 
-                                     // Ideally, leg_number is consistent.
-                                     const targetLeg = o.legs?.find((l: any) => l.leg_number === leg.leg_number) || 
-                                                       o.legs?.find((l: any) => l.transport_mode === leg.transport_mode && l.origin_location_id === leg.origin_location_id);
-                                     
-                                     if (targetLeg) {
-                                         o.charges?.filter((c: any) => c.leg_id === targetLeg.id).forEach((c: any) => legChargeNames.add(c.note || c.category?.name || "Charge"));
-                                     }
-                                 });
-                             });
+                            // Sub-header for Leg
+                            drawRect(40, y - 20, 510, 20, rgb(0.95, 0.95, 0.95), true, page); // Very light gray
+                            drawRect(40, y - 20, 510, 20, black, false, page); // Border
+                            drawText(legLabel, 45, y - 14, 9, true, gray, page);
+                            y -= 20;
 
-                             if (legChargeNames.size === 0) {
-                                // No charges specific to this leg found in options
-                                // maybe skip or show "Included"
-                             }
+                            // Check if this leg has ANY charges in ANY option
+                            let hasCharges = false;
+                            const legChargeNames = new Set<string>();
+                            
+                            for (const colKey of columns) {
+                                const optsForCol = sizeMap.get(colKey);
+                                if (optsForCol) {
+                                    for (const o of optsForCol) {
+                                        // Match leg in this option
+                                        // Try by ID first, then by properties
+                                        const targetLeg = o.legs?.find((l: any) => l.sort_order === leg.sort_order) || 
+                                                          o.legs?.find((l: any) => (l.transport_mode === leg.transport_mode || l.mode === leg.mode) && l.origin_location_id === leg.origin_location_id);
+                                        
+                                        if (targetLeg) {
+                                            const legCharges = o.charges?.filter((c: any) => c.leg_id === targetLeg.id);
+                                            if (legCharges && legCharges.length > 0) {
+                                                hasCharges = true;
+                                                legCharges.forEach((c: any) => {
+                                                    const cName = c.note || c.category?.name || "Charge";
+                                                    legChargeNames.add(cName);
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
-                             for (const cName of legChargeNames) {
-                                 const rowH = 20;
-                                 drawRect(40, y - rowH, 510, rowH);
-                                 
-                                 // Verticals
-                                 let lcx = 40 + descW;
-                                 drawLine(lcx, y, lcx, y - rowH);
-                                 for (let i = 0; i < colCount; i++) {
-                                     lcx += perColW;
-                                     drawLine(lcx, y, lcx, y - rowH);
-                                 }
+                            if (!hasCharges) {
+                                await logWarn(`No charges found for leg: ${legLabel}`);
+                                continue; // Skip empty legs
+                            }
 
-                                 drawText(cName, 45, y - 14, 9);
+                            for (const cName of legChargeNames) {
+                                // Page break check for Charge Row
+                                if (y < 50) { page = pdfDoc.addPage(); y = height - 50; }
 
-                                 lcx = 40 + descW;
-                                 for (const colKey of columns) {
-                                     const optsForCol = sizeMap.get(colKey);
-                                     let val = 0;
-                                     let found = false;
-                                     if (optsForCol) {
-                                         for (const o of optsForCol) {
-                                             const targetLeg = o.legs?.find((l: any) => l.leg_number === leg.leg_number) || 
-                                                               o.legs?.find((l: any) => l.transport_mode === leg.transport_mode); // Fallback
-                                             if (targetLeg) {
+                                const rowH = 20;
+                                drawRect(40, y - rowH, 510, rowH, black, false, page);
+                                
+                                // Verticals
+                                let lcx = 40 + descW;
+                                drawLine(lcx, y, lcx, y - rowH, black, page);
+                                for (let i = 0; i < colCount; i++) {
+                                    lcx += perColW;
+                                    drawLine(lcx, y, lcx, y - rowH, black, page);
+                                }
+
+                                drawText(cName, 45, y - 14, 9, false, black, page);
+                                await log(`  Drawing Charge Row: ${cName} at y=${y}`);
+
+                                lcx = 40 + descW;
+                                for (const colKey of columns) {
+                                    const optsForCol = sizeMap.get(colKey);
+                                    let val = 0;
+                                    let found = false;
+                                    if (optsForCol) {
+                                        for (const o of optsForCol) {
+                                            const targetLeg = o.legs?.find((l: any) => l.sort_order === leg.sort_order) || 
+                                                      o.legs?.find((l: any) => (l.transport_mode === leg.transport_mode || l.mode === leg.mode) && l.origin_location_id === leg.origin_location_id);
+                                            if (targetLeg) {
                                                 const chg = o.charges?.find((c: any) => c.leg_id === targetLeg.id && (c.note || c.category?.name || "Charge") === cName);
                                                 if (chg) {
                                                     val += Number(chg.amount);
                                                     found = true;
                                                 }
-                                             }
-                                         }
-                                     }
-                                     if (found) drawText(val.toFixed(2), lcx + 5, y - 14, 9);
-                                     lcx += perColW;
-                                 }
-                                 y -= rowH;
-                             }
-                         }
+                                            }
+                                        }
+                                    }
+                                    if (found) {
+                                        drawText(val.toFixed(2), lcx + 5, y - 14, 9, false, black, page);
+                                        await log(`    Val: ${val.toFixed(2)} for col ${colKey}`);
+                                    } else {
+                                        drawText("-", lcx + 5, y - 14, 9, false, black, page);
+                                    }
+                                    lcx += perColW;
+                                }
+                                y -= rowH;
+                            }
+                        }
 
                          // General Charges (No Leg ID)
                          const generalChargeNames = new Set<string>();
@@ -521,18 +611,29 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                              drawLine(lcx, y, lcx, y - rowH);
                          }
                          drawText("Total", 45, y - 14, 9, true);
-                         lcx = 40 + descW;
-                         for (const colKey of columns) {
-                             const optsForCol = sizeMap.get(colKey);
-                             let val = 0;
-                             if (optsForCol) {
-                                 for (const o of optsForCol) val += Number(o.total_amount) || 0;
-                             }
-                             drawText(val.toFixed(2), lcx + 5, y - 14, 9, true);
-                             lcx += perColW;
-                         }
-                         drawText("All Inclusive", lcx + 5, y - 14, 8);
-                         y -= rowH;
+                        lcx = 40 + descW;
+                        for (const colKey of columns) {
+                            const optsForCol = sizeMap.get(colKey);
+                            let val = 0;
+                            if (optsForCol) {
+                                for (const o of optsForCol) val += Number(o.total_amount) || 0;
+                            }
+                            drawText(val.toFixed(2), lcx + 5, y - 14, 9, true);
+                            lcx += perColW;
+                        }
+                        
+                        // Remarks (use first option's note)
+                        const firstOpt = carrierOptions[0];
+                        const remarks = firstOpt?.notes || "All Inclusive";
+                        
+                        // Split remarks if too long (basic wrapping)
+                        if (remarks.length > 25) {
+                             drawText(remarks.substring(0, 25) + "...", lcx + 5, y - 14, 8);
+                        } else {
+                             drawText(remarks, lcx + 5, y - 14, 8);
+                        }
+
+                        y -= rowH;
 
                      } else {
                         // --- STANDARD MGL MATRIX LOGIC (Collapsed) ---
@@ -612,13 +713,13 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                      y -= 15;
                  }
             }
-            else if (section.type === "terms_mgl") {
+            else if (section.type === "terms" || section.type === "terms_mgl") {
                  if (y < 200) { page = pdfDoc.addPage(); y = height - 50; }
 
-                 drawText(section.title || "TERMS & CONDITIONS:", 40, y, 11, true);
+                 drawText(section.title || "TERMS & CONDITIONS:", 40, y, 11, true, black, page);
                  y -= 15;
                  
-                 const textBlock = templateContent.terms_text || "";
+                 const textBlock = templateContent.terms_text || section.content || "Standard Terms and Conditions apply.";
                  const lines = textBlock.split('\n');
                  
                  for (const line of lines) {
@@ -754,7 +855,10 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     );
 
     return new Response(
-      JSON.stringify({ content: base64Content }),
+      JSON.stringify({ 
+        content: base64Content,
+        traceLogs: traceLogs
+      }),
       { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (error: any) {

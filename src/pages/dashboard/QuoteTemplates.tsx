@@ -31,17 +31,34 @@ export default function QuoteTemplates() {
       }
 
       // Create a new quote from the template
-      // We explicitly exclude id and system fields just in case they are in content
-      const { id, created_at, updated_at, quote_number, ...content } = template.content as any;
+      // We explicitly exclude id, system fields, and PDF layout fields (header, layout, sections)
+      // to prevent "column does not exist" errors
+      const { 
+        id, 
+        created_at, 
+        updated_at, 
+        quote_number, 
+        header, 
+        layout, 
+        sections, 
+        footer, 
+        styles,
+        terms,
+        ...content 
+      } = template.content as any;
+
+      // Map 'terms' to 'terms_conditions' if it exists and is a string
+      const quoteData = {
+        tenant_id: tenantId,
+        title: `${template.name} (Copy)`,
+        status: 'draft',
+        terms_conditions: content.terms_conditions || (typeof terms === 'string' ? terms : undefined),
+        ...content,
+      };
 
       const { data, error } = await supabase
         .from('quotes')
-        .insert({
-          tenant_id: tenantId,
-          title: `${template.name} (Copy)`,
-          status: 'draft',
-          ...content,
-        })
+        .insert(quoteData)
         .select()
         .single();
 

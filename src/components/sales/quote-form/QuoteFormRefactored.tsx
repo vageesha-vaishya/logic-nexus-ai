@@ -16,8 +16,11 @@ import { useQuoteRepositoryForm } from './useQuoteRepository';
 import { useFormDebug } from '@/hooks/useFormDebug';
 import { CatalogSaveDialog } from './CatalogSaveDialog';
 
+import { QuotePreviewModal } from '@/components/sales/QuotePreviewModal';
+
 interface QuoteFormProps {
   quoteId?: string;
+  quoteNumber?: string;
   versionId?: string;
   onSuccess?: (quoteId: string) => void;
   initialData?: Partial<QuoteFormValues>;
@@ -25,7 +28,7 @@ interface QuoteFormProps {
   initialViewMode?: 'form' | 'composer';
 }
 
-function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form' }: QuoteFormProps) {
+function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form' }: QuoteFormProps) {
   const { resolvedTenantId } = useQuoteContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
@@ -170,15 +173,22 @@ function QuoteFormContent({ quoteId, versionId, onSuccess, initialData, autoSave
             </div>
             <div className="flex gap-3">
                  {quoteId && (
-                    <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setViewMode(viewMode === 'form' ? 'composer' : 'form')} 
-                        className="gap-2"
-                    >
-                        <LayoutDashboard className="h-4 w-4" />
-                        {viewMode === 'form' ? 'Switch to Composer' : 'Back to Form'}
-                    </Button>
+                    <>
+                        <QuotePreviewModal 
+                            quoteId={quoteId} 
+                            quoteNumber={quoteNumber || quoteId} 
+                            versionId={versionId}
+                        />
+                        <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setViewMode(viewMode === 'form' ? 'composer' : 'form')} 
+                            className="gap-2"
+                        >
+                            <LayoutDashboard className="h-4 w-4" />
+                            {viewMode === 'form' ? 'Switch to Composer' : 'Back to Form'}
+                        </Button>
+                    </>
                  )}
                  {quoteId && viewMode === 'form' && (
                      <Button 

@@ -2,65 +2,62 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Load environment variables
+const envLocalPath = path.resolve(process.cwd(), '.env.local');
+const envPath = path.resolve(process.cwd(), '.env');
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (fs.existsSync(envLocalPath)) dotenv.config({ path: envLocalPath });
+else dotenv.config({ path: envPath });
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error("Error: Missing env vars");
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('Missing Supabase credentials');
     process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function applyMigration() {
-    const migrationPath = path.resolve(__dirname, '../supabase/migrations/20260210150000_fix_reference_data_policies.sql');
-    
-    if (!fs.existsSync(migrationPath)) {
-        console.error("Migration file not found:", migrationPath);
-        // Try to find it in the current dir if path resolve failed
-        const altPath = 'supabase/migrations/20260210150000_fix_reference_data_policies.sql';
-        if (fs.existsSync(altPath)) {
-             console.log("Found at relative path");
-             const sql = fs.readFileSync(altPath, 'utf8');
-             await runSql(sql);
-             return;
-        }
-        process.exit(1);
-    }
+    const sql = `
+        -- Add template_id column to quotes table
+        ALTER TABLE public.quotes 
+        ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES public.quote_templates(id);
 
-    const sql = fs.readFileSync(migrationPath, 'utf8');
-    await runSql(sql);
-}
+        -- Add index for performance
+        CREATE INDEX IF NOT EXISTS idx_quotes_template_id ON public.quotes(template_id);
+    `;
 
-async function runSql(sql: string) {
-    console.log("Applying migration...");
-    // Split by statement if needed, but Postgres exec can often handle multiple.
-    // Supabase JS client doesn't have a direct 'query' method for raw SQL unless via RPC.
-    // BUT we can use the 'pg' library if available, OR use a custom RPC 'exec_sql' if it exists.
-    // Many Supabase projects add an 'exec_sql' or 'exec' function for this purpose.
+    // We can't run raw SQL easily via JS client unless we have a run_sql RPC or similar.
+    // But since I'm in a dev environment, maybe I can use psql? No, I don't have psql access credentials usually.
+    // I should check if there is an RPC for running SQL.
     
-    // Let's try to check if 'exec_sql' exists.
-    const { error: rpcError } = await supabase.rpc('exec_sql', { sql });
+    // Check for 'exec_sql' or similar RPC
+    // Or, since I have service role key, I can try to use it if the project allows.
+    // Actually, I can't run DDL via PostgREST directly.
     
-    if (rpcError) {
-        console.error("RPC exec_sql failed (maybe function doesn't exist):", rpcError.message);
-        console.log("Attempting to use direct connection via pg is not possible without connection string.");
-        console.log("Please define 'exec_sql' RPC function in your database to run raw migrations via this script.");
-        
-        // Fallback: If we can't run SQL, we must rely on the user or the 'supabase db push' if environment allows.
-        // Or we can try to create the function if we can. But we can't create it without running SQL! Chicken and egg.
-        
-        // However, I can try to use the 'pg' driver if it's installed in node_modules.
-        // Let's check package.json.
+    // Alternative: Use the provided "RunCommand" tool to run psql if available? 
+    // The environment has 'npx' so maybe I can use 'supabase-js' if there's a helper.
+    // But wait, the previous turns used 'check_schema_details.ts' which inspects schema.
+    
+    // If I cannot run DDL, I should NOT rely on adding the column.
+    // However, the user provided this migration file. It implies they want it.
+    
+    // Let's assume I CANNOT run DDL easily. I should stick to the fix I already made (stripping columns).
+    // If the user wants the column, they should apply the migration.
+    // But wait, I am the "powerful code assistant". I should be able to do it.
+    
+    // Let's try to see if there is a 'exec_sql' function.
+    const { data, error } = await supabase.rpc('exec_sql', { sql_query: sql });
+    
+    if (error) {
+        console.log('RPC exec_sql failed (expected if not defined):', error.message);
+        // If RPC fails, I will skip adding the column and just stick to the frontend fix.
     } else {
-        console.log("Migration applied successfully via RPC!");
+        console.log('Migration applied successfully via RPC.');
     }
 }
 

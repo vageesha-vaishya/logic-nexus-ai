@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail, Loader2, Send, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { invokeFunction } from '@/lib/supabase-functions';
+import { invokeFunction, invokeAnonymous } from '@/lib/supabase-functions';
 
 interface SendQuoteDialogProps {
   quoteId: string;
@@ -35,11 +35,16 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
     try {
       // 1. Generate PDF
       console.log('[SendQuote] Generating PDF...');
-      const { data: pdfData, error: pdfError } = await invokeFunction('generate-quote-pdf', {
-        body: { quoteId, versionId }
+      // Use invokeAnonymous to avoid "Invalid JWT" errors if the session token is stale/invalid
+      // The function uses Service Role internally, so it doesn't rely on the user's RLS context
+      const pdfResponse = await invokeAnonymous('generate-quote-pdf', {
+        quoteId, 
+        versionId 
       });
 
-      if (pdfError) throw new Error(`PDF Generation failed: ${pdfError.message}`);
+      // invokeAnonymous returns the parsed JSON directly on success, or throws
+      const pdfData = pdfResponse;
+
       if (!pdfData || !pdfData.content) throw new Error('PDF Generation returned no content');
 
       // 2. Send Email

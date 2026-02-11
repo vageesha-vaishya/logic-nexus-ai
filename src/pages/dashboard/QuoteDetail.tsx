@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
 import { SendQuoteDialog } from '@/components/sales/SendQuoteDialog';
+import { QuotePreviewModal } from '@/components/sales/QuotePreviewModal';
 import { useDebug } from '@/hooks/useDebug';
 import { Button } from "@/components/ui/button";
 
@@ -207,6 +208,11 @@ export default function QuoteDetail() {
                   >
                       Convert to Booking
                   </Button>
+                  <QuotePreviewModal 
+                    quoteId={resolvedId} 
+                    quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
+                    versionId={versionId || undefined}
+                  />
                   <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
                   <SendQuoteDialog 
                       quoteId={resolvedId} 
@@ -220,6 +226,7 @@ export default function QuoteDetail() {
         </div>
         <QuoteForm 
             quoteId={resolvedId ?? id} 
+            quoteNumber={quoteNumber ?? (resolvedId ?? '')}
             versionId={versionId || undefined}
             onSuccess={handleSuccess} 
         />
