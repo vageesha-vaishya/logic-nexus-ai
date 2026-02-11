@@ -35,6 +35,7 @@ export default function QuoteNew() {
   const [versionError, setVersionError] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateData, setTemplateData] = useState<Partial<QuoteFormValues> | undefined>(undefined);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [generatedOptionIds, setGeneratedOptionIds] = useState<string[]>([]);
 
   const [optionsInserted, setOptionsInserted] = useState(false);
@@ -441,6 +442,7 @@ export default function QuoteNew() {
       const { id, created_at, updated_at, tenant_id, quote_number, ...rest } = content as any;
       
       setTemplateData(rest);
+      setSelectedTemplateId(template.id);
       setTemplateDialogOpen(false);
       toast.success(`Template "${template.name}" applied`);
     } catch (e) {
@@ -479,6 +481,17 @@ export default function QuoteNew() {
     
     // Switch to composer view
     setViewMode('composer');
+
+    // Update quote with selected template if applicable
+    if (selectedTemplateId) {
+        scopedDb.from('quotes')
+            .update({ template_id: selectedTemplateId })
+            .eq('id', quoteId)
+            .then(({ error }) => {
+                if (error) console.error('[QuoteNew] Failed to link template to quote:', error);
+                else logger.info('[QuoteNew] Linked template to quote', { templateId: selectedTemplateId });
+            });
+    }
 
     // Update AI Quote History if applicable
     if ((location.state as any)?.historyId) {
@@ -728,6 +741,7 @@ export default function QuoteNew() {
               optionId={generatedOptionIds.length > 0 ? generatedOptionIds[0] : undefined}
               lastSyncTimestamp={lastSyncTimestamp}
               tenantId={tenantId || undefined}
+              templateId={selectedTemplateId}
             />
           </div>
         )}

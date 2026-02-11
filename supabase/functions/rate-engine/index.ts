@@ -41,6 +41,12 @@ interface RateOption {
   co2_kg?: number
   route_type?: 'Direct' | 'Transshipment'
   stops?: number
+  charge_breakdown?: {
+      code: string
+      name: string
+      amount: number
+      currency: string
+  }[]
 }
 
 // Global Carrier List for AI Simulation / Market Estimates
@@ -176,18 +182,38 @@ serve(async (req) => {
                 }
                 
                 const originalCost = price; // Capture Base Cost
+                
+                // Detailed Charge Breakdown (Simulated/Calculated)
+                const breakdown = [
+                    { code: 'BAS', name: 'Base Freight', amount: Math.round(price * 0.8 * 100) / 100, currency: 'USD' },
+                    { code: 'BAF', name: 'Bunker Adjustment Factor', amount: Math.round(price * 0.1 * 100) / 100, currency: 'USD' },
+                    { code: 'CAF', name: 'Currency Adjustment Factor', amount: Math.round(price * 0.05 * 100) / 100, currency: 'USD' },
+                    { code: 'THC', name: 'Terminal Handling Charges', amount: Math.round(price * 0.05 * 100) / 100, currency: 'USD' },
+                    { code: 'DOC', name: 'Documentation Fee', amount: 50, currency: 'USD' }
+                ];
+                
+                // Adjust total price to include fixed fees if not already in "total_amount"
+                // Assuming "total_amount" from DB was all-inclusive, but let's say we want to expose components
+                // If DB price is all-in, we just broke it down above.
+                // If we want to ADD charges, we should do it here.
+                // For this exercise, let's keep the Total Price close to the DB value but ensure the breakdown sums up roughly or is just informative.
+                // Actually, let's make the breakdown sum to the price + fixed fees.
+                
+                const breakdownTotal = breakdown.reduce((sum, item) => sum + item.amount, 0);
+                const finalPrice = breakdownTotal; // Recalculate based on breakdown
 
                 options.push({
                     id: r.id,
                     tier: r.tier as any,
                     name: isContract ? 'Contract Rate' : (r.tier === 'spot' ? 'Spot Rate' : 'Market Rate'),
                     carrier: r.carrier?.name || 'Unknown',
-                    price: Math.round(price * 100) / 100,
+                    price: Math.round(finalPrice * 100) / 100,
                     buyPrice: Math.round(originalCost * 100) / 100,
                     marginAmount: 0, // Will be updated if margins applied
                     currency: 'USD',
                     transitTime: r.transit_days ? `${r.transit_days} Days` : '3-5 Days',
-                    validUntil: r.valid_to
+                    validUntil: r.valid_to,
+                    charge_breakdown: breakdown // Add breakdown to option
                 });
             });
         }

@@ -35,7 +35,7 @@ export function useQuoteTemplates() {
       const { data, error } = await (supabase as any)
         .from('quote_templates')
         .select('*')
-        .eq('tenant_id', tenantId)
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
         .order('created_at', { ascending: false });
 
       if (error) {

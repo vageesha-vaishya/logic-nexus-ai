@@ -4,8 +4,9 @@ import { DocumentPreview } from './DocumentPreview';
 
 import { QuoteStoreProvider, useQuoteStore } from './store/QuoteStore';
 
-interface ReviewAndSaveStepProps {}
-
+interface ReviewAndSaveStepProps {
+  templateId?: string;
+}
 
 // Helper to safely render strings
 const getSafeName = (val: any): string => {
@@ -15,7 +16,7 @@ const getSafeName = (val: any): string => {
   return String(val);
 };
 
-export function ReviewAndSaveStep({}: ReviewAndSaveStepProps) {
+export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
   const { state } = useQuoteStore();
   const { legs, quoteData, charges: combinedCharges, referenceData } = state;
   const { currencies } = referenceData;
@@ -57,7 +58,7 @@ export function ReviewAndSaveStep({}: ReviewAndSaveStepProps) {
             <CardTitle>Review Quotation</CardTitle>
             <CardDescription>Review all details before saving</CardDescription>
         </div>
-        <DocumentPreview quoteData={quoteData} legs={legs} combinedCharges={combinedCharges} />
+        <DocumentPreview quoteData={quoteData} legs={legs} combinedCharges={combinedCharges} templateId={templateId} />
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Quote Summary */}

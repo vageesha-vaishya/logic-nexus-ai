@@ -49,6 +49,7 @@ interface MultiModalQuoteComposerProps {
   lastSyncTimestamp?: number;
   tenantId?: string;
   initialState?: any;
+  templateId?: string;
 }
 
 const STEPS = [
@@ -78,7 +79,7 @@ export function MultiModalQuoteComposer(props: MultiModalQuoteComposerProps) {
   );
 }
 
-function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId }: MultiModalQuoteComposerProps) {
+function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialOptionId, lastSyncTimestamp, tenantId: propTenantId, templateId }: MultiModalQuoteComposerProps) {
   const { scopedDb, context } = useCRM();
   const debug = useDebug('Sales', 'QuoteComposer');
   const { toast } = useToast();
@@ -2315,7 +2316,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       )}
 
       {currentStep === 4 && (
-        <ReviewAndSaveStep />
+        <ReviewAndSaveStep templateId={templateId} />
       )}
 
       {/* Navigation */}

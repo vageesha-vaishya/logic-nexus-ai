@@ -6,6 +6,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useQuoteContext } from './QuoteContext';
 import { Ship, Plane, Truck, Train, MapPin, Anchor, ArrowRight, Settings2, Package, Globe } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { QuoteLegRow } from './QuoteLegRow';
+
+interface ServiceType {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+interface Service {
+  id: string;
+  service_name: string;
+  service_type_id: string;
+  is_default?: boolean;
+  priority?: number;
+}
+
+interface Carrier {
+  id: string;
+  carrier_name: string;
+  carrier_type: string;
+}
+
+interface Port {
+  id: string;
+  name?: string;
+  location_name?: string;
+  code?: string;
+  location_code?: string;
+}
+
+interface Leg {
+  id?: string;
+  transport_mode?: string;
+  origin_location_name?: string;
+  origin?: string;
+  destination_location_name?: string;
+  destination?: string;
+  [key: string]: any;
+}
+
+interface QuoteOption {
+  is_primary?: boolean;
+  legs?: Leg[];
+  [key: string]: any;
+}
 
 export function QuoteLogistics() {
   const { control } = useFormContext();
@@ -13,17 +58,17 @@ export function QuoteLogistics() {
   
   const serviceTypeId = useWatch({ control, name: 'service_type_id' });
   const options = useWatch({ control, name: 'options' });
-  const primaryOption = options?.find((o: any) => o.is_primary) || options?.[0];
+  const primaryOption = options?.find((o: QuoteOption) => o.is_primary) || options?.[0];
   const legs = primaryOption?.legs || [];
 
   const filteredServices = services.filter(
-    (s: any) => !serviceTypeId || String(s.service_type_id) === String(serviceTypeId)
+    (s: Service) => !serviceTypeId || String(s.service_type_id) === String(serviceTypeId)
   );
 
-  const filteredCarriers = carriers.filter((c: any) => {
+  const filteredCarriers = carriers.filter((c: Carrier) => {
     if (!serviceTypeId) return true;
 
-    const selectedServiceType = serviceTypes.find((st: any) => String(st.id) === String(serviceTypeId));
+    const selectedServiceType = serviceTypes.find((st: ServiceType) => String(st.id) === String(serviceTypeId));
     const serviceModeName = selectedServiceType?.name?.toLowerCase() || '';
 
     if (!serviceModeName) return true;
@@ -53,7 +98,7 @@ export function QuoteLogistics() {
 
   const getHeaderIcon = () => {
     if (!serviceTypeId) return <Ship className="h-5 w-5 text-blue-600" />;
-    const selectedServiceType = serviceTypes.find((st: any) => String(st.id) === String(serviceTypeId));
+    const selectedServiceType = serviceTypes.find((st: ServiceType) => String(st.id) === String(serviceTypeId));
     const n = selectedServiceType?.name?.toLowerCase() || '';
     
     if (n.includes('air')) return <Plane className="h-5 w-5 text-blue-600" />;
@@ -63,7 +108,7 @@ export function QuoteLogistics() {
   };
 
   // Resolve placeholders for blank fields if we have leg data
-  const mainLeg = legs.find((l: any) => l.transport_mode === 'ocean' || l.transport_mode === 'air') || legs[0];
+  const mainLeg = legs.find((l: Leg) => l.transport_mode === 'ocean' || l.transport_mode === 'air') || legs[0];
   const firstLeg = legs[0];
   const lastLeg = legs[legs.length - 1];
 
@@ -103,7 +148,7 @@ export function QuoteLogistics() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {serviceTypes.map((st: any) => (
+                    {serviceTypes.map((st: ServiceType) => (
                       <SelectItem key={st.id} value={st.id}>
                         <div className="flex items-center gap-2">
                             {getServiceIcon(typeof st.name === 'string' ? st.name : '')}
@@ -131,7 +176,7 @@ export function QuoteLogistics() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {filteredServices.map((s: any) => (
+                    {filteredServices.map((s: Service) => (
                       <SelectItem key={s.id} value={String(s.id)}>
                         {typeof s.service_name === 'string' ? s.service_name : String(s.service_name || '')}
                       </SelectItem>
@@ -172,9 +217,9 @@ export function QuoteLogistics() {
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        {ports.map((p: any) => (
+                        {ports.map((p: Port) => (
                         <SelectItem key={p.id} value={String(p.id)}>
-                            <div className="flex flex-col items-start">
+                             <div className="flex flex-col items-start">
                                 <span className="font-medium">{typeof (p.name || p.location_name) === 'string' ? (p.name || p.location_name) : String(p.name || p.location_name || '')}</span>
                                 <span className="text-xs text-muted-foreground">{typeof (p.code || p.location_code) === 'string' ? (p.code || p.location_code) : String(p.code || p.location_code || '')}</span>
                             </div>
@@ -209,7 +254,7 @@ export function QuoteLogistics() {
                         </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                        {ports.map((p: any) => (
+                        {ports.map((p: Port) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                              <div className="flex flex-col items-start">
                                 <span className="font-medium">{typeof (p.name || p.location_name) === 'string' ? (p.name || p.location_name) : String(p.name || p.location_name || '')}</span>
@@ -305,7 +350,7 @@ export function QuoteLogistics() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {filteredCarriers.map((c: any) => (
+                    {filteredCarriers.map((c: Carrier) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.carrier_name}
                       </SelectItem>
@@ -380,238 +425,24 @@ export function QuoteLogistics() {
                     </div>
                 </div>
                 <div className="grid gap-4">
-                    {legs.map((leg: any, index: number) => {
-                         const activeOptionIndex = options?.findIndex((o: any) => o.is_primary) !== -1 
-                             ? options?.findIndex((o: any) => o.is_primary) 
-                             : 0;
+                    {legs.map((leg: Leg, index: number) => {
+                         const primaryIndex = options?.findIndex((o: QuoteOption) => o.is_primary) ?? -1;
+                         const activeOptionIndex = primaryIndex !== -1 ? primaryIndex : 0;
                          
                          const prefix = `options.${activeOptionIndex}.legs.${index}`;
 
-                         // Filter carriers for this leg's mode
-                         const watchedMode = useWatch({ control, name: `${prefix}.transport_mode` });
-                         const legMode = (watchedMode || leg.transport_mode || '').toLowerCase();
-                         const isAir = legMode.includes('air');
-                         const isOcean = legMode.includes('ocean') || legMode.includes('sea');
-                         
-                         const legCarriers = carriers.filter((c: any) => {
-                             if (!legMode) return true;
-                             if (isOcean) return c.carrier_type === 'ocean';
-                             if (isAir) return c.carrier_type === 'air_cargo';
-                             if (legMode.includes('road') || legMode.includes('truck')) return c.carrier_type === 'trucking';
-                             if (legMode.includes('rail')) return c.carrier_type === 'rail';
-                             return true;
-                         });
-
-                         const departureDate = useWatch({ control, name: `${prefix}.departure_date` });
-                         const arrivalDate = useWatch({ control, name: `${prefix}.arrival_date` });
-                         const dateError = departureDate && arrivalDate && new Date(arrivalDate) <= new Date(departureDate);
-
                          return (
-                           <div key={leg.id || index} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-muted/20 rounded-lg border items-start">
-                               {/* Mode */}
-                               <div className="md:col-span-2">
-                                    <FormField
-                                       control={control}
-                                       name={`${prefix}.transport_mode`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Mode</FormLabel>
-                                               <Select onValueChange={field.onChange} value={field.value}>
-                                                   <FormControl>
-                                                       <SelectTrigger className="h-9 bg-background">
-                                                           <SelectValue />
-                                                       </SelectTrigger>
-                                                   </FormControl>
-                                                   <SelectContent>
-                                                       <SelectItem value="ocean">Ocean</SelectItem>
-                                                       <SelectItem value="air">Air</SelectItem>
-                                                       <SelectItem value="road">Road</SelectItem>
-                                                       <SelectItem value="rail">Rail</SelectItem>
-                                                   </SelectContent>
-                                               </Select>
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-
-                               {/* Origin */}
-                               <div className="md:col-span-3">
-                                    <FormField
-                                       control={control}
-                                       name={`${prefix}.origin_location_id`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Origin</FormLabel>
-                                               <Select onValueChange={field.onChange} value={field.value || ''}>
-                                                   <FormControl>
-                                                       <SelectTrigger className="h-9 bg-background">
-                                                           <SelectValue placeholder="Origin" />
-                                                       </SelectTrigger>
-                                                   </FormControl>
-                                                   <SelectContent>
-                                                       {ports.map((p: any) => (
-                                                           <SelectItem key={p.id} value={String(p.id)}>
-                                                               {p.name || p.location_name}
-                                                           </SelectItem>
-                                                       ))}
-                                                   </SelectContent>
-                                               </Select>
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-
-                               {/* Destination */}
-                               <div className="md:col-span-3">
-                                    <FormField
-                                       control={control}
-                                       name={`${prefix}.destination_location_id`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Destination</FormLabel>
-                                               <Select onValueChange={field.onChange} value={field.value || ''}>
-                                                   <FormControl>
-                                                       <SelectTrigger className="h-9 bg-background">
-                                                           <SelectValue placeholder="Destination" />
-                                                       </SelectTrigger>
-                                                   </FormControl>
-                                                   <SelectContent>
-                                                       {ports.map((p: any) => (
-                                                           <SelectItem key={p.id} value={String(p.id)}>
-                                                               {p.name || p.location_name}
-                                                           </SelectItem>
-                                                       ))}
-                                                   </SelectContent>
-                                               </Select>
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-
-                               {/* Carrier */}
-                               <div className="md:col-span-3">
-                                   <FormField
-                                       control={control}
-                                       name={`${prefix}.carrier_id`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Carrier</FormLabel>
-                                               <Select onValueChange={field.onChange} value={field.value || ''}>
-                                                   <FormControl>
-                                                       <SelectTrigger className="h-9 bg-background">
-                                                           <SelectValue placeholder="Carrier" />
-                                                       </SelectTrigger>
-                                                   </FormControl>
-                                                   <SelectContent>
-                                                       {legCarriers.map((c: any) => (
-                                                           <SelectItem key={c.id} value={String(c.id)}>
-                                                               {c.carrier_name}
-                                                           </SelectItem>
-                                                       ))}
-                                                   </SelectContent>
-                                               </Select>
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-
-                               {/* Transit Time */}
-                               <div className="md:col-span-1">
-                                   <FormField
-                                       control={control}
-                                       name={`${prefix}.transit_time_days`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Days</FormLabel>
-                                               <FormControl>
-                                                   <Input {...field} className="h-9" type="number" min={0} placeholder="0" />
-                                               </FormControl>
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-
-                               {/* Row 2: Flight/Voyage & Dates */}
-                               {isAir && (
-                                   <div className="md:col-span-3">
-                                       <FormField
-                                           control={control}
-                                           name={`${prefix}.flight_number`}
-                                           render={({ field }) => (
-                                               <FormItem>
-                                                   <FormLabel className="text-xs">Flight #</FormLabel>
-                                                   <FormControl>
-                                                       <Input {...field} className="h-9" placeholder="e.g. EK202" />
-                                                   </FormControl>
-                                               </FormItem>
-                                           )}
-                                       />
-                                   </div>
-                               )}
-                               
-                               {isOcean && (
-                                   <div className="md:col-span-3">
-                                       <FormField
-                                           control={control}
-                                           name={`${prefix}.voyage_number`}
-                                           render={({ field }) => (
-                                               <FormItem>
-                                                   <FormLabel className="text-xs">Voyage #</FormLabel>
-                                                   <FormControl>
-                                                       <Input {...field} className="h-9" placeholder="e.g. V001" />
-                                                   </FormControl>
-                                               </FormItem>
-                                           )}
-                                       />
-                                   </div>
-                               )}
-                               
-                               <div className="md:col-span-3">
-                                   <FormField
-                                       control={control}
-                                       name={`${prefix}.departure_date`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Departure</FormLabel>
-                                               <FormControl>
-                                                   <Input 
-                                                       {...field} 
-                                                       className="h-9" 
-                                                       type="datetime-local" 
-                                                       value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
-                                                       onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                                   />
-                                               </FormControl>
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-                               <div className="md:col-span-3">
-                                   <FormField
-                                       control={control}
-                                       name={`${prefix}.arrival_date`}
-                                       render={({ field }) => (
-                                           <FormItem>
-                                               <FormLabel className="text-xs">Arrival</FormLabel>
-                                               <FormControl>
-                                                   <Input 
-                                                       {...field} 
-                                                       className={`h-9 ${dateError ? 'border-red-500' : ''}`}
-                                                       type="datetime-local" 
-                                                       value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ''}
-                                                       onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                                                   />
-                                               </FormControl>
-                                               {dateError && <span className="text-[10px] text-red-500">Must be after departure</span>}
-                                           </FormItem>
-                                       )}
-                                   />
-                               </div>
-
-                           </div>
-                        );
-                   })}
-               </div>
+                            <QuoteLegRow 
+                                key={leg.id || index}
+                                prefix={prefix}
+                                leg={leg}
+                                index={index}
+                                carriers={carriers}
+                                ports={ports}
+                            />
+                         );
+                    })}
+                </div>
            </div>
        )}
 

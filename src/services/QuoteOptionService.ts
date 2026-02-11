@@ -95,6 +95,10 @@ export class QuoteOptionService {
                 total_transit_days: rate.transitTime ? parseInt(rate.transitTime.match(/\d+/)?.[0] || '0') || null : null,
                 valid_until: rate.validUntil ? new Date(rate.validUntil).toISOString() : null,
                 
+                // Container Details (for Matrix Quotes)
+                container_size_id: rate.container_size_id || rate.container_size?.id || null,
+                container_type_id: rate.container_type_id || rate.container_type?.id || null,
+                
                 // AI/Source tracking
                 reliability_score: rate.reliability_score || rate.reliability?.score,
                 ai_generated: rate.ai_generated || rate.source_attribution === 'AI Smart Engine',

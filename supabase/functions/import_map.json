@@ -3,6 +3,7 @@
     "std/": "https://deno.land/std@0.168.0/",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.7.1",
     "xml": "https://deno.land/x/xml@2.1.3/mod.ts",
-    "pdf-lib": "https://cdn.skypack.dev/pdf-lib@1.17.1?dts"
+    "pdf-lib": "https://esm.sh/pdf-lib@1.17.1",
+    "nodemailer": "npm:nodemailer@6.9.7"
   }
 }
