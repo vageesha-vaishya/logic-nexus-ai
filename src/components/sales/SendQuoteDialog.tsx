@@ -39,7 +39,8 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
       // The function uses Service Role internally, so it doesn't rely on the user's RLS context
       const pdfResponse = await invokeAnonymous('generate-quote-pdf', {
         quoteId, 
-        versionId 
+        versionId,
+        engine_v2: true
       });
 
       // invokeAnonymous returns the parsed JSON directly on success, or throws

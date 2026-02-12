@@ -52,6 +52,9 @@ export function QuoteFinancials() {
   const taxAmount = (subtotal * parseFloat(taxPercent || '0')) / 100;
   const total = subtotal + taxAmount;
 
+  const hasItems = (formItems && formItems.length > 0) || (cargoConfigs && cargoConfigs.length > 0);
+  const showZeroWarning = total === 0 && hasItems;
+
   const handleCalculateEstimate = async () => {
     setIsCalculating(true);
     setCalculationResult(null);
@@ -374,6 +377,14 @@ export function QuoteFinancials() {
                     </h4>
                     <Separator className="bg-gray-200" />
                     <div className="space-y-3">
+                        {showZeroWarning && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-md p-2 flex items-start gap-2 animate-in fade-in">
+                                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                <p className="text-xs text-amber-800">
+                                    Total is $0.00 despite having items. Click "Calculate Estimate" or enter manually.
+                                </p>
+                            </div>
+                        )}
                         <div className="flex justify-between text-sm text-gray-600">
                             <span>Subtotal</span>
                             <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>

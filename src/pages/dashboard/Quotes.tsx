@@ -475,7 +475,7 @@ export default function Quotes() {
                              <DropdownMenuItem onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
                                <Eye className="mr-2 h-4 w-4" /> View Details
                              </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => navigate(`/dashboard/quotes/${q.id}/edit`)}>
+                             <DropdownMenuItem onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>
                                <Pencil className="mr-2 h-4 w-4" /> Edit Quote
                              </DropdownMenuItem>
                              <Separator className="my-1" />

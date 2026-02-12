@@ -1926,6 +1926,49 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       
       updateProgress(4); // Charges saved
 
+      // Calculate and save totals to option
+      try {
+        const calculateLegTotal = (leg: any, side: 'buy' | 'sell') => {
+          return leg.charges.reduce((acc: number, charge: any) => {
+            const qty = charge[side]?.quantity || 0;
+            const rate = charge[side]?.rate || 0;
+            return acc + (qty * rate);
+          }, 0);
+        };
+
+        const calculateCombinedTotal = (side: 'buy' | 'sell') => {
+          return combinedCharges.reduce((acc: number, charge: any) => {
+            const qty = charge[side]?.quantity || 0;
+            const rate = charge[side]?.rate || 0;
+            return acc + (qty * rate);
+          }, 0);
+        };
+
+        const totalBuy = legs.reduce((acc: number, leg: any) => acc + calculateLegTotal(leg, 'buy'), 0) + calculateCombinedTotal('buy');
+        const totalSell = legs.reduce((acc: number, leg: any) => acc + calculateLegTotal(leg, 'sell'), 0) + calculateCombinedTotal('sell');
+        const marginAmount = totalSell - totalBuy;
+
+        debug.info('Updating option totals', { totalBuy, totalSell, marginAmount });
+
+        const { error: optionUpdateError } = await scopedDb
+            .from('quotation_version_options')
+            .update({
+                buy_subtotal: totalBuy,
+                sell_subtotal: totalSell,
+                margin_amount: marginAmount,
+                total_amount: totalSell,
+                quote_currency_id: quoteData.currencyId || null
+            })
+            .eq('id', currentOptionId);
+            
+        if (optionUpdateError) {
+           debug.error('Failed to update option totals', optionUpdateError);
+           // Don't fail the whole save, but log it
+        }
+      } catch (calcError) {
+        debug.error('Error calculating totals', calcError);
+      }
+
       const duration = performance.now() - startTime;
       debug.log('Quotation saved successfully', { 
         versionId, 

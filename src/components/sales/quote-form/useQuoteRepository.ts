@@ -317,11 +317,12 @@ export function useQuoteRepositoryForm(opts: {
   const hydrationQuery = useQuery({
     queryKey: quoteKeys.hydration(quoteId!),
     queryFn: async () => {
+      // Use scopedDb to ensure consistent access with QuoteDetail and respect admin overrides
       const [quoteResult, itemsResult, cargoResult, versionResult] = await Promise.all([
-        supabase.from('quotes').select('*').eq('id', quoteId!).maybeSingle(),
-        supabase.from('quote_items').select('*').eq('quote_id', quoteId!).order('line_number', { ascending: true }),
-        supabase.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId!),
-        supabase.from('quotation_versions')
+        scopedDb.from('quotes').select('*').eq('id', quoteId!).maybeSingle(),
+        scopedDb.from('quote_items').select('*').eq('quote_id', quoteId!).order('line_number', { ascending: true }),
+        scopedDb.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId!),
+        scopedDb.from('quotation_versions')
             .select(`
                 id, 
                 version_number, 
@@ -344,7 +345,13 @@ export function useQuoteRepositoryForm(opts: {
                         flight_number,
                         voyage_number,
                         departure_date,
-                        arrival_date
+                        arrival_date,
+                        quotation_version_option_leg_charges:quote_charges (
+                            id,
+                            amount,
+                            currency_id,
+                            charge_code:category_id
+                        )
                     )
                 )
             `)
@@ -353,8 +360,27 @@ export function useQuoteRepositoryForm(opts: {
             .limit(1)
             .maybeSingle()
       ]);
+      
       if (quoteResult.error) throw quoteResult.error;
       if (!quoteResult.data) return null;
+
+      // Critical: If items fail to load, do NOT return empty list, as saving would wipe existing items.
+      if (itemsResult.error) {
+        console.error('[useQuoteRepository] Failed to load quote items:', itemsResult.error);
+        throw new Error(`Failed to load quote items: ${itemsResult.error.message}`);
+      }
+      
+      if (cargoResult.error) {
+        console.error('[useQuoteRepository] Failed to load cargo configs:', cargoResult.error);
+        throw new Error(`Failed to load cargo configurations: ${cargoResult.error.message}`);
+      }
+
+      if (!versionResult.data) {
+        console.warn(`[useQuoteRepository] No quotation version found for quote ${quoteId}. Financials may be zero.`);
+      } else {
+        const optCount = versionResult.data.quotation_version_options?.length || 0;
+        console.log(`[useQuoteRepository] Loaded version ${versionResult.data.version_number} with ${optCount} options`);
+      }
       
       return {
         quote: quoteResult.data,
@@ -391,28 +417,46 @@ export function useQuoteRepositoryForm(opts: {
     });
 
     // Map Options and Legs
-    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => ({
-        id: opt.id,
-        is_primary: opt.is_selected, // Map is_selected to is_primary
-        total_amount: opt.total_amount,
-        currency: opt.quote_currency?.code || 'USD',
-        transit_time_days: opt.total_transit_days,
-        legs: opt.quotation_version_option_legs?.map((leg: any) => ({
-            id: leg.id,
-            sequence_number: leg.sort_order, // Map sort_order to sequence_number
-            transport_mode: leg.mode, // Map mode to transport_mode
-            carrier_id: leg.provider_id ? String(leg.provider_id) : undefined, // Map provider_id to carrier_id
-            origin_location_name: leg.origin_location, // Store as name since it might be string
-            destination_location_name: leg.destination_location, // Store as name
-            origin: leg.origin_location, // Fallback
-            destination: leg.destination_location, // Fallback
-            flight_number: leg.flight_number,
-            voyage_number: leg.voyage_number,
-            departure_date: leg.departure_date,
-            arrival_date: leg.arrival_date,
-            transit_time_days: leg.transit_time_hours ? Math.ceil(leg.transit_time_hours / 24) : undefined,
-        })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
-    })) || [];
+    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
+        // Calculate total from leg charges if option total is missing/zero
+        const legs = opt.quotation_version_option_legs || [];
+        const chargesTotal = legs.reduce((acc: number, leg: any) => {
+            const legCharges = leg.quotation_version_option_leg_charges || [];
+            return acc + legCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+        }, 0);
+        
+        const effectiveTotal = (Number(opt.total_amount) > 0) ? Number(opt.total_amount) : chargesTotal;
+
+        if (effectiveTotal > 0 && Number(opt.total_amount) === 0) {
+            console.warn(`[QuoteHydration] Option ${opt.id} has 0 total_amount but ${chargesTotal} in charges. Using calculated total.`);
+        } else {
+            console.log(`[QuoteHydration] Option ${opt.id}: Total=${opt.total_amount}, ChargesTotal=${chargesTotal}, Effective=${effectiveTotal}`);
+        }
+        
+        return {
+            id: opt.id,
+            is_primary: opt.is_selected, // Map is_selected to is_primary
+            total_amount: effectiveTotal,
+            currency: opt.quote_currency?.code || 'USD',
+            transit_time_days: opt.total_transit_days,
+            legs: legs.map((leg: any) => ({
+                id: leg.id,
+                sequence_number: leg.sort_order, // Map sort_order to sequence_number
+                transport_mode: leg.mode, // Map mode to transport_mode
+                carrier_id: leg.provider_id ? String(leg.provider_id) : undefined, // Map provider_id to carrier_id
+                origin_location_name: leg.origin_location, // Store as name since it might be string
+                destination_location_name: leg.destination_location, // Store as name
+                origin: leg.origin_location, // Fallback
+                destination: leg.destination_location, // Fallback
+                flight_number: leg.flight_number,
+                voyage_number: leg.voyage_number,
+                departure_date: leg.departure_date,
+                arrival_date: leg.arrival_date,
+                transit_time_days: leg.transit_time_hours ? Math.ceil(leg.transit_time_hours / 24) : undefined,
+                charges: leg.quotation_version_option_leg_charges || [] // Preserve charges in leg mapping
+            })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
+        };
+    }) || [];
 
     const primaryOption = mappedOptions.find((o: any) => o.is_primary) || mappedOptions[0];
     const initialShippingAmount = primaryOption?.total_amount 
@@ -509,7 +553,7 @@ export function useQuoteRepositoryForm(opts: {
     // Inject missing CRM entities into dropdowns
     const injectMissingEntities = async () => {
       if (quote.service_id) {
-        const { data: svc } = await supabase
+        const { data: svc } = await scopedDb
           .from('services')
           .select('id, service_name, service_type_id')
           .eq('id', quote.service_id)
@@ -533,7 +577,7 @@ export function useQuoteRepositoryForm(opts: {
       const oppId = quote.opportunity_id ? String(quote.opportunity_id) : '';
 
       if (accId && !accounts.some((a) => String(a.id) === accId)) {
-        const { data: acc } = await supabase
+        const { data: acc } = await scopedDb
           .from('accounts')
           .select('id, name')
           .eq('id', accId)
@@ -547,7 +591,7 @@ export function useQuoteRepositoryForm(opts: {
       }
 
       if (conId && !contacts.some((c) => String(c.id) === conId)) {
-        const { data: con } = await supabase
+        const { data: con } = await scopedDb
           .from('contacts')
           .select('id, first_name, last_name, account_id')
           .eq('id', conId)
@@ -569,7 +613,7 @@ export function useQuoteRepositoryForm(opts: {
       }
 
       if (oppId && !opportunities.some((o) => String(o.id) === oppId)) {
-        const { data: opp } = await supabase
+        const { data: opp } = await scopedDb
           .from('opportunities')
           .select('id, name, account_id, contact_id')
           .eq('id', oppId)

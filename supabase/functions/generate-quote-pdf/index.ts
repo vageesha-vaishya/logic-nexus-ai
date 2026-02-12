@@ -1,6 +1,10 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { PdfRenderer } from "./engine/renderer.ts";
+import { buildSafeContext } from "./engine/context.ts";
+import { DefaultTemplate } from "./engine/default_template.ts";
+import { getTemplate } from "./engine/template-service.ts";
 
 console.log("Hello from generate-quote-pdf!");
 
@@ -20,7 +24,23 @@ serveWithLogger(async (req, logger, supabaseClient) => {
         await logger.warn(msg);
     };
 
-    let { quoteId, versionId, templateId, template } = await req.json();
+    const body = await req.json();
+    let { quoteId, versionId, templateId, template, engine_v2, store_result } = body;
+
+    // Handle Database Webhook Payload
+    if (body.type === 'INSERT' || body.type === 'UPDATE') {
+         // It's likely a database webhook
+         if (body.table === 'quotation_versions' && body.record) {
+             versionId = body.record.id;
+             quoteId = body.record.quote_id;
+             store_result = true; // Auto-store if triggered by DB
+             await log(`Triggered by DB Webhook: Version=${versionId}, Quote=${quoteId}`);
+         } else if (body.table === 'quotes' && body.record) {
+             quoteId = body.record.id;
+             store_result = true;
+             await log(`Triggered by DB Webhook: Quote=${quoteId}`);
+         }
+    }
 
     if (!quoteId) {
       throw new Error("Missing quoteId");
@@ -28,35 +48,16 @@ serveWithLogger(async (req, logger, supabaseClient) => {
 
     await log(`Generating PDF for Quote: ${quoteId}, Version: ${versionId}, Template: ${templateId}`);
 
-    // Fetch Template
+    // Fetch Template (with Caching)
     let templateContent = null;
     if (templateId) {
-        const { data: tData, error: tError } = await supabaseClient
-            .from("quote_templates")
-            .select("content")
-            .eq("id", templateId)
-            .single();
-        
-        if (tError) {
-             await logger.warn(`Error fetching template: ${tError.message}`);
-        } else if (tData) {
-            templateContent = tData.content;
-        }
+        templateContent = await getTemplate(supabaseClient, templateId, logger);
     }
     
     // Default fallback template
     if (!templateContent) {
-         templateContent = {
-          layout: "mgl_granular",
-          header: { show_logo: true, company_info: true, title: "QUOTATION" },
-          sections: [
-              { type: "customer_matrix_header", title: "Customer Information" },
-              { type: "shipment_matrix_details", title: "Details (with Equipment/QTY)" },
-              { type: "rates_matrix", title: "Freight Charges Matrix" },
-              { type: "terms", title: "Terms & Conditions" }
-          ],
-          footer: { text: "Thank you for your business." }
-      };
+         await log("Using Default Template (fallback)");
+         templateContent = DefaultTemplate;
     }
 
     // Fetch Charge Sides for Filtering
@@ -182,6 +183,125 @@ serveWithLogger(async (req, logger, supabaseClient) => {
              await logger.warn(`No charges found for option ${opt.id}`);
           }
       }
+    }
+
+    // V2 Engine Logic
+    if (engine_v2) {
+       await log("Using V2 Rendering Engine");
+       
+       // Fetch Branding (Phase 2)
+       // For now, defaulting to 'Miami Global Lines' if no specific tenant logic is present
+       const { data: brandingData, error: brandingError } = await supabaseClient
+        .from("tenant_branding")
+        .select("*")
+        .eq("company_name", "Miami Global Lines")
+        .single();
+    
+       if (brandingError) {
+            await logger.warn(`Error fetching branding: ${brandingError.message}`);
+       } else {
+            await logger.info(`Fetched branding for: ${brandingData.company_name}`);
+       }
+
+       const selectedOption = options.length > 0 ? options[0] : null;
+       
+       const branding = brandingData || {};
+       let logoBase64 = undefined;
+       if (branding.logo_url && branding.logo_url.startsWith("data:image")) {
+           logoBase64 = branding.logo_url;
+       }
+
+       const rawData = {
+          branding: {
+              ...branding,
+              logo_base64: logoBase64
+          },
+          quote: {
+             quote_number: quote.quote_number,
+             created_at: quote.created_at,
+             expiration_date: quote.expiration_date,
+             status: quote.status,
+             total_amount: quote.total_amount, 
+             currency: quote.currency || "USD",
+             service_level: quote.service_level
+          },
+          customer: {
+             company_name: quote.accounts?.name,
+             contact_name: quote.accounts?.name, 
+             email: "", 
+             address: [quote.accounts?.billing_street, quote.accounts?.billing_city, quote.accounts?.billing_country].filter(Boolean).join(", ")
+          },
+          legs: selectedOption?.legs?.map((l: any) => ({
+             sequence_id: l.sequence_id || 0,
+             mode: l.mode,
+             pol: l.origin?.location_name,
+             pod: l.destination?.location_name,
+             carrier: selectedOption.carriers?.carrier_name,
+             transit_time: l.transit_time
+          })) || [],
+          charges: selectedOption?.charges?.map((c: any) => ({
+             description: c.charge_name || c.category?.name || "Charge",
+             amount: c.amount,
+             currency: c.currency || "USD",
+             type: c.charge_type,
+             basis: c.basis,
+             quantity: c.units,
+             leg_id: c.leg_id
+          })) || [],
+          items: quote.items?.map((i: any) => ({
+             container_type: i.container_types?.name || i.container_types?.code || "Container",
+             quantity: i.quantity,
+             commodity: i.commodity_description || "General Cargo",
+             weight: i.total_weight,
+             volume: i.total_volume
+          })) || []
+       };
+
+       const context = buildSafeContext(rawData);
+       // Use fetched template or fallback
+       const renderer = new PdfRenderer(templateContent || DefaultTemplate, context);
+       const pdfBytes = await renderer.render();
+
+       if (store_result) {
+            const fileName = `${quoteId}/${versionId || 'latest'}_${Date.now()}.pdf`;
+            const { data: uploadData, error: uploadError } = await supabaseClient
+                .storage
+                .from('quotations')
+                .upload(fileName, pdfBytes, {
+                    contentType: 'application/pdf',
+                    upsert: true
+                });
+            
+            if (uploadError) {
+                await logger.error(`Upload failed: ${uploadError.message}`);
+                throw new Error(`Upload failed: ${uploadError.message}`);
+            }
+
+            const fullPath = uploadData.path; 
+            
+            if (versionId) {
+                await supabaseClient
+                    .from('quotation_versions')
+                    .update({ storage_path: fullPath })
+                    .eq('id', versionId);
+            }
+
+            return new Response(JSON.stringify({ 
+                success: true, 
+                path: fullPath, 
+                message: "PDF generated and stored successfully" 
+            }), {
+                headers: { ...getCorsHeaders(req), "Content-Type": "application/json" }
+            });
+       }
+
+       return new Response(new Blob([pdfBytes as any]), {
+          headers: {
+             ...getCorsHeaders(req),
+             "Content-Type": "application/pdf",
+             "X-Trace-Logs": JSON.stringify(traceLogs)
+          }
+       });
     }
 
     // Create PDF
@@ -418,16 +538,60 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                      const rateAreaW = 510 - descW - remW;
                      const perColW = colCount > 0 ? rateAreaW / colCount : rateAreaW;
 
+                    // Helper to wrap text
+                    const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, size = 9, isBold = false, color = black, targetPage = page) => {
+                        const words = text.split(' ');
+                        let line = '';
+                        let currentY = y;
+                        const lineHeight = size + 2;
+                        // Approximate char width ~0.6 * size
+                        const avgCharWidth = size * 0.6;
+                        const maxChars = Math.floor(maxWidth / avgCharWidth);
+                        
+                        let linesDrawn = 0;
+
+                        for(let n = 0; n < words.length; n++) {
+                            const testLine = line + words[n] + ' ';
+                            if (testLine.length > maxChars && line.length > 0) {
+                                targetPage.drawText(line, { x, y: currentY, size, font: isBold ? boldFont : font, color });
+                                line = words[n] + ' ';
+                                currentY -= lineHeight;
+                                linesDrawn++;
+                            } else {
+                                line = testLine;
+                            }
+                        }
+                        targetPage.drawText(line, { x, y: currentY, size, font: isBold ? boldFont : font, color });
+                        return linesDrawn + 1;
+                    };
+
+                    const formatHeader = (key: string) => {
+                         // Clean up long container names
+                         return key.replace(/Logic Test \d+/, "") // Remove dynamic test IDs
+                                   .replace(/High Cube/gi, "HC")
+                                   .replace(/Standard/gi, "Std")
+                                   .replace(/Flat Rack/gi, "FR")
+                                   .replace(/Open Top/gi, "OT")
+                                   .replace(/ISO Tank/gi, "ISO")
+                                   .trim();
+                    };
+
                      // Table Header Row
-                     const headerH = 30; // Taller for multi-line text
-                     drawRect(40, y - headerH, 510, headerH);
+                     const headerH = 40; // Increased height for wrapping
+                     drawRect(40, y - headerH, 510, headerH, rgb(0.95, 0.95, 0.95), true); // Light gray background
+                     drawRect(40, y - headerH, 510, headerH); // Border
                      
                      // Vertical lines
                      let cx = 40 + descW;
                      drawLine(cx, y, cx, y - headerH); // After Desc
                      
                      for (let i = 0; i < colCount; i++) {
-                         drawText(columns[i], cx + 2, y - 12, 8, true);
+                         const cleanHeader = formatHeader(columns[i]);
+                         // Center text roughly
+                         const textX = cx + 2;
+                         // Use wrapped text
+                         drawWrappedText(cleanHeader, textX, y - 10, perColW - 4, 8, true);
+                         
                          cx += perColW;
                          drawLine(cx, y, cx, y - headerH);
                      }

@@ -28,6 +28,7 @@ const mockLimit = vi.fn();
 const mockGt = vi.fn();
 const mockOrder = vi.fn();
 const mockIs = vi.fn();
+const mockRpc = vi.fn();
 
 const mockFrom = vi.fn(() => ({
   insert: mockInsert,
@@ -61,8 +62,12 @@ vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
     scopedDb: {
       from: mockFrom,
+      rpc: mockRpc,
     },
     context: { tenantId: 'test-tenant' },
+    supabase: { // Also mock supabase as it might be used for other things
+        from: mockFrom,
+    }
   }),
 }));
 
@@ -75,6 +80,15 @@ vi.mock('@/hooks/useAuth', () => ({
 vi.mock('../QuoteContext', () => ({
   useQuoteContext: () => ({
     resolvedTenantId: 'test-tenant',
+    setResolvedTenantId: vi.fn(),
+    setAccounts: vi.fn(),
+    setContacts: vi.fn(),
+    setOpportunities: vi.fn(),
+    setServices: vi.fn(),
+    accounts: [],
+    contacts: [],
+    opportunities: [],
+    serviceTypes: [],
   }),
 }));
 
@@ -84,12 +98,13 @@ describe('useQuoteRepository', () => {
     
     // Default success responses
     mockMaybeSingle.mockResolvedValue({ data: { id: 'new-quote-id' }, error: null });
+    mockRpc.mockResolvedValue({ data: 'new-quote-id', error: null });
     mockInsert.mockReturnValue({ select: () => ({ maybeSingle: mockMaybeSingle }) });
     mockUpdate.mockReturnValue({ eq: () => Promise.resolve({ error: null }) });
     mockDelete.mockReturnValue({ eq: () => Promise.resolve({ error: null }) });
   });
 
-  it('should save a new quote with items', async () => {
+  it('should save a new quote using atomic RPC', async () => {
     const mockForm = { reset: vi.fn() } as any;
     const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
     
@@ -108,25 +123,25 @@ describe('useQuoteRepository', () => {
 
     const id = await result.current.saveQuote({ data: quoteData });
 
-    expect(mockFrom).toHaveBeenCalledWith('quotes');
-    expect(mockInsert).toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith('save_quote_atomic', expect.objectContaining({
+        p_payload: expect.objectContaining({
+            quote: expect.objectContaining({
+                title: 'Test Quote',
+            }),
+            items: expect.arrayContaining([
+                expect.objectContaining({
+                    product_name: 'Item 1',
+                    quantity: 10,
+                    unit_price: 100,
+                    discount_percent: 5,
+                })
+            ])
+        })
+    }));
     expect(id).toBe('new-quote-id');
-
-    // Verify items saving
-    expect(mockFrom).toHaveBeenCalledWith('quote_items');
-    expect(mockDelete).toHaveBeenCalled(); // Should clean up first
-    expect(mockInsert).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({
-        quote_id: 'new-quote-id',
-        product_name: 'Item 1',
-        quantity: 10,
-        unit_price: 100,
-        discount_percent: 5,
-      })
-    ]));
   });
 
-  it('should update an existing quote and replace items', async () => {
+  it('should update an existing quote using atomic RPC', async () => {
     const mockForm = { reset: vi.fn() } as any;
     const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
     
@@ -143,17 +158,18 @@ describe('useQuoteRepository', () => {
 
     await result.current.saveQuote({ quoteId: 'existing-id', data: quoteData });
 
-    expect(mockFrom).toHaveBeenCalledWith('quotes');
-    expect(mockUpdate).toHaveBeenCalled();
-    
-    // Verify items replacement
-    expect(mockFrom).toHaveBeenCalledWith('quote_items');
-    expect(mockDelete).toHaveBeenCalled(); // Should delete old items for existing-id
-    expect(mockInsert).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({
-        quote_id: 'existing-id',
-        product_name: 'Item 2',
-      })
-    ]));
+    expect(mockRpc).toHaveBeenCalledWith('save_quote_atomic', expect.objectContaining({
+        p_payload: expect.objectContaining({
+            quote: expect.objectContaining({
+                id: 'existing-id',
+                title: 'Updated Quote',
+            }),
+            items: expect.arrayContaining([
+                expect.objectContaining({
+                    product_name: 'Item 2',
+                })
+            ])
+        })
+    }));
   });
 });

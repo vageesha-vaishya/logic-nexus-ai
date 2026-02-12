@@ -32,7 +32,8 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
       
       const response = await invokeAnonymous('generate-quote-pdf', {
         quoteId,
-        versionId
+        versionId,
+        engine_v2: true
       });
 
       if (!response || !response.content) {
