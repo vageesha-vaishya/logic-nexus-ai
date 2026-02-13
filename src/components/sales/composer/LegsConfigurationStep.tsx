@@ -98,7 +98,7 @@ function LocationAutocomplete({
 export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { state, dispatch } = useQuoteStore();
   const { legs, validationErrors, referenceData } = state;
-  const { serviceTypes = [], carriers = [] } = referenceData || {};
+  const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};
   const { scopedDb } = useCRM();
 
   const onAddLeg = (mode: string) => {
@@ -282,20 +282,27 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                               <SelectValue placeholder="Select carrier" />
                             </SelectTrigger>
                             <SelectContent>
-                              {carriers
-                                .filter(c => {
-                                  // Map leg mode to carrier type
-                                  const modeMap: Record<string, string> = {
-                                    'ocean': 'ocean',
-                                    'air': 'air_cargo',
-                                    'road': 'trucking',
-                                    'rail': 'rail'
-                                  };
-                                  // If mode matches mapped type, or if no specific mode mapping (fallback)
-                                  const targetType = modeMap[leg.mode] || leg.mode;
-                                  return c.carrier_type === targetType;
-                                })
-                                .map((carrier) => (
+                            {carriers
+                              .filter(c => {
+                                // Map leg mode to carrier type with robust fallback
+                                const modeMap: Record<string, string> = {
+                                  'ocean': 'ocean',
+                                  'sea': 'ocean',
+                                  'air': 'air_cargo',
+                                  'air_cargo': 'air_cargo',
+                                  'road': 'trucking',
+                                  'truck': 'trucking',
+                                  'rail': 'rail',
+                                  'train': 'rail'
+                                };
+                                const legMode = (leg.mode || '').toLowerCase();
+                                const targetType = modeMap[legMode] || legMode;
+                                const carrierType = (c.carrier_type || '').toLowerCase();
+                                
+                                // Direct match or mapped match
+                                return carrierType === targetType || carrierType === legMode;
+                              })
+                              .map((carrier) => (
                                   <SelectItem key={carrier.id} value={carrier.id}>
                                     {carrier.carrier_name}
                                   </SelectItem>
@@ -319,9 +326,16 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                                   if (!st.is_active) return false;
                                   const transportMode = (st as any).transport_modes;
                                   const currentMode = (leg.mode || '').toLowerCase();
+                                  
+                                  // Robust check for transport mode match
                                   if (transportMode?.code) {
-                                    return transportMode.code.toLowerCase() === currentMode;
+                                    const tmCode = transportMode.code.toLowerCase();
+                                    return tmCode === currentMode || 
+                                           (currentMode === 'ocean' && (tmCode === 'sea' || tmCode === 'maritime')) ||
+                                           (currentMode === 'air' && tmCode === 'air_cargo');
                                   }
+                                  
+                                  // Fallback to mode_id check if available
                                   return st.mode_id === leg.mode;
                                 })
                                 .map((st) => (

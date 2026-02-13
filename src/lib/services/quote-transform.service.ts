@@ -10,6 +10,7 @@ interface MasterData {
     ports?: { id: string; location_name: string; location_code?: string; country?: string }[];
     containerTypes?: { id: string; name: string; code: string }[];
     containerSizes?: { id: string; name: string; code: string }[];
+    shippingTerms?: { id: string; code: string; name: string }[];
 }
 
 interface RetryOptions {
@@ -121,6 +122,15 @@ export class QuoteTransformService {
         const originPortId = this.resolvePortId(data.origin, masterData.ports);
         const destinationPortId = this.resolvePortId(data.destination, masterData.ports);
         
+        // Resolve Shipping Term ID (Incoterms)
+        // The form expects an ID for the Select component, but falls back to code if needed
+        let shippingTermId = undefined;
+        const incotermCode = data.incoterms || (tradeDirection === 'export' ? 'CIF' : 'FOB');
+        if (masterData.shippingTerms) {
+             const term = masterData.shippingTerms.find(t => t.code === incotermCode);
+             if (term) shippingTermId = term.id;
+        }
+
         // Pass normalized rates to helpers
         const items = this.generateQuoteItems(data, primaryRate, masterData);
         const notes = this.generateStructuredNotes({ ...data, selectedRates: rates });
@@ -147,13 +157,14 @@ export class QuoteTransformService {
             
             // Dates & Requirements
             valid_until: primaryRate?.validUntil ? new Date(primaryRate.validUntil).toISOString().split('T')[0] : undefined,
-            pickup_date: data.pickupDate,
-            delivery_deadline: data.deliveryDeadline,
+            pickup_date: data.pickupDate ? new Date(data.pickupDate).toISOString().split('T')[0] : undefined,
+            delivery_deadline: data.deliveryDeadline ? new Date(data.deliveryDeadline).toISOString().split('T')[0] : undefined,
             vehicle_type: data.vehicleType,
             special_handling: data.specialHandling,
             
             // Commercial
-            incoterms: data.incoterms || (tradeDirection === 'export' ? 'CIF' : 'FOB'),
+            // We pass the ID if resolved, otherwise the code. The form should handle the ID.
+            incoterms: shippingTermId || incotermCode,
             shipping_amount: primaryRate?.price?.toString(),
             
             // Content
@@ -248,26 +259,33 @@ export class QuoteTransformService {
         });
     }
 
-    private static resolveServiceTypeId(mode: string, explicitId: string | undefined, serviceTypes: MasterData['serviceTypes']): string | undefined {
+    public static resolveServiceTypeId(mode: string, explicitId: string | undefined, serviceTypes: MasterData['serviceTypes']): string | undefined {
         if (explicitId) return explicitId;
 
-        const modeMap: Record<string, string> = {
-            'ocean': 'Sea', 'sea': 'Sea',
-            'air': 'Air',
-            'road': 'Road', 'truck': 'Road',
-            'rail': 'Rail'
+        const modeMap: Record<string, string[]> = {
+            'ocean': ['Sea', 'Ocean'], 
+            'sea': ['Sea', 'Ocean'],
+            'air': ['Air'],
+            'road': ['Road', 'Truck'], 
+            'truck': ['Road', 'Truck'],
+            'rail': ['Rail']
         };
 
-        const targetMode = modeMap[mode?.toLowerCase()] || mode;
-        if (!targetMode || !serviceTypes.length) return undefined;
+        const targetModes = modeMap[mode?.toLowerCase()] || [mode];
+        if (!targetModes.length || !serviceTypes.length) return undefined;
 
-        return serviceTypes.find(
-            st => st.name.toLowerCase().includes(targetMode.toLowerCase()) || 
-                  st.code.toLowerCase() === targetMode.toLowerCase()
-        )?.id;
+        for (const targetMode of targetModes) {
+            const match = serviceTypes.find(
+                st => st.name.toLowerCase().includes(targetMode.toLowerCase()) || 
+                      st.code.toLowerCase() === targetMode.toLowerCase()
+            );
+            if (match) return match.id;
+        }
+        
+        return undefined;
     }
 
-    private static resolveCarrierId(rate: RateOption | undefined, carriers: MasterData['carriers']): string | undefined {
+    public static resolveCarrierId(rate: RateOption | undefined, carriers: MasterData['carriers']): string | undefined {
         if (!rate || !carriers.length) return undefined;
 
         // Priority 1: Direct ID
@@ -311,9 +329,14 @@ export class QuoteTransformService {
             match = ports.find(p => p.location_code?.toLowerCase() === searchName);
         }
 
-        // 3. Contains (Strict)
+        // 3. Contains (Strict) - Forward
         if (!match) {
             match = ports.find(p => p.location_name.toLowerCase().includes(searchName));
+        }
+
+        // 4. Contains (Strict) - Reverse (e.g. search "Shanghai" matches "Shanghai, CN")
+        if (!match) {
+             match = ports.find(p => searchName.includes(p.location_name.toLowerCase()));
         }
 
         return match?.id;
@@ -369,12 +392,12 @@ export class QuoteTransformService {
                 const productName = [
                     containerTypeName,
                     data.commodity || 'General Cargo'
-                ].filter(Boolean).join(' - ');
+                ].filter(Boolean).join(' - ') || 'General Cargo';
 
                 return {
                     type: 'container',
-                    container_type_id: resolvedContainerTypeId,
-                    container_size_id: resolvedContainerSizeId,
+                    container_type_id: resolvedContainerTypeId || undefined, // Ensure undefined if null/empty string
+                    container_size_id: resolvedContainerSizeId || undefined,
                     quantity: Number(c.qty) || 1,
                     product_name: productName,
                     unit_price: 0, // Calculated below

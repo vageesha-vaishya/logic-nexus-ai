@@ -152,6 +152,7 @@ export default function QuoteNew() {
     ports: any[];
     containerTypes?: any[];
     containerSizes?: any[];
+    shippingTerms?: any[];
   }>({ serviceTypes: [], carriers: [], ports: [] });
 
   // Fetch master data on mount
@@ -175,12 +176,16 @@ export default function QuoteNew() {
             const { data: cs, error: csError } = await scopedDb.from('container_sizes').select('id, name, code');
             if (csError) console.error('[QuoteNew] Error fetching container sizes:', csError);
 
+            const { data: terms, error: termsError } = await scopedDb.from('shipping_terms').select('id, code, name');
+            if (termsError) console.error('[QuoteNew] Error fetching shipping terms:', termsError);
+
             setMasterData({
                 serviceTypes: st || [],
                 carriers: c || [],
                 ports: p || [],
                 containerTypes: ct || [],
-                containerSizes: cs || []
+                containerSizes: cs || [],
+                shippingTerms: terms || []
             });
         } catch (error) {
             console.error('[QuoteNew] Unexpected error fetching master data:', error);
@@ -318,7 +323,9 @@ export default function QuoteNew() {
                 { data: serviceTypes },
                 { data: serviceModes },
                 { data: carriers },
-                { data: ports }
+                { data: ports },
+                { data: containerTypes },
+                { data: containerSizes }
             ] = await Promise.all([
                 scopedDb.from('charge_categories', true).select('id, code, name'),
                 scopedDb.from('charge_sides', true).select('id, code, name'),
@@ -327,19 +334,21 @@ export default function QuoteNew() {
                 scopedDb.from('service_types', true).select('id, code, name, transport_modes(code)'),
                 scopedDb.from('service_modes', true).select('id, code, name'),
                 scopedDb.from('carriers', true).select('id, carrier_name, scac'),
-                supabase.from('ports_locations').select('id, location_name, location_code, country')
+                supabase.from('ports_locations').select('id, location_name, location_code, country'),
+                scopedDb.from('container_types').select('id, name, code'),
+                scopedDb.from('container_sizes').select('id, name, code')
             ]);
             
             masterData = {
                 timestamp: Date.now(),
-                data: { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports }
+                data: { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports, containerTypes, containerSizes }
             };
             MASTER_DATA_CACHE[CACHE_KEY] = masterData;
         } else {
             logger.info('[QuoteNew] Using cached master data');
         }
 
-        const { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports } = masterData.data;
+        const { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports, containerTypes, containerSizes } = masterData.data;
 
         // Initialize Logistics Plugin Mapper
         const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
@@ -360,6 +369,11 @@ export default function QuoteNew() {
         const buySideId = rateMapper.getSideId('buy') || rateMapper.getSideId('cost');
         const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
+        if (!categories || categories.length === 0) {
+             console.error('[QuoteNew] Master Data Missing: Categories');
+             throw new Error('Missing charge categories configuration.');
+        }
+
         if (!buySideId || !sellSideId) {
              console.error('[QuoteNew] Master Data Missing: Sides', { sides });
              throw new Error(`Missing charge sides configuration. Found ${sides?.length} sides.`);
@@ -369,12 +383,42 @@ export default function QuoteNew() {
         const newOptionIds: string[] = [];
 
         const processRate = async (rawRate: any) => {
+            // Resolve Container IDs if they are missing or strings
+            let containerSizeId = rawRate.container_size_id || rawRate.container_size?.id;
+            if (!containerSizeId && containerSizes && rawRate.container_size) {
+                // Try to resolve from string (e.g. "20", "40HC")
+                const sizeStr = String(rawRate.container_size).trim().toUpperCase();
+                const match = containerSizes.find((s: any) => 
+                    s.name.toUpperCase() === sizeStr || 
+                    s.code.toUpperCase() === sizeStr ||
+                    s.name.toUpperCase().includes(sizeStr) // Loose match
+                );
+                if (match) containerSizeId = match.id;
+            }
+
+            let containerTypeId = rawRate.container_type_id || rawRate.container_type?.id;
+            if (!containerTypeId && containerTypes && rawRate.container_type) {
+                const typeStr = String(rawRate.container_type).trim().toUpperCase();
+                const match = containerTypes.find((t: any) => 
+                    t.name.toUpperCase() === typeStr || 
+                    t.code.toUpperCase() === typeStr
+                );
+                if (match) containerTypeId = match.id;
+            }
+
+            // Create enriched rate with resolved IDs to prevent UUID errors
+            const enrichedRate = {
+                ...rawRate,
+                container_size_id: containerSizeId,
+                container_type_id: containerTypeId
+            };
+
             try {
                 const optionId = await QuoteTransformService.retryOperation(async () => {
                     return await quoteOptionService.addOptionToVersion({
                         tenantId: resolvedTenantId,
                         versionId: versionId,
-                        rate: rawRate,
+                        rate: enrichedRate,
                         rateMapper: rateMapper,
                         source: rawRate.source_attribution || state.source || 'quick_quote',
                         context: {
@@ -382,7 +426,10 @@ export default function QuoteNew() {
                             destination: state.destination,
                             originDetails: state.originDetails,
                             destinationDetails: state.destinationDetails,
-                            ports: ports || []
+                            ports: ports || [],
+                            categories: categories || [],
+                            carriers: carriers || [],
+                            serviceTypes: serviceTypes || []
                         }
                     });
                 }, { maxAttempts: 3, backoffFactor: 1.5 });
@@ -525,6 +572,23 @@ export default function QuoteNew() {
     
     // Switch to composer view
     setViewMode('composer');
+
+    // CRITICAL: Fetch the version ID for the newly created quote so options can be inserted
+    scopedDb.from('quotation_versions')
+        .select('id')
+        .eq('quote_id', quoteId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .single()
+        .then(({ data, error }) => {
+            if (error) {
+                console.error('[QuoteNew] Failed to fetch version ID for new quote:', error);
+                toast.error('Failed to initialize quote version.');
+            } else if (data) {
+                logger.info('[QuoteNew] Fetched version ID for new quote', { versionId: data.id });
+                setVersionId(data.id);
+            }
+        });
 
     // Update quote with selected template if applicable
     if (selectedTemplateId) {

@@ -182,11 +182,15 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                         <Button 
                             type="button" 
                             variant="outline" 
-                            onClick={() => setViewMode(viewMode === 'form' ? 'composer' : 'form')} 
+                            onClick={viewMode === 'form' ? form.handleSubmit(async (data) => {
+                                const success = await onSubmit(data);
+                                if (success) setViewMode('composer');
+                            }) : () => setViewMode('form')}
                             className="gap-2"
+                            disabled={isSubmitting || isHydrating}
                         >
                             <LayoutDashboard className="h-4 w-4" />
-                            {viewMode === 'form' ? 'Switch to Composer' : 'Back to Form'}
+                            {isSubmitting ? 'Saving...' : (viewMode === 'form' ? 'Save & Switch to Composer' : 'Back to Form')}
                         </Button>
                     </>
                  )}

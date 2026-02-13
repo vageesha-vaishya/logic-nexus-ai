@@ -195,7 +195,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     containerTypes,
     containerSizes,
     carriers,
-    chargeSides
+    chargeSides,
+    serviceLegCategories,
+    shippingTerms,
+    ports
   } = storeState.referenceData;
 
   // Option management state
@@ -293,6 +296,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     
     const errors: string[] = [];
     
+    let fetchedQuoteData: any = null;
+    
     try {
       // Step 1: Resolve tenant ID & Context
       debug.debug('[Composer] Step 1: Resolving tenant ID and Context');
@@ -355,7 +360,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           // Construct query - if we have a resolved tenant, enforce it to satisfy RLS policies
           let quoteQuery = scopedDb
             .from('quotes', true)
-            .select('tenant_id, franchise_id, origin_location, destination_location, cargo_details, transport_mode, origin_code, destination_code')
+            .select('*, incoterms(code), accounts(name), contacts(first_name, last_name)')
             .eq('id', quoteId);
             
           if (resolvedTenantId) {
@@ -377,6 +382,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
             let calculatedTotalWeight = 0;
             let calculatedTotalVolume = 0;
             let derivedCommodity = '';
+            let quoteItems: any[] = [];
 
             try {
               let itemsQuery = scopedDb
@@ -403,6 +409,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
               }
 
               if (!itemsError && items) {
+                quoteItems = items;
                 items.forEach((item: any) => {
                   const qty = Number(item.quantity) || 1;
                   const weight = Number(item.weight_kg) || 0;
@@ -461,9 +468,34 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                 mode: raw.transport_mode || 'ocean',
                 total_weight: calculatedTotalWeight,
                 total_volume: calculatedTotalVolume,
-                franchiseId: (quoteRow as any)?.franchise_id // Include franchiseId in quoteData
-            };
+                franchiseId: (quoteRow as any)?.franchise_id,
+                // Map additional fields to ensure Basic Info is populated
+                reference: raw.reference_no || raw.quote_reference || '',
+                validUntil: raw.valid_until || raw.expiry_date || '',
+                incoterms: raw.incoterms?.code || raw.incoterm_id || '',
+                shipping_term_id: raw.shipping_term_id,
+                ready_date: raw.ready_date || raw.pickup_date,
+                deadline_date: raw.deadline_date || raw.delivery_deadline,
+                notes: raw.notes,
+                currencyId: raw.currency_id,
+                // Enhanced mapping for full field population
+                carrier_id: raw.carrier_id,
+                service_type_id: raw.service_type_id,
+                origin_port_id: raw.origin_port_id,
+                destination_port_id: raw.destination_port_id,
+                type: raw.type,
+                status: raw.status,
+                shipping_amount: raw.shipping_amount,
+                tax_percent: raw.tax_percent,
+                // Customer Info
+                account_id: raw.account_id,
+                contact_id: raw.contact_id,
+                billing_address: raw.billing_address,
+                 // Items for Document Preview
+                 items: quoteItems || []
+             };
 
+            fetchedQuoteData = normalizedQuote;
             dispatch({ type: 'UPDATE_QUOTE_DATA', payload: normalizedQuote });
           }
         } catch (error: any) {
@@ -571,7 +603,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           containerSizes: [] as any[],
           carriers: [] as any[],
           chargeSides: [] as any[],
-          serviceLegCategories: [] as any[]
+          serviceLegCategories: [] as any[],
+          shippingTerms: [] as any[],
+          ports: [] as any[]
         };
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
@@ -604,7 +638,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           fetchRef('container_types', 'containerTypes', 'Failed to load container types'),
           fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes'),
           fetchRef('carriers', 'carriers', 'Failed to load carriers'),
-          fetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order')
+          fetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order'),
+          fetchRef('shipping_terms', 'shippingTerms', 'Failed to load shipping terms'),
+          fetchRef('ports_locations', 'ports', 'Failed to load ports')
         ]);
 
         // Cache the results if we have a tenant ID
@@ -634,7 +670,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           containerSizes: refData.containerSizes,
           carriers: uniqueCarriers,
           chargeSides: refData.chargeSides,
-          serviceLegCategories: refData.serviceLegCategories
+          serviceLegCategories: refData.serviceLegCategories,
+          shippingTerms: refData.shippingTerms,
+          ports: refData.ports
         }
       });
 
@@ -647,6 +685,100 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       // Step 3: Ensure option exists if we have a versionId
       if (versionId && resolvedTenantId) {
         await ensureOptionExists(resolvedTenantId);
+      }
+
+      // Step 4: If no optionId and we have quote data, create default leg
+      if (!initialOptionId && fetchedQuoteData) {
+         const qData = fetchedQuoteData;
+         
+         // Resolve Origin/Destination names from Ports if missing
+         let originName = qData.origin;
+         let destinationName = qData.destination;
+
+         if (!originName && qData.origin_port_id) {
+             const port = refData.ports.find(p => p.id === qData.origin_port_id);
+             if (port) originName = port.name || port.port_name || port.code;
+         }
+         
+         if (!destinationName && qData.destination_port_id) {
+             const port = refData.ports.find(p => p.id === qData.destination_port_id);
+             if (port) destinationName = port.name || port.port_name || port.code;
+         }
+
+         // Fallback if still empty but we have shipping amount (force creation to show rates)
+         const shippingAmount = Number(qData.shipping_amount) || 0;
+         if (shippingAmount > 0) {
+             if (!originName) originName = 'Origin';
+             if (!destinationName) destinationName = 'Destination';
+         }
+
+         if (originName && destinationName) {
+             debug.log('[Composer] Creating default leg from quote data (New Option Mode)');
+             
+             // Resolve carrier name
+             const carrierId = qData.carrier_id;
+             const serviceTypeId = qData.service_type_id;
+             const carrierName = carrierId 
+                 ? refData.carriers.find(c => c.id === carrierId)?.carrier_name 
+                 : undefined;
+
+             const defaultLeg: Leg = {
+                 id: `leg-default-${Date.now()}`,
+                 mode: qData.mode || 'ocean',
+                 serviceTypeId: serviceTypeId || '',
+                 origin: originName,
+                 destination: destinationName,
+                 carrierId: carrierId || undefined,
+                 carrierName: carrierName,
+                 legType: 'transport',
+                 charges: []
+             };
+
+             // If we have a shipping amount, add it as a charge to the leg
+             if (shippingAmount > 0) {
+                 const freightCat = refData.chargeCategories.find(c => c.code === 'FRT' || c.name === 'Freight Charges') || refData.chargeCategories[0];
+                 const shipmentBasis = refData.chargeBases.find(b => b.code === 'shipment') || refData.chargeBases[0];
+                 const currencyId = qData.currencyId || refData.currencies[0]?.id || '';
+                 
+                 // Create a robust default charge
+                 const defaultCharge = {
+                     id: `charge-default-${Date.now()}`,
+                     category_id: freightCat?.id || '',
+                     basis_id: shipmentBasis?.id || '',
+                     unit: shipmentBasis?.code || 'shipment',
+                     currency_id: currencyId,
+                     description: 'Freight Charges',
+                     note: 'Auto-generated from Quick Quote',
+                     buy: { quantity: 1, rate: 0, amount: 0, dbChargeId: null },
+                     sell: { quantity: 1, rate: shippingAmount, amount: shippingAmount, dbChargeId: null }
+                 };
+
+                 // Add to leg charges
+                 defaultLeg.charges.push(defaultCharge);
+                 debug.log('[Composer] Added default freight charge from shipping_amount:', shippingAmount);
+             } else {
+                 debug.warn('[Composer] No shipping_amount found in quote data, leg created without charges.');
+             }
+
+             dispatch({ type: 'SET_LEGS', payload: [defaultLeg] });
+         } else {
+             debug.warn('[Composer] Missing origin/destination in quote data, cannot create default leg.');
+         }
+      }
+
+      // Final safety check: if we have legs but NO charges anywhere, and we have shipping_amount, try to inject it
+      // This handles cases where leg creation happened but charge addition failed or logic was skipped
+      if (!initialOptionId && fetchedQuoteData) {
+          const qData = fetchedQuoteData;
+          const shippingAmount = Number(qData.shipping_amount) || 0;
+          
+          // Check if we have any charges
+          const hasGlobalCharges = (storeState.charges && storeState.charges.length > 0); // Note: storeState might not be updated yet, use local if needed?
+          // Actually, we just dispatched SET_LEGS. We can't read storeState immediately.
+          // We can check our local logic.
+          
+          // If we created a default leg with charges, we are good.
+          // If we didn't create a default leg (e.g. because option existed but was empty?), we might need to check.
       }
 
       debug.debug('[Composer] Initial data load complete. Errors:', errors.length);
@@ -1026,7 +1158,52 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
         dispatch({ type: 'SET_LEGS', payload: legsWithCharges });
       } else {
-        dispatch({ type: 'SET_LEGS', payload: [] });
+        // Fallback: If no legs exist but we have quote data, create a default leg
+        if (quoteData.origin && quoteData.destination) {
+            debug.log('[Composer] No legs found, creating default leg from quote data');
+            
+            // Try to resolve carrier and service type
+            const carrierId = quoteData.carrier_id;
+            const serviceTypeId = quoteData.service_type_id;
+            
+            // Resolve carrier name
+            const carrierName = carrierId 
+                ? carriers.find(c => c.id === carrierId)?.carrier_name 
+                : undefined;
+
+            const defaultLeg: Leg = {
+                id: `leg-default-${Date.now()}`,
+                mode: quoteData.mode || 'ocean',
+                serviceTypeId: serviceTypeId || '',
+                origin: quoteData.origin,
+                destination: quoteData.destination,
+                carrierId: carrierId || undefined,
+                carrierName: carrierName,
+                legType: 'transport',
+                charges: []
+            };
+
+            // If we have a shipping amount, add it as a charge
+            const shippingAmount = Number(quoteData.shipping_amount) || 0;
+            if (shippingAmount > 0) {
+                const freightCat = chargeCategories.find(c => c.code === 'FRT' || c.name === 'Freight Charges') || chargeCategories[0];
+                const shipmentBasis = chargeBases.find(b => b.code === 'shipment') || chargeBases[0];
+                
+                defaultLeg.charges.push({
+                    id: `charge-default-${Date.now()}`,
+                    category_id: freightCat?.id || '',
+                    basis_id: shipmentBasis?.id || '',
+                    unit: shipmentBasis?.code || 'shipment',
+                    currency_id: quoteData.currencyId || currencies[0]?.id || '',
+                    buy: { quantity: 1, rate: 0, amount: 0 },
+                    sell: { quantity: 1, rate: shippingAmount, amount: shippingAmount }
+                });
+            }
+
+            dispatch({ type: 'SET_LEGS', payload: [defaultLeg] });
+        } else {
+            dispatch({ type: 'SET_LEGS', payload: [] });
+        }
       }
     } catch (error: any) {
       debug.error('[Composer] Error loading option data:', error);

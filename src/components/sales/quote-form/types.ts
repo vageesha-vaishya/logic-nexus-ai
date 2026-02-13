@@ -90,7 +90,9 @@ export const quoteSchema = z.object({
     legs: z.array(z.object({
       id: z.string().optional(),
       sequence_number: z.number(),
-      transport_mode: z.enum(['ocean', 'air', 'road', 'rail']),
+      transport_mode: z.string().optional(), // Relaxed from enum to support service legs
+      service_only_category: z.string().optional(),
+      leg_type: z.enum(['transport', 'service']).optional().default('transport'),
       carrier_id: z.string().optional(),
       origin_location_id: z.string().optional(),
       destination_location_id: z.string().optional(),

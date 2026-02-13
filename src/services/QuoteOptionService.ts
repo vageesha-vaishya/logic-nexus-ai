@@ -21,6 +21,9 @@ export interface AddOptionParams {
         originDetails?: any;
         destinationDetails?: any;
         ports?: any[];
+        categories?: any[];
+        carriers?: any[];
+        serviceTypes?: any[];
     };
 }
 
@@ -126,7 +129,7 @@ export class QuoteOptionService {
         const legData = await this.insertLegs(tenantId, optionId, rate, rateMapper, context);
         
         // 5. Insert Charges
-        await this.insertCharges(tenantId, optionId, versionId, rate, legData, rateMapper, financials);
+        await this.insertCharges(tenantId, optionId, versionId, rate, legData, rateMapper, financials, context);
 
         return optionId;
     }
@@ -152,7 +155,20 @@ export class QuoteOptionService {
         rateLegs.forEach((leg: any, index: number) => {
             const legMode = leg.mode || rate.transport_mode || rate.mode || 'ocean';
             const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
-            const serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
+            
+            // Try to use rateMapper first, then fallback to robust resolution if context is available
+            let serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
+            if (!serviceTypeId && context.serviceTypes) {
+                serviceTypeId = QuoteTransformService.resolveServiceTypeId(legMode, undefined, context.serviceTypes);
+            }
+
+            // Resolve Provider/Carrier ID
+            let providerId = rateMapper.getProviderId(carrierName);
+            if (!providerId && context.carriers) {
+                // Construct a minimal rate object for resolution
+                const mockRate = { carrier: carrierName, carrier_name: carrierName };
+                providerId = QuoteTransformService.resolveCarrierId(mockRate as any, context.carriers);
+            }
             
             const isFirstLeg = index === 0;
             const isLastLeg = index === rateLegs.length - 1;
@@ -184,7 +200,7 @@ export class QuoteOptionService {
                 mode_id: rateMapper.getModeId(legMode),
                 mode: legMode,
                 service_type_id: serviceTypeId,
-                provider_id: rateMapper.getProviderId(carrierName),
+                provider_id: providerId,
                 origin_location: origin || (isFirstLeg ? context.origin : null),
                 destination_location: destination || (isLastLeg ? context.destination : null),
                 origin_location_id: originLocationId,
@@ -215,7 +231,8 @@ export class QuoteOptionService {
         rate: any, 
         legData: any[], 
         rateMapper: any,
-        financials: any
+        financials: any,
+        context?: any
     ) {
         const legsToInsert = legData.map(l => ({
             id: l.id,
@@ -292,12 +309,25 @@ export class QuoteOptionService {
                 
                 // Absolute fallback: Use the first available category to prevent data loss
                 if (!catId) {
-                     // We can't easily access the raw list here without exposing it in rateMapper, 
-                     // but we can assume 'Freight' or similar exists.
-                     // If still null, we might have to skip or insert with null (if DB allows).
-                     // But DB likely requires category_id.
-                     this.debug.error(`Critical: Could not map category for "${categoryKey}" and no fallback found. Charge will be skipped.`);
-                     return false;
+                     // Last resort fallback to ensure charge is not skipped
+                     this.debug.warn(`Critical: Could not map category for "${categoryKey}". Fallback to first available category.`);
+                     // Use the first category from the rate mapper's master data (if accessible via getCatId internal logic)
+                     // Since we can't access master data directly, we rely on the fact that we checked categories exist in QuoteNew.
+                     // We try one more generic term that might map to ID 1 or similar if implemented
+                     catId = rateMapper.getCatId('SURCHARGE'); 
+                     
+                     if (!catId) {
+                         // ULTIMATE FALLBACK: Use first available category from context
+                         if (context?.categories && context.categories.length > 0) {
+                             this.debug.warn(`Ultimate Fallback: Using first available category ID for "${categoryKey}"`);
+                             catId = context.categories[0].id;
+                         }
+
+                         if (!catId) {
+                             // This should technically be impossible if categories exist and LogisticsRateMapper is used
+                             return false;
+                         }
+                     }
                 }
             }
 
@@ -314,8 +344,9 @@ export class QuoteOptionService {
             const marginPercent = Number(rate.marginPercent || rate.margin_percent || 15);
             // Use PricingService for centralized calculation (Sell-Based Model: isCostBased = false)
             const chargeFinancials = await this.pricingService.calculateFinancials(amount, marginPercent, false);
-            const buyAmount = chargeFinancials.buyPrice;
-            const sellAmount = chargeFinancials.sellPrice;
+            // Ensure 2-decimal precision to match DB storage and prevent accumulation of floating point errors
+            const buyAmount = Number(chargeFinancials.buyPrice.toFixed(2));
+            const sellAmount = Number(chargeFinancials.sellPrice.toFixed(2));
 
             chargesToInsert.push(
                 { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },

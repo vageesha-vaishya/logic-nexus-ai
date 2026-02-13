@@ -47,6 +47,23 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
     serviceTypes
   } = referenceData;
 
+  if (!legs || legs.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Charges Management</CardTitle>
+          <CardDescription>Configure charges for each leg of the journey.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+            <p className="mb-2 font-medium">No Transport Legs Configured</p>
+            <p className="text-sm">Please go back to the "Transport Legs" step and add at least one leg to configure charges.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const autoMargin = quoteData.autoMargin || false;
   const marginPercent = quoteData.marginPercent || 15;
 
@@ -568,15 +585,25 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
                   </tbody>
                   <tfoot className="bg-muted/30 font-semibold border-t-2">
                     <tr>
-                      <td colSpan={6} className="p-3 text-right">Totals:</td>
-                      <td className="p-3 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
-                      <td colSpan={2} className="p-3"></td>
-                      <td className="p-3 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
-                      <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                        {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
-                        {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
+                      <td colSpan={8} className="p-3">
+                        <div className="flex items-center justify-end gap-6">
+                          <div className="flex items-center gap-2">
+                             <span className="text-muted-foreground">Total Buy:</span>
+                             <span>{calculateTotals(combinedCharges).buy.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <span className="text-muted-foreground">Total Sell:</span>
+                             <span>{calculateTotals(combinedCharges).sell.toFixed(2)}</span>
+                          </div>
+                          <div className={`flex items-center gap-2 ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                             <span className="text-muted-foreground">Margin:</span>
+                             <span>
+                               {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
+                               {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
+                             </span>
+                          </div>
+                        </div>
                       </td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 </table>

@@ -35,7 +35,8 @@ const initialState: QuoteState = {
     containerSizes: [],
     carriers: [],
     chargeSides: [],
-    serviceLegCategories: []
+    serviceLegCategories: [],
+    shippingTerms: []
   },
   basisModal: {
     isOpen: false,

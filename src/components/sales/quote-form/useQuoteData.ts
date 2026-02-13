@@ -182,9 +182,24 @@ export function useQuoteData() {
     enabled: !!tenantId || !!context.tenantId,
   });
 
+  // 7. Fetch Shipping Terms (Global Resource)
+  const { data: shippingTerms = [] } = useQuery({
+    queryKey: quoteKeys.reference.shippingTerms(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shipping_terms')
+        .select('id, name, code, description')
+        .order('code');
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 60 * 24, // 24 hours
+  });
+
   return {
     ports,
     carriers,
+    shippingTerms,
     accounts: [...accounts, ...injectedAccounts],
     opportunities: [...opportunities, ...injectedOpportunities],
     contacts: [...contacts, ...injectedContacts],
