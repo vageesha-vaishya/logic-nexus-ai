@@ -1,11 +1,8 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { requireAuth } from '../_shared/auth.ts'
 
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-};
+declare const Deno: any;
 
 console.log("Rate Engine v2.1 Initialized")
 
@@ -70,7 +67,7 @@ const CARRIERS = {
     ]
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
   // 1. CORS

@@ -1,10 +1,10 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+declare const Deno: any;
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
 
 console.log("Hello from calculate-quote-financials!")
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {

@@ -1,11 +1,12 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
-serve(async (req) => {
+declare const Deno: any;
+
+Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });

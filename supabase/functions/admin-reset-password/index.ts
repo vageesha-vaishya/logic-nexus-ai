@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, createServiceClient } from '../_shared/auth.ts';
 
@@ -10,7 +9,9 @@ type ResetPayload = {
   redirect_url?: string;
 };
 
-serve(async (req: any) => {
+declare const Deno: any;
+
+Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {

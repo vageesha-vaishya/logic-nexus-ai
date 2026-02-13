@@ -1,19 +1,19 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import { Logger } from '../_shared/logger.ts';
 import { normalizeGmailPayload, normalizeOutlookPayload, NormalizedEmail, correlateThread } from './utils.ts';
 import { classifyEmailContent } from '../_shared/classification-logic.ts';
 import { determineRoute } from '../_shared/routing-logic.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { sanitizeForLLM } from "../_shared/pii-guard.ts";
+import { pickEmbeddingModel } from "../_shared/model-router.ts";
+import { logAiCall } from "../_shared/audit.ts";
 
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-};
+declare const Deno: any;
 
-const logger = new Logger({ module: "ingest-email" });
+const logger = new Logger(null, { component: "ingest-email" });
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -181,6 +181,48 @@ serve(async (req: Request) => {
     if (insertError) {
       logger.error("Failed to insert email", { error: insertError });
       throw insertError;
+    }
+
+    // 2.2 Embed email body for semantic search (if available)
+    try {
+      const bodyText = insertedEmail.body_text || insertedEmail.body_html || "";
+      const { sanitized, redacted } = sanitizeForLLM(bodyText);
+      if (sanitized && sanitized.length > 0) {
+        const { model, url, headers } = pickEmbeddingModel();
+        const embRes = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ input: sanitized, model }),
+        });
+        if (embRes.ok) {
+          const embJson = await embRes.json();
+          const embedding = embJson?.data?.[0]?.embedding;
+          if (Array.isArray(embedding)) {
+            const { error: updErr } = await supabase
+              .from("emails")
+              .update({ embedding })
+              .eq("id", insertedEmail.id);
+            if (updErr) {
+              logger.warn("Failed to update email embedding", { error: updErr });
+            } else {
+              await logAiCall(supabase, {
+                tenant_id: insertedEmail.tenant_id ?? null,
+                user_id: user.id,
+                function_name: "ingest-email-embed",
+                model_used: model,
+                output_summary: { redacted },
+                pii_detected: redacted.length > 0,
+                pii_fields_redacted: redacted,
+              });
+            }
+          }
+        } else {
+          const t = await embRes.text();
+          logger.warn("Embedding HTTP error", { text: t });
+        }
+      }
+    } catch (embErr) {
+      logger.warn("Embedding step failed", { error: embErr });
     }
 
     // 2.5 Insert Routing Event

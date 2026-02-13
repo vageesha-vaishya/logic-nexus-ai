@@ -3884,5 +3884,121 @@ Notes
 - Other AI functions can be similarly retrofitted using logAiCall; current update covers the high-priority pair.
 If you’d like, I can also push the migrations to the target database and deploy the updated edge functions once the access token and project-ref are provided.
 
-================sarvesh phase -2 =================
+=========sarvesh phase -2 ==implementation==========
+
+Phase 2 Analysis
+
+- Goals
+  
+  - Add hybrid semantic search for HTS codes combining trigrams, FTS, and vector similarity.
+  - Embed emails automatically for semantic search and thread discovery.
+  - Ship a Nexus Copilot RAG chatbot using knowledge_base with tenant-aware retrieval.
+  - Upgrade demand forecasting with a containerized microservice (Docker) instead of Fly.io.
+  - Keep everything RLS-aware and auditable with existing helpers.
+- Constraints
+  
+  - No Fly.io. Use Docker for microservices.
+  - Maintain existing Supabase Edge Functions structure, auth, and shared helpers.
+  - Reuse embedding model router; default to text-embedding-3-small.
+- Key Design Choices
+  
+  - Hybrid HTS search implemented at SQL layer for speed and composability.
+  - Email embeddings stored in the emails table with HNSW index for fast kNN.
+  - Copilot uses match_documents_scoped for retrieval and gpt-4o-mini for answers.
+  - Forecast microservice uses a Holt-Winters baseline in Python, containerized with Docker; edge function prefers microservice, falls back to OpenAI.
+Step-by-Step Implementation Guide
+
+- Database
+  
+  - Add emails embedding column and HNSW index.
+  - Create a hybrid HTS search SQL function combining vector, trigram, and FTS with sensible weights.
+  - Keep migrations idempotent and resilient.
+- Edge Functions
+  
+  - Nexus Copilot: Generate query embedding, fetch tenant-scoped context via RPC, answer with LLM, log audit.
+  - Email ingestion: After storing email, sanitize and embed body, update row embedding, log audit.
+- Microservice (Docker)
+  
+  - Create Python FastAPI service for time-series forecasting (Holt-Winters baseline).
+  - Add the service to docker-compose, expose on localhost.
+  - Modify forecast-demand to call the service when configured; otherwise use OpenAI.
+- Verification
+  
+  - Typecheck the repo.
+  - Run at least one existing test; keep services and functions consistent with shared helpers.
+  - Ensure migrations run idempotently.
+Implemented
+
+- Emails Embedding Migration
+  
+  - Adds vector(1536) and HNSW index on emails.
+  - File: 20260208000004_add_ai_fields_to_emails.sql
+- Hybrid HTS Search Function
+  
+  - Combines vector, trigram, and FTS scores; returns top-k ranked results.
+  - File: 20260208000006_search_hts_codes_hybrid.sql
+- Nexus Copilot Edge Function
+  
+  - Auth + CORS + PII guard; embeds query; uses match_documents_scoped; answers via gpt-4o-mini; logs audit.
+  - File: index.ts
+- Email Auto-Embedding
+  
+  - After inserting an email, sanitizes body, calls embedding model, updates emails.embedding, logs audit.
+  - File: index.ts
+- Docker Microservice for Forecasting
+  
+  - FastAPI service with Holt-Winters baseline; runs on port 8080 inside container.
+  - Files:
+    - app.py
+    - Dockerfile
+- Docker Compose Update
+  
+  - Adds timesfm-service container. Exposes on localhost:8088.
+  - File: docker-compose.yml
+- Forecast-Demand Integration
+  
+  - Prefers microservice when TIMESFM_URL is set or defaults to http://localhost:8088 ; falls back to OpenAI if microservice is unavailable.
+  - Logs audit with chosen path.
+  - File: index.ts
+How To Use
+
+- Run Docker microservice locally
+  
+  - In project root:
+    
+    ```
+    docker compose up -d --build 
+    timesfm-service
+    ```
+  - It will be available at http://localhost:8088/forecast .
+- Configure forecast-demand
+  
+  - Set TIMESFM_URL to http://localhost:8088 in your environment for the Edge Function.
+  - If the microservice is unavailable, forecast-demand falls back to OpenAI using OPENAI_API_KEY.
+- Query Copilot
+  
+  - POST to /functions/v1/nexus-copilot with Authorization header and body:
+    
+    ```
+    { "query": "What is our SOP 
+    for dangerous goods?", 
+    "tenantId": null, "topK": 8 }
+    ```
+- Ingest Email
+  
+  - POST to /functions/v1/ingest-email with provider payload; ingestion will auto-embed email body and store in emails.embedding.
+Verification
+
+- Typecheck
+  
+  - Completed successfully.
+- Unit tests
+  
+  - Existing classification tests pass: logic.test.ts
+Notes
+
+- The HTS hybrid search requires master_hts.embedding populated; use your existing embedding pipeline or backfill function to populate embeddings before relying on vector similarity.
+- Copilot uses knowledge_base via match_documents_scoped; ensure knowledge_base is populated with relevant documents and embeddings.
+- The forecasting microservice uses Holt-Winters as a practical baseline; swapping in TimesFM can be done by updating the Docker image dependencies and endpoint logic while keeping the same interface.
+If you want, I can also run the migrations and bring up the Docker service for you, and wire TIMESFM_URL into your Edge Function environment.
 

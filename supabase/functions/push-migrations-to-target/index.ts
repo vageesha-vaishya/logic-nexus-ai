@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+declare const Deno: any;
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth, createServiceClient } from '../_shared/auth.ts';
@@ -151,7 +151,7 @@ function parseConnectionString(connectionString: string): {
   return result;
 }
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   console.log(`[push-migrations-to-target] ${req.method} request received`);
 
@@ -502,7 +502,7 @@ serve(async (req) => {
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[push-migrations-to-target] Error:', error);
 
     let message = error instanceof Error ? error.message : String(error);

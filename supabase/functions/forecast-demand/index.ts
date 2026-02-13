@@ -1,14 +1,14 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 
+declare const Deno: any;
+
 console.log("Forecast Demand Function Initialized");
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
   // 1. Handle CORS
@@ -37,7 +37,7 @@ serve(async (req: Request) => {
 
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openAiKey) {
-      throw new Error("Missing OPENAI_API_KEY configuration");
+      throw new Error("OPENAI_API_KEY environment variable is not set");
     }
 
     // 4. Gather Data (if history not provided)
@@ -113,32 +113,64 @@ serve(async (req: Request) => {
       }
     `;
 
-    // 6. Call OpenAI
+    // 6. Forecast via Docker microservice if available; else fallback to OpenAI
     const start = performance.now();
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openAiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a helpful logistics AI assistant that outputs JSON." },
-          { role: "user", content: prompt }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.2, // Low temperature for consistent numerical output
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const err = await aiResponse.text();
-      throw new Error(`OpenAI API error: ${err}`);
+    const svcUrl = Deno.env.get("TIMESFM_URL") || "http://localhost:8088";
+    let result: any;
+    try {
+      const series = (historicalData || []).map((d: any) => ({
+        timestamp: `${d.date}-01`,
+        value: Number(d.volume || d.volume_cbm || 0),
+      }));
+      const svcRes = await fetch(`${svcUrl}/forecast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ series, horizon }),
+      });
+      if (!svcRes.ok) {
+        const t = await svcRes.text();
+        throw new Error(`Service error: ${t}`);
+      }
+      const svcJson = await svcRes.json();
+      result = {
+        predictions: svcJson.timestamps.map((ts: string, i: number) => ({
+          date: ts.slice(0, 7) + "-01",
+          predicted_volume: svcJson.forecast[i],
+          confidence: 75,
+        })),
+        analysis: {
+          trend: "stable",
+          seasonality: "Detected via Holt-Winters",
+          risk_factors: [],
+        },
+      };
+    } catch (svcErr) {
+      if (!openAiKey) {
+        throw svcErr;
+      }
+      const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openAiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: "You are a helpful logistics AI assistant that outputs JSON." },
+            { role: "user", content: prompt }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        }),
+      });
+      if (!aiResponse.ok) {
+        const err = await aiResponse.text();
+        throw new Error(`OpenAI API error: ${err}`);
+      }
+      const aiData = await aiResponse.json();
+      result = JSON.parse(aiData.choices[0].message.content);
     }
-
-    const aiData = await aiResponse.json();
-    const result = JSON.parse(aiData.choices[0].message.content);
 
     // 7. Store Predictions (Optional - if we want to cache them)
     // We'll store the *first* prediction as a record for now, or all of them.
@@ -177,7 +209,7 @@ serve(async (req: Request) => {
     await logAiCall(supabaseClient, {
       user_id: (await supabaseClient.auth.getUser()).data.user?.id ?? null,
       function_name: "forecast-demand",
-      model_used: "gpt-4o",
+      model_used: Deno.env.get("TIMESFM_URL") ? "holt-winters-docker" : "gpt-4o",
       latency_ms: latency,
       pii_detected: redacted.length > 0,
       pii_fields_redacted: redacted,

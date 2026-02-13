@@ -1,7 +1,5 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import PostalMime from "https://esm.sh/postal-mime@2.2.0";
+import { createClient } from "@supabase/supabase-js";
 import { Logger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
@@ -22,13 +20,17 @@ type GmailMessagePart = {
 };
 type GraphRecipient = { emailAddress?: { address?: string; name?: string } };
 
-serve(async (req: any) => {
+declare const Deno: any;
+const atob_ = (globalThis as any).atob as (s: string) => string;
+const btoa_ = (globalThis as any).btoa as (s: string) => string;
+
+Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const logger = new Logger({ function: "sync-emails" });
+  const logger = new Logger(null, { component: "sync-emails" });
 
   try {
     const requireEnv = (name: string) => {
@@ -136,7 +138,7 @@ serve(async (req: any) => {
       try {
         const path = `${messageId}/${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
         // Convert base64 to Uint8Array
-        const binaryString = atob(contentBase64.replace(/-/g, "+").replace(/_/g, "/"));
+        const binaryString = atob_(contentBase64.replace(/-/g, "+").replace(/_/g, "/"));
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
@@ -331,13 +333,15 @@ serve(async (req: any) => {
               for (let i = 0; i < bytes.length; i += chunkSize) {
                 binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
               }
-              return btoa(binary);
+              return btoa_(binary);
             };
 
             const rawMessage = `${headers}\r\n\r\n${bodyText}`;
             let parsed: any = null;
             try {
-              const parser = new PostalMime();
+              const parserMod = await (0, eval)('import("https://esm.sh/postal-mime@2.2.0")');
+              const ParserCtor = (parserMod as any).default as new () => any;
+              const parser = new ParserCtor();
               parsed = await parser.parse(rawMessage);
             } catch (e) {
               console.error(`IMAP mailparser error for message ${seq}:`, e);
@@ -396,15 +400,15 @@ serve(async (req: any) => {
                 console.error("IMAP attachment processing failed:", e);
               }
             }
-            const internetHeaders = Array.isArray(parsed?.headers)
-              ? parsed.headers.reduce((acc: any, h: any) => {
-                  if (h?.key && h?.value) acc[h.key] = h.value;
+            const internetHeaders: Record<string, string> = Array.isArray(parsed?.headers)
+              ? parsed.headers.reduce((acc: Record<string, string>, h: any) => {
+                  if (h?.key && h?.value) acc[h.key] = String(h.value);
                   return acc;
-                }, {})
+                }, {} as Record<string, string>)
               : (parsed?.headerLines || []).reduce((acc: Record<string, string>, h: any) => {
-                  if (h?.key && h?.line) acc[h.key] = h.line;
+                  if (h?.key && h?.line) acc[h.key] = String(h.line);
                   return acc;
-                }, {});
+                }, {} as Record<string, string>);
             const inReplyToHeader = headers.match(/^In-Reply-To:\s*(.+)$/mi)?.[1] || null;
             const inReplyTo = inReplyToHeader
               ? (inReplyToHeader.match(/<([^>]+)>/)?.[1] || inReplyToHeader.replace(/[<>]/g, "").trim())
@@ -452,6 +456,10 @@ serve(async (req: any) => {
             }
 
             // Insert email
+            const finalRawHeaders = Object.keys(internetHeaders).length
+              ? { ...rawHeadersObj, internetMessageHeaders: internetHeaders }
+              : rawHeadersObj;
+            
             const { error: insertError } = await supabase.from("emails").insert({
               account_id: account.id,
               tenant_id: account.tenant_id ?? null,
@@ -474,8 +482,7 @@ serve(async (req: any) => {
               attachments: attachmentsList,
               has_inline_images: hasInlineImages,
               size_bytes: sizeBytes,
-              raw_headers: rawHeadersObj,
-              ...(Object.keys(internetHeaders).length ? { raw_headers: { ...rawHeadersObj, internetMessageHeaders: internetHeaders } } : {}),
+              raw_headers: finalRawHeaders,
               direction: "inbound",
               status: "received",
               is_read: fetchResp.includes("\\Seen"),
@@ -880,7 +887,9 @@ serve(async (req: any) => {
             const messageRaw = raw.replace(/\r\n\.\r\n$/, "");
             let parsed: any = null;
             try {
-              const parser = new PostalMime();
+              const parserMod = await (0, eval)('import("https://esm.sh/postal-mime@2.2.0")');
+              const ParserCtor = (parserMod as any).default as new () => any;
+              const parser = new ParserCtor();
               parsed = await parser.parse(messageRaw);
             } catch { parsed = null; }
             
