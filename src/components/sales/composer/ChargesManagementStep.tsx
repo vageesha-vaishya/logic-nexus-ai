@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,7 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
   const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
+  const debounceTimers = useRef(new Map<string, NodeJS.Timeout>());
   
   const [fetchingRatesFor, setFetchingRatesFor] = useState<string | null>(null);
 
@@ -305,18 +306,49 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
     if (!leg) return;
 
     const updatedCharges = [...(leg.charges || [])];
-    if (updatedCharges[chargeIdx]) {
-      updatedCharges[chargeIdx] = { ...updatedCharges[chargeIdx], [field]: value };
-      
-      // Auto-calc amounts if quantity/rate changes
-      // This logic might be complex if nested fields (buy.rate) are passed as field path
-      // But VirtualChargesList usually passes 'buy' or 'sell' object, or top level field.
-      // If VirtualChargesList passes nested updates, we need to handle them.
-      // Based on typical usage, it might be passing the whole modified charge or handling field updates specifically.
-      // Let's assume field is top-level or handled by caller, but if field is 'buy' or 'sell', we might need to recalc totals.
-      // For now, trust the value passed is correct.
-      
-      dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+    if (!updatedCharges[chargeIdx]) return;
+
+    const existing = { ...updatedCharges[chargeIdx] };
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      const parentObj = { ...(existing as any)[parent] };
+      (parentObj as any)[child] = value;
+      (existing as any)[parent] = parentObj;
+    } else {
+      (existing as any)[field] = value;
+    }
+    updatedCharges[chargeIdx] = existing;
+
+    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+
+    if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
+      const buyRate = field === 'buy.rate' ? Number(value) : Number(existing?.buy?.rate || 0);
+      const timerKey = `leg-${legId}-charge-${chargeIdx}`;
+      if (debounceTimers.current.has(timerKey)) {
+        clearTimeout(debounceTimers.current.get(timerKey)!);
+      }
+      const timer = setTimeout(() => {
+        pricingService.calculateFinancials(buyRate, Number(marginPercent), true)
+          .then(result => {
+            const latestLeg = (state.legs || []).find(l => l.id === legId);
+            if (!latestLeg) return;
+            const nextCharges = [...(latestLeg.charges || [])];
+            if (!nextCharges[chargeIdx]) return;
+            const nextCharge = { ...nextCharges[chargeIdx] };
+            nextCharge.sell = {
+              ...(nextCharge.sell || {}),
+              quantity: nextCharge.buy?.quantity || 1,
+              rate: result.sellPrice
+            };
+            nextCharges[chargeIdx] = nextCharge;
+            dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: nextCharges } } });
+          })
+          .catch(err => logger.error('Pricing calculation failed', { error: err }))
+          .finally(() => {
+            debounceTimers.current.delete(timerKey);
+          });
+      }, 300);
+      debounceTimers.current.set(timerKey, timer);
     }
   };
 
