@@ -63,6 +63,9 @@ function runCommand(command, args, options = {}) {
             cwd: PROJECT_ROOT,
             env: { ...process.env, ...options.env } 
         });
+        proc.on('error', (err) => {
+            reject(err);
+        });
 
         let stdout = '';
         let stderr = '';
@@ -106,14 +109,17 @@ async function main() {
     }
 
     // Check dependencies
+// Replace the "Check dependencies" block with this:
+    const checkCmd = process.platform === 'win32' ? 'where' : 'which';
+    
     const missingDeps = [];
     try {
-        await runCommand('which', ['pg_dump'], { stdio: 'ignore' });
+        await runCommand(checkCmd, ['pg_dump']);
     } catch {
         missingDeps.push('pg_dump');
     }
     try {
-        await runCommand('which', ['psql'], { stdio: 'ignore' });
+        await runCommand(checkCmd, ['psql']);
     } catch {
         missingDeps.push('psql');
     }

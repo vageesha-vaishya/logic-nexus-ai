@@ -3667,3 +3667,130 @@ Annual TCO Comparison (100 Users):
 ---
 
 **Version:** 2.1 | **Pages:** ~130 | **Last Updated:** 2026-02-08
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+===================Sarvesh== Phase- 1==============
+implemented the Phase 1 foundations and prepared everything for database application and function deployment. Below is what I changed, what’s pending, and the exact steps to apply the SQL and deploy functions.
+
+Changes Made
+
+- Migrations
+  - Enable pgvector and index on master_hts embeddings: 20260208000000_enable_pgvector.sql
+  - Knowledge base with RLS and embedding index: 20260208000001_create_knowledge_base.sql
+  - AI audit logs table (RLS, indexes): 20260208000002_create_ai_audit_logs.sql
+  - RLS-aware vector match function: 20260208000003_create_match_documents_scoped.sql
+- Shared helpers (Edge Functions)
+  - PII guard: pii-guard.ts
+  - Model router: model-router.ts
+  - AI audit helper: audit.ts
+- New Edge Function
+  - Generate embeddings for knowledge_base and master_hts: generate-embedding/index.ts
+- Upgraded classify-email
+  - Real classification via Gemini 2.0 Flash, PII sanitization, audit logging, and writes results to emails row: index.ts
+Pending Ops
+
+- Apply migrations to the database
+- Deploy edge functions (generate-embedding and updated classify-email)
+- Set runtime secrets (OPENAI_API_KEY, GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY)
+Apply Migrations
+
+- Option A: Supabase CLI (Cloud)
+  - Ensure SUPABASE_ACCESS_TOKEN is set
+  - Link project or supply project-ref directly
+  - The project URL reported by MCP is https://gzhxgoigflftharcmdqj.supabase.co , so project ref is gzhxgoigflftharcmdqj
+  - Run:
+    - PowerShell
+      
+      ```
+      $env:SUPABASE_ACCESS_TOKEN = 
+      "<your_access_token>"
+      $env:VITE_SUPABASE_PROJECT_ID 
+      = "tmlaugggtcljtmhwyavz"
+      npx supabase link 
+      --project-ref 
+      $env:VITE_SUPABASE_PROJECT_ID
+      npx supabase db push
+      ```
+- Option B: Automated migration script (direct Postgres URL)
+  - Provide your Postgres URL (service role credentials) via SUPABASE_DB_URL or --target-url
+  - Run:
+    - PowerShell
+      
+      ```
+      node scripts/
+      automated_migration.js 
+      --target-url="<postgres_connect
+      ion_url>"
+      ```
+- Option C: MCP direct apply (recommended in Builder with MCP)
+  - Ensure SUPABASE_ACCESS_TOKEN is configured for the MCP server
+  - Then I can execute each migration via MCP. Right now the MCP returned Unauthorized for DB ops; once the token is present, I’ll apply all four migrations immediately.
+Deploy Functions
+
+- Configure secrets
+  - OPENAI_API_KEY for embeddings
+  - GOOGLE_API_KEY for Gemini classification
+  - SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+- Deploy via CLI
+  - PowerShell
+    
+    ```
+    $env:SUPABASE_ACCESS_TOKEN = 
+    "<your_access_token>"
+    $env:VITE_SUPABASE_PROJECT_ID = 
+    "tmlaugggtcljtmhwyavz"
+    npx supabase functions deploy 
+    --project-ref 
+    $env:VITE_SUPABASE_PROJECT_ID
+    ```
+  - Alternatively, after the MCP token is set, ask me to deploy via MCP and I’ll proceed.
+Verification
+
+- Typecheck: Ran successfully
+- Lint: Ran; unrelated files have warnings/errors; our new changes lint clean
+- Function checks
+  - classify-email: fetches email content through authenticated RLS client, sanitizes inputs, sends prompt to Gemini Flash, parses JSON result, updates emails row fields (category, ai_sentiment, intent), and logs to ai_audit_logs
+  - generate-embedding: runs batch/backfill or single embedding updates for knowledge_base and master_hts using OpenAI text-embedding-3-small
+Operational Checklist
+
+- Apply migrations via one of the methods above
+- Set secrets in Supabase environment
+- Deploy edge functions
+- Test calls:
+  - classify-email: POST with { email_id } and Authorization header; verify emails row updated
+  - generate-embedding:
+    - Batch HTS backfill
+      
+      ```
+      { "table": "master_hts", 
+      "batch": true, "limit": 2000 }
+      ```
+    - Knowledge base batch
+      
+      ```
+      { "table": "knowledge_base", 
+      "batch": true, "limit": 500 }
+      ```
+- Validate vector search via RPC match_documents_scoped (after embeddings exist)
+If you want me to apply the migrations and deploy functions via MCP right away, provide the SUPABASE_ACCESS_TOKEN in the MCP server. I’ll run the SQL and deployment immediately once the token is available.
+
+
+
+
+
+
+================sarvesh phase -2 =================
+
