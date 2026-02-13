@@ -1,8 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { logAiCall } from "../_shared/audit.ts";
+import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 
 console.log("Forecast Demand Function Initialized");
 
@@ -112,6 +114,7 @@ serve(async (req: Request) => {
     `;
 
     // 6. Call OpenAI
+    const start = performance.now();
     const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -169,6 +172,17 @@ serve(async (req: Request) => {
     }
 
     // 8. Return Result
+    const latency = Math.round(performance.now() - start);
+    const { sanitized, redacted } = sanitizeForLLM(JSON.stringify({ hs_code, horizon }));
+    await logAiCall(supabaseClient, {
+      user_id: (await supabaseClient.auth.getUser()).data.user?.id ?? null,
+      function_name: "forecast-demand",
+      model_used: "gpt-4o",
+      latency_ms: latency,
+      pii_detected: redacted.length > 0,
+      pii_fields_redacted: redacted,
+      output_summary: { predictions: result.predictions?.length ?? 0, confidence: result.predictions?.[0]?.confidence }
+    });
     return new Response(JSON.stringify(result), {
       headers: { ...headers, "Content-Type": "application/json" },
     });
