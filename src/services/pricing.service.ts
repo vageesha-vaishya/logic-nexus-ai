@@ -286,9 +286,7 @@ export class PricingService {
       }
     }
 
-    // Artificial delay to simulate network latency/processing (as requested for Phase 3 requirements)
-    // Only applied on cache miss
-    await new Promise(resolve => setTimeout(resolve, 300)); 
+    // Removed artificial delay for production performance
     
     let sellPrice = 0;
     let buyPrice = 0;

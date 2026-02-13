@@ -3,12 +3,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Copy, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Loader2, Plus, Trash2, Edit2, Wifi, WifiOff } from 'lucide-react';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
-import { mapOptionToQuote } from '@/lib/quote-mapper';
 import {
   Dialog,
   DialogContent,
@@ -38,9 +37,11 @@ import { PricingService } from '@/services/pricing.service';
 import { logger } from '@/lib/logger';
 import { useDebug } from '@/hooks/useDebug';
 import { formatContainerSize } from '@/lib/container-utils';
+import { DataInspector } from '@/components/debug/DataInspector';
 
 import { QuoteStoreProvider, useQuoteStore } from './composer/store/QuoteStore';
 import { Leg } from './composer/store/types';
+import { usePipelineInterceptor } from '@/components/debug/pipeline/usePipelineInterceptor';
 
 interface MultiModalQuoteComposerProps {
   quoteId: string;
@@ -51,6 +52,10 @@ interface MultiModalQuoteComposerProps {
   initialState?: any;
   templateId?: string;
 }
+
+// Module-level cache for Reference Data
+const REFERENCE_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const STEPS = [
   { id: 1, title: 'Quote Details', description: 'Basic information' },
@@ -87,6 +92,21 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
   
   // Initialize Store
   const { state: storeState, dispatch } = useQuoteStore();
+
+  // Pipeline Interceptor
+  usePipelineInterceptor('Composer', {
+    quoteId,
+    versionId,
+    activeOptionId: storeState.optionId,
+    step: storeState.currentStep,
+    quoteData: storeState.quoteData,
+    legs: storeState.legs,
+    charges: storeState.charges,
+    options: storeState.options
+  }, {
+    action: 'StateUpdate',
+    timestamp: Date.now()
+  }, [storeState]);
   
   // Initialize Services
   const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
@@ -531,6 +551,15 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       debug.debug('[Composer] Step 2: Loading reference data');
       
       const loadReferenceData = async () => {
+        // Check cache first
+        if (resolvedTenantId && REFERENCE_DATA_CACHE[resolvedTenantId]) {
+            const cached = REFERENCE_DATA_CACHE[resolvedTenantId];
+            if (Date.now() - cached.timestamp < CACHE_TTL) {
+                debug.debug('[Composer] Using cached reference data');
+                return cached.data;
+            }
+        }
+
         const results = {
           serviceTypes: [] as any[],
           transportModes: [] as any[],
@@ -577,6 +606,14 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           fetchRef('carriers', 'carriers', 'Failed to load carriers'),
           fetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order')
         ]);
+
+        // Cache the results if we have a tenant ID
+        if (resolvedTenantId) {
+            REFERENCE_DATA_CACHE[resolvedTenantId] = {
+                timestamp: Date.now(),
+                data: results
+            };
+        }
 
         return results;
       };
@@ -844,10 +881,26 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       // Process global charges
       if (chargeData) {
+        debug.log('[Composer] Processing global charges:', chargeData.length);
         const globalChargesMap = new Map();
         
         chargeData.forEach((charge: any) => {
-          const key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
+          let key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
+          const side = charge.charge_sides?.code?.toLowerCase();
+          
+          // Check for collision on the same side to prevent data loss
+          if (globalChargesMap.has(key)) {
+             const existing = globalChargesMap.get(key);
+             const hasBuy = existing.buy && (existing.buy.quantity !== 0 || existing.buy.rate !== 0);
+             const hasSell = existing.sell && (existing.sell.quantity !== 0 || existing.sell.rate !== 0);
+             
+             if ( ((side === 'buy' || side === 'cost') && hasBuy) || 
+                  ((side === 'sell' || side === 'revenue') && hasSell) ) {
+                 debug.warn(`[Composer] Charge collision detected for key ${key}. Creating new entry for charge ${charge.id}`);
+                 key = `${key}-${charge.id}`;
+             }
+          }
+
           if (!globalChargesMap.has(key)) {
             globalChargesMap.set(key, {
               id: charge.id,
@@ -862,7 +915,6 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           }
           
           const chargeObj = globalChargesMap.get(key);
-          const side = charge.charge_sides?.code;
           
           if (side === 'buy' || side === 'cost') {
             chargeObj.buy = {
@@ -878,6 +930,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
               rate: charge.rate,
               amount: charge.amount
             };
+          } else {
+             debug.warn(`[Composer] Unknown charge side: ${side} for charge ${charge.id}. Amount: ${charge.amount}`);
+             // If side is unknown but amount exists, try to display it anyway?
+             // Risky to assume buy vs sell. Logging is best for now.
           }
         });
         
@@ -887,12 +943,28 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       }
 
       if (legData && legData.length > 0) {
+        debug.log('[Composer] Processing legs with charges:', legData.length);
         const legsWithCharges = legData.map((leg: any) => {
           const chargesMap = new Map();
 
           // Group charges by their base properties (category, basis, etc.)
           leg.quote_charges?.forEach((charge: any) => {
-            const key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
+            let key = `${charge.category_id}-${charge.basis_id}-${charge.note || ''}`;
+            const side = charge.charge_sides?.code?.toLowerCase();
+
+            // Check for collision on the same side
+            if (chargesMap.has(key)) {
+                const existing = chargesMap.get(key);
+                const hasBuy = existing.buy && (existing.buy.quantity !== 0 || existing.buy.rate !== 0);
+                const hasSell = existing.sell && (existing.sell.quantity !== 0 || existing.sell.rate !== 0);
+                
+                if ( ((side === 'buy' || side === 'cost') && hasBuy) || 
+                    ((side === 'sell' || side === 'revenue') && hasSell) ) {
+                    debug.warn(`[Composer] Leg charge collision detected for key ${key}. Creating new entry for charge ${charge.id}`);
+                    key = `${key}-${charge.id}`;
+                }
+            }
+
             if (!chargesMap.has(key)) {
               chargesMap.set(key, {
                 id: charge.id,
@@ -907,21 +979,23 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
             }
 
             const chargeObj = chargesMap.get(key);
-            const side = charge.charge_sides?.code;
-            if (side === 'buy') {
+            
+            if (side === 'buy' || side === 'cost') {
               chargeObj.buy = { 
                 dbChargeId: charge.id, 
                 quantity: charge.quantity || 0, 
                 rate: charge.rate || 0, 
                 amount: charge.amount || 0 
               };
-            } else if (side === 'sell') {
+            } else if (side === 'sell' || side === 'revenue') {
               chargeObj.sell = { 
                 dbChargeId: charge.id, 
                 quantity: charge.quantity || 0, 
                 rate: charge.rate || 0, 
                 amount: charge.amount || 0 
               };
+            } else {
+                debug.warn(`[Composer] Unknown leg charge side: ${side} for charge ${charge.id}. Amount: ${charge.amount}`);
             }
           });
 
@@ -2536,6 +2610,34 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DataInspector
+        title="Quote Composer Inspector"
+        data={{
+          inputs: {
+            quoteId,
+            versionId,
+            optionId: storeState.optionId,
+            tenantId: storeState.tenantId
+          },
+          outputs: {
+            quoteData: storeState.quoteData,
+            legs: storeState.legs,
+            charges: storeState.charges,
+            validationErrors: storeState.validationErrors,
+            validationWarnings: storeState.validationWarnings,
+            marketAnalysis: storeState.marketAnalysis,
+            anomalies: storeState.anomalies
+          },
+          currentState: {
+            step: storeState.currentStep,
+            isSaving: storeState.isSaving,
+            isLoading: storeState.isLoading,
+            viewMode: storeState.viewMode,
+            optionsCount: storeState.options.length
+          }
+        }}
+        defaultOpen={false}
+      />
     </div>
   );
 }

@@ -96,6 +96,62 @@ describe('QuoteTransformService', () => {
         expect(result.items?.[0].quantity).toBe(2);
         expect(result.items?.[0].unit_price).toBe(5000); // 10000 / 2
     });
+
+    it('should map all selected rates to options array and preserve address details in notes', () => {
+        const comprehensivePayload: QuoteTransferData = {
+            ...validPayload,
+            originDetails: { address: '123 Origin St', city: 'Shanghai', country: 'China' },
+            destinationDetails: { address: '456 Dest Rd', city: 'LA', country: 'USA' },
+            dangerousGoods: true,
+            htsCode: '8517.12',
+            selectedRates: [
+                {
+                    id: 'rate-1',
+                    carrier: 'Maersk',
+                    price: 5000,
+                    currency: 'USD',
+                    transitTime: '25 Days',
+                    legs: [
+                        { id: 'leg-1', origin: 'Shanghai', destination: 'LA', mode: 'Ocean', carrier: 'Maersk' }
+                    ]
+                },
+                {
+                    id: 'rate-2',
+                    carrier: 'CMA CGM',
+                    price: 4800,
+                    currency: 'USD',
+                    transitTime: '30 Days'
+                }
+            ]
+        };
+
+        const result = QuoteTransformService.transformToQuoteForm(comprehensivePayload, mockMasterData);
+
+        // Verify Options Mapping
+        expect(result.options).toBeDefined();
+        expect(result.options).toHaveLength(2);
+        
+        const opt1 = result.options![0];
+        expect(opt1.is_primary).toBe(true);
+        expect(opt1.total_amount).toBe(5000);
+        expect(opt1.transit_time_days).toBe(25);
+        expect(opt1.legs).toHaveLength(1);
+        expect(opt1.legs[0].carrier_id).toBe('c-maersk');
+
+        const opt2 = result.options![1];
+        expect(opt2.is_primary).toBe(false);
+        expect(opt2.total_amount).toBe(4800);
+        expect(opt2.transit_time_days).toBe(30);
+
+        // Verify Address in Notes
+        expect(result.notes).toContain('123 Origin St, Shanghai, China');
+        expect(result.notes).toContain('456 Dest Rd, LA, USA');
+
+        // Verify Item Attributes
+        const item = result.items![0];
+        expect(item.attributes?.hs_code).toBe('8517.12');
+        expect(item.attributes?.hazmat).toEqual({ is_hazardous: true });
+    });
   });
 
   describe('retryOperation', () => {

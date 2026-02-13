@@ -7,6 +7,8 @@ import { matchLegForCharge } from '@/lib/charge-bifurcation';
 import { TransportLeg } from '@/types/quote-breakdown';
 import { logger } from '@/lib/logger';
 
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
+
 export interface AddOptionParams {
     tenantId: string;
     versionId: string;
@@ -18,6 +20,7 @@ export interface AddOptionParams {
         destination?: string;
         originDetails?: any;
         destinationDetails?: any;
+        ports?: any[];
     };
 }
 
@@ -168,6 +171,10 @@ export class QuoteOptionService {
                 origin = legsToInsert[index - 1].destination_location;
             }
             
+            // Resolve Location IDs
+            const originLocationId = QuoteTransformService.resolvePortId(origin, context.ports);
+            const destinationLocationId = QuoteTransformService.resolvePortId(destination, context.ports);
+
             // Database constraint relies on default 'transport'
             const legType = 'transport';
 
@@ -180,6 +187,8 @@ export class QuoteOptionService {
                 provider_id: rateMapper.getProviderId(carrierName),
                 origin_location: origin || (isFirstLeg ? context.origin : null),
                 destination_location: destination || (isLastLeg ? context.destination : null),
+                origin_location_id: originLocationId,
+                destination_location_id: destinationLocationId,
                 sort_order: index + 1,
                 leg_type: legType,
                 transit_time_hours: parseDurationToHours(leg.transit_time),
@@ -274,10 +283,26 @@ export class QuoteOptionService {
         const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
         const addChargePair = async (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): Promise<boolean> => {
-            const catId = rateMapper.getCatId(categoryKey);
+            let catId = rateMapper.getCatId(categoryKey);
+            
+            // Fallback: Try to find a generic category if specific mapping fails
+            if (!catId) {
+                this.debug.warn(`Category mapping failed for "${categoryKey}". Attempting fallback.`);
+                catId = rateMapper.getCatId('General') || rateMapper.getCatId('Other') || rateMapper.getCatId('Freight');
+                
+                // Absolute fallback: Use the first available category to prevent data loss
+                if (!catId) {
+                     // We can't easily access the raw list here without exposing it in rateMapper, 
+                     // but we can assume 'Freight' or similar exists.
+                     // If still null, we might have to skip or insert with null (if DB allows).
+                     // But DB likely requires category_id.
+                     this.debug.error(`Critical: Could not map category for "${categoryKey}" and no fallback found. Charge will be skipped.`);
+                     return false;
+                }
+            }
+
             const basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
             const currId = rateMapper.getCurrId(rate.currency || 'USD');
-            if (!catId) return false;
             
             const finalLegId = targetLegId || mainLegId || legData?.[0]?.id;
             
@@ -330,11 +355,12 @@ export class QuoteOptionService {
                         for (const charge of leg.charges) {
                             const amount = Number(charge.amount || charge.price || charge.total || 0);
                             if (amount !== 0) {
+                                const categoryKey = charge.category || charge.description || charge.name || charge.code || 'Charge';
                                 const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
                                 const unit = charge.unit || charge.basis;
                                 const note = charge.note || desc;
 
-                                if (await addChargePair(desc, amount, note, targetLegId, unit, unit)) {
+                                if (await addChargePair(categoryKey, amount, note, targetLegId, unit, unit)) {
                                     chargesFound = true;
                                 }
                             }
@@ -349,12 +375,13 @@ export class QuoteOptionService {
             for (const charge of rate.charges) {
                 const amount = Number(charge.amount || charge.price || charge.total || 0);
                 if (amount !== 0) {
+                    const categoryKey = charge.category || charge.description || charge.name || charge.code || 'Charge';
                     const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
                     const legId = getLegIdForCharge(desc);
                     const unit = charge.unit || charge.basis;
                     const note = charge.note || desc;
                     
-                    if (await addChargePair(desc, amount, note, legId, unit, unit)) {
+                    if (await addChargePair(categoryKey, amount, note, legId, unit, unit)) {
                         chargesFound = true;
                     }
                 }

@@ -20,7 +20,6 @@ import { QuotesList } from "@/components/sales/QuotesList";
 import { QuoteAnalytics } from "@/components/sales/analytics/QuoteAnalytics";
 import { Badge } from "@/components/ui/badge";
 import { ViewToggle, ViewMode } from "@/components/ui/view-toggle";
-import * as XLSX from 'xlsx';
 import { logger } from "@/lib/logger";
 import { useDebug } from '@/hooks/useDebug';
 import { formatCurrency } from '@/lib/utils';
@@ -358,7 +357,7 @@ export default function QuotesPipeline() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const dataToExport = filteredQuotes.map(q => {
       // Get latest version
       const latestVersion = q.quotation_versions?.slice().sort((a, b) => 
@@ -384,10 +383,20 @@ export default function QuotesPipeline() {
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Quotes");
-    XLSX.writeFile(wb, `quotes_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    try {
+      const XLSX = await import('xlsx');
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Quotes");
+      XLSX.writeFile(wb, `quotes_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      logger.error("Failed to load xlsx for export", error);
+      toast({
+        title: "Export Failed",
+        description: "Could not load export module. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const swimLanes = (() => {

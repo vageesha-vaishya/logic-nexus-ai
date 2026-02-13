@@ -69,6 +69,7 @@ export const QuoteTransferSchema = z.object({
   
   // Context
   accountId: z.string().optional(),
+  contactId: z.string().optional(),
   trade_direction: z.enum(['export', 'import']).optional(),
   
   // Detailed Location Data

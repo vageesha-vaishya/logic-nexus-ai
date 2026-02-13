@@ -12,6 +12,7 @@ import { DomainContextProvider } from "./contexts/DomainContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { LeadsViewStateProvider } from "./hooks/useLeadsViewState";
 import { ThemeProvider } from "./hooks/useTheme";
+import { PipelineProvider } from "@/components/debug/pipeline/PipelineContext";
 
 // Eager: shell pages (needed immediately)
 import Landing from "./pages/Landing";
@@ -178,7 +179,8 @@ const App = () => (
           <DomainContextProvider>
             <ThemeProvider>
               <TooltipProvider>
-                <LeadsViewStateProvider>
+              <LeadsViewStateProvider>
+                <PipelineProvider>
                 <Toaster />
                 <Sonner />
                 <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
@@ -738,6 +740,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
                 </Suspense>
+                </PipelineProvider>
                 </LeadsViewStateProvider>
               </TooltipProvider>
             </ThemeProvider>

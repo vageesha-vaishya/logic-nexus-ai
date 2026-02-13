@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Printer, FileText, Package, Box, Calculator } from 'lucide-react';
 import { LandedCostService, LandedCostResult } from '@/services/quotation/LandedCostService';
 import { supabase } from '@/integrations/supabase/client';
+import { usePipelineInterceptor } from '@/components/debug/pipeline/usePipelineInterceptor';
 
 interface DocumentPreviewProps {
   quoteData: any;
@@ -16,6 +17,17 @@ interface DocumentPreviewProps {
 export function DocumentPreview({ quoteData, legs, combinedCharges = [], templateId }: DocumentPreviewProps) {
   const [landedCost, setLandedCost] = useState<LandedCostResult | null>(null);
   const [template, setTemplate] = useState<any>(null);
+
+  // Pipeline Capture
+  usePipelineInterceptor('PDFGen', { 
+    quoteData, 
+    legs, 
+    combinedCharges, 
+    templateId,
+    landedCost 
+  }, { 
+    action: 'PreviewRender' 
+  }, [quoteData, legs, combinedCharges, templateId, landedCost]);
 
   useEffect(() => {
     if (templateId) {

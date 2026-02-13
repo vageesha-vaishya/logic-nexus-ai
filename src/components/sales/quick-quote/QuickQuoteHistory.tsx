@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History, ArrowRight, Plane, Ship, Truck, Clock, FileText, CheckCircle, AlertCircle, Sparkles, ArrowLeft, CheckSquare, Square } from 'lucide-react';
+import { Loader2, History, ArrowRight, Plane, Ship, Truck, Clock, FileText, CheckCircle, AlertCircle, Sparkles, ArrowLeft, CheckSquare, Square, Train } from 'lucide-react';
+import { logger } from '@/lib/logger';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Dialog,
@@ -75,7 +76,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
           filter: `tenant_id=eq.${context.tenantId}`
         },
         (payload) => {
-          console.log('[QuickQuoteHistory] Real-time update received:', payload.eventType);
+          logger.info('[QuickQuoteHistory] Real-time update received:', { eventType: payload.eventType });
           fetchHistory();
         }
       )

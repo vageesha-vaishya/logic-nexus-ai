@@ -349,8 +349,17 @@ export function useQuoteRepositoryForm(opts: {
                         quotation_version_option_leg_charges:quote_charges (
                             id,
                             amount,
+                            rate,
+                            quantity,
                             currency_id,
-                            charge_code:category_id
+                            currency:currencies(code),
+                            charge_code:category_id,
+                            charge_sides(code),
+                            charge_side_id,
+                            basis:charge_bases(code),
+                            unit:charge_bases(code),
+                            description:charge_categories(name),
+                            note
                         )
                     )
                 )
@@ -363,6 +372,16 @@ export function useQuoteRepositoryForm(opts: {
       
       if (quoteResult.error) throw quoteResult.error;
       if (!quoteResult.data) return null;
+
+      // Log hydration data for debugging
+      console.log('[useQuoteRepository] Hydration Data:', {
+        quoteId,
+        versionId: versionResult.data?.id,
+        itemsCount: itemsResult.data?.length,
+        cargoCount: cargoResult.data?.length,
+        optionsCount: versionResult.data?.quotation_version_options?.length,
+        firstOptionCharges: versionResult.data?.quotation_version_options?.[0]?.quotation_version_option_legs?.[0]?.quotation_version_option_leg_charges
+      });
 
       // Critical: If items fail to load, do NOT return empty list, as saving would wipe existing items.
       if (itemsResult.error) {
@@ -422,13 +441,27 @@ export function useQuoteRepositoryForm(opts: {
         const legs = opt.quotation_version_option_legs || [];
         const chargesTotal = legs.reduce((acc: number, leg: any) => {
             const legCharges = leg.quotation_version_option_leg_charges || [];
-            return acc + legCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+            return acc + legCharges.reduce((sum: number, c: any) => {
+                // Only sum SELL charges for the total amount
+                const side = c.charge_sides?.code?.toLowerCase();
+                
+                // Fallback: If side is missing but charge has amount, check if we can infer or should warn
+                if (!side && Number(c.amount) > 0) {
+                    console.warn(`[QuoteHydration] Charge ${c.id} has amount ${c.amount} but no resolved side (charge_side_id: ${c.charge_side_id}).`);
+                    // Optional: could default to 'sell' if strict mode is off, but for now just warn
+                }
+
+                if (side === 'sell' || side === 'revenue') {
+                    return sum + (Number(c.amount) || 0);
+                }
+                return sum;
+            }, 0);
         }, 0);
         
         const effectiveTotal = (Number(opt.total_amount) > 0) ? Number(opt.total_amount) : chargesTotal;
 
         if (effectiveTotal > 0 && Number(opt.total_amount) === 0) {
-            console.warn(`[QuoteHydration] Option ${opt.id} has 0 total_amount but ${chargesTotal} in charges. Using calculated total.`);
+            console.warn(`[QuoteHydration] Option ${opt.id} has 0 total_amount but ${chargesTotal} in sell charges. Using calculated total.`);
         } else {
             console.log(`[QuoteHydration] Option ${opt.id}: Total=${opt.total_amount}, ChargesTotal=${chargesTotal}, Effective=${effectiveTotal}`);
         }
@@ -444,6 +477,8 @@ export function useQuoteRepositoryForm(opts: {
                 sequence_number: leg.sort_order, // Map sort_order to sequence_number
                 transport_mode: leg.mode, // Map mode to transport_mode
                 carrier_id: leg.provider_id ? String(leg.provider_id) : undefined, // Map provider_id to carrier_id
+                origin_location_id: leg.origin_location_id ? String(leg.origin_location_id) : undefined,
+                destination_location_id: leg.destination_location_id ? String(leg.destination_location_id) : undefined,
                 origin_location_name: leg.origin_location, // Store as name since it might be string
                 destination_location_name: leg.destination_location, // Store as name
                 origin: leg.origin_location, // Fallback
@@ -453,7 +488,17 @@ export function useQuoteRepositoryForm(opts: {
                 departure_date: leg.departure_date,
                 arrival_date: leg.arrival_date,
                 transit_time_days: leg.transit_time_hours ? Math.ceil(leg.transit_time_hours / 24) : undefined,
-                charges: leg.quotation_version_option_leg_charges || [] // Preserve charges in leg mapping
+                charges: (leg.quotation_version_option_leg_charges || []).map((c: any) => ({
+                    id: c.id,
+                    description: c.description?.name || 'Charge',
+                    amount: Number(c.amount || 0),
+                    currency: c.currency?.code || 'USD',
+                    charge_code: c.charge_code,
+                    basis: c.basis?.code,
+                    unit_price: Number(c.rate || 0),
+                    quantity: Number(c.quantity || 1),
+                    note: c.note
+                })) // Preserve charges in leg mapping
             })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
         };
     }) || [];

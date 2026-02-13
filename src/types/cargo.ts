@@ -37,6 +37,12 @@ export const cargoItemSchema = z.object({
     temperature: z.number().optional(),
     ventilation: z.number().optional(),
   }).optional(),
+  containerCombos: z.array(z.object({
+    id: z.string().optional(),
+    typeId: z.string(),
+    sizeId: z.string(),
+    quantity: z.number()
+  })).optional(),
   weight: weightSchema,
   stackable: z.boolean().default(false),
   hazmat: hazmatSchema.optional(),

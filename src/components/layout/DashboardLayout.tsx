@@ -8,6 +8,9 @@ import { StickyActionsProvider, useStickyActions } from '@/components/layout/Sti
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 import { AdminScopeSwitcher } from './AdminScopeSwitcher';
 import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
+import { PipelineProvider, usePipeline } from '@/components/debug/pipeline/PipelineContext';
+import { PipelineDashboard } from '@/components/debug/pipeline/PipelineDashboard';
+import { Bug } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -18,36 +21,49 @@ function StickyActionsMount() {
   return <StickyActionsBar left={actions.left} right={actions.right} />;
 }
 
+function PipelineTrigger() {
+  const { toggleDashboard } = usePipeline();
+  return (
+    <Button variant="ghost" size="icon" onClick={toggleDashboard} title="Pipeline Debugger">
+      <Bug className="h-4 w-4" />
+    </Button>
+  );
+}
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   return (
-    <SidebarProvider>
-      <StickyActionsProvider>
-        <div className="min-h-screen flex w-full">
-          <AppSidebar />
-          <div className="flex-1 flex flex-col">
-            <header className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10">
-              <SidebarTrigger />
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Go back"
-                onClick={() => navigate(-1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex-1" />
-              <DomainSwitcher />
-              <AdminScopeSwitcher />
-              <ObjectMenu />
-            </header>
-            <main className="flex-1 p-4 bg-muted/30 pb-24" style={{ backgroundImage: 'var(--app-background, none)' }}>
-              {children}
-              <StickyActionsMount />
-            </main>
+    <PipelineProvider>
+      <SidebarProvider>
+        <StickyActionsProvider>
+          <div className="min-h-screen flex w-full">
+            <AppSidebar />
+            <div className="flex-1 flex flex-col">
+              <header className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10">
+                <SidebarTrigger />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Go back"
+                  onClick={() => navigate(-1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex-1" />
+                <PipelineTrigger />
+                <DomainSwitcher />
+                <AdminScopeSwitcher />
+                <ObjectMenu />
+              </header>
+              <main className="flex-1 p-4 bg-muted/30 pb-24" style={{ backgroundImage: 'var(--app-background, none)' }}>
+                {children}
+                <StickyActionsMount />
+              </main>
+            </div>
+            <PipelineDashboard />
           </div>
-        </div>
-      </StickyActionsProvider>
-    </SidebarProvider>
+        </StickyActionsProvider>
+      </SidebarProvider>
+    </PipelineProvider>
   );
 }

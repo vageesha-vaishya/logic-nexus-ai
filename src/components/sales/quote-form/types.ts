@@ -102,6 +102,17 @@ export const quoteSchema = z.object({
       flight_number: z.string().optional(),
       arrival_date: z.string().optional(),
       departure_date: z.string().optional(),
+      charges: z.array(z.object({
+        description: z.string().optional(),
+        amount: z.coerce.number().optional(),
+        currency: z.string().optional(),
+        charge_code: z.string().optional(),
+        charge_type: z.string().optional(),
+        basis: z.string().optional(),
+        unit_price: z.coerce.number().optional(),
+        quantity: z.coerce.number().optional(),
+        note: z.string().optional(),
+      })).optional().default([]),
     }).refine((data) => {
         if (data.departure_date && data.arrival_date) {
             return new Date(data.arrival_date) > new Date(data.departure_date);
