@@ -4002,3 +4002,98 @@ Notes
 - The forecasting microservice uses Holt-Winters as a practical baseline; swapping in TimesFM can be done by updating the Docker image dependencies and endpoint logic while keeping the same interface.
 If you want, I can also run the migrations and bring up the Docker service for you, and wire TIMESFM_URL into your Edge Function environment.
 
+===============sarvesh phase 3 implementation ======
+Analysis
+
+- Scope Review
+  
+  - Phase 3 features target predictive modeling and customer-facing AI in production contexts.
+  - Security and governance constraints emphasize PII sanitization, structured outputs, audit trails, and regional data residency considerations.
+  - Applicable guidance: PII handling for LLM prompts, audit logging via ai_audit_logs, prompt-injection mitigations, max-token limits, and output validation patterns.
+- Architecture Fit
+  
+  - Reuse existing RAG foundation: embeddings + match_documents_scoped RPC for knowledge base.
+  - Align new predictive functions with current Deno Edge runtime and existing TimesFM microservice for time-series forecasts.
+  - Ensure all new functions follow shared modules for CORS, auth, audit, and PII guard where applicable.
+Implemented
+
+- Win Probability Model
+  
+  - Heuristic logistic proxy for XGBoost-ready pipeline over opportunities.
+  - Writes to probability history if present; PII sanitized input; audited.
+  - Reference: win-probability/index.ts
+- Portal Chatbot
+  
+  - Edge function: customer-facing RAG chatbot with quote token scoping and restricted actions.
+  - UI: embedded in Quote Portal page with simple ask/answer flow and suggested actions.
+  - References:
+    - portal-chatbot/index.ts
+    - PortalCopilot.tsx
+    - QuotePortal.tsx
+- Smart Reply Suggestions
+  
+  - Edge function synthesizes thread-aware draft reply via LLM using sanitized context; audited.
+  - Reference: smart-reply/index.ts
+- Supply Chain Risk Scoring
+  
+  - Edge function composes risk from shipment delays, compliance screenings, route history, and optional external geopolitical index; audited.
+  - Reference: risk-scoring/index.ts
+- Container Demand Prediction
+  
+  - Edge function aggregates weekly counts per container type; forecasts via TimesFM microservice (fallback moving average); audited.
+  - Reference: container-demand/index.ts
+- Carrier Performance Scoring
+  
+  - Edge function computes on-time rate and produces a calibrated score; attempts persistence if carriers.performance_score exists; audited.
+  - Reference: carrier-scoring/index.ts
+- Dynamic Margin Optimization
+  
+  - Edge function fits logistic elasticity of win probability vs. margin from quotes; suggests margin that balances win-rate and revenue; audited.
+  - Reference: margin-optimizer/index.ts
+Security & Governance Alignment
+
+- PII Guard
+  
+  - Applied sanitization for LLM-bound text in portal-chatbot and smart-reply, returning redaction metadata for auditing.
+  - Reference guidance: 9.1 PII Handling in LLM prompts.
+- Audit Trail
+  
+  - All new AI functions log structured summaries via shared audit utilities, not raw outputs.
+  - Reference guidance: 9.4 AI Audit Trail & Model Governance.
+- Prompt Injection Mitigations
+  
+  - System/user separation, XML user_context enclosure, token limits, structured JSON outputs parsed server-side.
+  - Reference guidance: 9.3 Prompt Injection Prevention.
+Typecheck
+
+- Repository typecheck runs clean after these additions.
+How to Use
+
+- Win probability
+  - POST /functions/v1/win-probability with { opportunity_id }
+- Smart reply
+  - POST /functions/v1/smart-reply with { conversation_id, prompt_hint? }
+- Risk scoring
+  - POST /functions/v1/risk-scoring with { shipment_id? , route? }
+- Container demand
+  - POST /functions/v1/container-demand with { container_type?, horizon_weeks? }
+- Carrier scoring
+  - POST /functions/v1/carrier-scoring with { carrier_id }
+- Margin optimizer
+  - POST /functions/v1/margin-optimizer with { product_id?, lookback_days? }
+- Portal chatbot
+  - Embedded in Quote Portal; UI added below quote actions.
+  - Calls /functions/v1/portal-chatbot with { query, token }
+Next Steps
+
+- Strengthen models:
+  - Replace heuristics with trained models (XGBoost for win probability, calibrated scoring for carriers, SARIMA or TimesFM fine-tuned for containers).
+- Output validation:
+  - Add Zod schemas for all JSON outputs to strictly validate LLM responses.
+- UI exposure:
+  - Add admin panels to run and review risk scores, carrier performance, margin suggestions.
+- Governance:
+  - Verify ai_audit_logs table and TTL policies; ensure EU tenant routing if applicable.
+- Optional wiring:
+  - Elevate portal actions (accept quote, predict ETA) directly from chatbot suggested actions.
+If you want me to wire these endpoints into specific admin pages or dashboards, I can add those components next.
