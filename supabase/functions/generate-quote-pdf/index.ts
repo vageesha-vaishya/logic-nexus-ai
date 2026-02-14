@@ -295,10 +295,22 @@ serveWithLogger(async (req, logger, supabaseClient) => {
             });
        }
 
-       return new Response(new Blob([pdfBytes as any]), {
+       // Convert PDF bytes to Base64 for JSON response
+       let binary = '';
+       const len = pdfBytes.byteLength;
+       for (let i = 0; i < len; i++) {
+           binary += String.fromCharCode(pdfBytes[i]);
+       }
+       const base64Pdf = btoa(binary);
+
+       return new Response(JSON.stringify({
+          content: base64Pdf,
+          filename: `quote_${quote.quote_number || 'draft'}.pdf`,
+          contentType: "application/pdf"
+       }), {
           headers: {
              ...getCorsHeaders(req),
-             "Content-Type": "application/pdf",
+             "Content-Type": "application/json",
              "X-Trace-Logs": JSON.stringify(traceLogs)
           }
        });

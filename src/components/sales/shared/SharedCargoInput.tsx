@@ -20,9 +20,10 @@ interface SharedCargoInputProps {
   onRemove?: () => void;
   className?: string;
   errors?: Record<string, string>;
+  disableMultiContainer?: boolean;
 }
 
-export function SharedCargoInput({ value, onChange, onRemove, className, errors }: SharedCargoInputProps) {
+export function SharedCargoInput({ value, onChange, onRemove, className, errors, disableMultiContainer }: SharedCargoInputProps) {
   const [showHazmat, setShowHazmat] = useState(!!value.hazmat);
   const [showWizard, setShowWizard] = useState(false);
   const { containerTypes, containerSizes, formatSize } = useContainerRefs();
@@ -55,6 +56,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors 
         description: selection.description,
         hts_code: selection.hts_code,
         id: selection.master_commodity_id,
+        aes_hts_id: selection.aes_hts_id,
       },
     };
 
@@ -227,14 +229,16 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors 
              <div className="space-y-3 bg-blue-50/50 p-3 rounded-md border border-blue-100">
                 <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium text-blue-900">Container Configuration</Label>
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={addCombo}
-                        className="h-6 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-100 px-2"
-                    >
-                        <Plus className="w-3 h-3 mr-1" /> Add Container
-                    </Button>
+                    {!disableMultiContainer && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={addCombo}
+                            className="h-6 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-100 px-2"
+                        >
+                            <Plus className="w-3 h-3 mr-1" /> Add Container
+                        </Button>
+                    )}
                 </div>
                 
                 <div className="space-y-2">
@@ -281,15 +285,17 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors 
                                 />
                             </div>
                             <div className="col-span-1 pb-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeCombo(idx)}
-                                    disabled={value.containerCombos?.length === 1}
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                {!disableMultiContainer && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeCombo(idx)}
+                                        disabled={value.containerCombos?.length === 1}
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     ))}

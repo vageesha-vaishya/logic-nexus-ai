@@ -113,7 +113,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         country_code: p.country,
       }));
     },
-    staleTime: 0, // Force refetch to ensure global ports are loaded
+    staleTime: 1000 * 60 * 60, // 1 hour for global ports
   });
 
   // 2. Carriers
@@ -128,7 +128,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
       if (error) throw error;
       return (data || []) as CarrierOption[];
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   // 3. Accounts
@@ -247,7 +247,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
 
       return { services: servicesForDropdown, serviceTypes: serviceTypesForDropdown };
     },
-    staleTime: 0, // Force refetch to ensure mappings are updated
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
   const serviceData = serviceQuery.data ?? { services: [], serviceTypes: [] };
 
@@ -314,15 +314,41 @@ export function useQuoteRepositoryForm(opts: {
 
   // --- Hydration: fetch existing quote via React Query ---
 
-  const hydrationQuery = useQuery({
-    queryKey: quoteKeys.hydration(quoteId!),
+  const coreQuery = useQuery({
+    queryKey: quoteKeys.hydration(quoteId!)?.concat(['core']),
     queryFn: async () => {
-      // Use scopedDb to ensure consistent access with QuoteDetail and respect admin overrides
-      const [quoteResult, itemsResult, cargoResult, versionResult] = await Promise.all([
+      const start = performance.now();
+      const [quoteResult, itemsResult, cargoResult] = await Promise.all([
         scopedDb.from('quotes').select('*').eq('id', quoteId!).maybeSingle(),
         scopedDb.from('quote_items').select('*').eq('quote_id', quoteId!).order('line_number', { ascending: true }),
         scopedDb.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId!),
-        scopedDb.from('quotation_versions')
+      ]);
+      
+      if (quoteResult.error) throw quoteResult.error;
+      if (!quoteResult.data) return null;
+
+      const duration = performance.now() - start;
+      if (duration > 1000) {
+        console.warn(`[useQuoteRepository] Slow hydration: ${duration.toFixed(2)}ms`);
+      } else {
+        console.log(`[useQuoteRepository] Hydration took: ${duration.toFixed(2)}ms`);
+      }
+
+      return {
+        quote: quoteResult.data,
+        items: itemsResult.data,
+        cargo: cargoResult.data,
+      };
+    },
+    enabled: !!quoteId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  const versionsQuery = useQuery({
+    queryKey: quoteKeys.hydration(quoteId!)?.concat(['versions']),
+    queryFn: async () => {
+      const start = performance.now();
+       const { data, error } = await scopedDb.from('quotation_versions')
             .select(`
                 id, 
                 version_number, 
@@ -367,90 +393,56 @@ export function useQuoteRepositoryForm(opts: {
             .eq('quote_id', quoteId!)
             .order('version_number', { ascending: false })
             .limit(1)
-            .maybeSingle()
-      ]);
+            .maybeSingle();
+
+      if (error) throw error;
       
-      if (quoteResult.error) throw quoteResult.error;
-      if (!quoteResult.data) return null;
-
-      // Log hydration data for debugging
-      console.log('[useQuoteRepository] Hydration Data:', {
-        quoteId,
-        versionId: versionResult.data?.id,
-        itemsCount: itemsResult.data?.length,
-        cargoCount: cargoResult.data?.length,
-        optionsCount: versionResult.data?.quotation_version_options?.length,
-        firstOptionCharges: versionResult.data?.quotation_version_options?.[0]?.quotation_version_option_legs?.[0]?.quotation_version_option_leg_charges
-      });
-
-      // Critical: If items fail to load, do NOT return empty list, as saving would wipe existing items.
-      if (itemsResult.error) {
-        console.error('[useQuoteRepository] Failed to load quote items:', itemsResult.error);
-        throw new Error(`Failed to load quote items: ${itemsResult.error.message}`);
-      }
-      
-      if (cargoResult.error) {
-        console.error('[useQuoteRepository] Failed to load cargo configs:', cargoResult.error);
-        throw new Error(`Failed to load cargo configurations: ${cargoResult.error.message}`);
-      }
-
-      if (!versionResult.data) {
-        console.warn(`[useQuoteRepository] No quotation version found for quote ${quoteId}. Financials may be zero.`);
+      const duration = performance.now() - start;
+      if (duration > 1000) {
+        console.warn(`[useQuoteRepository] Slow versions hydration: ${duration.toFixed(2)}ms`);
       } else {
-        const optCount = versionResult.data.quotation_version_options?.length || 0;
-        console.log(`[useQuoteRepository] Loaded version ${versionResult.data.version_number} with ${optCount} options`);
+        console.log(`[useQuoteRepository] Versions hydration took: ${duration.toFixed(2)}ms`);
       }
       
-      return {
-        quote: quoteResult.data,
-        items: itemsResult.data ?? [],
-        cargoConfigs: cargoResult.data ?? [],
-        latestVersion: versionResult.data
-      };
+      return data;
     },
     enabled: !!quoteId,
-    refetchOnWindowFocus: false,
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  // Log hydration data for debugging
+  useEffect(() => {
+    if (coreQuery.data) {
+        console.log('[useQuoteRepository] Core Data Loaded:', {
+            quoteId,
+            itemsCount: coreQuery.data.items?.length,
+            cargoCount: coreQuery.data.cargo?.length
+        });
+    }
+  }, [coreQuery.data, quoteId]);
+
+  // Combine loading states
+  // We only block UI for core data. Versions can load in background.
+  const isHydrating = coreQuery.isLoading; 
+
+
 
   // --- Side effect: populate form + inject missing CRM entities ---
 
   useEffect(() => {
-    if (!hydrationQuery.data) return;
-    const { quote, items, cargoConfigs, latestVersion } = hydrationQuery.data;
+    if (!coreQuery.data) return;
 
-    if (quote.tenant_id) {
-      setResolvedTenantId(String(quote.tenant_id));
-    }
+    const { quote, items, cargo: cargoConfigs } = coreQuery.data;
+    const latestVersion = versionsQuery.data;
 
-    debug.log('[useQuoteRepository] Hydrating form with quote data:', {
-      id: quote.id,
-      service_type_id: quote.service_type_id,
-      service_id: quote.service_id,
-      origin_port_id: quote.origin_port_id,
-      destination_port_id: quote.destination_port_id,
-      pickup_date: quote.pickup_date,
-      vehicle_type: quote.vehicle_type,
-      special_handling: quote.special_handling,
-      version: latestVersion?.version_number
-    });
-
-    // Map Options and Legs
+    // Map Options and Legs (Moved up for progressive loading)
     const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
         // Calculate total from leg charges if option total is missing/zero
         const legs = opt.quotation_version_option_legs || [];
         const chargesTotal = legs.reduce((acc: number, leg: any) => {
             const legCharges = leg.quotation_version_option_leg_charges || [];
             return acc + legCharges.reduce((sum: number, c: any) => {
-                // Only sum SELL charges for the total amount
                 const side = c.charge_sides?.code?.toLowerCase();
-                
-                // Fallback: If side is missing but charge has amount, check if we can infer or should warn
-                if (!side && Number(c.amount) > 0) {
-                    console.warn(`[QuoteHydration] Charge ${c.id} has amount ${c.amount} but no resolved side (charge_side_id: ${c.charge_side_id}).`);
-                    // Optional: could default to 'sell' if strict mode is off, but for now just warn
-                }
-
                 if (side === 'sell' || side === 'revenue') {
                     return sum + (Number(c.amount) || 0);
                 }
@@ -459,30 +451,24 @@ export function useQuoteRepositoryForm(opts: {
         }, 0);
         
         const effectiveTotal = (Number(opt.total_amount) > 0) ? Number(opt.total_amount) : chargesTotal;
-
-        if (effectiveTotal > 0 && Number(opt.total_amount) === 0) {
-            console.warn(`[QuoteHydration] Option ${opt.id} has 0 total_amount but ${chargesTotal} in sell charges. Using calculated total.`);
-        } else {
-            console.log(`[QuoteHydration] Option ${opt.id}: Total=${opt.total_amount}, ChargesTotal=${chargesTotal}, Effective=${effectiveTotal}`);
-        }
         
         return {
             id: opt.id,
-            is_primary: opt.is_selected, // Map is_selected to is_primary
+            is_primary: opt.is_selected,
             total_amount: effectiveTotal,
             currency: opt.quote_currency?.code || 'USD',
             transit_time_days: opt.total_transit_days,
             legs: legs.map((leg: any) => ({
                 id: leg.id,
-                sequence_number: leg.sort_order, // Map sort_order to sequence_number
-                transport_mode: leg.mode, // Map mode to transport_mode
-                carrier_id: leg.provider_id ? String(leg.provider_id) : undefined, // Map provider_id to carrier_id
+                sequence_number: leg.sort_order,
+                transport_mode: leg.mode,
+                carrier_id: leg.provider_id ? String(leg.provider_id) : undefined,
                 origin_location_id: leg.origin_location_id ? String(leg.origin_location_id) : undefined,
                 destination_location_id: leg.destination_location_id ? String(leg.destination_location_id) : undefined,
-                origin_location_name: leg.origin_location, // Store as name since it might be string
-                destination_location_name: leg.destination_location, // Store as name
-                origin: leg.origin_location, // Fallback
-                destination: leg.destination_location, // Fallback
+                origin_location_name: leg.origin_location,
+                destination_location_name: leg.destination_location,
+                origin: leg.origin_location,
+                destination: leg.destination_location,
                 flight_number: leg.flight_number,
                 voyage_number: leg.voyage_number,
                 departure_date: leg.departure_date,
@@ -498,10 +484,38 @@ export function useQuoteRepositoryForm(opts: {
                     unit_price: Number(c.rate || 0),
                     quantity: Number(c.quantity || 1),
                     note: c.note
-                })) // Preserve charges in leg mapping
+                }))
             })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
         };
     }) || [];
+
+    // Progressive Loading Logic
+    const isDirty = form.formState.isDirty;
+    const currentOptions = form.getValues('options');
+    const hasOptions = currentOptions && currentOptions.length > 0;
+
+    // Case 1: Progressive Injection (Dirty form, but options just arrived)
+    if (isDirty && !hasOptions && mappedOptions.length > 0) {
+        console.log('[useQuoteRepository] Progressive hydration: Injecting late-arriving options');
+        form.reset({
+            ...form.getValues(),
+            options: mappedOptions
+        }, { keepDirty: true });
+        return;
+    }
+
+    // Case 2: Dirty form, do not overwrite
+    if (isDirty) return;
+
+    // Case 3: Full Reset (Clean form)
+    if (quote.tenant_id) {
+      setResolvedTenantId(String(quote.tenant_id));
+    }
+
+    debug.log('[useQuoteRepository] Hydrating form with quote data:', {
+      id: quote.id,
+      version: latestVersion?.version_number
+    });
 
     const primaryOption = mappedOptions.find((o: any) => o.is_primary) || mappedOptions[0];
     const initialShippingAmount = primaryOption?.total_amount 
@@ -527,16 +541,18 @@ export function useQuoteRepositoryForm(opts: {
       service_type_id: resolvedServiceTypeId,
       service_id: quote.service_id ? String(quote.service_id) : '',
       incoterms: quote.incoterms || '',
-      trade_direction: (quote.regulatory_data as any)?.trade_direction,
+      trade_direction: ['import', 'export'].includes((quote.regulatory_data as any)?.trade_direction) 
+        ? (quote.regulatory_data as any)?.trade_direction 
+        : undefined,
       carrier_id: quote.carrier_id ? String(quote.carrier_id) : '',
       origin_port_id: quote.origin_port_id ? String(quote.origin_port_id) : '',
       destination_port_id: quote.destination_port_id ? String(quote.destination_port_id) : '',
       account_id: quote.account_id ? String(quote.account_id) : '',
       contact_id: quote.contact_id ? String(quote.contact_id) : '',
       opportunity_id: quote.opportunity_id ? String(quote.opportunity_id) : '',
-      valid_until: quote.valid_until || '',
-      pickup_date: quote.pickup_date || '',
-      delivery_deadline: quote.delivery_deadline || '',
+      valid_until: quote.valid_until ? new Date(quote.valid_until).toISOString().split('T')[0] : '',
+      pickup_date: quote.pickup_date ? new Date(quote.pickup_date).toISOString().split('T')[0] : '',
+      delivery_deadline: quote.delivery_deadline ? new Date(quote.delivery_deadline).toISOString().split('T')[0] : '',
       vehicle_type: quote.vehicle_type || '',
       special_handling: Array.isArray(quote.special_handling) ? quote.special_handling.join(', ') : (quote.special_handling || ''),
       tax_percent: quote.tax_percent ? String(quote.tax_percent) : '0',
@@ -562,9 +578,9 @@ export function useQuoteRepositoryForm(opts: {
                 length: item.attributes?.length || 0,
                 width: item.attributes?.width || 0,
                 height: item.attributes?.height || 0,
-                hs_code: item.hs_code || '',
-                stackable: item.stackable || false,
-                hazmat: item.hazmat_details || undefined,
+                hs_code: item.attributes?.hs_code || '',
+                stackable: item.attributes?.stackable || false,
+                hazmat: item.attributes?.hazmat || undefined,
             }
           }))
         : [],
@@ -683,7 +699,8 @@ export function useQuoteRepositoryForm(opts: {
     injectMissingEntities().catch((err) => {
       console.error('[QuoteRepository] Error injecting CRM entities:', err);
     });
-  }, [hydrationQuery.data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coreQuery.data, versionsQuery.data]);
 
   // --- Save mutation ---
 
@@ -830,8 +847,9 @@ export function useQuoteRepositoryForm(opts: {
   });
 
   return {
-    isHydrating: hydrationQuery.isLoading,
+    isHydrating,
     saveQuote: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,
   };
+
 }

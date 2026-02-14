@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,6 +31,7 @@ const MASTER_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
 
 export default function QuoteNew() {
   useBenchmark('QuoteNew');
+  const { user, isPlatformAdmin } = useAuth();
   const { supabase, context, scopedDb } = useCRM();
   // Cast supabase to any to avoid strict type mismatch, assuming it's a valid client when used
   const quoteOptionService = new QuoteOptionService(supabase as any);
@@ -757,6 +759,10 @@ export default function QuoteNew() {
     ensureVersion();
   }, [createdQuoteId, tenantId, context.tenantId, scopedDb, supabase]);
 
+  // Debug Data Inspector Logic
+  const debugModeEnabled = user?.user_metadata?.debug_mode_enabled === true;
+  const showDebugInspector = isPlatformAdmin() && debugModeEnabled;
+
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-6">
@@ -894,13 +900,14 @@ export default function QuoteNew() {
                 )}
              </div>
         )}
+        {showDebugInspector && (
         <DataInspector
           title="Create Quote Inspector"
           data={{
             inputs: {
               locationState: location.state,
               templateData,
-              masterData
+              masterData: MASTER_DATA_CACHE[`master_data_${tenantId}`] // Use safely
             },
             outputs: {
               createdQuoteId,
@@ -920,6 +927,7 @@ export default function QuoteNew() {
           }}
           defaultOpen={false}
         />
+        )}
       </div>
     </DashboardLayout>
   );

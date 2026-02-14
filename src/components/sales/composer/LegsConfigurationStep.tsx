@@ -102,12 +102,23 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { scopedDb } = useCRM();
 
   const onAddLeg = (mode: string) => {
+    // Find default service type for this mode
+    const defaultServiceType = serviceTypes.find(st => {
+      const stMode = (st.mode || '').toLowerCase();
+      const legMode = mode.toLowerCase();
+      // Match mode directly or via common aliases
+      if (stMode === legMode) return true;
+      if (legMode === 'ocean' && stMode === 'sea') return true;
+      if (legMode === 'sea' && stMode === 'ocean') return true;
+      return false;
+    });
+
     const newLeg: Leg = {
       id: crypto.randomUUID(),
       mode,
-      serviceTypeId: '',
-      origin: '',
-      destination: '',
+      serviceTypeId: defaultServiceType?.id || '',
+      origin: legs.length === 0 ? state.quoteData.origin : '', // Default to Quote Origin for first leg
+      destination: legs.length === 0 ? state.quoteData.destination : '', // Default to Quote Dest for first leg
       charges: [],
       legType: 'transport'
     };

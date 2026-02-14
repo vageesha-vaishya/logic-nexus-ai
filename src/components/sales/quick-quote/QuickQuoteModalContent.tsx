@@ -12,6 +12,7 @@ import { Plane, Ship, Truck, Train, Package, ArrowRight, Timer, Sparkles, AlertT
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
@@ -85,6 +86,7 @@ interface QuickQuoteModalContentProps {
 
 export default function QuickQuoteModalContent({ accountId, contactId, onClose }: QuickQuoteModalContentProps) {
   useBenchmark('QuickQuoteModalContent');
+  const { user, isPlatformAdmin } = useAuth();
   const debug = useDebug('Sales', 'QuickQuoteModalContent');
   const [results, setResults] = useState<RateOption[] | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
@@ -887,6 +889,10 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
     setAnomalies([]);
   };
 
+  // Debug Data Inspector Logic
+  const debugModeEnabled = user?.user_metadata?.debug_mode_enabled === true;
+  const showDebugInspector = isPlatformAdmin() && debugModeEnabled;
+
   return (
     <>
         <DialogHeader className="px-8 py-5 border-b bg-background z-10">
@@ -1202,6 +1208,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
             )}
           </div>
         </div>
+        {showDebugInspector && (
         <DataInspector
           title="Quick Quote Inspector"
           data={{
@@ -1227,6 +1234,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
           }}
           defaultOpen={false}
         />
+        )}
     </>
   );
 }

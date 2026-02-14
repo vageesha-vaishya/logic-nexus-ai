@@ -1,0 +1,38 @@
+-- Optimize Quote Module Performance
+-- Created: 2026-02-14
+
+-- 1. Quotes Table Indexes
+CREATE INDEX IF NOT EXISTS idx_quotes_tenant_id ON public.quotes (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_status ON public.quotes (status);
+CREATE INDEX IF NOT EXISTS idx_quotes_account_id ON public.quotes (account_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_contact_id ON public.quotes (contact_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_created_at_desc ON public.quotes (created_at DESC);
+
+-- 2. Quote Items Indexes
+CREATE INDEX IF NOT EXISTS idx_quote_items_quote_id ON public.quote_items (quote_id);
+CREATE INDEX IF NOT EXISTS idx_quote_items_line_number ON public.quote_items (quote_id, line_number);
+
+-- 3. Quote Cargo Configurations Indexes
+CREATE INDEX IF NOT EXISTS idx_quote_cargo_quote_id ON public.quote_cargo_configurations (quote_id);
+
+-- 4. Quotation Versions Indexes
+CREATE INDEX IF NOT EXISTS idx_quotation_versions_quote_id ON public.quotation_versions (quote_id);
+CREATE INDEX IF NOT EXISTS idx_quotation_versions_quote_version ON public.quotation_versions (quote_id, version_number);
+
+-- 5. Quotation Version Options Indexes
+CREATE INDEX IF NOT EXISTS idx_qv_options_version_id ON public.quotation_version_options (quotation_version_id);
+CREATE INDEX IF NOT EXISTS idx_qv_options_is_selected ON public.quotation_version_options (quotation_version_id) WHERE is_selected = true;
+
+-- 6. Quotation Version Option Legs Indexes
+CREATE INDEX IF NOT EXISTS idx_qv_option_legs_option_id ON public.quotation_version_option_legs (quotation_version_option_id);
+CREATE INDEX IF NOT EXISTS idx_qv_option_legs_sort_order ON public.quotation_version_option_legs (quotation_version_option_id, sort_order);
+
+-- 7. Quote Charges Indexes
+-- Note: quote_charges is a polymorphic table or linked via legs/options
+CREATE INDEX IF NOT EXISTS idx_quote_charges_leg_id ON public.quote_charges (quotation_version_option_leg_id);
+CREATE INDEX IF NOT EXISTS idx_quote_charges_option_id ON public.quote_charges (quotation_version_option_id);
+
+-- 8. Reference Data Foreign Key Indexes (often missed)
+CREATE INDEX IF NOT EXISTS idx_quotes_service_id ON public.quotes (service_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_origin_port_id ON public.quotes (origin_port_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_destination_port_id ON public.quotes (destination_port_id);

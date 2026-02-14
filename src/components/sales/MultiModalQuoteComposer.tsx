@@ -36,6 +36,7 @@ import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 import { PricingService } from '@/services/pricing.service';
 import { logger } from '@/lib/logger';
 import { useDebug } from '@/hooks/useDebug';
+import { useAuth } from '@/hooks/useAuth';
 import { formatContainerSize } from '@/lib/container-utils';
 import { DataInspector } from '@/components/debug/DataInspector';
 
@@ -89,9 +90,46 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
   const debug = useDebug('Sales', 'QuoteComposer');
   const { toast } = useToast();
   const { invokeAiAdvisor } = useAiAdvisor();
+  const { user, isPlatformAdmin } = useAuth();
   
   // Initialize Store
   const { state: storeState, dispatch } = useQuoteStore();
+
+  // Debug Data Inspector Logic
+  const debugModeEnabled = user?.user_metadata?.debug_mode_enabled === true;
+  const showDebugInspector = isPlatformAdmin() && debugModeEnabled;
+
+  const debugData = useMemo(() => ({
+    inputs: {
+      quoteId,
+      versionId,
+      optionId: storeState.optionId,
+      tenantId: storeState.tenantId,
+      propTenantId,
+      templateId
+    },
+    outputs: {
+      quoteData: storeState.quoteData,
+      legs: storeState.legs,
+      charges: storeState.charges,
+      validationErrors: storeState.validationErrors,
+      validationWarnings: storeState.validationWarnings,
+      marketAnalysis: storeState.marketAnalysis,
+      anomalies: storeState.anomalies
+    },
+    currentState: {
+      step: storeState.currentStep,
+      isSaving: storeState.isSaving,
+      isLoading: storeState.isLoading,
+      viewMode: storeState.viewMode,
+      optionsCount: storeState.options?.length || 0
+    },
+    context: {
+      tenantId: context.tenantId,
+      userId: user?.id,
+      roles: user?.app_metadata?.roles || []
+    }
+  }), [quoteId, versionId, propTenantId, templateId, storeState, context.tenantId, user]);
 
   // Pipeline Interceptor
   usePipelineInterceptor('Composer', {
@@ -462,15 +500,15 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
             const normalizedQuote = {
                 ...raw,
-                origin: raw.origin_location?.name || raw.origin_code || '',
-                destination: raw.destination_location?.name || raw.destination_code || '',
-                commodity: getSafeString(validCargoDetails?.commodity) || derivedCommodity || '',
+                origin: raw.origin_location?.name || raw.origin_code || raw.origin || '',
+                destination: raw.destination_location?.name || raw.destination_code || raw.destination || '',
+                commodity: getSafeString(validCargoDetails?.commodity) || raw.commodity || derivedCommodity || '',
                 mode: raw.transport_mode || 'ocean',
-                total_weight: calculatedTotalWeight,
-                total_volume: calculatedTotalVolume,
+                total_weight: calculatedTotalWeight > 0 ? calculatedTotalWeight : (Number(raw.total_weight) || 0),
+                total_volume: calculatedTotalVolume > 0 ? calculatedTotalVolume : (Number(raw.total_volume) || 0),
                 franchiseId: (quoteRow as any)?.franchise_id,
                 // Map additional fields to ensure Basic Info is populated
-                reference: raw.reference_no || raw.quote_reference || '',
+                reference: raw.reference || raw.reference_no || raw.quote_reference || '',
                 validUntil: raw.valid_until || raw.expiry_date || '',
                 incoterms: raw.incoterms?.code || raw.incoterm_id || '',
                 shipping_term_id: raw.shipping_term_id,
@@ -656,6 +694,36 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       const refData = await loadReferenceData();
       const uniqueCarriers = uniqueByCarrierName(refData.carriers, resolvedTenantId);
+
+      // Enhance quote data with resolved names from reference data if missing
+      if (fetchedQuoteData) {
+         const qData = fetchedQuoteData;
+         let updates: any = {};
+         let hasUpdates = false;
+
+         if (!qData.origin && qData.origin_port_id) {
+             const port = refData.ports.find(p => p.id === qData.origin_port_id);
+             if (port) {
+                 updates.origin = port.name || port.port_name || port.code;
+                 hasUpdates = true;
+             }
+         }
+
+         if (!qData.destination && qData.destination_port_id) {
+             const port = refData.ports.find(p => p.id === qData.destination_port_id);
+             if (port) {
+                 updates.destination = port.name || port.port_name || port.code;
+                 hasUpdates = true;
+             }
+         }
+
+         if (hasUpdates) {
+             debug.debug('[Composer] Auto-filled missing origin/destination from ports:', updates);
+             dispatch({ type: 'UPDATE_QUOTE_DATA', payload: updates });
+             // Update local reference
+             fetchedQuoteData = { ...fetchedQuoteData, ...updates };
+         }
+      }
 
       dispatch({
         type: 'SET_REFERENCE_DATA',
@@ -1141,14 +1209,26 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
              ? (transportModes.find(m => m.id === leg.mode_id)?.name || serviceTypes.find(s => s.transport_modes?.id === leg.mode_id)?.transport_modes?.code || 'ocean')
              : (leg.mode || 'ocean');
 
+          const origin = getSafeString(leg.origin_location || leg.origin || leg.origin_name);
+          const destination = getSafeString(leg.destination_location || leg.destination || leg.destination_name);
+          
+          if (!origin || !destination) {
+             debug.warn(`[Composer] Leg ${leg.id} missing location data`, { 
+                origin: leg.origin, 
+                origin_location: leg.origin_location,
+                destination: leg.destination,
+                destination_location: leg.destination_location 
+             });
+          }
+
           return {
             id: leg.id,
             mode: getSafeString(modeName),
             serviceTypeId: leg.service_type_id || '',
             carrierId: carrierId || undefined,
             carrierName: getSafeString(carrierName),
-            origin: getSafeString(leg.origin_location),
-            destination: getSafeString(leg.destination_location),
+            origin: origin,
+            destination: destination,
             // Normalize legType to ensure it's either 'transport' or 'service'
             legType: leg.leg_type === 'service' ? 'service' : 'transport',
             serviceOnlyCategory: getSafeString(leg.service_only_category),
@@ -1159,8 +1239,32 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         dispatch({ type: 'SET_LEGS', payload: legsWithCharges });
       } else {
         // Fallback: If no legs exist but we have quote data, create a default leg
-        if (quoteData.origin && quoteData.destination) {
-            debug.log('[Composer] No legs found, creating default leg from quote data');
+        
+        // Robust resolution of Origin/Destination
+        let originName = quoteData.origin;
+        let destinationName = quoteData.destination;
+        
+        // Try to resolve from ports if names are missing
+        if (!originName && quoteData.origin_port_id) {
+            const port = ports.find(p => p.id === quoteData.origin_port_id);
+            if (port) originName = port.name || port.port_name || port.code;
+        }
+        
+        if (!destinationName && quoteData.destination_port_id) {
+            const port = ports.find(p => p.id === quoteData.destination_port_id);
+            if (port) destinationName = port.name || port.port_name || port.code;
+        }
+
+        const shippingAmount = Number(quoteData.shipping_amount) || 0;
+        
+        // If we have shipping amount, we force creation even if locations are generic
+        if (shippingAmount > 0) {
+            if (!originName) originName = 'Origin';
+            if (!destinationName) destinationName = 'Destination';
+        }
+
+        if (originName && destinationName) {
+            debug.log('[Composer] No legs found, creating default leg from quote data (loadOptionData fallback)');
             
             // Try to resolve carrier and service type
             const carrierId = quoteData.carrier_id;
@@ -1175,8 +1279,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                 id: `leg-default-${Date.now()}`,
                 mode: quoteData.mode || 'ocean',
                 serviceTypeId: serviceTypeId || '',
-                origin: quoteData.origin,
-                destination: quoteData.destination,
+                origin: originName,
+                destination: destinationName,
                 carrierId: carrierId || undefined,
                 carrierName: carrierName,
                 legType: 'transport',
@@ -1184,19 +1288,21 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
             };
 
             // If we have a shipping amount, add it as a charge
-            const shippingAmount = Number(quoteData.shipping_amount) || 0;
             if (shippingAmount > 0) {
                 const freightCat = chargeCategories.find(c => c.code === 'FRT' || c.name === 'Freight Charges') || chargeCategories[0];
                 const shipmentBasis = chargeBases.find(b => b.code === 'shipment') || chargeBases[0];
+                const currencyId = quoteData.currencyId || currencies[0]?.id || '';
                 
                 defaultLeg.charges.push({
                     id: `charge-default-${Date.now()}`,
                     category_id: freightCat?.id || '',
                     basis_id: shipmentBasis?.id || '',
                     unit: shipmentBasis?.code || 'shipment',
-                    currency_id: quoteData.currencyId || currencies[0]?.id || '',
-                    buy: { quantity: 1, rate: 0, amount: 0 },
-                    sell: { quantity: 1, rate: shippingAmount, amount: shippingAmount }
+                    currency_id: currencyId,
+                    buy: { quantity: 1, rate: 0, amount: 0, dbChargeId: null },
+                    sell: { quantity: 1, rate: shippingAmount, amount: shippingAmount, dbChargeId: null },
+                    description: 'Freight Charges',
+                    note: 'Auto-generated from Quick Quote'
                 });
             }
 
@@ -2787,34 +2893,15 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <DataInspector
-        title="Quote Composer Inspector"
-        data={{
-          inputs: {
-            quoteId,
-            versionId,
-            optionId: storeState.optionId,
-            tenantId: storeState.tenantId
-          },
-          outputs: {
-            quoteData: storeState.quoteData,
-            legs: storeState.legs,
-            charges: storeState.charges,
-            validationErrors: storeState.validationErrors,
-            validationWarnings: storeState.validationWarnings,
-            marketAnalysis: storeState.marketAnalysis,
-            anomalies: storeState.anomalies
-          },
-          currentState: {
-            step: storeState.currentStep,
-            isSaving: storeState.isSaving,
-            isLoading: storeState.isLoading,
-            viewMode: storeState.viewMode,
-            optionsCount: storeState.options.length
-          }
-        }}
-        defaultOpen={false}
-      />
+      {/* Debug Inspector - Only for Super Admins with Debug Mode Enabled */}
+      {showDebugInspector && (
+        <DataInspector 
+          title="Composer Debug"
+          data={debugData}
+          defaultOpen={false}
+          className="border-orange-500 bg-orange-50/90 dark:bg-orange-900/20"
+        />
+      )}
     </div>
   );
 }

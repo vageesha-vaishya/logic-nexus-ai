@@ -295,7 +295,7 @@ export const mapOptionToQuote = (opt: any) => {
                  // and we might be missing hidden fees/surcharges in the line items.
                  // Add balancing charge ONLY if the discrepancy is positive (Header > Components)
                  const discrepancy = price_breakdown.total - calculatedTotal;
-                 if (discrepancy > 0) {
+                 if (discrepancy > 0.01) {
                      const currency = price_breakdown.currency || normalized.currency || 'USD';
                      charges.push({ 
                          category: 'Adjustment', 
@@ -357,5 +357,48 @@ export const mapOptionToQuote = (opt: any) => {
         tier: normalized.tier || 'standard',
         environmental: normalized.environmental || (normalized.total_co2_kg ? { co2_emissions: `${normalized.total_co2_kg} kg` } : undefined),
         ai_generated: normalized.ai_generated || (normalized.source_attribution && normalized.source_attribution.includes("AI"))
+    };
+};
+
+/**
+ * Calculates financial metrics (Buy/Sell/Margin) based on amount and margin/markup rules.
+ * @param amount - The base amount (either Cost or Sell price depending on isCostBased)
+ * @param marginPercent - The target margin percentage (default 15%)
+ * @param isCostBased - If true, treats 'amount' as Cost (Cost-Plus). If false, treats 'amount' as Sell (Discount).
+ */
+export const calculateQuoteFinancials = (amount: number, marginPercent: number = 15, isCostBased: boolean = true) => {
+    let sellPrice = 0;
+    let buyPrice = 0;
+    let marginAmount = 0;
+    
+    // Ensure valid inputs
+    const safeCost = Number(amount) || 0;
+    const safeMargin = Number(marginPercent) || 0;
+
+    if (isCostBased) {
+        // Cost-Plus Model: Sell = Cost / (1 - Margin%)
+        buyPrice = safeCost;
+        const divisor = 1 - (safeMargin / 100);
+        sellPrice = divisor > 0 ? Number((buyPrice / divisor).toFixed(2)) : buyPrice;
+        marginAmount = Number((sellPrice - buyPrice).toFixed(2));
+    } else {
+        // Sell-Based Model (Discount): Buy = Sell * (1 - Margin%)
+        sellPrice = safeCost;
+        marginAmount = Number((sellPrice * (safeMargin / 100)).toFixed(2));
+        buyPrice = Number((sellPrice - marginAmount).toFixed(2));
+    }
+    
+    // Calculate markup for backward compatibility
+    let markupPercent = 0;
+    if (buyPrice > 0) {
+        markupPercent = Number(((marginAmount / buyPrice) * 100).toFixed(2));
+    }
+    
+    return {
+        sellPrice,
+        buyPrice,
+        marginAmount,
+        marginPercent: safeMargin, 
+        markupPercent 
     };
 };

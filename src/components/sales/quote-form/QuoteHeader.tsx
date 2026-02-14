@@ -165,12 +165,14 @@ export function QuoteHeader() {
                 name="pickup_date"
                 label="Pickup Date"
                 placeholder="Select pickup date"
+                emitString={true}
             />
             <DateField
                 control={control}
                 name="delivery_deadline"
                 label="Delivery Deadline"
                 placeholder="Select delivery deadline"
+                emitString={true}
             />
         </div>
 

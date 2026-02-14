@@ -52,6 +52,7 @@ export const cargoItemSchema = z.object({
     description: z.string().min(1, 'Description is required'),
     hts_code: z.string().optional(),
     id: z.string().optional(), // Master Commodity ID
+    aes_hts_id: z.string().optional(), // Specific HTS Code ID
   }).optional(),
 });
 

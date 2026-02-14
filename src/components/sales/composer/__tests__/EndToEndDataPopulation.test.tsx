@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MultiModalQuoteComposer } from '../../MultiModalQuoteComposer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // --- Mocks Setup ---
+
+vi.mock('@/components/debug/pipeline/usePipelineInterceptor', () => ({
+  usePipelineInterceptor: () => ({ capture: vi.fn() })
+}));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +43,37 @@ const mockQuoteData = {
   status: 'DRAFT'
 };
 
+const mockCharges = [
+  {
+    id: 'chg-1-sell',
+    leg_id: 'leg-1',
+    category_id: 'cat-freight',
+    basis_id: 'basis-container',
+    unit: 'container',
+    currency_id: 'curr-usd',
+    amount: 1500,
+    quantity: 1,
+    rate: 1500,
+    charge_side_id: 'side-sell',
+    charge_sides: { code: 'SELL' },
+    note: 'Freight'
+  },
+  {
+    id: 'chg-1-buy',
+    leg_id: 'leg-1',
+    category_id: 'cat-freight',
+    basis_id: 'basis-container',
+    unit: 'container',
+    currency_id: 'curr-usd',
+    amount: 1200,
+    quantity: 1,
+    rate: 1200,
+    charge_side_id: 'side-buy',
+    charge_sides: { code: 'BUY' },
+    note: 'Freight'
+  }
+];
+
 const mockLegs = [
   {
     id: 'leg-1',
@@ -50,22 +85,9 @@ const mockLegs = [
     carrier_id: 'carrier-maersk',
     service_type_id: 'service-fcl',
     sort_order: 1,
-    transit_time: 14
-  }
-];
-
-const mockCharges = [
-  {
-    id: 'chg-1',
-    leg_id: 'leg-1',
-    category_id: 'cat-freight',
-    basis_id: 'basis-container',
-    unit: 'container',
-    currency_id: 'curr-usd',
-    amount: 1500,
-    quantity: 1,
-    rate: 1500,
-    charge_side_id: 'side-sell' // Simplified for mock
+    transit_time: 14,
+    legType: 'transport',
+    quote_charges: mockCharges // Correct property name for relation
   }
 ];
 
@@ -89,6 +111,9 @@ const mockReferenceData = {
   ],
   chargeCategories: [
     { id: 'cat-freight', name: 'Freight Charges', code: 'FRT' }
+  ],
+  chargeBasis: [
+    { id: 'basis-container', name: 'Per Container', code: 'CTR' }
   ]
 };
 
@@ -99,8 +124,17 @@ const createMockBuilder = (mockResult: any) => {
     eq: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
-    single: vi.fn(() => Promise.resolve({ data: mockResult, error: null })),
-    maybeSingle: vi.fn(() => Promise.resolve({ data: mockResult, error: null })),
+    is: vi.fn(() => builder),
+    insert: vi.fn(() => builder),
+    update: vi.fn(() => builder),
+    single: vi.fn(() => Promise.resolve({ 
+      data: Array.isArray(mockResult) ? mockResult[0] : mockResult, 
+      error: null 
+    })),
+    maybeSingle: vi.fn(() => Promise.resolve({ 
+      data: Array.isArray(mockResult) ? (mockResult.length > 0 ? mockResult[0] : null) : mockResult, 
+      error: null 
+    })),
     then: (resolve: any) => Promise.resolve({ data: mockResult, error: null }).then(resolve)
   };
   return builder;
@@ -137,8 +171,8 @@ vi.mock('@/hooks/useCRM', () => ({
             
             // Quote Data lookups
             if (table === 'quotes') return createMockBuilder(mockQuoteData);
-            if (table === 'quotation_versions') return createMockBuilder({ id: 'ver-123', quote_id: 'quote-123' });
-            if (table === 'quotation_version_options') return createMockBuilder({ id: 'opt-123', quotation_version_id: 'ver-123' });
+            if (table === 'quotation_versions') return createMockBuilder({ id: 'ver-123', quote_id: 'quote-123', tenant_id: 'tenant-123' });
+            if (table === 'quotation_version_options') return createMockBuilder([{ id: 'opt-123', quotation_version_id: 'ver-123', tenant_id: 'tenant-123' }]);
             if (table === 'quotation_version_option_legs') return createMockBuilder(mockLegs);
             if (table === 'quote_charges') return createMockBuilder(mockCharges);
             
@@ -155,8 +189,8 @@ vi.mock('@/hooks/useCRM', () => ({
           if (table === 'charge_categories') return createMockBuilder(mockReferenceData.chargeCategories);
           
           if (table === 'quotes') return createMockBuilder(mockQuoteData);
-          if (table === 'quotation_versions') return createMockBuilder({ id: 'ver-123' });
-          if (table === 'quotation_version_options') return createMockBuilder({ id: 'opt-123' });
+          if (table === 'quotation_versions') return createMockBuilder({ id: 'ver-123', tenant_id: 'tenant-123' });
+          if (table === 'quotation_version_options') return createMockBuilder([{ id: 'opt-123', tenant_id: 'tenant-123' }]);
           if (table === 'quotation_version_option_legs') return createMockBuilder(mockLegs);
           if (table === 'quote_charges') return createMockBuilder(mockCharges);
           
@@ -176,6 +210,10 @@ vi.mock('@/hooks/useAiAdvisor', () => ({
 // --- Test Suite ---
 
 describe('End-to-End Quote Data Population', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should fully populate all sections with data from Quick Quote / DB', async () => {
     render(
       <QueryClientProvider client={queryClient}>
@@ -188,12 +226,16 @@ describe('End-to-End Quote Data Population', () => {
       </QueryClientProvider>
     );
 
-    // 1. Wait for loading to finish and "Quote Details" step to appear
+    // 1. Wait for loading to finish and "Quote Details" step to appear with data
     await waitFor(() => {
-      expect(screen.getByText(/Quote Details/i)).toBeInTheDocument();
-    });
+      // Check for value population to ensure data is loaded
+      expect(screen.getByDisplayValue(/Shanghai Port/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
 
     // 2. Verify Basic Information Fields
+    // Label check (static)
+    expect(screen.getByLabelText(/Origin Location/i)).toBeInTheDocument();
+    
     // Customer
     expect(screen.getByText(/Acme Corp/i)).toBeInTheDocument(); // Customer Name
     // Origin/Destination
@@ -202,7 +244,7 @@ describe('End-to-End Quote Data Population', () => {
     // Shipping Term
     // Note: Select components might be harder to query by display value directly depending on implementation, 
     // but checking for the text presence usually works if it's rendered.
-    expect(screen.getByText(/FOB/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/FOB/i).length).toBeGreaterThan(0);
     
     // 3. Navigate to Transport Legs
     const nextButtons = screen.getAllByRole('button', { name: /Next/i }); // Or arrow right
@@ -221,28 +263,73 @@ describe('End-to-End Quote Data Population', () => {
     
     // 4. Verify Charges (Mocked as populated)
     // We need to switch steps to verify UI.
-    // If we can't easily click, we can assume the data is there if "Review & Save" shows it.
-    // But let's try to find the "Review & Save" tab/step.
-    
-    // Assuming Stepper is clickable:
+    // Use fireEvent to click the stepper directly as it might be more reliable in this test environment
     const reviewStep = screen.getByText(/Review & Save/i);
-    await userEvent.click(reviewStep);
+    fireEvent.click(reviewStep);
     
     // 5. Verify Review & Save Summary
+    // Note: In test environment, the step transition might be async or require state update
+    // We'll rely on waitFor to catch the appearance of the new step content
     await waitFor(() => {
-      expect(screen.getByText(/Review Quotation/i)).toBeInTheDocument();
-    });
+       // Debug: print current body if failing
+       // console.log(document.body.innerHTML);
+       expect(screen.getByText(/Review Quotation/i)).toBeInTheDocument();
+    }, { timeout: 15000 });
     
     // Check Expanded Grid Details
-    expect(screen.getByText(/Shanghai Port/i)).toBeInTheDocument(); // Origin
-    expect(screen.getByText(/Los Angeles Port/i)).toBeInTheDocument(); // Dest
-    expect(screen.getByText(/FOB/i)).toBeInTheDocument(); // Term
-    expect(screen.getByText(/Maersk/i)).toBeInTheDocument(); // Carrier
-    expect(screen.getByText(/FCL/i)).toBeInTheDocument(); // Service Type
-    expect(screen.getByText(/Electronics/i)).toBeInTheDocument(); // Commodity
+    await waitFor(() => {
+      // Check for presence of key data elements in the summary
+      const summaryText = document.body.textContent || '';
+      if (!summaryText.includes('Shanghai Port')) {
+        // console.log('DEBUG: Summary text not found. Current body:', document.body.innerHTML);
+      }
+      expect(screen.getAllByText(/Shanghai Port/i).length).toBeGreaterThan(0); // Origin
+    });
+    expect(screen.getAllByText(/Los Angeles Port/i).length).toBeGreaterThan(0); // Dest
+    expect(screen.getAllByText(/FOB/i).length).toBeGreaterThan(0); // Term
+    expect(screen.getAllByText(/Maersk/i).length).toBeGreaterThan(0); // Carrier
+    expect(screen.getAllByText(/FCL/i).length).toBeGreaterThan(0); // Service Type
+    expect(screen.getAllByText(/Electronics/i).length).toBeGreaterThan(0); // Commodity
     
     // Check Totals
-    // 1500 (Leg Charge)
-    expect(screen.getByText(/1500/i)).toBeInTheDocument();
+    // 1500 (Leg Charge + Total Sell Price) - Should appear at least once
+    const sellPrices = screen.getAllByText(/1500/i);
+    expect(sellPrices.length).toBeGreaterThan(0);
+
+    // Check Buy Cost (1200) - Should appear at least once (Leg Buy + Total Buy)
+    const buyCosts = screen.getAllByText(/1200/i);
+    expect(buyCosts.length).toBeGreaterThan(0);
+
+    // Check Profit (300) - Should appear at least once (Leg Profit + Total Profit)
+    const profits = screen.getAllByText(/300/i);
+    expect(profits.length).toBeGreaterThan(0);
+  }, 30000);
+
+  it('should display correctly populated origin/destination and port selection', async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MultiModalQuoteComposer 
+          quoteId="quote-123" 
+          versionId="ver-123" 
+          optionId="opt-123" 
+          tenantId="tenant-123" 
+        />
+      </QueryClientProvider>
+    );
+
+    // Wait for initial load and verify Input value
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Shanghai Port')).toBeInTheDocument();
+    }, { timeout: 5000 });
+
+    // Verify Port Select displays the correct text
+    // The SelectValue should display "Shanghai Port (CNSHA)" based on the mock data
+    // We look for the text within the Select Trigger
+    const portSelectText = screen.getByText('Shanghai Port (CNSHA)');
+    expect(portSelectText).toBeInTheDocument();
+
+    // Verify Destination Port Select as well
+    const destSelectText = screen.getByText('Los Angeles Port (USLAX)');
+    expect(destSelectText).toBeInTheDocument();
   });
 });

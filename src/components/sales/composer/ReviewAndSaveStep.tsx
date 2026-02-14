@@ -143,7 +143,7 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
                              isServiceLeg ? 'Service' : 'Leg';
 
               return (
-                <Card key={leg.id} className="border-2">
+                <Card key={leg.id} className="border-2 mb-4">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -153,11 +153,11 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
                              // DB requires 'transport'/'service' so we infer display role from position
                              if (leg.legType === 'service') return `Service: ${leg.serviceOnlyCategory || 'General'}`;
                              
-                             if (legs.length === 1) return `Main Leg ${idx + 1} - ${leg.mode.toUpperCase()}`;
+                             if (legs.length === 1) return `Main Leg 1 - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
                              
-                             if (idx === 0) return `Pickup Leg - ${leg.mode.toUpperCase()}`;
-                             if (idx === legs.length - 1) return `Delivery Leg - ${leg.mode.toUpperCase()}`;
-                             return `Main Leg ${idx + 1} - ${leg.mode.toUpperCase()}`;
+                             if (idx === 0) return `Pickup Leg - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
+                             if (idx === legs.length - 1) return `Delivery Leg - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
+                             return `Main Leg ${idx + 1} - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">

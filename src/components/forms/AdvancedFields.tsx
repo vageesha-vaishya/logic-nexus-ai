@@ -30,7 +30,8 @@ export function DateField<TFieldValues extends FieldValues, TName extends FieldP
   placeholder = "Pick a date",
   disabled,
   className,
-}: BaseFieldProps<TFieldValues, TName>) {
+  emitString = false,
+}: BaseFieldProps<TFieldValues, TName> & { emitString?: boolean }) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -58,7 +59,10 @@ export function DateField<TFieldValues extends FieldValues, TName extends FieldP
                 mode="single"
                 selected={field.value ? new Date(field.value as any) : undefined}
                 onSelect={(date) => {
-                  field.onChange(date || undefined);
+                  const value = emitString && date 
+                    ? date.toISOString().split('T')[0] 
+                    : date;
+                  field.onChange(value || undefined);
                   setOpen(false);
                 }}
                 initialFocus

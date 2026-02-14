@@ -287,14 +287,20 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
     const leg = legs.find(l => l.id === legId);
     if (!leg) return;
 
+    // Default values from reference data
+    const defaultCurrency = currencies.find(c => c.code === 'USD') || currencies[0];
+    const defaultCategory = chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
+    const defaultBasis = chargeBases.find(b => b.code === 'shipment') || chargeBases[0];
+
     const newCharge = {
       id: crypto.randomUUID(),
-      category: '',
-      basis: 'Per Shipment',
-      unit: 'Shipment',
-      currency: 'USD',
+      category_id: defaultCategory?.id || '',
+      basis_id: defaultBasis?.id || '',
+      unit: defaultBasis?.code || 'shipment',
+      currency_id: defaultCurrency?.id || '',
       buy: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
-      sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' }
+      sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
+      note: ''
     };
 
     const updatedCharges = [...(leg.charges || []), newCharge];

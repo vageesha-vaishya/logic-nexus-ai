@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Sparkles, Loader2, ShieldCheck, AlertTriangle, Building2 } from 'lucide-react';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
@@ -32,7 +32,7 @@ const INCOTERMS = [
 export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
   const { state, dispatch } = useQuoteStore();
   const { quoteData, validationErrors, referenceData } = state;
-  const { currencies, carriers, serviceTypes, shippingTerms, ports } = referenceData;
+  const { currencies = [], carriers = [], serviceTypes = [], shippingTerms = [], ports = [] } = referenceData;
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
   const [aiLoading, setAiLoading] = useState(false);
@@ -61,7 +61,49 @@ export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
 
   const daysRemaining = calculateDaysRemaining(quoteData.validUntil);
 
-  // AI: Classify Commodity & Suggest HTS
+  // Auto-fill origin/destination names from ports if empty
+  useEffect(() => {
+    if (ports.length > 0) {
+      if (!quoteData.origin && quoteData.origin_port_id) {
+        const port = ports.find((p: any) => p.id === quoteData.origin_port_id);
+        if (port) {
+           onChange('origin', port.name || port.port_name || port.code);
+        }
+      }
+      if (!quoteData.destination && quoteData.destination_port_id) {
+        const port = ports.find((p: any) => p.id === quoteData.destination_port_id);
+        if (port) {
+           onChange('destination', port.name || port.port_name || port.code);
+        }
+      }
+    }
+  }, [ports, quoteData.origin_port_id, quoteData.destination_port_id, quoteData.origin, quoteData.destination]);
+
+  // Sync Incoterms and Shipping Term
+  useEffect(() => {
+    if (shippingTerms.length > 0) {
+      // If Shipping Term is set but Incoterms is empty, try to set Incoterms
+      if (quoteData.shipping_term_id && !quoteData.incoterms) {
+        const term = shippingTerms.find((t: any) => t.id === quoteData.shipping_term_id);
+        if (term && term.code) {
+           // Check if code exists in INCOTERMS list
+           const matchingIncoterm = INCOTERMS.find(i => i.startsWith(term.code));
+           if (matchingIncoterm) {
+             onChange('incoterms', term.code);
+           }
+        }
+      }
+      // If Incoterms is set but Shipping Term is empty, try to set Shipping Term
+      else if (quoteData.incoterms && !quoteData.shipping_term_id) {
+        const term = shippingTerms.find((t: any) => t.code === quoteData.incoterms || t.name === quoteData.incoterms);
+        if (term) {
+          onChange('shipping_term_id', term.id);
+        }
+      }
+    }
+  }, [shippingTerms, quoteData.shipping_term_id, quoteData.incoterms]);
+
+  // AI: Classify Commodity & Suggest HTSValidate Compliance
   const handleAiAnalyze = async () => {
     if (!quoteData.commodity || quoteData.commodity.length < 3) {
       toast({
@@ -201,6 +243,29 @@ export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         
+        {/* Customer Information Section */}
+        <div className="bg-muted/30 p-4 rounded-md border border-dashed mb-6">
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Building2 className="h-4 w-4" /> Client Details
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs text-muted-foreground">Customer</Label>
+              <div className="font-medium text-base">
+                {getSafeName((quoteData as any).accounts, 'N/A')}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Contact</Label>
+              <div className="font-medium text-base">
+                 {(quoteData as any).contacts 
+                    ? `${(quoteData as any).contacts.first_name || ''} ${(quoteData as any).contacts.last_name || ''}`.trim() || 'N/A'
+                    : 'N/A'}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Route & Timing Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
