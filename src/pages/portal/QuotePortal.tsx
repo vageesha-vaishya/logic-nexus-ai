@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { logger } from '@/lib/logger';
+import PortalCopilot from '@/components/portal/PortalCopilot';
 
 type QuoteRecord = {
   id: string;
@@ -248,6 +249,9 @@ export default function QuotePortal() {
                   Accept Quote
                 </Button>
               </div>
+
+              <Separator />
+              <PortalCopilot token={token} />
             </CardContent>
           </Card>
         )}
