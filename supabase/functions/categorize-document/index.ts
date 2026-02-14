@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -35,6 +36,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
     let category = "unknown";
     let confidence = 0.5;
 
@@ -84,7 +91,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    await logAiCall(null as any, {
+    await logAiCall(supabase as any, {
       user_id: user.id,
       function_name: "categorize-document",
       model_used: openaiKey ? "gpt-4o-vision" : "heuristics",

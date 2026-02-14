@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -35,6 +36,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     // Fallback regex parsing from text_hint
     const text = (payload?.text_hint ?? "").toString();
@@ -43,15 +50,15 @@ Deno.serve(async (req: Request) => {
       consignee: text.match(/Consignee:\s*(.+)/i)?.[1]?.trim() || null,
       notify_party: text.match(/Notify Party:\s*(.+)/i)?.[1]?.trim() || null,
       booking_no: text.match(/Booking\s*No[:#]\s*(\S+)/i)?.[1]?.trim() || null,
-      bl_no: text.match(/(B\/L|Bill of Lading)\s*(No|#)[:\s]*([A-Z0-9\-]+)/i)?.[3]?.trim() || null,
-      vessel: text.match(/Vessel[:\s]*([A-Za-z0-9 \-]+)/i)?.[1]?.trim() || null,
-      voyage: text.match(/Voyage[:\s]*([A-Za-z0-9\-]+)/i)?.[1]?.trim() || null,
-      port_of_loading: text.match(/Port of Loading[:\s]*([A-Za-z \-]+)/i)?.[1]?.trim() || null,
-      port_of_discharge: text.match(/Port of Discharge[:\s]*([A-Za-z \-]+)/i)?.[1]?.trim() || null,
+      bl_no: text.match(/(?:B\/L|Bill of Lading)\s*(?:No|#)[:\s]*([A-Z0-9-]+)/i)?.[1]?.trim() || null,
+      vessel: text.match(/Vessel[:\s]*([A-Za-z0-9 -]+)/i)?.[1]?.trim() || null,
+      voyage: text.match(/Voyage[:\s]*([A-Za-z0-9-]+)/i)?.[1]?.trim() || null,
+      port_of_loading: text.match(/Port of Loading[:\s]*([A-Za-z -]+)/i)?.[1]?.trim() || null,
+      port_of_discharge: text.match(/Port of Discharge[:\s]*([A-Za-z -]+)/i)?.[1]?.trim() || null,
       marks_numbers: text.match(/Marks & Numbers[:\s]*([\s\S]+?)\n\n/i)?.[1]?.trim() || null,
       description_goods: text.match(/Description of Goods[:\s]*([\s\S]+?)\n\n/i)?.[1]?.trim() || null,
-      gross_weight: text.match(/Gross Weight[:\s]*([0-9\.,\sA-Za-z]+)/i)?.[1]?.trim() || null,
-      measurement: text.match(/Measurement[:\s]*([0-9\.,\sA-Za-z]+)/i)?.[1]?.trim() || null,
+      gross_weight: text.match(/Gross Weight[:\s]*([0-9.,\sA-Za-z]+)/i)?.[1]?.trim() || null,
+      measurement: text.match(/Measurement[:\s]*([0-9.,\sA-Za-z]+)/i)?.[1]?.trim() || null,
     };
 
     // If no text provided and key exists, try GPT-4o Vision to extract
@@ -80,7 +87,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    await logAiCall(null as any, {
+    await logAiCall(supabase as any, {
       user_id: user.id,
       function_name: "extract-bol-fields",
       model_used: openaiKey ? "gpt-4o-vision" : "regex-fallback",
