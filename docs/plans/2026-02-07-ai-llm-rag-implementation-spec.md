@@ -4187,3 +4187,106 @@ Result
   - Add Zod schemas to validate structured outputs for all LLM calls.
   - Wire admin UI panels to trigger and review win probability, risk scores, carrier scores, and margin suggestions.
   - Create focused vitest suites that mock network to smoke-test each edge function’s input/output contracts.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  =========Sarvesh Phase 4 ==========
+  Spec Analysis
+
+- Scope
+  
+  - Weeks 19–26: route optimization, autonomous email handling, anomaly detection, revenue forecasting, fleet utilization, ensemble demand forecasting, AI agent with tool calling.
+  - Dependencies: VROOM Docker, Phase 2 email AI, existing pipelines, win probability, fleet data, TimesFM microservice, existing tools.
+  - Governance: keep PII sanitation, audit logs, structured outputs, safe prompt design.
+- Fit to Codebase
+  
+  - Reuses shared CORS/auth/audit/PII guard modules.
+  - Integrates with existing email, shipments, quotes, opportunities tables.
+  - Aligns with existing RAG and forecasting infrastructure.
+Implemented Features
+
+- Route Optimization
+  
+  - Input: vehicle_count, stops with lat/lng and optional time windows.
+  - Calls VROOM microservice if available; generates concise LLM suggestion.
+  - Reference: route-optimization/index.ts
+- Autonomous Email Handling
+  
+  - Orchestrates classify → route → draft reply. Updates email with ai_routed_to and ai_reply_draft. Supports dry_run.
+  - Reference: autonomous-email/index.ts
+- Anomaly Detection Suite
+  
+  - Financial: margin outliers; Operational: extreme delays; Quality: invoice issues.
+  - Optional persistence to anomalies table; audits results.
+  - Reference: anomaly-detection/index.ts
+- Revenue Forecasting
+  
+  - Pipeline-weighted model using opportunity stages for expected monthly revenue.
+  - Reference: revenue-forecasting/index.ts
+- Fleet Utilization Optimization
+  
+  - Greedy capacity assignment of shipments to vehicles; persists assignments.
+  - Reference: fleet-utilization/index.ts
+- Ensemble Demand Forecasting
+  
+  - Combines TimesFM forecast with linear trend; generates short narrative via LLM with sanitized context.
+  - Reference: ensemble-demand/index.ts
+- AI Agent with Tool Calling
+  
+  - Planner produces tool call steps; executes allowed tools (rate-engine, predict-eta, categorize-document, extract-bol-fields, margin-optimizer).
+  - Reference: ai-agent/index.ts
+Validation
+
+- Typecheck
+  
+  - Repository typecheck passes.
+- Lint
+  
+  - Resolved lint issues introduced by new code (empty catch blocks).
+  - Some preexisting lint errors remain in older files unrelated to Phase 4.
+- Spec Traceability
+  
+  - Route optimization: VROOM integration points with LLM suggestion.
+  - Autonomous email: chain classification→routing→reply with audit trail.
+  - Anomaly detection: covers financial/operational/quality anomalies.
+  - Revenue forecasting: stage-weighted expected revenue per month.
+  - Fleet utilization: assignment heuristic; upgrade path to OR-Tools.
+  - Ensemble demand: Prophet proxy via TimesFM+linear ensemble + LLM narrative.
+  - AI agent: tool-planning and invocation over existing functions.
+How to Use
+
+- POST /functions/v1/route-optimization
+  - { vehicle_count, stops: [{ lat, lng, time_window_start?, time_window_end? }] }
+- POST /functions/v1/autonomous-email
+  - { email_id? , conversation_id? , dry_run? }
+- POST /functions/v1/anomaly-detection
+  - { save?: true|false }
+- POST /functions/v1/revenue-forecasting
+  - { horizon_months?: number }
+- POST /functions/v1/fleet-utilization
+  - {}
+- POST /functions/v1/ensemble-demand
+  - { container_type?: string, horizon_weeks?: number }
+- POST /functions/v1/ai-agent
+  - { goal: string, tools?: string[] }
+Notes
+
+- Environment variables used where applicable:
+  - SUPABASE_URL, SUPABASE_ANON_KEY, OPENAI_API_KEY, VROOM_URL, TIMESFM_URL.
+- All LLM-bound text uses sanitization and audit logging.
+- Outputs are compact JSON structures suitable for UI wiring.
+If you want, I can add admin UI views for anomalies, revenue forecasts, and fleet assignments, and smoke tests for selected endpoints.
+
