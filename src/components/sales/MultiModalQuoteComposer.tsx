@@ -804,7 +804,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
          if (!qData.origin && qData.origin_port_id) {
              const port = refData.ports.find(p => p.id === qData.origin_port_id);
              if (port) {
-                 updates.origin = port.name || port.port_name || port.code;
+                 updates.origin = port.name || port.location_name || port.code;
                  hasUpdates = true;
              }
          }
@@ -812,7 +812,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
          if (!qData.destination && qData.destination_port_id) {
              const port = refData.ports.find(p => p.id === qData.destination_port_id);
              if (port) {
-                 updates.destination = port.name || port.port_name || port.code;
+                 updates.destination = port.name || port.location_name || port.code;
                  hasUpdates = true;
              }
          }
@@ -867,12 +867,12 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
          if (!originName && qData.origin_port_id) {
              const port = refData.ports.find(p => p.id === qData.origin_port_id);
-             if (port) originName = port.name || port.port_name || port.code;
+             if (port) originName = port.name || port.location_name || port.code;
          }
          
          if (!destinationName && qData.destination_port_id) {
              const port = refData.ports.find(p => p.id === qData.destination_port_id);
-             if (port) destinationName = port.name || port.port_name || port.code;
+             if (port) destinationName = port.name || port.location_name || port.code;
          }
 
          // Fallback if still empty but we have shipping amount (force creation to show rates)

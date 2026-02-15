@@ -294,6 +294,30 @@ export class QuoteTransformService {
 
     public static resolveServiceTypeId(mode: string, explicitId: string | undefined, serviceTypes: MasterData['serviceTypes']): string | undefined {
         if (explicitId) return explicitId;
+        if (!serviceTypes?.length) return undefined;
+
+        const normalizeModeKey = (value: string | undefined | null) => {
+            const v = (value || '').toLowerCase();
+            if (!v) return '';
+            if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+            if (v.includes('air')) return 'air';
+            if (v.includes('rail')) return 'rail';
+            if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+            if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+            if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+            return v;
+        };
+
+        const targetKey = normalizeModeKey(mode);
+        if (!targetKey) return undefined;
+
+        for (const st of serviceTypes) {
+            const tm = (st as any).transport_modes;
+            const codeKey = normalizeModeKey(tm?.code);
+            if (codeKey && codeKey === targetKey) {
+                return st.id;
+            }
+        }
 
         const modeMap: Record<string, string[]> = {
             'ocean': ['Sea', 'Ocean'], 
@@ -305,7 +329,7 @@ export class QuoteTransformService {
         };
 
         const targetModes = modeMap[mode?.toLowerCase()] || [mode];
-        if (!targetModes.length || !serviceTypes.length) return undefined;
+        if (!targetModes.length) return undefined;
 
         for (const targetMode of targetModes) {
             const match = serviceTypes.find(

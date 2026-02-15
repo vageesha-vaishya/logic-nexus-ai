@@ -1,7 +1,7 @@
 # Quotation Platform Enterprise Enhancement Design
 
-**Version**: 2.0
-**Date**: 2026-02-15
+**Version**: 2.1
+**Date**: 2026-02-15 (revised)
 **Classification**: Internal Engineering
 **Supersedes**: QUOTATION-PLATFORM-ENHANCEMENT-DESIGN.md v1.0
 **Scope**: End-to-end quotation platform data consistency, enterprise hardening, and competitive positioning
@@ -25,6 +25,7 @@
 13. [Risk Assessment Matrix](#13-risk-assessment-matrix)
 14. [Success Metrics and KPIs](#14-success-metrics-and-kpis)
 15. [Post-Implementation Monitoring](#15-post-implementation-monitoring)
+16. [Appendix C: v2.1 Review Findings](#appendix-c-v21-review-findings-2026-02-15)
 
 ---
 
@@ -41,7 +42,7 @@ The Logic Nexus AI quotation platform supports multi-modal freight quoting (air,
 - Multi-provider email delivery with retry and failover
 - AI-assisted rate generation via GPT-4o with 5-tier options
 
-**Critical data consistency challenges (38 issues identified):**
+**Critical data consistency challenges (67 issues identified):**
 
 | Category | Critical | High | Medium | Low | Total |
 |----------|----------|------|--------|-----|-------|
@@ -49,7 +50,12 @@ The Logic Nexus AI quotation platform supports multi-modal freight quoting (air,
 | PDF Generation | 3 | 3 | 2 | 1 | 9 |
 | Auto-Population | 2 | 4 | 1 | 0 | 7 |
 | Schema/Type Safety | 1 | 2 | 2 | 2 | 7 |
-| **Total** | **10** | **15** | **8** | **5** | **38** |
+| Infrastructure Gaps | 0 | 3 | 5 | 2 | 10 |
+| Security (Newly Identified) | 1 | 2 | 2 | 0 | 5 |
+| Data Flow Edge Cases | 0 | 2 | 6 | 6 | 14 |
+| **Total** | **11** | **22** | **21** | **13** | **67** |
+
+*Note: v2.0 identified 38 issues. v2.1 review identified 29 additional gaps (see Appendix C).*
 
 ### 1.2 Top 5 Data Consistency Blockers
 
@@ -58,6 +64,11 @@ The Logic Nexus AI quotation platform supports multi-modal freight quoting (air,
 3. **Missing commodity join** — PDF query never joins `commodities` table; defaults to "General Cargo" for every quote.
 4. **RPC save gap** — `save_quote_atomic()` does not persist new options, new legs, or any charges. Silent data loss on every save.
 5. **Schema triple-divergence** — Zod frontend (`is_primary`), TypeScript types, and Postgres (`is_selected`) disagree on column names for 6+ fields.
+6. **Unguarded `rates[0]` access** — `QuoteTransformService` accesses `rates[0]` without checking array length. When `rates` is empty, `primaryRate` is `undefined`, cascading through `resolveCarrierId()` and `generateQuoteItems()`, producing blank fields.
+7. **Non-atomic charge persistence** — Charges are saved via manual INSERT/DELETE in `MultiModalQuoteComposer.tsx`, separate from `save_quote_atomic()`. If RPC succeeds but charge save fails (or vice versa), data becomes inconsistent. Current charge persistence is ~30%, not 0%.
+8. **No feature flag infrastructure** — Document proposes feature flags for Phase 3-6 rollback, but zero feature flag system exists in codebase.
+9. **Hardcoded secrets in send-email** — `send-email/index.ts` contains a fallback Resend API key literal and hardcoded sender domain `notifications@soslogistics.pro`.
+10. **AI Advisor hardcoded surcharges** — `ai-advisor/index.ts:456` injects a 12% fuel surcharge (`fuelSurchargeRate = 0.12`) into every AI-generated quote with no market basis.
 
 ### 1.3 Enhancement Strategy
 
@@ -65,14 +76,16 @@ This document proposes a **6-phase enhancement roadmap** targeting enterprise-gr
 
 | Phase | Focus | Duration | Key Outcome |
 |-------|-------|----------|-------------|
-| 1 | Critical Fixes | Weeks 1-2 | Data visible in Composer and PDF |
-| 2 | Data Integrity | Weeks 3-4 | Zero silent data loss |
-| 3 | Unification | Weeks 5-7 | Single source of truth everywhere |
-| 4 | Enterprise Hardening | Weeks 8-10 | Production resilience + audit trail |
-| 5 | API & Integration | Weeks 11-13 | Versioned API, real-time sync |
-| 6 | Competitive Edge | Weeks 14-16 | Advanced features, observability |
+| 1 | Critical Fixes | Weeks 1-2 | Data visible in Composer and PDF; secrets removed |
+| 2 | Data Integrity + Infra | Weeks 3-5 | Zero silent data loss; feature flag infrastructure |
+| 3 | Unification | Weeks 6-8 | Single source of truth everywhere |
+| 4 | Enterprise Hardening | Weeks 9-11 | Production resilience + audit trail + state machine |
+| 5 | API & Integration | Weeks 12-14 | Versioned API, real-time sync |
+| 6 | Competitive Edge | Weeks 15-18 | Advanced features, observability, approval UI |
 
-**Total estimated effort**: ~280 engineering hours (~7 weeks at full capacity, 1 senior engineer)
+**Total estimated effort**: ~367 engineering hours (~9 weeks at full capacity, 1 senior engineer)
+
+*v2.1 revision added ~87 hours across all phases from 29 newly identified gaps.*
 
 ### 1.4 Competitive Positioning
 
@@ -90,7 +103,7 @@ Current freight-tech platforms (Freightos, Flexport, Xeneta) offer real-time rat
 
 **Goal**: Users can see their data in the Composer and PDF — no more blank fields or "General Cargo."
 
-**Quality Gate**: All 8 tasks pass unit tests; manual QA confirms field population rate > 85%.
+**Quality Gate**: All 12 tasks pass unit tests; manual QA confirms field population rate > 85%.
 
 | # | Task | Severity | Effort | Files Affected | Deliverable |
 |---|------|----------|--------|----------------|-------------|
@@ -102,8 +115,12 @@ Current freight-tech platforms (Freightos, Flexport, Xeneta) offer real-time rat
 | 1.6 | Fix `st.mode` → resolve via `service_type_mappings` → `transport_modes` | High | 3h | `LegsConfigurationStep.tsx:120-130` | Service type pre-selected |
 | 1.7 | Replace hardcoded MGL company data → tenant branding config | High | 4h | `generate-quote-pdf/index.ts` V1 engine | Correct company on all tenant PDFs |
 | 1.8 | Add Rail mode to Quick Quote (`z.enum` + form fields + AI advisor) | High | 6h | `QuickQuoteModal.tsx`, `quote-transfer.ts:54` | Rail quotes from Quick Quote |
+| 1.9 | Guard `rates[0]` access in `QuoteTransformService` — validate `rates` is non-empty before accessing `primaryRate` | Critical | 2h | `quote-transform.service.ts:117` | No more blank fields from empty rates |
+| 1.10 | Include `notes` and `terms_conditions` in PDF SafeContext and template | High | 3h | `generate-quote-pdf/engine/context.ts:82-128`, `default_template.ts` | Notes/terms visible on PDF |
+| 1.11 | Remove hardcoded Resend API key fallback from `send-email` | Critical | 1h | `send-email/index.ts:47` | No secrets in code |
+| 1.12 | Add page-level React Error Boundary around Quotes page and QuickQuoteModal | Medium | 2h | `QuoteNew.tsx`, `QuickQuoteModal.tsx` | Graceful crash recovery |
 
-**Effort**: ~24 hours
+**Effort**: ~32 hours
 **Milestone**: `v1.1.0-field-fixes`
 **Approval**: Engineering lead sign-off after CI green + QA pass
 
@@ -117,13 +134,17 @@ Current freight-tech platforms (Freightos, Flexport, Xeneta) offer real-time rat
 |---|------|----------|--------|----------------|-------------|
 | 2.1 | Extend `save_quote_atomic` → create new options (INSERT when `id` is NULL) | Critical | 8h | `save_quote_atomic` RPC, `useQuoteRepository.ts` | New options persisted |
 | 2.2 | Add charge persistence to RPC (INSERT/UPDATE/DELETE `quote_charges`) | Critical | 8h | `save_quote_atomic` RPC, `useQuoteRepository.ts` | Charges survive save |
-| 2.3 | Replace all `z.any()` in `QuoteTransferSchema` with strict types | High | 4h | `quote-transfer.ts` (10+ fields) | Malformed data rejected at entry |
+| 2.3 | Replace all 8 `z.any()` in `QuoteTransferSchema` with strict types (lines 16, 22-24, 28-29, 76-77) | High | 4h | `quote-transfer.ts` | Malformed data rejected at entry |
 | 2.4 | Post-save consistency validation (verify options > 0, charges > 0) | High | 4h | `useQuoteRepository.ts` | User warned on incomplete save |
 | 2.5 | Fix sell-side charge filtering — log warning instead of fallback to ALL | High | 3h | `generate-quote-pdf/index.ts:172-187` | No buy-side data on customer PDF |
 | 2.6 | Multi-leg auto-population from rate option data | Medium | 4h | `LegsConfigurationStep.tsx:136-137` | Intermediate ports pre-filled |
 | 2.7 | Fix auto-save guard: `origin_location_id` → `origin_port_id` | Medium | 1h | `QuoteFormRefactored.tsx:108` | Auto-save triggers correctly |
+| 2.8 | Centralize transit time parsing — unified `parseTransitTime()` handling "25 days", "48h", bare numbers, "1d 12h" | High | 3h | `QuoteOptionService.ts:144-156`, new `src/lib/transit-time.ts` | No more unit ambiguity |
+| 2.9 | Add container type+size cross-validation (prevent invalid combos like 40HC with "loose" type) | Medium | 2h | `QuoteOptionService.ts:106-107`, `QuoteTransferSchema` | No nonsensical container configs |
+| 2.10 | Make charge save atomic — move charge INSERT/UPDATE/DELETE into `save_quote_atomic` RPC | Critical | 6h | `save_quote_atomic` RPC, `MultiModalQuoteComposer.tsx` charge mutations | Charges transactional with quote save |
+| 2.11 | Implement feature flag infrastructure (DB-backed `feature_flags` table + `useFeatureFlags()` hook) | High | 8h | New migration, new `src/hooks/useFeatureFlags.ts`, new `_shared/feature-flags.ts` | Prerequisite for Phase 3-6 rollback |
 
-**Effort**: ~32 hours
+**Effort**: ~51 hours
 **Milestone**: `v1.2.0-data-integrity`
 **Approval**: Integration test suite green + engineering review
 
@@ -141,8 +162,10 @@ Current freight-tech platforms (Freightos, Flexport, Xeneta) offer real-time rat
 | 3.4 | PDF pre-render validation gate (block if commodity missing, amount = 0) | Medium | 6h | `generate-quote-pdf/engine/context.ts` | No incomplete PDFs sent |
 | 3.5 | Store generated PDF in Supabase Storage; serve cached for preview/download/send | Medium | 8h | `generate-quote-pdf`, `QuotePreviewModal`, `SendQuoteDialog` | Same PDF everywhere |
 | 3.6 | Add completeness score indicator to Composer UI | Low | 6h | `MultiModalQuoteComposer.tsx` | Users see data quality |
+| 3.7 | Unify `DocumentPreview.tsx` with PDF V2 engine (3rd render path) — use same template for browser preview and PDF | Medium | 8h | `DocumentPreview.tsx`, `generate-quote-pdf/engine/` | No divergence between preview and PDF |
+| 3.8 | Make email sender address configurable per tenant (remove hardcoded `notifications@soslogistics.pro`) | Medium | 3h | `send-email/index.ts`, tenant config | Multi-tenant email branding |
 
-**Effort**: ~48 hours
+**Effort**: ~59 hours
 **Milestone**: `v2.0.0-unified`
 **Approval**: Architecture review + full regression test
 
@@ -161,9 +184,14 @@ Current freight-tech platforms (Freightos, Flexport, Xeneta) offer real-time rat
 | 4.5 | Upgrade `reconcile-quote` with auto-repair (regenerate missing PDF, re-resolve undefined IDs) | Medium | 8h | `reconcile-quote/index.ts` | Self-healing system |
 | 4.6 | Add transformation audit trail (log every field resolution in `QuoteTransformService`) | Medium | 6h | `quote-transform.service.ts` | Full traceability |
 | 4.7 | Mode-specific PDF templates (ocean, air, road, rail sections) | Medium | 14h | `generate-quote-pdf/engine/default_template.ts` | Professional mode-specific PDFs |
-| 4.8 | Version diff mechanism (charge-level comparison between versions) | Low | 10h | New `VersionDiff` component | Version comparison |
+| 4.8 | Version diff mechanism (charge-level comparison between versions — current UI has side-by-side but no actual diff logic) | Low | 10h | New `VersionDiff` component, `QuotationVersionHistory.tsx` | Version comparison |
+| 4.9 | Add quote status transition enforcement — DB trigger to prevent invalid transitions (e.g., `accepted` → `draft`) | Medium | 4h | New migration with trigger function | Valid state machine |
+| 4.10 | Add `CHECK` constraints: `weight_kg >= 0`, `volume_cbm >= 0` on `quote_items_extension` | Medium | 2h | New migration | No negative weights/volumes |
+| 4.11 | Add scheduled auto-expiry — extend `scheduled-reconcile` to set status=`expired` when `valid_until < NOW()` | Medium | 3h | `scheduled-reconcile/index.ts` or new function | Quotes auto-expire |
+| 4.12 | Replace hardcoded 12% fuel surcharge in AI Advisor with configurable per-tenant surcharge rates | Medium | 4h | `ai-advisor/index.ts:456`, new `surcharge_config` table or tenant setting | Market-based surcharges |
+| 4.13 | Add AI Advisor output validation — validate GPT response against schema before injecting into quotes | High | 4h | `ai-advisor/index.ts:453-505` | No corrupt AI data in quotes |
 
-**Effort**: ~68 hours
+**Effort**: ~85 hours
 **Milestone**: `v2.1.0-enterprise`
 **Approval**: Security review + schema migration dry-run on staging
 
@@ -195,28 +223,33 @@ Current freight-tech platforms (Freightos, Flexport, Xeneta) offer real-time rat
 | # | Task | Severity | Effort | Files Affected | Deliverable |
 |---|------|----------|--------|----------------|-------------|
 | 6.1 | Circuit breaker for PDF generation with fallback to text-only quote | Medium | 6h | `generate-quote-pdf`, `SendQuoteDialog` | Resilient PDF pipeline |
-| 6.2 | Multi-currency charge aggregation in PDF (show charges in original + converted) | Medium | 8h | `generate-quote-pdf` | Multi-currency support |
+| 6.2 | Multi-currency charge aggregation in PDF (show charges in original + converted). **Note**: Zero FX infrastructure exists currently — requires building exchange rate service from scratch, not just PDF formatting | Medium | 16h | `generate-quote-pdf`, new `FxService`, new `exchange_rates` table | Multi-currency support |
 | 6.3 | Distributed tracing integration (connect `trace_id` to OpenTelemetry-compatible backend) | Medium | 12h | `emit-event`, `_shared/logger.ts`, frontend telemetry | End-to-end trace visibility |
 | 6.4 | Quote analytics dashboard (conversion rate, avg margin, quote-to-close time) | Low | 14h | New `QuoteAnalyticsDashboard` page | Business intelligence |
 | 6.5 | Soft delete with restore capability for quotes | Low | 8h | Migration + `QuoteDataProvider` | Data recovery |
 | 6.6 | Template marketplace (tenant-specific PDF/email templates) | Low | 10h | New template management UI + edge function | Customization |
+| 6.7 | Quote clone/duplicate feature — duplicate existing quote to new customer or as new version | Low | 8h | `QuotesList.tsx`, new `clone-quote` RPC | Faster quote creation |
+| 6.8 | Server-side quote filtering/pagination (current client-side filtering has 1000-row limit) | Medium | 8h | `Quotes.tsx`, new `list-quotes` edge function or RPC | Scalable quote listing |
+| 6.9 | Approval workflow UI (DB tables exist from `enterprise_quote_architecture` migration but zero UI) | Low | 16h | New approval components, `QuoteDataProvider` integration | Approval workflows functional |
 
-**Effort**: ~58 hours
+**Effort**: ~90 hours
 **Milestone**: `v3.0.0-competitive`
 **Approval**: Product review + full regression + performance benchmark pass
 
 ### Summary Timeline
 
 ```
-Week 1-2    ████████  Phase 1: Critical Fixes (24h)
-Week 3-4    ████████  Phase 2: Data Integrity (32h)
-Week 5-7    ████████████  Phase 3: Unification (48h)
-Week 8-10   ████████████  Phase 4: Enterprise Hardening (68h)
-Week 11-13  ██████████  Phase 5: API & Integration (50h)
-Week 14-16  ██████████  Phase 6: Competitive Edge (58h)
+Week 1-2    ████████  Phase 1: Critical Fixes (32h)
+Week 3-5    ████████████  Phase 2: Data Integrity + Feature Flags (51h)
+Week 6-8    ████████████  Phase 3: Unification (59h)
+Week 9-11   ████████████████  Phase 4: Enterprise Hardening (85h)
+Week 12-14  ██████████  Phase 5: API & Integration (50h)
+Week 15-18  ██████████████  Phase 6: Competitive Edge (90h)
             ─────────────────────────────────────────────
-            Total: ~280 hours across 16 weeks
+            Total: ~367 hours across 18 weeks
 ```
+
+*Note: v2.1 added ~87 hours across all phases from 29 newly identified gaps. Phase 2 expanded by 1 week to accommodate feature flag infrastructure (prerequisite for later phase rollbacks).*
 
 ---
 
@@ -235,12 +268,13 @@ Week 14-16  ██████████  Phase 6: Competitive Edge (58h)
 │       │               │                   │                          │
 │  ┌────▼───────────────▼───────────────────▼──────────────────┐      │
 │  │          VALIDATION (QuoteTransferSchema - Zod)            │      │
-│  │  PROBLEM: 10+ fields use z.any() — no real validation     │      │
+│  │  PROBLEM: 8 fields use z.any() — no real validation        │      │
 │  └────────────────────────┬──────────────────────────────────┘      │
 │                           │                                          │
 │  ┌────────────────────────▼──────────────────────────────────┐      │
 │  │       TRANSFORMATION (QuoteTransformService)               │      │
 │  │  PROBLEM: String-based ID resolution, silent undefined     │      │
+│  │  PROBLEM: rates[0] unguarded — blank fields if empty       │      │
 │  └────────────────────────┬──────────────────────────────────┘      │
 │                           │                                          │
 │  ┌────────────────────────▼──────────────────────────────────┐      │
@@ -712,10 +746,12 @@ Stage 1: ENTRY VALIDATION (QuoteTransferSchema v2)
   └── Output: Validated QuoteTransferData or ZodError with field paths
 
 Stage 2: TRANSFORMATION VALIDATION (QuoteTransformService)
+  ├── Rates array guard: MUST have rates.length > 0 before accessing rates[0]
   ├── Port resolution: MUST resolve to UUID (warn if fuzzy match, error if no match)
   ├── Carrier resolution: SHOULD resolve (warn if missing, allow null)
   ├── Service type: MUST resolve for mode-specific operations
-  ├── Container: Validate type+size combination against master data
+  ├── Container: Validate type+size combination against master data (no 40HC with "loose")
+  ├── Transit time: Normalize via TransitTimeSchema (reject ambiguous formats)
   └── Output: TransformationReport { resolved: [], warnings: [], errors: [] }
 
 Stage 3: PERSISTENCE VALIDATION (save_quote_atomic_v2)
@@ -727,8 +763,10 @@ Stage 3: PERSISTENCE VALIDATION (save_quote_atomic_v2)
 
 Stage 4: PRE-RENDER VALIDATION (PDF generation)
   ├── Required data present: commodity != "General Cargo" when commodity_id exists
-  ├── Weight/volume non-zero when items exist
-  ├── Company branding loaded for tenant
+  ├── Weight/volume non-zero when items exist (reject negative values)
+  ├── Company branding loaded for tenant (not hardcoded MGL)
+  ├── Notes/terms_conditions included in SafeContext (currently missing)
+  ├── Incoterms resolved (not conflicting between quotes.incoterms and shipping_term_id)
   ├── Sell-side charges filtered (NEVER show buy-side)
   └── Output: PDF binary or ValidationBlockError with missing fields
 
@@ -744,6 +782,20 @@ Stage 5: DELIVERY VALIDATION (send-email)
 ```typescript
 // Replaces the current z.any() fields in quote-transfer.ts
 
+// Transit time normalization (centralizes fragile parsing in QuoteOptionService.ts:144-156)
+const TransitTimeSchema = z.union([
+  z.string().regex(/^\d+\s*(days?|hours?|hrs?|d|h)$/i, "Format: '25 days' or '48 hours'"),
+  z.number().int().min(0),
+]).optional().transform((val) => {
+  // Normalize to hours for consistent storage
+  if (typeof val === 'number') return val;
+  if (!val) return undefined;
+  const num = parseFloat(val);
+  if (isNaN(num)) return undefined;
+  if (/day|d/i.test(val)) return Math.round(num * 24);
+  return Math.round(num); // assume hours
+});
+
 const LegSchema = z.object({
   sequence: z.number().int().min(1),
   from: z.string().min(1, "Leg origin required"),
@@ -753,8 +805,8 @@ const LegSchema = z.object({
   mode: z.enum(['air', 'ocean', 'road', 'rail']),
   carrier: z.string().optional(),
   carrier_id: z.string().uuid().optional(),
-  transit_time: z.string().optional(),
-  transit_time_hours: z.number().optional(),
+  transit_time: TransitTimeSchema,
+  transit_time_hours: z.number().int().min(0).optional(),
   leg_type: z.enum(['origin', 'main', 'destination']).optional(),
   charges: z.array(z.lazy(() => ChargeSchema)).optional(),
 });
@@ -864,7 +916,7 @@ export function dbField<E extends keyof typeof FIELD_MAP>(
 | Metric | Current (estimated) | Phase 2 Target | Phase 4 Target |
 |--------|-------------------|----------------|----------------|
 | Quick Quote → Composer field population rate | ~30% | 85% | 98% |
-| Charge persistence after save | 0% | 95% | 100% |
+| Charge persistence after save (atomic) | ~30% (non-atomic, via Composer manual ops) | 95% | 100% |
 | New option persistence after save | 0% | 95% | 100% |
 | PDF field accuracy rate | ~50% | 90% | 99% |
 | Preview ↔ delivered PDF consistency | ~50% | 95% | 100% |
@@ -909,6 +961,10 @@ export function dbField<E extends keyof typeof FIELD_MAP>(
 | Audit trail | Partial | 4 event types logged; editing/charge events missing |
 | PII masking in logs | Implemented | `src/lib/logger.ts` with PII masking |
 | Secret management | Needs work | Credentials were in `.env` in git history (MUST rotate) |
+| Email secrets | **Exposed** | `send-email/index.ts:47` contains hardcoded Resend API key fallback; sender domain hardcoded to `soslogistics.pro` with fallback to Resend demo domain `onboarding@resend.dev` |
+| AI Advisor pricing | Hardcoded | `ai-advisor/index.ts:456` injects 12% fuel surcharge into every quote with no market basis or tenant configuration |
+| Quote status integrity | Missing | No DB constraint prevents invalid status transitions (e.g., `accepted` → `draft`) |
+| Notes sanitization | Missing | `quotes.notes` stored as raw text; no XSS sanitization if rendered in HTML context |
 
 ### 9.2 Enhancement Requirements
 
@@ -922,6 +978,9 @@ export function dbField<E extends keyof typeof FIELD_MAP>(
 | 9.2.4 | Quote data encryption — encrypt sensitive fields (pricing, margins) at rest | Postgres column-level encryption via `pgcrypto` | Medium |
 | 9.2.5 | Rate limiting — prevent abuse of quote creation/PDF generation | Edge function middleware: 100 req/min/tenant | Medium |
 | 9.2.6 | Data retention — quote data lifecycle (archive after 2 years, delete after 5) | Scheduled function with configurable retention policy | Low |
+| 9.2.7 | Remove hardcoded Resend API key from `send-email/index.ts` (Phase 1) | Delete fallback literal; require env var; fail explicitly if missing | Critical |
+| 9.2.8 | Remove hardcoded fuel surcharge from AI Advisor (Phase 4) | Replace `fuelSurchargeRate = 0.12` with tenant-configurable rate | Medium |
+| 9.2.9 | Sanitize `quotes.notes` and `terms_conditions` before rendering in HTML/PDF | Apply HTML entity escaping or use safe rendering library | Medium |
 
 ### 9.3 Compliance Requirements
 
@@ -971,7 +1030,7 @@ export function dbField<E extends keyof typeof FIELD_MAP>(
 
 ### 10.3 Unit Test Additions (Per Phase)
 
-**Phase 1 tests (8 new):**
+**Phase 1 tests (12 new):**
 - `port.location_name` resolves correctly (not `port_name`)
 - Commodity name fetched via JOIN (not hardcoded)
 - V2 engine uses `weight_kg` / `volume_cbm`
@@ -980,10 +1039,14 @@ export function dbField<E extends keyof typeof FIELD_MAP>(
 - Service type resolution via `transport_modes` relationship
 - Tenant branding loaded for non-MGL tenants
 - Rail mode in Quick Quote enum
+- `rates[0]` guard: empty rates array returns default/error, not undefined cascade
+- PDF SafeContext includes `notes` and `terms_conditions` fields
+- `send-email` function fails explicitly when `RESEND_API_KEY` env var is missing (no fallback)
+- Error boundary renders fallback UI when Composer child throws
 
-**Phase 2 tests (10 new):**
+**Phase 2 tests (16 new):**
 - `save_quote_atomic_v2` creates new options
-- `save_quote_atomic_v2` persists charges
+- `save_quote_atomic_v2` persists charges atomically (rollback if quote save fails)
 - Strict Zod schema rejects `z.any()` payload shapes
 - Post-save validation detects empty options/charges
 - Sell-side filter never returns buy-side charges
@@ -992,6 +1055,12 @@ export function dbField<E extends keyof typeof FIELD_MAP>(
 - Charge deduplication precision (no false positives)
 - Financial balance validation (total = sum of charges)
 - Transform audit trail captures all resolutions
+- Transit time: "25 days" → 600h, "48 hours" → 48h, bare "25" → rejected or explicit unit
+- Transit time: "1d 12h" → 36h (not 24h), "" → null (not 0)
+- Container validation: reject 40HC size with "loose" type
+- Container validation: accept valid combos (20GP + container, FCL + 40HC)
+- Feature flag: `useFeatureFlags('QUOTE_UNIFIED_PROVIDER')` returns default when flag missing
+- Feature flag: flag toggle propagates within 5 seconds
 
 ### 10.4 Integration Tests (Phase 2+)
 
@@ -1076,6 +1145,10 @@ describe('Quote Lifecycle Integration', () => {
 
 **General principle**: Every phase deployment is reversible within 30 minutes. Database migrations include DOWN scripts. Feature flags gate new behavior.
 
+> **PREREQUISITE (v2.1)**: Feature flag infrastructure must be built in Phase 2 (Task 2.11) before Phase 3. No feature flag system currently exists in the codebase. Rollback strategies for Phases 3-6 depend on this.
+
+> **NOTE (v2.1)**: No DOWN migration files currently exist in `supabase/migrations/`. The rollback templates below are aspirational — implement them as part of each phase's migration work.
+
 | Phase | Rollback Mechanism | Data Considerations | RTO |
 |-------|-------------------|---------------------|-----|
 | Phase 1 (Field Fixes) | Git revert; no schema changes | No data migration needed | 5 min |
@@ -1133,12 +1206,12 @@ ALTER TABLE quotation_version_option_legs DROP COLUMN IF EXISTS resolved_carrier
 
 | Role | Responsibility | Phases | Allocation |
 |------|---------------|--------|------------|
-| **Senior Full-Stack Engineer** (Lead) | Architecture decisions, RPC development, schema migrations, code review | All phases | 100% for 16 weeks |
-| **Frontend Engineer** | React components, QuoteDataProvider, Composer fixes, UI validation | Phases 1-3, 6 | 75% for 12 weeks |
-| **Backend/Edge Function Engineer** | Edge functions, PDF engine, API layer, event system | Phases 2-5 | 75% for 12 weeks |
-| **QA Engineer** | Test automation, integration tests, chaos engineering, regression | All phases | 50% for 16 weeks |
-| **DBA / DevOps** | Schema migrations, indexing, backup verification, monitoring setup | Phases 4-6 | 25% for 8 weeks |
-| **Product Owner** | Quality gate approvals, acceptance criteria, prioritization | All phases | 10% for 16 weeks |
+| **Senior Full-Stack Engineer** (Lead) | Architecture decisions, RPC development, schema migrations, code review | All phases | 100% for 18 weeks |
+| **Frontend Engineer** | React components, QuoteDataProvider, Composer fixes, UI validation, error boundaries | Phases 1-3, 6 | 75% for 14 weeks |
+| **Backend/Edge Function Engineer** | Edge functions, PDF engine, API layer, event system, feature flags | Phases 2-5 | 75% for 12 weeks |
+| **QA Engineer** | Test automation, integration tests, chaos engineering, regression | All phases | 50% for 18 weeks |
+| **DBA / DevOps** | Schema migrations, indexing, backup verification, monitoring setup | Phases 4-6 | 25% for 10 weeks |
+| **Product Owner** | Quality gate approvals, acceptance criteria, prioritization | All phases | 10% for 18 weeks |
 
 ### 12.2 Skill Requirements
 
@@ -1166,12 +1239,12 @@ ALTER TABLE quotation_version_option_legs DROP COLUMN IF EXISTS resolved_carrier
 | Staging environment | Supabase free tier | 4 months | $0 |
 | Monitoring tools (if external) | Varies | 4 months | TBD |
 
-*Note: Labor costs depend on team location and employment model. The 280h estimate in Section 2 assumes a single senior engineer executing all code changes. The 1,760h above includes the full team for parallel execution, QA, and oversight.*
+*Note: Labor costs depend on team location and employment model. The 367h estimate in Section 2 assumes a single senior engineer executing all code changes. The team hours above include the full team for parallel execution, QA, and oversight.*
 
 ### 12.4 Phase Staffing Matrix
 
 ```
-            Week 1-2  Week 3-4  Week 5-7  Week 8-10  Week 11-13  Week 14-16
+            Week 1-2  Week 3-5  Week 6-8  Week 9-11  Week 12-14  Week 15-18
 Lead          ████      ████      ████       ████       ████        ████
 Frontend      ████      ████      ████                              ████
 Backend                 ████      ████       ████       ████
@@ -1198,19 +1271,23 @@ Product       █         █         █          █          █           �
 | R8 | Supabase Realtime subscription limits exceeded | Low | Medium | Low | 5 | Monitor connection count; implement connection pooling per tenant |
 | R9 | AI-generated rate data fails new strict validation | High | Low | Medium | 2 | Coerce AI output to schema; log validation failures for AI tuning |
 | R10 | Concurrent edit conflicts frustrate users | Medium | Low | Low | 5 | Clear UI for conflict resolution; merge non-overlapping changes silently |
+| R11 | Feature flag infrastructure delayed — blocks Phase 3-6 rollback capability | Medium | High | High | 2 | Prioritize Task 2.11 early in Phase 2; use simple DB-backed flags (not external service) |
+| R12 | Transit time parsing produces wrong values for existing quotes during migration | Medium | Medium | Medium | 2 | Run migration with dry-run report first; log all format mismatches before auto-correcting |
+| R13 | Hardcoded Resend API key exploited before removal | Low | Critical | High | 1 | Immediate action: check if key is live; rotate via Resend dashboard before Phase 1 starts |
+| R14 | Client-side quote filtering breaks at scale (1000-row limit) | High | Medium | High | 6 | Task 6.8 adds server-side pagination; monitor quote count growth |
 
 ### 13.2 Severity Matrix
 
 ```
               │  Low Impact  │  Medium Impact  │  High Impact  │  Critical Impact
 ──────────────┼──────────────┼─────────────────┼───────────────┼─────────────────
-High          │  R9          │                 │               │
-Likelihood    │  Accept      │                 │               │
+High          │  R9          │  R14            │               │
+Likelihood    │  Accept      │  Mitigate       │               │
 ──────────────┼──────────────┼─────────────────┼───────────────┼─────────────────
-Medium        │  R10         │  R4, R5, R7     │  R2, R3       │
+Medium        │  R10         │  R4, R5, R7, R12│  R2, R3, R11  │
 Likelihood    │  Accept      │  Mitigate       │  Mitigate     │
 ──────────────┼──────────────┼─────────────────┼───────────────┼─────────────────
-Low           │              │  R6, R8         │               │  R1
+Low           │              │  R6, R8         │               │  R1, R13
 Likelihood    │              │  Monitor        │               │  Prevent
 ```
 
@@ -1223,6 +1300,9 @@ Likelihood    │              │  Monitor        │               │  Preven
 | R3 | Integration test shows data loss with v2 RPC | Fall back to v1 RPC; debug v2 in isolation | Lead |
 | R4 | Regression reported after provider merge | Disable unified provider via feature flag | Frontend |
 | R7 | Team member out for > 1 week | Re-prioritize; shift non-critical tasks; bring in backup | Product Owner |
+| R11 | Feature flag infra not ready by Phase 3 start | Delay Phase 3; use git branch deployments as interim rollback | Lead |
+| R13 | Hardcoded Resend key found to be live | Rotate key immediately via Resend dashboard; update env var | Lead |
+| R14 | Quote list performance degrades (>1000 quotes) | Implement temporary LIMIT increase; fast-track Task 6.8 | Backend |
 
 ---
 
@@ -1233,7 +1313,7 @@ Likelihood    │              │  Monitor        │               │  Preven
 | KPI | Baseline | Phase 1 | Phase 2 | Phase 4 | Phase 6 | Measurement |
 |-----|----------|---------|---------|---------|---------|-------------|
 | Field population rate (QQ → Composer) | ~30% | 85% | 90% | 98% | 99% | `quote.fields.populated` / total fields |
-| Charge persistence rate | 0% | 0% | 95% | 100% | 100% | Charges in DB after save / charges in form |
+| Charge persistence rate (atomic) | ~30% (non-atomic) | ~30% | 95% | 100% | 100% | Charges in DB after atomic save / charges in form |
 | PDF field accuracy | ~50% | 90% | 95% | 99% | 99.5% | Correct fields on PDF / total PDF fields |
 | Reconciliation pass rate | Unknown | 60% | 80% | 95% | 98% | `scheduled-reconcile` pass / total checked |
 | Silent data loss per 100 quotes | ~40 | 15 | 5 | < 2 | 0 | Audit log alerts / quote count |
@@ -1261,10 +1341,10 @@ Likelihood    │              │  Monitor        │               │  Preven
 
 | Phase | Exit Criteria | Approver |
 |-------|--------------|----------|
-| Phase 1 | All 8 field fixes pass unit tests; manual QA confirms > 85% population rate; CI green | Engineering Lead |
-| Phase 2 | Integration test: QQ → Composer → Save → Reload → 100% data present; zero `z.any()` in schema; sell-side filter verified | Engineering Lead |
+| Phase 1 | All 12 tasks pass unit tests; manual QA confirms > 85% population rate; CI green; no hardcoded secrets in code | Engineering Lead |
+| Phase 2 | Integration test: QQ → Composer → Save → Reload → 100% data present; zero `z.any()` in schema; sell-side filter verified; feature flag infrastructure operational; charges saved atomically | Engineering Lead |
 | Phase 3 | V1 engine removed; single provider active; PDF cached and consistent across preview/download/send; pre-render validation blocks incomplete PDFs | Engineering Lead + Architect |
-| Phase 4 | No duplicate columns in schema; full audit trail (8 event types); reconciliation auto-repairs common issues; mode-specific PDFs render correctly | Engineering Lead + Security |
+| Phase 4 | No duplicate columns in schema; full audit trail (8 event types); reconciliation auto-repairs common issues; mode-specific PDFs render correctly; status transitions enforced; weight/volume constraints active; auto-expiry operational; AI surcharges configurable | Engineering Lead + Security |
 | Phase 5 | v1 API endpoints stable; optimistic locking prevents data loss; real-time sync < 2s delay; rate limiting enforced | Engineering Lead + Product |
 | Phase 6 | Circuit breaker active; chaos tests pass; performance benchmarks met; analytics dashboard operational | Full Team + Product |
 
@@ -1368,8 +1448,8 @@ After each phase, update `docs/Runbooks/quotation-platform-runbook.md` with:
 
 | File | Purpose | Key Issues |
 |------|---------|------------|
-| `src/components/sales/quick-quote/QuickQuoteModal.tsx` | Quick Quote entry (~670 lines) | Dual state (form + extendedData); no Rail mode |
-| `src/components/sales/MultiModalQuoteComposer.tsx` | Composer wizard (~930 lines) | `port.port_name` mismatch; 570-line init |
+| `src/components/sales/quick-quote/QuickQuoteModal.tsx` | Quick Quote entry (~1085 lines) | Dual state (form + extendedData); no Rail mode; no page-level error boundary |
+| `src/components/sales/MultiModalQuoteComposer.tsx` | Composer wizard (~930 lines) | `port.port_name` mismatch; 570-line init; non-atomic charge mutations |
 | `src/components/sales/composer/QuoteDetailsStep.tsx` | Composer step 1 | `port.port_name` mismatch |
 | `src/components/sales/composer/LegsConfigurationStep.tsx` | Composer step 2 | `st.mode` mismatch; single-leg auto-fill |
 | `src/components/sales/composer/ChargesManagementStep.tsx` | Composer step 3 | Location name vs code for AI |
@@ -1382,8 +1462,14 @@ After each phase, update `docs/Runbooks/quotation-platform-runbook.md` with:
 | `src/components/sales/QuotePreviewModal.tsx` | PDF preview | Always V2; no cache |
 | `src/pages/dashboard/QuoteNew.tsx` | Quote orchestrator page | Complex option insertion |
 | `src/lib/services/quote-transform.service.ts` | Transfer → form transform (563 lines) | String-based ID resolution |
-| `src/lib/schemas/quote-transfer.ts` | Transfer Zod schema | 10+ `z.any()` fields |
+| `src/lib/schemas/quote-transfer.ts` | Transfer Zod schema | 8 `z.any()` fields (lines 16, 22-24, 28-29, 76-77) |
 | `src/lib/quote-mapper.ts` | Rate → quote mapping (405 lines) | `opt.name` mode fallback; loose dedup |
+| `src/components/sales/composer/DocumentPreview.tsx` | Browser preview (3rd render path) | Uses `window.print()` + inline HTML; diverges from PDF engine; has `@media print` CSS. Not unified with V2 PDF engine |
+| `src/components/sales/composer/ErrorBoundary.tsx` | Composer error boundary | Sub-component level only; not page-level |
+| `src/components/sales/quote-form/QuoteErrorBoundary.tsx` | Quote form error boundary | Sub-component level only |
+| `src/services/QuoteOptionService.ts` | Option/leg creation | `parseDurationToHours()` fragile; no container type validation |
+| `src/services/pricing.service.ts` | Margin/financial calculations | Handles edge cases (0%, 100%, >100%) but no negative margin prevention |
+| `src/pages/dashboard/Quotes.tsx` | Quote list page | Client-side filtering with 1000-row limit; bulk delete only; no server-side pagination |
 
 ### Edge Functions — Quote System
 
@@ -1393,7 +1479,7 @@ After each phase, update `docs/Runbooks/quotation-platform-runbook.md` with:
 | `supabase/functions/generate-quote-pdf/engine/renderer.ts` | V2 PDF renderer | Template-based; uses SafeContext |
 | `supabase/functions/generate-quote-pdf/engine/context.ts` | Data → template context | Field name mismatches |
 | `supabase/functions/generate-quote-pdf/engine/default_template.ts` | Default template | Generic; not mode-specific |
-| `supabase/functions/send-email/index.ts` | Email dispatch (1080 lines) | Multi-provider; retry logic |
+| `supabase/functions/send-email/index.ts` | Email dispatch (1080 lines) | Multi-provider; retry logic; **hardcoded Resend API key fallback**; hardcoded sender domain; no template system |
 | `supabase/functions/emit-event/index.ts` | Event emission (70 lines) | Only 4 event types |
 | `supabase/functions/reconcile-quote/index.ts` | Consistency check (75 lines) | No auto-repair |
 | `supabase/functions/scheduled-reconcile/index.ts` | Background reconciliation (58 lines) | 200 quote limit |
@@ -1430,6 +1516,74 @@ After each phase, update `docs/Runbooks/quotation-platform-runbook.md` with:
 
 ---
 
+## Appendix C: v2.1 Review Findings (2026-02-15)
+
+This appendix documents all gaps, inaccuracies, and new issues identified during the v2.1 codebase audit.
+
+### C.1 Newly Identified Gaps (22 items)
+
+| # | Finding | Severity | Phase | Task Added |
+|---|---------|----------|-------|------------|
+| G1 | `rates[0]` unguarded access in `QuoteTransformService:117` — produces blank fields when rates array is empty | Critical | 1 | 1.9 |
+| G2 | Hardcoded Resend API key fallback in `send-email/index.ts:47` | Critical | 1 | 1.11 |
+| G3 | Non-atomic charge persistence — charges saved via manual ops in Composer, separate from RPC | Critical | 2 | 2.10 |
+| G4 | No feature flag infrastructure exists — rollback strategies for Phase 3-6 are unbuildable | High | 2 | 2.11 |
+| G5 | Transit time parsing is fragile — "25" ambiguous (hours? days?), "1d 12h" loses 12h | High | 2 | 2.8 |
+| G6 | AI Advisor hardcoded 12% fuel surcharge injected into every quote | High | 4 | 4.12 |
+| G7 | AI Advisor has no output validation — GPT response injected into quotes without schema check | High | 4 | 4.13 |
+| G8 | Zero FX/currency conversion infrastructure — Task 6.2 underestimated at 8h | High | 6 | 6.2 (revised to 16h) |
+| G9 | Client-side-only quote filtering with 1000-row hard limit | High | 6 | 6.8 |
+| G10 | Notes and terms_conditions excluded from PDF SafeContext | Medium | 1 | 1.10 |
+| G11 | No page-level React error boundaries (QuickQuoteModal, Quotes page unprotected) | Medium | 1 | 1.12 |
+| G12 | Container type+size validation missing — invalid combos allowed | Medium | 2 | 2.9 |
+| G13 | No quote status transition enforcement — `accepted` → `draft` allowed | Medium | 4 | 4.9 |
+| G14 | Weight/volume allow negative values — no CHECK constraint | Medium | 4 | 4.10 |
+| G15 | No automatic quote expiry — `valid_until` is informational only | Medium | 4 | 4.11 |
+| G16 | `DocumentPreview.tsx` is a 3rd render path — diverges from PDF V2 engine | Medium | 3 | 3.7 |
+| G17 | Email sender domain hardcoded to `soslogistics.pro` — not configurable per tenant | Medium | 3 | 3.8 |
+| G18 | Approval workflow has DB tables but zero UI components | Low | 6 | 6.9 |
+| G19 | No quote clone/duplicate feature | Low | 6 | 6.7 |
+| G20 | Zero i18n in quote components — all strings hardcoded in English | Low | Future | — |
+| G21 | Zero accessibility (aria-*, role, tabIndex) in QuickQuoteModal | Low | Future | — |
+| G22 | No offline queue for failed saves | Low | Future | — |
+
+### C.2 Corrections to v2.0 (7 items)
+
+| # | v2.0 Claim | Reality | Correction |
+|---|-----------|---------|------------|
+| C1 | "10+ fields use z.any()" | Actual count: 8 `z.any()` fields | Fixed throughout document |
+| C2 | "QuickQuoteModal ~670 lines" | Actually ~1085 lines | Fixed in Appendix A |
+| C3 | "Charge persistence 0%" | ~30% via non-atomic Composer manual ops | Fixed in Sections 8.3, 14.1 |
+| C4 | "47 Deno functions" (Sections 3.4, 9.1) | MEMORY.md says 45 total | Verify exact count and reconcile |
+| C5 | Rollback via feature flags (Section 11) | No feature flag system exists | Added prerequisite note + Task 2.11 |
+| C6 | DOWN migrations referenced (Section 11.2) | No DOWN migration files exist in `supabase/migrations/` | Added note that this is aspirational |
+| C7 | Version diff as new feature (Task 4.8) | `QuotationVersionHistory.tsx` has side-by-side UI but no diff logic | Updated task description |
+
+### C.3 Items Deferred (Not in 18-Week Scope)
+
+These were identified but intentionally excluded from the phase plan:
+
+| Item | Reason for Deferral |
+|------|-------------------|
+| i18n for quote components (G20) | Requires translation infrastructure + content creation; separate project |
+| Accessibility audit (G21) | Full audit needed; should be a dedicated sprint post-Phase 6 |
+| Offline queue for saves (G22) | Requires service worker + IndexedDB; architectural change beyond current scope |
+| Bulk operations (status change, PDF, export) | Nice-to-have; not blocking enterprise readiness |
+| Document attachment/upload for quotes | Requires Supabase Storage integration; separate feature request |
+| Mobile-specific testing | Responsive classes exist; formal testing should follow Phase 6 |
+
+### C.4 Audit Methodology
+
+Three parallel codebase research agents analyzed:
+1. **Quote system internals** — schema, transform service, RPC, AI advisor, charges, currency, approval workflow, email templates, version history
+2. **Security and infrastructure** — multi-tenancy, feature flags, rate limiting, error boundaries, i18n, accessibility, mobile, offline, file upload, print, clone, search, bulk ops
+3. **Data flow edge cases** — status transitions, quote numbering, soft delete, expiry, margins, container types, weight/volume, incoterms, transit time, notes
+
+Total files analyzed: ~55 quote-related source files + 489 migrations
+
+---
+
 *This document is a living reference. Update as issues are resolved and architecture evolves. Version history tracked in git.*
 
-*Last updated: 2026-02-15*
+*v2.0: 2026-02-15 — Initial release (38 issues)*
+*v2.1: 2026-02-15 — Codebase audit added 29 findings; total effort revised to ~367h across 18 weeks*

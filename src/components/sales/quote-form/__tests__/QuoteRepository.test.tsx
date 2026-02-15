@@ -172,4 +172,29 @@ describe('useQuoteRepository', () => {
         })
     }));
   });
+
+  it('maps is_primary to is_selected in options payload', async () => {
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
+
+    const quoteData = {
+      title: 'Quote With Options',
+      items: [],
+      options: [
+        { id: 'opt-primary', is_primary: true, legs: [] },
+        { id: 'opt-secondary', is_primary: false, legs: [] },
+      ],
+    } as any;
+
+    await result.current.saveQuote({ data: quoteData });
+
+    expect(mockRpc).toHaveBeenCalledWith('save_quote_atomic', expect.objectContaining({
+      p_payload: expect.objectContaining({
+        options: expect.arrayContaining([
+          expect.objectContaining({ id: 'opt-primary', is_selected: true }),
+          expect.objectContaining({ id: 'opt-secondary', is_selected: false }),
+        ]),
+      }),
+    }));
+  });
 });

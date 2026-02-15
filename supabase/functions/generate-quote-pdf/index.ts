@@ -2,7 +2,7 @@ import { serveWithLogger } from "../_shared/logger.ts";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { PdfRenderer } from "./engine/renderer.ts";
-import { buildSafeContext } from "./engine/context.ts";
+import { buildSafeContext, mapQuoteItemsToRawItems } from "./engine/context.ts";
 import { DefaultTemplate } from "./engine/default_template.ts";
 import { getTemplate } from "./engine/template-service.ts";
 
@@ -87,7 +87,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
       .select(`
         *,
         container_sizes (code, name),
-        container_types (code, name)
+        container_types (code, name),
+        master_commodities (name)
       `)
       .eq("quote_id", quoteId);
     
@@ -197,36 +198,41 @@ serveWithLogger(async (req, logger, supabaseClient) => {
       }
     }
 
-    // V2 Engine Logic
+    let branding: any = null;
+    let brandingLogoBase64: string | undefined = undefined;
+
+    try {
+      const tenantBrandingId = (quote as any).tenant_id;
+      let brandingQuery = supabaseClient.from("tenant_branding").select("*");
+      if (tenantBrandingId) {
+        brandingQuery = brandingQuery.eq("tenant_id", tenantBrandingId);
+      } else {
+        brandingQuery = brandingQuery.eq("company_name", "Miami Global Lines");
+      }
+      const { data: brandingData, error: brandingError } = await brandingQuery.single();
+      if (!brandingError && brandingData) {
+        branding = brandingData;
+        if (branding.logo_url && typeof branding.logo_url === "string" && branding.logo_url.startsWith("data:image")) {
+          brandingLogoBase64 = branding.logo_url;
+        }
+        await logger.info(`Fetched branding for: ${branding.company_name}`);
+      } else if (brandingError) {
+        await logger.warn(`Error fetching branding: ${brandingError.message}`);
+      }
+    } catch (e: any) {
+      await logger.warn(`Branding fetch failed: ${e?.message || String(e)}`);
+    }
+
     if (engine_v2) {
        await log("Using V2 Rendering Engine");
-       
-       // Fetch Branding (Phase 2)
-       // For now, defaulting to 'Miami Global Lines' if no specific tenant logic is present
-       const { data: brandingData, error: brandingError } = await supabaseClient
-        .from("tenant_branding")
-        .select("*")
-        .eq("company_name", "Miami Global Lines")
-        .single();
-    
-       if (brandingError) {
-            await logger.warn(`Error fetching branding: ${brandingError.message}`);
-       } else {
-            await logger.info(`Fetched branding for: ${brandingData.company_name}`);
-       }
 
-       // Prefer an option that actually has charges; otherwise fallback to first
-       let selectedOption = options.find((o: any) => Array.isArray(o.charges) && o.charges.length > 0) || (options.length > 0 ? options[0] : null);
-       
-       const branding = brandingData || {};
-       let logoBase64 = undefined;
-       if (branding.logo_url && branding.logo_url.startsWith("data:image")) {
-           logoBase64 = branding.logo_url;
-       }
+       const selectedOption = options.find((o: any) => Array.isArray(o.charges) && o.charges.length > 0) || (options.length > 0 ? options[0] : null);
+       const brandingObj = branding || {};
+       const logoBase64 = brandingLogoBase64;
 
        const rawData = {
           branding: {
-              ...branding,
+              ...brandingObj,
               logo_base64: logoBase64
           },
           quote: {
@@ -261,13 +267,7 @@ serveWithLogger(async (req, logger, supabaseClient) => {
              quantity: c.units,
              leg_id: c.leg_id
           })) || [],
-          items: quote.items?.map((i: any) => ({
-             container_type: i.container_types?.name || i.container_types?.code || "Container",
-             quantity: i.quantity,
-             commodity: i.commodity_description || "General Cargo",
-             weight: i.total_weight,
-             volume: i.total_volume
-          })) || []
+          items: mapQuoteItemsToRawItems(quote.items)
        };
 
        const context = buildSafeContext(rawData);
@@ -346,6 +346,23 @@ serveWithLogger(async (req, logger, supabaseClient) => {
 
     let y = height - 50;
 
+    const brandingName = branding?.company_name || "Miami Global Lines";
+    const brandingShortSource = branding?.short_name || brandingName;
+    const brandingShort = brandingShortSource
+      .split(" ")
+      .filter((p: string) => p.length > 0)
+      .map((p: string) => p[0])
+      .join("")
+      .slice(0, 3)
+      .toUpperCase() || "MGL";
+    const brandingAddressLine1 =
+      branding?.address_line1 || "140 Ethel Road West; Unit 'S&T', Piscataway, NJ 08854-USA";
+    const brandingAddressLine2 =
+      branding?.address_line2 ||
+      "Phone: +1-732-640-2365 | FMC Lic. # 023172NF | IAC #: NE1210010";
+    const brandingTagline =
+      branding?.tagline || "Professional Attitude at all Altitudes";
+
     // Helper
     const drawText = (text: string, x: number, y: number, size = 10, isBold = false, color = black, targetPage = page) => {
         targetPage.drawText(String(text || ''), { x, y, size, font: isBold ? boldFont : font, color });
@@ -365,24 +382,19 @@ serveWithLogger(async (req, logger, supabaseClient) => {
 
     // --- RENDERER ---
 
-    // MGL Layout Logic
     const isMGL = templateContent.layout === "mgl_matrix";
     const isMGLGranular = templateContent.layout === "mgl_granular";
     
     await log(`Layout Mode: MGL=${isMGL}, Granular=${isMGLGranular}`);
 
     if (isMGL || isMGLGranular) {
-        // MGL Header
-        // Logo Placeholder (Text for now)
-        // Center aligned MGL logo text
-        drawText("MGL", 270, height - 40, 30, true, primaryColor);
-        drawText("MIAMI GLOBAL LINES", 230, height - 60, 16, true, primaryColor);
+        drawText(brandingShort, 270, height - 40, 30, true, primaryColor);
+        drawText(brandingName.toUpperCase(), 230, height - 60, 16, true, primaryColor);
 
-        // Address Centered
         const addrY = height - 85;
-        drawText("140 Ethel Road West; Unit 'S&T', Piscataway, NJ 08854-USA", 160, addrY, 10, true);
-        drawText("Phone:+1-732-640-2365,FMC Lic. # 023172NF / IAC #: NE1210010", 160, addrY - 12, 10, true);
-        drawText("Professional Attitude at all Altitudes", 220, addrY - 24, 10, true, black);
+        drawText(brandingAddressLine1, 160, addrY, 10, true);
+        drawText(brandingAddressLine2, 160, addrY - 12, 10, true);
+        drawText(brandingTagline, 220, addrY - 24, 10, true, black);
 
         y = addrY - 50;
 
@@ -399,19 +411,18 @@ serveWithLogger(async (req, logger, supabaseClient) => {
         
         y -= 35;
     } else {
-        // Standard Header
         if (templateContent.header?.show_logo) {
-            drawText("MGL", 50, y, 24, true, primaryColor);
-            drawText("MIAMI GLOBAL LINES", 110, y, 20, true, primaryColor);
+            drawText(brandingShort, 50, y, 24, true, primaryColor);
+            drawText(brandingName.toUpperCase(), 110, y, 20, true, primaryColor);
             y -= 30;
         }
         
         if (templateContent.header?.company_info) {
-             drawText("140 Ethel Road West; Unit 'S&T', Piscataway, NJ 08854-USA", 50, y, 10);
+             drawText(brandingAddressLine1, 50, y, 10);
              y -= 15;
-             drawText("Phone: +1-732-640-2365 | FMC Lic. # 023172NF | IAC #: NE1210010", 50, y, 10, true);
+             drawText(brandingAddressLine2, 50, y, 10, true);
              y -= 15;
-             drawText("Professional Attitude at all Altitudes", 50, y, 10, true, primaryColor);
+             drawText(brandingTagline, 50, y, 10, true, primaryColor);
              y -= 30;
         }
     }

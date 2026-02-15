@@ -86,6 +86,7 @@ describe('mapOptionToQuote', () => {
         const result = mapOptionToQuote(quickQuoteOption);
 
         expect(result.carrier).toBe('Maersk');
+        expect(result.mode).toBe('ocean');
         expect(result.transport_mode).toBe('Ocean - FCL');
         expect(result.transit_time.details).toBe('25 Days');
         expect(result.total_amount).toBe(2000);
@@ -97,6 +98,22 @@ describe('mapOptionToQuote', () => {
         expect(result.legs[0].charges).toHaveLength(1);
         expect(result.legs[0].charges[0].amount).toBe(2000);
         expect(result.legs[0].charges[0].category).toBe('Freight');
+    });
+
+    it('does not use option name as transport mode when name is not a mode', () => {
+        const option = {
+            id: 'opt-best-value',
+            carrier: 'Test Line',
+            name: 'Best Value',
+            price: 1000,
+            currency: 'USD',
+            legs: []
+        };
+
+        const result = mapOptionToQuote(option);
+
+        expect(result.mode).toBe('ocean');
+        expect(result.transport_mode).toBe('Best Value');
     });
 
     it('adds balancing charge if parts do not sum to total', () => {

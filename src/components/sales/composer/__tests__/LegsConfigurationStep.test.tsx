@@ -29,7 +29,7 @@ const mockState = {
   validationErrors: [],
   referenceData: {
     serviceTypes: [
-      { id: 'st1', name: 'Loading', code: 'LOAD' }
+      { id: 'st1', name: 'Ocean Freight', code: 'OCEAN', is_active: true, transport_modes: { code: 'ocean' } }
     ],
     carriers: [
       { id: 'c1', carrier_name: 'Maersk', carrier_type: 'ocean' }
@@ -79,13 +79,16 @@ describe('LegsConfigurationStep', () => {
     const addButton = screen.getByText('Add Ocean Leg');
     fireEvent.click(addButton);
 
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'ADD_LEG',
-      payload: expect.objectContaining({
-        mode: 'ocean',
-        legType: 'transport'
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ADD_LEG',
+        payload: expect.objectContaining({
+          mode: 'ocean',
+          legType: 'transport',
+          serviceTypeId: 'st1'
+        })
       })
-    });
+    );
   });
 
   it('displays existing legs', () => {

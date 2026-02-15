@@ -117,16 +117,26 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};
   const { scopedDb } = useCRM();
 
+  const normalizeModeKey = (value: string) => {
+    const v = (value || '').toLowerCase();
+    if (!v) return '';
+    if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+    if (v.includes('air')) return 'air';
+    if (v.includes('rail')) return 'rail';
+    if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+    if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+    if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+    return v;
+  };
+
   const onAddLeg = (mode: string) => {
-    // Find default service type for this mode
+    const targetKey = normalizeModeKey(mode);
     const defaultServiceType = serviceTypes.find(st => {
-      const stMode = (st.mode || '').toLowerCase();
-      const legMode = mode.toLowerCase();
-      // Match mode directly or via common aliases
-      if (stMode === legMode) return true;
-      if (legMode === 'ocean' && stMode === 'sea') return true;
-      if (legMode === 'sea' && stMode === 'ocean') return true;
-      return false;
+      if (!st) return false;
+      const transportMode = (st as any).transport_modes;
+      const codeKey = normalizeModeKey(transportMode?.code || (st as any).mode || '');
+      if (!codeKey) return false;
+      return codeKey === targetKey;
     });
 
     const newLeg: Leg = {

@@ -138,7 +138,8 @@ export class QuoteOptionService {
     private async insertLegs(tenantId: string, optionId: string, rate: any, rateMapper: any, context: any) {
         const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
         const legsToInsert: any[] = [];
-        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || rate.mode || 'ocean' }];
+        const baseMode = rate.mode || 'ocean';
+        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
 
         const parseDurationToHours = (duration: string | number | undefined) => {
             if (typeof duration === 'number') return duration; 
@@ -155,7 +156,7 @@ export class QuoteOptionService {
         }
 
         rateLegs.forEach((leg: any, index: number) => {
-            const legMode = leg.mode || rate.transport_mode || rate.mode || 'ocean';
+            const legMode = leg.mode || baseMode;
             const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
             
             // Try to use rateMapper first, then fallback to robust resolution if context is available
@@ -263,7 +264,8 @@ export class QuoteOptionService {
         // legData returned from insert has mode_id. We need to look up mode code.
         // Or we can assume the order matches the input `rate.legs` (which we sorted).
         
-        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || 'ocean' }];
+        const baseMode = rate.mode || 'ocean';
+        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
         if (rateLegs.length > 1 && rateLegs.every((l: any) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
             rateLegs.sort((a: any, b: any) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
         }
@@ -273,7 +275,7 @@ export class QuoteOptionService {
             return {
                 id: l.id,
                 leg_type: l.leg_type || 'transport',
-                mode: originalLeg?.mode || rate.transport_mode || 'ocean',
+                mode: originalLeg?.mode || baseMode,
                 origin: '', // Not critical for matching
                 destination: '',
                 sequence: l.sort_order,
@@ -281,7 +283,7 @@ export class QuoteOptionService {
             } as TransportLeg;
         });
 
-        let targetModeId = rateMapper.getModeId(rate.transport_mode || 'ocean');
+        let targetModeId = rateMapper.getModeId(baseMode);
         
         // If the target mode doesn't match any leg, try to infer the main mode from the legs
         // This handles cases where transport_mode is default (ocean) but legs are Air/Road

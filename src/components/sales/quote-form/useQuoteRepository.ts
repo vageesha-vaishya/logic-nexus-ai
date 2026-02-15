@@ -244,13 +244,14 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         if (uniqueTypeIds.length > 0) {
           const { data: typeRows, error: typesErr } = await (supabase as any)
             .from('service_types')
-            .select('id, name, code')
+            .select('id, name, code, transport_modes:transport_modes(code)')
             .in('id', uniqueTypeIds);
           if (!typesErr && Array.isArray(typeRows)) {
             serviceTypesForDropdown = typeRows.map((t: any) => ({
               id: String(t.id),
               code: String(t.code),
               name: t.name || String(t.code),
+              transport_modes: t.transport_modes,
             }));
           }
         }
@@ -571,15 +572,39 @@ export function useQuoteRepositoryForm(opts: {
         ? String(primaryOption.total_amount) 
         : (quote.shipping_amount ? String(quote.shipping_amount) : '0');
 
-    // Resolve Service Type ID from Option if missing
+    const normalizeModeKey = (value: string | undefined | null) => {
+      const v = (value || '').toLowerCase();
+      if (!v) return '';
+      if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+      if (v.includes('air')) return 'air';
+      if (v.includes('rail')) return 'rail';
+      if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+      if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+      if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+      return v;
+    };
+
     let resolvedServiceTypeId = quote.service_type_id ? String(quote.service_type_id) : '';
-    if (!resolvedServiceTypeId && primaryOption && primaryOption.legs.length > 0) {
+    if (!resolvedServiceTypeId && primaryOption && primaryOption.legs.length > 0 && serviceTypes && serviceTypes.length > 0) {
         const mainMode = primaryOption.legs.find((l: any) => l.transport_mode === 'ocean' || l.transport_mode === 'air')?.transport_mode || primaryOption.legs[0].transport_mode;
-        if (mainMode && serviceTypes) {
-             const foundType = serviceTypes.find((st: any) => st.name?.toLowerCase().includes(mainMode.toLowerCase()) || st.code?.toLowerCase() === mainMode.toLowerCase());
-             if (foundType) {
-                 resolvedServiceTypeId = String(foundType.id);
-             }
+        const mainKey = normalizeModeKey(mainMode);
+        if (mainKey) {
+          const foundType = serviceTypes.find((st: any) => {
+            const tm = (st as any).transport_modes;
+            const tmKey = normalizeModeKey(tm?.code);
+            if (tmKey && tmKey === mainKey) return true;
+
+            const nameKey = normalizeModeKey(st.name);
+            const codeKey = normalizeModeKey(st.code);
+            if (nameKey && nameKey === mainKey) return true;
+            if (codeKey && codeKey === mainKey) return true;
+
+            const lowerMain = (mainMode || '').toLowerCase();
+            return !!(st.name?.toLowerCase().includes(lowerMain) || st.code?.toLowerCase() === lowerMain);
+          });
+          if (foundType) {
+            resolvedServiceTypeId = String(foundType.id);
+          }
         }
     }
 
