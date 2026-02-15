@@ -28,17 +28,17 @@
 
 ### Objective
 
-This document delivers a comprehensive root cause analysis of the Logic Nexus AI quotation platform, covering all modules from initial quote capture through PDF delivery. It identifies **37 distinct technical issues** across 5 severity tiers, proposes architectural solutions, and provides a phased implementation roadmap.
+This document delivers a comprehensive root cause analysis of the Logic Nexus AI quotation platform, covering all modules from initial quote capture through PDF delivery. It identifies **38 distinct technical issues** across 5 severity tiers, proposes architectural solutions, and provides a phased implementation roadmap.
 
 ### Key Findings
 
 | Category | Critical | High | Medium | Low | Total |
 |----------|----------|------|--------|-----|-------|
-| Data Consistency | 4 | 5 | 3 | 2 | 14 |
+| Data Consistency | 4 | 6 | 3 | 2 | 15 |
 | PDF Generation | 3 | 3 | 2 | 1 | 9 |
 | Auto-Population | 2 | 4 | 1 | 0 | 7 |
 | Schema/Type Safety | 1 | 2 | 2 | 2 | 7 |
-| **Total** | **10** | **14** | **8** | **5** | **37** |
+| **Total** | **10** | **15** | **8** | **5** | **38** |
 
 ### Top 5 Critical Blockers
 
@@ -135,7 +135,7 @@ This document delivers a comprehensive root cause analysis of the Logic Nexus AI
 **Files**: `src/components/sales/quick-quote/QuickQuoteModal.tsx`
 
 **Capabilities**:
-- 3 transport modes (Air, Ocean, Road) with mode-specific fields
+- 4 transport modes (Air, Ocean, Road, Rail) with mode-specific fields
 - AI-assisted code lookup, commodity classification, compliance validation
 - Parallel rate engine invocation (legacy `rate-engine` + AI advisor `generate_smart_quotes`)
 - Multi-rate selection with batch conversion to full quote
@@ -146,6 +146,7 @@ This document delivers a comprehensive root cause analysis of the Logic Nexus AI
 - Ocean: containerCombos[] (type, size, qty)
 - Air: dimensions, dangerous goods
 - Road: vehicleType, pallets
+- Rail: containerCombos[] (type, size, qty), intermodal terminal details
 - All: pickupDate, deliveryDeadline, htsCode, scheduleB, preferredCarriers
 - Extended: originDetails/destinationDetails (full location objects with name, code, type, country, city)
 
@@ -155,6 +156,7 @@ This document delivers a comprehensive root cause analysis of the Logic Nexus AI
 - `extendedData` state managed separately from React Hook Form — dual state source
 - AI fallback to "simulation engine" when rate-engine fails produces synthetic data with no source marking
 - Rate deduplication in `mapOptionToQuote` uses loose name matching ("Freight" vs "Freight Charges")
+- **Missing Rail mode**: Quick Quote base schema only defines `z.enum(["air", "ocean", "road"])` — Rail must be added to the mode enum, along with rail-specific form fields (container combos, intermodal terminal, rail carrier selection)
 
 ### 3.2 AI Quote (AI Advisor)
 
@@ -303,13 +305,14 @@ MultiModalQuoteComposer
   │
   ▼ Dispatches to QuoteStore
   │ FAILURE POINT 7: All empty initial state — no validation that dispatched data is non-empty
+  │ FAILURE POINT 8: Rail mode not in Quick Quote enum — rail quotes cannot originate from Quick Quote
 ```
 
 **Data Loss Points** (quantified):
 
 | Transfer Step | Fields at Risk | Typical Loss Rate |
 |--------------|----------------|-------------------|
-| Quick Quote → TransferSchema | originDetails, containerCombos | ~5% (Zod strips extra fields) |
+| Quick Quote → TransferSchema | originDetails, containerCombos, rail mode entirely | ~5% (Zod strips extra fields); 100% for rail (mode not in enum) |
 | TransferSchema → QuoteFormValues | origin_port_id, carrier_id, service_type_id | ~30% (ID resolution failures) |
 | QuoteFormValues → DB Insert | charges, leg details | ~15% (RPC doesn't save charges) |
 | DB → Composer loadInitialData | origin name, destination name, service type | ~40% (field name mismatches) |
@@ -445,6 +448,7 @@ STAGE 8: DELIVERY (send-email edge fn)
 | 7 | commodity_description missing | Critical | "General Cargo" on PDF |
 | 7 | V1/V2 engine divergence | Critical | Preview ≠ delivered PDF |
 | 7 | weight field mismatch | High | 0 weight on PDF |
+| 1 | Rail mode missing from Quick Quote enum | High | Rail quotes cannot originate from Quick Quote |
 
 ---
 
@@ -505,7 +509,7 @@ This is a business-critical data exposure risk.
 
 ### 6.5 Template System Gaps
 
-- `DefaultTemplate` renders a generic layout — no mode-specific sections (ocean vs air vs road)
+- `DefaultTemplate` renders a generic layout — no mode-specific sections (ocean vs air vs road vs rail)
 - No support for multi-currency charge aggregation within a single PDF
 - Template schema (`engine/schema.ts`) validates structure but not content completeness
 - No preview-to-final consistency guarantee (both could use different templates)
@@ -753,7 +757,7 @@ export const FIELD_MAP = {
 1. **Proper data fetching**: Join `commodities` table for actual commodity name
 2. **Correct field mapping**: Use `weight_kg` and `volume_cbm` (actual DB columns)
 3. **Tenant-aware branding**: Replace hardcoded MGL data with tenant config
-4. **Mode-specific templates**: Different PDF sections for ocean, air, road
+4. **Mode-specific templates**: Different PDF sections for ocean, air, road, rail
 5. **Validation gate**: Schema-validate all data before rendering; log warnings for missing required fields
 6. **Consistency guarantee**: Store rendered PDF in Supabase Storage; serve same PDF for preview and download
 
@@ -862,8 +866,9 @@ Phase 3: Drop deprecated columns with migration
 | 1.5 | Fix `opt.name` fallback for transport mode | High | 1h | quote-mapper.ts |
 | 1.6 | Fix `st.mode` → use transport_modes relationship | High | 3h | LegsConfigurationStep.tsx |
 | 1.7 | Remove hardcoded MGL company data → tenant config | High | 4h | generate-quote-pdf/index.ts |
+| 1.8 | Add Rail mode to Quick Quote enum and form fields | High | 6h | QuickQuoteModal.tsx, quote-transfer.ts |
 
-**Estimated effort**: ~18 hours
+**Estimated effort**: ~24 hours
 
 ### Phase 2: Data Integrity (Week 3-4)
 
@@ -906,13 +911,13 @@ Phase 3: Drop deprecated columns with migration
 | 4.2 | Add transformation audit trail (log every field resolution) | Medium | 8h | QuoteTransformService |
 | 4.3 | Enhance reconciliation with charge-level validation | Medium | 6h | reconcile-quote |
 | 4.4 | Add event emission for QuoteUpdated, ChargesChanged | Medium | 4h | emit-event, supabase-functions.ts |
-| 4.5 | Mode-specific PDF templates (ocean, air, road) | Medium | 12h | PDF engine templates |
+| 4.5 | Mode-specific PDF templates (ocean, air, road, rail) | Medium | 14h | PDF engine templates |
 | 4.6 | Multi-currency charge aggregation in PDF | Low | 8h | generate-quote-pdf |
 | 4.7 | Version diff mechanism (charge-level comparison) | Low | 10h | VersionComparison.tsx |
 
-**Estimated effort**: ~60 hours
+**Estimated effort**: ~62 hours
 
-### Total Estimated Effort: ~158 hours (~4 weeks at full capacity)
+### Total Estimated Effort: ~166 hours (~4.5 weeks at full capacity)
 
 ---
 
@@ -953,7 +958,8 @@ Phase 3: Drop deprecated columns with migration
 - [ ] PDF shows actual commodity name when `commodity_id` exists
 - [ ] V2 PDF shows correct weight/volume
 - [ ] No hardcoded company data in PDF for non-MGL tenants
-- [ ] Unit tests cover all 7 fixed issues
+- [ ] Rail mode added to Quick Quote (enum, form fields, AI advisor support)
+- [ ] Unit tests cover all 8 fixed issues
 
 **Phase 2 Exit Criteria**:
 - [ ] `save_quote_atomic_v2` handles new options + legs + charges
@@ -971,7 +977,7 @@ Phase 3: Drop deprecated columns with migration
 - [ ] No duplicate columns in schema
 - [ ] Full audit trail for every field transformation
 - [ ] Reconciliation runs on schedule with alerting
-- [ ] Mode-specific PDF templates for ocean, air, road
+- [ ] Mode-specific PDF templates for ocean, air, road, rail
 
 ---
 
