@@ -129,8 +129,8 @@ export default function ServiceTypes() {
         code: code.trim().toLowerCase(),
         description: description || null, 
         is_active: isActive,
-        category_id: categoryId === 'none' ? null : categoryId,
-        mode_id: modeId === 'none' ? null : modeId
+        category_id: (() => { const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v); return categoryId === 'none' ? null : (isUUID(categoryId) ? categoryId : null); })(),
+        mode_id: (() => { const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v); return modeId === 'none' ? null : (isUUID(modeId) ? modeId : null); })()
       };
       const { error } = await scopedDb.from('service_types').insert(payload);
       if (error) throw error;
@@ -153,7 +153,7 @@ export default function ServiceTypes() {
       const { error } = await scopedDb
         .from('service_types')
         .update({ is_active: next })
-        .eq('id', row.id);
+        .eq('id', ((v) => { const isUUID = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val); return isUUID(v) ? v : ''; })(row.id));
       if (error) throw error;
       fetchTypes();
     } catch (err: unknown) {
@@ -171,7 +171,7 @@ export default function ServiceTypes() {
       const { error } = await scopedDb
         .from('service_types')
         .delete()
-        .eq('id', row.id);
+        .eq('id', ((v) => { const isUUID = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val); return isUUID(v) ? v : ''; })(row.id));
       if (error) throw error;
       toast.success('Service type deleted');
       fetchTypes();
@@ -212,13 +212,13 @@ export default function ServiceTypes() {
         code: editCode.trim().toLowerCase(),
         description: editDescription || null,
         is_active: editIsActive,
-        category_id: editCategoryId === 'none' ? null : editCategoryId,
-        mode_id: editModeId === 'none' ? null : editModeId
+        category_id: (() => { const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v); return editCategoryId === 'none' ? null : (isUUID(editCategoryId) ? editCategoryId : null); })(),
+        mode_id: (() => { const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v); return editModeId === 'none' ? null : (isUUID(editModeId) ? editModeId : null); })()
       } as const;
       const { error } = await scopedDb
         .from('service_types')
         .update(payload)
-        .eq('id', editingRow.id);
+        .eq('id', ((v) => { const isUUID = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val); return isUUID(v) ? v : ''; })(editingRow.id));
       if (error) throw error;
       toast.success('Service type updated');
       setEditOpen(false);

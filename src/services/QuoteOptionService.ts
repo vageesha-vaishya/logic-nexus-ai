@@ -77,7 +77,8 @@ export class QuoteOptionService {
             this.debug.warn('Discrepancy between sellPrice and rate.total_amount', { sellPrice, rateTotal: rate.total_amount });
         }
 
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rate.id);
+        const candidateCarrierRateId = typeof rate.carrier_rate_id === 'string' ? rate.carrier_rate_id : rate.id;
+        const isUUID = typeof candidateCarrierRateId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidateCarrierRateId);
 
         // Calculate total CO2
         const totalCo2 = rate.co2_kg || (rate.legs?.reduce((acc: number, leg: any) => acc + (Number(leg.co2_emission) || Number(leg.co2) || 0), 0)) || 0;
@@ -88,7 +89,7 @@ export class QuoteOptionService {
             .insert({
                 tenant_id: tenantId,
                 quotation_version_id: versionId,
-                carrier_rate_id: isUUID ? rate.id : null,
+                carrier_rate_id: isUUID ? candidateCarrierRateId : null,
                 option_name: rate.name || `${rate.carrier} ${rate.tier}`,
                 carrier_name: rate.carrier,
                 total_amount: sellPrice,
@@ -135,6 +136,7 @@ export class QuoteOptionService {
     }
 
     private async insertLegs(tenantId: string, optionId: string, rate: any, rateMapper: any, context: any) {
+        const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
         const legsToInsert: any[] = [];
         const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || rate.mode || 'ocean' }];
 
@@ -161,6 +163,9 @@ export class QuoteOptionService {
             if (!serviceTypeId && context.serviceTypes) {
                 serviceTypeId = QuoteTransformService.resolveServiceTypeId(legMode, undefined, context.serviceTypes);
             }
+            if (!isUuid(serviceTypeId)) {
+                serviceTypeId = null;
+            }
 
             // Resolve Provider/Carrier ID
             let providerId = rateMapper.getProviderId(carrierName);
@@ -168,6 +173,9 @@ export class QuoteOptionService {
                 // Construct a minimal rate object for resolution
                 const mockRate = { carrier: carrierName, carrier_name: carrierName };
                 providerId = QuoteTransformService.resolveCarrierId(mockRate as any, context.carriers);
+            }
+            if (!isUuid(providerId)) {
+                providerId = null;
             }
             
             const isFirstLeg = index === 0;
@@ -188,16 +196,21 @@ export class QuoteOptionService {
             }
             
             // Resolve Location IDs
-            const originLocationId = QuoteTransformService.resolvePortId(origin, context.ports);
-            const destinationLocationId = QuoteTransformService.resolvePortId(destination, context.ports);
+            const originLocationIdRaw = QuoteTransformService.resolvePortId(origin, context.ports);
+            const destinationLocationIdRaw = QuoteTransformService.resolvePortId(destination, context.ports);
+            const originLocationId = isUuid(originLocationIdRaw) ? originLocationIdRaw : null;
+            const destinationLocationId = isUuid(destinationLocationIdRaw) ? destinationLocationIdRaw : null;
 
             // Database constraint relies on default 'transport'
             const legType = 'transport';
 
+            const modeIdRaw = rateMapper.getModeId(legMode);
+            const modeId = isUuid(modeIdRaw) ? modeIdRaw : null;
+
             legsToInsert.push({
                 quotation_version_option_id: optionId,
                 tenant_id: tenantId,
-                mode_id: rateMapper.getModeId(legMode),
+                mode_id: modeId,
                 mode: legMode,
                 service_type_id: serviceTypeId,
                 provider_id: providerId,
@@ -300,6 +313,7 @@ export class QuoteOptionService {
         const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
         const addChargePair = async (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): Promise<boolean> => {
+            const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
             let catId = rateMapper.getCatId(categoryKey);
             
             // Fallback: Try to find a generic category if specific mapping fails
@@ -331,13 +345,29 @@ export class QuoteOptionService {
                 }
             }
 
-            const basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
-            const currId = rateMapper.getCurrId(rate.currency || 'USD');
+            let basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
+            let currId = rateMapper.getCurrId(rate.currency || 'USD');
             
-            const finalLegId = targetLegId || mainLegId || legData?.[0]?.id;
+            const finalLegCandidate = targetLegId || mainLegId || legData?.[0]?.id;
+            const finalLegId = isUuid(finalLegCandidate) ? finalLegCandidate : null;
             
             if (!finalLegId) {
                 this.debug.warn('Skipping charge insertion: No valid leg ID found', { categoryKey, amount });
+                return false;
+            }
+
+            if (!isUuid(catId)) {
+                this.debug.warn('Skipping charge insertion: Invalid category_id', { categoryKey });
+                return false;
+            }
+            if (!isUuid(basisId)) {
+                basisId = null;
+            }
+            if (!isUuid(currId)) {
+                currId = null;
+            }
+            if (!isUuid(buySideId) || !isUuid(sellSideId)) {
+                this.debug.warn('Skipping charge insertion: Invalid charge_side_id(s)');
                 return false;
             }
 

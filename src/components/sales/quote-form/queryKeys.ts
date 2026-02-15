@@ -15,6 +15,7 @@ export const quoteKeys = {
     opportunities: (tenantId?: string) => [...quoteKeys.reference.all, 'opportunities', { tenantId }] as const,
     contacts: (tenantId?: string) => [...quoteKeys.reference.all, 'contacts', { tenantId }] as const,
     shippingTerms: () => [...quoteKeys.reference.all, 'shipping-terms'] as const,
+    currencies: () => [...quoteKeys.reference.all, 'currencies'] as const,
   },
 
   // Quote hydration (loading existing quote for editing)

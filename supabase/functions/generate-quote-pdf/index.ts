@@ -25,7 +25,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     };
 
     const body = await req.json();
-    let { quoteId, versionId, templateId, template, engine_v2, store_result } = body;
+    const { templateId, template, engine_v2 } = body;
+    let { quoteId, versionId, store_result } = body;
 
     // Handle Database Webhook Payload
     if (body.type === 'INSERT' || body.type === 'UPDATE') {
@@ -901,9 +902,9 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                  for (const line of lines) {
                      if (y < 40) { page = pdfDoc.addPage(); y = height - 50; }
                      
-                     let fontSize = 8;
+                    const fontSize = 8;
                      let isBold = false;
-                     let color = black;
+                    const color = black;
 
                      if (line.includes("LAP TOP BATTERIES") || line.includes("RATES ARE NOT SUBJECT")) {
                          isBold = true;
@@ -954,66 +955,6 @@ serveWithLogger(async (req, logger, supabaseClient) => {
                  const totalWeight = quote.items?.reduce((acc: number, i: any) => acc + (Number(i.weight_kg) || 0), 0) || 0;
                  drawRow('Total Quantity', String(totalQty));
                  if (totalWeight > 0) drawRow('Total Weight', `${totalWeight} kg`);
-                 y -= 20;
-            }
-            else if (section.type === "rates_table") {
-                 // ... (Keep existing standard logic) ...
-                 drawText(section.title || "Freight Charges", 40, y, 12, true, primaryColor);
-                 y -= 20;
-                 if (options.length > 0) {
-                    for (const opt of options) {
-                        if (y < 100) { page = pdfDoc.addPage(); y = height - 50; }
-                        drawRect(40, y - 25, 510, 25, primaryColor, true);
-                        const carrierName = opt.carriers?.carrier_name || "Standard";
-                        drawText(`Carrier: ${carrierName}`, 50, y - 17, 12, true, white);
-                        drawText(`Transit: ${opt.transit_days || '-'} Days`, 250, y - 17, 12, true, white);
-                        y -= 30;
-                        drawRect(40, y - 20, 510, 20);
-                        drawText("Description", 45, y - 14, 9, true);
-                        drawText("Amount", 400, y - 14, 9, true);
-                        y -= 20;
-                        let total = 0;
-                        if (opt.charges?.length > 0) {
-                            for (const chg of opt.charges) {
-                                drawRect(40, y - 20, 510, 20);
-                                drawText(chg.note || "Charge", 45, y - 14, 9);
-                                const amt = Number(chg.amount) || 0;
-                                drawText(`$${amt.toFixed(2)}`, 400, y - 14, 9);
-                                total += amt;
-                                y -= 20;
-                            }
-                        } else {
-                            drawRect(40, y - 20, 510, 20);
-                            drawText("Total Freight", 45, y - 14, 9);
-                            drawText(`$${(Number(opt.total_amount) || 0).toFixed(2)}`, 400, y - 14, 9);
-                            total = Number(opt.total_amount) || 0;
-                            y -= 20;
-                        }
-                        drawRect(40, y - 20, 510, 20, primaryColor, true);
-                        drawText("Total", 45, y - 14, 10, true, white);
-                        drawText(`$${total.toFixed(2)}`, 400, y - 14, 10, true, white);
-                        y -= 30;
-                    }
-                 } else {
-                     drawText("No rates available.", 50, y, 12, false, gray);
-                     y -= 20;
-                 }
-            }
-            else if (section.type === "terms") {
-                 // ... (Keep existing standard logic) ...
-                 drawText(section.title || "Terms & Conditions", 40, y, 12, true, primaryColor);
-                 y -= 15;
-                 const terms = [
-                      'Above Rates Are Excluding of: Destination charges / Cargo Insurance / taxes / duties.',
-                      'Rates are on: PER UNIT basis.',
-                      'Prepaid basis.',
-                      'Valid for 30 days.',
-                      'Subject to change without prior notice.'
-                 ];
-                 for (const term of terms) {
-                      drawText(`• ${term}`, 50, y, 8);
-                      y -= 12;
-                 }
                  y -= 20;
             }
         }

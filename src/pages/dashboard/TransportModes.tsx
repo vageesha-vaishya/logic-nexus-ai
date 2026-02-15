@@ -51,6 +51,13 @@ export default function TransportModes() {
     });
   };
 
+  const isUUID = (v: any) =>
+    typeof v === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+  const isValidModeCode = (v: string) =>
+    /^[a-z][a-z0-9_\-]{1,31}$/.test(v);
+
   const handleCreate = async () => {
     if (!formData.name || !formData.code || !formData.icon_name) {
       toast({
@@ -61,9 +68,35 @@ export default function TransportModes() {
       return;
     }
 
+    const normalizedCode = String(formData.code).toLowerCase().trim();
+    if (!isValidModeCode(normalizedCode)) {
+      toast({
+        title: 'Invalid Code',
+        description: 'Code must start with a letter and contain only a-z, 0-9, _ or -',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (modes?.some((m) => String(m.code).toLowerCase() === normalizedCode)) {
+      toast({
+        title: 'Duplicate Code',
+        description: 'A transport mode with this code already exists',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!iconOptions.includes(formData.icon_name)) {
+      toast({
+        title: 'Invalid Icon',
+        description: 'Please select a valid icon from the list',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const { error } = await scopedDb
       .from('transport_modes', true)
-      .insert([formData]);
+      .insert([{ ...formData, code: normalizedCode }]);
 
     if (error) {
       toast({
@@ -85,17 +118,53 @@ export default function TransportModes() {
   const handleUpdate = async () => {
     if (!editingMode) return;
 
+    const id = editingMode.id;
+    if (!isUUID(id)) {
+      toast({
+        title: 'Invalid ID',
+        description: 'Transport mode ID is not a valid UUID',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const normalizedCode = String(formData.code).toLowerCase().trim();
+    if (!isValidModeCode(normalizedCode)) {
+      toast({
+        title: 'Invalid Code',
+        description: 'Code must start with a letter and contain only a-z, 0-9, _ or -',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (modes?.some((m) => m.id !== id && String(m.code).toLowerCase() === normalizedCode)) {
+      toast({
+        title: 'Duplicate Code',
+        description: 'A transport mode with this code already exists',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!iconOptions.includes(formData.icon_name)) {
+      toast({
+        title: 'Invalid Icon',
+        description: 'Please select a valid icon from the list',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from('transport_modes')
       .update({
         name: formData.name,
-        code: formData.code,
+        code: normalizedCode,
         icon_name: formData.icon_name,
         color: formData.color,
         display_order: formData.display_order,
         is_active: formData.is_active
       })
-      .eq('id', editingMode.id);
+      .eq('id', id);
 
     if (error) {
       toast({
@@ -117,6 +186,15 @@ export default function TransportModes() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this transport mode?')) return;
+
+    if (!isUUID(id)) {
+      toast({
+        title: 'Invalid ID',
+        description: 'Transport mode ID is not a valid UUID',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     const { error } = await scopedDb
       .from('transport_modes', true)
@@ -154,6 +232,15 @@ export default function TransportModes() {
   const updateDisplayOrder = async (id: string, direction: 'up' | 'down') => {
     if (!modes) return;
     
+    if (!isUUID(id)) {
+      toast({
+        title: 'Invalid ID',
+        description: 'Transport mode ID is not a valid UUID',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const currentMode = modes.find(m => m.id === id);
     if (!currentMode) return;
 

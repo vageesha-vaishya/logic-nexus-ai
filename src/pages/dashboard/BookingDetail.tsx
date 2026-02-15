@@ -103,6 +103,11 @@ export default function BookingDetail() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={() => {
+                    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+                    if (!isUUID(id)) {
+                      toast.error('Invalid booking identifier');
+                      return;
+                    }
                     scopedDb.from('bookings').delete().eq('id', id!).then(({ error }) => {
                       if (error) {
                         toast.error('Failed to delete booking');

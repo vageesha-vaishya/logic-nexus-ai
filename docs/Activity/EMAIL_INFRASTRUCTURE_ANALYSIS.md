@@ -1,20 +1,22 @@
 # Email Infrastructure Analysis & Enhancement Plan
+
 ## SOS Logistics Pro Multi-Tenant Platform
 
----
+***
 
 ## Executive Summary
 
 This document provides a comprehensive analysis and implementation roadmap for email functionality in **SOS Logistics Pro**, specifically designed for the platform's **Super Admin → Tenant → Franchisee** multi-tenant architecture. It covers the role-based access matrix, database optimization for performance, UI/UX best practices inspired by world-class CRMs (Salesforce, HubSpot, Pipedrive), and module-wise integration opportunities.
 
 **Key Recommendations:**
-- **Primary Email Provider**: Resend ($20/month for 50K emails)
-- **Multi-Tenant Isolation**: RLS policies with tenant_id + franchise_id scoping
-- **AI Enhancement**: Lovable AI Gateway (no additional API key required)
-- **UI/UX Standard**: Gmail-like speed, Salesforce-like CRM integration
-- **Estimated Monthly Cost**: $20-$80 depending on volume
 
----
+* **Primary Email Provider**: Resend ($20/month for 50K emails)
+* **Multi-Tenant Isolation**: RLS policies with tenant\_id + franchise\_id scoping
+* **AI Enhancement**: Lovable AI Gateway (no additional API key required)
+* **UI/UX Standard**: Gmail-like speed, Salesforce-like CRM integration
+* **Estimated Monthly Cost**: $20-$80 depending on volume
+
+***
 
 ## Table of Contents
 
@@ -33,7 +35,7 @@ This document provides a comprehensive analysis and implementation roadmap for e
 13. [Cost Analysis](#13-cost-analysis)
 14. [Risk Assessment](#14-risk-assessment)
 
----
+***
 
 ## 1. Multi-Tenant Architecture
 
@@ -104,14 +106,14 @@ The email visibility follows a **strict hierarchical cascade** model:
 
 ### 1.3 Email Scope Matrix by Role Level
 
-| Role Level | Own Emails | Team Emails | Franchisee Emails | Tenant Emails | All Platform Emails |
-|------------|:----------:|:-----------:|:-----------------:|:-------------:|:-------------------:|
-| **Super Admin** | ✅ | ✅ | ✅ (All Franchisees) | ✅ (All Tenants) | ✅ |
-| **Tenant Admin** | ✅ | ✅ | ✅ (All Tenant's Franchisees) | ✅ | ❌ |
-| **Franchisee Admin** | ✅ | ✅ | ✅ (Own Franchisee Only) | ❌ | ❌ |
-| **Sales Manager** | ✅ | ✅ (Direct Reports) | ❌ | ❌ | ❌ |
-| **Sales Rep / User** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Viewer** | ✅ (Read-Only) | ❌ | ❌ | ❌ | ❌ |
+| Role Level           |   Own Emails  |     Team Emails    |       Franchisee Emails      |  Tenant Emails  | All Platform Emails |
+| -------------------- | :-----------: | :----------------: | :--------------------------: | :-------------: | :-----------------: |
+| **Super Admin**      |       ✅       |          ✅         |      ✅ (All Franchisees)     | ✅ (All Tenants) |          ✅          |
+| **Tenant Admin**     |       ✅       |          ✅         | ✅ (All Tenant's Franchisees) |        ✅        |          ❌          |
+| **Franchisee Admin** |       ✅       |          ✅         |    ✅ (Own Franchisee Only)   |        ❌        |          ❌          |
+| **Sales Manager**    |       ✅       | ✅ (Direct Reports) |               ❌              |        ❌        |          ❌          |
+| **Sales Rep / User** |       ✅       |          ❌         |               ❌              |        ❌        |          ❌          |
+| **Viewer**           | ✅ (Read-Only) |          ❌         |               ❌              |        ❌        |          ❌          |
 
 ### 1.4 Enhanced Visibility Logic
 
@@ -238,24 +240,24 @@ emails (
 )
 ```
 
----
+***
 
 ## 2. Role Matrix & Access Control
 
 ### 2.1 Role-Based Email Permissions
 
-| Permission | Platform Admin | Tenant Admin | Franchise Admin | Sales Manager | Sales Rep | Viewer |
-|------------|:-------------:|:------------:|:---------------:|:-------------:|:---------:|:------:|
-| **View All Tenant Emails** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **View Franchise Emails** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **View Own Emails** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Send Emails** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **Create Templates** | ✅ (Global) | ✅ (Tenant) | ✅ (Local) | ❌ | ❌ | ❌ |
-| **Share Templates** | ✅ (All) | ✅ (Tenant) | ✅ (Franchise) | ❌ | ❌ | ❌ |
-| **Configure OAuth** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **View Analytics** | ✅ (Global) | ✅ (Tenant) | ✅ (Franchise) | ✅ (Team) | ✅ (Own) | ❌ |
-| **Delete Emails** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Bulk Operations** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Permission                 | Platform Admin | Tenant Admin | Franchise Admin | Sales Manager | Sales Rep | Viewer |
+| -------------------------- | :------------: | :----------: | :-------------: | :-----------: | :-------: | :----: |
+| **View All Tenant Emails** |        ✅       |       ✅      |        ❌        |       ❌       |     ❌     |    ❌   |
+| **View Franchise Emails**  |        ✅       |       ✅      |        ✅        |       ✅       |     ❌     |    ❌   |
+| **View Own Emails**        |        ✅       |       ✅      |        ✅        |       ✅       |     ✅     |    ✅   |
+| **Send Emails**            |        ✅       |       ✅      |        ✅        |       ✅       |     ✅     |    ❌   |
+| **Create Templates**       |   ✅ (Global)   |  ✅ (Tenant)  |    ✅ (Local)    |       ❌       |     ❌     |    ❌   |
+| **Share Templates**        |     ✅ (All)    |  ✅ (Tenant)  |  ✅ (Franchise)  |       ❌       |     ❌     |    ❌   |
+| **Configure OAuth**        |        ✅       |       ✅      |        ✅        |       ❌       |     ❌     |    ❌   |
+| **View Analytics**         |   ✅ (Global)   |  ✅ (Tenant)  |  ✅ (Franchise)  |    ✅ (Team)   |  ✅ (Own)  |    ❌   |
+| **Delete Emails**          |        ✅       |       ✅      |        ✅        |       ❌       |     ❌     |    ❌   |
+| **Bulk Operations**        |        ✅       |       ✅      |        ✅        |       ✅       |     ❌     |    ❌   |
 
 ### 2.2 Permission Implementation
 
@@ -606,7 +608,7 @@ END;
 $$;
 ```
 
----
+***
 
 ## 3. Communication Continuity & Team Collaboration
 
@@ -915,7 +917,7 @@ export async function handleOutOfOfficeRouting(
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+***
 
 ## 4. Complete Activity History & 360° View
 
@@ -957,13 +959,13 @@ Based on **Salesforce Activity 360**, **Dynamics 365 Timeline**, and **HubSpot A
 
 #### Activity History at Different Levels
 
-| Level | What to Track | Who Can See | Use Case |
-|-------|--------------|-------------|----------|
-| **Platform** | All activities across all tenants | Super Admin only | System health, compliance audits |
-| **Tenant** | All activities within tenant | Tenant Admin + | Business analytics, team performance |
-| **Franchisee** | All activities within franchisee | Franchise Admin + | Local team management |
-| **User** | Own activities | Self + Managers | Personal productivity |
-| **Record** | All activities on a record | Anyone with record access | Customer communication history |
+| Level          | What to Track                     | Who Can See               | Use Case                             |
+| -------------- | --------------------------------- | ------------------------- | ------------------------------------ |
+| **Platform**   | All activities across all tenants | Super Admin only          | System health, compliance audits     |
+| **Tenant**     | All activities within tenant      | Tenant Admin +            | Business analytics, team performance |
+| **Franchisee** | All activities within franchisee  | Franchise Admin +         | Local team management                |
+| **User**       | Own activities                    | Self + Managers           | Personal productivity                |
+| **Record**     | All activities on a record        | Anyone with record access | Customer communication history       |
 
 ### 4.3 Unified Activity Table Design
 
@@ -1287,7 +1289,7 @@ Based on research of top CRMs, SOS Logistics Pro should implement:
 
 2. **Unified Activity Timeline**: Single view per record showing emails, calls, notes, tasks, stage changes.
 
-3. **Shared Team Inboxes**: Support for sales@company.com with round-robin assignment and shared visibility.
+3. **Shared Team Inboxes**: Support for <sales@company.com> with round-robin assignment and shared visibility.
 
 4. **Out-of-Office Management**: User availability status, backup user assignment, auto-routing.
 
@@ -1295,7 +1297,7 @@ Based on research of top CRMs, SOS Logistics Pro should implement:
 
 6. **360° Customer View**: Cross-departmental visibility linking leads, contacts, accounts, opportunities, quotes, shipments.
 
----
+***
 
 ## 5. Database Design for Performance
 
@@ -1655,64 +1657,67 @@ export const EMAIL_QUERY_CONFIG = {
 };
 ```
 
----
+***
 
 ## 4. Current Implementation Status
 
 ### 4.1 Frontend Components
 
-| Component | Path | Purpose | Status |
-|-----------|------|---------|--------|
-| `EmailInbox.tsx` | `src/components/email/` | Main inbox with folder navigation | ✅ Complete |
-| `EmailAccounts.tsx` | `src/components/email/` | Manage connected accounts | ✅ Complete |
-| `EmailComposeDialog.tsx` | `src/components/email/` | Compose new emails | ✅ Complete |
-| `EmailDetailView.tsx` | `src/components/email/` | View email content | ✅ Complete |
-| `EmailFilters.tsx` | `src/components/email/` | Automation rules | ✅ Complete |
-| `EmailTemplates.tsx` | `src/components/email/` | Template management | ✅ Complete |
-| `OAuthSettings.tsx` | `src/components/email/` | OAuth configuration | ✅ Complete |
-| `EmailActivity.tsx` | `src/components/dashboard/` | Dashboard widget | ✅ Complete |
-| `EmailManagement.tsx` | `src/pages/dashboard/` | Full email page | ✅ Complete |
+| Component                | Path                        | Purpose                           | Status     |
+| ------------------------ | --------------------------- | --------------------------------- | ---------- |
+| `EmailInbox.tsx`         | `src/components/email/`     | Main inbox with folder navigation | ✅ Complete |
+| `EmailAccounts.tsx`      | `src/components/email/`     | Manage connected accounts         | ✅ Complete |
+| `EmailComposeDialog.tsx` | `src/components/email/`     | Compose new emails                | ✅ Complete |
+| `EmailDetailView.tsx`    | `src/components/email/`     | View email content                | ✅ Complete |
+| `EmailFilters.tsx`       | `src/components/email/`     | Automation rules                  | ✅ Complete |
+| `EmailTemplates.tsx`     | `src/components/email/`     | Template management               | ✅ Complete |
+| `OAuthSettings.tsx`      | `src/components/email/`     | OAuth configuration               | ✅ Complete |
+| `EmailActivity.tsx`      | `src/components/dashboard/` | Dashboard widget                  | ✅ Complete |
+| `EmailManagement.tsx`    | `src/pages/dashboard/`      | Full email page                   | ✅ Complete |
 
 ### 4.2 Edge Functions
 
-| Function | Path | Purpose | Status |
-|----------|------|---------|--------|
-| `send-email` | `supabase/functions/send-email/` | Send via Gmail/Office 365 | ✅ Complete |
-| `sync-emails` | `supabase/functions/sync-emails/` | Sync inbox | ✅ Complete |
-| `sync-all-mailboxes` | `supabase/functions/sync-all-mailboxes/` | Batch sync | ✅ Complete |
-| `search-emails` | `supabase/functions/search-emails/` | Full-text search | ✅ Complete |
-| `exchange-oauth-token` | `supabase/functions/exchange-oauth-token/` | OAuth flow | ✅ Complete |
+| Function               | Path                                       | Purpose                   | Status     |
+| ---------------------- | ------------------------------------------ | ------------------------- | ---------- |
+| `send-email`           | `supabase/functions/send-email/`           | Send via Gmail/Office 365 | ✅ Complete |
+| `sync-emails`          | `supabase/functions/sync-emails/`          | Sync inbox                | ✅ Complete |
+| `sync-all-mailboxes`   | `supabase/functions/sync-all-mailboxes/`   | Batch sync                | ✅ Complete |
+| `search-emails`        | `supabase/functions/search-emails/`        | Full-text search          | ✅ Complete |
+| `exchange-oauth-token` | `supabase/functions/exchange-oauth-token/` | OAuth flow                | ✅ Complete |
 
 ### 4.3 Gaps to Address
 
-| Gap | Impact | Priority |
-|-----|--------|----------|
-| No Resend fallback | Reliability risk if OAuth fails | High |
-| No AI assistant | Missing modern CRM feature | High |
-| No scheduled emails | User productivity | Medium |
-| No role-based template sharing | Template fragmentation | Medium |
-| No email analytics | No visibility into engagement | Low |
+| Gap                            | Impact                          | Priority |
+| ------------------------------ | ------------------------------- | -------- |
+| No Resend fallback             | Reliability risk if OAuth fails | High     |
+| No AI assistant                | Missing modern CRM feature      | High     |
+| No scheduled emails            | User productivity               | Medium   |
+| No role-based template sharing | Template fragmentation          | Medium   |
+| No email analytics             | No visibility into engagement   | Low      |
 
----
+***
 
 ## 5. Module-Wise Implementation Plan
 
 ### 5.1 CRM Module (Leads, Contacts, Accounts, Opportunities)
 
 **Access Rules:**
-- Lead/Contact owners see related emails
-- Account team members see account emails
-- Opportunity owners see deal correspondence
+
+* Lead/Contact owners see related emails
+* Account team members see account emails
+* Opportunity owners see deal correspondence
 
 **Features:**
-| Feature | Component Location | Implementation |
-|---------|-------------------|----------------|
-| Email Timeline | `LeadDetailPage.tsx` | Embedded email list with quick compose |
-| Contact History | `ContactDetailPage.tsx` | Full conversation threads grouped by date |
-| Account Inbox | `AccountDetailPage.tsx` | All contacts' emails for organization |
+
+| Feature                    | Component Location          | Implementation                                 |
+| -------------------------- | --------------------------- | ---------------------------------------------- |
+| Email Timeline             | `LeadDetailPage.tsx`        | Embedded email list with quick compose         |
+| Contact History            | `ContactDetailPage.tsx`     | Full conversation threads grouped by date      |
+| Account Inbox              | `AccountDetailPage.tsx`     | All contacts' emails for organization          |
 | Opportunity Correspondence | `OpportunityDetailPage.tsx` | Quote-related emails with template suggestions |
 
 **UI Component:**
+
 ```tsx
 // src/components/crm/EntityEmailTab.tsx
 interface EntityEmailTabProps {
@@ -1741,21 +1746,24 @@ export function EntityEmailTab({ entityType, entityId }: EntityEmailTabProps) {
 ### 5.2 Quotes & Sales Module
 
 **Access Rules:**
-- Quote owners send quote emails
-- Franchise admins see all franchise quotes
-- Tenant admins see all tenant quotes
+
+* Quote owners send quote emails
+* Franchise admins see all franchise quotes
+* Tenant admins see all tenant quotes
 
 **Email Templates:**
-| Template | Trigger | Variables |
-|----------|---------|-----------|
+
+| Template         | Trigger                | Variables                                                                      |
+| ---------------- | ---------------------- | ------------------------------------------------------------------------------ |
 | Quote Submission | Quote sent to customer | `{{quote_number}}`, `{{customer_name}}`, `{{total_amount}}`, `{{valid_until}}` |
-| Quote Follow-up | 3 days after sent | `{{quote_number}}`, `{{salesperson_name}}` |
-| Quote Accepted | Customer accepts | `{{quote_number}}`, `{{booking_steps}}` |
-| Quote Expired | Validity passed | `{{quote_number}}`, `{{new_quote_link}}` |
+| Quote Follow-up  | 3 days after sent      | `{{quote_number}}`, `{{salesperson_name}}`                                     |
+| Quote Accepted   | Customer accepts       | `{{quote_number}}`, `{{booking_steps}}`                                        |
+| Quote Expired    | Validity passed        | `{{quote_number}}`, `{{new_quote_link}}`                                       |
 
 ### 5.3 Shipments Module
 
 **Automated Notifications:**
+
 ```typescript
 const SHIPMENT_EMAIL_TRIGGERS = [
   { event: 'booking_confirmed', template: 'booking_confirmation', recipients: ['customer', 'carrier'] },
@@ -1770,26 +1778,27 @@ const SHIPMENT_EMAIL_TRIGGERS = [
 ### 5.4 Administrative Modules
 
 **User Management Emails:**
-| Email Type | Trigger | Template |
-|------------|---------|----------|
-| Welcome Email | New user created | `welcome_user` |
-| Password Reset | User requests reset | `password_reset` |
-| Role Change | Admin changes role | `role_update_notification` |
-| Franchise Assignment | User assigned to franchise | `franchise_assignment` |
 
----
+| Email Type           | Trigger                    | Template                   |
+| -------------------- | -------------------------- | -------------------------- |
+| Welcome Email        | New user created           | `welcome_user`             |
+| Password Reset       | User requests reset        | `password_reset`           |
+| Role Change          | Admin changes role         | `role_update_notification` |
+| Franchise Assignment | User assigned to franchise | `franchise_assignment`     |
+
+***
 
 ## 6. UI/UX Design Standards
 
 ### 6.1 Inspiration from Top CRMs
 
-| CRM | Strength | Implementation in SOS |
-|-----|----------|----------------------|
-| **Gmail** | Speed, search, threading | Fast virtualized lists, instant search |
-| **Salesforce** | CRM integration, activity timeline | Unified activity feed with emails |
-| **HubSpot** | Templates, sequences, tracking | Template library, scheduled sends |
-| **Pipedrive** | Deal-centric email view | Opportunity email sidebar |
-| **Zoho CRM** | Multi-channel inbox | Combined email + activity view |
+| CRM            | Strength                           | Implementation in SOS                  |
+| -------------- | ---------------------------------- | -------------------------------------- |
+| **Gmail**      | Speed, search, threading           | Fast virtualized lists, instant search |
+| **Salesforce** | CRM integration, activity timeline | Unified activity feed with emails      |
+| **HubSpot**    | Templates, sequences, tracking     | Template library, scheduled sends      |
+| **Pipedrive**  | Deal-centric email view            | Opportunity email sidebar              |
+| **Zoho CRM**   | Multi-channel inbox                | Combined email + activity view         |
 
 ### 6.2 Email Inbox UI Components
 
@@ -1854,6 +1863,7 @@ export function EmailInboxLayout() {
 ### 6.4 Key UI Patterns
 
 **1. Gmail-like Email List:**
+
 ```tsx
 <VirtualList
   items={emails}
@@ -1872,6 +1882,7 @@ export function EmailInboxLayout() {
 ```
 
 **2. Salesforce-like Activity Timeline:**
+
 ```tsx
 <ActivityTimeline
   entityId={contactId}
@@ -1889,6 +1900,7 @@ export function EmailInboxLayout() {
 ```
 
 **3. HubSpot-like Template Picker:**
+
 ```tsx
 <TemplatePickerPopover
   onSelect={(template) => applyTemplate(template)}
@@ -1936,19 +1948,19 @@ const EmailResponsiveLayout = () => {
 };
 ```
 
----
+***
 
 ## 7. AI Enhancement Opportunities
 
 ### 7.1 Available AI Features (Lovable AI Gateway)
 
-| Feature | Model | Use Case | Cost |
-|---------|-------|----------|------|
-| Smart Reply | `google/gemini-3-flash-preview` | Generate contextual responses | $0 |
-| Email Classification | `google/gemini-2.5-flash-lite` | Auto-categorize incoming | $0 |
-| Sentiment Analysis | `google/gemini-2.5-flash` | Detect urgency | $0 |
-| Thread Summary | `google/gemini-2.5-flash` | Summarize conversations | $0 |
-| Translation | `google/gemini-2.5-flash` | Multi-language support | $0 |
+| Feature              | Model                           | Use Case                      | Cost |
+| -------------------- | ------------------------------- | ----------------------------- | ---- |
+| Smart Reply          | `google/gemini-3-flash-preview` | Generate contextual responses | $0   |
+| Email Classification | `google/gemini-2.5-flash-lite`  | Auto-categorize incoming      | $0   |
+| Sentiment Analysis   | `google/gemini-2.5-flash`       | Detect urgency                | $0   |
+| Thread Summary       | `google/gemini-2.5-flash`       | Summarize conversations       | $0   |
+| Translation          | `google/gemini-2.5-flash`       | Multi-language support        | $0   |
 
 ### 7.2 AI Email Assistant Edge Function
 
@@ -2042,18 +2054,18 @@ serve(async (req) => {
 });
 ```
 
----
+***
 
 ## 8. Security & Compliance
 
 ### 8.1 Multi-Tenant Data Isolation
 
-| Layer | Implementation |
-|-------|----------------|
-| **Database** | RLS policies with tenant_id/franchise_id checks |
-| **API** | Context-aware queries via ScopedDataAccess |
-| **UI** | Permission hooks gate feature visibility |
-| **OAuth** | Tokens scoped to user, never shared |
+| Layer        | Implementation                                    |
+| ------------ | ------------------------------------------------- |
+| **Database** | RLS policies with tenant\_id/franchise\_id checks |
+| **API**      | Context-aware queries via ScopedDataAccess        |
+| **UI**       | Permission hooks gate feature visibility          |
+| **OAuth**    | Tokens scoped to user, never shared               |
 
 ### 8.2 Encryption & Token Security
 
@@ -2126,7 +2138,7 @@ END;
 $$;
 ```
 
----
+***
 
 ## 9. Implementation Roadmap
 
@@ -2134,42 +2146,42 @@ $$;
 
 > **Detailed Implementation Plan:** See [`documentation/EMAIL_PHASE_1_IMPLEMENTATION.md`](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/documentation/EMAIL_PHASE_1_IMPLEMENTATION.md) for full technical specifications, DNS requirements, and configuration templates.
 
-| Task | Owner | Effort | Deliverable |
-|------|-------|--------|-------------|
-| Add Resend integration | Backend | 2 days | `send-email-resend/` edge function |
-| Enable AI Gateway | DevOps | 1 day | `LOVABLE_API_KEY` configured |
-| Implement role-based RLS | Backend | 2 days | Updated RLS policies |
-| Add email permissions hook | Frontend | 1 day | `useEmailPermission()` |
-| Performance indexes | Backend | 1 day | Optimized queries |
+| Task                       | Owner    | Effort | Deliverable                        |
+| -------------------------- | -------- | ------ | ---------------------------------- |
+| Add Resend integration     | Backend  | 2 days | `send-email-resend/` edge function |
+| Enable AI Gateway          | DevOps   | 1 day  | `LOVABLE_API_KEY` configured       |
+| Implement role-based RLS   | Backend  | 2 days | Updated RLS policies               |
+| Add email permissions hook | Frontend | 1 day  | `useEmailPermission()`             |
+| Performance indexes        | Backend  | 1 day  | Optimized queries                  |
 
 ### 9.2 Phase 2: CRM Integration (Weeks 3-4)
 
-| Task | Owner | Effort | Deliverable |
-|------|-------|--------|-------------|
-| Lead email tab | Frontend | 2 days | Email timeline in lead detail |
-| Contact email history | Frontend | 2 days | Full conversation view |
-| Account email aggregation | Frontend | 2 days | All contacts' emails |
-| Opportunity correspondence | Frontend | 2 days | Quote email integration |
-| Email-to-Lead creation | Backend | 3 days | Auto-link new senders |
+| Task                       | Owner    | Effort | Deliverable                   |
+| -------------------------- | -------- | ------ | ----------------------------- |
+| Lead email tab             | Frontend | 2 days | Email timeline in lead detail |
+| Contact email history      | Frontend | 2 days | Full conversation view        |
+| Account email aggregation  | Frontend | 2 days | All contacts' emails          |
+| Opportunity correspondence | Frontend | 2 days | Quote email integration       |
+| Email-to-Lead creation     | Backend  | 3 days | Auto-link new senders         |
 
 ### 9.3 Phase 3: AI Features (Weeks 5-6)
 
-| Task | Owner | Effort | Deliverable |
-|------|-------|--------|-------------|
-| AI email assistant function | Backend | 2 days | Edge function deployed |
-| Smart reply UI | Frontend | 2 days | Suggestion panel |
-| Auto-classification | Backend | 2 days | Incoming email categorization |
-| Sentiment-based prioritization | Frontend | 1 day | Visual urgency indicators |
-| Thread summarization | Frontend | 2 days | Summary card in thread view |
+| Task                           | Owner    | Effort | Deliverable                   |
+| ------------------------------ | -------- | ------ | ----------------------------- |
+| AI email assistant function    | Backend  | 2 days | Edge function deployed        |
+| Smart reply UI                 | Frontend | 2 days | Suggestion panel              |
+| Auto-classification            | Backend  | 2 days | Incoming email categorization |
+| Sentiment-based prioritization | Frontend | 1 day  | Visual urgency indicators     |
+| Thread summarization           | Frontend | 2 days | Summary card in thread view   |
 
 ### 9.4 Phase 4: Automation (Weeks 7-8)
 
-| Task | Owner | Effort | Deliverable |
-|------|-------|--------|-------------|
-| Scheduled emails table | Backend | 1 day | Database migration |
-| Schedule send UI | Frontend | 2 days | Date/time picker in compose |
-| Email analytics | Backend | 3 days | Tracking & reporting |
-| Workflow automation | Full-stack | 5 days | Visual rule builder |
+| Task                   | Owner      | Effort | Deliverable                 |
+| ---------------------- | ---------- | ------ | --------------------------- |
+| Scheduled emails table | Backend    | 1 day  | Database migration          |
+| Schedule send UI       | Frontend   | 2 days | Date/time picker in compose |
+| Email analytics        | Backend    | 3 days | Tracking & reporting        |
+| Workflow automation    | Full-stack | 5 days | Visual rule builder         |
 
 ### 9.5 Gantt Chart
 
@@ -2204,18 +2216,18 @@ gantt
     Workflow Automation      :p4c, after p4b, 5d
 ```
 
----
+***
 
 ## 10. Technical Requirements
 
 ### 10.1 New Edge Functions
 
-| Function | Purpose | Auth Required |
-|----------|---------|---------------|
-| `send-email-resend` | Fallback email sending | Yes |
-| `ai-email-assistant` | AI drafting/classification | Yes |
-| `scheduled-email-processor` | Process scheduled sends | Cron |
-| `email-webhook-handler` | Gmail/O365 push notifications | Webhook secret |
+| Function                    | Purpose                       | Auth Required  |
+| --------------------------- | ----------------------------- | -------------- |
+| `send-email-resend`         | Fallback email sending        | Yes            |
+| `ai-email-assistant`        | AI drafting/classification    | Yes            |
+| `scheduled-email-processor` | Process scheduled sends       | Cron           |
+| `email-webhook-handler`     | Gmail/O365 push notifications | Webhook secret |
 
 ### 10.2 Database Migrations
 
@@ -2252,24 +2264,24 @@ ADD COLUMN IF NOT EXISTS ai_processed_at TIMESTAMPTZ;
 
 ### 10.3 Required Secrets
 
-| Secret | Purpose | Provider |
-|--------|---------|----------|
-| `RESEND_API_KEY` | Transactional email sending | Resend |
-| `LOVABLE_API_KEY` | AI Gateway (auto-provisioned) | Lovable |
+| Secret            | Purpose                       | Provider |
+| ----------------- | ----------------------------- | -------- |
+| `RESEND_API_KEY`  | Transactional email sending   | Resend   |
+| `LOVABLE_API_KEY` | AI Gateway (auto-provisioned) | Lovable  |
 
----
+***
 
 ## 11. Cost Analysis
 
 ### 11.1 Monthly Cost Breakdown
 
-| Component | Startup | Growing | Scale |
-|-----------|---------|---------|-------|
-| **Email Volume** | < 3K | 10-50K | 50-200K |
-| **Resend** | $0 (Free) | $20 | $80 |
-| **AI (Lovable Gateway)** | $0 | $0 | $0 |
-| **OAuth (Gmail/O365)** | $0 | $0 | $0 |
-| **Total** | **$0** | **$20** | **$80** |
+| Component                | Startup   | Growing | Scale   |
+| ------------------------ | --------- | ------- | ------- |
+| **Email Volume**         | < 3K      | 10-50K  | 50-200K |
+| **Resend**               | $0 (Free) | $20     | $80     |
+| **AI (Lovable Gateway)** | $0        | $0      | $0      |
+| **OAuth (Gmail/O365)**   | $0        | $0      | $0      |
+| **Total**                | **$0**    | **$20** | **$80** |
 
 ### 11.2 Cost Optimization Tips
 
@@ -2278,53 +2290,56 @@ ADD COLUMN IF NOT EXISTS ai_processed_at TIMESTAMPTZ;
 3. **Archive old emails**: Move to cold storage after 1 year
 4. **Template reuse**: Reduce composition time
 
----
+***
 
 ## 12. Risk Assessment
 
 ### 12.1 Technical Risks
 
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| OAuth token expiry | Sync fails | Medium | Proactive refresh |
-| Rate limiting | API blocked | Medium | Queue + backoff |
-| AI hallucination | Wrong response | Medium | Human review required |
-| Large attachment | Memory error | Low | Size limits + streaming |
+| Risk               | Impact         | Probability | Mitigation              |
+| ------------------ | -------------- | ----------- | ----------------------- |
+| OAuth token expiry | Sync fails     | Medium      | Proactive refresh       |
+| Rate limiting      | API blocked    | Medium      | Queue + backoff         |
+| AI hallucination   | Wrong response | Medium      | Human review required   |
+| Large attachment   | Memory error   | Low         | Size limits + streaming |
 
 ### 12.2 Business Risks
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Poor deliverability | Emails to spam | SPF/DKIM/DMARC setup |
-| User confusion | Low adoption | Training + onboarding |
-| Data breach | Compliance failure | Encryption + audit logs |
+| Risk                | Impact             | Mitigation              |
+| ------------------- | ------------------ | ----------------------- |
+| Poor deliverability | Emails to spam     | SPF/DKIM/DMARC setup    |
+| User confusion      | Low adoption       | Training + onboarding   |
+| Data breach         | Compliance failure | Encryption + audit logs |
 
----
+***
 
 ## Appendix: File Reference
 
 ### Frontend Components
-- `src/components/email/EmailInbox.tsx`
-- `src/components/email/EmailAccounts.tsx`
-- `src/components/email/EmailComposeDialog.tsx`
-- `src/components/email/EmailDetailView.tsx`
-- `src/components/email/EmailFilters.tsx`
-- `src/components/email/EmailTemplates.tsx`
-- `src/components/email/OAuthSettings.tsx`
-- `src/components/dashboard/EmailActivity.tsx`
+
+* `src/components/email/EmailInbox.tsx`
+* `src/components/email/EmailAccounts.tsx`
+* `src/components/email/EmailComposeDialog.tsx`
+* `src/components/email/EmailDetailView.tsx`
+* `src/components/email/EmailFilters.tsx`
+* `src/components/email/EmailTemplates.tsx`
+* `src/components/email/OAuthSettings.tsx`
+* `src/components/dashboard/EmailActivity.tsx`
 
 ### Edge Functions
-- `supabase/functions/send-email/`
-- `supabase/functions/sync-emails/`
-- `supabase/functions/sync-all-mailboxes/`
-- `supabase/functions/search-emails/`
-- `supabase/functions/exchange-oauth-token/`
+
+* `supabase/functions/send-email/`
+* `supabase/functions/sync-emails/`
+* `supabase/functions/sync-all-mailboxes/`
+* `supabase/functions/search-emails/`
+* `supabase/functions/exchange-oauth-token/`
 
 ### Pages
-- `src/pages/dashboard/EmailManagement.tsx`
 
----
+* `src/pages/dashboard/EmailManagement.tsx`
 
-**Document Version:** 3.0  
-**Last Updated:** 2026-01-11  
+***
+
+**Document Version:** 3.0\
+**Last Updated:** 2026-01-11\
 **Author:** SOS Logistics Pro Engineering Team

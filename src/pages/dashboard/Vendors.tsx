@@ -79,6 +79,11 @@ export default function Vendors() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this vendor?')) return;
     try {
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      if (!isUUID(id)) {
+        toast.error('Invalid vendor identifier');
+        return;
+      }
       const { error } = await supabase.from('vendors').delete().eq('id', id);
       if (error) throw error;
       toast.success('Vendor deleted');

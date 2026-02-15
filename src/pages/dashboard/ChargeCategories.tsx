@@ -30,11 +30,15 @@ export default function ChargeCategories() {
   };
 
   const update = async (id: string, patch: Partial<ChargeCategory>) => {
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    if (!isUUID(id)) return;
     await scopedDb.from('charge_categories').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    if (!isUUID(id)) return;
     await scopedDb.from('charge_categories').delete().eq('id', id);
     load();
   };

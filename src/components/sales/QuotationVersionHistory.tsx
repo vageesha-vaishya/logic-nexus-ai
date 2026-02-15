@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
@@ -47,22 +47,28 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
   const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
   const [selectedVersionForCustomer, setSelectedVersionForCustomer] = useState<string | null>(null);
   const navigate = useNavigate();
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
+      if (abortRef.current) abortRef.current.abort();
+      abortRef.current = new AbortController();
+      const signal = abortRef.current.signal;
       // Parallel fetch: current version ID and all versions
       const [quoteRes, versionsRes] = await Promise.all([
         supabase
           .from('quotes')
           .select('current_version_id')
           .eq('id', quoteId)
-          .maybeSingle(),
+          .maybeSingle()
+          .abortSignal(signal),
         supabase
           .from('quotation_versions')
           .select('*')
           .eq('quote_id', quoteId)
           .order('version_number', { ascending: false })
+          .abortSignal(signal)
       ]);
 
       const quoteData = quoteRes.data;
@@ -94,7 +100,8 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
             margin_amount,
             margin_percentage
           `)
-          .in('quotation_version_id', versionIds);
+          .in('quotation_version_id', versionIds)
+          .abortSignal(signal);
         if (oErr) throw oErr;
         const carrierRateIds = (opts ?? []).map((o: any) => o.carrier_rate_id).filter(Boolean);
         const rateMap: Record<string, any> = {};
@@ -102,7 +109,8 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
           const { data: rates, error: rErr } = await scopedDb
             .from('carrier_rates')
             .select('id, carrier_name, currency, base_rate, mode, valid_until')
-            .in('id', carrierRateIds);
+            .in('id', carrierRateIds)
+            .abortSignal(signal);
           if (rErr) throw rErr;
           (rates ?? []).forEach((r: any) => { rateMap[String(r.id)] = r; });
         }
@@ -132,7 +140,9 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       }
       setVersions(versionsWithCurrent);
     } catch (e: any) {
-      toast({ title: 'Failed to load versions', description: e.message, variant: 'destructive' });
+      const msg = e?.message ? String(e.message).toLowerCase() : '';
+      if (e?.name === 'AbortError' || msg.includes('aborted')) return;
+      toast({ title: 'Failed to load versions', description: e?.message || String(e), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -145,7 +155,8 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
           .from('quotes')
           .select('tenant_id, franchise_id')
           .eq('id', quoteId)
-          .maybeSingle();
+          .maybeSingle()
+          .abortSignal(abortRef.current?.signal as any);
         if (q?.tenant_id) setTenantId(String(q.tenant_id));
         if (q?.franchise_id) setFranchiseId(String(q.franchise_id));
         const { data: auth } = await supabase.auth.getUser();
@@ -156,6 +167,9 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
     };
     init();
     load();
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, [quoteId]);
 
   const latestVersionNumber = useMemo(
@@ -269,34 +283,35 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
         compLegIds = (legs2 ?? []).map((l: any) => String(l.id));
       }
 
-      for (const b of chunk(optionIds, 1000)) {
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      for (const b of chunk(optionIds.filter(isUUID), 1000)) {
         if (!b.length) continue;
         const { error } = await scopedDb.from('quote_charges').delete().in('quote_option_id', b);
         if (error) throw error;
       }
-      for (const b of chunk(quoteLegIds, 1000)) {
+      for (const b of chunk(quoteLegIds.filter(isUUID), 1000)) {
         if (!b.length) continue;
         const { error } = await scopedDb.from('quote_charges').delete().in('leg_id', b);
         if (error) throw error;
       }
 
-      for (const b of chunk(quoteLegIds, 1000)) {
+      for (const b of chunk(quoteLegIds.filter(isUUID), 1000)) {
         if (!b.length) continue;
         const { error } = await scopedDb.from('quote_legs').delete().in('id', b);
         if (error) throw error;
       }
-      for (const b of chunk(compLegIds, 1000)) {
+      for (const b of chunk(compLegIds.filter(isUUID), 1000)) {
         if (!b.length) continue;
         const { error } = await scopedDb.from('quotation_version_option_legs').delete().in('id', b);
         if (error) throw error;
       }
 
-      for (const b of chunk(optionIds, 1000)) {
+      for (const b of chunk(optionIds.filter(isUUID), 1000)) {
         if (!b.length) continue;
         const { error } = await scopedDb.from('quotation_version_options').delete().in('id', b);
         if (error) throw error;
       }
-      for (const b of chunk(versionIds, 1000)) {
+      for (const b of chunk(versionIds.filter(isUUID), 1000)) {
         if (!b.length) continue;
         const { error } = await scopedDb.from('quotation_versions').delete().in('id', b);
         if (error) throw error;

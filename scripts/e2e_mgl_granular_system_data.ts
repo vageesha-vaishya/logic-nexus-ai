@@ -39,8 +39,8 @@ const pgClient = new Client({
 });
 
 // --- Mappings ---
-let CONTAINER_SIZES: Record<string, string> = {};
-let CONTAINER_TYPES: Record<string, string> = {};
+const CONTAINER_SIZES: Record<string, string> = {};
+const CONTAINER_TYPES: Record<string, string> = {};
 
 // User provided sample data
 const SYSTEM_DATA = {

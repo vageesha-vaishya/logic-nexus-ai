@@ -2,6 +2,8 @@ import { supabase as defaultClient } from '@/integrations/supabase/client';
 import { ScopedDataAccess } from '@/lib/db/access';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
 type ChargeInput = {
   type: string;
   amount: number;
@@ -59,10 +61,10 @@ export async function createCarrierRate(params: CreateRateParams, client: Scoped
   const payload: any = {
     id: preGeneratedId,
     tenant_id: params.tenant_id,
-    carrier_id: params.carrier_id,
-    service_id: params.service_id || null,
-    origin_port_id: params.origin_port_id || null,
-    destination_port_id: params.destination_port_id || null,
+    carrier_id: isUuid(params.carrier_id) ? params.carrier_id : null,
+    service_id: isUuid(params.service_id) ? params.service_id : null,
+    origin_port_id: isUuid(params.origin_port_id) ? params.origin_port_id : null,
+    destination_port_id: isUuid(params.destination_port_id) ? params.destination_port_id : null,
     mode: params.mode || null,
     currency: params.currency || 'USD',
     base_rate: params.base_rate ?? 0,
@@ -89,6 +91,7 @@ export async function upsertChargesForRate(
   client = defaultClient,
 ): Promise<void> {
   if (!charges || charges.length === 0) return;
+  if (!isUuid(carrier_rate_id)) return;
   const rows = charges.map((c) => ({
     tenant_id,
     carrier_rate_id,
@@ -153,17 +156,19 @@ export async function upsertRatesAndChargesForQuote(
 
   for (const cq of (carrierQuotes || [])) {
     if (!cq.carrier_id && !cq.carrier_rate_id) continue;
-    let rateId = cq.carrier_rate_id ? String(cq.carrier_rate_id) : undefined;
+    const carrierIdValid = isUuid(cq.carrier_id);
+    let rateId = cq.carrier_rate_id && isUuid(String(cq.carrier_rate_id)) ? String(cq.carrier_rate_id) : undefined;
 
     // Create new rate if none provided
     if (!rateId) {
+      if (!carrierIdValid) continue;
       rateId = await createCarrierRate(
         {
           tenant_id,
           carrier_id: cq.carrier_id,
-          service_id,
-          origin_port_id,
-          destination_port_id,
+          service_id: isUuid(service_id) ? service_id : null,
+          origin_port_id: isUuid(origin_port_id) ? origin_port_id : null,
+          destination_port_id: isUuid(destination_port_id) ? destination_port_id : null,
           mode: cq.mode || null,
           currency: 'USD',
           base_rate: 0,
@@ -177,10 +182,10 @@ export async function upsertRatesAndChargesForQuote(
         await (client as any)
           .from('carrier_rates')
           .update({
-            carrier_id: cq.carrier_id,
-            service_id: service_id || null,
-            origin_port_id: origin_port_id || null,
-            destination_port_id: destination_port_id || null,
+            carrier_id: carrierIdValid ? cq.carrier_id : null,
+            service_id: isUuid(service_id) ? service_id : null,
+            origin_port_id: isUuid(origin_port_id) ? origin_port_id : null,
+            destination_port_id: isUuid(destination_port_id) ? destination_port_id : null,
             mode: cq.mode || null,
             rate_reference_id: quoteId,
           })
@@ -191,10 +196,12 @@ export async function upsertRatesAndChargesForQuote(
     }
 
     // Replace charges for this rate to avoid duplication
-    await (client as any)
-      .from('carrier_rate_charges')
-      .delete()
-      .eq('carrier_rate_id', rateId);
+    if (isUuid(rateId)) {
+      await (client as any)
+        .from('carrier_rate_charges')
+        .delete()
+        .eq('carrier_rate_id', rateId);
+    }
 
     const mergedCharges: ChargeInput[] = [
       ...((cq.buying_charges || []) as ChargeInput[]),
@@ -338,7 +345,8 @@ export async function createQuotationVersionWithOptions(
   // Only create options if there are carrier rates to link
   let option_ids: string[] = [];
   if (carrier_rate_ids.length > 0) {
-    const optionRows = carrier_rate_ids.map((rid) => ({
+    const filteredIds = (carrier_rate_ids || []).filter((rid) => isUuid(rid));
+    const optionRows = filteredIds.map((rid) => ({
       tenant_id,
       franchise_id,
       quotation_version_id: version_id,

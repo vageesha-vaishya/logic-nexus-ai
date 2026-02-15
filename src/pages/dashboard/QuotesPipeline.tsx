@@ -105,8 +105,19 @@ export default function QuotesPipeline() {
           service_types:service_type_id(name),
           franchises:franchise_id(name),
           quotation_versions:quotation_versions!quotation_versions_quote_id_fkey (
+            id,
             version_number,
             created_at,
+            quotation_version_options (
+              id,
+              is_selected,
+              recommended,
+              total_amount,
+              sell_subtotal,
+              buy_subtotal,
+              margin_amount,
+              margin_percentage
+            ),
             aes_hts_codes (
               hts_code,
               description
@@ -123,7 +134,47 @@ export default function QuotesPipeline() {
         duration: `${duration.toFixed(2)}ms`
       });
 
-      setQuotes((data || []) as unknown as Quote[]);
+      const enhanced = (data || []).map((q: any) => {
+        const versions = Array.isArray(q.quotation_versions) ? q.quotation_versions.slice() : [];
+        versions.sort((a: any, b: any) => (b?.version_number || 0) - (a?.version_number || 0));
+        const latest = versions[0];
+        const options = Array.isArray(latest?.quotation_version_options) ? latest.quotation_version_options : [];
+        const selected = options.find((o: any) => o?.is_selected) 
+          || options.find((o: any) => o?.recommended) 
+          || options[0];
+        
+        const hasValidNumber = (v: any) => typeof v === 'number' && Number.isFinite(v);
+        let sell = hasValidNumber(q.sell_price) ? q.sell_price : undefined;
+        let marginPct = hasValidNumber(q.margin_percentage) ? q.margin_percentage : undefined;
+        let marginAmt = hasValidNumber(q.margin_amount) ? q.margin_amount : undefined;
+        
+        if (selected) {
+          if (sell == null) {
+            const derivedSell = selected.total_amount ?? selected.sell_subtotal;
+            if (hasValidNumber(derivedSell)) sell = Number(derivedSell);
+          }
+          if (marginPct == null) {
+            const derivedPct = selected.margin_percentage;
+            if (hasValidNumber(derivedPct)) {
+              marginPct = Number(derivedPct);
+            } else if (hasValidNumber(selected.margin_amount) && hasValidNumber(selected.buy_subtotal) && Number(selected.buy_subtotal) > 0) {
+              marginPct = (Number(selected.margin_amount) / Number(selected.buy_subtotal)) * 100;
+            }
+          }
+          if (marginAmt == null && hasValidNumber(selected.margin_amount)) {
+            marginAmt = Number(selected.margin_amount);
+          }
+        }
+        
+        return {
+          ...q,
+          sell_price: sell ?? null,
+          margin_percentage: marginPct ?? null,
+          margin_amount: marginAmt ?? null,
+        };
+      });
+
+      setQuotes(enhanced as unknown as Quote[]);
     } catch (error: any) {
       const duration = performance.now() - startTime;
       logger.error("Error fetching quotes", {
@@ -287,13 +338,69 @@ export default function QuotesPipeline() {
         description: `Successfully deleted ${quoteIds.length} quote(s)`,
       });
     } catch (err: any) {
-        const duration = performance.now() - startTime;
-        debug.error('Delete failed', { error: err, duration: `${duration.toFixed(2)}ms` });
-        toast({
-          title: "Error",
-          description: "Failed to delete quotes",
-          variant: "destructive",
-        });
+        // Fallback: scoped, ordered deletes for cascade
+        try {
+          debug.warn('RPC delete failed, attempting client-side cascade', { error: err?.message });
+          await scopedDb
+            .from('opportunities')
+            .update({ primary_quote_id: null })
+            .in('primary_quote_id', quoteIds);
+
+          const { data: versions = [] } = await scopedDb
+            .from('quotation_versions')
+            .select('id')
+            .in('quote_id', quoteIds);
+          const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+          const versionIds = (versions as any[]).map(v => String(v.id)).filter(isUUID);
+
+          let optionIds: string[] = [];
+          if (versionIds.length) {
+            const { data: options = [] } = await scopedDb
+              .from('quotation_version_options')
+              .select('id')
+              .in('quotation_version_id', versionIds);
+            optionIds = (options as any[]).map(o => String(o.id)).filter(isUUID);
+          }
+
+          if (optionIds.length) {
+            const validOptionIds = optionIds.filter(isUUID);
+            if (validOptionIds.length) {
+              await scopedDb.from('quote_charges').delete().in('quote_option_id', validOptionIds);
+              await scopedDb.from('quotation_version_option_legs').delete().in('quotation_version_option_id', validOptionIds);
+              await scopedDb.from('quote_legs').delete().in('quote_option_id', validOptionIds);
+              await scopedDb.from('quotation_version_options').delete().in('id', validOptionIds);
+            }
+          }
+          if (versionIds.length) {
+            await scopedDb.from('quotation_versions').delete().in('id', versionIds);
+          }
+          const validQuoteIds = quoteIds.filter(isUUID);
+          if (validQuoteIds.length) {
+            await scopedDb.from('quotes').delete().in('id', validQuoteIds);
+          }
+
+          setQuotes(prev => prev.filter(q => !quoteIds.includes(q.id)));
+          setSelectedQuotes(prev => {
+            const ns = new Set(prev);
+            quoteIds.forEach(id => ns.delete(id));
+            return ns;
+          });
+
+          const duration = performance.now() - startTime;
+          debug.info('Client-side cascade delete successful', { count: quoteIds.length, quoteIds, duration: `${duration.toFixed(2)}ms` });
+          toast({
+            title: "Success",
+            description: `Successfully deleted ${quoteIds.length} quote(s)`,
+          });
+        } catch (fallbackErr: any) {
+          const duration = performance.now() - startTime;
+          debug.error('Delete failed (RPC and fallback)', { error: fallbackErr, duration: `${duration.toFixed(2)}ms` });
+          toast({
+            title: "Error",
+            description: fallbackErr?.message || "Failed to delete quotes",
+            variant: "destructive",
+          });
+        }
     } finally {
         setLoading(false);
     }
@@ -325,7 +432,7 @@ export default function QuotesPipeline() {
       const { error } = await scopedDb
         .from("quotes")
         .update({ status: newStatus })
-        .in("id", Array.from(selectedQuotes));
+        .in("id", Array.from(selectedQuotes).filter((v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)));
 
       if (error) throw error;
 

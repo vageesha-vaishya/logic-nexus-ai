@@ -178,8 +178,12 @@ export default function QuoteNew() {
             const { data: cs, error: csError } = await scopedDb.from('container_sizes').select('id, name, code');
             if (csError) console.error('[QuoteNew] Error fetching container sizes:', csError);
 
-            const { data: terms, error: termsError } = await scopedDb.from('shipping_terms').select('id, code, name');
-            if (termsError) console.error('[QuoteNew] Error fetching shipping terms:', termsError);
+            const { data: terms, error: termsError } = await scopedDb
+              .from('incoterms', true)
+              .select('id, incoterm_code as code, incoterm_name as name')
+              .eq('is_active', true)
+              .order('incoterm_code');
+            if (termsError) console.error('[QuoteNew] Error fetching incoterms:', termsError);
 
             setMasterData({
                 serviceTypes: st || [],
@@ -299,15 +303,19 @@ export default function QuoteNew() {
 
         // 0. Update Version with AI Analysis (if available)
         if (state.marketAnalysis || state.confidenceScore) {
-             const { error: versionUpdateError } = await scopedDb.from('quotation_versions').update({
-                 market_analysis: state.marketAnalysis,
-                 confidence_score: state.confidenceScore,
-                 anomalies: state.anomalies ? (Array.isArray(state.anomalies) ? state.anomalies : []) : []
-             }).eq('id', versionId);
-             
-             if (versionUpdateError) {
-                 console.warn('[QuoteNew] Failed to save AI analysis to version:', versionUpdateError);
+             const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+             if (isUUID(versionId)) {
+               const { error: versionUpdateError } = await scopedDb.from('quotation_versions').update({
+                   market_analysis: state.marketAnalysis,
+                   confidence_score: state.confidenceScore,
+                   anomalies: state.anomalies ? (Array.isArray(state.anomalies) ? state.anomalies : []) : []
+               }).eq('id', versionId);
+               
+               if (versionUpdateError) {
+                   console.warn('[QuoteNew] Failed to save AI analysis to version:', versionUpdateError);
+               }
              }
+             
         }
 
         // 1. Fetch Master Data (Cached)

@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-export function QuoteHeader() {
+export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
   const { control, setValue, register, watch } = useFormContext();
   const { opportunities, accounts, contacts, isLoadingOpportunities } = useQuoteContext() as QuoteContextType;
   const [open, setOpen] = useState(false);
@@ -110,6 +110,9 @@ export function QuoteHeader() {
             <div>
                 <CardTitle className="text-xl">Quote Details</CardTitle>
                 <CardDescription>General information and customer context</CardDescription>
+                {quoteNumber && (
+                  <div className="text-xs text-muted-foreground mt-1">Quote #: {quoteNumber}</div>
+                )}
             </div>
         </div>
       </CardHeader>

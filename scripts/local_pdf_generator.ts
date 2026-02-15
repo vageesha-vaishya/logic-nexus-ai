@@ -547,9 +547,9 @@ export async function generatePdfLocal(quoteId: string, versionId?: string, temp
                for (const line of lines) {
                    if (y < 40) { page = pdfDoc.addPage([595.28, 841.89]); y = height - 50; }
                    
-                   let fontSize = 8;
+                   const fontSize = 8;
                    let isBold = false;
-                   let color = black;
+                   const color = black;
 
                    if (line.includes("LAP TOP BATTERIES") || line.includes("RATES ARE NOT SUBJECT")) {
                        isBold = true;

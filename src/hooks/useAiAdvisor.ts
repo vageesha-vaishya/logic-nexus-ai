@@ -62,8 +62,7 @@ export function useAiAdvisor() {
         if (sessionToken) {
             response = await doFetch(sessionToken, false);
             
-            // If 401, retry with Anon Key
-            if (response.status === 401) {
+            if (response.status === 401 || response.status === 403) {
                 console.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
                 response = await doFetch(anonKey, true);
             }

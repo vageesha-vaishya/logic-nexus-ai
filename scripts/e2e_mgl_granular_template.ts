@@ -22,8 +22,8 @@ if (!SUPABASE_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- Mappings ---
-let CONTAINER_SIZES: Record<string, string> = {};
-let CONTAINER_TYPES: Record<string, string> = {};
+const CONTAINER_SIZES: Record<string, string> = {};
+const CONTAINER_TYPES: Record<string, string> = {};
 
 // User provided sample data from the text template
 const USER_TEMPLATE_DATA = {

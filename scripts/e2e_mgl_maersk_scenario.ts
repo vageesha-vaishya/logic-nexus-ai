@@ -24,7 +24,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- Mappings ---
 // Will be populated dynamically
-let CONTAINER_SIZES: Record<string, string> = {};
+const CONTAINER_SIZES: Record<string, string> = {};
 
 const CHARGE_CATS: Record<string, string> = {
   'ocean_freight': 'fb1a45f6-f50a-47be-8fe5-56f084c26ef4', // Freight

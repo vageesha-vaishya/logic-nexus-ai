@@ -100,8 +100,8 @@ export function KanbanDashboard() {
         else if (context.tenantId) quotesQuery = quotesQuery.eq("tenant_id", context.tenantId as string);
       }
 
-      let shipmentsQuery = (db.from("shipments") as any).select("status, tenant_id, franchise_id");
-      let activitiesQuery = (db.from("activities") as any).select("status, tenant_id, franchise_id");
+      const shipmentsQuery = (db.from("shipments") as any).select("status, tenant_id, franchise_id");
+      const activitiesQuery = (db.from("activities") as any).select("status, tenant_id, franchise_id");
 
       const [leadsData, opportunitiesData, quotesData, shipmentsData, activitiesData] = await Promise.all([
         leadsQuery,
@@ -201,7 +201,7 @@ export function KanbanDashboard() {
   useEffect(() => {
     const loadAccounts = async () => {
       const db = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      let query = (db.from("accounts") as any).select("id, name").limit(200).order("name");
+      const query = (db.from("accounts") as any).select("id, name").limit(200).order("name");
       const { data } = await query;
       setAccounts(data || []);
     };
@@ -211,7 +211,7 @@ export function KanbanDashboard() {
   useEffect(() => {
     const loadFranchises = async () => {
       const db = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      let query = (db.from("franchises") as any).select("id, name").order("name");
+      const query = (db.from("franchises") as any).select("id, name").order("name");
       const { data } = await query;
       setFranchises(data || []);
     };

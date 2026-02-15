@@ -19,19 +19,27 @@ export class PortsService {
    */
   async getAllPorts(): Promise<PortLocation[]> {
     console.log('[PortsService] Fetching all ports (global scope)...');
-    // Use raw client to ensure no scoping interference for this global table
-    const { data, error } = await this.db.client
-      .from('ports_locations')
-      .select('*')
-      .order('location_name');
-      
-    if (error) {
-      console.error('Error fetching ports:', error);
-      throw error;
+    try {
+      // Use raw client to ensure no scoping interference for this global table
+      const { data, error } = await this.db.client
+        .from('ports_locations')
+        .select('id, location_name, location_code, country, is_active')
+        .order('location_name');
+
+      if (error) {
+        console.error('[PortsService] Error fetching ports:', error);
+        throw error;
+      }
+
+      const rows = Array.isArray(data) ? data : [];
+      const active = rows.filter((p: any) => p.is_active !== false);
+
+      console.log(`[PortsService] Fetched ${active.length} ports.`);
+      return active as any[];
+    } catch (e: any) {
+      console.error('[PortsService] Exception during ports fetch:', e?.message || e);
+      return [];
     }
-    
-    console.log(`[PortsService] Fetched ${data?.length || 0} ports.`);
-    return data || [];
   }
 
   /**

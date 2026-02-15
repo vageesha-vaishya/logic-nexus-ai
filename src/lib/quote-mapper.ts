@@ -52,8 +52,8 @@ export const mapOptionToQuote = (opt: any) => {
         let total = normalized.total_amount || 0;
         let base_fare = 0;
         let taxes = 0;
-        let surcharges: any = {};
-        let fees: any = {};
+        const surcharges: any = {};
+        const fees: any = {};
 
         if (normalized.legs) {
             normalized.legs.forEach((leg: any) => {

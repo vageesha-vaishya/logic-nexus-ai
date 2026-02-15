@@ -72,6 +72,8 @@ export interface QuoteState {
     serviceLegCategories: any[];
     shippingTerms: any[];
     ports: any[];
+    accounts: any[];
+    contacts: any[];
   };
 
   // UI State

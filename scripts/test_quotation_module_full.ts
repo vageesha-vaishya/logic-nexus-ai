@@ -27,7 +27,7 @@ async function runTest() {
     try {
         // 1. Setup Data
         // Fetch a valid tenant_id
-        let { data: tenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+        const { data: tenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
         let tenantId = tenant?.id;
         
         if (!tenantId) {

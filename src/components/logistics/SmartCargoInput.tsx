@@ -44,6 +44,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
   const [browserOpen, setBrowserOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   // Debounce search term
   useEffect(() => {
@@ -139,6 +140,12 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     setSearchTerm(`${selection.description} - ${selection.code}`);
   };
 
+  useEffect(() => {
+    if (open && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [open]);
+
   return (
     <div className={cn("flex gap-2 w-full", className)}>
       <Popover open={open} onOpenChange={setOpen}>
@@ -148,6 +155,29 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
             role="combobox"
             aria-expanded={open}
             className={cn("flex-1 justify-between text-left font-normal", !searchTerm && "text-muted-foreground")}
+            onFocus={() => setOpen(true)}
+            onKeyDown={(e) => {
+              const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+              if (isPrintable) {
+                setOpen(true);
+                setSearchTerm((prev) => prev + e.key);
+                e.preventDefault();
+              } else if (e.key === 'Backspace') {
+                setOpen(true);
+                setSearchTerm((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
+                e.preventDefault();
+              } else if (e.key === 'Escape') {
+                setOpen(false);
+              }
+            }}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData('text');
+              if (text) {
+                setOpen(true);
+                setSearchTerm(text);
+                e.preventDefault();
+              }
+            }}
           >
             {searchTerm || placeholder}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -159,6 +189,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
               placeholder="Type to search..." 
               value={searchTerm}
               onValueChange={setSearchTerm}
+              ref={inputRef as any}
             />
             <CommandList>
               <CommandEmpty className="py-2 px-4 text-sm">

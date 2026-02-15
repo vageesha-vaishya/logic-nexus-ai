@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 
 // Mock useCRM hook
-const mockSupabase = {
+const mockSupabase: any = {
     rpc: vi.fn().mockResolvedValue({
         data: [
             {
@@ -27,6 +27,16 @@ const mockSupabase = {
             }
         ],
         error: null
+    }),
+    from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue({
+                    data: [],
+                    error: null
+                })
+            })
+        })
     })
 };
 
@@ -163,5 +173,109 @@ describe('LocationAutocomplete', () => {
         });
         
         consoleSpy.mockRestore();
+    });
+
+    it('falls back to ports_locations when RPC returns empty', async () => {
+        mockSupabase.rpc.mockResolvedValueOnce({
+            data: [],
+            error: null
+        });
+        mockSupabase.from = vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                or: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockResolvedValue({
+                        data: [
+                            { id: 'p1', location_name: 'Fallback Port', location_code: 'FB001', location_type: 'seaport', country: 'US', city: 'Fallback' }
+                        ],
+                        error: null
+                    })
+                })
+            })
+        } as any);
+
+        render(<LocationAutocomplete onChange={() => {}} />);
+        const trigger = screen.getByRole('combobox');
+        fireEvent.click(trigger);
+        const input = screen.getByPlaceholderText('Search port, airport, city...');
+        fireEvent.change(input, { target: { value: 'Fall' } });
+
+        await waitFor(() => {
+            expect(screen.getByText(/Fallback Port/)).toBeInTheDocument();
+        });
+    });
+
+    it('shows friendly message when no locations found', async () => {
+        mockSupabase.rpc.mockResolvedValueOnce({
+            data: [],
+            error: null
+        });
+        mockSupabase.from = vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+                or: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockResolvedValue({
+                        data: [],
+                        error: null
+                    })
+                })
+            })
+        } as any);
+
+        render(<LocationAutocomplete onChange={() => {}} />);
+        const trigger = screen.getByRole('combobox');
+        fireEvent.click(trigger);
+        const input = screen.getByPlaceholderText('Search port, airport, city...');
+        fireEvent.change(input, { target: { value: 'UnknownPlace' } });
+
+        await waitFor(() => {
+            expect(screen.getByText(/No locations found./)).toBeInTheDocument();
+        });
+    });
+
+    it('loads initial ports list on open and supports Load more', async () => {
+        // Mock initial list
+        const initialList = Array.from({ length: 50 }).map((_, i) => ({
+            id: `p${i+1}`,
+            location_name: `Port ${i+1}`,
+            location_code: `P${i+1}`,
+            location_type: 'seaport',
+            country: 'US',
+            city: 'City'
+        }));
+        const nextList = Array.from({ length: 50 }).map((_, i) => ({
+            id: `p${i+51}`,
+            location_name: `Port ${i+51}`,
+            location_code: `P${i+51}`,
+            location_type: 'seaport',
+            country: 'US',
+            city: 'City'
+        }));
+        const selectMock = vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+                range: vi.fn()
+                    // First page
+                    .mockResolvedValueOnce({ data: initialList, error: null })
+                    // Second page
+                    .mockResolvedValueOnce({ data: nextList, error: null })
+            })
+        });
+        mockSupabase.from = vi.fn().mockReturnValue({
+            select: selectMock
+        } as any);
+
+        render(<LocationAutocomplete onChange={() => {}} />);
+        const trigger = screen.getByRole('combobox');
+        fireEvent.click(trigger);
+
+        await waitFor(() => {
+            const options = screen.getAllByRole('option');
+            expect(options.length).toBeGreaterThan(0);
+        });
+
+        // Load more
+        fireEvent.click(screen.getByText('Load more ports…'));
+        await waitFor(() => {
+            const options = screen.getAllByRole('option');
+            expect(options.length).toBeGreaterThan(50);
+        });
     });
 });

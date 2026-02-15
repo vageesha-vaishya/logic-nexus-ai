@@ -328,6 +328,18 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     }
   }, [optionId, tenantId, carriers.length, transportModes.length, serviceTypes.length]);
 
+  // Helper for date formatting
+  const formatDateForInput = (dateVal: any): string => {
+      if (!dateVal) return '';
+      try {
+          const d = new Date(dateVal);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString().split('T')[0];
+      } catch (e) {
+          return '';
+      }
+  };
+
   const loadInitialData = async () => {
     debug.debug('[Composer] Loading initial data...', { quoteId, versionId, optionId: initialOptionId });
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -341,17 +353,22 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       debug.debug('[Composer] Step 1: Resolving tenant ID and Context');
       
       let resolvedTenantId: string | null = propTenantId || context?.tenantId || null;
+      let tenantContextFound = !!resolvedTenantId;
       
       // Attempt 1: User Metadata
       if (!resolvedTenantId) {
         const { data: { user } } = await scopedDb.client.auth.getUser();
-        resolvedTenantId = user?.user_metadata?.tenant_id ?? null;
+        const userTenant = user?.user_metadata?.tenant_id;
+        if (userTenant) {
+            resolvedTenantId = userTenant;
+            tenantContextFound = true;
+        }
       }
 
       // Attempt 2: Fetch from Quote (lightweight query)
-      if (!resolvedTenantId && quoteId) {
+      if (!tenantContextFound && quoteId) {
           try {
-             // Use bypass mode (true) to rely on RLS, but don't inject missing scope
+             // Use bypass mode (true) to rely on RLS
              const { data, error } = await scopedDb
                 .from('quotes', true)
                 .select('tenant_id')
@@ -359,7 +376,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                 .maybeSingle();
              
              if (!error && data) {
-                resolvedTenantId = data.tenant_id;
+                resolvedTenantId = data.tenant_id; // Can be null for global
+                tenantContextFound = true;
                 debug.log('[Composer] Resolved tenant from quote lookup:', resolvedTenantId);
              }
           } catch (e) {
@@ -368,7 +386,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       }
 
       // Attempt 3: Fetch from Version (lightweight query)
-      if (!resolvedTenantId && versionId) {
+      if (!tenantContextFound && versionId) {
           try {
              const { data, error } = await scopedDb
                 .from('quotation_versions', true)
@@ -377,7 +395,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                 .maybeSingle();
              
              if (!error && data) {
-                resolvedTenantId = data.tenant_id;
+                resolvedTenantId = data.tenant_id; // Can be null for global
+                tenantContextFound = true;
                 debug.log('[Composer] Resolved tenant from version lookup:', resolvedTenantId);
              }
           } catch (e) {
@@ -385,20 +404,27 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           }
       }
 
-      if (!resolvedTenantId) {
-        debug.error('[Composer] Failed to resolve tenant ID after all attempts');
-        errors.push('Could not determine tenant context');
-      } else {
-        dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
-      }
+      if (!tenantContextFound && !resolvedTenantId) {
+        // Only error if we strictly couldn't find ANY context (not even a global record)
+        // But for safety, if we haven't found a record yet, we might still proceed if it's a new quote?
+        // If quoteId is provided but we couldn't find it, that's an issue.
+        if (quoteId || versionId) {
+             debug.error('[Composer] Failed to resolve tenant context after lookups');
+             // We don't error block here, we try to fetch the full quote which handles its own errors
+        }
+      } 
+      
+      // Dispatch initialize even if tenantId is null (global)
+      dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
 
       // Always fetch quote details if quoteId is present to populate context
       if (quoteId) {
         try {
           // Construct query - if we have a resolved tenant, enforce it to satisfy RLS policies
+          // Fixed: Removed incoterms join (relationship missing) and updated ports_locations columns (location_name/location_code)
           let quoteQuery = scopedDb
             .from('quotes', true)
-            .select('*, incoterms(code), accounts(name), contacts(first_name, last_name)')
+            .select('*, accounts(name), contacts(first_name, last_name), origin_location:origin_port_id(location_name, location_code), destination_location:destination_port_id(location_name, location_code)')
             .eq('id', quoteId);
             
           if (resolvedTenantId) {
@@ -423,16 +449,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
             let quoteItems: any[] = [];
 
             try {
-              let itemsQuery = scopedDb
-                .from('quote_items')
+              const itemsQuery = scopedDb
+                .from('quote_items', true)
                 .select('weight_kg, volume_cbm, quantity, product_name, description')
                 .eq('quote_id', quoteId);
-
-              // Removed tenant_id filter as quote_items table relies on quote_id relationship
-              // and does not store tenant_id directly in the view/table in some cases.
-              // if (resolvedTenantId) {
-              //   itemsQuery = itemsQuery.eq('tenant_id', resolvedTenantId);
-              // }
 
               const { data: items, error: itemsError } = await itemsQuery;
 
@@ -453,9 +473,6 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                   const weight = Number(item.weight_kg) || 0;
                   const volume = Number(item.volume_cbm) || 0;
                   
-                  // Assuming weight_kg and volume_cbm are per-line-item totals or per-unit? 
-                  // In logistics, usually specificed as total for the line. 
-                  // If ambiguous, we sum the raw values.
                   calculatedTotalWeight += weight;
                   calculatedTotalVolume += volume;
                   
@@ -472,10 +489,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
             // Use quote's tenant_id if we don't have one yet, or verify it matches
             if (!resolvedTenantId) {
               resolvedTenantId = (quoteRow as any)?.tenant_id ?? null;
-              if (resolvedTenantId) {
-                 debug.log('[Composer] Resolved tenant from full quote load:', resolvedTenantId);
-                 dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
-              }
+              // Update context with the definitive tenant from the quote
+              dispatch({ type: 'INITIALIZE', payload: { tenantId: resolvedTenantId } });
             }
             
             // Normalize quote data for consumption
@@ -500,8 +515,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
             const normalizedQuote = {
                 ...raw,
-                origin: raw.origin_location?.name || raw.origin_code || raw.origin || '',
-                destination: raw.destination_location?.name || raw.destination_code || raw.destination || '',
+                origin: raw.origin_location?.location_name || raw.origin_code || raw.origin || '',
+                destination: raw.destination_location?.location_name || raw.destination_code || raw.destination || '',
                 commodity: getSafeString(validCargoDetails?.commodity) || raw.commodity || derivedCommodity || '',
                 mode: raw.transport_mode || 'ocean',
                 total_weight: calculatedTotalWeight > 0 ? calculatedTotalWeight : (Number(raw.total_weight) || 0),
@@ -509,11 +524,11 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                 franchiseId: (quoteRow as any)?.franchise_id,
                 // Map additional fields to ensure Basic Info is populated
                 reference: raw.reference || raw.reference_no || raw.quote_reference || '',
-                validUntil: raw.valid_until || raw.expiry_date || '',
+                validUntil: formatDateForInput(raw.valid_until || raw.expiry_date),
                 incoterms: raw.incoterms?.code || raw.incoterm_id || '',
                 shipping_term_id: raw.shipping_term_id,
-                ready_date: raw.ready_date || raw.pickup_date,
-                deadline_date: raw.deadline_date || raw.delivery_deadline,
+                ready_date: formatDateForInput(raw.ready_date || raw.pickup_date),
+                deadline_date: formatDateForInput(raw.deadline_date || raw.delivery_deadline),
                 notes: raw.notes,
                 currencyId: raw.currency_id,
                 // Enhanced mapping for full field population
@@ -532,6 +547,12 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                  // Items for Document Preview
                  items: quoteItems || []
              };
+
+            debug.log('[Composer] Normalized quote data:', {
+                validUntil: normalizedQuote.validUntil,
+                ready_date: normalizedQuote.ready_date,
+                deadline_date: normalizedQuote.deadline_date
+            });
 
             fetchedQuoteData = normalizedQuote;
             dispatch({ type: 'UPDATE_QUOTE_DATA', payload: normalizedQuote });
@@ -643,7 +664,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           chargeSides: [] as any[],
           serviceLegCategories: [] as any[],
           shippingTerms: [] as any[],
-          ports: [] as any[]
+          ports: [] as any[],
+          accounts: [] as any[],
+          contacts: [] as any[]
         };
 
         const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
@@ -677,8 +700,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes'),
           fetchRef('carriers', 'carriers', 'Failed to load carriers'),
           fetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order'),
-          fetchRef('shipping_terms', 'shippingTerms', 'Failed to load shipping terms'),
-          fetchRef('ports_locations', 'ports', 'Failed to load ports')
+          fetchRef('incoterms', 'shippingTerms', 'Failed to load shipping terms', 'id, incoterm_name as name, incoterm_code as code, description'),
+          fetchRef('ports_locations', 'ports', 'Failed to load ports', 'id, location_name as name, location_code as code, country'),
+          fetchRef('accounts', 'accounts', 'Failed to load accounts', 'id, name'),
+          fetchRef('contacts', 'contacts', 'Failed to load contacts', 'id, first_name, last_name, account_id')
         ]);
 
         // Cache the results if we have a tenant ID
@@ -698,7 +723,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       // Enhance quote data with resolved names from reference data if missing
       if (fetchedQuoteData) {
          const qData = fetchedQuoteData;
-         let updates: any = {};
+         const updates: any = {};
          let hasUpdates = false;
 
          if (!qData.origin && qData.origin_port_id) {
@@ -740,7 +765,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           chargeSides: refData.chargeSides,
           serviceLegCategories: refData.serviceLegCategories,
           shippingTerms: refData.shippingTerms,
-          ports: refData.ports
+          ports: refData.ports,
+          accounts: refData.accounts,
+          contacts: refData.contacts
         }
       });
 
@@ -869,8 +896,13 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
   // Ensure an option exists for this version
   const ensureOptionExists = async (resolvedTenantId: string) => {
     debug.debug('[Composer] Ensuring option exists for version:', versionId);
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
     
     try {
+      if (!isUUID(versionId)) {
+        debug.warn('[Composer] Skipping option ensure: invalid versionId');
+        return;
+      }
       // Query for existing options with full details for overview
       const { data: existingOptions, error: queryError } = await scopedDb
         .from('quotation_version_options', true)
@@ -923,6 +955,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       // Create new option only if none exists
       debug.debug('[Composer] Creating new option for version');
+      if (!isUUID(resolvedTenantId)) {
+        debug.warn('[Composer] Skipping option creation: invalid tenantId');
+        return;
+      }
       const { data: newOption, error: insertError } = await scopedDb
         .from('quotation_version_options')
         .insert({
@@ -1356,7 +1392,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
   const updateLeg = (legId: string, updates: Partial<Leg>) => {
     // If mode changed, recalculate chargeable weight for weight-based charges
-    let finalUpdates = { ...updates };
+    const finalUpdates = { ...updates };
     
     if (updates.mode) {
       const leg = legs.find(l => l.id === legId);
@@ -1883,16 +1919,21 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       // Ensure we have an option to save to
       debug.debug('[Composer] Ensuring option exists before save. Current optionId:', optionId);
       let currentOptionId = optionId;
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
       
       if (!currentOptionId) {
         // This should rarely happen now that we call ensureOptionExists in loadInitialData
         debug.debug('[Composer] No optionId - checking for existing options');
-        const { data: existingOptions } = await scopedDb
-          .from('quotation_version_options')
-          .select('id')
-          .eq('quotation_version_id', versionId)
-          .order('created_at', { ascending: false })
-          .limit(1);
+        let existingOptions: any[] | null = null;
+        if (isUUID(versionId)) {
+          const res = await scopedDb
+            .from('quotation_version_options')
+            .select('id')
+            .eq('quotation_version_id', versionId)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          existingOptions = res.data || null;
+        }
 
         if (existingOptions && existingOptions.length > 0) {
           currentOptionId = existingOptions[0].id;
@@ -1900,6 +1941,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           debug.debug('[Composer] Using existing option:', currentOptionId);
         } else {
           debug.debug('[Composer] Creating new option during save');
+          if (!isUUID(versionId) || !isUUID(finalTenantId)) {
+            throw new Error('Invalid identifiers for option creation');
+          }
           const { data: newOption, error: optError } = await scopedDb
             .from('quotation_version_options')
             .insert({
@@ -1931,15 +1975,18 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       // Delete tracked charges first
       if (deletedChargeIds.length > 0) {
-        const { error: deleteError } = await scopedDb
-          .from('quote_charges')
-          .delete()
-          .in('id', deletedChargeIds);
-        
-        if (deleteError) {
-          debug.error('Error deleting charges:', deleteError);
-          throw new Error(`Failed to delete charges: ${deleteError.message}`);
+        const validDeleted = deletedChargeIds.filter((id) => isUUID(id));
+        if (validDeleted.length > 0) {
+          const { error: deleteError } = await scopedDb
+            .from('quote_charges')
+            .delete()
+            .in('id', validDeleted);
+          if (deleteError) {
+            debug.error('Error deleting charges:', deleteError);
+            throw new Error(`Failed to delete charges: ${deleteError.message}`);
+          }
         }
+        
       }
 
       // Get charge side IDs
@@ -1956,10 +2003,14 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       const sellSideId = sellSideRes.data.id;
 
       // Clean up orphaned legs and their charges
-      const { data: existingLegs } = await scopedDb
-        .from('quotation_version_option_legs')
-        .select('id')
-        .eq('quotation_version_option_id', currentOptionId);
+      let existingLegs: any[] | null = null;
+      if (isUUID(currentOptionId)) {
+        const resLegs = await scopedDb
+          .from('quotation_version_option_legs')
+          .select('id')
+          .eq('quotation_version_option_id', currentOptionId);
+        existingLegs = resLegs.data || null;
+      }
       
       const stateLegIds = new Set(
         (legs || [])
@@ -1969,19 +2020,22 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       
       const toDeleteLegIds = (existingLegs || [])
         .map((l: any) => String(l.id))
+        .filter((id: string) => isUUID(id))
         .filter((id: string) => !stateLegIds.has(id));
       
       if (toDeleteLegIds.length > 0) {
         // Delete charges associated with removed legs
-        const { error: chargeDeleteError } = await scopedDb
-          .from('quote_charges')
-          .delete()
-          .in('leg_id', toDeleteLegIds)
-          .eq('quote_option_id', currentOptionId);
-        
-        if (chargeDeleteError) {
-          debug.error('Error deleting leg charges:', chargeDeleteError);
-          throw new Error(`Failed to delete leg charges: ${chargeDeleteError.message}`);
+        if (isUUID(currentOptionId)) {
+          const { error: chargeDeleteError } = await scopedDb
+            .from('quote_charges')
+            .delete()
+            .in('leg_id', toDeleteLegIds)
+            .eq('quote_option_id', currentOptionId);
+          
+          if (chargeDeleteError) {
+            debug.error('Error deleting leg charges:', chargeDeleteError);
+            throw new Error(`Failed to delete leg charges: ${chargeDeleteError.message}`);
+          }
         }
         
         // Delete the legs themselves
@@ -2005,6 +2059,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         
         if (leg.id.startsWith('leg-')) {
           // New leg
+          if (!isUUID(currentOptionId)) {
+            throw new Error('Invalid option identifier for leg insert');
+          }
           const { data: newLeg, error: legError } = await scopedDb
             .from('quotation_version_option_legs')
             .insert({
@@ -2029,23 +2086,24 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           legId = (newLeg as any).id;
         } else {
           // Update existing leg
-          const { error: updateError } = await scopedDb
-            .from('quotation_version_option_legs')
-            .update({
-              mode: leg.mode,
-              service_type_id: leg.serviceTypeId || null,
-              origin_location: leg.origin,
-              destination_location: leg.destination,
-              // Strict enforcement of leg_type constraint
-              leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
-              service_only_category: leg.serviceOnlyCategory || null,
-              sort_order: i,
-              carrier_id: leg.carrierId || null,
-              carrier_name: leg.carrierName || null
-            })
-            .eq('id', legId);
-          
-          if (updateError) throw updateError;
+          if (isUUID(legId)) {
+            const { error: updateError } = await scopedDb
+              .from('quotation_version_option_legs')
+              .update({
+                mode: leg.mode,
+                service_type_id: leg.serviceTypeId || null,
+                origin_location: leg.origin,
+                destination_location: leg.destination,
+                leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
+                service_only_category: leg.serviceOnlyCategory || null,
+                sort_order: i,
+                carrier_id: leg.carrierId || null,
+                carrier_name: leg.carrierName || null
+              })
+              .eq('id', legId);
+            
+            if (updateError) throw updateError;
+          }
         }
 
         // Save charges with UPDATE/INSERT logic
@@ -2065,55 +2123,87 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           // Handle buy side
           if (charge.buy?.dbChargeId) {
             // Update existing
-            const { error: updateError } = await scopedDb
-              .from('quote_charges')
-              .update({
-                ...chargeData,
-                quantity: charge.buy.quantity || 1,
-                rate: charge.buy.rate || 0,
-                amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
-              })
-              .eq('id', charge.buy.dbChargeId);
-            if (updateError) throw updateError;
+            if (isUUID(charge.buy.dbChargeId)) {
+              const { error: updateError } = await scopedDb
+                .from('quote_charges')
+                .update({
+                  ...chargeData,
+                  quantity: charge.buy.quantity || 1,
+                  rate: charge.buy.rate || 0,
+                  amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
+                })
+                .eq('id', charge.buy.dbChargeId);
+              if (updateError) throw updateError;
+            } else {
+              const { error: insertError } = await scopedDb
+                .from('quote_charges')
+                .insert({
+                  ...chargeData,
+                  charge_side_id: buySideId,
+                  quantity: charge.buy?.quantity || 1,
+                  rate: charge.buy?.rate || 0,
+                  amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
+                });
+              if (insertError) throw insertError;
+            }
           } else {
             // Insert new
-            const { error: insertError } = await scopedDb
-              .from('quote_charges')
-              .insert({
-                ...chargeData,
-                charge_side_id: buySideId,
-                quantity: charge.buy?.quantity || 1,
-                rate: charge.buy?.rate || 0,
-                amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
-              });
-            if (insertError) throw insertError;
+            if (isUUID(currentOptionId) && isUUID(legId)) {
+              const { error: insertError } = await scopedDb
+                .from('quote_charges')
+                .insert({
+                  ...chargeData,
+                  charge_side_id: buySideId,
+                  quantity: charge.buy?.quantity || 1,
+                  rate: charge.buy?.rate || 0,
+                  amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
+                });
+              if (insertError) throw insertError;
+            }
           }
 
           // Handle sell side
           if (charge.sell?.dbChargeId) {
             // Update existing
-            const { error: updateError } = await scopedDb
-              .from('quote_charges')
-              .update({
-                ...chargeData,
-                quantity: charge.sell.quantity || 1,
-                rate: charge.sell.rate || 0,
-                amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
-              })
-              .eq('id', charge.sell.dbChargeId);
-            if (updateError) throw updateError;
+            if (isUUID(charge.sell.dbChargeId)) {
+              const { error: updateError } = await scopedDb
+                .from('quote_charges')
+                .update({
+                  ...chargeData,
+                  quantity: charge.sell.quantity || 1,
+                  rate: charge.sell.rate || 0,
+                  amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
+                })
+                .eq('id', charge.sell.dbChargeId);
+              if (updateError) throw updateError;
+            } else {
+              if (isUUID(currentOptionId) && isUUID(legId)) {
+                const { error: insertError } = await scopedDb
+                  .from('quote_charges')
+                  .insert({
+                    ...chargeData,
+                    charge_side_id: sellSideId,
+                    quantity: charge.sell?.quantity || 1,
+                    rate: charge.sell?.rate || 0,
+                    amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
+                  });
+                if (insertError) throw insertError;
+              }
+            }
           } else {
             // Insert new
-            const { error: insertError } = await scopedDb
-              .from('quote_charges')
-              .insert({
-                ...chargeData,
-                charge_side_id: sellSideId,
-                quantity: charge.sell?.quantity || 1,
-                rate: charge.sell?.rate || 0,
-                amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
-              });
-            if (insertError) throw insertError;
+            if (isUUID(currentOptionId) && isUUID(legId)) {
+              const { error: insertError } = await scopedDb
+                .from('quote_charges')
+                .insert({
+                  ...chargeData,
+                  charge_side_id: sellSideId,
+                  quantity: charge.sell?.quantity || 1,
+                  rate: charge.sell?.rate || 0,
+                  amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
+                });
+              if (insertError) throw insertError;
+            }
           }
         }
       }
@@ -2121,21 +2211,22 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       updateProgress(3); // Legs saved
 
       // Update Quotation Version (Header)
-      const { error: versionError } = await scopedDb
-        .from('quotation_versions')
-        .update({
-          valid_until: quoteData.validUntil || null,
-          total_weight: quoteData.total_weight ? Number(quoteData.total_weight) : null,
-          total_volume: quoteData.total_volume ? Number(quoteData.total_volume) : null,
-          incoterms: quoteData.incoterms || null,
-          commodity: quoteData.commodity || null,
-          notes: quoteData.notes || null,
-          aes_hts_id: quoteData.aes_hts_id || null,
-        })
-        .eq('id', versionId);
-
-      if (versionError) {
-        debug.error('Error updating version:', versionError);
+      if (isUUID(versionId)) {
+        const { error: versionError } = await scopedDb
+          .from('quotation_versions')
+          .update({
+            valid_until: quoteData.validUntil || null,
+            total_weight: quoteData.total_weight ? Number(quoteData.total_weight) : null,
+            total_volume: quoteData.total_volume ? Number(quoteData.total_volume) : null,
+            incoterms: quoteData.incoterms || null,
+            commodity: quoteData.commodity || null,
+            notes: quoteData.notes || null,
+            aes_hts_id: quoteData.aes_hts_id || null,
+          })
+          .eq('id', versionId);
+        if (versionError) {
+          debug.error('Error updating version:', versionError);
+        }
       }
 
       // SYNC: Update Parent Quote Header with Totals and Status
@@ -2159,15 +2250,17 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
               parentUpdatePayload.shipping_amount = currentTotalSell;
           }
 
-          const { error: parentError } = await scopedDb
-              .from('quotes')
-              .update(parentUpdatePayload)
-              .eq('id', quoteId);
+          if (isUUID(quoteId)) {
+            const { error: parentError } = await scopedDb
+                .from('quotes')
+                .update(parentUpdatePayload)
+                .eq('id', quoteId);
 
-          if (parentError) {
-              debug.warn('[Composer] Failed to sync parent quote header:', parentError);
-          } else {
-              debug.log('[Composer] Synced parent quote header with new totals');
+            if (parentError) {
+                debug.warn('[Composer] Failed to sync parent quote header:', parentError);
+            } else {
+                debug.log('[Composer] Synced parent quote header with new totals');
+            }
           }
       }
 
@@ -2194,27 +2287,30 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         const newMarginAmount = newTotalSell - newTotalBuy;
         const newMarginPercent = newTotalSell > 0 ? (newMarginAmount / newTotalSell) * 100 : 0;
 
-        const { error: optionError } = await scopedDb
-          .from('quotation_version_options')
-          .update({
-            carrier_id: quoteData.carrier_id || null,
-            carrier_name: quoteData.carrier_name || null,
-            service_type: quoteData.service_type || null,
-            transit_time: quoteData.transit_time || null,
-            valid_until: quoteData.validUntil || null,
-            currency: quoteData.currencyId ? currencies.find(c => c.id === quoteData.currencyId)?.code : null,
-            option_name: quoteData.option_name || null,
-            total_buy: newTotalBuy,
-            total_sell: newTotalSell,
-            total_amount: newTotalSell,
-            margin_amount: newMarginAmount,
-            margin_percentage: newMarginPercent
-          })
-          .eq('id', currentOptionId);
-
-        if (optionError) {
-          debug.error('Error updating option:', optionError);
+        if (isUUID(currentOptionId)) {
+          const { error: optionError } = await scopedDb
+            .from('quotation_version_options')
+            .update({
+              carrier_id: quoteData.carrier_id || null,
+              carrier_name: quoteData.carrier_name || null,
+              service_type: quoteData.service_type || null,
+              transit_time: quoteData.transit_time || null,
+              valid_until: quoteData.validUntil || null,
+              currency: quoteData.currencyId ? currencies.find(c => c.id === quoteData.currencyId)?.code : null,
+              option_name: quoteData.option_name || null,
+              total_buy: newTotalBuy,
+              total_sell: newTotalSell,
+              total_amount: newTotalSell,
+              margin_amount: newMarginAmount,
+              margin_percentage: newMarginPercent
+            })
+            .eq('id', currentOptionId);
+  
+          if (optionError) {
+            debug.error('Error updating option:', optionError);
+          }
         }
+
       }
 
       // Save combined charges with UPDATE/INSERT logic
@@ -2232,52 +2328,86 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
         // Handle buy side
         if (charge.buy?.dbChargeId) {
-          const { error: updateError } = await scopedDb
-            .from('quote_charges')
-            .update({
-              ...chargeData,
-              quantity: charge.buy.quantity || 1,
-              rate: charge.buy.rate || 0,
-              amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
-            })
-            .eq('id', charge.buy.dbChargeId);
-          if (updateError) throw updateError;
+          if (isUUID(charge.buy.dbChargeId)) {
+            const { error: updateError } = await scopedDb
+              .from('quote_charges')
+              .update({
+                ...chargeData,
+                quantity: charge.buy.quantity || 1,
+                rate: charge.buy.rate || 0,
+                amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
+              })
+              .eq('id', charge.buy.dbChargeId);
+            if (updateError) throw updateError;
+          } else {
+            if (isUUID(currentOptionId)) {
+              const { error: insertError } = await scopedDb
+                .from('quote_charges')
+                .insert({
+                  ...chargeData,
+                  charge_side_id: buySideId,
+                  quantity: charge.buy?.quantity || 1,
+                  rate: charge.buy?.rate || 0,
+                  amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
+                });
+              if (insertError) throw insertError;
+            }
+          }
         } else {
-          const { error: insertError } = await scopedDb
-            .from('quote_charges')
-            .insert({
-              ...chargeData,
-              charge_side_id: buySideId,
-              quantity: charge.buy?.quantity || 1,
-              rate: charge.buy?.rate || 0,
-              amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
-            });
-          if (insertError) throw insertError;
+          if (isUUID(currentOptionId)) {
+            const { error: insertError } = await scopedDb
+              .from('quote_charges')
+              .insert({
+                ...chargeData,
+                charge_side_id: buySideId,
+                quantity: charge.buy?.quantity || 1,
+                rate: charge.buy?.rate || 0,
+                amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
+              });
+            if (insertError) throw insertError;
+          }
         }
 
         // Handle sell side
         if (charge.sell?.dbChargeId) {
-          const { error: updateError } = await scopedDb
-            .from('quote_charges')
-            .update({
-              ...chargeData,
-              quantity: charge.sell.quantity || 1,
-              rate: charge.sell.rate || 0,
-              amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
-            })
-            .eq('id', charge.sell.dbChargeId);
-          if (updateError) throw updateError;
+          if (isUUID(charge.sell.dbChargeId)) {
+            const { error: updateError } = await scopedDb
+              .from('quote_charges')
+              .update({
+                ...chargeData,
+                quantity: charge.sell.quantity || 1,
+                rate: charge.sell.rate || 0,
+                amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
+              })
+              .eq('id', charge.sell.dbChargeId);
+            if (updateError) throw updateError;
+          } else {
+            if (isUUID(currentOptionId)) {
+              const { error: insertError } = await scopedDb
+                .from('quote_charges')
+                .insert({
+                  ...chargeData,
+                  charge_side_id: sellSideId,
+                  quantity: charge.sell?.quantity || 1,
+                  rate: charge.sell?.rate || 0,
+                  amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
+                });
+              if (insertError) throw insertError;
+            }
+          }
         } else {
-          const { error: insertError } = await scopedDb
-            .from('quote_charges')
-            .insert({
-              ...chargeData,
-              charge_side_id: sellSideId,
-              quantity: charge.sell?.quantity || 1,
-              rate: charge.sell?.rate || 0,
-              amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
-            });
-          if (insertError) throw insertError;
+          if (isUUID(currentOptionId)) {
+            const { error: insertError } = await scopedDb
+              .from('quote_charges')
+              .insert({
+                ...chargeData,
+                charge_side_id: sellSideId,
+                quantity: charge.sell?.quantity || 1,
+                rate: charge.sell?.rate || 0,
+                amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
+              });
+            if (insertError) throw insertError;
+          }
         }
       }
       
@@ -2332,6 +2462,39 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         optionId: currentOptionId,
         duration: `${duration.toFixed(2)}ms`
       });
+
+      // Update parent Quote details (dates, notes, etc.)
+      if (quoteId) {
+        try {
+            const quoteUpdates: any = {
+                valid_until: quoteData.validUntil || null,
+                ready_date: quoteData.ready_date || null,
+                delivery_deadline: quoteData.deadline_date || null,
+                notes: quoteData.notes || null,
+                incoterms: quoteData.incoterms || null,
+                origin_port_id: quoteData.origin_port_id || null,
+                destination_port_id: quoteData.destination_port_id || null
+            };
+
+            // Only update if we have data to avoid overwriting with nulls if not loaded?
+            // Actually quoteData should be fully loaded.
+            
+            if (isUUID(quoteId)) {
+              const { error: quoteUpdateError } = await scopedDb
+                  .from('quotes')
+                  .update(quoteUpdates)
+                  .eq('id', quoteId);
+
+              if (quoteUpdateError) {
+                  debug.error('Failed to update parent quote details', quoteUpdateError);
+              } else {
+                  debug.log('Updated parent quote details');
+              }
+            }
+        } catch (e) {
+            debug.error('Exception updating parent quote', e);
+        }
+      }
 
       toast({ 
         title: 'Success', 
@@ -2419,12 +2582,14 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     debug.info('Deleting quote option', { optionId: id });
 
     try {
-      const { error } = await scopedDb
-        .from('quotation_version_options')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      if (isUUID(id)) {
+        const { error } = await scopedDb
+          .from('quotation_version_options')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      }
 
       const newOptions = options.filter(o => o.id !== id);
       dispatch({ type: 'SET_OPTIONS', payload: newOptions });
@@ -2480,6 +2645,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       if (editingOption) {
         // Update existing
+        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        if (!isUUID(editingOption.id) || !isUUID(payload.tenant_id) || !isUUID(payload.quotation_version_id)) {
+          throw new Error('Invalid identifiers for option update');
+        }
         const { data, error } = await scopedDb
           .from('quotation_version_options')
           .update(payload)
@@ -2505,6 +2674,10 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         }
       } else {
         // Create new
+        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        if (!isUUID(payload.tenant_id) || !isUUID(payload.quotation_version_id)) {
+          throw new Error('Invalid identifiers for option creation');
+        }
         const { data, error } = await scopedDb
           .from('quotation_version_options')
           .insert({

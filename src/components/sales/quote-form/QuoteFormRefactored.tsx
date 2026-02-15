@@ -158,6 +158,11 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
     try {
       const savedId = await saveQuote({ quoteId, data });
       
+      // Reset form with the submitted data to clear dirty state
+      // This ensures that subsequent hydrations (e.g. after switching back from Composer)
+      // are not blocked by the dirty check.
+      form.reset(data);
+      
       const duration = performance.now() - startTime;
       formDebug.logResponse(
         { success: true, savedId }, 
@@ -213,7 +218,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                         {quoteId ? 'Edit Quote' : 'New Quote'}
                     </h2>
                     <p className="text-sm text-muted-foreground hidden md:block">
-                        {quoteId ? `Ref: ${quoteId.slice(0, 8)}...` : 'Create a new logistics quotation'}
+                        {quoteId ? `Quote #: ${quoteNumber || quoteId}` : 'Create a new logistics quotation'}
                     </p>
                 </div>
             </div>
@@ -292,7 +297,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">1</span>
                     <h3>General Information</h3>
                 </div>
-                <QuoteHeader />
+                <QuoteHeader quoteNumber={quoteNumber || quoteId} />
             </section>
             
             <section className="space-y-4">

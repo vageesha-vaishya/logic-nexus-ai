@@ -296,7 +296,7 @@ function processCFDData(versions: any[], currentQuotes: Quote[]) {
   });
   
   // Iterate days
-  let currentState: Record<string, string> = {}; // quoteId -> status
+  const currentState: Record<string, string> = {}; // quoteId -> status
   
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     const dayStr = d.toISOString().split('T')[0];

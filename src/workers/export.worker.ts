@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-globals */
+ 
 import JSZip from 'jszip';
 
 // Define the worker context

@@ -4,6 +4,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Ship, Plane, Truck, Train } from 'lucide-react';
+import { useTransportModes } from '@/hooks/useTransportModes';
 
 interface Carrier {
   id: string;
@@ -28,6 +29,7 @@ interface QuoteLegRowProps {
 
 export function QuoteLegRow({ prefix, leg, index, carriers, ports }: QuoteLegRowProps) {
   const { control } = useFormContext();
+  const { modes, loading: modesLoading } = useTransportModes();
 
   // Filter carriers for this leg's mode
   const watchedMode = useWatch({ control, name: `${prefix}.transport_mode` });
@@ -65,10 +67,17 @@ export function QuoteLegRow({ prefix, leg, index, carriers, ports }: QuoteLegRow
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="ocean">Ocean</SelectItem>
-                  <SelectItem value="air">Air</SelectItem>
-                  <SelectItem value="road">Road</SelectItem>
-                  <SelectItem value="rail">Rail</SelectItem>
+                  {modesLoading ? (
+                    <SelectItem value="__loading" disabled>Loading...</SelectItem>
+                  ) : modes.length === 0 ? (
+                    <SelectItem value="__empty" disabled>No modes available</SelectItem>
+                  ) : (
+                    modes.map(m => (
+                      <SelectItem key={m.id} value={m.code}>
+                        {m.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </FormItem>

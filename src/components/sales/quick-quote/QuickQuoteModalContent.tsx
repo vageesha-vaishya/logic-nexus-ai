@@ -27,6 +27,7 @@ import { CommoditySelection } from '@/components/logistics/SmartCargoInput';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
 import { CargoItem } from '@/types/cargo';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
+import { useIncoterms } from '@/hooks/useIncoterms';
 import { useDebug } from '@/hooks/useDebug';
 import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
 import { DataInspector } from '@/components/debug/DataInspector';
@@ -39,18 +40,30 @@ import { generateSimulatedRates } from '@/lib/simulation-engine';
 
 const baseSchema = z.object({
   mode: z.enum(["air", "ocean", "road", "rail"]),
-  origin: z.string().min(2, "Origin is required"), // Store Code or Name
-  destination: z.string().min(2, "Destination is required"), // Store Code or Name
+  origin: z.string().min(2, "Origin is required"),
+  destination: z.string().min(2, "Destination is required"),
   commodity: z.string().min(2, "Commodity is required"),
   preferredCarriers: z.array(z.string()).optional(),
   // Common
-  weight: z.string().optional(),
-  volume: z.string().optional(),
-  unit: z.string().optional(),
+  weight: z.string().optional().refine((val) => {
+    if (val === undefined || val === null || val === "") return true;
+    const n = Number(val);
+    return !isNaN(n) && n >= 0;
+  }, { message: "Weight must be a non-negative number" }),
+  volume: z.string().optional().refine((val) => {
+    if (val === undefined || val === null || val === "") return true;
+    const n = Number(val);
+    return !isNaN(n) && n >= 0;
+  }, { message: "Volume must be a non-negative number" }),
+  unit: z.enum(["kg", "lb", "cbm"]).optional(),
+  // Ocean/Rail helpers (validated conditionally)
+  containerType: z.string().optional(),
+  containerSize: z.string().optional(),
+  containerQty: z.string().optional(),
 });
 
 // We'll use a superRefine to handle mode-specific requirements
-const quickQuoteSchema = baseSchema.superRefine((data, ctx) => {
+export const quickQuoteSchema = baseSchema.superRefine((data, ctx) => {
   // Air Requirements
   if (data.mode === 'air') {
     if (!data.weight || isNaN(Number(data.weight)) || Number(data.weight) <= 0) {
@@ -59,8 +72,20 @@ const quickQuoteSchema = baseSchema.superRefine((data, ctx) => {
   }
   // Ocean Requirements
   if (data.mode === 'ocean' || data.mode === 'rail') {
-     // Ensure container details are checked in UI state, but basic validation here
-     // We might want to enforce weight OR volume if LCL, or Container count if FCL
+     const qtyNum = Number(data.containerQty || "");
+     if (!data.containerType) {
+       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Container type is required", path: ["containerType"] });
+     }
+     if (!data.containerSize) {
+       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Container size is required", path: ["containerSize"] });
+     }
+     if (isNaN(qtyNum) || qtyNum <= 0) {
+       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Container quantity must be greater than 0", path: ["containerQty"] });
+     }
+  }
+  // Common sanity checks
+  if (data.origin.trim().toLowerCase() === data.destination.trim().toLowerCase()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Origin and Destination cannot be the same", path: ["destination"] });
   }
 });
 
@@ -130,6 +155,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
   const { toast } = useToast();
   const { supabase, context } = useCRM();
   const { containerTypes, containerSizes } = useContainerRefs();
+  const { incoterms, loading: incLoading } = useIncoterms();
   const [carriers, setCarriers] = useState<{ id: string; carrier_name: string; carrier_type: string }[]>([]);
   const { capture: capturePipeline } = usePipeline();
 
@@ -215,6 +241,10 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                     containerQty: String(cargoItem.quantity), // Total quantity
                     containerCombos: combos
                 }));
+                // Also sync to form for schema validation
+                form.setValue('containerType', combos[0].type);
+                form.setValue('containerSize', combos[0].size);
+                form.setValue('containerQty', String(cargoItem.quantity));
              }
           }
       } else {
@@ -228,6 +258,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
              }));
            form.setValue('weight', String(cargoItem.weight.value)); 
            form.setValue('volume', String(cargoItem.volume || 0));
+           form.setValue('containerQty', String(cargoItem.quantity));
       }
   }, [cargoItem, form.watch('mode')]);
 
@@ -637,7 +668,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
               const aiData = aiRes.data;
               
               if (aiData.options) {
-                  let aiOptions = await Promise.all(aiData.options.map(async (opt: any) => {
+                  const aiOptions = await Promise.all(aiData.options.map(async (opt: any) => {
                       const mapped = mapOptionToQuote(opt);
                       // Replace synchronous legacy calc with async PricingService
                       const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
@@ -695,7 +726,49 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
 
       if (combinedOptions.length === 0) {
           const aiError = aiRes.error ? (aiRes.error.message || 'Unknown AI Error') : 'No Data';
-          throw new Error(`No quotes available. Legacy: ${legacyErrorMsg || 'No Data'}. AI: ${aiError}`);
+          debug.warn("[QuickQuote] No engine rates available. Using unconditional simulation fallback.", { legacyErrorMsg, aiError });
+          
+          const { type: typeName, size: sizeName } = resolveContainerInfo(extendedData.containerType, extendedData.containerSize);
+          const simulated = generateSimulatedRates({
+            mode: payload.mode as any,
+            origin: payload.origin,
+            destination: payload.destination,
+            weightKg: Number(payload.weight) || undefined,
+            containerQty: Number(extendedData.containerQty) || 1,
+            containerSize: sizeName,
+            vehicleType: extendedData.vehicleType
+          });
+          
+          if (simulated.length > 0) {
+            let simOptions = await Promise.all(simulated.map(async (opt: any) => {
+              const mapped = mapOptionToQuote(opt);
+              const sell = mapped.total_amount || 0;
+              const calc = await pricingService.calculateFinancials(sell, 15, false);
+              let markupPercent = 0;
+              if (calc.buyPrice > 0) {
+                markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
+              }
+              return {
+                ...mapped,
+                price: sell,
+                currency: mapped.currency || 'USD',
+                carrier: mapped.carrier || 'Unknown Carrier',
+                markupPercent,
+                verified: true,
+                verificationTimestamp: new Date().toISOString()
+              };
+            }));
+            simOptions = simOptions.sort((a: any, b: any) => a.price - b.price).slice(0, 5);
+            combinedOptions = [...combinedOptions, ...simOptions];
+            
+            toast({
+              title: "Showing Simulated Rates",
+              description: `Legacy and AI engines were unavailable. Displaying simulated market rates.`,
+              variant: "default"
+            });
+          } else {
+            throw new Error(`No quotes available. Legacy: ${legacyErrorMsg || 'No Data'}. AI: ${aiError}`);
+          }
       }
 
       setResults(combinedOptions);
@@ -711,13 +784,18 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                   anomalies: smartMode && aiRes?.data?.anomalies ? aiRes.data.anomalies : []
               };
 
-              await supabase.from('ai_quote_requests').insert({
-                  user_id: user.id,
-                  tenant_id: context.tenantId,
-                  request_payload: payload,
-                  response_payload: historyPayload,
-                  status: 'generated'
-              });
+          const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+          const userId = String(user.id);
+          const tenantId = String(context.tenantId);
+          if (isUUID(userId) && isUUID(tenantId)) {
+            await supabase.from('ai_quote_requests').insert({
+                user_id: userId,
+                tenant_id: tenantId,
+                request_payload: payload,
+                response_payload: historyPayload,
+                status: 'generated'
+            });
+          }
           }
       } catch (err) {
           console.error("[QuickQuote] Failed to save history:", err);
@@ -999,17 +1077,17 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                         <SelectValue placeholder="Select Incoterms (Optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="EXW">EXW - Ex Works</SelectItem>
-                        <SelectItem value="FCA">FCA - Free Carrier</SelectItem>
-                        <SelectItem value="CPT">CPT - Carriage Paid To</SelectItem>
-                        <SelectItem value="CIP">CIP - Carriage and Insurance Paid To</SelectItem>
-                        <SelectItem value="DAP">DAP - Delivered at Place</SelectItem>
-                        <SelectItem value="DPU">DPU - Delivered at Place Unloaded</SelectItem>
-                        <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
-                        <SelectItem value="FAS">FAS - Free Alongside Ship</SelectItem>
-                        <SelectItem value="FOB">FOB - Free on Board</SelectItem>
-                        <SelectItem value="CFR">CFR - Cost and Freight</SelectItem>
-                        <SelectItem value="CIF">CIF - Cost, Insurance and Freight</SelectItem>
+                        {incLoading ? (
+                          <SelectItem value="__loading" disabled>Loading...</SelectItem>
+                        ) : incoterms.length === 0 ? (
+                          <SelectItem value="__empty" disabled>No Incoterms available</SelectItem>
+                        ) : (
+                          incoterms.map((t) => (
+                            <SelectItem key={t.id} value={t.incoterm_code}>
+                              {t.incoterm_code} - {t.incoterm_name}
+                            </SelectItem>
+                          ))
+                        )}
                     </SelectContent>
                  </Select>
               </div>

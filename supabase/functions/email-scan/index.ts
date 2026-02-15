@@ -49,7 +49,7 @@ serve(async (req: Request) => {
     
     let status = 'clean';
     let score = 0;
-    let reasons: string[] = [];
+    const reasons: string[] = [];
 
     const content = (email.subject + " " + (email.body_text || "")).toLowerCase();
 

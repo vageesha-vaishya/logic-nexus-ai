@@ -130,6 +130,10 @@ export function CommodityDocuments({ commodityId }: CommodityDocumentsProps) {
       }
 
       // 2. Delete from Database
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      if (!isUUID(doc.id)) {
+        throw new Error('Invalid document identifier');
+      }
       const { error: dbError } = await supabase
         .from('commodity_documents')
         .delete()

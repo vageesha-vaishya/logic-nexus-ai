@@ -243,6 +243,11 @@ export default function Carriers() {
   const handleDeleteCarrier = async (id: string) => {
     if (!confirm('Delete this carrier? This action cannot be undone.')) return;
     try {
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      if (!isUUID(id)) {
+        toast.error('Invalid carrier identifier');
+        return;
+      }
       const { error } = await scopedDb.from('carriers').delete().eq('id', id);
       if (error) throw error;
       toast.success('Carrier deleted');

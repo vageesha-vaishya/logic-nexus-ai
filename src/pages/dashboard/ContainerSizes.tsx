@@ -46,9 +46,10 @@ export default function ContainerSizes() {
 
   const add = async () => {
     if (!newItem.name || !newItem.type_id) return;
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
     await scopedDb.from('container_sizes').insert({ 
       ...newItem,
-      type_id: newItem.type_id === '' ? null : newItem.type_id // Ensure null if empty string (though validated above)
+      type_id: newItem.type_id === '' ? null : (isUUID(newItem.type_id) ? newItem.type_id : null)
     });
     setNewItem({ 
       name: '', 
@@ -67,11 +68,15 @@ export default function ContainerSizes() {
   };
 
   const update = async (id: string, patch: Partial<ContainerSize>) => {
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    if (!isUUID(id)) return;
     await scopedDb.from('container_sizes').update(patch).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    if (!isUUID(id)) return;
     await scopedDb.from('container_sizes').delete().eq('id', id);
     load();
   };

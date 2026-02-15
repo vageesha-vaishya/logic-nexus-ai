@@ -21,10 +21,13 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { QuoteResultsList } from './QuoteResultsList';
 import { QuoteComparisonView } from './QuoteComparisonView';
+import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
+import { SmartCargoInput } from '@/components/logistics/SmartCargoInput';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import { RateOption } from '@/types/quote-breakdown';
+import { useContainerRefs } from '@/hooks/useContainerRefs';
 
 const CARRIER_OPTIONS = [
   "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
@@ -119,6 +122,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { supabase, context } = useCRM();
+  const { containerTypes, containerSizes } = useContainerRefs();
 
   const form = useForm<QuickQuoteValues>({
     resolver: zodResolver(quickQuoteSchema),
@@ -173,6 +177,22 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     return () => clearTimeout(timer);
   }, [origin, destination, mode]);
 
+  const handleLocationChange = (field: 'origin' | 'destination', value: string, location?: any) => {
+    form.setValue(field, value);
+    if (location) {
+      setExtendedData(prev => ({
+        ...prev,
+        [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
+          name: location.location_name,
+          formatted_address: [location.city, location.state_province, location.country].filter(Boolean).join(", "),
+          code: location.location_code,
+          type: location.location_type,
+          country: location.country,
+          city: location.city
+        }
+      }));
+    }
+  };
 
   // AI: Classify Commodity & Suggest HTS
   const handleAiSuggest = async () => {
@@ -392,6 +412,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
               return {
                   ...mapped,
+                  id: mapped.id || `std-${Math.random().toString(36).substr(2, 9)}`,
                   source_attribution: 'Standard Rate Engine',
                   carrier: mapped.carrier_name, // Ensure carrier is a string for validation
                   price: mapped.total_amount, // Ensure price field is populated for UI
@@ -472,6 +493,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       try {
           const user = (await supabase.auth.getUser()).data.user;
           if (user && context?.tenantId) {
+              const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+              const userId = String(user.id);
+              const tenantId = String(context.tenantId);
+              if (!isUUID(userId) || !isUUID(tenantId)) {
+                  return;
+              }
               const historyPayload = {
                   options: combinedOptions,
                   market_analysis: smartMode && aiRes?.data?.market_analysis ? aiRes.data.market_analysis : null,
@@ -480,8 +507,8 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               };
 
               await supabase.from('ai_quote_requests').insert({
-                  user_id: user.id,
-                  tenant_id: context.tenantId,
+                  user_id: userId,
+                  tenant_id: tenantId,
                   request_payload: payload,
                   response_payload: historyPayload,
                   status: 'generated'
@@ -576,12 +603,15 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     } catch (error) {
         if (error instanceof z.ZodError) {
             logger.error('Quote Transfer Validation Failed', { errors: error.errors });
+            const errorMessages = error.errors.map(err => {
+                const path = err.path.join('.');
+                return `${path}: ${err.message}`;
+            }).join('\n');
             toast({
                 title: "Data Validation Error",
-                description: "Cannot proceed: Missing required fields for quote generation.",
+                description: `Cannot proceed. Missing or invalid fields:\n${errorMessages}`,
                 variant: "destructive"
             });
-            // Detailed log for debugging
             console.error("Validation details:", error.errors);
         } else {
             logger.error('Unexpected Transfer Error', { error });
@@ -677,7 +707,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     {mode === 'ocean' ? 'Origin Port' : mode === 'air' ? 'Origin Airport' : 'Origin City'}
                     {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
                   </Label>
-                  <Input placeholder={mode === 'ocean' ? 'e.g. USLAX' : 'e.g. JFK'} {...form.register("origin")} className="bg-background"/>
+                  <LocationAutocomplete
+                    data-testid="location-origin"
+                    placeholder={mode === 'ocean' ? 'Search origin port...' : mode === 'air' ? 'Search origin airport...' : 'Search origin city...'}
+                    value={origin}
+                    onChange={(value, location) => handleLocationChange('origin', value, location)}
+                  />
+                  <input type="hidden" {...form.register("origin")} />
                   {codeSuggestions.length > 0 && origin && (
                     <div className="text-[10px] text-muted-foreground truncate">
                         Suggestion: {codeSuggestions[0].label}
@@ -689,7 +725,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     {mode === 'ocean' ? 'Dest Port' : mode === 'air' ? 'Dest Airport' : 'Dest City'}
                     {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
                   </Label>
-                  <Input placeholder={mode === 'ocean' ? 'e.g. CNSHA' : 'e.g. LHR'} {...form.register("destination")} className="bg-background"/>
+                  <LocationAutocomplete
+                    data-testid="location-destination"
+                    placeholder={mode === 'ocean' ? 'Search destination port...' : mode === 'air' ? 'Search destination airport...' : 'Search destination city...'}
+                    value={destination}
+                    onChange={(value, location) => handleLocationChange('destination', value, location)}
+                  />
+                  <input type="hidden" {...form.register("destination")} />
                 </div>
               </div>
 
@@ -701,7 +743,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                         <Sparkles className="w-3 h-3" /> AI Analyze
                     </button>
                  </Label>
-                 <Input {...form.register("commodity")} onBlur={handleAiSuggest} className="bg-background" />
+     <SmartCargoInput
+       placeholder="Search commodities or HTS codes..."
+       onSelect={(sel: { description: string }) => {
+         form.setValue("commodity", sel.description, { shouldDirty: true, shouldValidate: true });
+         handleAiSuggest();
+       }}
+     />
               </div>
 
               {/* Preferred Carriers */}
@@ -756,9 +804,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                               <Select value={extendedData.containerType} onValueChange={(v) => setExtendedData({...extendedData, containerType: v})}>
                                   <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                      <SelectItem value="dry">Dry Standard</SelectItem>
-                                      <SelectItem value="reefer">Reefer</SelectItem>
-                                      <SelectItem value="opentop">Open Top</SelectItem>
+                                      {containerTypes.length === 0 ? (
+                                        <SelectItem value="__empty" disabled>No types available</SelectItem>
+                                      ) : (
+                                        containerTypes.map(t => (
+                                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                        ))
+                                      )}
                                   </SelectContent>
                               </Select>
                           </div>
@@ -767,10 +819,19 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                               <Select value={extendedData.containerSize} onValueChange={(v) => setExtendedData({...extendedData, containerSize: v})}>
                                   <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                                   <SelectContent>
-                                      <SelectItem value="20ft">20ft</SelectItem>
-                                      <SelectItem value="40ft">40ft</SelectItem>
-                                      <SelectItem value="40hc">40ft HC</SelectItem>
-                                      <SelectItem value="45ft">45ft</SelectItem>
+                                      {(extendedData.containerType 
+                                        ? containerSizes.filter(s => s.type_id === extendedData.containerType) 
+                                        : containerSizes
+                                      ).length === 0 ? (
+                                        <SelectItem value="__empty" disabled>No sizes available</SelectItem>
+                                      ) : (
+                                        (extendedData.containerType 
+                                          ? containerSizes.filter(s => s.type_id === extendedData.containerType) 
+                                          : containerSizes
+                                        ).map(s => (
+                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))
+                                      )}
                                   </SelectContent>
                               </Select>
                           </div>

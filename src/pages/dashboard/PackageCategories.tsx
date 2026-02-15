@@ -26,7 +26,7 @@ export default function PackageCategories() {
     if (!isPlatform && !tenantId) return;
 
     try {
-      let query = scopedDb.from("package_categories").select("*");
+      const query = scopedDb.from("package_categories").select("*");
       const { data, error } = await query.order("category_name");
 
       if (error) {
