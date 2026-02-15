@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invokeFunction } from "@/lib/supabase-functions";
+import { useLeadDuplicateCheck } from "@/hooks/useLeadDuplicateCheck";
+import { cleanEmail } from "@/lib/data-cleaning";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
 import { format } from "date-fns";
@@ -59,6 +61,8 @@ export function EmailInbox() {
   const [threads, setThreads] = useState<any[]>([]);
   const { toast } = useToast();
   const { roles } = useAuth();
+  const { buildEmailDuplicateMap } = useLeadDuplicateCheck();
+  const [duplicateMap, setDuplicateMap] = useState<Record<string, { count: number; leadIds: string[] }>>({});
 
   const renderSecurityBadge = (email: Email) => {
     if (!email.security_status || email.security_status === 'pending') return null;
@@ -199,6 +203,26 @@ export function EmailInbox() {
     fetchEmails();
   }, [selectedFolder, searchQuery, selectedAccountId, sortField, sortDirection, conversationView]);
 
+  useEffect(() => {
+    async function computeDuplicates() {
+      try {
+        if (conversationView) {
+          const emailList = threads.map((t: any) => t.latestEmail?.from_email).filter(Boolean);
+          const map = await buildEmailDuplicateMap(emailList);
+          setDuplicateMap(map);
+        } else {
+          const emailList = emails.map((e: any) => e.from_email).filter(Boolean);
+          const map = await buildEmailDuplicateMap(emailList);
+          setDuplicateMap(map);
+        }
+      } catch {
+        setDuplicateMap({});
+      }
+    }
+    if (!loading) {
+      computeDuplicates();
+    }
+  }, [loading, emails, threads, conversationView]);
   const fetchAccounts = async () => {
     try {
       const { data, error } = await (supabase as any)
@@ -576,6 +600,18 @@ export function EmailInbox() {
                               <span className={`font-medium ${!latest.is_read ? "font-bold" : ""} break-words whitespace-normal lg:truncate`}>
                                 {latest.subject || "(No Subject)"}
                               </span>
+                              {(() => {
+                                const key = cleanEmail(latest.from_email).value || latest.from_email?.trim().toLowerCase();
+                                const dup = key ? duplicateMap[key] : undefined;
+                                if (dup && dup.count > 0) {
+                                  return (
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500 text-amber-700 bg-amber-50">
+                                      Duplicate Lead
+                                    </Badge>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {latest.ai_urgency && latest.ai_urgency !== 'low' && (
                                 <Badge 
                                   variant="outline" 
@@ -699,6 +735,18 @@ export function EmailInbox() {
                           <span className={`font-medium ${!email.is_read ? "font-bold" : ""} break-words whitespace-normal lg:truncate`}>
                             {email.from_name || email.from_email}
                           </span>
+                          {(() => {
+                            const key = cleanEmail(email.from_email).value || email.from_email?.trim().toLowerCase();
+                            const dup = key ? duplicateMap[key] : undefined;
+                            if (dup && dup.count > 0) {
+                              return (
+                                <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500 text-amber-700 bg-amber-50">
+                                  Duplicate Lead
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
                           {email.has_attachments && <Paperclip className="w-4 h-4 text-muted-foreground" />}
                           {email.ai_urgency && email.ai_urgency !== 'low' && (
                             <Badge 

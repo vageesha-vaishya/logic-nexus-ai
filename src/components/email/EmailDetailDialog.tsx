@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { useState, useCallback, useEffect } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailToLeadDialog } from "./EmailToLeadDialog";
+import { useLeadDuplicateCheck } from "@/hooks/useLeadDuplicateCheck";
+import { extractEmailAddress } from "./email-to-lead-helpers";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -43,6 +45,8 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
   const [expanded, setExpanded] = useState(false);
   const [showConvertToLead, setShowConvertToLead] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const { checkByEmail } = useLeadDuplicateCheck();
+  const [dupInfo, setDupInfo] = useState<{ count: number; leadIds: string[] }>({ count: 0, leadIds: [] });
   
   // Phase 1: Zero-Trust Security State
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -53,6 +57,19 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
   useEffect(() => {
     checkSecurityRequirements();
   }, [email.id, email.account_id]);
+
+  useEffect(() => {
+    async function runDupCheck() {
+      try {
+        const sender = extractEmailAddress(email.from_email);
+        const res = await checkByEmail(sender || email.from_email);
+        setDupInfo(res);
+      } catch {
+        setDupInfo({ count: 0, leadIds: [] });
+      }
+    }
+    runDupCheck();
+  }, [email.id, email.from_email]);
 
   const checkSecurityRequirements = async () => {
     if (!email.account_id) return;
@@ -193,6 +210,11 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
                 <DialogTitle className="text-2xl mb-2 break-words overflow-x-hidden">{email.subject}</DialogTitle>
                 <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
                   <span className="font-medium">{email.from_name || email.from_email}</span>
+                  {dupInfo.count > 0 && (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500 text-amber-700 bg-amber-50">
+                      Duplicate Lead
+                    </Badge>
+                  )}
                   <span>•</span>
                   <span>{format(new Date(email.received_at), "MMM d, yyyy 'at' h:mm a")}</span>
                 </div>
