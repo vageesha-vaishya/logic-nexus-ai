@@ -37,7 +37,7 @@ const CARRIER_OPTIONS = [
 // --- Zod Schemas ---
 
 const baseSchema = z.object({
-  mode: z.enum(["air", "ocean", "road"]),
+  mode: z.enum(["air", "ocean", "road", "rail"]),
   origin: z.string().min(2, "Origin is required"), // Store Code or Name
   destination: z.string().min(2, "Destination is required"), // Store Code or Name
   commodity: z.string().min(2, "Commodity is required"),
