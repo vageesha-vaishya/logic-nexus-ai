@@ -4290,3 +4290,117 @@ Notes
 - Outputs are compact JSON structures suitable for UI wiring.
 If you want, I can add admin UI views for anomalies, revenue forecasts, and fleet assignments, and smoke tests for selected endpoints.
 
+=========running VROOM=======
+Overview
+
+- VROOM runs as an HTTP service (“vroom-express”) and needs a routing backend (OSRM, Valhalla, or OpenRouteService).
+- Easiest path: run OSRM (port 5000) + VROOM (port 3000) with Docker, point VROOM to the router via config or env.
+- References:
+  - GitHub “vroom-docker” quick start and options: https://github.com/VROOM-Project/vroom-docker
+  - Docker Hub image notes: https://hub.docker.com/r/vroomvrp/vroom-docker
+  - OSRM preprocessing steps example: https://medium.com/@fbaierl1/setting-up-vroom-osrm-with-docker-compose-c8dc48d0cb2a
+Prereqs
+
+- Install Docker Desktop on Windows.
+- Pick a region OSM PBF file (e.g., from Geofabrik).
+- Decide router: OSRM recommended for quickest start.
+Step 1: Preprocess OSRM Data
+
+- Place your region file in a directory, e.g. d:\osrm\data\city.osm.pbf
+- Run preprocessing (MLD algorithm) with OSRM backend container:
+```
+# In PowerShell
+cd d:\osrm\data
+
+docker run --rm -t -v "${PWD}:/data" osrm/osrm-backend 
+osrm-extract -p /opt/car.lua /data/city.osm.pbf
+docker run --rm -t -v "${PWD}:/data" osrm/osrm-backend 
+osrm-partition /data/city.osrm
+docker run --rm -t -v "${PWD}:/data" osrm/osrm-backend 
+osrm-customize /data/city.osrm
+```
+- This produces the .osrm and auxiliary files in d:\osrm\data. Medium walkthrough: https://medium.com/@fbaierl1/setting-up-vroom-osrm-with-docker-compose-c8dc48d0cb2a
+Step 2: Run OSRM Router
+
+```
+cd d:\osrm\data
+
+docker run -d --name osrm -p 5000:5000 `
+  -v "${PWD}:/data" osrm/osrm-backend `
+  osrm-routed --algorithm mld /data/city.osrm
+```
+- OSRM will serve on http://localhost:5000 .
+Step 3: Run VROOM (vroom-express)
+
+Option A — simple run (config via env):
+
+```
+# Create a local config directory for VROOM (optional)
+mkdir d:\vroom\conf
+
+docker run -d --name vroom -p 3000:3000 `
+  -v "d:\vroom\conf:/conf" `
+  -e VROOM_ROUTER=osrm `
+  ghcr.io/vroom-project/vroom-docker:v1.15.0-rc.2
+```
+- Image docs with env, conf, ports: https://github.com/VROOM-Project/vroom-docker
+- By default VROOM expects OSRM at localhost:5000; you can adjust in conf/config.yml if needed.
+Option B — docker compose (OSRM + VROOM)
+
+Create docker-compose.yml:
+
+```
+version: "3.8"
+services:
+  osrm:
+    image: osrm/osrm-backend
+    container_name: osrm
+    command: osrm-routed --algorithm mld /data/city.osrm
+    volumes:
+      - ./osrm/data:/data
+    ports:
+      - "5000:5000"
+
+  vroom:
+    image: ghcr.io/vroom-project/vroom-docker:v1.15.0-rc.2
+    container_name: vroom
+    environment:
+      - VROOM_ROUTER=osrm
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./vroom/conf:/conf
+    depends_on:
+      - osrm
+```
+Then:
+
+```
+docker compose up -d
+```
+- Compose guidance (router options and networking): https://hub.docker.com/r/vroomvrp/vroom-docker
+Step 4: Verify
+
+- Health check VROOM:
+```
+curl http://localhost:3000
+```
+- Try a minimal job POST (replace coords with valid points):
+```
+curl -X POST http://localhost:3000/api/v1/solve `
+  -H "Content-Type: application/json" `
+  -d '{"vehicles":[{"id":1,"start":[-73.9857,40.7484]}],
+       "jobs":[{"id":1,"location":[-73.9851,40.7580]}]}'
+```
+- You should get a JSON solution with routes / steps.
+Integration with Your App
+
+- Set environment variable used by route-optimization function:
+  - VROOM_URL= http://localhost:3000
+- The edge function will call ${VROOM_URL}/optimize (as implemented) and provide an LLM suggestion when available.
+Notes
+
+- Windows path mapping: use PowerShell ${PWD} or explicit paths like d:\osrm\data in -v mounts.
+- Large regions require significant RAM during preprocessing; start with a smaller OSM extract if needed.
+- Alternative routers (Valhalla / ORS) are supported by vroom-docker; set VROOM_ROUTER accordingly and ensure router host/port match config.yml.
+- If containers need to talk by service name (compose network), update conf/config.yml router host from 0.0.0.0/localhost to the service name (e.g., osrm) per guidance: https://github.com/VROOM-Project/vroom-docker
