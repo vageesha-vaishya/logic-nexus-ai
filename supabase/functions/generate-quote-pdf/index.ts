@@ -174,9 +174,20 @@ serveWithLogger(async (req, logger, supabaseClient) => {
           }
           
           const { data: charges, error: chargesError } = await chargesQuery;
+          // If filtering by Sell side yields zero, fallback to all charges
+          let finalCharges = charges || [];
+          if (!chargesError && sellSideId && Array.isArray(finalCharges) && finalCharges.length === 0) {
+             const { data: allCharges, error: allErr } = await supabaseClient
+               .from("quote_charges")
+               .select("*, category:charge_categories(name)")
+               .eq("quote_option_id", opt.id);
+             if (!allErr) {
+               finalCharges = allCharges || [];
+             }
+          }
           
           if (chargesError) await logger.warn(`Error fetching charges for option ${opt.id}: ${chargesError.message}`);
-          opt.charges = charges || [];
+          opt.charges = finalCharges;
           await logger.info(`Option ${opt.id}: ${opt.legs.length} legs, ${opt.charges.length} charges. SellSideId: ${sellSideId}`);
           if (opt.charges.length > 0) {
              await logger.info(`First Charge: LegID=${opt.charges[0].leg_id}, SideID=${opt.charges[0].charge_side_id}, Amount=${opt.charges[0].amount}, Note=${opt.charges[0].note}`);
@@ -204,7 +215,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
             await logger.info(`Fetched branding for: ${brandingData.company_name}`);
        }
 
-       const selectedOption = options.length > 0 ? options[0] : null;
+       // Prefer an option that actually has charges; otherwise fallback to first
+       let selectedOption = options.find((o: any) => Array.isArray(o.charges) && o.charges.length > 0) || (options.length > 0 ? options[0] : null);
        
        const branding = brandingData || {};
        let logoBase64 = undefined;
@@ -970,6 +982,23 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     const base64Content = btoa(
       new Uint8Array(pdfBytes).reduce((data, byte) => data + String.fromCharCode(byte), "")
     );
+
+    try {
+      const traceId = body?.trace_id;
+      const idem = body?.idempotency_key;
+      await supabaseClient.from("audit_logs").insert({
+        action: "EVENT:PdfGenerated",
+        resource_type: "quotation",
+        details: {
+          trace_id: traceId || null,
+          idempotency_key: idem || null,
+          quote_id: quoteId,
+          version_id: versionId || null
+        }
+      });
+    } catch (_e) {
+      await logger.warn("Audit log insert failed for PdfGenerated");
+    }
 
     return new Response(
       JSON.stringify({ 

@@ -584,21 +584,30 @@ export default function QuoteNew() {
     setViewMode('composer');
 
     // CRITICAL: Fetch the version ID for the newly created quote so options can be inserted
-    scopedDb.from('quotation_versions')
-        .select('id')
-        .eq('quote_id', quoteId)
-        .order('version_number', { ascending: false })
-        .limit(1)
-        .single()
-        .then(({ data, error }) => {
-            if (error) {
-                console.error('[QuoteNew] Failed to fetch version ID for new quote:', error);
-                toast.error('Failed to initialize quote version.');
-            } else if (data) {
-                logger.info('[QuoteNew] Fetched version ID for new quote', { versionId: data.id });
-                setVersionId(data.id);
-            }
-        });
+    (async () => {
+      const maxAttempts = 3;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const { data, error } = await (scopedDb
+          .from('quotation_versions', true)
+          .select('id')
+          .eq('quote_id', quoteId)
+          .order('version_number', { ascending: false })
+          .limit(1) as any)
+          .single();
+        if (!error && data) {
+          logger.info('[QuoteNew] Fetched version ID for new quote', { versionId: data.id });
+          setVersionId(data.id);
+          return;
+        }
+        if (attempt < maxAttempts - 1) {
+          const delay = Math.min(800 * Math.pow(2, attempt), 3000);
+          await new Promise(res => setTimeout(res, delay));
+          continue;
+        }
+        console.error('[QuoteNew] Failed to fetch version ID for new quote after retries:', error);
+        setVersionError('Failed to initialize quote version: ' + (error?.message || 'Unknown error'));
+      }
+    })();
 
     // Update quote with selected template if applicable
     if (selectedTemplateId) {
@@ -939,6 +948,26 @@ export default function QuoteNew() {
       </div>
     </DashboardLayout>
   );
+}
+
+export async function getLatestVersionIdWithRetry(scopedDb: any, quoteId: string, maxAttempts = 3): Promise<string | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data, error } = await (scopedDb
+      .from('quotation_versions', true)
+      .select('id')
+      .eq('quote_id', quoteId)
+      .order('version_number', { ascending: false })
+      .limit(1) as any)
+      .single();
+    if (!error && data) return data.id as string;
+    if (attempt < maxAttempts - 1) {
+      const delay = Math.min(800 * Math.pow(2, attempt), 3000);
+      await new Promise(res => setTimeout(res, delay));
+      continue;
+    }
+    return null;
+  }
+  return null;
 }
 
 // Helper function for robust carrier matching

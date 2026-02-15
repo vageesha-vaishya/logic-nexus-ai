@@ -96,13 +96,24 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
 
   // Auto-save logic for Quick Quote conversion
   useEffect(() => {
-    if (autoSave && !hasAutoSaved && !quoteId && initialData && !isSubmitting) {
-      console.log('[QuoteForm] Triggering auto-save from Quick Quote data...');
-      const timer = setTimeout(() => {
-        form.handleSubmit(onSubmit)();
-        setHasAutoSaved(true);
-      }, 500); // Small delay to ensure form state is settled
-      return () => clearTimeout(timer);
+    if (
+      autoSave && 
+      !hasAutoSaved && 
+      !quoteId && 
+      initialData && 
+      !isSubmitting
+    ) {
+      const hasPortsResolved = !!initialData.origin_port_id && !!initialData.destination_port_id;
+      const legs = Array.isArray(initialData.options) ? (initialData.options[0]?.legs || []) : [];
+      const hasLegsResolved = legs.length > 0 && legs.every((l: any) => !!l.origin_location_id && !!l.destination_location_id);
+      
+      if (hasPortsResolved || hasLegsResolved) {
+        const timer = setTimeout(() => {
+          form.handleSubmit(onSubmit)();
+          setHasAutoSaved(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
   }, [autoSave, hasAutoSaved, quoteId, initialData, form]);
 

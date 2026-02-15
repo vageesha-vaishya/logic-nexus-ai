@@ -1,4 +1,3 @@
-/// <reference lib="deno.ns" />
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ImapService } from "./services/imap.ts";
@@ -7,7 +6,7 @@ import { GmailService } from "./services/gmail.ts";
 import { saveSyncLog, getAdminSupabaseClient } from "./utils/db.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });

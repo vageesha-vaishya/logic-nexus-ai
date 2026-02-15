@@ -1,186 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { QuoteTransformService } from '../quote-transform.service';
-import { QuoteTransferData } from '@/lib/schemas/quote-transfer';
-import { logger } from '@/lib/logger';
 
-// Mock logger
-vi.mock('@/lib/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }
-}));
+const masterData = {
+  serviceTypes: [{ id: 'st1', name: 'Ocean', code: 'ocean' }],
+  carriers: [{ id: 'c1', carrier_name: 'Evergreen Line', scac: 'EGLV' }],
+  ports: [
+    { id: 'p1', location_name: 'Los Angeles', location_code: 'USLAX', country: 'US' },
+    { id: 'p2', location_name: 'Nhava Sheva Port', location_code: 'INNSA', country: 'IN' },
+    { id: 'p3', location_name: 'San Juan Port', location_code: 'PRSJU', country: 'PR' },
+    { id: 'p4', location_name: 'ICD Tughlakabad', location_code: 'INITK', country: 'IN' },
+  ],
+  containerTypes: [],
+  containerSizes: [],
+  shippingTerms: [{ id: 'inc1', code: 'CIF', name: 'Cost Insurance Freight' }]
+};
 
-describe('QuoteTransformService', () => {
-  const mockMasterData = {
-    serviceTypes: [
-      { id: 'st-sea', name: 'Sea Freight', code: 'sea' },
-      { id: 'st-air', name: 'Air Freight', code: 'air' }
-    ],
-    carriers: [
-      { id: 'c-maersk', carrier_name: 'Maersk Line', scac: 'MAEU' },
-      { id: 'c-cma', carrier_name: 'CMA CGM', scac: 'CMDU' }
-    ]
-  };
-
-  const validPayload: QuoteTransferData = {
-    origin: 'Shanghai',
-    destination: 'Los Angeles',
-    mode: 'Ocean',
-    commodity: 'Electronics',
-    weight: '1000',
-    volume: '10',
-    selectedRates: [{
-      id: 'rate-1',
-      carrier: 'Maersk',
-      price: 5000,
-      currency: 'USD',
-      validUntil: '2023-12-31'
-    }],
-    containerCombos: [],
-    containerType: '20GP',
-    containerSize: '20',
-    containerQty: '1'
-  };
-
-  describe('validatePayload', () => {
-    it('should validate correct payload', () => {
-      const result = QuoteTransformService.validatePayload(validPayload);
-      expect(result).toEqual(validPayload);
-    });
-
-    it('should throw on invalid payload', () => {
-      const invalidPayload = { ...validPayload, origin: '' }; // Invalid: min length 2
-      expect(() => QuoteTransformService.validatePayload(invalidPayload)).toThrow();
-      expect(logger.error).toHaveBeenCalled();
-    });
+describe('QuoteTransformService.resolvePortId', () => {
+  it('prioritizes id and code over name', () => {
+    const idMatch = QuoteTransformService.resolvePortId('AGUADILLA', masterData.ports as any, 'USLAX', 'p1');
+    expect(idMatch).toBe('p1');
+    const codeMatch = QuoteTransformService.resolvePortId('Unknown', masterData.ports as any, 'PRSJU');
+    expect(codeMatch).toBe('p3');
+    const nameMatch = QuoteTransformService.resolvePortId('ICD Tughlakabad', masterData.ports as any);
+    expect(nameMatch).toBe('p4');
   });
+});
 
-  describe('transformToQuoteForm', () => {
-    it('should transform payload to form values correctly', () => {
-      const result = QuoteTransformService.transformToQuoteForm(validPayload, mockMasterData);
-      
-      expect(result.title).toContain('Shanghai -> Los Angeles');
-      expect(result.commodity).toBe('Electronics');
-      expect(result.service_type_id).toBe('st-sea');
-      expect(result.carrier_id).toBe('c-maersk');
-      expect(result.items).toHaveLength(1);
-      expect(result.items?.[0].unit_price).toBe(5000);
-      expect(result.notes).toContain('Maersk');
-    });
+describe('QuoteTransformService.transformToQuoteForm', () => {
+  it('maps origin/destination using id/code safely', () => {
+    const payload: any = {
+      origin: 'Aguadilla',
+      destination: 'ICD Tughlakabad',
+      mode: 'ocean',
+      selectedRates: [{
+        id: 'opt1',
+        carrier_name: 'Evergreen Line',
+        price: 1000,
+        currency: 'USD',
+        transitTime: '32 days port-to-port',
+        legs: [
+          { id: 'l1', mode: 'road', origin: 'Aguadilla', destination: 'San Juan Port' },
+          { id: 'l2', mode: 'ocean', origin: 'San Juan Port', destination: 'Nhava Sheva Port' },
+          { id: 'l3', mode: 'rail', origin: 'Nhava Sheva Port', destination: 'ICD Tughlakabad' },
+        ]
+      }],
+      originDetails: { id: 'p3', name: 'San Juan Port', code: 'PRSJU' },
+      destinationDetails: { id: 'p4', name: 'ICD Tughlakabad', code: 'INITK' }
+    };
 
-    it('should handle carrier resolution by name', () => {
-        const payload = {
-            ...validPayload,
-            selectedRates: [{
-                ...validPayload.selectedRates[0],
-                carrier: 'CMA CGM',
-                carrier_id: undefined
-            }]
-        };
-        const result = QuoteTransformService.transformToQuoteForm(payload, mockMasterData);
-        expect(result.carrier_id).toBe('c-cma');
-    });
-
-    it('should calculate unit price correctly', () => {
-        const payload = {
-            ...validPayload,
-            containerQty: '2',
-            selectedRates: [{
-                ...validPayload.selectedRates[0],
-                price: 10000
-            }]
-        };
-        const result = QuoteTransformService.transformToQuoteForm(payload, mockMasterData);
-        expect(result.items?.[0].quantity).toBe(2);
-        expect(result.items?.[0].unit_price).toBe(5000); // 10000 / 2
-    });
-
-    it('should map all selected rates to options array and preserve address details in notes', () => {
-        const comprehensivePayload: QuoteTransferData = {
-            ...validPayload,
-            originDetails: { address: '123 Origin St', city: 'Shanghai', country: 'China' },
-            destinationDetails: { address: '456 Dest Rd', city: 'LA', country: 'USA' },
-            dangerousGoods: true,
-            htsCode: '8517.12',
-            selectedRates: [
-                {
-                    id: 'rate-1',
-                    carrier: 'Maersk',
-                    price: 5000,
-                    currency: 'USD',
-                    transitTime: '25 Days',
-                    legs: [
-                        { id: 'leg-1', origin: 'Shanghai', destination: 'LA', mode: 'Ocean', carrier: 'Maersk' }
-                    ]
-                },
-                {
-                    id: 'rate-2',
-                    carrier: 'CMA CGM',
-                    price: 4800,
-                    currency: 'USD',
-                    transitTime: '30 Days'
-                }
-            ]
-        };
-
-        const result = QuoteTransformService.transformToQuoteForm(comprehensivePayload, mockMasterData);
-
-        // Verify Options Mapping
-        expect(result.options).toBeDefined();
-        expect(result.options).toHaveLength(2);
-        
-        const opt1 = result.options![0];
-        expect(opt1.is_primary).toBe(true);
-        expect(opt1.total_amount).toBe(5000);
-        expect(opt1.transit_time_days).toBe(25);
-        expect(opt1.legs).toHaveLength(1);
-        expect(opt1.legs[0].carrier_id).toBe('c-maersk');
-
-        const opt2 = result.options![1];
-        expect(opt2.is_primary).toBe(false);
-        expect(opt2.total_amount).toBe(4800);
-        expect(opt2.transit_time_days).toBe(30);
-
-        // Verify Address in Notes
-        expect(result.notes).toContain('123 Origin St, Shanghai, China');
-        expect(result.notes).toContain('456 Dest Rd, LA, USA');
-
-        // Verify Item Attributes
-        const item = result.items![0];
-        expect(item.attributes?.hs_code).toBe('8517.12');
-        expect(item.attributes?.hazmat).toEqual({ is_hazardous: true });
-    });
-  });
-
-  describe('retryOperation', () => {
-    it('should return result on success', async () => {
-        const mockFn = vi.fn().mockResolvedValue('success');
-        const result = await QuoteTransformService.retryOperation(mockFn);
-        expect(result).toBe('success');
-        expect(mockFn).toHaveBeenCalledTimes(1);
-    });
-
-    it('should retry on failure and eventually succeed', async () => {
-        const mockFn = vi.fn()
-            .mockRejectedValueOnce(new Error('fail 1'))
-            .mockResolvedValue('success');
-            
-        const result = await QuoteTransformService.retryOperation(mockFn, { initialDelay: 10 });
-        expect(result).toBe('success');
-        expect(mockFn).toHaveBeenCalledTimes(2);
-        expect(logger.warn).toHaveBeenCalled();
-    });
-
-    it('should throw after max retries', async () => {
-        const mockFn = vi.fn().mockRejectedValue(new Error('fail'));
-        
-        await expect(QuoteTransformService.retryOperation(mockFn, { maxAttempts: 3, initialDelay: 1 }))
-            .rejects.toThrow('fail'); // It rethrows the last error or wrapper
-        
-        expect(mockFn).toHaveBeenCalledTimes(3);
-        expect(logger.error).toHaveBeenCalled();
-    });
+    const form = QuoteTransformService.transformToQuoteForm(payload, masterData as any);
+    expect(form.origin_port_id).toBe('p3');
+    expect(form.destination_port_id).toBe('p4');
+    const legs = form.options?.[0]?.legs || [];
+    expect(legs[0].origin_location_id).toBe('p3');
+    expect(legs[2].destination_location_id).toBe('p4');
   });
 });

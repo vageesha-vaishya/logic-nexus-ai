@@ -312,6 +312,11 @@ export function LocationAutocomplete({
                                     {location.location_code}
                                 </Badge>
                             )}
+                            {location.id && location.location_code && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 h-5">
+                                    ID verified
+                                </Badge>
+                            )}
                         </div>
                         <span className="text-xs text-muted-foreground truncate">
                             {[location.city, location.country].filter(Boolean).join(", ")}

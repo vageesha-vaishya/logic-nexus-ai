@@ -119,8 +119,18 @@ export class QuoteTransformService {
         const tradeDirection = data.trade_direction || 'export';
         const serviceTypeId = this.resolveServiceTypeId(data.mode, data.service_type_id, masterData.serviceTypes);
         const carrierId = this.resolveCarrierId(primaryRate, masterData.carriers);
-        const originPortId = this.resolvePortId(data.origin, masterData.ports);
-        const destinationPortId = this.resolvePortId(data.destination, masterData.ports);
+        const originPortId = this.resolvePortId(
+            data.origin, 
+            masterData.ports, 
+            data.originDetails?.code, 
+            data.originDetails?.id
+        );
+        const destinationPortId = this.resolvePortId(
+            data.destination, 
+            masterData.ports, 
+            data.destinationDetails?.code, 
+            data.destinationDetails?.id
+        );
         
         // Resolve Shipping Term ID (Incoterms)
         // The form expects an ID for the Select component, but falls back to code if needed
@@ -137,6 +147,7 @@ export class QuoteTransformService {
         
         // Map selected rates to form options
         const options = this.mapToQuoteOptions(rates, masterData, data);
+        const fallbackCarrierId = (options?.[0]?.legs?.[0]?.carrier_id) as string | undefined;
 
         return {
             title: `Quote for ${data.commodity || 'General Cargo'} (${data.origin} -> ${data.destination})`,
@@ -150,10 +161,10 @@ export class QuoteTransformService {
             trade_direction: tradeDirection,
             
             // Logistics
-            origin_port_id: originPortId || data.originId || data.originDetails?.id,
-            destination_port_id: destinationPortId || data.destinationId || data.destinationDetails?.id,
+            origin_port_id: originPortId,
+            destination_port_id: destinationPortId,
             service_type_id: serviceTypeId,
-            carrier_id: carrierId,
+            carrier_id: carrierId || fallbackCarrierId,
             
             // Dates & Requirements
             valid_until: primaryRate?.validUntil ? new Date(primaryRate.validUntil).toISOString().split('T')[0] : undefined,
@@ -224,20 +235,42 @@ export class QuoteTransformService {
                 sequence_number: i + 1,
                 transport_mode: (leg.mode || transferData.mode || 'ocean').toLowerCase(),
                 carrier_id: leg.carrier ? this.resolveCarrierId({ carrier_name: leg.carrier } as any, masterData.carriers) : carrierId,
-                origin_location_name: leg.origin || (i === 0 ? transferData.origin : undefined),
-                destination_location_name: leg.destination || (i === (rate.legs?.length || 0) - 1 ? transferData.destination : undefined),
-                origin_location_id: this.resolvePortId(leg.origin, masterData.ports) || (i === 0 ? this.resolvePortId(transferData.origin, masterData.ports) : undefined),
-                destination_location_id: this.resolvePortId(leg.destination, masterData.ports) || (i === (rate.legs?.length || 0) - 1 ? this.resolvePortId(transferData.destination, masterData.ports) : undefined),
+                origin_location_name: leg.origin 
+                    || (i === 0 ? (transferData.originDetails?.name || transferData.origin) : undefined),
+                destination_location_name: leg.destination 
+                    || (i === (rate.legs?.length || 0) - 1 ? (transferData.destinationDetails?.name || transferData.destination) : undefined),
+                origin_location_id: this.resolvePortId(
+                    leg.origin, 
+                    masterData.ports, 
+                    i === 0 ? transferData.originDetails?.code : undefined, 
+                    i === 0 ? transferData.originDetails?.id : undefined
+                ),
+                destination_location_id: this.resolvePortId(
+                    leg.destination, 
+                    masterData.ports, 
+                    i === (rate.legs?.length || 0) - 1 ? transferData.destinationDetails?.code : undefined, 
+                    i === (rate.legs?.length || 0) - 1 ? transferData.destinationDetails?.id : undefined
+                ),
                 transit_time: leg.transit_time,
                 charges: [] // Legs might have their own charges, but usually we attach to the option or the first leg
             })) : [{
                 sequence_number: 1,
                 transport_mode: (transferData.mode || 'ocean').toLowerCase(),
                 carrier_id: carrierId,
-                origin_location_name: transferData.origin,
-                destination_location_name: transferData.destination,
-                origin_location_id: this.resolvePortId(transferData.origin, masterData.ports),
-                destination_location_id: this.resolvePortId(transferData.destination, masterData.ports),
+                origin_location_name: transferData.originDetails?.name || transferData.origin,
+                destination_location_name: transferData.destinationDetails?.name || transferData.destination,
+                origin_location_id: this.resolvePortId(
+                    transferData.origin, 
+                    masterData.ports, 
+                    transferData.originDetails?.code, 
+                    transferData.originDetails?.id
+                ),
+                destination_location_id: this.resolvePortId(
+                    transferData.destination, 
+                    masterData.ports, 
+                    transferData.destinationDetails?.code, 
+                    transferData.destinationDetails?.id
+                ),
                 transit_time: rate.transitTime,
                 transit_time_days: transitDays,
                 charges: charges // Attach charges to the single leg
@@ -317,29 +350,53 @@ export class QuoteTransformService {
         return match?.id;
     }
 
-    public static resolvePortId(name: string | undefined, ports: MasterData['ports']): string | undefined {
-        if (!name || !ports?.length) return undefined;
-        const searchName = name.trim().toLowerCase();
+    public static resolvePortId(
+        name: string | undefined, 
+        ports: MasterData['ports'], 
+        code?: string, 
+        id?: string
+    ): string | undefined {
+        if (!ports?.length) return undefined;
         
-        // 1. Exact Name
-        let match = ports.find(p => p.location_name.toLowerCase() === searchName);
+        // 0. Direct ID match against master ports
+        if (id) {
+            const byId = ports.find(p => String(p.id) === String(id));
+            if (byId) return byId.id;
+        }
         
-        // 2. Code
-        if (!match) {
-            match = ports.find(p => p.location_code?.toLowerCase() === searchName);
+        // 1. Code match
+        if (code) {
+            const codeLower = code.trim().toLowerCase();
+            const byCode = ports.find(p => (p.location_code || '').toLowerCase() === codeLower);
+            if (byCode) return byCode.id;
         }
-
-        // 3. Contains (Strict) - Forward
-        if (!match) {
-            match = ports.find(p => p.location_name.toLowerCase().includes(searchName));
+        
+        // 2. Name-based matching
+        if (name) {
+            const searchName = name.trim().toLowerCase();
+            
+            // Exact name
+            let match = ports.find(p => (p.location_name || '').toLowerCase() === searchName);
+            
+            // Code equals name (user typed code into name field)
+            if (!match) {
+                match = ports.find(p => (p.location_code || '').toLowerCase() === searchName);
+            }
+            
+            // Contains forward
+            if (!match) {
+                match = ports.find(p => (p.location_name || '').toLowerCase().includes(searchName));
+            }
+            
+            // Contains reverse
+            if (!match) {
+                match = ports.find(p => searchName.includes((p.location_name || '').toLowerCase()));
+            }
+            
+            if (match) return match.id;
         }
-
-        // 4. Contains (Strict) - Reverse (e.g. search "Shanghai" matches "Shanghai, CN")
-        if (!match) {
-             match = ports.find(p => searchName.includes(p.location_name.toLowerCase()));
-        }
-
-        return match?.id;
+        
+        return undefined;
     }
 
     private static generateQuoteItems(data: QuoteTransferData, primaryRate: RateOption | undefined, masterData?: MasterData): QuoteItem[] {

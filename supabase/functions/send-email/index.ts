@@ -1,4 +1,3 @@
-/// <reference lib="deno.ns" />
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -1040,6 +1039,30 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
           tracking_id: emailId,
         },
       });
+    }
+
+    // Emit audit event (EmailSent)
+    try {
+      const traceId = payload?.trace_id;
+      const idem = payload?.idempotency_key;
+      const { error: auditErr } = await adminSupabase
+        .from("audit_logs")
+        .insert({
+          action: "EVENT:EmailSent",
+          resource_type: "quotation",
+          details: {
+            trace_id: traceId || null,
+            idempotency_key: idem || null,
+            email_id: emailId,
+            message_id: response.messageId || null,
+            to: Array.isArray(to) ? to : [to]
+          }
+        });
+      if (auditErr) {
+        await baseLogger.warn("Audit log insert failed for EmailSent", { error: auditErr.message });
+      }
+    } catch (e: any) {
+      await baseLogger.warn("Audit event emission failed", { error: e?.message || String(e) });
     }
 
     return new Response(JSON.stringify(response), {

@@ -82,9 +82,25 @@ function LocationAutocomplete({
                         }}
                         className="cursor-pointer"
                     >
-                        <div className="flex flex-col">
-                            <span className="font-medium">{suggestion.label}</span>
-                            <span className="text-xs text-muted-foreground">{suggestion.details}</span>
+                        <div className="flex flex-col w-full">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{suggestion.label}</span>
+                              {suggestion?.details?.code && (
+                                <span className="text-[10px] px-1 py-0 h-5 bg-muted rounded">
+                                  {suggestion.details.code}
+                                </span>
+                              )}
+                              {suggestion?.details?.id && (
+                                <span className="text-[10px] px-1 py-0 h-5 border rounded">
+                                  ID verified
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {typeof suggestion.details === 'string' 
+                                ? suggestion.details 
+                                : [suggestion?.details?.city, suggestion?.details?.country].filter(Boolean).join(', ')}
+                            </span>
                         </div>
                     </CommandItem>
                 ))}

@@ -126,6 +126,22 @@ describe('LocationAutocomplete', () => {
         });
     });
 
+    it('shows “ID verified” hint when a result has a database ID', async () => {
+        render(<LocationAutocomplete onChange={() => {}} />);
+        
+        const trigger = screen.getByRole('combobox');
+        fireEvent.click(trigger);
+
+        const input = screen.getByPlaceholderText('Search port, airport, city...');
+        fireEvent.change(input, { target: { value: 'Los' } });
+
+        await waitFor(() => {
+            expect(screen.getByText('Los Angeles Port')).toBeInTheDocument();
+        });
+
+        expect(screen.getAllByText('ID verified').length).toBeGreaterThan(0);
+    });
+
     it('calls onChange when a location is selected', async () => {
         const handleChange = vi.fn();
         render(<LocationAutocomplete onChange={handleChange} />);

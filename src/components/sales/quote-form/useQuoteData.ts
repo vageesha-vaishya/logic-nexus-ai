@@ -27,13 +27,37 @@ export function useQuoteData() {
   const tenantId = resolvedTenantId || context.tenantId || roles?.[0]?.tenant_id;
 
   // 1. Fetch Ports (Global Resource)
+  const recordTelemetry = (table: string, status: 'success' | 'failure', attempts: number, durationMs: number, errorMsg?: string) => {
+    try {
+      const w = window as any;
+      w.__lnxTelemetry = w.__lnxTelemetry || {};
+      const bucket = (w.__lnxTelemetry.quote_data_query = w.__lnxTelemetry.quote_data_query || {});
+      const prev = bucket[table] || { successes: 0, failures: 0, totalAttempts: 0 };
+      const updated = {
+        ...prev,
+        successes: prev.successes + (status === 'success' ? 1 : 0),
+        failures: prev.failures + (status === 'failure' ? 1 : 0),
+        totalAttempts: prev.totalAttempts + attempts,
+        lastAttempts: attempts,
+        lastDurationMs: durationMs,
+        lastError: errorMsg || null,
+        lastAt: Date.now()
+      };
+      bucket[table] = updated;
+      debug.debug(`[Telemetry] ${table}: ${status} in ${durationMs}ms after ${attempts} attempts`);
+    } catch {
+    }
+  };
+
   const { data: ports = [] } = useQuery({
     queryKey: quoteKeys.reference.ports(),
     queryFn: async () => {
+      const start = Date.now();
       const portsService = new PortsService(scopedDb);
       try {
         const data = await portsService.getAllPorts();
         console.log(`[useQuoteData] Ports loaded: ${Array.isArray(data) ? data.length : 0}`);
+        recordTelemetry('ports_locations', 'success', 1, Date.now() - start);
         return (Array.isArray(data) ? data : []).map((p: any) => ({
           id: p.id,
           name: p.location_name,
@@ -43,16 +67,20 @@ export function useQuoteData() {
       } catch (e: any) {
         debug.error('Failed to load ports', { error: e });
         console.error('[useQuoteData] Failed to load ports', e);
+        recordTelemetry('ports_locations', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     staleTime: 1000 * 60 * 60, // 1 hour
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   // 2. Fetch Carriers (Global Resource)
   const { data: carriers = [] } = useQuery({
     queryKey: quoteKeys.reference.carriers(),
     queryFn: async () => {
+      const start = Date.now();
       try {
         const { data, error } = await supabase
           .from('carriers')
@@ -60,20 +88,25 @@ export function useQuoteData() {
           .eq('is_active', true)
           .order('carrier_name');
         if (error) throw error;
+        recordTelemetry('carriers', 'success', 1, Date.now() - start);
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load carriers', { error: e });
         console.error('[useQuoteData] Failed to load carriers', e);
+        recordTelemetry('carriers', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     staleTime: 1000 * 60 * 60, // 1 hour
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   // 3. Fetch Accounts (Scoped)
   const { data: accounts = [], refetch: refetchAccounts } = useQuery({
     queryKey: quoteKeys.reference.accounts(tenantId),
     queryFn: async () => {
+      const start = Date.now();
       // Use scopedDb to automatically enforce tenant isolation
       try {
         const { data, error } = await scopedDb
@@ -81,40 +114,50 @@ export function useQuoteData() {
           .select('id, name')
           .order('name');
         if (error) throw error;
+        recordTelemetry('accounts', 'success', 1, Date.now() - start);
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load accounts', { error: e, tenantId });
         console.error('[useQuoteData] Failed to load accounts', e);
+        recordTelemetry('accounts', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     enabled: !!tenantId || !!context.tenantId, // Ensure we have a scope context
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   // 4. Fetch Opportunities (Scoped)
   const { data: opportunities = [], isLoading: isLoadingOpportunities } = useQuery({
     queryKey: quoteKeys.reference.opportunities(tenantId),
     queryFn: async () => {
+      const start = Date.now();
       try {
         const { data, error } = await scopedDb
           .from('opportunities')
           .select('id, name, account_id, contact_id, stage, amount, probability')
           .order('created_at', { ascending: false });
         if (error) throw error;
+        recordTelemetry('opportunities', 'success', 1, Date.now() - start);
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load opportunities', { error: e, tenantId });
         console.error('[useQuoteData] Failed to load opportunities', e);
+        recordTelemetry('opportunities', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     enabled: !!tenantId || !!context.tenantId,
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   // 5. Fetch Services & Types (Scoped)
   const serviceQuery: any = useQuery({
     queryKey: quoteKeys.reference.services(tenantId),
     queryFn: async () => {
+      const start = Date.now();
       // Logic from original fetchServiceData but using scopedDb
       const query = scopedDb
         .from('service_type_mappings')
@@ -186,14 +229,18 @@ export function useQuoteData() {
           })
           .filter(Boolean) as any[];
     
+        recordTelemetry('service_type_mappings', 'success', 1, Date.now() - start);
         return { services: servicesForDropdown, serviceTypes: serviceTypesForDropdown };
       } catch (e: any) {
         debug.error('Failed to load services/types', { error: e, tenantId });
         console.error('[useQuoteData] Failed to load services/types', e);
+        recordTelemetry('service_type_mappings', 'failure', 1, Date.now() - start, String(e?.message || e));
         return { services: [], serviceTypes: [] };
       }
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
   const serviceData = serviceQuery.data ?? { services: [], serviceTypes: [] };
 
@@ -201,26 +248,32 @@ export function useQuoteData() {
   const { data: contacts = [] } = useQuery({
     queryKey: quoteKeys.reference.contacts(tenantId),
     queryFn: async () => {
+      const start = Date.now();
       try {
         const { data, error } = await scopedDb
           .from('contacts')
           .select('id, first_name, last_name, account_id')
           .order('first_name');
         if (error) throw error;
+        recordTelemetry('contacts', 'success', 1, Date.now() - start);
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load contacts', { error: e, tenantId });
         console.error('[useQuoteData] Failed to load contacts', e);
+        recordTelemetry('contacts', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     enabled: !!tenantId || !!context.tenantId,
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   // 7. Fetch Shipping Terms (Global Resource)
   const { data: shippingTerms = [] } = useQuery({
     queryKey: quoteKeys.reference.shippingTerms(),
     queryFn: async () => {
+      const start = Date.now();
       try {
         const { data, error } = await supabase
           .from('incoterms')
@@ -228,20 +281,25 @@ export function useQuoteData() {
           .eq('is_active', true)
           .order('incoterm_code');
         if (error) throw error;
+        recordTelemetry('incoterms', 'success', 1, Date.now() - start);
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load shipping terms', { error: e });
         console.error('[useQuoteData] Failed to load shipping terms', e);
+        recordTelemetry('incoterms', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     staleTime: 1000 * 60 * 60 * 24, // 24 hours
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   // 8. Fetch Currencies (Global Resource)
   const { data: currencies = [] } = useQuery({
     queryKey: quoteKeys.reference.currencies(),
     queryFn: async () => {
+      const start = Date.now();
       try {
         const { data, error } = await supabase
           .from('currencies')
@@ -249,14 +307,18 @@ export function useQuoteData() {
           .eq('is_active', true)
           .order('code');
         if (error) throw error;
+        recordTelemetry('currencies', 'success', 1, Date.now() - start);
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load currencies', { error: e });
         console.error('[useQuoteData] Failed to load currencies', e);
+        recordTelemetry('currencies', 'failure', 1, Date.now() - start, String(e?.message || e));
         return [];
       }
     },
     staleTime: 1000 * 60 * 60 * 24, // 24 hours
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(800 * Math.pow(2, attemptIndex), 4000),
   });
 
   return {

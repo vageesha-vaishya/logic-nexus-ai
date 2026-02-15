@@ -1,4 +1,3 @@
-/// <reference lib="deno.ns" />
 import { EmailAccount, saveEmailToDb, SupabaseClient } from "../utils/db.ts";
 import { ImapFlow } from "npm:imapflow";
 import { parseEmail } from "../utils/parser.ts";
@@ -95,15 +94,17 @@ export class ImapService {
               // if (!forceFullSync) {
               //   await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true });
               // }
-            } catch (e) {
-              console.error(`Error processing message ${message.uid}:`, e);
-              debugInfo.errors.push(`Msg ${message.uid}: ${e.message}`);
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : String(e);
+              console.error(`Error processing message ${message.uid}:`, msg);
+              debugInfo.errors.push(`Msg ${message.uid}: ${msg}`);
             }
           }
       }
-    } catch (err) {
-      console.error("IMAP Sync Error:", err);
-      debugInfo.errors.push(`Sync Error: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("IMAP Sync Error:", msg);
+      debugInfo.errors.push(`Sync Error: ${msg}`);
       throw err;
     } finally {
       if (lock) lock.release();

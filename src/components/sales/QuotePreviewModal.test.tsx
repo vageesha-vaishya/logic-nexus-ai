@@ -52,10 +52,10 @@ describe('QuotePreviewModal', () => {
 
     // Wait for PDF generation
     await waitFor(() => {
-      expect(SupabaseFunctions.invokeAnonymous).toHaveBeenCalledWith('generate-quote-pdf', {
-        quoteId: 'test-quote-id',
-        versionId: 'v1',
-      });
+      expect((SupabaseFunctions.invokeAnonymous as any).mock.calls[0][0]).toBe('generate-quote-pdf');
+      const payload = (SupabaseFunctions.invokeAnonymous as any).mock.calls[0][1];
+      expect(payload.quoteId).toBe('test-quote-id');
+      expect(payload.versionId).toBe('v1');
     });
 
     // Check if iframe is rendered

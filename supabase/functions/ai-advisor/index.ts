@@ -100,7 +100,7 @@ serve(async (req: Request) => {
         result = await generateSmartQuotes(payload, openAiKey, supabase, userToken);
         break;
       case 'lookup_codes':
-        result = await lookupCodes(payload.query, payload.mode);
+        result = await lookupCodes(payload.query, payload.mode, supabase);
         break;
       case 'validate_compliance':
         result = await validateCompliance(payload);
@@ -167,7 +167,7 @@ async function predictPrice(payload: any) {
   };
 }
 
-async function lookupCodes(query: string, mode: string) {
+async function lookupCodes(query: string, mode: string, supabase: any) {
     if (!query || query.length < 2) return { suggestions: [] };
     const lowerQ = query.toLowerCase();
     let source: any[] = [];
@@ -180,6 +180,41 @@ async function lookupCodes(query: string, mode: string) {
         item.name.toLowerCase().includes(lowerQ) ||
         item.country.toLowerCase().includes(lowerQ)
     ).map(item => ({ label: `${item.name} (${item.code})`, value: item.code, details: item }));
+    
+    try {
+      // Enhance with real IDs from ports_locations when available
+      const { data, error } = await supabase
+        .from('ports_locations')
+        .select('id, location_name, location_code, location_type, country, city')
+        .or(`location_code.ilike.%${query}%,location_name.ilike.%${query}%`)
+        .limit(10);
+      
+      if (!error && Array.isArray(data)) {
+        const byCode = new Map<string, any>();
+        for (const row of data) {
+          if (row.location_code) byCode.set(String(row.location_code).toUpperCase(), row);
+        }
+        // Merge IDs into suggestions where codes match
+        for (const s of suggestions) {
+          const codeKey = String(s.value || s.details?.code || '').toUpperCase();
+          const match = byCode.get(codeKey);
+          if (match) {
+            s.details = {
+              ...s.details,
+              id: match.id,
+              name: match.location_name || s.details?.name,
+              code: match.location_code || s.details?.code,
+              country: match.country || s.details?.country,
+              type: match.location_type || s.details?.type,
+              city: match.city || s.details?.city
+            };
+          }
+        }
+      }
+    } catch (_err) {
+      // Silent fallback to mock suggestions when DB unavailable
+    }
+    
     return { suggestions };
 }
 

@@ -180,6 +180,8 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
   } = storeState;
 
   const [connectionStatus, setConnectionStatus] = useState<'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('SUBSCRIBED');
+  const pricingSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+  const reconnectAttemptsRef = useRef(0);
   const [pricingRequestsCount, setPricingRequestsCount] = useState(0);
   const isPricingCalculating = pricingRequestsCount > 0;
   
@@ -257,26 +259,43 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
   // Real-time Pricing Updates Subscription
   useEffect(() => {
-    const subscription = pricingService.subscribeToUpdates(() => {
-      toast({
-        title: "Pricing Updated",
-        description: "Market rates or pricing configurations have been updated.",
+    const subscribe = () => {
+      const subscription = pricingService.subscribeToUpdates(() => {
+        toast({
+          title: "Pricing Updated",
+          description: "Market rates or pricing configurations have been updated.",
+        });
+      }, (status) => {
+          setConnectionStatus(status);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+               toast({
+                  title: "Pricing Service Disconnected",
+                  description: "Attempting to reconnect...",
+                  variant: "destructive"
+               });
+               // Exponential backoff reconnect (max ~8s)
+               const attempt = reconnectAttemptsRef.current + 1;
+               reconnectAttemptsRef.current = attempt;
+               const delay = Math.min(8000, 1000 * Math.pow(2, attempt - 1));
+               setTimeout(() => {
+                 // Clean up previous subscription if any
+                 try { pricingSubRef.current?.unsubscribe(); } catch {}
+                 pricingSubRef.current = pricingService.subscribeToUpdates(() => {
+                   toast({ title: "Pricing Updated", description: "Market rates or pricing configurations have been updated." });
+                 }, (st) => setConnectionStatus(st));
+                 // Reset attempts after successful subscribe
+                 reconnectAttemptsRef.current = 0;
+               }, delay);
+          } else if (status === 'SUBSCRIBED') {
+             reconnectAttemptsRef.current = 0;
+          }
       });
-      // Cache is automatically cleared by the service.
-      // Future improvement: Automatically re-calculate open quotes if auto-margin is enabled.
-    }, (status) => {
-        setConnectionStatus(status);
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-             toast({
-                title: "Pricing Service Disconnected",
-                description: "Attempting to reconnect...",
-                variant: "destructive"
-             });
-        }
-    });
-
+      pricingSubRef.current = subscription;
+    };
+    subscribe();
     return () => {
-      subscription.unsubscribe();
+      try { pricingSubRef.current?.unsubscribe(); } catch {}
+      pricingSubRef.current = null;
     };
   }, [pricingService, toast]);
 
@@ -669,23 +688,79 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           contacts: [] as any[]
         };
 
-        const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
+        const recordTelemetry = (table: string, status: 'success' | 'failure', attempts: number, durationMs: number, errorMsg?: string) => {
           try {
-            const { data, error } = await (scopedDb
-              .from(table as any, true)
-              .select(selectQuery)
-              .eq('is_active', true) as any);
-            
-            if (error) {
-              debug.error(`[Composer] Error loading ${table}:`, error);
+            const w = window as any;
+            w.__lnxTelemetry = w.__lnxTelemetry || {};
+            const bucket = (w.__lnxTelemetry.composer_reference = w.__lnxTelemetry.composer_reference || {});
+            const prev = bucket[table] || { successes: 0, failures: 0, totalAttempts: 0 };
+            const updated = {
+              ...prev,
+              successes: prev.successes + (status === 'success' ? 1 : 0),
+              failures: prev.failures + (status === 'failure' ? 1 : 0),
+              totalAttempts: prev.totalAttempts + attempts,
+              lastAttempts: attempts,
+              lastDurationMs: durationMs,
+              lastError: errorMsg || null,
+              lastAt: Date.now()
+            };
+            bucket[table] = updated;
+            debug.debug(`[Telemetry] ${table}: ${status} in ${durationMs}ms after ${attempts} attempts`);
+          } catch {
+            // ignore telemetry errors
+          }
+        };
+
+        const fetchRef = async (table: string, resultKey: keyof typeof results, errorMsg: string, selectQuery: string = '*') => {
+          const maxAttempts = 3;
+          const start = Date.now();
+          let attempts = 0;
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            attempts = attempt + 1;
+            try {
+              // First try with is_active filter
+              const first = await (scopedDb
+                .from(table as any, true)
+                .select(selectQuery)
+                .eq('is_active', true) as any);
+              
+              if (first.error) {
+                const second = await (scopedDb
+                  .from(table as any, true)
+                  .select(selectQuery) as any);
+                if (!second.error) {
+                  (results as any)[resultKey] = second.data || [];
+                  debug.debug(`[Composer] Loaded ${table} (fallback without is_active):`, (results as any)[resultKey].length);
+                  recordTelemetry(table, 'success', attempts, Date.now() - start);
+                  break;
+                }
+                debug.warn(`[Composer] Attempt ${attempt + 1}/${maxAttempts} error loading ${table}:`, first.error);
+                if (attempt < maxAttempts - 1) {
+                  const delay = Math.min(800 * Math.pow(2, attempt), 4000);
+                  await new Promise(res => setTimeout(res, delay));
+                  continue;
+                }
+                debug.error(`[Composer] Failed to load ${table} after retries:`, first.error);
+                errors.push(errorMsg);
+                recordTelemetry(table, 'failure', attempts, Date.now() - start, String(first.error?.message || errorMsg));
+              } else {
+                (results as any)[resultKey] = first.data || [];
+                debug.debug(`[Composer] Loaded ${table}:`, (results as any)[resultKey].length);
+                recordTelemetry(table, 'success', attempts, Date.now() - start);
+              }
+              break;
+            } catch (error) {
+              debug.warn(`[Composer] Attempt ${attempt + 1}/${maxAttempts} exception loading ${table}:`, error);
+              if (attempt < maxAttempts - 1) {
+                const delay = Math.min(800 * Math.pow(2, attempt), 4000);
+                await new Promise(res => setTimeout(res, delay));
+                continue;
+              }
+              debug.error(`[Composer] Exception loading ${table} after retries:`, error);
               errors.push(errorMsg);
-            } else {
-              (results as any)[resultKey] = data || [];
-              debug.debug(`[Composer] Loaded ${table}:`, (results as any)[resultKey].length);
+              recordTelemetry(table, 'failure', attempts, Date.now() - start, String((error as any)?.message || errorMsg));
+              break;
             }
-          } catch (error) {
-            debug.error(`[Composer] Exception loading ${table}:`, error);
-            errors.push(errorMsg);
           }
         };
 

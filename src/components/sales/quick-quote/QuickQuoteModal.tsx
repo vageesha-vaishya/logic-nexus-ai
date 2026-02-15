@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown } from 'lucide-react';
+import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
@@ -123,6 +123,9 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const { toast } = useToast();
   const { supabase, context } = useCRM();
   const { containerTypes, containerSizes } = useContainerRefs();
+  const [containerCombos, setContainerCombos] = useState<Array<{id:string,typeId:string,sizeId:string,quantity:number}>>([
+    { id: crypto.randomUUID(), typeId: containerTypes[0]?.id || '', sizeId: containerSizes.find(s => s.type_id === (containerTypes[0]?.id || ''))?.id || '', quantity: 1 }
+  ]);
 
   const form = useForm<QuickQuoteValues>({
     resolver: zodResolver(quickQuoteSchema),
@@ -144,6 +147,38 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     setComplianceCheck(null);
     setCodeSuggestions([]);
   }, [mode]);
+
+  useEffect(() => {
+    const totalQty = containerCombos.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+    const first = containerCombos[0];
+    setExtendedData(prev => ({
+      ...prev,
+      containerType: first?.typeId || prev.containerType,
+      containerSize: first?.sizeId || prev.containerSize,
+      containerQty: String(totalQty || prev.containerQty)
+    }));
+  }, [containerCombos]);
+
+  const addCombo = () => {
+    const typeId = containerTypes[0]?.id || '';
+    const sizeId = containerSizes.find(s => s.type_id === typeId)?.id || '';
+    setContainerCombos(prev => [...prev, { id: crypto.randomUUID(), typeId, sizeId, quantity: 1 }]);
+  };
+  const updateCombo = (index: number, field: 'typeId'|'sizeId'|'quantity', val: string|number) => {
+    setContainerCombos(prev => {
+      const next = [...prev];
+      const curr = next[index];
+      next[index] = { ...curr, [field]: val as any };
+      if (field === 'typeId') {
+        const matched = containerSizes.find(s => s.type_id === (val as string));
+        next[index].sizeId = matched?.id || next[index].sizeId;
+      }
+      return next;
+    });
+  };
+  const removeCombo = (index: number) => {
+    setContainerCombos(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
+  };
 
   // AI: Lookup Codes (Debounced)
   useEffect(() => {
@@ -183,6 +218,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       setExtendedData(prev => ({
         ...prev,
         [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
+          id: location.id,
           name: location.location_name,
           formatted_address: [location.city, location.state_province, location.country].filter(Boolean).join(", "),
           code: location.location_code,
@@ -565,6 +601,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     const transferPayload = { 
       ...form.getValues(),
       ...extendedData,
+      containerCombos: containerCombos.map(c => ({ type: c.typeId, size: c.sizeId, qty: c.quantity })),
       selectedRates: selectedOptions.map(opt => ({
         ...opt,
         // Ensure AI fields are explicitly passed
@@ -796,60 +833,64 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               
               {/* OCEAN FIELDS */}
               {mode === 'ocean' && (
-                  <div className="space-y-4 p-4 border rounded-md bg-background">
-                      <h4 className="text-sm font-medium flex items-center gap-2"><Ship className="w-3 h-3"/> Ocean Details</h4>
-                      <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                              <Label className="text-xs">Container Type</Label>
-                              <Select value={extendedData.containerType} onValueChange={(v) => setExtendedData({...extendedData, containerType: v})}>
-                                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                      {containerTypes.length === 0 ? (
-                                        <SelectItem value="__empty" disabled>No types available</SelectItem>
-                                      ) : (
-                                        containerTypes.map(t => (
-                                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                                        ))
-                                      )}
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                          <div className="space-y-1">
-                              <Label className="text-xs">Size</Label>
-                              <Select value={extendedData.containerSize} onValueChange={(v) => setExtendedData({...extendedData, containerSize: v})}>
-                                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                      {(extendedData.containerType 
-                                        ? containerSizes.filter(s => s.type_id === extendedData.containerType) 
-                                        : containerSizes
-                                      ).length === 0 ? (
-                                        <SelectItem value="__empty" disabled>No sizes available</SelectItem>
-                                      ) : (
-                                        (extendedData.containerType 
-                                          ? containerSizes.filter(s => s.type_id === extendedData.containerType) 
-                                          : containerSizes
-                                        ).map(s => (
-                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))
-                                      )}
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <Label className="text-xs">Quantity</Label>
-                            <Input type="number" value={extendedData.containerQty} onChange={(e) => setExtendedData({...extendedData, containerQty: e.target.value})} className="h-8" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-xs flex justify-between">
-                                Weight (Total kg)
-                                {form.formState.errors.weight && <span className="text-destructive text-[10px]">{form.formState.errors.weight.message}</span>}
-                            </Label>
-                            <Input {...form.register("weight")} className="h-8" />
-                        </div>
-                      </div>
+                <div className="space-y-4 p-4 border rounded-md bg-background">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium flex items-center gap-2"><Ship className="w-3 h-3"/> Ocean Containers</h4>
+                    <Button variant="ghost" size="sm" onClick={addCombo} className="h-7 text-xs px-2">
+                      <Plus className="w-3 h-3 mr-1" /> Add Container
+                    </Button>
                   </div>
+                  <div className="space-y-2">
+                    {containerCombos.map((combo, idx) => (
+                      <div key={combo.id} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Type</Label>
+                          <Select value={combo.typeId} onValueChange={(v) => updateCombo(idx, 'typeId', v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
+                            <SelectContent>
+                              {containerTypes.length === 0 ? (
+                                <SelectItem value="__empty" disabled>No types</SelectItem>
+                              ) : (
+                                containerTypes.map(t => (
+                                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-4 space-y-1">
+                          <Label className="text=[10px] text-muted-foreground">Size</Label>
+                          <Select value={combo.sizeId} onValueChange={(v) => updateCombo(idx, 'sizeId', v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Size" /></SelectTrigger>
+                            <SelectContent>
+                              {(containerSizes.filter(s => !combo.typeId || s.type_id === combo.typeId)).map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Qty</Label>
+                          <Input type="number" min={1} className="h-8 text-xs" value={combo.quantity} onChange={(e) => updateCombo(idx, 'quantity', parseInt(e.target.value) || 1)} />
+                        </div>
+                        <div className="col-span-1 pb-1">
+                          <Button variant="ghost" size="icon" onClick={() => removeCombo(idx)} disabled={containerCombos.length === 1} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs flex justify-between">
+                        Weight (Total kg)
+                        {form.formState.errors.weight && <span className="text-destructive text-[10px]">{form.formState.errors.weight.message}</span>}
+                      </Label>
+                      <Input {...form.register("weight")} className="h-8" />
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* AIR FIELDS */}
