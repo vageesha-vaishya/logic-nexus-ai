@@ -56,6 +56,29 @@ export const RawQuoteDataSchema = z.object({
 
 export type RawQuoteData = z.infer<typeof RawQuoteDataSchema>;
 
+export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
+  if (!items) return [];
+  return items.map((i: any) => {
+    const weight = Number(
+      typeof i.weight_kg !== "undefined" && i.weight_kg !== null
+        ? i.weight_kg
+        : i.total_weight
+    ) || 0;
+    const volume = Number(
+      typeof i.volume_cbm !== "undefined" && i.volume_cbm !== null
+        ? i.volume_cbm
+        : i.total_volume
+    ) || 0;
+    return {
+      container_type: i.container_types?.name || i.container_types?.code || "Container",
+      quantity: i.quantity,
+      commodity: i.master_commodities?.name || i.commodity_description || "General Cargo",
+      weight,
+      volume,
+    };
+  });
+}
+
 export interface SafeContext {
   meta: {
     generated_at: string;

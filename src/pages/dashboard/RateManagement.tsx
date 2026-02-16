@@ -23,11 +23,13 @@ import {
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { RateSheetsTab } from '@/components/rates/RateSheetsTab';
+import { useTransportModes, getTransportModeIcon } from '@/hooks/useTransportModes';
 
 export default function RateManagement() {
   const [activeTab, setActiveTab] = useState('analysis');
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
+  const { modes, loading: modesLoading } = useTransportModes();
 
   // Analysis State
   const [origin, setOrigin] = useState('');
@@ -45,6 +47,18 @@ export default function RateManagement() {
         variant: "destructive"
       });
       return;
+    }
+
+    if (!modesLoading && modes.length > 0) {
+      const validCodes = new Set(modes.map(m => String(m.code)));
+      if (!validCodes.has(mode)) {
+        toast({
+          title: "Invalid Transport Mode",
+          description: "Please select a valid transport mode from the list.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -126,18 +140,20 @@ export default function RateManagement() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ocean">
-                            <div className="flex items-center gap-2"><Ship className="h-4 w-4" /> Ocean Freight</div>
-                          </SelectItem>
-                          <SelectItem value="air">
-                            <div className="flex items-center gap-2"><Plane className="h-4 w-4" /> Air Freight</div>
-                          </SelectItem>
-                          <SelectItem value="road">
-                            <div className="flex items-center gap-2"><Truck className="h-4 w-4" /> Road Freight</div>
-                          </SelectItem>
-                          <SelectItem value="rail">
-                            <div className="flex items-center gap-2"><Train className="h-4 w-4" /> Rail Freight</div>
-                          </SelectItem>
+                          {modesLoading ? (
+                            <SelectItem value="__loading" disabled>Loading...</SelectItem>
+                          ) : modes.length === 0 ? (
+                            <SelectItem value="__empty" disabled>No modes available</SelectItem>
+                          ) : (
+                            modes.map(m => (
+                              <SelectItem key={m.id} value={m.code}>
+                                <div className="flex items-center gap-2">
+                                  {(() => { const Icon = getTransportModeIcon(m.icon_name); return <Icon className="h-4 w-4" />; })()}
+                                  {m.name}
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UseFormReturn } from 'react-hook-form';
 import { useCRM } from '@/hooks/useCRM';
@@ -104,31 +104,42 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     queryKey: quoteKeys.reference.ports(),
     queryFn: async () => {
       const portsService = new PortsService(scopedDb);
-      const data = await portsService.getAllPorts();
-      console.log(`[useQuoteRepository] Ports loaded: ${data.length}`);
-      return data.map((p: any) => ({
-        id: p.id,
-        name: p.location_name,
-        code: p.location_code,
-        country_code: p.country,
-      }));
+      try {
+        const data = await portsService.getAllPorts();
+        console.log(`[useQuoteRepository] Ports loaded: ${data.length}`);
+        return data.map((p: any) => ({
+          id: p.id,
+          name: p.location_name,
+          code: p.location_code,
+          country_code: p.country,
+        }));
+      } catch (err: any) {
+        console.error('[useQuoteRepository] Failed to load ports', err);
+        return [];
+      }
     },
-    staleTime: 0, // Force refetch to ensure global ports are loaded
+    staleTime: 1000 * 60 * 60, // 1 hour for global ports
   });
 
   // 2. Carriers
   const { data: carriers = [] } = useQuery<CarrierOption[]>({
     queryKey: quoteKeys.reference.carriers(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('carriers')
-        .select('id, carrier_name, scac, carrier_type')
-        .eq('is_active', true)
-        .order('carrier_name');
-      if (error) throw error;
-      return (data || []) as CarrierOption[];
+      try {
+        const { data, error } = await supabase
+          .from('carriers')
+          .select('id, carrier_name, scac, carrier_type')
+          .eq('is_active', true)
+          .order('carrier_name');
+        if (error) throw error;
+        return (data || []) as CarrierOption[];
+      } catch (e: any) {
+        debug.error('Failed to load carriers', { error: e });
+        console.error('[useQuoteRepository] Failed to load carriers', e);
+        return [];
+      }
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   // 3. Accounts
@@ -136,13 +147,19 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     queryKey: quoteKeys.reference.accounts(tenantId),
     queryFn: async () => {
       if (!tenantId) return [];
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id, name')
-        .eq('tenant_id', tenantId)
-        .order('name');
-      if (error) throw error;
-      return (data || []) as AccountOption[];
+      try {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('id, name')
+          .eq('tenant_id', tenantId)
+          .order('name');
+        if (error) throw error;
+        return (data || []) as AccountOption[];
+      } catch (e: any) {
+        debug.error('Failed to load accounts', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load accounts', e);
+        return [];
+      }
     },
     enabled: !!tenantId,
   });
@@ -152,13 +169,19 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     queryKey: quoteKeys.reference.opportunities(tenantId),
     queryFn: async () => {
       if (!tenantId) return [];
-      const { data, error } = await (supabase as any)
-        .from('opportunities')
-        .select('id, name, account_id, contact_id, stage, amount, probability')
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []) as OpportunityOption[];
+      try {
+        const { data, error } = await (supabase as any)
+          .from('opportunities')
+          .select('id, name, account_id, contact_id, stage, amount, probability')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []) as OpportunityOption[];
+      } catch (e: any) {
+        debug.error('Failed to load opportunities', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load opportunities', e);
+        return [];
+      }
     },
     enabled: !!tenantId,
   });
@@ -180,74 +203,81 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         query = query.is('tenant_id', null);
       }
 
-      const { data: mappingsData, error: mappingsError } = await query;
-      if (mappingsError) {
-        debug.error('Failed to fetch service mappings', { error: mappingsError });
-        throw mappingsError;
-      }
-
-      const mappingRows = Array.isArray(mappingsData) ? mappingsData : [];
-      const serviceIds = [...new Set(mappingRows.map((m: any) => m.service_id).filter(Boolean))];
-
-      const servicesById: Record<string, any> = {};
-      if (serviceIds.length > 0) {
-        const { data: svcData, error: svcErr } = await (supabase as any)
-          .from('services')
-          .select('id, service_name, is_active')
-          .in('id', serviceIds)
-          .eq('is_active', true);
-        if (svcErr) {
-          debug.error('Failed to fetch services details', { error: svcErr });
-          throw svcErr;
+      try {
+        const { data: mappingsData, error: mappingsError } = await query;
+        if (mappingsError) {
+          debug.error('Failed to fetch service mappings', { error: mappingsError });
+          throw mappingsError;
         }
-        for (const s of svcData || []) servicesById[String(s.id)] = s;
-      }
 
-      debug.log('Fetched services data', {
-        tenantId,
-        mappingsCount: mappingRows.length,
-        servicesCount: Object.keys(servicesById).length,
-      });
+        const mappingRows = Array.isArray(mappingsData) ? mappingsData : [];
+        const serviceIds = [...new Set(mappingRows.map((m: any) => m.service_id).filter(Boolean))];
 
-      const uniqueTypeIds = [...new Set(
-        mappingRows
-          .map((m: any) => m.service_type_id)
-          .filter((id: any) => id !== null && id !== undefined)
-          .map(String),
-      )];
-
-      let serviceTypesForDropdown: ServiceTypeOption[] = [];
-      if (uniqueTypeIds.length > 0) {
-        const { data: typeRows, error: typesErr } = await (supabase as any)
-          .from('service_types')
-          .select('id, name, code')
-          .in('id', uniqueTypeIds);
-        if (!typesErr && Array.isArray(typeRows)) {
-          serviceTypesForDropdown = typeRows.map((t: any) => ({
-            id: String(t.id),
-            code: String(t.code),
-            name: t.name || String(t.code),
-          }));
+        const servicesById: Record<string, any> = {};
+        if (serviceIds.length > 0) {
+          const { data: svcData, error: svcErr } = await (supabase as any)
+            .from('services')
+            .select('id, service_name, is_active')
+            .in('id', serviceIds)
+            .eq('is_active', true);
+          if (svcErr) {
+            debug.error('Failed to fetch services details', { error: svcErr });
+            throw svcErr;
+          }
+          for (const s of svcData || []) servicesById[String(s.id)] = s;
         }
+
+        debug.log('Fetched services data', {
+          tenantId,
+          mappingsCount: mappingRows.length,
+          servicesCount: Object.keys(servicesById).length,
+        });
+
+        const uniqueTypeIds = [...new Set(
+          mappingRows
+            .map((m: any) => m.service_type_id)
+            .filter((id: any) => id !== null && id !== undefined)
+            .map(String),
+        )];
+
+        let serviceTypesForDropdown: ServiceTypeOption[] = [];
+        if (uniqueTypeIds.length > 0) {
+          const { data: typeRows, error: typesErr } = await (supabase as any)
+            .from('service_types')
+            .select('id, name, code, transport_modes:transport_modes(code)')
+            .in('id', uniqueTypeIds);
+          if (!typesErr && Array.isArray(typeRows)) {
+            serviceTypesForDropdown = typeRows.map((t: any) => ({
+              id: String(t.id),
+              code: String(t.code),
+              name: t.name || String(t.code),
+              transport_modes: t.transport_modes,
+            }));
+          }
+        }
+
+        const servicesForDropdown: ServiceOption[] = mappingRows
+          .map((m: any) => {
+            const svc = servicesById[String(m.service_id)];
+            if (!svc) return null;
+            return {
+              id: String(svc.id),
+              service_name: svc.service_name,
+              service_type_id: String(m.service_type_id),
+              is_default: m.is_default,
+              priority: m.priority,
+            };
+          })
+          .filter(Boolean) as ServiceOption[];
+
+        return { services: servicesForDropdown, serviceTypes: serviceTypesForDropdown };
+      } catch (e: any) {
+        debug.error('Failed to load services/types', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load services/types', e);
+        return { services: [], serviceTypes: [] };
       }
-
-      const servicesForDropdown: ServiceOption[] = mappingRows
-        .map((m: any) => {
-          const svc = servicesById[String(m.service_id)];
-          if (!svc) return null;
-          return {
-            id: String(svc.id),
-            service_name: svc.service_name,
-            service_type_id: String(m.service_type_id),
-            is_default: m.is_default,
-            priority: m.priority,
-          };
-        })
-        .filter(Boolean) as ServiceOption[];
-
-      return { services: servicesForDropdown, serviceTypes: serviceTypesForDropdown };
     },
-    staleTime: 0, // Force refetch to ensure mappings are updated
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
   const serviceData = serviceQuery.data ?? { services: [], serviceTypes: [] };
 
@@ -256,13 +286,19 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     queryKey: quoteKeys.reference.contacts(tenantId),
     queryFn: async () => {
       if (!tenantId) return [];
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('id, first_name, last_name, account_id')
-        .eq('tenant_id', tenantId)
-        .order('first_name');
-      if (error) throw error;
-      return (data || []) as ContactOption[];
+      try {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('id, first_name, last_name, account_id')
+          .eq('tenant_id', tenantId)
+          .order('first_name');
+        if (error) throw error;
+        return (data || []) as ContactOption[];
+      } catch (e: any) {
+        debug.error('Failed to load contacts', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load contacts', e);
+        return [];
+      }
     },
     enabled: !!tenantId,
   });
@@ -299,6 +335,7 @@ export function useQuoteRepositoryForm(opts: {
   const { roles } = useAuth();
   const debug = useDebug('Sales', 'useQuoteRepositoryForm');
   const queryClient = useQueryClient();
+  const hydratedQuoteId = useRef<string | null>(null);
   const {
     resolvedTenantId,
     setResolvedTenantId,
@@ -314,15 +351,42 @@ export function useQuoteRepositoryForm(opts: {
 
   // --- Hydration: fetch existing quote via React Query ---
 
-  const hydrationQuery = useQuery({
-    queryKey: quoteKeys.hydration(quoteId!),
-    queryFn: async () => {
-      // Use scopedDb to ensure consistent access with QuoteDetail and respect admin overrides
-      const [quoteResult, itemsResult, cargoResult, versionResult] = await Promise.all([
-        scopedDb.from('quotes').select('*').eq('id', quoteId!).maybeSingle(),
-        scopedDb.from('quote_items').select('*').eq('quote_id', quoteId!).order('line_number', { ascending: true }),
-        scopedDb.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId!),
-        scopedDb.from('quotation_versions')
+  const coreQuery = useQuery({
+    queryKey: quoteKeys.hydration(quoteId!)?.concat(['core']),
+    queryFn: async ({ signal }) => {
+      const start = performance.now();
+      const [quoteResult, itemsResult, cargoResult] = await Promise.all([
+        scopedDb.from('quotes').select('*').eq('id', quoteId!).maybeSingle().abortSignal(signal as any),
+        scopedDb.from('quote_items', true).select('*').eq('quote_id', quoteId!).order('line_number', { ascending: true }).abortSignal(signal as any),
+        scopedDb.from('quote_cargo_configurations', true).select('*').eq('quote_id', quoteId!).abortSignal(signal as any),
+      ]);
+      
+      if (quoteResult.error) throw quoteResult.error;
+      if (!quoteResult.data) return null;
+
+      const duration = performance.now() - start;
+      if (duration > 1000) {
+        console.warn(`[useQuoteRepository] Slow hydration: ${duration.toFixed(2)}ms`);
+      } else {
+        console.log(`[useQuoteRepository] Hydration took: ${duration.toFixed(2)}ms`);
+      }
+
+      return {
+        quote: quoteResult.data,
+        items: itemsResult.data,
+        cargo: cargoResult.data,
+      };
+    },
+    enabled: !!quoteId,
+    staleTime: 0, // Always fetch fresh data on mount to support cross-module switches
+    refetchOnMount: true,
+  });
+
+  const versionsQuery = useQuery({
+    queryKey: quoteKeys.hydration(quoteId!)?.concat(['versions']),
+    queryFn: async ({ signal }) => {
+      const start = performance.now();
+      const { data, error } = await scopedDb.from('quotation_versions')
             .select(`
                 id, 
                 version_number, 
@@ -349,8 +413,17 @@ export function useQuoteRepositoryForm(opts: {
                         quotation_version_option_leg_charges:quote_charges (
                             id,
                             amount,
+                            rate,
+                            quantity,
                             currency_id,
-                            charge_code:category_id
+                            currency:currencies(code),
+                            charge_code:category_id,
+                            charge_sides(code),
+                            charge_side_id,
+                            basis:charge_bases(code),
+                            unit:charge_bases(code),
+                            description:charge_categories(name),
+                            note
                         )
                     )
                 )
@@ -359,121 +432,189 @@ export function useQuoteRepositoryForm(opts: {
             .order('version_number', { ascending: false })
             .limit(1)
             .maybeSingle()
-      ]);
-      
-      if (quoteResult.error) throw quoteResult.error;
-      if (!quoteResult.data) return null;
+            .abortSignal(signal as any);
 
-      // Critical: If items fail to load, do NOT return empty list, as saving would wipe existing items.
-      if (itemsResult.error) {
-        console.error('[useQuoteRepository] Failed to load quote items:', itemsResult.error);
-        throw new Error(`Failed to load quote items: ${itemsResult.error.message}`);
-      }
+      if (error) throw error;
       
-      if (cargoResult.error) {
-        console.error('[useQuoteRepository] Failed to load cargo configs:', cargoResult.error);
-        throw new Error(`Failed to load cargo configurations: ${cargoResult.error.message}`);
-      }
-
-      if (!versionResult.data) {
-        console.warn(`[useQuoteRepository] No quotation version found for quote ${quoteId}. Financials may be zero.`);
+      const duration = performance.now() - start;
+      if (duration > 1000) {
+        console.warn(`[useQuoteRepository] Slow versions hydration: ${duration.toFixed(2)}ms`);
       } else {
-        const optCount = versionResult.data.quotation_version_options?.length || 0;
-        console.log(`[useQuoteRepository] Loaded version ${versionResult.data.version_number} with ${optCount} options`);
+        console.log(`[useQuoteRepository] Versions hydration took: ${duration.toFixed(2)}ms`);
       }
       
-      return {
-        quote: quoteResult.data,
-        items: itemsResult.data ?? [],
-        cargoConfigs: cargoResult.data ?? [],
-        latestVersion: versionResult.data
-      };
+      return data;
     },
     enabled: !!quoteId,
-    refetchOnWindowFocus: false,
-    staleTime: 0,
+    staleTime: 0, // Always fetch fresh versions
   });
+
+  // Log hydration data for debugging
+  useEffect(() => {
+    if (coreQuery.data) {
+        console.log('[useQuoteRepository] Core Data Loaded:', {
+            quoteId,
+            itemsCount: coreQuery.data.items?.length,
+            cargoCount: coreQuery.data.cargo?.length
+        });
+    }
+  }, [coreQuery.data, quoteId]);
+
+  // Combine loading states
+  // We only block UI for core data. Versions can load in background.
+  const isHydrating = coreQuery.isLoading; 
+
+
 
   // --- Side effect: populate form + inject missing CRM entities ---
 
   useEffect(() => {
-    if (!hydrationQuery.data) return;
-    const { quote, items, cargoConfigs, latestVersion } = hydrationQuery.data;
+    if (!coreQuery.data) return;
 
+    const { quote, items, cargo: cargoConfigs } = coreQuery.data;
+    const latestVersion = versionsQuery.data;
+
+    // Map Options and Legs (Moved up for progressive loading)
+    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
+        // Calculate total from leg charges if option total is missing/zero
+        const legs = opt.quotation_version_option_legs || [];
+        const chargesTotal = legs.reduce((acc: number, leg: any) => {
+            const legCharges = leg.quotation_version_option_leg_charges || [];
+            return acc + legCharges.reduce((sum: number, c: any) => {
+                const side = c.charge_sides?.code?.toLowerCase();
+                if (side === 'sell' || side === 'revenue') {
+                    return sum + (Number(c.amount) || 0);
+                }
+                return sum;
+            }, 0);
+        }, 0);
+        
+        const effectiveTotal = (Number(opt.total_amount) > 0) ? Number(opt.total_amount) : chargesTotal;
+        
+        return {
+            id: opt.id,
+            is_primary: opt.is_selected,
+            total_amount: effectiveTotal,
+            currency: opt.quote_currency?.code || 'USD',
+            transit_time_days: opt.total_transit_days,
+            legs: legs.map((leg: any) => ({
+                id: leg.id,
+                sequence_number: leg.sort_order,
+                transport_mode: leg.mode,
+                carrier_id: leg.provider_id ? String(leg.provider_id) : undefined,
+                origin_location_id: leg.origin_location_id ? String(leg.origin_location_id) : undefined,
+                destination_location_id: leg.destination_location_id ? String(leg.destination_location_id) : undefined,
+                origin_location_name: leg.origin_location,
+                destination_location_name: leg.destination_location,
+                origin: leg.origin_location,
+                destination: leg.destination_location,
+                flight_number: leg.flight_number,
+                voyage_number: leg.voyage_number,
+                departure_date: leg.departure_date,
+                arrival_date: leg.arrival_date,
+                transit_time_days: leg.transit_time_hours ? Math.ceil(leg.transit_time_hours / 24) : undefined,
+                charges: (leg.quotation_version_option_leg_charges || []).map((c: any) => ({
+                    id: c.id,
+                    description: c.description?.name || 'Charge',
+                    amount: Number(c.amount || 0),
+                    currency: c.currency?.code || 'USD',
+                    charge_code: c.charge_code,
+                    basis: c.basis?.code,
+                    unit_price: Number(c.rate || 0),
+                    quantity: Number(c.quantity || 1),
+                    note: c.note
+                }))
+            })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
+        };
+    }) || [];
+
+    // Progressive Loading Logic
+    const isDirty = form.formState.isDirty;
+    const currentOptions = form.getValues('options');
+    const hasOptions = currentOptions && currentOptions.length > 0;
+
+    // Case 1: Progressive Injection (Dirty form, but options just arrived)
+    if (isDirty && !hasOptions && mappedOptions.length > 0) {
+        console.log('[useQuoteRepository] Progressive hydration: Injecting late-arriving options');
+        form.reset({
+            ...form.getValues(),
+            options: mappedOptions
+        }, { keepDirty: true });
+        return;
+    }
+
+    // Case 2: Dirty form check
+    // If we haven't hydrated this quote ID yet, we MUST hydrate even if dirty (e.g. from default values)
+    // If we HAVE hydrated this ID, and it's dirty, AND the data hasn't changed significantly, we skip.
+    // However, if the user explicitly saved or we need to ensure fresh data (like switching modes), we should allow re-hydration.
+    // We'll relax the check: Only skip if it's the SAME quote ID and we've already done an initial hydration.
+    if (isDirty && hydratedQuoteId.current === quote.id) {
+        // Double check if we really should skip. If the form is dirty, we usually don't want to overwrite user work.
+        // But if the "work" was just default values, we should overwrite.
+        // For now, we'll assume that if the user is switching context, the parent component handles the reset (which clears isDirty).
+        // So this check is mainly for background re-fetches.
+        debug.log('[useQuoteRepository] Skipping hydration because form is dirty and already hydrated');
+        return;
+    }
+
+    // Case 3: Full Reset (Clean form)
     if (quote.tenant_id) {
       setResolvedTenantId(String(quote.tenant_id));
     }
 
     debug.log('[useQuoteRepository] Hydrating form with quote data:', {
       id: quote.id,
-      service_type_id: quote.service_type_id,
-      service_id: quote.service_id,
-      origin_port_id: quote.origin_port_id,
-      destination_port_id: quote.destination_port_id,
-      pickup_date: quote.pickup_date,
-      vehicle_type: quote.vehicle_type,
-      special_handling: quote.special_handling,
       version: latestVersion?.version_number
     });
-
-    // Map Options and Legs
-    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
-        // Calculate total from leg charges if option total is missing/zero
-        const legs = opt.quotation_version_option_legs || [];
-        const chargesTotal = legs.reduce((acc: number, leg: any) => {
-            const legCharges = leg.quotation_version_option_leg_charges || [];
-            return acc + legCharges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-        }, 0);
-        
-        const effectiveTotal = (Number(opt.total_amount) > 0) ? Number(opt.total_amount) : chargesTotal;
-
-        if (effectiveTotal > 0 && Number(opt.total_amount) === 0) {
-            console.warn(`[QuoteHydration] Option ${opt.id} has 0 total_amount but ${chargesTotal} in charges. Using calculated total.`);
-        } else {
-            console.log(`[QuoteHydration] Option ${opt.id}: Total=${opt.total_amount}, ChargesTotal=${chargesTotal}, Effective=${effectiveTotal}`);
-        }
-        
-        return {
-            id: opt.id,
-            is_primary: opt.is_selected, // Map is_selected to is_primary
-            total_amount: effectiveTotal,
-            currency: opt.quote_currency?.code || 'USD',
-            transit_time_days: opt.total_transit_days,
-            legs: legs.map((leg: any) => ({
-                id: leg.id,
-                sequence_number: leg.sort_order, // Map sort_order to sequence_number
-                transport_mode: leg.mode, // Map mode to transport_mode
-                carrier_id: leg.provider_id ? String(leg.provider_id) : undefined, // Map provider_id to carrier_id
-                origin_location_name: leg.origin_location, // Store as name since it might be string
-                destination_location_name: leg.destination_location, // Store as name
-                origin: leg.origin_location, // Fallback
-                destination: leg.destination_location, // Fallback
-                flight_number: leg.flight_number,
-                voyage_number: leg.voyage_number,
-                departure_date: leg.departure_date,
-                arrival_date: leg.arrival_date,
-                transit_time_days: leg.transit_time_hours ? Math.ceil(leg.transit_time_hours / 24) : undefined,
-                charges: leg.quotation_version_option_leg_charges || [] // Preserve charges in leg mapping
-            })).sort((a: any, b: any) => a.sequence_number - b.sequence_number) || []
-        };
-    }) || [];
 
     const primaryOption = mappedOptions.find((o: any) => o.is_primary) || mappedOptions[0];
     const initialShippingAmount = primaryOption?.total_amount 
         ? String(primaryOption.total_amount) 
         : (quote.shipping_amount ? String(quote.shipping_amount) : '0');
 
-    // Resolve Service Type ID from Option if missing
+    const normalizeModeKey = (value: string | undefined | null) => {
+      const v = (value || '').toLowerCase();
+      if (!v) return '';
+      if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+      if (v.includes('air')) return 'air';
+      if (v.includes('rail')) return 'rail';
+      if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+      if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+      if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+      return v;
+    };
+
     let resolvedServiceTypeId = quote.service_type_id ? String(quote.service_type_id) : '';
-    if (!resolvedServiceTypeId && primaryOption && primaryOption.legs.length > 0) {
+    if (!resolvedServiceTypeId && primaryOption && primaryOption.legs.length > 0 && serviceTypes && serviceTypes.length > 0) {
         const mainMode = primaryOption.legs.find((l: any) => l.transport_mode === 'ocean' || l.transport_mode === 'air')?.transport_mode || primaryOption.legs[0].transport_mode;
-        if (mainMode && serviceTypes) {
-             const foundType = serviceTypes.find((st: any) => st.name?.toLowerCase().includes(mainMode.toLowerCase()) || st.code?.toLowerCase() === mainMode.toLowerCase());
-             if (foundType) {
-                 resolvedServiceTypeId = String(foundType.id);
-             }
+        const mainKey = normalizeModeKey(mainMode);
+        if (mainKey) {
+          const foundType = serviceTypes.find((st: any) => {
+            const tm = (st as any).transport_modes;
+            const tmKey = normalizeModeKey(tm?.code);
+            if (tmKey && tmKey === mainKey) return true;
+
+            const nameKey = normalizeModeKey(st.name);
+            const codeKey = normalizeModeKey(st.code);
+            if (nameKey && nameKey === mainKey) return true;
+            if (codeKey && codeKey === mainKey) return true;
+
+            const lowerMain = (mainMode || '').toLowerCase();
+            return !!(st.name?.toLowerCase().includes(lowerMain) || st.code?.toLowerCase() === lowerMain);
+          });
+          if (foundType) {
+            resolvedServiceTypeId = String(foundType.id);
+          }
         }
     }
+
+    // Hoist root-level fields from items/cargo for UI consistency
+    const firstItem = items?.[0];
+    const derivedCommodity = firstItem?.description || firstItem?.product_name || '';
+    const derivedHtsCode = firstItem?.attributes?.hs_code || '';
+    const derivedTotalWeight = items?.reduce((sum: number, item: any) => sum + (Number(item.weight_kg) || 0), 0) || 0;
+    const derivedTotalVolume = items?.reduce((sum: number, item: any) => sum + (Number(item.volume_cbm) || 0), 0) || 0;
+    const derivedHazmat = firstItem?.attributes?.hazmat || undefined;
 
     form.reset({
       title: quote.title,
@@ -482,16 +623,25 @@ export function useQuoteRepositoryForm(opts: {
       service_type_id: resolvedServiceTypeId,
       service_id: quote.service_id ? String(quote.service_id) : '',
       incoterms: quote.incoterms || '',
-      trade_direction: (quote.regulatory_data as any)?.trade_direction,
+      shipping_term_id: quote.incoterm_id ? String(quote.incoterm_id) : (quote.shipping_term_id ? String(quote.shipping_term_id) : ''),
+      commodity: derivedCommodity,
+      hts_code: derivedHtsCode,
+      total_weight: String(derivedTotalWeight),
+      total_volume: String(derivedTotalVolume),
+      hazmat_details: derivedHazmat,
+      trade_direction: ['import', 'export'].includes((quote.regulatory_data as any)?.trade_direction) 
+        ? (quote.regulatory_data as any)?.trade_direction 
+        : undefined,
+      currency_id: quote.currency_id ? String(quote.currency_id) : '',
       carrier_id: quote.carrier_id ? String(quote.carrier_id) : '',
       origin_port_id: quote.origin_port_id ? String(quote.origin_port_id) : '',
       destination_port_id: quote.destination_port_id ? String(quote.destination_port_id) : '',
       account_id: quote.account_id ? String(quote.account_id) : '',
       contact_id: quote.contact_id ? String(quote.contact_id) : '',
       opportunity_id: quote.opportunity_id ? String(quote.opportunity_id) : '',
-      valid_until: quote.valid_until || '',
-      pickup_date: quote.pickup_date || '',
-      delivery_deadline: quote.delivery_deadline || '',
+      valid_until: quote.valid_until ? new Date(quote.valid_until).toISOString().split('T')[0] : '',
+      pickup_date: (quote.ready_date || quote.pickup_date) ? new Date(quote.ready_date || quote.pickup_date).toISOString().split('T')[0] : '',
+      delivery_deadline: quote.delivery_deadline ? new Date(quote.delivery_deadline).toISOString().split('T')[0] : '',
       vehicle_type: quote.vehicle_type || '',
       special_handling: Array.isArray(quote.special_handling) ? quote.special_handling.join(', ') : (quote.special_handling || ''),
       tax_percent: quote.tax_percent ? String(quote.tax_percent) : '0',
@@ -517,12 +667,11 @@ export function useQuoteRepositoryForm(opts: {
                 length: item.attributes?.length || 0,
                 width: item.attributes?.width || 0,
                 height: item.attributes?.height || 0,
-                hs_code: item.hs_code || '',
-                stackable: item.stackable || false,
-                hazmat: item.hazmat_details || undefined,
+                hs_code: item.attributes?.hs_code || '',
+                stackable: item.attributes?.stackable || false,
+                hazmat: item.attributes?.hazmat || undefined,
             }
-          }))
-        : [],
+          })) : [],
       cargo_configurations: cargoConfigs
         ? cargoConfigs.map((c: any) => ({
             id: c.id,
@@ -638,7 +787,8 @@ export function useQuoteRepositoryForm(opts: {
     injectMissingEntities().catch((err) => {
       console.error('[QuoteRepository] Error injecting CRM entities:', err);
     });
-  }, [hydrationQuery.data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coreQuery.data, versionsQuery.data]);
 
   // --- Save mutation ---
 
@@ -663,24 +813,35 @@ export function useQuoteRepositoryForm(opts: {
         }
       }
 
+      const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      const uuidOrNull = (v: any) => (isUuid(v) ? v : null);
+      const uuidOrUndefined = (v: any) => (isUuid(v) ? v : undefined);
+      const sanitizeQuoteIds = {
+        service_type_id: uuidOrNull(data.service_type_id),
+        service_id: uuidOrNull(data.service_id),
+        incoterms: data.incoterms || null,
+        shipping_term_id: uuidOrNull(data.shipping_term_id),
+        incoterm_id: uuidOrNull(data.shipping_term_id),
+        currency_id: uuidOrNull(data.currency_id),
+        carrier_id: uuidOrNull(data.carrier_id),
+        consignee_id: uuidOrNull(data.consignee_id),
+        origin_port_id: uuidOrNull(data.origin_port_id),
+        destination_port_id: uuidOrNull(data.destination_port_id),
+        account_id: uuidOrNull(accountId || null),
+        contact_id: uuidOrNull(contactId || null),
+        opportunity_id: uuidOrNull(opportunityId || null),
+      };
+ 
       // Prepare payload for RPC
       const payload: any = {
         quote: {
             id: saveQuoteId || undefined,
             title: data.title,
             description: data.description || null,
-            service_type_id: data.service_type_id || null,
-            service_id: data.service_id || null,
-            incoterms: data.incoterms || null,
-            carrier_id: data.carrier_id || null,
-            consignee_id: data.consignee_id || null,
-            origin_port_id: data.origin_port_id || null,
-            destination_port_id: data.destination_port_id || null,
-            account_id: accountId || null,
-            contact_id: contactId || null,
-            opportunity_id: opportunityId || null,
+            ...sanitizeQuoteIds,
             status: data.status || 'draft',
             valid_until: data.valid_until || null,
+            ready_date: data.pickup_date || null,
             pickup_date: data.pickup_date || null,
             delivery_deadline: data.delivery_deadline || null,
             vehicle_type: data.vehicle_type || null,
@@ -729,8 +890,8 @@ export function useQuoteRepositoryForm(opts: {
             cargo_type: config.cargo_type,
             container_type: config.container_type || null,
             container_size: config.container_size || null,
-            container_type_id: config.container_type_id || null,
-            container_size_id: config.container_size_id || null,
+            container_type_id: uuidOrNull(config.container_type_id),
+            container_size_id: uuidOrNull(config.container_size_id),
             quantity: config.quantity,
             unit_weight_kg: config.unit_weight_kg || null,
             unit_volume_cbm: config.unit_volume_cbm || null,
@@ -749,11 +910,11 @@ export function useQuoteRepositoryForm(opts: {
             remarks: config.remarks || null,
         })) || [],
         options: data.options?.map((option) => ({
-            id: option.id,
+            id: uuidOrUndefined(option.id),
             is_selected: option.is_primary,
             legs: option.legs?.map((leg: any) => ({
-                id: leg.id,
-                carrier_id: leg.carrier_id,
+                id: uuidOrUndefined(leg.id),
+                carrier_id: uuidOrNull(leg.carrier_id),
                 transport_mode: leg.transport_mode,
                 origin_location_name: leg.origin_location_name,
                 destination_location_name: leg.destination_location_name,
@@ -785,8 +946,9 @@ export function useQuoteRepositoryForm(opts: {
   });
 
   return {
-    isHydrating: hydrationQuery.isLoading,
+    isHydrating,
     saveQuote: saveMutation.mutateAsync,
     isSaving: saveMutation.isPending,
   };
+
 }

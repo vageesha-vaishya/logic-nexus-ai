@@ -249,17 +249,74 @@ export default function Quotes() {
       toast.success(`Successfully deleted ${quoteIds.length} quote(s)`);
       fetchQuotes();
     } catch (err: any) {
+        // Fallback: perform scoped cascading deletes if RPC is unavailable or blocked
+        try {
+          debug.warn('RPC delete failed, attempting client-side cascade', { error: err?.message });
+          // 1) Unlink opportunities
+          await scopedDb
+            .from('opportunities')
+            .update({ primary_quote_id: null })
+            .in('primary_quote_id', quoteIds);
+          
+          // 2) Resolve versions and options
+          const { data: versions = [] } = await scopedDb
+            .from('quotation_versions')
+            .select('id')
+            .in('quote_id', quoteIds);
+          const versionIds = (versions as any[]).map(v => String(v.id));
+          
+          let optionIds: string[] = [];
+          if (versionIds.length) {
+            const { data: options = [] } = await scopedDb
+              .from('quotation_version_options')
+              .select('id')
+              .in('quotation_version_id', versionIds);
+            const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+            optionIds = (options as any[]).map(o => String(o.id)).filter(isUUID);
+          }
+          
+          // 3) Delete charges
+          if (optionIds.length) {
+            await scopedDb.from('quote_charges').delete().in('quote_option_id', optionIds);
+          }
+          // 4) Delete legs
+          if (optionIds.length) {
+            await scopedDb.from('quotation_version_option_legs').delete().in('quotation_version_option_id', optionIds);
+            await scopedDb.from('quote_legs').delete().in('quote_option_id', optionIds);
+          }
+          // 5) Delete options and versions
+          if (optionIds.length) {
+            await scopedDb.from('quotation_version_options').delete().in('id', optionIds);
+          }
+          if (versionIds.length) {
+            await scopedDb.from('quotation_versions').delete().in('id', versionIds);
+          }
+          // 6) Delete quotes
+          const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+          const validQuoteIds = quoteIds.filter(isUUID);
+          if (validQuoteIds.length) {
+            await scopedDb.from('quotes').delete().in('id', validQuoteIds);
+          }
+
+          const duration = performance.now() - startTime;
+          debug.info('Client-side cascade delete successful', { count: quoteIds.length, quoteIds, duration: `${duration.toFixed(2)}ms` });
+          toast.success(`Successfully deleted ${quoteIds.length} quote(s)`);
+          fetchQuotes();
+          return;
+        } catch (fallbackErr: any) {
+          const duration = performance.now() - startTime;
+          logger.error('Delete failed', {
+              error: fallbackErr.message,
+              stack: fallbackErr.stack,
+              component: 'QuotesList',
+              action: 'deleteQuotes',
+              quoteIds,
+              duration: `${duration.toFixed(2)}ms`
+          });
+          debug.error('Delete failed (RPC and fallback):', { error: fallbackErr, duration: `${duration.toFixed(2)}ms` });
+          toast.error('Failed to delete quotes', { description: fallbackErr.message || err?.message });
+        }
         const duration = performance.now() - startTime;
-        logger.error('Delete failed', {
-            error: err.message,
-            stack: err.stack,
-            component: 'QuotesList',
-            action: 'deleteQuotes',
-            quoteIds,
-            duration: `${duration.toFixed(2)}ms`
-        });
-        debug.error('Delete failed:', { error: err, duration: `${duration.toFixed(2)}ms` });
-        toast.error('Failed to delete quotes', { description: err.message });
         setLoading(false);
     }
   };

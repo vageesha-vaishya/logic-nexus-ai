@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Plus, Trash2 } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { useDebug } from '@/hooks/useDebug';
+import { useTransportModes } from '@/hooks/useTransportModes';
 
 type Charge = {
   type: string;
@@ -38,6 +39,7 @@ export function CarrierQuotesSection({
   onReload?: () => void | Promise<void>;
 }) {
   const debug = useDebug('Sales', 'CarrierQuotesSection');
+  const { modes, loading: modesLoading } = useTransportModes();
   // Collapsible on mobile, open by default on md+; persist to localStorage
   const [accordionOpen, setAccordionOpen] = useState<boolean>(true);
   useEffect(() => {
@@ -165,12 +167,17 @@ export function CarrierQuotesSection({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="ocean">Ocean Freight</SelectItem>
-                      <SelectItem value="air">Air Freight</SelectItem>
-                      <SelectItem value="trucking">Trucking</SelectItem>
-                      <SelectItem value="courier">Courier</SelectItem>
-                      <SelectItem value="moving">Moving & Packing</SelectItem>
-                      <SelectItem value="railway_transport">Railways</SelectItem>
+                      {modesLoading ? (
+                        <SelectItem value="__loading" disabled>Loading...</SelectItem>
+                      ) : modes.length === 0 ? (
+                        <SelectItem value="__empty" disabled>No modes available</SelectItem>
+                      ) : (
+                        modes.map(m => (
+                          <SelectItem key={m.id} value={m.code}>
+                            {m.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

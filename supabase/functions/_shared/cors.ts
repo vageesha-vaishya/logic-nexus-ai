@@ -31,7 +31,7 @@ function getAllowedOrigin(req: Request): string {
 export function getCorsHeaders(req: Request): Record<string, string> {
   const allowedOrigin = getAllowedOrigin(req);
   return {
-    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Origin': allowedOrigin || '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Vary': 'Origin',

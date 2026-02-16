@@ -82,9 +82,25 @@ function LocationAutocomplete({
                         }}
                         className="cursor-pointer"
                     >
-                        <div className="flex flex-col">
-                            <span className="font-medium">{suggestion.label}</span>
-                            <span className="text-xs text-muted-foreground">{suggestion.details}</span>
+                        <div className="flex flex-col w-full">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{suggestion.label}</span>
+                              {suggestion?.details?.code && (
+                                <span className="text-[10px] px-1 py-0 h-5 bg-muted rounded">
+                                  {suggestion.details.code}
+                                </span>
+                              )}
+                              {suggestion?.details?.id && (
+                                <span className="text-[10px] px-1 py-0 h-5 border rounded">
+                                  ID verified
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {typeof suggestion.details === 'string' 
+                                ? suggestion.details 
+                                : [suggestion?.details?.city, suggestion?.details?.country].filter(Boolean).join(', ')}
+                            </span>
                         </div>
                     </CommandItem>
                 ))}
@@ -98,16 +114,37 @@ function LocationAutocomplete({
 export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { state, dispatch } = useQuoteStore();
   const { legs, validationErrors, referenceData } = state;
-  const { serviceTypes = [], carriers = [] } = referenceData || {};
+  const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};
   const { scopedDb } = useCRM();
 
+  const normalizeModeKey = (value: string) => {
+    const v = (value || '').toLowerCase();
+    if (!v) return '';
+    if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+    if (v.includes('air')) return 'air';
+    if (v.includes('rail')) return 'rail';
+    if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+    if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+    if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+    return v;
+  };
+
   const onAddLeg = (mode: string) => {
+    const targetKey = normalizeModeKey(mode);
+    const defaultServiceType = serviceTypes.find(st => {
+      if (!st) return false;
+      const transportMode = (st as any).transport_modes;
+      const codeKey = normalizeModeKey(transportMode?.code || (st as any).mode || '');
+      if (!codeKey) return false;
+      return codeKey === targetKey;
+    });
+
     const newLeg: Leg = {
       id: crypto.randomUUID(),
       mode,
-      serviceTypeId: '',
-      origin: '',
-      destination: '',
+      serviceTypeId: defaultServiceType?.id || '',
+      origin: legs.length === 0 ? state.quoteData.origin : '', // Default to Quote Origin for first leg
+      destination: legs.length === 0 ? state.quoteData.destination : '', // Default to Quote Dest for first leg
       charges: [],
       legType: 'transport'
     };
@@ -282,20 +319,27 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                               <SelectValue placeholder="Select carrier" />
                             </SelectTrigger>
                             <SelectContent>
-                              {carriers
-                                .filter(c => {
-                                  // Map leg mode to carrier type
-                                  const modeMap: Record<string, string> = {
-                                    'ocean': 'ocean',
-                                    'air': 'air_cargo',
-                                    'road': 'trucking',
-                                    'rail': 'rail'
-                                  };
-                                  // If mode matches mapped type, or if no specific mode mapping (fallback)
-                                  const targetType = modeMap[leg.mode] || leg.mode;
-                                  return c.carrier_type === targetType;
-                                })
-                                .map((carrier) => (
+                            {carriers
+                              .filter(c => {
+                                // Map leg mode to carrier type with robust fallback
+                                const modeMap: Record<string, string> = {
+                                  'ocean': 'ocean',
+                                  'sea': 'ocean',
+                                  'air': 'air_cargo',
+                                  'air_cargo': 'air_cargo',
+                                  'road': 'trucking',
+                                  'truck': 'trucking',
+                                  'rail': 'rail',
+                                  'train': 'rail'
+                                };
+                                const legMode = (leg.mode || '').toLowerCase();
+                                const targetType = modeMap[legMode] || legMode;
+                                const carrierType = (c.carrier_type || '').toLowerCase();
+                                
+                                // Direct match or mapped match
+                                return carrierType === targetType || carrierType === legMode;
+                              })
+                              .map((carrier) => (
                                   <SelectItem key={carrier.id} value={carrier.id}>
                                     {carrier.carrier_name}
                                   </SelectItem>
@@ -319,9 +363,16 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                                   if (!st.is_active) return false;
                                   const transportMode = (st as any).transport_modes;
                                   const currentMode = (leg.mode || '').toLowerCase();
+                                  
+                                  // Robust check for transport mode match
                                   if (transportMode?.code) {
-                                    return transportMode.code.toLowerCase() === currentMode;
+                                    const tmCode = transportMode.code.toLowerCase();
+                                    return tmCode === currentMode || 
+                                           (currentMode === 'ocean' && (tmCode === 'sea' || tmCode === 'maritime')) ||
+                                           (currentMode === 'air' && tmCode === 'air_cargo');
                                   }
+                                  
+                                  // Fallback to mode_id check if available
                                   return st.mode_id === leg.mode;
                                 })
                                 .map((st) => (

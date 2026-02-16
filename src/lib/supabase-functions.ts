@@ -1,4 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
+import { EmitEventSchema } from '@/lib/schemas/events';
+import { validateAvro } from '@/lib/avro/validate';
+import { schemaForEvent } from '@/lib/schemas/avro/events';
+import { ensureSchemaId } from '@/lib/avro/registry';
 
 /**
  * Invokes a Supabase Edge Function anonymously (using the ANON/Public key).
@@ -26,6 +30,13 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
 
     console.log(`[invokeAnonymous] Calling ${functionName} at ${functionUrl}`);
 
+    const key = `cb:${functionName}`;
+    const now = Date.now();
+    const cb = CIRCUIT.get(key) || { state: 'closed', failures: 0, nextTryAt: 0 };
+    if (cb.state === 'open' && now < cb.nextTryAt) {
+      throw new Error(`Circuit open for ${functionName}`);
+    }
+
     try {
         const response = await fetch(functionUrl, {
             method: 'POST',
@@ -33,7 +44,7 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${supabaseAnonKey}`
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify(enrichPayload(body))
         });
 
         if (!response.ok) {
@@ -44,12 +55,26 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
                 errorMsg = json.error || json.message || text;
             } catch {}
             console.error(`[invokeAnonymous] Failed: ${errorMsg}`);
+            updateCircuit(key, false);
             throw new Error(errorMsg);
         }
 
-        return response.json();
+        updateCircuit(key, true);
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return response.json();
+    }
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    return { content: base64, contentType } as any;
     } catch (error: any) {
         console.error(`[invokeAnonymous] Fetch error:`, error);
+        updateCircuit(key, false);
         // If we failed with relative URL in dev, maybe try absolute as fallback? 
         // Or just return clearer error.
         if (error.message === 'Failed to fetch' && import.meta.env.DEV) {
@@ -80,12 +105,18 @@ export async function invokeFunction<T = any>(
   options: InvokeOptions = {}
 ): Promise<{ data: T | null; error: any }> {
   try {
+    const key = `cb:${functionName}`;
+    const now = Date.now();
+    const cb = CIRCUIT.get(key) || { state: 'closed', failures: 0, nextTryAt: 0 };
+    if (cb.state === 'open' && now < cb.nextTryAt) {
+      return { data: null, error: new Error(`Circuit open for ${functionName}`) };
+    }
     // Use the official client's invoke method which handles auth headers and token refresh automatically
      // We filter out Authorization header to ensure we rely on the client's auth handling
      const { Authorization, authorization, ...customHeaders } = options.headers || {};
      
      let { data, error } = await supabase.functions.invoke(functionName, {
-       body: options.body,
+       body: enrichPayload(options.body),
        headers: customHeaders,
        method: options.method || 'POST',
      });
@@ -159,7 +190,7 @@ export async function invokeFunction<T = any>(
            const { Authorization, authorization, ...baseHeaders } = options.headers || {};
            
            const result = await supabase.functions.invoke(functionName, {
-            body: options.body,
+           body: enrichPayload(options.body),
             headers: {
               ...baseHeaders,
               Authorization: `Bearer ${refreshData.session.access_token}`
@@ -203,7 +234,7 @@ export async function invokeFunction<T = any>(
                                'Authorization': `Bearer ${anonKey}`,
                                ...baseHeaders
                            },
-                           body: options.body ? JSON.stringify(options.body) : undefined
+                           body: options.body ? JSON.stringify(enrichPayload(options.body)) : undefined
                        });
 
                        if (!response.ok) {
@@ -228,6 +259,7 @@ export async function invokeFunction<T = any>(
 
         // If we have a successful retry (or a different error), return it
         if (!retryError) {
+            updateCircuit(key, true);
             return { data: retryData, error: null };
         }
         
@@ -261,12 +293,93 @@ export async function invokeFunction<T = any>(
             console.warn('[Supabase Function] Failed to parse error response body:', e);
          }
       }
+      updateCircuit(key, false);
       return { data: null, error };
     }
 
+    updateCircuit(key, true);
     return { data, error: null };
   } catch (err: any) {
     console.error(`[Supabase Function] Unexpected error invoking ${functionName}:`, err);
     return { data: null, error: err };
   }
+}
+
+const CIRCUIT: Map<string, { state: 'closed' | 'open' | 'half', failures: number, nextTryAt: number }> = new Map();
+function updateCircuit(key: string, success: boolean) {
+  const e = CIRCUIT.get(key) || { state: 'closed', failures: 0, nextTryAt: 0 };
+  if (success) {
+    e.failures = 0;
+    e.state = 'closed';
+    e.nextTryAt = 0;
+  } else {
+    e.failures += 1;
+    const threshold = 3;
+    if (e.failures >= threshold) {
+      e.state = 'open';
+      const cooldownMs = Math.min(30000, 1000 * Math.pow(2, e.failures - threshold));
+      e.nextTryAt = Date.now() + cooldownMs;
+    }
+  }
+  CIRCUIT.set(key, e);
+}
+
+export function enrichPayload(body: any) {
+  const traceId = body?.trace_id || cryptoRandomId();
+  const idemKey = body?.idempotency_key || computeIdempotencyKey(body);
+  return { ...body, trace_id: traceId, idempotency_key: idemKey };
+}
+
+function cryptoRandomId() {
+  const arr = new Uint8Array(16);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(arr);
+  } else {
+    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function computeIdempotencyKey(body: any) {
+  try {
+    const str = JSON.stringify(body || {});
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return `idem_${Math.abs(hash)}`;
+  } catch {
+    return `idem_${Date.now()}`;
+  }
+}
+
+export async function emitEvent(eventName: string, payload: any) {
+  const enriched = enrichPayload(payload || {});
+  const z = EmitEventSchema.safeParse({ eventName, payload: enriched });
+  if (!z.success) {
+    return { ok: false, error: new Error('zod validation failed') };
+  }
+  const avro = schemaForEvent(eventName);
+  if (avro) {
+    const v = validateAvro(avro as any, enriched);
+    if (!v.ok) {
+      return { ok: false, error: new Error(`avro validation failed: ${v.error}`) };
+    }
+    const id = await ensureSchemaId(eventName, avro as any).catch(() => null);
+    if (id != null) {
+      enriched.schema_id = id;
+    }
+  }
+  const { data, error } = await invokeFunction('emit-event', {
+    body: {
+      eventName,
+      payload: enriched
+    }
+  });
+  if (error) {
+    console.warn('[emitEvent] Failed', error);
+    return { ok: false, error };
+  }
+  return { ok: true, data };
 }

@@ -7,8 +7,10 @@ import { SupabaseClient } from '@supabase/supabase-js';
 interface MasterData {
     serviceTypes: { id: string; name: string; code: string }[];
     carriers: { id: string; carrier_name: string; scac?: string }[];
+    ports?: { id: string; location_name: string; location_code?: string; country?: string }[];
     containerTypes?: { id: string; name: string; code: string }[];
     containerSizes?: { id: string; name: string; code: string }[];
+    shippingTerms?: { id: string; code: string; name: string }[];
 }
 
 interface RetryOptions {
@@ -117,10 +119,35 @@ export class QuoteTransformService {
         const tradeDirection = data.trade_direction || 'export';
         const serviceTypeId = this.resolveServiceTypeId(data.mode, data.service_type_id, masterData.serviceTypes);
         const carrierId = this.resolveCarrierId(primaryRate, masterData.carriers);
+        const originPortId = this.resolvePortId(
+            data.origin, 
+            masterData.ports, 
+            data.originDetails?.code, 
+            data.originDetails?.id
+        );
+        const destinationPortId = this.resolvePortId(
+            data.destination, 
+            masterData.ports, 
+            data.destinationDetails?.code, 
+            data.destinationDetails?.id
+        );
         
+        // Resolve Shipping Term ID (Incoterms)
+        // The form expects an ID for the Select component, but falls back to code if needed
+        let shippingTermId = undefined;
+        const incotermCode = data.incoterms || (tradeDirection === 'export' ? 'CIF' : 'FOB');
+        if (masterData.shippingTerms) {
+             const term = masterData.shippingTerms.find(t => t.code === incotermCode);
+             if (term) shippingTermId = term.id;
+        }
+
         // Pass normalized rates to helpers
         const items = this.generateQuoteItems(data, primaryRate, masterData);
         const notes = this.generateStructuredNotes({ ...data, selectedRates: rates });
+        
+        // Map selected rates to form options
+        const options = this.mapToQuoteOptions(rates, masterData, data);
+        const fallbackCarrierId = (options?.[0]?.legs?.[0]?.carrier_id) as string | undefined;
 
         return {
             title: `Quote for ${data.commodity || 'General Cargo'} (${data.origin} -> ${data.destination})`,
@@ -130,54 +157,192 @@ export class QuoteTransformService {
             
             // Context
             account_id: data.accountId,
+            contact_id: data.contactId, // Map Contact ID if present
             trade_direction: tradeDirection,
             
             // Logistics
-            origin_port_id: data.originId || data.originDetails?.id,
-            destination_port_id: data.destinationId || data.destinationDetails?.id,
+            origin_port_id: originPortId,
+            destination_port_id: destinationPortId,
             service_type_id: serviceTypeId,
-            carrier_id: carrierId,
+            carrier_id: carrierId || fallbackCarrierId,
             
             // Dates & Requirements
             valid_until: primaryRate?.validUntil ? new Date(primaryRate.validUntil).toISOString().split('T')[0] : undefined,
-            pickup_date: data.pickupDate,
-            delivery_deadline: data.deliveryDeadline,
+            pickup_date: data.pickupDate ? new Date(data.pickupDate).toISOString().split('T')[0] : undefined,
+            delivery_deadline: data.deliveryDeadline ? new Date(data.deliveryDeadline).toISOString().split('T')[0] : undefined,
             vehicle_type: data.vehicleType,
             special_handling: data.specialHandling,
             
             // Commercial
-            incoterms: data.incoterms || (tradeDirection === 'export' ? 'CIF' : 'FOB'),
+            // We pass the ID if resolved, otherwise the code. The form should handle the ID.
+            incoterms: shippingTermId || incotermCode,
             shipping_amount: primaryRate?.price?.toString(),
             
             // Content
-            items: items,
-            notes: notes,
+                items: items,
+                notes: notes,
+                description: notes, // Map to description for QuoteHeader
+                options: options,
             
             // Deprecated but required by types until fully removed
             cargo_configurations: [] 
         };
     }
 
-    private static resolveServiceTypeId(mode: string, explicitId: string | undefined, serviceTypes: MasterData['serviceTypes']): string | undefined {
-        if (explicitId) return explicitId;
+    private static mapToQuoteOptions(rates: RateOption[], masterData: MasterData, transferData: QuoteTransferData): any[] {
+        return rates.map((rate, index) => {
+            const isPrimary = index === 0;
+            const carrierId = this.resolveCarrierId(rate, masterData.carriers);
+            
+            // Parse transit time days from string (e.g. "25 Days" -> 25)
+            let transitDays = 0;
+            if (rate.transitTime) {
+                const match = rate.transitTime.match(/(\d+)/);
+                if (match) transitDays = parseInt(match[1], 10);
+            }
 
-        const modeMap: Record<string, string> = {
-            'ocean': 'Sea', 'sea': 'Sea',
-            'air': 'Air',
-            'road': 'Road', 'truck': 'Road',
-            'rail': 'Rail'
-        };
+            // Map Charges if present (flattened structure often used in Quick Quote)
+            // If rate has specific charges array, use it. Otherwise, create a single 'Freight' charge.
+            const charges = rate.charges?.map(c => {
+                // Map common codes to standard DB codes
+                let code = c.code || 'freight';
+                if (code === 'FRT') code = 'freight';
+                
+                return {
+                    description: c.description || 'Freight',
+                    amount: Number(c.amount) || 0,
+                    currency: c.currency || rate.currency || 'USD',
+                    charge_code: code,
+                    charge_type: 'freight', // logical type
+                    basis: 'flat', // Default
+                    unit_price: Number(c.amount) || 0,
+                    quantity: 1
+                };
+            }) || [{
+                description: 'Base Freight',
+                amount: Number(rate.price ?? rate.total_amount ?? 0),
+                currency: rate.currency || 'USD',
+                charge_code: 'freight',
+                charge_type: 'freight',
+                basis: 'flat',
+                unit_price: Number(rate.price ?? rate.total_amount ?? 0),
+                quantity: 1
+            }];
 
-        const targetMode = modeMap[mode?.toLowerCase()] || mode;
-        if (!targetMode || !serviceTypes.length) return undefined;
+            // Create a default leg if none exist
+            const legs = rate.legs?.length ? rate.legs.map((leg, i) => ({
+                id: leg.id,
+                sequence_number: i + 1,
+                transport_mode: (leg.mode || transferData.mode || 'ocean').toLowerCase(),
+                carrier_id: leg.carrier ? this.resolveCarrierId({ carrier_name: leg.carrier } as any, masterData.carriers) : carrierId,
+                origin_location_name: leg.origin 
+                    || (i === 0 ? (transferData.originDetails?.name || transferData.origin) : undefined),
+                destination_location_name: leg.destination 
+                    || (i === (rate.legs?.length || 0) - 1 ? (transferData.destinationDetails?.name || transferData.destination) : undefined),
+                origin_location_id: this.resolvePortId(
+                    leg.origin, 
+                    masterData.ports, 
+                    i === 0 ? transferData.originDetails?.code : undefined, 
+                    i === 0 ? transferData.originDetails?.id : undefined
+                ),
+                destination_location_id: this.resolvePortId(
+                    leg.destination, 
+                    masterData.ports, 
+                    i === (rate.legs?.length || 0) - 1 ? transferData.destinationDetails?.code : undefined, 
+                    i === (rate.legs?.length || 0) - 1 ? transferData.destinationDetails?.id : undefined
+                ),
+                transit_time: leg.transit_time,
+                charges: [] // Legs might have their own charges, but usually we attach to the option or the first leg
+            })) : [{
+                sequence_number: 1,
+                transport_mode: (transferData.mode || 'ocean').toLowerCase(),
+                carrier_id: carrierId,
+                origin_location_name: transferData.originDetails?.name || transferData.origin,
+                destination_location_name: transferData.destinationDetails?.name || transferData.destination,
+                origin_location_id: this.resolvePortId(
+                    transferData.origin, 
+                    masterData.ports, 
+                    transferData.originDetails?.code, 
+                    transferData.originDetails?.id
+                ),
+                destination_location_id: this.resolvePortId(
+                    transferData.destination, 
+                    masterData.ports, 
+                    transferData.destinationDetails?.code, 
+                    transferData.destinationDetails?.id
+                ),
+                transit_time: rate.transitTime,
+                transit_time_days: transitDays,
+                charges: charges // Attach charges to the single leg
+            }];
+            
+            // If multiple legs, attach charges to the first leg for now (simplification)
+            if (rate.legs?.length && legs.length > 0 && charges.length > 0) {
+                 legs[0].charges = charges;
+            }
 
-        return serviceTypes.find(
-            st => st.name.toLowerCase().includes(targetMode.toLowerCase()) || 
-                  st.code.toLowerCase() === targetMode.toLowerCase()
-        )?.id;
+            return {
+                id: rate.id, // Preserve ID if possible, though new quote might generate new IDs
+                is_primary: isPrimary,
+                total_amount: rate.price ?? rate.total_amount ?? 0,
+                currency: rate.currency || 'USD',
+                transit_time_days: transitDays,
+                legs: legs
+            };
+        });
     }
 
-    private static resolveCarrierId(rate: RateOption | undefined, carriers: MasterData['carriers']): string | undefined {
+    public static resolveServiceTypeId(mode: string, explicitId: string | undefined, serviceTypes: MasterData['serviceTypes']): string | undefined {
+        if (explicitId) return explicitId;
+        if (!serviceTypes?.length) return undefined;
+
+        const normalizeModeKey = (value: string | undefined | null) => {
+            const v = (value || '').toLowerCase();
+            if (!v) return '';
+            if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+            if (v.includes('air')) return 'air';
+            if (v.includes('rail')) return 'rail';
+            if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+            if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+            if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+            return v;
+        };
+
+        const targetKey = normalizeModeKey(mode);
+        if (!targetKey) return undefined;
+
+        for (const st of serviceTypes) {
+            const tm = (st as any).transport_modes;
+            const codeKey = normalizeModeKey(tm?.code);
+            if (codeKey && codeKey === targetKey) {
+                return st.id;
+            }
+        }
+
+        const modeMap: Record<string, string[]> = {
+            'ocean': ['Sea', 'Ocean'], 
+            'sea': ['Sea', 'Ocean'],
+            'air': ['Air'],
+            'road': ['Road', 'Truck'], 
+            'truck': ['Road', 'Truck'],
+            'rail': ['Rail']
+        };
+
+        const targetModes = modeMap[mode?.toLowerCase()] || [mode];
+        if (!targetModes.length) return undefined;
+
+        for (const targetMode of targetModes) {
+            const match = serviceTypes.find(
+                st => st.name.toLowerCase().includes(targetMode.toLowerCase()) || 
+                      st.code.toLowerCase() === targetMode.toLowerCase()
+            );
+            if (match) return match.id;
+        }
+        
+        return undefined;
+    }
+
+    public static resolveCarrierId(rate: RateOption | undefined, carriers: MasterData['carriers']): string | undefined {
         if (!rate || !carriers.length) return undefined;
 
         // Priority 1: Direct ID
@@ -207,6 +372,55 @@ export class QuoteTransformService {
         }
 
         return match?.id;
+    }
+
+    public static resolvePortId(
+        name: string | undefined, 
+        ports: MasterData['ports'], 
+        code?: string, 
+        id?: string
+    ): string | undefined {
+        if (!ports?.length) return undefined;
+        
+        // 0. Direct ID match against master ports
+        if (id) {
+            const byId = ports.find(p => String(p.id) === String(id));
+            if (byId) return byId.id;
+        }
+        
+        // 1. Code match
+        if (code) {
+            const codeLower = code.trim().toLowerCase();
+            const byCode = ports.find(p => (p.location_code || '').toLowerCase() === codeLower);
+            if (byCode) return byCode.id;
+        }
+        
+        // 2. Name-based matching
+        if (name) {
+            const searchName = name.trim().toLowerCase();
+            
+            // Exact name
+            let match = ports.find(p => (p.location_name || '').toLowerCase() === searchName);
+            
+            // Code equals name (user typed code into name field)
+            if (!match) {
+                match = ports.find(p => (p.location_code || '').toLowerCase() === searchName);
+            }
+            
+            // Contains forward
+            if (!match) {
+                match = ports.find(p => (p.location_name || '').toLowerCase().includes(searchName));
+            }
+            
+            // Contains reverse
+            if (!match) {
+                match = ports.find(p => searchName.includes((p.location_name || '').toLowerCase()));
+            }
+            
+            if (match) return match.id;
+        }
+        
+        return undefined;
     }
 
     private static generateQuoteItems(data: QuoteTransferData, primaryRate: RateOption | undefined, masterData?: MasterData): QuoteItem[] {
@@ -259,12 +473,12 @@ export class QuoteTransformService {
                 const productName = [
                     containerTypeName,
                     data.commodity || 'General Cargo'
-                ].filter(Boolean).join(' - ');
+                ].filter(Boolean).join(' - ') || 'General Cargo';
 
                 return {
                     type: 'container',
-                    container_type_id: resolvedContainerTypeId,
-                    container_size_id: resolvedContainerSizeId,
+                    container_type_id: resolvedContainerTypeId || undefined, // Ensure undefined if null/empty string
+                    container_size_id: resolvedContainerSizeId || undefined,
                     quantity: Number(c.qty) || 1,
                     product_name: productName,
                     unit_price: 0, // Calculated below
@@ -324,7 +538,21 @@ export class QuoteTransformService {
         const parts: string[] = [];
         parts.push(`**Quick Quote Conversion**`);
         parts.push(`- **Origin**: ${data.origin}`);
+        if (data.originDetails && typeof data.originDetails === 'object') {
+             // Extract address details if available
+             const d = data.originDetails;
+             const address = [d.address, d.city, d.state, d.country, d.zipCode].filter(Boolean).join(', ');
+             if (address) parts.push(`  *Address*: ${address}`);
+        }
+
         parts.push(`- **Destination**: ${data.destination}`);
+        if (data.destinationDetails && typeof data.destinationDetails === 'object') {
+             // Extract address details if available
+             const d = data.destinationDetails;
+             const address = [d.address, d.city, d.state, d.country, d.zipCode].filter(Boolean).join(', ');
+             if (address) parts.push(`  *Address*: ${address}`);
+        }
+
         parts.push(`- **Mode**: ${data.mode}`);
         
         // Note: We no longer dump pickupDate/deliveryDeadline etc. here as they are mapped to fields.

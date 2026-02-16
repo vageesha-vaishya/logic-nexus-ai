@@ -122,7 +122,7 @@ export default function Services() {
     try {
       // Platform admins can view all services across tenants; others are tenant-scoped
       // scopedDb handles tenant scoping automatically for non-platform users
-      let query = scopedDb
+      const query = scopedDb
         .from('services')
         .select('id, tenant_id, service_name, service_type, service_type_id, service_code, description, pricing_unit, base_price, transit_time_days, is_active')
         .order('service_name');

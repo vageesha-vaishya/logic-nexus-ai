@@ -1,7 +1,19 @@
-import * as LucideIcons from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useTransportModes } from '@/hooks/useTransportModes';
-import { Loader2 } from 'lucide-react';
+import { 
+  Loader2, 
+  Ship, 
+  Plane, 
+  Truck, 
+  Train, 
+  Package, 
+  Waves, 
+  Container, 
+  Navigation, 
+  Anchor, 
+  Bus, 
+  Network 
+} from 'lucide-react';
 
 export interface TransportMode {
   id: string;
@@ -15,6 +27,20 @@ interface TransportModeSelectorProps {
   selectedMode: string | null;
   onSelect: (modeId: string) => void;
 }
+
+const ICON_MAP: Record<string, any> = {
+  Ship, 
+  Plane, 
+  Truck, 
+  Train, 
+  Package, 
+  Waves, 
+  Container, 
+  Navigation, 
+  Anchor, 
+  Bus, 
+  Network
+};
 
 export function TransportModeSelector({ selectedMode, onSelect }: TransportModeSelectorProps) {
   const { data: modes, isLoading } = useTransportModes();
@@ -38,8 +64,8 @@ export function TransportModeSelector({ selectedMode, onSelect }: TransportModeS
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {modes.map(mode => {
-        // Dynamically get the icon from lucide-react
-        const IconComponent = (LucideIcons as any)[mode.icon_name] || LucideIcons.Package;
+        // Get the icon from the map, fallback to Package
+        const IconComponent = ICON_MAP[mode.icon_name] || Package;
         const isSelected = selectedMode === mode.id;
         
         return (

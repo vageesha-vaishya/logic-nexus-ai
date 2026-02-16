@@ -7,6 +7,8 @@ import { matchLegForCharge } from '@/lib/charge-bifurcation';
 import { TransportLeg } from '@/types/quote-breakdown';
 import { logger } from '@/lib/logger';
 
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
+
 export interface AddOptionParams {
     tenantId: string;
     versionId: string;
@@ -18,6 +20,10 @@ export interface AddOptionParams {
         destination?: string;
         originDetails?: any;
         destinationDetails?: any;
+        ports?: any[];
+        categories?: any[];
+        carriers?: any[];
+        serviceTypes?: any[];
     };
 }
 
@@ -71,7 +77,8 @@ export class QuoteOptionService {
             this.debug.warn('Discrepancy between sellPrice and rate.total_amount', { sellPrice, rateTotal: rate.total_amount });
         }
 
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rate.id);
+        const candidateCarrierRateId = typeof rate.carrier_rate_id === 'string' ? rate.carrier_rate_id : rate.id;
+        const isUUID = typeof candidateCarrierRateId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidateCarrierRateId);
 
         // Calculate total CO2
         const totalCo2 = rate.co2_kg || (rate.legs?.reduce((acc: number, leg: any) => acc + (Number(leg.co2_emission) || Number(leg.co2) || 0), 0)) || 0;
@@ -82,7 +89,7 @@ export class QuoteOptionService {
             .insert({
                 tenant_id: tenantId,
                 quotation_version_id: versionId,
-                carrier_rate_id: isUUID ? rate.id : null,
+                carrier_rate_id: isUUID ? candidateCarrierRateId : null,
                 option_name: rate.name || `${rate.carrier} ${rate.tier}`,
                 carrier_name: rate.carrier,
                 total_amount: sellPrice,
@@ -123,14 +130,16 @@ export class QuoteOptionService {
         const legData = await this.insertLegs(tenantId, optionId, rate, rateMapper, context);
         
         // 5. Insert Charges
-        await this.insertCharges(tenantId, optionId, versionId, rate, legData, rateMapper, financials);
+        await this.insertCharges(tenantId, optionId, versionId, rate, legData, rateMapper, financials, context);
 
         return optionId;
     }
 
     private async insertLegs(tenantId: string, optionId: string, rate: any, rateMapper: any, context: any) {
+        const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
         const legsToInsert: any[] = [];
-        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || rate.mode || 'ocean' }];
+        const baseMode = rate.mode || 'ocean';
+        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
 
         const parseDurationToHours = (duration: string | number | undefined) => {
             if (typeof duration === 'number') return duration; 
@@ -147,9 +156,28 @@ export class QuoteOptionService {
         }
 
         rateLegs.forEach((leg: any, index: number) => {
-            const legMode = leg.mode || rate.transport_mode || rate.mode || 'ocean';
+            const legMode = leg.mode || baseMode;
             const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
-            const serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
+            
+            // Try to use rateMapper first, then fallback to robust resolution if context is available
+            let serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
+            if (!serviceTypeId && context.serviceTypes) {
+                serviceTypeId = QuoteTransformService.resolveServiceTypeId(legMode, undefined, context.serviceTypes);
+            }
+            if (!isUuid(serviceTypeId)) {
+                serviceTypeId = null;
+            }
+
+            // Resolve Provider/Carrier ID
+            let providerId = rateMapper.getProviderId(carrierName);
+            if (!providerId && context.carriers) {
+                // Construct a minimal rate object for resolution
+                const mockRate = { carrier: carrierName, carrier_name: carrierName };
+                providerId = QuoteTransformService.resolveCarrierId(mockRate as any, context.carriers);
+            }
+            if (!isUuid(providerId)) {
+                providerId = null;
+            }
             
             const isFirstLeg = index === 0;
             const isLastLeg = index === rateLegs.length - 1;
@@ -168,18 +196,29 @@ export class QuoteOptionService {
                 origin = legsToInsert[index - 1].destination_location;
             }
             
+            // Resolve Location IDs
+            const originLocationIdRaw = QuoteTransformService.resolvePortId(origin, context.ports);
+            const destinationLocationIdRaw = QuoteTransformService.resolvePortId(destination, context.ports);
+            const originLocationId = isUuid(originLocationIdRaw) ? originLocationIdRaw : null;
+            const destinationLocationId = isUuid(destinationLocationIdRaw) ? destinationLocationIdRaw : null;
+
             // Database constraint relies on default 'transport'
             const legType = 'transport';
+
+            const modeIdRaw = rateMapper.getModeId(legMode);
+            const modeId = isUuid(modeIdRaw) ? modeIdRaw : null;
 
             legsToInsert.push({
                 quotation_version_option_id: optionId,
                 tenant_id: tenantId,
-                mode_id: rateMapper.getModeId(legMode),
+                mode_id: modeId,
                 mode: legMode,
                 service_type_id: serviceTypeId,
-                provider_id: rateMapper.getProviderId(carrierName),
+                provider_id: providerId,
                 origin_location: origin || (isFirstLeg ? context.origin : null),
                 destination_location: destination || (isLastLeg ? context.destination : null),
+                origin_location_id: originLocationId,
+                destination_location_id: destinationLocationId,
                 sort_order: index + 1,
                 leg_type: legType,
                 transit_time_hours: parseDurationToHours(leg.transit_time),
@@ -206,7 +245,8 @@ export class QuoteOptionService {
         rate: any, 
         legData: any[], 
         rateMapper: any,
-        financials: any
+        financials: any,
+        context?: any
     ) {
         const legsToInsert = legData.map(l => ({
             id: l.id,
@@ -224,7 +264,8 @@ export class QuoteOptionService {
         // legData returned from insert has mode_id. We need to look up mode code.
         // Or we can assume the order matches the input `rate.legs` (which we sorted).
         
-        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: rate.transport_mode || 'ocean' }];
+        const baseMode = rate.mode || 'ocean';
+        const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
         if (rateLegs.length > 1 && rateLegs.every((l: any) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
             rateLegs.sort((a: any, b: any) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
         }
@@ -234,7 +275,7 @@ export class QuoteOptionService {
             return {
                 id: l.id,
                 leg_type: l.leg_type || 'transport',
-                mode: originalLeg?.mode || rate.transport_mode || 'ocean',
+                mode: originalLeg?.mode || baseMode,
                 origin: '', // Not critical for matching
                 destination: '',
                 sequence: l.sort_order,
@@ -242,7 +283,7 @@ export class QuoteOptionService {
             } as TransportLeg;
         });
 
-        let targetModeId = rateMapper.getModeId(rate.transport_mode || 'ocean');
+        let targetModeId = rateMapper.getModeId(baseMode);
         
         // If the target mode doesn't match any leg, try to infer the main mode from the legs
         // This handles cases where transport_mode is default (ocean) but legs are Air/Road
@@ -274,23 +315,70 @@ export class QuoteOptionService {
         const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
         const addChargePair = async (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): Promise<boolean> => {
-            const catId = rateMapper.getCatId(categoryKey);
-            const basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
-            const currId = rateMapper.getCurrId(rate.currency || 'USD');
-            if (!catId) return false;
+            const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+            let catId = rateMapper.getCatId(categoryKey);
             
-            const finalLegId = targetLegId || mainLegId || legData?.[0]?.id;
+            // Fallback: Try to find a generic category if specific mapping fails
+            if (!catId) {
+                this.debug.warn(`Category mapping failed for "${categoryKey}". Attempting fallback.`);
+                catId = rateMapper.getCatId('General') || rateMapper.getCatId('Other') || rateMapper.getCatId('Freight');
+                
+                // Absolute fallback: Use the first available category to prevent data loss
+                if (!catId) {
+                     // Last resort fallback to ensure charge is not skipped
+                     this.debug.warn(`Critical: Could not map category for "${categoryKey}". Fallback to first available category.`);
+                     // Use the first category from the rate mapper's master data (if accessible via getCatId internal logic)
+                     // Since we can't access master data directly, we rely on the fact that we checked categories exist in QuoteNew.
+                     // We try one more generic term that might map to ID 1 or similar if implemented
+                     catId = rateMapper.getCatId('SURCHARGE'); 
+                     
+                     if (!catId) {
+                         // ULTIMATE FALLBACK: Use first available category from context
+                         if (context?.categories && context.categories.length > 0) {
+                             this.debug.warn(`Ultimate Fallback: Using first available category ID for "${categoryKey}"`);
+                             catId = context.categories[0].id;
+                         }
+
+                         if (!catId) {
+                             // This should technically be impossible if categories exist and LogisticsRateMapper is used
+                             return false;
+                         }
+                     }
+                }
+            }
+
+            let basisId = rateMapper.getBasisId(basisCode || '') || rateMapper.getBasisId('PER_SHIPMENT');
+            let currId = rateMapper.getCurrId(rate.currency || 'USD');
+            
+            const finalLegCandidate = targetLegId || mainLegId || legData?.[0]?.id;
+            const finalLegId = isUuid(finalLegCandidate) ? finalLegCandidate : null;
             
             if (!finalLegId) {
                 this.debug.warn('Skipping charge insertion: No valid leg ID found', { categoryKey, amount });
                 return false;
             }
 
+            if (!isUuid(catId)) {
+                this.debug.warn('Skipping charge insertion: Invalid category_id', { categoryKey });
+                return false;
+            }
+            if (!isUuid(basisId)) {
+                basisId = null;
+            }
+            if (!isUuid(currId)) {
+                currId = null;
+            }
+            if (!isUuid(buySideId) || !isUuid(sellSideId)) {
+                this.debug.warn('Skipping charge insertion: Invalid charge_side_id(s)');
+                return false;
+            }
+
             const marginPercent = Number(rate.marginPercent || rate.margin_percent || 15);
             // Use PricingService for centralized calculation (Sell-Based Model: isCostBased = false)
             const chargeFinancials = await this.pricingService.calculateFinancials(amount, marginPercent, false);
-            const buyAmount = chargeFinancials.buyPrice;
-            const sellAmount = chargeFinancials.sellPrice;
+            // Ensure 2-decimal precision to match DB storage and prevent accumulation of floating point errors
+            const buyAmount = Number(chargeFinancials.buyPrice.toFixed(2));
+            const sellAmount = Number(chargeFinancials.sellPrice.toFixed(2));
 
             chargesToInsert.push(
                 { tenant_id: tenantId, quote_option_id: optionId, leg_id: finalLegId, category_id: catId, basis_id: basisId, charge_side_id: buySideId, quantity: 1, rate: buyAmount, amount: buyAmount, currency_id: currId, note: note, unit: chargeUnit },
@@ -330,11 +418,12 @@ export class QuoteOptionService {
                         for (const charge of leg.charges) {
                             const amount = Number(charge.amount || charge.price || charge.total || 0);
                             if (amount !== 0) {
+                                const categoryKey = charge.category || charge.description || charge.name || charge.code || 'Charge';
                                 const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
                                 const unit = charge.unit || charge.basis;
                                 const note = charge.note || desc;
 
-                                if (await addChargePair(desc, amount, note, targetLegId, unit, unit)) {
+                                if (await addChargePair(categoryKey, amount, note, targetLegId, unit, unit)) {
                                     chargesFound = true;
                                 }
                             }
@@ -349,12 +438,13 @@ export class QuoteOptionService {
             for (const charge of rate.charges) {
                 const amount = Number(charge.amount || charge.price || charge.total || 0);
                 if (amount !== 0) {
+                    const categoryKey = charge.category || charge.description || charge.name || charge.code || 'Charge';
                     const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
                     const legId = getLegIdForCharge(desc);
                     const unit = charge.unit || charge.basis;
                     const note = charge.note || desc;
                     
-                    if (await addChargePair(desc, amount, note, legId, unit, unit)) {
+                    if (await addChargePair(categoryKey, amount, note, legId, unit, unit)) {
                         chargesFound = true;
                     }
                 }

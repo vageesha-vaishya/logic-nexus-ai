@@ -1,4 +1,5 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
+declare const Deno: any;
 
 export enum LogLevel {
   DEBUG = 'DEBUG',
@@ -43,7 +44,7 @@ export class Logger {
   private maskPII(text: string): string {
     if (!text) return text;
     // Email masking
-    let masked = text.replace(/\b[\w\.-]+@[\w\.-]+\.\w{2,4}\b/g, '***@***.***');
+    let masked = text.replace(/\b[\w.-]+@[\w.-]+\.\w{2,4}\b/g, '***@***.***');
     // Phone masking
     masked = masked.replace(/\b(?:\+?1[-. ]?)?\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})\b/g, '***-***-$3');
     // Credit Card
@@ -164,7 +165,7 @@ export const serveWithLogger = (
   handler: (req: Request, logger: Logger, supabase: SupabaseClient) => Promise<Response>,
   componentName: string
 ) => {
-  Deno.serve(async (req) => {
+  Deno.serve(async (req: Request) => {
     const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID();
     
     // Initial logger (no DB access yet)

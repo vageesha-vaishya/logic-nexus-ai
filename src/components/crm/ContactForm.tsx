@@ -100,7 +100,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
   };
 
   const fetchFranchises = async () => {
-    let query = scopedDb
+    const query = scopedDb
       .from('franchises')
       .select('id, name, code')
       .eq('is_active', true);

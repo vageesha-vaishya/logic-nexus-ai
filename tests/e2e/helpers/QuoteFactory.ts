@@ -135,7 +135,7 @@ export class QuoteFactory {
 
     async addOption(versionId: string, params: OptionParams) {
         // 1. Get/Create Carrier
-        let carrierId = await this.getCarrierId(params.carrierName);
+        const carrierId = await this.getCarrierId(params.carrierName);
 
         // 2. Create Option
         const sizeId = this.containerSizes[params.containerSizeCode] || this.containerSizes['standard_20'];

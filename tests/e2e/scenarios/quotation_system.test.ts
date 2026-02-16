@@ -6,7 +6,7 @@ import { PDFValidator } from '../helpers/PDFValidator';
 
 describe('Quotation System E2E', () => {
     let factory: QuoteFactory;
-    let supabase = SupabaseHelper.getClient();
+    const supabase = SupabaseHelper.getClient();
     let tenantId: string;
     let accountId: string;
     let originPortId: string;

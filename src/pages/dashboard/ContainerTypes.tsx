@@ -52,11 +52,15 @@ export default function ContainerTypes() {
 
   const update = async (id: string, patch: Partial<ContainerType>) => {
     // Cast to any to bypass strict type checking
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    if (!isUUID(id)) return;
     await scopedDb.from('container_types').update(patch as any).eq('id', id);
     load();
   };
 
   const remove = async (id: string) => {
+    const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+    if (!isUUID(id)) return;
     await scopedDb.from('container_types').delete().eq('id', id);
     load();
   };

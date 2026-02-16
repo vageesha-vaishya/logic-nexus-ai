@@ -106,7 +106,7 @@ export function QuotesList({
                   {formatCurrency(quote.sell_price)}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {quote.margin_percentage ? `${Math.round(quote.margin_percentage)}%` : '-'}
+                  {quote.margin_percentage !== null && quote.margin_percentage !== undefined ? `${Math.round(quote.margin_percentage)}%` : '-'}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDistanceToNow(new Date(quote.created_at), { addSuffix: true })}

@@ -1,4 +1,3 @@
-/// <reference lib="deno.ns" />
 import { EmailAccount, saveEmailToDb, SupabaseClient } from "../utils/db.ts";
 // Import POP3 client library compatible with Deno
 

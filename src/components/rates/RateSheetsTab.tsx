@@ -133,6 +133,7 @@ export function RateSheetsTab() {
       const { data: carriers } = await supabase.from('carriers').select('id, carrier_code, scac, iata');
       const portsService = new PortsService(scopedDb);
       const ports = await portsService.getAllPorts();
+      const { data: modesData } = await supabase.from('transport_modes').select('code').eq('is_active', true);
 
       const carrierMap = new Map();
       carriers?.forEach(c => {
@@ -146,6 +147,8 @@ export function RateSheetsTab() {
         if (p.location_code) portMap.set(p.location_code.toUpperCase(), p.id);
       });
 
+      const validModes = new Set<string>((modesData || []).map((m: any) => String(m.code).toLowerCase()));
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
       const ratesToInsert = [];
       const errors = [];
 
@@ -153,6 +156,7 @@ export function RateSheetsTab() {
         const carrierCode = (row.Carrier || '').toString().toUpperCase();
         const originCode = (row.Origin || '').toString().toUpperCase();
         const destCode = (row.Destination || '').toString().toUpperCase();
+        const modeVal = (row.Mode || 'ocean').toLowerCase();
 
         const carrierId = carrierMap.get(carrierCode);
         const originId = portMap.get(originCode);
@@ -161,13 +165,14 @@ export function RateSheetsTab() {
         if (!carrierId) errors.push(`Row ${index + 2}: Carrier '${carrierCode}' not found`);
         if (!originId) errors.push(`Row ${index + 2}: Origin '${originCode}' not found`);
         if (!destId) errors.push(`Row ${index + 2}: Destination '${destCode}' not found`);
+        if (validModes.size > 0 && !validModes.has(modeVal)) errors.push(`Row ${index + 2}: Mode '${modeVal}' is invalid`);
 
-        if (carrierId && originId && destId) {
+        if (carrierId && originId && destId && isUUID(carrierId) && isUUID(originId) && isUUID(destId) && (validModes.size === 0 || validModes.has(modeVal))) {
           ratesToInsert.push({
             carrier_id: carrierId,
             origin_port_id: originId,
             destination_port_id: destId,
-            mode: (row.Mode || 'ocean').toLowerCase(),
+            mode: modeVal,
             amount: Number(row.Amount) || 0,
             currency: row.Currency || 'USD',
             container_type: row.Container || null,

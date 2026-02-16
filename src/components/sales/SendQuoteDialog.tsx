@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail, Loader2, Send, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { invokeFunction, invokeAnonymous } from '@/lib/supabase-functions';
+import { invokeFunction, invokeAnonymous, emitEvent, enrichPayload } from '@/lib/supabase-functions';
+import { EmitEventSchema } from '@/lib/schemas/events';
 
 interface SendQuoteDialogProps {
   quoteId: string;
@@ -37,11 +38,13 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
       console.log('[SendQuote] Generating PDF...');
       // Use invokeAnonymous to avoid "Invalid JWT" errors if the session token is stale/invalid
       // The function uses Service Role internally, so it doesn't rely on the user's RLS context
-      const pdfResponse = await invokeAnonymous('generate-quote-pdf', {
+      const pdfResponse = await invokeAnonymous('generate-quote-pdf', enrichPayload({
         quoteId, 
         versionId,
-        engine_v2: true
-      });
+        engine_v2: true,
+        source: 'send-email',
+        action: 'generate-pdf'
+      }));
 
       // invokeAnonymous returns the parsed JSON directly on success, or throws
       const pdfData = pdfResponse;
@@ -63,11 +66,19 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
               encoding: 'base64',
               contentType: 'application/pdf'
             }
-          ]
+          ],
+          source: 'send-email',
+          action: 'dispatch-email'
         }
       });
 
       if (emailError) throw new Error(`Email sending failed: ${emailError.message}`);
+      
+      const evt = { eventName: 'EmailSent', payload: { quote_id: quoteId, version_id: versionId } };
+      const parsed = EmitEventSchema.safeParse(evt);
+      if (parsed.success) {
+        await emitEvent(parsed.data.eventName, parsed.data.payload);
+      }
 
       toast.success('Quote sent successfully', { id: toastId });
       setOpen(false);

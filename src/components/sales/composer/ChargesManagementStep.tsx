@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,7 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
   const pricingService = useMemo(() => new PricingService(scopedDb.client), [scopedDb.client]);
+  const debounceTimers = useRef(new Map<string, NodeJS.Timeout>());
   
   const [fetchingRatesFor, setFetchingRatesFor] = useState<string | null>(null);
 
@@ -46,6 +47,23 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
     currencies,
     serviceTypes
   } = referenceData;
+
+  if (!legs || legs.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Charges Management</CardTitle>
+          <CardDescription>Configure charges for each leg of the journey.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+            <p className="mb-2 font-medium">No Transport Legs Configured</p>
+            <p className="text-sm">Please go back to the "Transport Legs" step and add at least one leg to configure charges.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const autoMargin = quoteData.autoMargin || false;
   const marginPercent = quoteData.marginPercent || 15;
@@ -269,14 +287,20 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
     const leg = legs.find(l => l.id === legId);
     if (!leg) return;
 
+    // Default values from reference data
+    const defaultCurrency = currencies.find(c => c.code === 'USD') || currencies[0];
+    const defaultCategory = chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
+    const defaultBasis = chargeBases.find(b => b.code === 'shipment') || chargeBases[0];
+
     const newCharge = {
       id: crypto.randomUUID(),
-      category: '',
-      basis: 'Per Shipment',
-      unit: 'Shipment',
-      currency: 'USD',
+      category_id: defaultCategory?.id || '',
+      basis_id: defaultBasis?.id || '',
+      unit: defaultBasis?.code || 'shipment',
+      currency_id: defaultCurrency?.id || '',
       buy: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
-      sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' }
+      sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
+      note: ''
     };
 
     const updatedCharges = [...(leg.charges || []), newCharge];
@@ -288,18 +312,49 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
     if (!leg) return;
 
     const updatedCharges = [...(leg.charges || [])];
-    if (updatedCharges[chargeIdx]) {
-      updatedCharges[chargeIdx] = { ...updatedCharges[chargeIdx], [field]: value };
-      
-      // Auto-calc amounts if quantity/rate changes
-      // This logic might be complex if nested fields (buy.rate) are passed as field path
-      // But VirtualChargesList usually passes 'buy' or 'sell' object, or top level field.
-      // If VirtualChargesList passes nested updates, we need to handle them.
-      // Based on typical usage, it might be passing the whole modified charge or handling field updates specifically.
-      // Let's assume field is top-level or handled by caller, but if field is 'buy' or 'sell', we might need to recalc totals.
-      // For now, trust the value passed is correct.
-      
-      dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+    if (!updatedCharges[chargeIdx]) return;
+
+    const existing = { ...updatedCharges[chargeIdx] };
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      const parentObj = { ...(existing as any)[parent] };
+      (parentObj as any)[child] = value;
+      (existing as any)[parent] = parentObj;
+    } else {
+      (existing as any)[field] = value;
+    }
+    updatedCharges[chargeIdx] = existing;
+
+    dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
+
+    if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
+      const buyRate = field === 'buy.rate' ? Number(value) : Number(existing?.buy?.rate || 0);
+      const timerKey = `leg-${legId}-charge-${chargeIdx}`;
+      if (debounceTimers.current.has(timerKey)) {
+        clearTimeout(debounceTimers.current.get(timerKey)!);
+      }
+      const timer = setTimeout(() => {
+        pricingService.calculateFinancials(buyRate, Number(marginPercent), true)
+          .then(result => {
+            const latestLeg = (state.legs || []).find(l => l.id === legId);
+            if (!latestLeg) return;
+            const nextCharges = [...(latestLeg.charges || [])];
+            if (!nextCharges[chargeIdx]) return;
+            const nextCharge = { ...nextCharges[chargeIdx] };
+            nextCharge.sell = {
+              ...(nextCharge.sell || {}),
+              quantity: nextCharge.buy?.quantity || 1,
+              rate: result.sellPrice
+            };
+            nextCharges[chargeIdx] = nextCharge;
+            dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: nextCharges } } });
+          })
+          .catch(err => logger.error('Pricing calculation failed', { error: err }))
+          .finally(() => {
+            debounceTimers.current.delete(timerKey);
+          });
+      }, 300);
+      debounceTimers.current.set(timerKey, timer);
     }
   };
 
@@ -568,15 +623,25 @@ export function ChargesManagementStep({}: ChargesManagementStepProps) {
                   </tbody>
                   <tfoot className="bg-muted/30 font-semibold border-t-2">
                     <tr>
-                      <td colSpan={6} className="p-3 text-right">Totals:</td>
-                      <td className="p-3 text-right">{calculateTotals(combinedCharges).buy.toFixed(2)}</td>
-                      <td colSpan={2} className="p-3"></td>
-                      <td className="p-3 text-right">{calculateTotals(combinedCharges).sell.toFixed(2)}</td>
-                      <td className={`p-3 text-right font-bold ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                        {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
-                        {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
+                      <td colSpan={8} className="p-3">
+                        <div className="flex items-center justify-end gap-6">
+                          <div className="flex items-center gap-2">
+                             <span className="text-muted-foreground">Total Buy:</span>
+                             <span>{calculateTotals(combinedCharges).buy.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <span className="text-muted-foreground">Total Sell:</span>
+                             <span>{calculateTotals(combinedCharges).sell.toFixed(2)}</span>
+                          </div>
+                          <div className={`flex items-center gap-2 ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                             <span className="text-muted-foreground">Margin:</span>
+                             <span>
+                               {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
+                               {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
+                             </span>
+                          </div>
+                        </div>
                       </td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 </table>

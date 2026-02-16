@@ -56,6 +56,11 @@ export function ComplianceSettings() {
   const deleteItem = async (table: string, id: string) => {
     if (!confirm("Are you sure? This action cannot be undone.")) return;
     try {
+      const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      if (!isUUID(id)) {
+        toast({ title: "Error", description: "Invalid identifier", variant: "destructive" });
+        return;
+      }
       const { error } = await supabase.from(table).delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Deleted", description: "Item removed successfully." });

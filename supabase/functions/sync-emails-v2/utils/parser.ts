@@ -1,5 +1,5 @@
-/// <reference lib="deno.ns" />
 import { simpleParser, Attachment } from "npm:mailparser";
+type AddressVal = { name?: string; address?: string }
 
 export interface ParsedAttachment {
   filename: string;
@@ -52,9 +52,9 @@ export async function parseEmail(source: any): Promise<ParsedEmail> {
       name: fromVal?.name, 
       email: fromVal?.address || "" 
     },
-    to: toVal.map(v => ({ name: v.name, email: v.address || "" })),
-    cc: ccVal.map(v => ({ name: v.name, email: v.address || "" })),
-    bcc: bccVal.map(v => ({ name: v.name, email: v.address || "" })),
+    to: (toVal as AddressVal[]).map((v: AddressVal) => ({ name: v.name, email: v.address || "" })),
+    cc: (ccVal as AddressVal[]).map((v: AddressVal) => ({ name: v.name, email: v.address || "" })),
+    bcc: (bccVal as AddressVal[]).map((v: AddressVal) => ({ name: v.name, email: v.address || "" })),
     bodyText: parsed.text || "",
     bodyHtml: (parsed.html as string) || parsed.textAsHtml || "",
     receivedAt: (parsed.date || new Date()).toISOString(),

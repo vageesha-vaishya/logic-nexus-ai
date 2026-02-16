@@ -82,7 +82,7 @@ export default function OpportunitiesPipeline() {
     try {
       setLoading(true);
       
-      let query = scopedDb
+      const query = scopedDb
         .from("opportunities")
         .select(`
           *,

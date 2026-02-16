@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
@@ -23,6 +23,7 @@ export default function QuoteDetail() {
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
+  const versionAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const checkQuote = async () => {
@@ -73,12 +74,16 @@ export default function QuoteDetail() {
       debug.info('Loading latest version', { quoteId: resolvedId });
       
       try {
+        if (versionAbortRef.current) versionAbortRef.current.abort();
+        versionAbortRef.current = new AbortController();
+        const signal = versionAbortRef.current.signal;
         const { data, error } = await (scopedDb
           .from('quotation_versions')
           .select('id, version_number, tenant_id') as any)
           .eq('quote_id', resolvedId)
           .order('version_number', { ascending: false })
-          .limit(1);
+          .limit(1)
+          .abortSignal(signal);
         
         if (error) {
           debug.error('Error querying versions', error);
@@ -106,7 +111,8 @@ export default function QuoteDetail() {
             .from('quotes')
             .select('tenant_id')
             .eq('id', resolvedId)
-            .maybeSingle();
+            .maybeSingle()
+            .abortSignal(signal);
           
           if (qError) {
             console.error('[QuoteDetail] Error fetching quote tenant:', qError);
@@ -136,7 +142,8 @@ export default function QuoteDetail() {
           .from('quotation_versions')
           .insert({ quote_id: resolvedId, tenant_id: finalTenantId, version_number: 1 })
           .select('id')
-          .maybeSingle();
+          .maybeSingle()
+          .abortSignal(signal);
         
         if (insertError) {
           console.error('[QuoteDetail] Error creating version:', insertError);
@@ -146,7 +153,8 @@ export default function QuoteDetail() {
             .select('id') as any)
             .eq('quote_id', resolvedId)
             .limit(1)
-            .maybeSingle();
+            .maybeSingle()
+            .abortSignal(signal);
           
           if ((retry as any)?.id) {
             console.log('[QuoteDetail] Version found on retry:', (retry as any).id);
@@ -159,12 +167,17 @@ export default function QuoteDetail() {
           console.log('[QuoteDetail] Created version:', (v as any).id);
           setVersionId(String((v as any).id));
         }
-      } catch (error) {
+      } catch (error: any) {
+        const msg = error?.message ? String(error.message).toLowerCase() : '';
+        if (error?.name === 'AbortError' || msg.includes('aborted')) return;
         console.error('[QuoteDetail] Unexpected error in loadLatestVersion:', error);
       }
     };
     
     loadLatestVersion();
+    return () => {
+      if (versionAbortRef.current) versionAbortRef.current.abort();
+    };
   }, [resolvedId]);
 
   const handleSuccess = () => {

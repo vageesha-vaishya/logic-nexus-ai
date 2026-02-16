@@ -149,7 +149,7 @@ export class ScopedDataAccess {
 
     return {
       select: (columns = '*', options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
-        let selectQuery = baseQuery.select(columns, options as any) as any;
+        const selectQuery = baseQuery.select(columns, options as any) as any;
         // Apply scope filters unless it's a global table
         if (!isGlobal) {
           return applyScopeFilter(selectQuery);
@@ -171,7 +171,7 @@ export class ScopedDataAccess {
       },
 
       update: (values: any) => {
-        let updateQuery = baseQuery.update(values) as any;
+        const updateQuery = baseQuery.update(values) as any;
         logAudit('UPDATE', table as string, { values });
         // Apply scope filters unless it's a global table
         if (!isGlobal) {
@@ -189,7 +189,7 @@ export class ScopedDataAccess {
         }
 
         logAudit('UPSERT', table as string, { count: Array.isArray(values) ? values.length : 1 });
-        let upsertQuery = baseQuery.upsert(finalValues, options) as any;
+        const upsertQuery = baseQuery.upsert(finalValues, options) as any;
         // Apply scope filters unless it's a global table
         if (!isGlobal) {
           return applyScopeFilter(upsertQuery);
@@ -198,7 +198,7 @@ export class ScopedDataAccess {
       },
 
       delete: () => {
-        let deleteQuery = baseQuery.delete() as any;
+        const deleteQuery = baseQuery.delete() as any;
         logAudit('DELETE', table as string, {});
         // Apply scope filters unless it's a global table
         if (!isGlobal) {

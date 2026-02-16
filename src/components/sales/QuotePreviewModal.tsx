@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Eye, Loader2, Download, RefreshCw, AlertTriangle } from 'lucide-react';
-import { invokeAnonymous } from '@/lib/supabase-functions';
+import { invokeAnonymous, emitEvent, enrichPayload } from '@/lib/supabase-functions';
+import { startSpan } from '@/lib/otel-lite';
 import { toast } from 'sonner';
+import { EmitEventSchema } from '@/lib/schemas/events';
 
 interface QuotePreviewModalProps {
   quoteId: string;
@@ -22,6 +24,7 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
     setLoading(true);
     setError(null);
     try {
+      const span = startSpan('preview.generate', { quoteId, versionId });
       // Clean up previous URL to avoid memory leaks
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
@@ -29,12 +32,8 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
       }
 
       console.log('[QuotePreview] Generating PDF for:', { quoteId, versionId });
-      
-      const response = await invokeAnonymous('generate-quote-pdf', {
-        quoteId,
-        versionId,
-        engine_v2: true
-      });
+      const basePayload = { quoteId, versionId, engine_v2: true, source: 'preview', action: 'generate-pdf', trace_id: span.id };
+      const response = await invokeAnonymous('generate-quote-pdf', enrichPayload(basePayload));
 
       if (!response || !response.content) {
         throw new Error('Received empty content from PDF generation service');
@@ -50,6 +49,12 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
       const blob = new Blob([bytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
+      const evt = { eventName: 'PdfGenerated', payload: { quote_id: quoteId, version_id: versionId, trace_id: basePayload.trace_id } };
+      const parsed = EmitEventSchema.safeParse(evt);
+      if (parsed.success) {
+        await emitEvent(parsed.data.eventName, parsed.data.payload);
+      }
+      span.end();
     } catch (err: any) {
       console.error('PDF Preview Error:', err);
       setError(err.message || 'Failed to generate PDF preview');

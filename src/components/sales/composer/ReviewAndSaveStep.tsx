@@ -19,7 +19,7 @@ const getSafeName = (val: any): string => {
 export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
   const { state } = useQuoteStore();
   const { legs, quoteData, charges: combinedCharges, referenceData } = state;
-  const { currencies } = referenceData;
+  const { currencies, shippingTerms, carriers, serviceTypes } = referenceData;
 
   const calculateLegTotal = (leg: any, side: 'buy' | 'sell' = 'sell') => {
     return leg.charges.reduce((acc, charge) => {
@@ -64,10 +64,20 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
         {/* Quote Summary */}
         <div>
           <h3 className="font-semibold mb-3">Quote Details</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Reference</p>
               <p className="font-medium">{quoteData.reference || 'Auto-generated'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Customer</p>
+              <p className="font-medium">{quoteData.accounts?.name || 'Not specified'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Contact</p>
+              <p className="font-medium">
+                {quoteData.contacts ? `${quoteData.contacts.first_name || ''} ${quoteData.contacts.last_name || ''}` : 'Not specified'}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Valid Until</p>
@@ -80,6 +90,24 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
             <div>
               <p className="text-muted-foreground">Incoterms</p>
               <p className="font-medium">{quoteData.incoterms || 'Not specified'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Shipping Term</p>
+              <p className="font-medium">
+                {getSafeName(shippingTerms.find(t => t.id === quoteData.shipping_term_id)) || 'Not specified'}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Preferred Carrier</p>
+              <p className="font-medium">
+                {carriers.find(c => c.id === quoteData.carrier_id)?.carrier_name || 'Not specified'}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Service Type</p>
+              <p className="font-medium">
+                {getSafeName(serviceTypes.find(s => s.id === quoteData.service_type_id)) || 'Not specified'}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Commodity</p>
@@ -115,7 +143,7 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
                              isServiceLeg ? 'Service' : 'Leg';
 
               return (
-                <Card key={leg.id} className="border-2">
+                <Card key={leg.id} className="border-2 mb-4">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -125,11 +153,11 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
                              // DB requires 'transport'/'service' so we infer display role from position
                              if (leg.legType === 'service') return `Service: ${leg.serviceOnlyCategory || 'General'}`;
                              
-                             if (legs.length === 1) return `Main Leg ${idx + 1} - ${leg.mode.toUpperCase()}`;
+                             if (legs.length === 1) return `Main Leg 1 - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
                              
-                             if (idx === 0) return `Pickup Leg - ${leg.mode.toUpperCase()}`;
-                             if (idx === legs.length - 1) return `Delivery Leg - ${leg.mode.toUpperCase()}`;
-                             return `Main Leg ${idx + 1} - ${leg.mode.toUpperCase()}`;
+                             if (idx === 0) return `Pickup Leg - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
+                             if (idx === legs.length - 1) return `Delivery Leg - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
+                             return `Main Leg ${idx + 1} - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">

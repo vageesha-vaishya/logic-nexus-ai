@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Printer, FileText, Package, Box, Calculator } from 'lucide-react';
 import { LandedCostService, LandedCostResult } from '@/services/quotation/LandedCostService';
 import { supabase } from '@/integrations/supabase/client';
+import { usePipelineInterceptor } from '@/components/debug/pipeline/usePipelineInterceptor';
 
 interface DocumentPreviewProps {
   quoteData: any;
@@ -16,6 +17,17 @@ interface DocumentPreviewProps {
 export function DocumentPreview({ quoteData, legs, combinedCharges = [], templateId }: DocumentPreviewProps) {
   const [landedCost, setLandedCost] = useState<LandedCostResult | null>(null);
   const [template, setTemplate] = useState<any>(null);
+
+  // Pipeline Capture
+  usePipelineInterceptor('PDFGen', { 
+    quoteData, 
+    legs, 
+    combinedCharges, 
+    templateId,
+    landedCost 
+  }, { 
+    action: 'PreviewRender' 
+  }, [quoteData, legs, combinedCharges, templateId, landedCost]);
 
   useEffect(() => {
     if (templateId) {
@@ -126,8 +138,12 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     <div>
                         <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Prepared For</h3>
                         <div className="text-sm font-medium">
-                            <p className="font-bold text-lg">{getSafeString(quoteData.account_id, 'Client Name')}</p>
-                            <p className="text-slate-500">{getSafeString(quoteData.contact_id, 'Contact Person')}</p>
+                            <p className="font-bold text-lg">{quoteData.accounts?.name || getSafeString(quoteData.account_id, 'Client Name')}</p>
+                            <p className="text-slate-500">
+                                {quoteData.contacts 
+                                    ? `${quoteData.contacts.first_name || ''} ${quoteData.contacts.last_name || ''}`.trim() 
+                                    : getSafeString(quoteData.contact_id, 'Contact Person')}
+                            </p>
                             <p className="text-slate-500 mt-1">{getSafeString(quoteData.destination, 'Client Address')}</p>
                         </div>
                     </div>

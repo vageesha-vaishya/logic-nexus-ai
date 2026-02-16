@@ -1,34 +1,43 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
-import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { QuoteTemplateList } from '@/components/sales/templates/QuoteTemplateList';
 import { QuoteTemplate } from '@/components/sales/templates/types';
 import { FileText, Loader2 } from 'lucide-react';
+
+const MultiModalQuoteComposer = lazy(() => import('@/components/sales/MultiModalQuoteComposer').then(module => ({ default: module.MultiModalQuoteComposer })));
+const QuoteTemplateList = lazy(() => import('@/components/sales/templates/QuoteTemplateList').then(module => ({ default: module.QuoteTemplateList })));
 import { QuoteFormValues } from '@/components/sales/quote-form/types';
 import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
-import { QuickQuoteHistory } from '@/components/sales/quick-quote/QuickQuoteHistory';
+const QuickQuoteHistory = lazy(() => import('@/components/sales/quick-quote/QuickQuoteHistory').then(module => ({ default: module.QuickQuoteHistory })));
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
 import { QuoteTransformService } from '@/lib/services/quote-transform.service';
+import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
+import { DataInspector } from '@/components/debug/DataInspector';
+import { useBenchmark } from '@/lib/benchmark';
+
+// Module-level cache for Master Data to prevent redundant fetching
+const MASTER_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
 
 export default function QuoteNew() {
+  useBenchmark('QuoteNew');
+  const { user, isPlatformAdmin } = useAuth();
   const { supabase, context, scopedDb } = useCRM();
   // Cast supabase to any to avoid strict type mismatch, assuming it's a valid client when used
   const quoteOptionService = new QuoteOptionService(supabase as any);
   const location = useLocation();
   const navigate = useNavigate();
+  const { capture: capturePipeline } = usePipeline();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -49,6 +58,16 @@ export default function QuoteNew() {
         setViewMode('composer');
     }
   }, [optionsInserted, location.state]);
+
+  // Capture Pipeline Data
+  useEffect(() => {
+    if (location.state) {
+        capturePipeline('QuoteNew', location.state, { 
+            source: 'navigation_state',
+            hasTemplate: !!selectedTemplateId
+        });
+    }
+  }, [location.state, capturePipeline, selectedTemplateId]);
   const [insertionError, setInsertionError] = useState<string | null>(null);
   const [insertionProgress, setInsertionProgress] = useState({ current: 0, total: 0 });
   const [insertionStartTime, setInsertionStartTime] = useState<number | null>(null);
@@ -58,7 +77,7 @@ export default function QuoteNew() {
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleSyncUpdate = (source: string, payload: any) => {
-    console.log(`[QuoteNew] Sync: ${source} changed`, payload);
+    logger.info(`[QuoteNew] Sync: ${source} changed`, payload);
     
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
@@ -132,9 +151,11 @@ export default function QuoteNew() {
   const [masterData, setMasterData] = useState<{
     serviceTypes: any[];
     carriers: any[];
+    ports: any[];
     containerTypes?: any[];
     containerSizes?: any[];
-  }>({ serviceTypes: [], carriers: [] });
+    shippingTerms?: any[];
+  }>({ serviceTypes: [], carriers: [], ports: [] });
 
   // Fetch master data on mount
   useEffect(() => {
@@ -146,24 +167,38 @@ export default function QuoteNew() {
             const { data: c, error: cError } = await scopedDb.from('carriers').select('id, carrier_name, scac');
             if (cError) console.error('[QuoteNew] Error fetching carriers:', cError);
 
+            // Fetch ports/locations - global data so we can use raw client or scopedDb with bypass if supported
+            // Using supabase client directly for ports_locations as it's a global table
+            const { data: p, error: pError } = await supabase.from('ports_locations').select('id, location_name, location_code, country');
+            if (pError) console.error('[QuoteNew] Error fetching ports:', pError);
+
             const { data: ct, error: ctError } = await scopedDb.from('container_types').select('id, name, code');
             if (ctError) console.error('[QuoteNew] Error fetching container types:', ctError);
 
             const { data: cs, error: csError } = await scopedDb.from('container_sizes').select('id, name, code');
             if (csError) console.error('[QuoteNew] Error fetching container sizes:', csError);
 
+            const { data: terms, error: termsError } = await scopedDb
+              .from('incoterms', true)
+              .select('id, incoterm_code as code, incoterm_name as name')
+              .eq('is_active', true)
+              .order('incoterm_code');
+            if (termsError) console.error('[QuoteNew] Error fetching incoterms:', termsError);
+
             setMasterData({
                 serviceTypes: st || [],
                 carriers: c || [],
+                ports: p || [],
                 containerTypes: ct || [],
-                containerSizes: cs || []
+                containerSizes: cs || [],
+                shippingTerms: terms || []
             });
         } catch (error) {
             console.error('[QuoteNew] Unexpected error fetching master data:', error);
         }
     };
     fetchMasterData();
-  }, [scopedDb]);
+  }, [scopedDb, supabase]);
 
   useEffect(() => {
     if (location.state) {
@@ -268,35 +303,62 @@ export default function QuoteNew() {
 
         // 0. Update Version with AI Analysis (if available)
         if (state.marketAnalysis || state.confidenceScore) {
-             const { error: versionUpdateError } = await scopedDb.from('quotation_versions').update({
-                 market_analysis: state.marketAnalysis,
-                 confidence_score: state.confidenceScore,
-                 anomalies: state.anomalies ? (Array.isArray(state.anomalies) ? state.anomalies : []) : []
-             }).eq('id', versionId);
-             
-             if (versionUpdateError) {
-                 console.warn('[QuoteNew] Failed to save AI analysis to version:', versionUpdateError);
+             const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+             if (isUUID(versionId)) {
+               const { error: versionUpdateError } = await scopedDb.from('quotation_versions').update({
+                   market_analysis: state.marketAnalysis,
+                   confidence_score: state.confidenceScore,
+                   anomalies: state.anomalies ? (Array.isArray(state.anomalies) ? state.anomalies : []) : []
+               }).eq('id', versionId);
+               
+               if (versionUpdateError) {
+                   console.warn('[QuoteNew] Failed to save AI analysis to version:', versionUpdateError);
+               }
              }
+             
         }
 
-        // 1. Fetch Master Data in Parallel
-        const [
-            { data: categories },
-            { data: sides },
-            { data: bases },
-            { data: currencies },
-            { data: serviceTypes },
-            { data: serviceModes },
-            { data: carriers }
-        ] = await Promise.all([
-            scopedDb.from('charge_categories', true).select('id, code, name'),
-            scopedDb.from('charge_sides', true).select('id, code, name'),
-            scopedDb.from('charge_bases', true).select('id, code, name'),
-            scopedDb.from('currencies', true).select('id, code'),
-            scopedDb.from('service_types', true).select('id, code, name, transport_modes(code)'),
-            scopedDb.from('service_modes', true).select('id, code, name'),
-            scopedDb.from('carriers', true).select('id, carrier_name, scac')
-        ]);
+        // 1. Fetch Master Data (Cached)
+        const CACHE_KEY = `master_data_${resolvedTenantId}`;
+        const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+        let masterData = MASTER_DATA_CACHE[CACHE_KEY];
+        if (!masterData || (Date.now() - masterData.timestamp > CACHE_TTL)) {
+            logger.info('[QuoteNew] Fetching master data from DB (Cache Miss/Expired)');
+            const [
+                { data: categories },
+                { data: sides },
+                { data: bases },
+                { data: currencies },
+                { data: serviceTypes },
+                { data: serviceModes },
+                { data: carriers },
+                { data: ports },
+                { data: containerTypes },
+                { data: containerSizes }
+            ] = await Promise.all([
+                scopedDb.from('charge_categories', true).select('id, code, name'),
+                scopedDb.from('charge_sides', true).select('id, code, name'),
+                scopedDb.from('charge_bases', true).select('id, code, name'),
+                scopedDb.from('currencies', true).select('id, code'),
+                scopedDb.from('service_types', true).select('id, code, name, transport_modes(code)'),
+                scopedDb.from('service_modes', true).select('id, code, name'),
+                scopedDb.from('carriers', true).select('id, carrier_name, scac'),
+                supabase.from('ports_locations').select('id, location_name, location_code, country'),
+                scopedDb.from('container_types').select('id, name, code'),
+                scopedDb.from('container_sizes').select('id, name, code')
+            ]);
+            
+            masterData = {
+                timestamp: Date.now(),
+                data: { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports, containerTypes, containerSizes }
+            };
+            MASTER_DATA_CACHE[CACHE_KEY] = masterData;
+        } else {
+            logger.info('[QuoteNew] Using cached master data');
+        }
+
+        const { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports, containerTypes, containerSizes } = masterData.data;
 
         // Initialize Logistics Plugin Mapper
         const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
@@ -317,6 +379,11 @@ export default function QuoteNew() {
         const buySideId = rateMapper.getSideId('buy') || rateMapper.getSideId('cost');
         const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
+        if (!categories || categories.length === 0) {
+             console.error('[QuoteNew] Master Data Missing: Categories');
+             throw new Error('Missing charge categories configuration.');
+        }
+
         if (!buySideId || !sellSideId) {
              console.error('[QuoteNew] Master Data Missing: Sides', { sides });
              throw new Error(`Missing charge sides configuration. Found ${sides?.length} sides.`);
@@ -326,19 +393,53 @@ export default function QuoteNew() {
         const newOptionIds: string[] = [];
 
         const processRate = async (rawRate: any) => {
+            // Resolve Container IDs if they are missing or strings
+            let containerSizeId = rawRate.container_size_id || rawRate.container_size?.id;
+            if (!containerSizeId && containerSizes && rawRate.container_size) {
+                // Try to resolve from string (e.g. "20", "40HC")
+                const sizeStr = String(rawRate.container_size).trim().toUpperCase();
+                const match = containerSizes.find((s: any) => 
+                    s.name.toUpperCase() === sizeStr || 
+                    s.code.toUpperCase() === sizeStr ||
+                    s.name.toUpperCase().includes(sizeStr) // Loose match
+                );
+                if (match) containerSizeId = match.id;
+            }
+
+            let containerTypeId = rawRate.container_type_id || rawRate.container_type?.id;
+            if (!containerTypeId && containerTypes && rawRate.container_type) {
+                const typeStr = String(rawRate.container_type).trim().toUpperCase();
+                const match = containerTypes.find((t: any) => 
+                    t.name.toUpperCase() === typeStr || 
+                    t.code.toUpperCase() === typeStr
+                );
+                if (match) containerTypeId = match.id;
+            }
+
+            // Create enriched rate with resolved IDs to prevent UUID errors
+            const enrichedRate = {
+                ...rawRate,
+                container_size_id: containerSizeId,
+                container_type_id: containerTypeId
+            };
+
             try {
                 const optionId = await QuoteTransformService.retryOperation(async () => {
                     return await quoteOptionService.addOptionToVersion({
                         tenantId: resolvedTenantId,
                         versionId: versionId,
-                        rate: rawRate,
+                        rate: enrichedRate,
                         rateMapper: rateMapper,
                         source: rawRate.source_attribution || state.source || 'quick_quote',
                         context: {
                             origin: state.origin,
                             destination: state.destination,
                             originDetails: state.originDetails,
-                            destinationDetails: state.destinationDetails
+                            destinationDetails: state.destinationDetails,
+                            ports: ports || [],
+                            categories: categories || [],
+                            carriers: carriers || [],
+                            serviceTypes: serviceTypes || []
                         }
                     });
                 }, { maxAttempts: 3, backoffFactor: 1.5 });
@@ -481,6 +582,32 @@ export default function QuoteNew() {
     
     // Switch to composer view
     setViewMode('composer');
+
+    // CRITICAL: Fetch the version ID for the newly created quote so options can be inserted
+    (async () => {
+      const maxAttempts = 3;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const { data, error } = await (scopedDb
+          .from('quotation_versions', true)
+          .select('id')
+          .eq('quote_id', quoteId)
+          .order('version_number', { ascending: false })
+          .limit(1) as any)
+          .single();
+        if (!error && data) {
+          logger.info('[QuoteNew] Fetched version ID for new quote', { versionId: data.id });
+          setVersionId(data.id);
+          return;
+        }
+        if (attempt < maxAttempts - 1) {
+          const delay = Math.min(800 * Math.pow(2, attempt), 3000);
+          await new Promise(res => setTimeout(res, delay));
+          continue;
+        }
+        console.error('[QuoteNew] Failed to fetch version ID for new quote after retries:', error);
+        setVersionError('Failed to initialize quote version: ' + (error?.message || 'Unknown error'));
+      }
+    })();
 
     // Update quote with selected template if applicable
     if (selectedTemplateId) {
@@ -649,6 +776,10 @@ export default function QuoteNew() {
     ensureVersion();
   }, [createdQuoteId, tenantId, context.tenantId, scopedDb, supabase]);
 
+  // Debug Data Inspector Logic
+  const debugModeEnabled = user?.user_metadata?.debug_mode_enabled === true;
+  const showDebugInspector = isPlatformAdmin() && debugModeEnabled;
+
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-6">
@@ -669,7 +800,9 @@ export default function QuoteNew() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold">New Quote</h1>
             <div className="flex gap-2">
-                <QuickQuoteHistory onSelect={handleHistorySelect} />
+                <Suspense fallback={<Button variant="outline" disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" /> History</Button>}>
+                    <QuickQuoteHistory onSelect={handleHistorySelect} />
+                </Suspense>
                 <Button variant="outline" onClick={() => setTemplateDialogOpen(true)}>
                 <FileText className="mr-2 h-4 w-4" />
                 Use Template
@@ -729,20 +862,24 @@ export default function QuoteNew() {
             <DialogHeader>
               <DialogTitle>Select a Quote Template</DialogTitle>
             </DialogHeader>
-            <QuoteTemplateList onSelect={handleTemplateSelect} />
+            <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>}>
+              <QuoteTemplateList onSelect={handleTemplateSelect} />
+            </Suspense>
           </DialogContent>
         </Dialog>
         
         {createdQuoteId && versionId && viewMode === 'composer' && (!location.state?.selectedRates || optionsInserted) && (
           <div className="mt-6">
-            <MultiModalQuoteComposer 
-              quoteId={createdQuoteId} 
-              versionId={versionId} 
-              optionId={generatedOptionIds.length > 0 ? generatedOptionIds[0] : undefined}
-              lastSyncTimestamp={lastSyncTimestamp}
-              tenantId={tenantId || undefined}
-              templateId={selectedTemplateId}
-            />
+            <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>}>
+              <MultiModalQuoteComposer 
+                quoteId={createdQuoteId} 
+                versionId={versionId} 
+                optionId={generatedOptionIds.length > 0 ? generatedOptionIds[0] : undefined}
+                lastSyncTimestamp={lastSyncTimestamp}
+                tenantId={tenantId || undefined}
+                templateId={selectedTemplateId}
+              />
+            </Suspense>
           </div>
         )}
         
@@ -780,9 +917,57 @@ export default function QuoteNew() {
                 )}
              </div>
         )}
+        {showDebugInspector && (
+        <DataInspector
+          title="Create Quote Inspector"
+          data={{
+            inputs: {
+              locationState: location.state,
+              templateData,
+              masterData: MASTER_DATA_CACHE[`master_data_${tenantId}`] // Use safely
+            },
+            outputs: {
+              createdQuoteId,
+              versionId,
+              generatedOptionIds,
+              versionError,
+              insertionError
+            },
+            currentState: {
+              viewMode,
+              isInsertingOptions,
+              optionsInserted,
+              insertionProgress,
+              templateDialogOpen,
+              lastSyncTimestamp
+            }
+          }}
+          defaultOpen={false}
+        />
+        )}
       </div>
     </DashboardLayout>
   );
+}
+
+export async function getLatestVersionIdWithRetry(scopedDb: any, quoteId: string, maxAttempts = 3): Promise<string | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data, error } = await (scopedDb
+      .from('quotation_versions', true)
+      .select('id')
+      .eq('quote_id', quoteId)
+      .order('version_number', { ascending: false })
+      .limit(1) as any)
+      .single();
+    if (!error && data) return data.id as string;
+    if (attempt < maxAttempts - 1) {
+      const delay = Math.min(800 * Math.pow(2, attempt), 3000);
+      await new Promise(res => setTimeout(res, delay));
+      continue;
+    }
+    return null;
+  }
+  return null;
 }
 
 // Helper function for robust carrier matching

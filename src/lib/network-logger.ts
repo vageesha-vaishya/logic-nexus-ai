@@ -72,7 +72,7 @@ export const initNetworkLogger = () => {
 
       // --- Response Capture ---
       let responseBody: any = null;
-      let responseHeaders: any = {};
+      const responseHeaders: any = {};
       
       // Always read response if error or if debug enabled and capture requested
       const shouldCaptureBody = !response.ok || (debugConfig.enabled && debugConfig.network.captureResponseBody);

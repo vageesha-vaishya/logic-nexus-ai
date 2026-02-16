@@ -33,6 +33,7 @@ export interface SimulationParams {
 
 export function generateSimulatedRates(params: SimulationParams): RateOption[] {
     const { mode, weightKg = 0, containerQty = 1, containerSize, vehicleType } = params;
+    const w = Number(weightKg) || 0;
     const options: RateOption[] = [];
     
     // Dynamic Base Rates Calculation
@@ -48,7 +49,7 @@ export function generateSimulatedRates(params: SimulationParams): RateOption[] {
         baseTransitDays = 25;
     } else if (mode === 'air') {
         const ratePerKg = 4.50;
-        basePrice = (weightKg || 100) * ratePerKg;
+        basePrice = (w || 100) * ratePerKg;
         baseTransitDays = 3;
     } else if (mode === 'road') {
         const ratePerKm = 2.50; 
@@ -90,7 +91,7 @@ export function generateSimulatedRates(params: SimulationParams): RateOption[] {
         const co2Factor = mode === 'air' ? 0.6 : 
                          (mode === 'ocean' ? 0.03 : 
                          (mode === 'rail' ? 0.02 : 0.1));
-        const estimatedCo2 = Math.round((weightKg || 1000) * co2Factor * (1 + (stops * 0.1)));
+        const estimatedCo2 = Math.round((w || 1000) * co2Factor * (1 + (stops * 0.1)));
         
         const originalCost = simulatedPrice;
 

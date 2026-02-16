@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +38,8 @@ function QuoteLineItemRow({ index, remove }: { index: number; remove: (index: nu
         commodity: {
             description: itemValues?.product_name || '',
             hts_code: itemValues?.attributes?.hs_code,
-            id: itemValues?.commodity_id
+            id: itemValues?.commodity_id,
+            aes_hts_id: itemValues?.aes_hts_id
         },
         hazmat: itemValues?.attributes?.hazmat,
         stackable: itemValues?.attributes?.stackable,
@@ -78,9 +81,11 @@ function QuoteLineItemRow({ index, remove }: { index: number; remove: (index: nu
             if (newCargo.commodity.id) {
                 setValue(`items.${index}.commodity_id`, newCargo.commodity.id);
             }
+            // Always update aes_hts_id (set or clear)
+            setValue(`items.${index}.aes_hts_id`, newCargo.commodity.aes_hts_id);
+
             if (newCargo.commodity.hts_code) {
                 setValue(`items.${index}.attributes.hs_code`, newCargo.commodity.hts_code);
-                setValue(`items.${index}.aes_hts_id`, newCargo.commodity.id); // Assuming ID maps to aes_hts_id contextually
             }
         }
 
@@ -106,6 +111,7 @@ function QuoteLineItemRow({ index, remove }: { index: number; remove: (index: nu
                         <SharedCargoInput 
                             value={cargoItem}
                             onChange={handleCargoChange}
+                            disableMultiContainer={true}
                         />
                     </div>
 
@@ -189,6 +195,15 @@ export function QuoteLineItems() {
     name: "items"
   });
 
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: fields.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 400, // Estimate height for complex row
+    overscan: 3,
+  });
+
   const handleAddItem = () => {
     append({
       line_number: fields.length + 1,
@@ -238,10 +253,38 @@ export function QuoteLineItems() {
                 </Button>
              </div>
         ) : (
-            <div className="space-y-4">
-                {fields.map((field, index) => (
-                    <QuoteLineItemRow key={field.id} index={index} remove={remove} />
-                ))}
+            <div 
+                ref={parentRef}
+                className="max-h-[800px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+            >
+                <div
+                    style={{
+                        height: `${rowVirtualizer.getTotalSize()}px`,
+                        width: '100%',
+                        position: 'relative',
+                    }}
+                >
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+                        <div
+                            key={virtualRow.key}
+                            data-index={virtualRow.index}
+                            ref={rowVirtualizer.measureElement}
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                transform: `translateY(${virtualRow.start}px)`,
+                                paddingBottom: '1rem', // Add spacing between rows
+                            }}
+                        >
+                            <QuoteLineItemRow 
+                                index={virtualRow.index} 
+                                remove={remove} 
+                            />
+                        </div>
+                    ))}
+                </div>
             </div>
         )}
       </CardContent>

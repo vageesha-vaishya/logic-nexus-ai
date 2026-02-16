@@ -18,19 +18,21 @@ export function QuotationWorkflowStepper({ currentStep, onStepClick, steps }: Qu
       <div className="flex items-center justify-between">
         {steps.map((step, index) => (
           <div key={step.id} className="flex items-center flex-1">
-            <div className="flex flex-col items-center flex-1">
-              <button
-                onClick={() => onStepClick(step.id)}
+            <div 
+              className="flex flex-col items-center flex-1 cursor-pointer group"
+              onClick={() => onStepClick(step.id)}
+            >
+              <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
                   currentStep > step.id
                     ? 'bg-primary text-primary-foreground'
                     : currentStep === step.id
                     ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                    : 'bg-muted text-muted-foreground'
+                    : 'bg-muted text-muted-foreground group-hover:bg-muted/80'
                 }`}
               >
                 {currentStep > step.id ? <Check className="h-5 w-5" /> : step.id}
-              </button>
+              </div>
               <div className="mt-2 text-center">
                 <p className={`text-sm font-medium ${currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {step.title}

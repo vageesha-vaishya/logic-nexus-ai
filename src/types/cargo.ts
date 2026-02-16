@@ -37,6 +37,12 @@ export const cargoItemSchema = z.object({
     temperature: z.number().optional(),
     ventilation: z.number().optional(),
   }).optional(),
+  containerCombos: z.array(z.object({
+    id: z.string().optional(),
+    typeId: z.string(),
+    sizeId: z.string(),
+    quantity: z.number()
+  })).optional(),
   weight: weightSchema,
   stackable: z.boolean().default(false),
   hazmat: hazmatSchema.optional(),
@@ -46,6 +52,7 @@ export const cargoItemSchema = z.object({
     description: z.string().min(1, 'Description is required'),
     hts_code: z.string().optional(),
     id: z.string().optional(), // Master Commodity ID
+    aes_hts_id: z.string().optional(), // Specific HTS Code ID
   }).optional(),
 });
 

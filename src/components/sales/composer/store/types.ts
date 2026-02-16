@@ -70,6 +70,10 @@ export interface QuoteState {
     carriers: any[];
     chargeSides: any[];
     serviceLegCategories: any[];
+    shippingTerms: any[];
+    ports: any[];
+    accounts: any[];
+    contacts: any[];
   };
 
   // UI State

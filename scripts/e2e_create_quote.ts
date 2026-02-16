@@ -72,7 +72,7 @@ async function main() {
   const containerSizeId = containerSizes.id;
 
   // Get Ports
-  let { data: ports, error: pError } = await supabase
+  const { data: ports, error: pError } = await supabase
     .from('ports_locations')
     .select('id, location_name')
     .limit(2);

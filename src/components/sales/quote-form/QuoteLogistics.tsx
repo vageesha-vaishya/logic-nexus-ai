@@ -131,7 +131,7 @@ export function QuoteLogistics() {
       <CardContent className="grid gap-6">
         
         {/* Service Configuration Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-muted/5 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-muted/5 rounded-lg border">
           <FormField
             control={control}
             name="service_type_id"
@@ -179,6 +179,31 @@ export function QuoteLogistics() {
                     {filteredServices.map((s: Service) => (
                       <SelectItem key={s.id} value={String(s.id)}>
                         {typeof s.service_name === 'string' ? s.service_name : String(s.service_name || '')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="carrier_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Preferred Carrier</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select Carrier (Optional)" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {filteredCarriers.map((c: Carrier) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.carrier_name}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -154,7 +154,7 @@ export default function DataManagement() {
         return;
       }
 
-      let tablesPayload: Record<string, any[]> = {};
+      const tablesPayload: Record<string, any[]> = {};
       if (parsed && typeof parsed === 'object' && parsed.tables && typeof parsed.tables === 'object') {
         Object.entries(parsed.tables as Record<string, any>).forEach(([key, value]) => {
           if (Array.isArray(value)) {
@@ -552,7 +552,7 @@ export default function DataManagement() {
                                 toast.error('Invalid file', { description: 'Expected JSON content' });
                                 return;
                               }
-                              let tablesPayload: Record<string, any[]> = {};
+                              const tablesPayload: Record<string, any[]> = {};
                               if (parsed && typeof parsed === 'object' && parsed.tables && typeof parsed.tables === 'object') {
                                 Object.entries(parsed.tables as Record<string, any>).forEach(([key, value]) => {
                                   if (Array.isArray(value)) {

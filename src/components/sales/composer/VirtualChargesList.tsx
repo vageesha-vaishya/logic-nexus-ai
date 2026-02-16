@@ -1,7 +1,5 @@
 
 import { useRef } from 'react';
-import { List } from 'react-window';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { VirtualChargeRow } from './VirtualChargeRow';
 import { cn } from '@/lib/utils';
 
@@ -26,28 +24,7 @@ export function VirtualChargesList({
   onConfigureBasis,
   height = 500
 }: VirtualChargesListProps) {
-  const listRef = useRef<any>(null);
-
-  const getItemSize = (index: number) => {
-    // 60px for top row + 80px for bottom row = 140px
-    return 140;
-  };
-
-  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => (
-    <VirtualChargeRow
-      style={style}
-      charge={charges[index]}
-      index={index}
-      currencyOptions={currencies}
-      basisOptions={bases}
-      categoryOptions={categories}
-      onUpdate={(field, value) => onUpdate(index, field, value)}
-      onRemove={() => onRemove(index)}
-      onConfigureBasis={() => onConfigureBasis(index)}
-      className={index % 2 === 1 ? 'bg-muted/5' : ''}
-    />
-  );
-
+  
   return (
     <div className="border rounded-lg shadow-sm overflow-hidden flex flex-col">
       {/* Header */}
@@ -62,19 +39,30 @@ export function VirtualChargesList({
         <div className="w-[50px] text-center">Actions</div>
       </div>
 
-      {/* Virtual List */}
-      <div style={{ height: typeof height === 'number' ? `${height}px` : height }} className="bg-background">
-        <AutoSizer>
-          {({ height: autoHeight, width }) => (
-            <List
-              ref={listRef}
-              style={{ width, height: autoHeight }}
-              rowCount={charges.length}
-              rowHeight={getItemSize}
-              rowComponent={Row}
+      {/* List (Non-virtualized fallback since react-window is missing) */}
+      <div 
+        style={{ height: typeof height === 'number' ? `${height}px` : height }} 
+        className="bg-background overflow-y-auto"
+      >
+        {charges.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
+            <p>No charges added yet</p>
+          </div>
+        ) : (
+          charges.map((charge, index) => (
+            <VirtualChargeRow
+              key={charge.id || index}
+              charge={charge}
+              categories={categories}
+              bases={bases}
+              currencies={currencies}
+              onUpdate={(field, value) => onUpdate(index, field, value)}
+              onRemove={() => onRemove(index)}
+              onConfigureBasis={() => onConfigureBasis(index)}
+              className={index % 2 === 1 ? 'bg-muted/5' : ''}
             />
-          )}
-        </AutoSizer>
+          ))
+        )}
       </div>
     </div>
   );

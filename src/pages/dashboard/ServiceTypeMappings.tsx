@@ -158,7 +158,7 @@ export default function ServiceTypeMappings() {
 
   const fetchMappings = async () => {
     try {
-      let query = scopedDb
+      const query = scopedDb
         .from('service_type_mappings')
         .select('*');
         

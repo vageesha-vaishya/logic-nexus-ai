@@ -23,7 +23,7 @@ export const processImportRow = (
 ): ProcessedRow => {
   const processedData: Record<string, any> = {};
   const logs: ImportLog[] = [];
-  let isValid = true;
+  const isValid = true;
 
   // Invert mapping to iterate over DB fields we care about
   // actually we iterate over the mapping entries

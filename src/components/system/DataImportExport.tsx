@@ -931,7 +931,7 @@ export default function DataImportExport({
   const handleExport = async (format: 'xlsx' | 'csv') => {
     setExportStage('counting');
     try {
-      let query = db.from(tableName as any).select('*');
+      const query = db.from(tableName as any).select('*');
       
       // ScopedDataAccess automatically applies context filters
       

@@ -1,5 +1,7 @@
 # Comprehensive Strategic Analysis & Enhancement Plan
+
 ## Logic Nexus AI: Enterprise Multi-Domain CRM Platform
+
 ## Platform Hierarchy: Super Admin → Multi-Tenant → Multi-Franchise
 
 **Document Version:** 2.1
@@ -8,16 +10,17 @@
 **Status:** Complete — All sections written and fact-checked against codebase (v2.1: 30 undocumented features added)
 **Classification:** Internal Strategic Document
 **Revision Notes (v1.1):** Corrected migration count (489, not 280+), Leads.tsx line count (715, not 800+), lead scoring description (rule-based, not AI), booking system status (corrected in v2.1: full UI exists), removed non-existent tables from schema diagrams, corrected competitive ratings, added budget realism note, marked Sections 7-9 as unwritten stubs, added user-role scoping to ScopedDataAccess documentation.
-**Revision Notes (v2.0):** Section 5 expanded with detailed SWOT analysis, 2025-2026 market data, pricing comparisons (CargoWise Value Packs, Salesforce Agentforce, Dynamics Copilot, HubSpot Breeze, Freightos marketplace), positioning map, and market sizing ($16.3B logistics software market). Section 7 rewritten with verified codebase facts: 46 Edge Functions catalogued, Docker/Nginx/CI config documented, bundle splitting strategy, dual-layer auth architecture, state management patterns, 491 migrations with 347 RLS policies and 193 stored procedures. Section 8 rewritten with actual test inventory (76 files, 339 tests, 5 testing patterns), ESLint config, TypeScript strictness analysis, testing gap assessment, and CI/CD quality gate recommendations. Section 9 rewritten with detailed go-live checklist (weighted readiness score: ~22%), monitoring inventory, infrastructure assessment, migration plan with rollback procedures, and legal/compliance gaps. Added Appendices A-E: Glossary, Technology Stack (58 packages), Edge Function Inventory (45 functions), Migration Statistics, Configuration File Map. Conclusion expanded with maturity assessment matrix and market-window analysis (CargoWise pricing disruption).
-**Revision Notes (v2.1):** Comprehensive feature discovery audit — 30 previously undocumented features identified and catalogued. **Section 2.B.2 (Booking System) CORRECTED**: was marked "Critical Architecture Gap / DB only, no UI" but actually has full CRUD implementation (BookingNew.tsx, BookingDetail.tsx, Bookings.tsx, `convert_quote_to_booking` RPC). Gap table updated to show booking entity/quote-conversion as ✅ Closed. **Section 3.4 ADDED**: Platform-Wide Features Inventory with 4 sub-tables: 16 fully implemented features (Transfer Center, Debug Console, Customer Quote Portal, Container Tracking, Theme Management, Permissions Matrix, Reports Dashboard, Audit Trail, Tax Engine, Invoice System, Margin Rules, Document Manager, Data Import/Export, Lead Assignment/Routing, Restricted Party Screening, Vendor CLM), 5 partially implemented features (E-Signature, GL Sync, Notification Center, Interaction Timeline, Multi-Domain Quotation Engines), 6 placeholder features (Calendar, Chatter, Campaigns, Files, Groups, CRMWorkspace), 8 AI Edge Functions mapped to UI surfaces. Feature completeness summary: 35 features + 8 AI functions, ~65% production-ready. TOC updated. Conclusion updated to reflect corrected feature count and booking system status.
+**Revision Notes (v2.0):** Section 5 expanded with detailed SWOT analysis, 2025-2026 market data, pricing comparisons (CargoWise Value Packs, Salesforce Agentforce, Dynamics Copilot, HubSpot Breeze, Freightos marketplace), positioning map, and market sizing ($16.3B logistics software market). Section 7 rewritten with verified codebase facts: 46 Edge Functions catalogued, Docker/Nginx/CI config documented, bundle splitting strategy, dual-layer auth architecture, state management patterns, 491 migrations with 347 RLS policies and 193 stored procedures. Section 8 rewritten with actual test inventory (76 files, 339 tests, 5 testing patterns), ESLint config, TypeScript strictness analysis, testing gap assessment, and CI/CD quality gate recommendations. Section 9 rewritten with detailed go-live checklist (weighted readiness score: \~22%), monitoring inventory, infrastructure assessment, migration plan with rollback procedures, and legal/compliance gaps. Added Appendices A-E: Glossary, Technology Stack (58 packages), Edge Function Inventory (45 functions), Migration Statistics, Configuration File Map. Conclusion expanded with maturity assessment matrix and market-window analysis (CargoWise pricing disruption).
+**Revision Notes (v2.1):** Comprehensive feature discovery audit — 30 previously undocumented features identified and catalogued. **Section 2.B.2 (Booking System) CORRECTED**: was marked "Critical Architecture Gap / DB only, no UI" but actually has full CRUD implementation (BookingNew\.tsx, BookingDetail.tsx, Bookings.tsx, `convert_quote_to_booking` RPC). Gap table updated to show booking entity/quote-conversion as ✅ Closed. **Section 3.4 ADDED**: Platform-Wide Features Inventory with 4 sub-tables: 16 fully implemented features (Transfer Center, Debug Console, Customer Quote Portal, Container Tracking, Theme Management, Permissions Matrix, Reports Dashboard, Audit Trail, Tax Engine, Invoice System, Margin Rules, Document Manager, Data Import/Export, Lead Assignment/Routing, Restricted Party Screening, Vendor CLM), 5 partially implemented features (E-Signature, GL Sync, Notification Center, Interaction Timeline, Multi-Domain Quotation Engines), 6 placeholder features (Calendar, Chatter, Campaigns, Files, Groups, CRMWorkspace), 8 AI Edge Functions mapped to UI surfaces. Feature completeness summary: 35 features + 8 AI functions, \~65% production-ready. TOC updated. Conclusion updated to reflect corrected feature count and booking system status.
 
----
+***
 
 ## Executive Summary
 
 This comprehensive analysis provides a complete assessment of the Logic Nexus AI platform, covering architecture, business workflows, competitive positioning, technical roadmap, and production readiness. The platform operates as an enterprise-grade SaaS/PaaS solution with a strict three-tier hierarchy: **Super Admin (Platform Owner: SOS Services) → Multi-Tenant (Companies) → Multi-Franchise (Locations)**.
 
 **Key Focus Areas:**
+
 1. **Technical Debt Resolution**: Address code maintainability issues blocking development velocity
 2. **Hierarchy Enforcement**: Ensure strict data isolation across Super Admin → Tenant → Franchise
 3. **Feature Gap Analysis**: Identify missing capabilities vs. industry leaders (Cargowise, Magaya, Salesforce)
@@ -25,92 +28,100 @@ This comprehensive analysis provides a complete assessment of the Logic Nexus AI
 5. **Domain Expansion**: Prepare architecture for multi-vertical platform (Logistics, Banking, Telecom, etc.)
 
 **Critical Findings Summary:**
-- ✅ **Strengths**: Multi-domain plugin architecture (8 domains), 161 dashboard pages spanning 47 features (26 fully implemented) + 8 AI Edge Functions + 20+ master data pages + 6 Kanban pipeline views, established 3-tier hierarchy, 347 RLS policies across 145 tables, 46 Edge Functions with auth hardening, dual-layer data isolation (RLS + ScopedDataAccess)
-- ⚠️ **Technical Debt**: Quote system maintainability (30+ files), TypeScript strict mode disabled, no code coverage tooling, 46 failing tests, no pre-commit hooks
-- 🔴 **Critical Gaps**: Credentials in git history need rotation, ~22% production readiness score, no APM/distributed tracing, no mobile app, rule-based heuristics only (no ML)
-- 🎯 **Priority**: Phase 1 must address credential rotation, monitoring, TypeScript strictness, and testing infrastructure before expanding features
-- 💰 **Market Opportunity**: CargoWise's December 2025 pricing disruption (25-35% increases) creates acquisition window for mid-market freight forwarders
 
----
+* ✅ **Strengths**: Multi-domain plugin architecture (8 domains), 161 dashboard pages spanning 47 features (26 fully implemented) + 8 AI Edge Functions + 20+ master data pages + 6 Kanban pipeline views, established 3-tier hierarchy, 347 RLS policies across 145 tables, 46 Edge Functions with auth hardening, dual-layer data isolation (RLS + ScopedDataAccess)
+* ⚠️ **Technical Debt**: Quote system maintainability (30+ files), TypeScript strict mode disabled, no code coverage tooling, 46 failing tests, no pre-commit hooks
+* 🔴 **Critical Gaps**: Credentials in git history need rotation, \~22% production readiness score, no APM/distributed tracing, no mobile app, rule-based heuristics only (no ML)
+* 🎯 **Priority**: Phase 1 must address credential rotation, monitoring, TypeScript strictness, and testing infrastructure before expanding features
+* 💰 **Market Opportunity**: CargoWise's December 2025 pricing disruption (25-35% increases) creates acquisition window for mid-market freight forwarders
+
+***
 
 ## Table of Contents
 
-**Section 1: Architecture Assessment & Hierarchy Implementation** _(Pages 1-25)_
-- 1.1 Platform Hierarchy Architecture
-- 1.2 Current Codebase Structure
-- 1.3 Database Architecture & Tenant Isolation
-- 1.4 Plugin System Design Patterns
-- 1.5 Multi-Tenant Access Control Analysis
-- 1.6 Enterprise Readiness Assessment
+**Section 1: Architecture Assessment & Hierarchy Implementation** *(Pages 1-25)*
+
+* 1.1 Platform Hierarchy Architecture
+* 1.2 Current Codebase Structure
+* 1.3 Database Architecture & Tenant Isolation
+* 1.4 Plugin System Design Patterns
+* 1.5 Multi-Tenant Access Control Analysis
+* 1.6 Enterprise Readiness Assessment
 
 **Section 2: Complete Business Workflow Analysis**
-- 2.A Pre-Quotation (CRM) Workflows
-  - 2.A.1 Lead Management System
-  - 2.A.2 Tasks & Activities Management
-  - 2.A.3 Opportunities Tracking & Pipeline
-  - 2.A.4 Account Management
-  - 2.A.5 Contacts Management
-  - 2.A.6 Email Infrastructure & Management
-  - 2.A.7 Pipeline Operations, CPQ Integration & Forecasting (Extended Analysis)
-  - 2.A.8 Calendar & Scheduling
-  - 2.A.9 CRM Dashboard & Analytics
-- 2.B Post-Quotation (Operations) Workflows
-  - 2.B.1 Quotation System
-  - 2.B.2 Booking System
-  - 2.B.3 Shipment Management
-  - 2.B.4 Fulfillment & Execution
-  - 2.B.5 Financial Operations (AR & AP)
-  - 2.B.6 Financial Accounting & Revenue Management
-  - 2.B.7 Financial Integration & Interoperability
-  - 2.B.8 Compliance & Regulatory Filing
-  - 2.B.9 Analytics & Business Intelligence (BI)
 
-**Section 3: Feature Inventory** _(Pages 101-130)_
-- 3.1 Implemented Logistics Features
-- 3.2 Logistics Gaps vs. Industry Leaders
-- 3.3 Logistics Enhancement Roadmap
-- 3.4 Platform-Wide Features Inventory
-  - 3.4.1 Fully Implemented Features (16 features)
-  - 3.4.2 Partially Implemented / Simulated Features (5 features)
-  - 3.4.3 Placeholder / Coming-Soon Features (6 features)
-  - 3.4.4 AI & Intelligence Edge Functions (8 functions)
-  - 3.4.5 Operational & Administrative Features (10 features)
-  - 3.4.6 Master Data & Reference Pages (20+ pages)
-  - 3.4.7 Platform Feature Completeness Summary
+* 2.A Pre-Quotation (CRM) Workflows
+  * 2.A.1 Lead Management System
+  * 2.A.2 Tasks & Activities Management
+  * 2.A.3 Opportunities Tracking & Pipeline
+  * 2.A.4 Account Management
+  * 2.A.5 Contacts Management
+  * 2.A.6 Email Infrastructure & Management
+  * 2.A.7 Pipeline Operations, CPQ Integration & Forecasting (Extended Analysis)
+  * 2.A.8 Calendar & Scheduling
+  * 2.A.9 CRM Dashboard & Analytics
+* 2.B Post-Quotation (Operations) Workflows
+  * 2.B.1 Quotation System
+  * 2.B.2 Booking System
+  * 2.B.3 Shipment Management
+  * 2.B.4 Fulfillment & Execution
+  * 2.B.5 Financial Operations (AR & AP)
+  * 2.B.6 Financial Accounting & Revenue Management
+  * 2.B.7 Financial Integration & Interoperability
+  * 2.B.8 Compliance & Regulatory Filing
+  * 2.B.9 Analytics & Business Intelligence (BI)
 
-**Section 4: Multi-Domain Capability Gap Analysis** _(Pages 111-125)_
+**Section 3: Feature Inventory** *(Pages 101-130)*
 
-**Section 5: Competitive Benchmarking** _(Pages 126-160)_
+* 3.1 Implemented Logistics Features
+* 3.2 Logistics Gaps vs. Industry Leaders
+* 3.3 Logistics Enhancement Roadmap
+* 3.4 Platform-Wide Features Inventory
+  * 3.4.1 Fully Implemented Features (16 features)
+  * 3.4.2 Partially Implemented / Simulated Features (5 features)
+  * 3.4.3 Placeholder / Coming-Soon Features (6 features)
+  * 3.4.4 AI & Intelligence Edge Functions (8 functions)
+  * 3.4.5 Operational & Administrative Features (10 features)
+  * 3.4.6 Master Data & Reference Pages (20+ pages)
+  * 3.4.7 Platform Feature Completeness Summary
 
-**Section 6: Enterprise Implementation Roadmap** _(Pages 161-185)_
+**Section 4: Multi-Domain Capability Gap Analysis** *(Pages 111-125)*
+
+**Section 5: Competitive Benchmarking** *(Pages 126-160)*
+
+**Section 6: Enterprise Implementation Roadmap** *(Pages 161-185)*
 
 **Section 7: Technical Specifications**
-- 7.1 System Architecture (Frontend, Backend, State Management, Bundle Optimization)
-- 7.2 Security Architecture (Authentication, Authorization, Transport Security)
-- 7.3 Data Governance (Schema Statistics, Retention, Audit Trail)
-- 7.4 Deployment Architecture (Containers, CI/CD, Environment Configuration)
+
+* 7.1 System Architecture (Frontend, Backend, State Management, Bundle Optimization)
+* 7.2 Security Architecture (Authentication, Authorization, Transport Security)
+* 7.3 Data Governance (Schema Statistics, Retention, Audit Trail)
+* 7.4 Deployment Architecture (Containers, CI/CD, Environment Configuration)
 
 **Section 8: Quality Assurance Framework**
-- 8.1 Current Testing Infrastructure (Config, Inventory, Setup, Patterns)
-- 8.2 Testing Gaps & Improvement Plan
-- 8.3 Linting & Static Analysis
-- 8.4 CI/CD Quality Gates
-- 8.5 Visual Testing & Design System
+
+* 8.1 Current Testing Infrastructure (Config, Inventory, Setup, Patterns)
+* 8.2 Testing Gaps & Improvement Plan
+* 8.3 Linting & Static Analysis
+* 8.4 CI/CD Quality Gates
+* 8.5 Visual Testing & Design System
 
 **Section 9: Production Readiness Checklist**
-- 9.1 Current Production Readiness Assessment
-- 9.2 Go-Live Criteria Checklist (Security, Performance, Reliability, Operations, Legal)
-- 9.3 Data Migration Plan
-- 9.4 Go-Live Readiness Score
+
+* 9.1 Current Production Readiness Assessment
+* 9.2 Go-Live Criteria Checklist (Security, Performance, Reliability, Operations, Legal)
+* 9.3 Data Migration Plan
+* 9.4 Go-Live Readiness Score
 
 **Appendices**
-- Appendix A: Glossary of Terms
-- Appendix B: Technology Stack Reference
-- Appendix C: Edge Function Inventory
-- Appendix D: Database Migration Statistics
-- Appendix E: Key Configuration File Locations
 
----
+* Appendix A: Glossary of Terms
+* Appendix B: Technology Stack Reference
+* Appendix C: Edge Function Inventory
+* Appendix D: Database Migration Statistics
+* Appendix E: Key Configuration File Locations
+
+***
 
 # Section 1: Architecture Assessment & Hierarchy Implementation
 
@@ -230,32 +241,35 @@ CREATE TABLE public.user_roles (
 **Hierarchy Column Pattern:**
 
 Every tenant-scoped table in the platform MUST include:
-- `tenant_id UUID NOT NULL REFERENCES public.tenants(id)`
-- `franchise_id UUID REFERENCES public.franchises(id)` (nullable for HQ/tenant-level data)
+
+* `tenant_id UUID NOT NULL REFERENCES public.tenants(id)`
+* `franchise_id UUID REFERENCES public.franchises(id)` (nullable for HQ/tenant-level data)
 
 **Current Schema Coverage:**
 
-✅ **Tables with Full Hierarchy Columns** (tenant_id + franchise_id):
-- accounts
-- contacts
-- leads
-- opportunities
-- activities
-- quotes
-- shipments
-- invoices
-- user_roles
-- vendors
-- customs_documents
-- tracking_events
+✅ **Tables with Full Hierarchy Columns** (tenant\_id + franchise\_id):
+
+* accounts
+* contacts
+* leads
+* opportunities
+* activities
+* quotes
+* shipments
+* invoices
+* user\_roles
+* vendors
+* customs\_documents
+* tracking\_events
 
 ⚠️ **Tables Missing Hierarchy Columns** (Technical Debt Identified):
-- segment_members (missing tenant_id - fixed in migration 20240111)
-- email_templates (missing franchise_id - global templates only)
-- rate_sheets (global vs. tenant-specific unclear)
-- Some audit/log tables (intentionally global)
 
-🔴 **Critical Gap**: ~15-20 tables need audit for hierarchy column completeness
+* segment\_members (missing tenant\_id - fixed in migration 20240111)
+* email\_templates (missing franchise\_id - global templates only)
+* rate\_sheets (global vs. tenant-specific unclear)
+* Some audit/log tables (intentionally global)
+
+🔴 **Critical Gap**: \~15-20 tables need audit for hierarchy column completeness
 
 ### 1.1.3 Row-Level Security (RLS) Implementation
 
@@ -281,39 +295,42 @@ CREATE POLICY "Users can view franchise accounts" ON public.accounts
 
 **RLS Policy Hierarchy Logic:**
 
-| User Role | tenant_id Filter | franchise_id Filter | Result |
-|-----------|------------------|---------------------|---------|
-| **Platform Admin** (no override) | NONE | NONE | Sees ALL data globally |
-| **Platform Admin** (override enabled) | = selected tenant | = selected franchise (if set) | Sees specific tenant/franchise |
-| **Tenant Admin** | = user's tenant | = selected franchise (if set) OR NULL | Sees all franchises in tenant |
-| **Franchise Admin** | = user's tenant | = user's franchise | Sees only their franchise |
-| **User** | = user's tenant | = user's franchise | Sees only their franchise |
+| User Role                             | tenant\_id Filter | franchise\_id Filter                  | Result                         |
+| ------------------------------------- | ----------------- | ------------------------------------- | ------------------------------ |
+| **Platform Admin** (no override)      | NONE              | NONE                                  | Sees ALL data globally         |
+| **Platform Admin** (override enabled) | = selected tenant | = selected franchise (if set)         | Sees specific tenant/franchise |
+| **Tenant Admin**                      | = user's tenant   | = selected franchise (if set) OR NULL | Sees all franchises in tenant  |
+| **Franchise Admin**                   | = user's tenant   | = user's franchise                    | Sees only their franchise      |
+| **User**                              | = user's tenant   | = user's franchise                    | Sees only their franchise      |
 
 **Current RLS Policy Status:**
 
 ✅ **Tables with Correct RLS Policies** (confirmed in migrations 20260211150000, 20260211160000):
-- accounts
-- contacts
-- leads
-- opportunities
-- quotes
-- shipments
-- invoices
-- activities
+
+* accounts
+* contacts
+* leads
+* opportunities
+* quotes
+* shipments
+* invoices
+* activities
 
 ⚠️ **Tables with Loose/Missing RLS Policies**:
-- Some configuration tables (intentionally permissive)
-- Legacy tables from pre-hierarchy implementation
-- Tables relying on JOIN-based RLS (performance concern)
+
+* Some configuration tables (intentionally permissive)
+* Legacy tables from pre-hierarchy implementation
+* Tables relying on JOIN-based RLS (performance concern)
 
 🔴 **Critical Issues Identified:**
-1. **segment_members** table lacked direct tenant_id column, relied on join-based RLS (fixed)
+
+1. **segment\_members** table lacked direct tenant\_id column, relied on join-based RLS (fixed)
 2. **AdminScopeSwitcher** had race condition causing filter bypass (fixed)
-3. **HQ Users** (franchise_id = NULL) unable to see HQ-level data (fixed in migration 20260211150000)
+3. **HQ Users** (franchise\_id = NULL) unable to see HQ-level data (fixed in migration 20260211150000)
 
 ### 1.1.4 ScopedDataAccess Implementation
 
-The frontend enforces hierarchy through the `ScopedDataAccess` class (src/lib/db/access.ts), which automatically injects tenant_id/franchise_id filters into all database queries:
+The frontend enforces hierarchy through the `ScopedDataAccess` class (src/lib/db/access.ts), which automatically injects tenant\_id/franchise\_id filters into all database queries:
 
 **Architecture:**
 
@@ -387,146 +404,152 @@ from('leads').insert({ name: 'New Lead' })
 **Current Implementation Status:**
 
 ✅ **Strengths:**
-- Centralized scoping logic
-- Automatic tenant_id/franchise_id injection on INSERTs
-- Support for Platform Admin scope override
-- Global table exceptions (ports_locations)
+
+* Centralized scoping logic
+* Automatic tenant\_id/franchise\_id injection on INSERTs
+* Support for Platform Admin scope override
+* Global table exceptions (ports\_locations)
 
 ⚠️ **Identified Issues:**
-- Some components bypass ScopedDataAccess and call Supabase directly
-- Inconsistent usage across codebase (technical debt)
-- Race conditions in AdminScopeSwitcher (fixed)
-- No automated testing for scope enforcement
+
+* Some components bypass ScopedDataAccess and call Supabase directly
+* Inconsistent usage across codebase (technical debt)
+* Race conditions in AdminScopeSwitcher (fixed)
+* No automated testing for scope enforcement
 
 🔴 **Critical Gaps:**
-- ~30% of components don't use ScopedDataAccess
-- Direct Supabase client usage in services layer (notably `InvoiceService.ts` bypasses ScopedDataAccess entirely, calling `supabase.from('invoices')` directly)
-- No compile-time enforcement of scoping
-- `user` role had NO scoping applied — fell through with zero filters (FIXED in v1.1)
+
+* \~30% of components don't use ScopedDataAccess
+* Direct Supabase client usage in services layer (notably `InvoiceService.ts` bypasses ScopedDataAccess entirely, calling `supabase.from('invoices')` directly)
+* No compile-time enforcement of scoping
+* `user` role had NO scoping applied — fell through with zero filters (FIXED in v1.1)
 
 ### 1.1.5 Hierarchy Enforcement Gaps & Technical Debt
 
 **Database Layer Gaps:**
 
-| Issue | Severity | Impact | Status |
-|-------|----------|---------|---------|
-| Tables missing tenant_id/franchise_id columns | 🔴 HIGH | Data leakage risk | Partially Fixed |
-| Inconsistent RLS policies across tables | 🟡 MEDIUM | Security gaps | In Progress |
-| JOIN-based RLS (performance issue) | 🟡 MEDIUM | Query performance | Fixed (segment_members) |
-| Missing foreign key constraints for hierarchy | 🟡 MEDIUM | Data integrity | Needs Audit |
-| HQ Users (franchise_id = NULL) unable to access HQ data | 🔴 HIGH | Functionality broken | Fixed |
+| Issue                                                    | Severity  | Impact               | Status                   |
+| -------------------------------------------------------- | --------- | -------------------- | ------------------------ |
+| Tables missing tenant\_id/franchise\_id columns          | 🔴 HIGH   | Data leakage risk    | Partially Fixed          |
+| Inconsistent RLS policies across tables                  | 🟡 MEDIUM | Security gaps        | In Progress              |
+| JOIN-based RLS (performance issue)                       | 🟡 MEDIUM | Query performance    | Fixed (segment\_members) |
+| Missing foreign key constraints for hierarchy            | 🟡 MEDIUM | Data integrity       | Needs Audit              |
+| HQ Users (franchise\_id = NULL) unable to access HQ data | 🔴 HIGH   | Functionality broken | Fixed                    |
 
 **Application Layer Gaps:**
 
-| Issue | Severity | Impact | Status |
-|-------|----------|---------|---------|
-| Components bypassing ScopedDataAccess | 🔴 HIGH | Direct data leakage | Not Fixed |
-| Inconsistent scope injection across services | 🟡 MEDIUM | Data isolation risks | Not Fixed |
-| AdminScopeSwitcher race condition | 🔴 HIGH | Filter bypass | Fixed |
-| No scope validation in API layer | 🔴 HIGH | Security vulnerability | Not Fixed |
-| RPCs don't enforce hierarchy automatically | 🟡 MEDIUM | Manual scoping required | Not Fixed |
+| Issue                                        | Severity  | Impact                  | Status    |
+| -------------------------------------------- | --------- | ----------------------- | --------- |
+| Components bypassing ScopedDataAccess        | 🔴 HIGH   | Direct data leakage     | Not Fixed |
+| Inconsistent scope injection across services | 🟡 MEDIUM | Data isolation risks    | Not Fixed |
+| AdminScopeSwitcher race condition            | 🔴 HIGH   | Filter bypass           | Fixed     |
+| No scope validation in API layer             | 🔴 HIGH   | Security vulnerability  | Not Fixed |
+| RPCs don't enforce hierarchy automatically   | 🟡 MEDIUM | Manual scoping required | Not Fixed |
 
 **Testing Gaps:**
 
-| Gap | Impact | Priority |
-|-----|--------|----------|
-| No automated multi-tenant isolation tests | 🔴 HIGH | Can't detect regressions | P0 |
-| No cross-franchise data leakage tests | 🔴 HIGH | Security risk | P0 |
-| No hierarchy permission inheritance tests | 🟡 MEDIUM | Permission bugs | P1 |
-| No Platform Admin override tests | 🟡 MEDIUM | Admin UX issues | P1 |
+| Gap                                       | Impact    | Priority                 |    |
+| ----------------------------------------- | --------- | ------------------------ | -- |
+| No automated multi-tenant isolation tests | 🔴 HIGH   | Can't detect regressions | P0 |
+| No cross-franchise data leakage tests     | 🔴 HIGH   | Security risk            | P0 |
+| No hierarchy permission inheritance tests | 🟡 MEDIUM | Permission bugs          | P1 |
+| No Platform Admin override tests          | 🟡 MEDIUM | Admin UX issues          | P1 |
 
 **Performance Issues:**
 
-| Issue | Impact | Priority |
-|-------|--------|----------|
-| Hierarchical queries slow at scale (10K+ franchises) | 🟡 MEDIUM | User experience | P1 |
-| No indexes on tenant_id/franchise_id combinations | 🟡 MEDIUM | Query performance | P1 |
-| RLS policy complexity causes query planner issues | 🟡 MEDIUM | Database load | P2 |
+| Issue                                                | Impact    | Priority          |    |
+| ---------------------------------------------------- | --------- | ----------------- | -- |
+| Hierarchical queries slow at scale (10K+ franchises) | 🟡 MEDIUM | User experience   | P1 |
+| No indexes on tenant\_id/franchise\_id combinations  | 🟡 MEDIUM | Query performance | P1 |
+| RLS policy complexity causes query planner issues    | 🟡 MEDIUM | Database load     | P2 |
 
 ### 1.1.6 Hierarchy Enhancement Recommendations
 
 **Phase 1: Critical Fixes (Weeks 1-4)**
 
 1. **Database Schema Audit**
-   - Action: Audit ALL tables for tenant_id/franchise_id columns
-   - Deliverable: Complete table inventory with hierarchy column status
-   - Priority: P0
+   * Action: Audit ALL tables for tenant\_id/franchise\_id columns
+   * Deliverable: Complete table inventory with hierarchy column status
+   * Priority: P0
 
 2. **RLS Policy Standardization**
-   - Action: Create RLS policy generator script
-   - Deliverable: Consistent RLS policies across all tenant-scoped tables
-   - Priority: P0
+   * Action: Create RLS policy generator script
+   * Deliverable: Consistent RLS policies across all tenant-scoped tables
+   * Priority: P0
 
 3. **ScopedDataAccess Enforcement**
-   - Action: Audit all components, replace direct Supabase calls
-   - Deliverable: 100% ScopedDataAccess usage
-   - Priority: P0
+   * Action: Audit all components, replace direct Supabase calls
+   * Deliverable: 100% ScopedDataAccess usage
+   * Priority: P0
 
 4. **Hierarchy Testing Framework**
-   - Action: Build multi-tenant isolation test suite
-   - Deliverable: Automated tests for data leakage prevention
-   - Priority: P0
+   * Action: Build multi-tenant isolation test suite
+   * Deliverable: Automated tests for data leakage prevention
+   * Priority: P0
 
 **Phase 2: Hardening (Weeks 5-12)**
 
 5. **API Layer Scope Validation**
-   - Action: Implement middleware for hierarchy validation
-   - Deliverable: Centralized scope enforcement at API boundary
-   - Priority: P1
+   * Action: Implement middleware for hierarchy validation
+   * Deliverable: Centralized scope enforcement at API boundary
+   * Priority: P1
 
 6. **Performance Optimization**
-   - Action: Add indexes, optimize RLS policies
-   - Deliverable: Sub-100ms query times at 10K+ franchise scale
-   - Priority: P1
+   * Action: Add indexes, optimize RLS policies
+   * Deliverable: Sub-100ms query times at 10K+ franchise scale
+   * Priority: P1
 
 7. **Hierarchy-Aware RPC Functions**
-   - Action: Refactor RPCs to use tenant_id/franchise_id parameters
-   - Deliverable: Automatic scoping for all stored procedures
-   - Priority: P1
+   * Action: Refactor RPCs to use tenant\_id/franchise\_id parameters
+   * Deliverable: Automatic scoping for all stored procedures
+   * Priority: P1
 
 **Phase 3: Advanced Features (Weeks 13-16)**
 
 8. **Hierarchy Analytics Dashboard**
-   - Action: Build platform-wide hierarchy health monitoring
-   - Deliverable: Real-time hierarchy metrics and alerts
-   - Priority: P2
+   * Action: Build platform-wide hierarchy health monitoring
+   * Deliverable: Real-time hierarchy metrics and alerts
+   * Priority: P2
 
 9. **Cross-Franchise Collaboration Features**
-   - Action: Implement controlled data sharing between franchises
-   - Deliverable: Franchise-to-franchise transfer workflows
-   - Priority: P2
+   * Action: Implement controlled data sharing between franchises
+   * Deliverable: Franchise-to-franchise transfer workflows
+   * Priority: P2
 
 10. **Hierarchy-Aware Caching**
-    - Action: Implement tenant/franchise-scoped caching layer
-    - Deliverable: Improved performance without breaking isolation
-    - Priority: P2
+    * Action: Implement tenant/franchise-scoped caching layer
+    * Deliverable: Improved performance without breaking isolation
+    * Priority: P2
 
----
+***
 
 ## 1.2 Current Codebase Structure
 
 ### 1.2.1 Technology Stack
 
 **Frontend:**
-- **Framework**: React 18.3.1 with TypeScript 5.8.3
-- **Build Tool**: Vite 5.4.19
-- **UI Library**: Radix UI + shadcn/ui components
-- **Styling**: Tailwind CSS 3.4.17
-- **State Management**: React Query (@tanstack/react-query 5.83.0)
-- **Routing**: React Router DOM 6.30.1
-- **Form Handling**: React Hook Form 7.61.1 + Zod 3.25.76 validation
+
+* **Framework**: React 18.3.1 with TypeScript 5.8.3
+* **Build Tool**: Vite 5.4.19
+* **UI Library**: Radix UI + shadcn/ui components
+* **Styling**: Tailwind CSS 3.4.17
+* **State Management**: React Query (@tanstack/react-query 5.83.0)
+* **Routing**: React Router DOM 6.30.1
+* **Form Handling**: React Hook Form 7.61.1 + Zod 3.25.76 validation
 
 **Backend:**
-- **Database**: PostgreSQL (via Supabase)
-- **BaaS**: Supabase 2.72.8 (Authentication, RLS, Storage, Edge Functions)
-- **API Architecture**: RESTful + RPC (Supabase functions)
-- **Edge Functions**: Deno runtime for serverless functions
+
+* **Database**: PostgreSQL (via Supabase)
+* **BaaS**: Supabase 2.72.8 (Authentication, RLS, Storage, Edge Functions)
+* **API Architecture**: RESTful + RPC (Supabase functions)
+* **Edge Functions**: Deno runtime for serverless functions
 
 **Development & Testing:**
-- **Testing**: Vitest 4.0.16 + Testing Library + Playwright 1.57.0
-- **Linting**: ESLint 9.32.0 + TypeScript ESLint
-- **CI/CD**: (Not documented in package.json)
-- **Monitoring**: Sentry (@sentry/react 10.32.1) + PostHog (posthog-js 1.313.0)
+
+* **Testing**: Vitest 4.0.16 + Testing Library + Playwright 1.57.0
+* **Linting**: ESLint 9.32.0 + TypeScript ESLint
+* **CI/CD**: (Not documented in package.json)
+* **Monitoring**: Sentry (@sentry/react 10.32.1) + PostHog (posthog-js 1.313.0)
 
 ### 1.2.2 Folder Structure
 
@@ -592,6 +615,7 @@ logic-nexus-ai/
 **Current Pattern: Hybrid Monolith + Plugin Architecture**
 
 The codebase exhibits characteristics of:
+
 1. **Frontend Monolith**: Single React application with all domains
 2. **Plugin System**: Domain-specific logic encapsulated in plugins
 3. **Service Layer**: Business logic in services (pricing, quotation)
@@ -613,70 +637,72 @@ The codebase exhibits characteristics of:
 
 **Component Organization:**
 
-| Area | Status | Issues |
-|------|---------|---------|
-| **Quote System** | 🔴 POOR | Duplicate logic across QuickQuote, QuoteForm, MultiModalComposer; tight coupling |
-| **Data Fetching** | 🟡 FAIR | Inconsistent React Query usage; duplicate hooks; no standard patterns |
-| **Access Control** | 🟡 FAIR | ScopedDataAccess exists but not consistently used; components bypass it |
-| **Plugin System** | 🟡 FAIR | Good design but only Logistics implemented; other plugins are stubs |
-| **Shared Components** | ✅ GOOD | Radix UI + shadcn/ui provides consistency |
+| Area                  | Status  | Issues                                                                           |
+| --------------------- | ------- | -------------------------------------------------------------------------------- |
+| **Quote System**      | 🔴 POOR | Duplicate logic across QuickQuote, QuoteForm, MultiModalComposer; tight coupling |
+| **Data Fetching**     | 🟡 FAIR | Inconsistent React Query usage; duplicate hooks; no standard patterns            |
+| **Access Control**    | 🟡 FAIR | ScopedDataAccess exists but not consistently used; components bypass it          |
+| **Plugin System**     | 🟡 FAIR | Good design but only Logistics implemented; other plugins are stubs              |
+| **Shared Components** | ✅ GOOD  | Radix UI + shadcn/ui provides consistency                                        |
 
 **Technical Debt Hotspots:**
 
 1. **Quote System (Critical)**
-   - **Files Affected**: 20+ components in `src/components/sales/`
-   - **Issues**:
-     - `QuoteForm.tsx` (DELETED) vs. `QuoteFormRefactored.tsx` (duplication)
-     - `QuickQuoteModal.tsx` has embedded business logic
-     - `MultiModalQuoteComposer.tsx` duplicates rate mapping logic
-     - No shared quotation state management
-     - Quote-to-shipment conversion logic scattered
-   - **Impact**: Every quote feature requires changes in 5+ files
-   - **Estimated Effort**: 3-4 weeks to refactor
+   * **Files Affected**: 20+ components in `src/components/sales/`
+   * **Issues**:
+     * `QuoteForm.tsx` (DELETED) vs. `QuoteFormRefactored.tsx` (duplication)
+     * `QuickQuoteModal.tsx` has embedded business logic
+     * `MultiModalQuoteComposer.tsx` duplicates rate mapping logic
+     * No shared quotation state management
+     * Quote-to-shipment conversion logic scattered
+   * **Impact**: Every quote feature requires changes in 5+ files
+   * **Estimated Effort**: 3-4 weeks to refactor
 
 2. **Data Fetching Patterns**
-   - **Issues**:
-     - Duplicate hooks (`useQuoteData`, `useQuoteHydration`, `useQuoteRepository`)
-     - Inconsistent error handling
-     - No standard loading state patterns
-     - Direct Supabase calls mixed with React Query
-   - **Impact**: Hard to maintain, optimize, or test data layer
-   - **Estimated Effort**: 2-3 weeks to standardize
+   * **Issues**:
+     * Duplicate hooks (`useQuoteData`, `useQuoteHydration`, `useQuoteRepository`)
+     * Inconsistent error handling
+     * No standard loading state patterns
+     * Direct Supabase calls mixed with React Query
+   * **Impact**: Hard to maintain, optimize, or test data layer
+   * **Estimated Effort**: 2-3 weeks to standardize
 
 3. **Multi-Tenant Access Control**
-   - **Issues**:
-     - ~30% of components bypass `ScopedDataAccess`
-     - Inconsistent tenant/franchise filtering
-     - No compile-time enforcement
-     - Race conditions in scope switcher (fixed)
-   - **Impact**: Data leakage risks, security vulnerabilities
-   - **Estimated Effort**: 2-3 weeks to enforce
+   * **Issues**:
+     * \~30% of components bypass `ScopedDataAccess`
+     * Inconsistent tenant/franchise filtering
+     * No compile-time enforcement
+     * Race conditions in scope switcher (fixed)
+   * **Impact**: Data leakage risks, security vulnerabilities
+   * **Estimated Effort**: 2-3 weeks to enforce
 
 ### 1.2.5 Dependency Analysis
 
 **Critical Dependencies:**
 
-| Package | Version | Purpose | Risk |
-|---------|---------|---------|------|
-| React | 18.3.1 | Frontend framework | ✅ Stable |
-| Supabase | 2.72.8 | Backend platform | ⚠️ Major version updates |
-| React Query | 5.83.0 | Data fetching | ✅ Stable |
-| Zod | 3.25.76 | Validation | ✅ Stable |
-| TypeScript | 5.8.3 | Type safety | ✅ Stable |
+| Package     | Version | Purpose            | Risk                     |
+| ----------- | ------- | ------------------ | ------------------------ |
+| React       | 18.3.1  | Frontend framework | ✅ Stable                 |
+| Supabase    | 2.72.8  | Backend platform   | ⚠️ Major version updates |
+| React Query | 5.83.0  | Data fetching      | ✅ Stable                 |
+| Zod         | 3.25.76 | Validation         | ✅ Stable                 |
+| TypeScript  | 5.8.3   | Type safety        | ✅ Stable                 |
 
 **Dependency Risks:**
-- Supabase frequent breaking changes in major versions
-- Large bundle size (need code splitting)
-- No dependency update automation
 
----
+* Supabase frequent breaking changes in major versions
+* Large bundle size (need code splitting)
+* No dependency update automation
+
+***
 
 ## 1.3 Database Architecture & Tenant Isolation
 
 ### 1.3.1 Database Architecture Overview
 
 The Logic Nexus AI platform uses **PostgreSQL** (via Supabase) with a **shared database, multi-tenant architecture**. All tenants share the same database instance, with isolation enforced through:
-1. **tenant_id column** on every tenant-scoped table
+
+1. **tenant\_id column** on every tenant-scoped table
 2. **Row-Level Security (RLS) policies** for automatic filtering
 3. **Application-layer scoping** via ScopedDataAccess
 
@@ -705,12 +731,12 @@ The Logic Nexus AI platform uses **PostgreSQL** (via Supabase) with a **shared d
 
 **Alternative Architectures Considered:**
 
-| Architecture | Pros | Cons | Decision |
-|--------------|------|------|----------|
-| **Shared DB + Discriminator** (Current) | Cost-effective, easy management, cross-tenant analytics | Potential security risk, noisy neighbor issues | ✅ **Chosen** |
-| **Separate Schema per Tenant** | Better isolation, easier backup/restore per tenant | Schema proliferation, harder migrations | ❌ Rejected |
-| **Separate Database per Tenant** | Best isolation, independent scaling | High cost, operational complexity | ❌ Rejected |
-| **Sharding by Tenant** | Horizontal scaling | Complexity, cross-shard queries difficult | 🔮 Future consideration |
+| Architecture                            | Pros                                                    | Cons                                           | Decision                |
+| --------------------------------------- | ------------------------------------------------------- | ---------------------------------------------- | ----------------------- |
+| **Shared DB + Discriminator** (Current) | Cost-effective, easy management, cross-tenant analytics | Potential security risk, noisy neighbor issues | ✅ **Chosen**            |
+| **Separate Schema per Tenant**          | Better isolation, easier backup/restore per tenant      | Schema proliferation, harder migrations        | ❌ Rejected              |
+| **Separate Database per Tenant**        | Best isolation, independent scaling                     | High cost, operational complexity              | ❌ Rejected              |
+| **Sharding by Tenant**                  | Horizontal scaling                                      | Complexity, cross-shard queries difficult      | 🔮 Future consideration |
 
 ### 1.3.2 Schema Organization
 
@@ -929,18 +955,19 @@ CREATE INDEX idx_invoices_due_date ON public.invoices(due_date) WHERE status != 
 
 **Index Gap Analysis:**
 
-| Table | Missing Indexes | Impact | Priority |
-|-------|-----------------|---------|----------|
-| accounts | (tenant_id, franchise_id) composite | Slow dashboard queries | P0 |
-| contacts | (tenant_id, franchise_id) composite | Slow contact lists | P0 |
-| quotes | (tenant_id, status) composite | Slow quote pipeline | P0 |
-| shipments | (tenant_id, status) composite | Slow shipment tracking | P0 |
-| activities | (tenant_id, franchise_id) composite | Slow activity timelines | P1 |
-| audit_logs | (tenant_id, created_at) composite | Slow audit reports | P1 |
+| Table       | Missing Indexes                       | Impact                  | Priority |
+| ----------- | ------------------------------------- | ----------------------- | -------- |
+| accounts    | (tenant\_id, franchise\_id) composite | Slow dashboard queries  | P0       |
+| contacts    | (tenant\_id, franchise\_id) composite | Slow contact lists      | P0       |
+| quotes      | (tenant\_id, status) composite        | Slow quote pipeline     | P0       |
+| shipments   | (tenant\_id, status) composite        | Slow shipment tracking  | P0       |
+| activities  | (tenant\_id, franchise\_id) composite | Slow activity timelines | P1       |
+| audit\_logs | (tenant\_id, created\_at) composite   | Slow audit reports      | P1       |
 
 **Estimated Performance Impact:**
-- Missing indexes cause 5-10x slower queries at 10K+ franchise scale
-- RLS policy evaluation overhead without proper indexes
+
+* Missing indexes cause 5-10x slower queries at 10K+ franchise scale
+* RLS policy evaluation overhead without proper indexes
 
 ### 1.3.5 Data Isolation Mechanisms
 
@@ -1016,9 +1043,9 @@ CREATE POLICY "Tenant admins view all tenant quotes" ON public.quotes
 
 **Migration Strategy:**
 
-- **Tool**: Supabase CLI with PostgreSQL migrations
-- **Migration Count**: 489 migration files (177 contain CREATE POLICY statements)
-- **Naming Convention**: `YYYYMMDDHHMMSS_description.sql`
+* **Tool**: Supabase CLI with PostgreSQL migrations
+* **Migration Count**: 489 migration files (177 contain CREATE POLICY statements)
+* **Naming Convention**: `YYYYMMDDHHMMSS_description.sql`
 
 **Current Migration Issues:**
 
@@ -1029,66 +1056,66 @@ CREATE POLICY "Tenant admins view all tenant quotes" ON public.quotes
 
 **Migration Health Assessment:**
 
-| Aspect | Status | Issues |
-|--------|---------|---------|
-| **Idempotency** | 🟡 FAIR | ~40% of migrations not idempotent |
-| **Rollback** | 🔴 POOR | <5% have rollback scripts |
-| **Documentation** | 🟡 FAIR | Some migrations lack comments |
-| **Testing** | 🔴 POOR | No automated migration tests |
-| **Hierarchy Enforcement** | 🟡 FAIR | Recent migrations adding tenant_id/franchise_id |
+| Aspect                    | Status  | Issues                                            |
+| ------------------------- | ------- | ------------------------------------------------- |
+| **Idempotency**           | 🟡 FAIR | \~40% of migrations not idempotent                |
+| **Rollback**              | 🔴 POOR | <5% have rollback scripts                         |
+| **Documentation**         | 🟡 FAIR | Some migrations lack comments                     |
+| **Testing**               | 🔴 POOR | No automated migration tests                      |
+| **Hierarchy Enforcement** | 🟡 FAIR | Recent migrations adding tenant\_id/franchise\_id |
 
 **Recent Hierarchy-Related Migrations:**
 
-- `20260211160000_fix_hierarchy_gaps.sql` - Fixed HQ user visibility
-- `20260211150000_fix_hq_visibility.sql` - Fixed NULL franchise_id handling
-- `20260211140000_enforce_compliance_hierarchy.sql` - Added hierarchy to compliance tables
-- `20240111_add_tenant_id_to_segment_members.sql` - Added missing tenant_id column
+* `20260211160000_fix_hierarchy_gaps.sql` - Fixed HQ user visibility
+* `20260211150000_fix_hq_visibility.sql` - Fixed NULL franchise\_id handling
+* `20260211140000_enforce_compliance_hierarchy.sql` - Added hierarchy to compliance tables
+* `20240111_add_tenant_id_to_segment_members.sql` - Added missing tenant\_id column
 
 ### 1.3.7 Data Model Issues & Technical Debt
 
 **Identified Data Model Problems:**
 
 1. **Inconsistent Hierarchy Enforcement**
-   - **Issue**: Not all tables have tenant_id/franchise_id
-   - **Impact**: Potential data leakage, incomplete filtering
-   - **Affected Tables**: ~15-20 tables (segment_members fixed, others pending)
-   - **Priority**: P0
+   * **Issue**: Not all tables have tenant\_id/franchise\_id
+   * **Impact**: Potential data leakage, incomplete filtering
+   * **Affected Tables**: \~15-20 tables (segment\_members fixed, others pending)
+   * **Priority**: P0
 
 2. **Denormalization vs. Normalization Inconsistency**
-   - **Issue**: Some data duplicated (e.g., address in multiple tables), other data over-normalized
-   - **Impact**: Data consistency issues, complex queries
-   - **Example**: Customer address in accounts, contacts, and shipments
-   - **Priority**: P1
+   * **Issue**: Some data duplicated (e.g., address in multiple tables), other data over-normalized
+   * **Impact**: Data consistency issues, complex queries
+   * **Example**: Customer address in accounts, contacts, and shipments
+   * **Priority**: P1
 
 3. **Missing Foreign Key Constraints**
-   - **Issue**: Some relationships not enforced at DB level
-   - **Impact**: Orphaned records, referential integrity issues
-   - **Example**: Some quote_items without valid quote_id
-   - **Priority**: P1
+   * **Issue**: Some relationships not enforced at DB level
+   * **Impact**: Orphaned records, referential integrity issues
+   * **Example**: Some quote\_items without valid quote\_id
+   * **Priority**: P1
 
 4. **JSONB Overuse**
-   - **Issue**: Complex data stored in JSONB columns (settings, metadata, config)
-   - **Impact**: Hard to query, validate, and index
-   - **Example**: `settings JSONB` in tenants table contains structured data
-   - **Priority**: P2
+   * **Issue**: Complex data stored in JSONB columns (settings, metadata, config)
+   * **Impact**: Hard to query, validate, and index
+   * **Example**: `settings JSONB` in tenants table contains structured data
+   * **Priority**: P2
 
 5. **Audit Trail Gaps**
-   - **Issue**: Not all tables have updated_at triggers
-   - **Impact**: Can't track when data was last modified
-   - **Priority**: P2
+   * **Issue**: Not all tables have updated\_at triggers
+   * **Impact**: Can't track when data was last modified
+   * **Priority**: P2
 
 **Schema Refactoring Recommendations:**
 
-| Recommendation | Effort | Impact | Priority |
-|----------------|--------|--------|----------|
-| Add missing tenant_id/franchise_id columns | 2 weeks | High | P0 |
-| Add composite indexes for hierarchy | 1 week | High | P0 |
-| Standardize RLS policies | 2 weeks | High | P0 |
-| Add missing foreign key constraints | 1 week | Medium | P1 |
-| Normalize address data model | 2 weeks | Medium | P1 |
-| Add updated_at triggers to all tables | 1 week | Low | P2 |
+| Recommendation                               | Effort  | Impact | Priority |
+| -------------------------------------------- | ------- | ------ | -------- |
+| Add missing tenant\_id/franchise\_id columns | 2 weeks | High   | P0       |
+| Add composite indexes for hierarchy          | 1 week  | High   | P0       |
+| Standardize RLS policies                     | 2 weeks | High   | P0       |
+| Add missing foreign key constraints          | 1 week  | Medium | P1       |
+| Normalize address data model                 | 2 weeks | Medium | P1       |
+| Add updated\_at triggers to all tables       | 1 week  | Low    | P2       |
 
----
+***
 
 ## 1.4 Plugin System Design Patterns
 
@@ -1192,16 +1219,16 @@ export interface FormField {
 
 **Plugin Implementation Status:**
 
-| Plugin | Status | Quotation Engine | Form Config | Domain Code |
-|--------|--------|------------------|-------------|-------------|
-| **LogisticsPlugin** | ✅ **COMPLETE** | LogisticsQuotationEngine | ✅ Implemented | LOGISTICS |
-| **BankingPlugin** | 🟡 STUB | Returns null | ✅ Basic | BANKING |
-| **TradingPlugin** | 🟡 STUB | Returns null | ✅ Basic | TRADING |
-| **InsurancePlugin** | 🟡 STUB | Returns null | ✅ Basic | INSURANCE |
-| **CustomsPlugin** | 🟡 STUB | Returns null | ✅ Basic | CUSTOMS |
-| **TelecomPlugin** | 🟡 STUB | Returns null | ✅ Basic | TELECOM |
-| **RealEstatePlugin** | 🟡 STUB | Returns null | ✅ Basic | REAL_ESTATE |
-| **EcommercePlugin** | 🟡 STUB | Returns null | ✅ Basic | ECOMMERCE |
+| Plugin               | Status         | Quotation Engine         | Form Config   | Domain Code  |
+| -------------------- | -------------- | ------------------------ | ------------- | ------------ |
+| **LogisticsPlugin**  | ✅ **COMPLETE** | LogisticsQuotationEngine | ✅ Implemented | LOGISTICS    |
+| **BankingPlugin**    | 🟡 STUB        | Returns null             | ✅ Basic       | BANKING      |
+| **TradingPlugin**    | 🟡 STUB        | Returns null             | ✅ Basic       | TRADING      |
+| **InsurancePlugin**  | 🟡 STUB        | Returns null             | ✅ Basic       | INSURANCE    |
+| **CustomsPlugin**    | 🟡 STUB        | Returns null             | ✅ Basic       | CUSTOMS      |
+| **TelecomPlugin**    | 🟡 STUB        | Returns null             | ✅ Basic       | TELECOM      |
+| **RealEstatePlugin** | 🟡 STUB        | Returns null             | ✅ Basic       | REAL\_ESTATE |
+| **EcommercePlugin**  | 🟡 STUB        | Returns null             | ✅ Basic       | ECOMMERCE    |
 
 **LogisticsPlugin Implementation (Fully Functional):**
 
@@ -1346,24 +1373,24 @@ export function initializePlugins() {
 
 **Plugin Architecture Gaps:**
 
-| Gap | Impact | Priority |
-|-----|--------|----------|
-| No tenant-level plugin activation | All tenants see all domains | P0 |
-| No plugin routing integration | Plugin routes not isolated | P1 |
-| No plugin state management | Plugins can't maintain state | P1 |
-| No plugin lifecycle hooks | Can't initialize/cleanup plugins | P1 |
-| No plugin versioning | Can't upgrade plugins independently | P2 |
-| No plugin dependency management | Plugins can't share functionality | P2 |
+| Gap                               | Impact                              | Priority |
+| --------------------------------- | ----------------------------------- | -------- |
+| No tenant-level plugin activation | All tenants see all domains         | P0       |
+| No plugin routing integration     | Plugin routes not isolated          | P1       |
+| No plugin state management        | Plugins can't maintain state        | P1       |
+| No plugin lifecycle hooks         | Can't initialize/cleanup plugins    | P1       |
+| No plugin versioning              | Can't upgrade plugins independently | P2       |
+| No plugin dependency management   | Plugins can't share functionality   | P2       |
 
 ### 1.4.6 Plugin System Enhancement Roadmap
 
 **Phase 1: Core Plugin Infrastructure (Weeks 1-6)**
 
 1. **Tenant-Level Plugin Activation**
-   - Add `tenant_plugins` table to track enabled plugins per tenant
-   - Update `ScopedDataAccess` to filter by active plugins
-   - UI for tenant admins to enable/disable plugins
-   - Migration to seed default plugin activations
+   * Add `tenant_plugins` table to track enabled plugins per tenant
+   * Update `ScopedDataAccess` to filter by active plugins
+   * UI for tenant admins to enable/disable plugins
+   * Migration to seed default plugin activations
 
 2. **Plugin Lifecycle Hooks**
    ```typescript
@@ -1375,15 +1402,15 @@ export function initializePlugins() {
    ```
 
 3. **Plugin Routing**
-   - Add `getRoutes()` method to IPlugin
-   - Dynamic route registration based on active plugins
-   - Plugin-specific navigation menu items
+   * Add `getRoutes()` method to IPlugin
+   * Dynamic route registration based on active plugins
+   * Plugin-specific navigation menu items
 
 **Phase 2: Advanced Plugin Features (Weeks 7-12)**
 
 4. **Plugin State Management**
-   - Isolated plugin state contexts
-   - Plugin-specific Redux slices or Zustand stores
+   * Isolated plugin state contexts
+   * Plugin-specific Redux slices or Zustand stores
 
 5. **Plugin Services Layer**
    ```typescript
@@ -1399,28 +1426,28 @@ export function initializePlugins() {
    ```
 
 6. **Plugin Configuration Schema**
-   - Define plugin-specific settings
-   - UI for configuring plugins per tenant
-   - Validation schemas for plugin config
+   * Define plugin-specific settings
+   * UI for configuring plugins per tenant
+   * Validation schemas for plugin config
 
 **Phase 3: Plugin Marketplace (Weeks 13-20)**
 
 7. **Plugin SDK**
-   - Documentation for building plugins
-   - Plugin development templates
-   - Testing utilities for plugins
+   * Documentation for building plugins
+   * Plugin development templates
+   * Testing utilities for plugins
 
 8. **Plugin Packaging & Distribution**
-   - npm packages for plugins
-   - Plugin installation workflow
-   - Version management and updates
+   * npm packages for plugins
+   * Plugin installation workflow
+   * Version management and updates
 
 9. **Third-Party Plugin Support**
-   - Plugin marketplace UI
-   - Plugin approval workflow
-   - Revenue sharing model
+   * Plugin marketplace UI
+   * Plugin approval workflow
+   * Revenue sharing model
 
----
+***
 
 ## 1.5 Multi-Tenant Access Control Analysis
 
@@ -1442,12 +1469,12 @@ User (Franchise-specific with limited permissions)
 
 **Role Definitions:**
 
-| Role | Scope | Permissions | Use Case |
-|------|-------|-------------|----------|
-| **platform_admin** | Global | ALL | SOS Services platform owners |
-| **tenant_admin** | Tenant | All operations within tenant | Company-wide administrators |
-| **franchise_admin** | Franchise | All operations within franchise | Branch managers |
-| **user** | Franchise | Limited to assigned records | Regular employees |
+| Role                 | Scope     | Permissions                     | Use Case                     |
+| -------------------- | --------- | ------------------------------- | ---------------------------- |
+| **platform\_admin**  | Global    | ALL                             | SOS Services platform owners |
+| **tenant\_admin**    | Tenant    | All operations within tenant    | Company-wide administrators  |
+| **franchise\_admin** | Franchise | All operations within franchise | Branch managers              |
+| **user**             | Franchise | Limited to assigned records     | Regular employees            |
 
 ### 1.5.2 Permission Model
 
@@ -1469,9 +1496,10 @@ CREATE TABLE public.user_roles (
 **Multi-Role Support:**
 
 Users can have multiple roles across different tenants/franchises:
-- ✅ User can be Franchise Admin in Tenant A, Franchise NYC
-- ✅ Same user can be User in Tenant B, Franchise London
-- ✅ Platform Admin role exists without tenant_id/franchise_id
+
+* ✅ User can be Franchise Admin in Tenant A, Franchise NYC
+* ✅ Same user can be User in Tenant B, Franchise London
+* ✅ Platform Admin role exists without tenant\_id/franchise\_id
 
 **Current Permission Model Issues:**
 
@@ -1485,42 +1513,42 @@ Users can have multiple roles across different tenants/franchises:
 **Identified Issues:**
 
 1. **ScopedDataAccess Bypass**
-   - **Issue**: ~30% of components call Supabase directly
-   - **Risk**: Data leakage, unauthorized access
-   - **Example**: Some dashboard widgets fetch unscoped data
-   - **Priority**: P0
+   * **Issue**: \~30% of components call Supabase directly
+   * **Risk**: Data leakage, unauthorized access
+   * **Example**: Some dashboard widgets fetch unscoped data
+   * **Priority**: P0
 
 2. **AdminScopeSwitcher Race Condition** (FIXED)
-   - **Issue**: Platform Admin scope selection was lost due to stale state
-   - **Impact**: Admin saw all tenants instead of filtered view
-   - **Fix**: Explicit parameter passing to avoid closure issues
-   - **Status**: ✅ Resolved in migration
+   * **Issue**: Platform Admin scope selection was lost due to stale state
+   * **Impact**: Admin saw all tenants instead of filtered view
+   * **Fix**: Explicit parameter passing to avoid closure issues
+   * **Status**: ✅ Resolved in migration
 
 3. **HQ User Visibility** (FIXED)
-   - **Issue**: Users with franchise_id = NULL couldn't see HQ-level data
-   - **Impact**: Tenant HQ staff couldn't manage tenant-wide records
-   - **Fix**: Updated RLS policies to handle NULL franchise_id
-   - **Status**: ✅ Resolved in migration 20260211150000
+   * **Issue**: Users with franchise\_id = NULL couldn't see HQ-level data
+   * **Impact**: Tenant HQ staff couldn't manage tenant-wide records
+   * **Fix**: Updated RLS policies to handle NULL franchise\_id
+   * **Status**: ✅ Resolved in migration 20260211150000
 
 4. **No API-Layer Authorization**
-   - **Issue**: Authorization only at database (RLS) and application (ScopedDataAccess)
-   - **Risk**: API endpoints can be called with forged tenant_id
-   - **Priority**: P0
+   * **Issue**: Authorization only at database (RLS) and application (ScopedDataAccess)
+   * **Risk**: API endpoints can be called with forged tenant\_id
+   * **Priority**: P0
 
 5. **Inconsistent Owner-Based Access**
-   - **Issue**: Some tables use owner_id for access, others use franchise_id
-   - **Impact**: Confusing permission model, hard to audit
-   - **Example**: Leads use owner_id + franchise_id, but accounts only use franchise_id
-   - **Priority**: P1
+   * **Issue**: Some tables use owner\_id for access, others use franchise\_id
+   * **Impact**: Confusing permission model, hard to audit
+   * **Example**: Leads use owner\_id + franchise\_id, but accounts only use franchise\_id
+   * **Priority**: P1
 
 ### 1.5.4 Access Control Enhancement Recommendations
 
 **Phase 1: Immediate Security Fixes (Weeks 1-4)**
 
 1. **Enforce ScopedDataAccess Usage**
-   - Audit all components, replace direct Supabase calls
-   - Create ESLint rule to prevent direct Supabase imports
-   - 100% coverage in critical paths (quotes, shipments, invoices)
+   * Audit all components, replace direct Supabase calls
+   * Create ESLint rule to prevent direct Supabase imports
+   * 100% coverage in critical paths (quotes, shipments, invoices)
 
 2. **API Layer Authorization Middleware**
    ```typescript
@@ -1537,9 +1565,9 @@ Users can have multiple roles across different tenants/franchises:
    ```
 
 3. **Automated Access Control Testing**
-   - Build test suite for multi-tenant isolation
-   - Test cross-tenant data leakage scenarios
-   - Test privilege escalation attempts
+   * Build test suite for multi-tenant isolation
+   * Test cross-tenant data leakage scenarios
+   * Test privilege escalation attempts
 
 **Phase 2: Advanced RBAC (Weeks 5-12)**
 
@@ -1560,22 +1588,23 @@ Users can have multiple roles across different tenants/franchises:
    ```
 
 5. **Custom Roles**
-   - UI for defining custom roles
-   - Permission assignment interface
-   - Role templates (Sales Manager, Operations Lead, etc.)
+   * UI for defining custom roles
+   * Permission assignment interface
+   * Role templates (Sales Manager, Operations Lead, etc.)
 
 6. **Object-Level Permissions**
-   - Share individual records across franchises
-   - Transfer ownership of records
-   - Delegate permissions temporarily
+   * Share individual records across franchises
+   * Transfer ownership of records
+   * Delegate permissions temporarily
 
----
+***
 
 ## Section 1 Summary: Architecture Assessment & Hierarchy Implementation
 
 ### Key Findings
 
 **✅ Strengths:**
+
 1. Solid hierarchical foundation (Super Admin → Tenant → Franchise)
 2. RLS policies provide database-level security
 3. ScopedDataAccess provides application-level scoping
@@ -1583,13 +1612,15 @@ Users can have multiple roles across different tenants/franchises:
 5. PostgreSQL + Supabase provides robust platform
 
 **🔴 Critical Issues:**
-1. ~30% of components bypass ScopedDataAccess (data leakage risk)
+
+1. \~30% of components bypass ScopedDataAccess (data leakage risk)
 2. Quote system has severe maintainability issues (20+ tightly coupled files)
-3. ~15-20 tables missing tenant_id/franchise_id columns
+3. \~15-20 tables missing tenant\_id/franchise\_id columns
 4. No API-layer authorization (security vulnerability)
 5. Plugin system underutilized (only Logistics implemented)
 
 **⚠️ Technical Debt:**
+
 1. Inconsistent data fetching patterns across codebase
 2. Missing indexes on hierarchy columns (performance)
 3. 489 migrations with poor documentation
@@ -1598,23 +1629,23 @@ Users can have multiple roles across different tenants/franchises:
 
 **🎯 Priority Recommendations:**
 
-| Recommendation | Effort | Impact | Priority |
-|----------------|--------|--------|----------|
-| Enforce 100% ScopedDataAccess usage | 3 weeks | Security | P0 |
-| Add hierarchy columns to all tables | 2 weeks | Security | P0 |
-| Refactor Quote system for maintainability | 4 weeks | Velocity | P0 |
-| Add composite indexes for hierarchy queries | 1 week | Performance | P0 |
-| Implement API-layer authorization | 2 weeks | Security | P0 |
-| Standardize data fetching patterns | 3 weeks | Maintainability | P1 |
-| Build hierarchy testing framework | 2 weeks | Quality | P1 |
+| Recommendation                              | Effort  | Impact          | Priority |
+| ------------------------------------------- | ------- | --------------- | -------- |
+| Enforce 100% ScopedDataAccess usage         | 3 weeks | Security        | P0       |
+| Add hierarchy columns to all tables         | 2 weeks | Security        | P0       |
+| Refactor Quote system for maintainability   | 4 weeks | Velocity        | P0       |
+| Add composite indexes for hierarchy queries | 1 week  | Performance     | P0       |
+| Implement API-layer authorization           | 2 weeks | Security        | P0       |
+| Standardize data fetching patterns          | 3 weeks | Maintainability | P1       |
+| Build hierarchy testing framework           | 2 weeks | Quality         | P1       |
 
 **Estimated Total Effort for Phase 1 (Critical Fixes):** 12-16 weeks
 
----
+***
 
 *End of Section 1*
 
----
+***
 
 ## 1.6 Enterprise Readiness Assessment
 
@@ -1622,26 +1653,30 @@ Users can have multiple roles across different tenants/franchises:
 This assessment evaluates the platform's current maturity level against enterprise requirements (ISO 27001, SOC 2, HIPAA) and identifies foundational risks preventing global scale deployment.
 
 **1.6.1 Scalability & Performance**
-*   **Current State:** Single-region Supabase instance. Vertical scaling dependency.
-*   **Limitation:** "Noisy Neighbor" risk where one high-volume tenant (e.g., massive file uploads) degrades performance for others.
-*   **Enterprise Requirement:** Horizontal read-replicas, dedicated compute for large tenants, and global edge caching (CDN).
+
+* **Current State:** Single-region Supabase instance. Vertical scaling dependency.
+* **Limitation:** "Noisy Neighbor" risk where one high-volume tenant (e.g., massive file uploads) degrades performance for others.
+* **Enterprise Requirement:** Horizontal read-replicas, dedicated compute for large tenants, and global edge caching (CDN).
 
 **1.6.2 Security & Compliance**
-*   **Current State:** Row Level Security (RLS) is implemented but relies on developer discipline. No automated regression testing for security policies.
-*   **Limitation:** Audit logs track *writes* but not *reads* (critical for HIPAA/PII). No formal Data Loss Prevention (DLP) controls.
-*   **Enterprise Requirement:** Automated RLS testing, Field-Level Encryption for PII, WAF (Web Application Firewall), and SOC 2 Type II attestation.
+
+* **Current State:** Row Level Security (RLS) is implemented but relies on developer discipline. No automated regression testing for security policies.
+* **Limitation:** Audit logs track *writes* but not *reads* (critical for HIPAA/PII). No formal Data Loss Prevention (DLP) controls.
+* **Enterprise Requirement:** Automated RLS testing, Field-Level Encryption for PII, WAF (Web Application Firewall), and SOC 2 Type II attestation.
 
 **1.6.3 Reliability & Disaster Recovery**
-*   **Current State:** Reliance on Supabase managed backups (daily).
-*   **Limitation:** No defined RTO (Recovery Time Objective) or RPO (Recovery Point Objective). No cross-region failover.
-*   **Enterprise Requirement:** 99.99% SLA, 15-minute RPO, 1-hour RTO, and automated failover drills.
+
+* **Current State:** Reliance on Supabase managed backups (daily).
+* **Limitation:** No defined RTO (Recovery Time Objective) or RPO (Recovery Point Objective). No cross-region failover.
+* **Enterprise Requirement:** 99.99% SLA, 15-minute RPO, 1-hour RTO, and automated failover drills.
 
 **1.6.4 Observability & DevOps**
-*   **Current State:** Basic console logging. No centralized APM (Application Performance Monitoring).
-*   **Limitation:** "Black box" debugging in production. Inability to trace a request from UI -> API -> DB -> External Service.
-*   **Enterprise Requirement:** Distributed Tracing (OpenTelemetry), Structured Logging, and Real-time Alerting (PagerDuty integration).
 
----
+* **Current State:** Basic console logging. No centralized APM (Application Performance Monitoring).
+* **Limitation:** "Black box" debugging in production. Inability to trace a request from UI -> API -> DB -> External Service.
+* **Enterprise Requirement:** Distributed Tracing (OpenTelemetry), Structured Logging, and Real-time Alerting (PagerDuty integration).
+
+***
 
 # Section 2: Complete Business Workflow Analysis
 
@@ -1674,6 +1709,7 @@ This section provides a comprehensive analysis of ALL business workflows in the 
 **Analysis Framework:**
 
 For each workflow module, we assess:
+
 1. **Current Implementation Review** - What exists today
 2. **Hierarchy Implementation** - How Super Admin → Tenant → Franchise is enforced
 3. **Technical Debt Assessment** - Code quality, maintainability, performance issues
@@ -1681,7 +1717,7 @@ For each workflow module, we assess:
 5. **Missing Features Identification** - Gaps vs. industry best practices
 6. **Hierarchy Enhancement Recommendations** - Improvements needed
 
----
+***
 
 ## 2.A PRE-QUOTATION (CRM) WORKFLOWS
 
@@ -1725,76 +1761,82 @@ CREATE TABLE public.leads (
 
 **Lead Statuses:**
 
-| Status | Description | Next Steps |
-|--------|-------------|------------|
-| `new` | Newly captured, uncontacted | Assign owner, initial outreach |
-| `contacted` | Initial contact made | Qualification assessment |
-| `qualified` | Meets qualification criteria | Convert to opportunity |
-| `unqualified` | Does not meet criteria | Nurture or discard |
-| `nurturing` | In long-term nurture campaign | Continue engagement |
-| `converted` | Converted to opportunity | Link to opportunity record |
-| `lost` | Closed without conversion | Archive, capture loss reason |
+| Status        | Description                   | Next Steps                     |
+| ------------- | ----------------------------- | ------------------------------ |
+| `new`         | Newly captured, uncontacted   | Assign owner, initial outreach |
+| `contacted`   | Initial contact made          | Qualification assessment       |
+| `qualified`   | Meets qualification criteria  | Convert to opportunity         |
+| `unqualified` | Does not meet criteria        | Nurture or discard             |
+| `nurturing`   | In long-term nurture campaign | Continue engagement            |
+| `converted`   | Converted to opportunity      | Link to opportunity record     |
+| `lost`        | Closed without conversion     | Archive, capture loss reason   |
 
 **Lead Sources:**
 
-- `website` - Inbound from website forms
-- `referral` - Customer or partner referral
-- `cold_call` - Outbound prospecting
-- `event` - Trade shows, conferences
-- `social_media` - LinkedIn, Twitter, etc.
-- `email_campaign` - Marketing email responses
-- `other` - Miscellaneous sources
+* `website` - Inbound from website forms
+* `referral` - Customer or partner referral
+* `cold_call` - Outbound prospecting
+* `event` - Trade shows, conferences
+* `social_media` - LinkedIn, Twitter, etc.
+* `email_campaign` - Marketing email responses
+* `other` - Miscellaneous sources
 
 **UI Components:**
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| Leads Dashboard | `src/pages/dashboard/Leads.tsx` | Main leads list with filters, search, bulk actions |
-| Lead Detail | `src/pages/dashboard/LeadDetail.tsx` | Full lead profile with activity timeline |
-| Lead Form | `src/components/crm/LeadForm.tsx` | Create/edit lead form |
-| Lead Card | `src/components/crm/LeadCard.tsx` | Card view for pipeline visualization |
-| Lead Pipeline | `src/pages/dashboard/LeadsPipeline.tsx` | Kanban board for lead stages |
-| Lead Assignment | `src/pages/dashboard/LeadAssignment.tsx` | Bulk lead assignment interface |
-| Lead Routing | `src/pages/dashboard/LeadRouting.tsx` | Auto-assignment rule configuration |
-| Lead Import/Export | `src/pages/dashboard/LeadsImportExport.tsx` | CSV import/export functionality |
+| Component          | File                                        | Purpose                                            |
+| ------------------ | ------------------------------------------- | -------------------------------------------------- |
+| Leads Dashboard    | `src/pages/dashboard/Leads.tsx`             | Main leads list with filters, search, bulk actions |
+| Lead Detail        | `src/pages/dashboard/LeadDetail.tsx`        | Full lead profile with activity timeline           |
+| Lead Form          | `src/components/crm/LeadForm.tsx`           | Create/edit lead form                              |
+| Lead Card          | `src/components/crm/LeadCard.tsx`           | Card view for pipeline visualization               |
+| Lead Pipeline      | `src/pages/dashboard/LeadsPipeline.tsx`     | Kanban board for lead stages                       |
+| Lead Assignment    | `src/pages/dashboard/LeadAssignment.tsx`    | Bulk lead assignment interface                     |
+| Lead Routing       | `src/pages/dashboard/LeadRouting.tsx`       | Auto-assignment rule configuration                 |
+| Lead Import/Export | `src/pages/dashboard/LeadsImportExport.tsx` | CSV import/export functionality                    |
 
 **Current Features:**
 
 ✅ **Lead Capture**
-- Manual lead entry via form
-- CSV bulk import
-- Web-to-lead forms (via API)
+
+* Manual lead entry via form
+* CSV bulk import
+* Web-to-lead forms (via API)
 
 ✅ **Lead Scoring**
-- Rule-based heuristic scoring (0-100) — NOT AI/ML-powered despite UI labels
-- Configurable scoring weights
-- Decay over time for inactive leads
-- Score tracking history
+
+* Rule-based heuristic scoring (0-100) — NOT AI/ML-powered despite UI labels
+* Configurable scoring weights
+* Decay over time for inactive leads
+* Score tracking history
 
 ✅ **Lead Assignment**
-- Manual assignment to users
-- Round-robin auto-assignment
-- Territory-based assignment (basic)
-- Bulk reassignment
+
+* Manual assignment to users
+* Round-robin auto-assignment
+* Territory-based assignment (basic)
+* Bulk reassignment
 
 ✅ **Lead Qualification**
-- Status-based qualification workflow
-- Qualification score factors
-- Conversion to opportunity
+
+* Status-based qualification workflow
+* Qualification score factors
+* Conversion to opportunity
 
 ✅ **Lead Views**
-- List view with advanced filters
-- Kanban pipeline view
-- Card view
-- Activity timeline per lead
+
+* List view with advanced filters
+* Kanban pipeline view
+* Card view
+* Activity timeline per lead
 
 ✅ **Search & Filtering**
-- Text search (name, company, email)
-- Status filter
-- Score range filter
-- Owner filter (me, unassigned, any)
-- Estimated value range
-- Date range (created, expected close)
+
+* Text search (name, company, email)
+* Status filter
+* Score range filter
+* Owner filter (me, unassigned, any)
+* Estimated value range
+* Date range (created, expected close)
 
 #### 2.A.1.2 Hierarchy Implementation
 
@@ -1818,69 +1860,75 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
 
 **Hierarchy Logic:**
 
-| User Level | Lead Visibility | Lead Creation | Lead Assignment |
-|------------|-----------------|---------------|-----------------|
-| **Platform Admin** | ALL leads (all tenants) | Any tenant/franchise | Any franchise |
-| **Tenant Admin** | All leads in tenant (all franchises) | Any franchise in tenant | Any franchise in tenant |
-| **Franchise Admin** | Leads in their franchise + unassigned HQ leads | Their franchise only | Their franchise only |
-| **User** | Leads assigned to them | Their franchise only | Cannot assign |
+| User Level          | Lead Visibility                                | Lead Creation           | Lead Assignment         |
+| ------------------- | ---------------------------------------------- | ----------------------- | ----------------------- |
+| **Platform Admin**  | ALL leads (all tenants)                        | Any tenant/franchise    | Any franchise           |
+| **Tenant Admin**    | All leads in tenant (all franchises)           | Any franchise in tenant | Any franchise in tenant |
+| **Franchise Admin** | Leads in their franchise + unassigned HQ leads | Their franchise only    | Their franchise only    |
+| **User**            | Leads assigned to them                         | Their franchise only    | Cannot assign           |
 
 **Current Hierarchy Issues:**
 
 🔴 **Lead Transfer Between Franchises**
-- No UI for transferring leads between franchises
-- Tenant Admin must manually update franchise_id
-- No audit trail for franchise transfers
-- **Impact**: Poor inter-franchise collaboration
+
+* No UI for transferring leads between franchises
+* Tenant Admin must manually update franchise\_id
+* No audit trail for franchise transfers
+* **Impact**: Poor inter-franchise collaboration
 
 🟡 **HQ Lead Pool**
-- Leads with franchise_id = NULL are "HQ leads"
-- HQ users (franchise_id = NULL) can see HQ leads
-- But no clear UI indication of HQ vs. franchise leads
-- **Impact**: Confusing for users
+
+* Leads with franchise\_id = NULL are "HQ leads"
+* HQ users (franchise\_id = NULL) can see HQ leads
+* But no clear UI indication of HQ vs. franchise leads
+* **Impact**: Confusing for users
 
 🟡 **Lead Routing Rules Not Hierarchy-Aware**
-- Auto-assignment rules don't respect franchise boundaries
-- Can accidentally assign cross-franchise leads
-- **Impact**: Data leakage risk
+
+* Auto-assignment rules don't respect franchise boundaries
+* Can accidentally assign cross-franchise leads
+* **Impact**: Data leakage risk
 
 #### 2.A.1.3 Technical Debt Assessment
 
 **Code Quality Issues:**
 
-| Issue | Severity | Files Affected | Impact |
-|-------|----------|----------------|---------|
-| `Leads.tsx` is ~715 lines | 🟡 MEDIUM | Leads.tsx | Hard to maintain, test |
-| Duplicate filtering logic | 🟡 MEDIUM | Leads.tsx, LeadsPipeline.tsx | Inconsistent behavior |
-| No shared lead data hook | 🟡 MEDIUM | Multiple files | Duplicate API calls |
-| Direct Supabase calls | 🔴 HIGH | LeadAssignment.tsx | Bypasses ScopedDataAccess |
-| No error boundaries | 🟡 MEDIUM | All lead components | Poor error handling |
+| Issue                      | Severity  | Files Affected               | Impact                    |
+| -------------------------- | --------- | ---------------------------- | ------------------------- |
+| `Leads.tsx` is \~715 lines | 🟡 MEDIUM | Leads.tsx                    | Hard to maintain, test    |
+| Duplicate filtering logic  | 🟡 MEDIUM | Leads.tsx, LeadsPipeline.tsx | Inconsistent behavior     |
+| No shared lead data hook   | 🟡 MEDIUM | Multiple files               | Duplicate API calls       |
+| Direct Supabase calls      | 🔴 HIGH   | LeadAssignment.tsx           | Bypasses ScopedDataAccess |
+| No error boundaries        | 🟡 MEDIUM | All lead components          | Poor error handling       |
 
 **Performance Issues:**
 
-| Issue | Impact | Priority |
-|-------|--------|----------|
-| No pagination on lead list | Slow with 1000+ leads | P0 |
-| Fetches all leads on mount | High memory usage | P0 |
-| No virtual scrolling | UI lag with large lists | P1 |
-| Lead score calculation in browser | Slow for bulk scoring | P1 |
+| Issue                             | Impact                  | Priority |
+| --------------------------------- | ----------------------- | -------- |
+| No pagination on lead list        | Slow with 1000+ leads   | P0       |
+| Fetches all leads on mount        | High memory usage       | P0       |
+| No virtual scrolling              | UI lag with large lists | P1       |
+| Lead score calculation in browser | Slow for bulk scoring   | P1       |
 
 **Data Model Issues:**
 
 🔴 **Lead Deduplication**
-- No duplicate detection on email/phone
-- Can create multiple leads for same person
-- **Recommendation**: Add unique constraint + merge UI
+
+* No duplicate detection on email/phone
+* Can create multiple leads for same person
+* **Recommendation**: Add unique constraint + merge UI
 
 🟡 **Lead Scoring Configuration**
-- Scoring weights stored in separate table
-- Not easily editable via UI
-- **Recommendation**: Build admin UI for scoring config
+
+* Scoring weights stored in separate table
+* Not easily editable via UI
+* **Recommendation**: Build admin UI for scoring config
 
 🟡 **Lead Activity Tracking**
-- Separate `lead_activities` table exists
-- Not fully integrated with main activities table
-- **Recommendation**: Consolidate activity tables
+
+* Separate `lead_activities` table exists
+* Not fully integrated with main activities table
+* **Recommendation**: Consolidate activity tables
 
 #### 2.A.1.4 Competitive Gap Analysis
 
@@ -1901,104 +1949,104 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
 
 **Competitive Feature Matrix:**
 
-| Feature | Logic Nexus | Cargowise | Magaya | Salesforce | Gap Priority |
-|---------|-------------|-----------|--------|------------|--------------|
-| Lead Capture (Manual) | ✅ | ✅ | ✅ | ✅ | - |
-| Web-to-Lead Forms | 🟡 Basic | ✅ | ✅ | ✅ | P1 |
-| Lead Scoring | 🟡 Rule-based | ✅ | ✅ | ✅ Einstein (AI) | P1 (upgrade to ML) |
-| Auto-Assignment | ✅ Basic | ✅ Advanced | ✅ | ✅ Queues | P1 |
-| Duplicate Detection | ❌ | ✅ | ✅ | ✅ | P0 |
-| Lead Conversion | ✅ | ✅ | ✅ | ✅ | - |
-| Territory Management | 🟡 Basic | ✅ | 🟡 | ✅ | P1 (enhance) |
-| Lead Nurturing Campaigns | ❌ | 🟡 | ✅ | ✅ | P2 |
-| Mobile Lead Capture | ❌ | ✅ | ✅ | ✅ | P2 |
-| Activity Timeline | ✅ | ✅ | ✅ | ✅ | - |
-| Lead Import/Export | ✅ | ✅ | ✅ | ✅ | - |
+| Feature                  | Logic Nexus   | Cargowise  | Magaya | Salesforce      | Gap Priority       |
+| ------------------------ | ------------- | ---------- | ------ | --------------- | ------------------ |
+| Lead Capture (Manual)    | ✅             | ✅          | ✅      | ✅               | -                  |
+| Web-to-Lead Forms        | 🟡 Basic      | ✅          | ✅      | ✅               | P1                 |
+| Lead Scoring             | 🟡 Rule-based | ✅          | ✅      | ✅ Einstein (AI) | P1 (upgrade to ML) |
+| Auto-Assignment          | ✅ Basic       | ✅ Advanced | ✅      | ✅ Queues        | P1                 |
+| Duplicate Detection      | ❌             | ✅          | ✅      | ✅               | P0                 |
+| Lead Conversion          | ✅             | ✅          | ✅      | ✅               | -                  |
+| Territory Management     | 🟡 Basic      | ✅          | 🟡     | ✅               | P1 (enhance)       |
+| Lead Nurturing Campaigns | ❌             | 🟡         | ✅      | ✅               | P2                 |
+| Mobile Lead Capture      | ❌             | ✅          | ✅      | ✅               | P2                 |
+| Activity Timeline        | ✅             | ✅          | ✅      | ✅               | -                  |
+| Lead Import/Export       | ✅             | ✅          | ✅      | ✅               | -                  |
 
 #### 2.A.1.5 Missing Features Identification
 
 **Critical Missing Features (P0):**
 
 1. **Duplicate Lead Detection & Merge**
-   - **Description**: Automatically detect duplicate leads based on email, phone, company
-   - **Use Case**: Prevent duplicate data entry, maintain clean database
-   - **Implementation**:
-     - Add unique constraint on email (tenant-scoped)
-     - Build fuzzy matching algorithm for company names
-     - Create merge UI to combine duplicate leads
-     - Preserve activity history during merge
-   - **Effort**: 2-3 weeks
+   * **Description**: Automatically detect duplicate leads based on email, phone, company
+   * **Use Case**: Prevent duplicate data entry, maintain clean database
+   * **Implementation**:
+     * Add unique constraint on email (tenant-scoped)
+     * Build fuzzy matching algorithm for company names
+     * Create merge UI to combine duplicate leads
+     * Preserve activity history during merge
+   * **Effort**: 2-3 weeks
 
 2. **Lead Enrichment (Third-Party Integration)**
-   - **Description**: Automatically enrich lead data with company info, social profiles
-   - **Providers**: Clearbit, ZoomInfo, LinkedIn Sales Navigator
-   - **Fields**: Company size, revenue, industry, social profiles
-   - **Effort**: 2 weeks
+   * **Description**: Automatically enrich lead data with company info, social profiles
+   * **Providers**: Clearbit, ZoomInfo, LinkedIn Sales Navigator
+   * **Fields**: Company size, revenue, industry, social profiles
+   * **Effort**: 2 weeks
 
 **High Priority Missing Features (P1):**
 
 3. **Web-to-Lead Form Builder**
-   - **Description**: Embeddable forms for website lead capture
-   - **Features**:
-     - Drag-and-drop form builder
-     - Custom fields mapping
-     - CAPTCHA/spam protection
-     - Auto-assignment rules per form
-     - Thank you page redirect
-   - **Effort**: 3-4 weeks
+   * **Description**: Embeddable forms for website lead capture
+   * **Features**:
+     * Drag-and-drop form builder
+     * Custom fields mapping
+     * CAPTCHA/spam protection
+     * Auto-assignment rules per form
+     * Thank you page redirect
+   * **Effort**: 3-4 weeks
 
 4. **Advanced Lead Assignment Queues**
-   - **Description**: Queue-based lead distribution instead of direct assignment
-   - **Features**:
-     - Multiple queues (geography, product, industry)
-     - Queue members with availability status
-     - Load balancing algorithms (round-robin, least assigned, weighted)
-     - Queue performance metrics
-   - **Effort**: 2-3 weeks
+   * **Description**: Queue-based lead distribution instead of direct assignment
+   * **Features**:
+     * Multiple queues (geography, product, industry)
+     * Queue members with availability status
+     * Load balancing algorithms (round-robin, least assigned, weighted)
+     * Queue performance metrics
+   * **Effort**: 2-3 weeks
 
 5. **Territory Management**
-   - **Description**: Geographic/account-based territories for lead routing
-   - **Features**:
-     - Define territories (zip codes, states, countries, named accounts)
-     - Assign users to territories
-     - Auto-assign leads based on territory rules
-     - Territory performance reporting
-   - **Effort**: 3-4 weeks
+   * **Description**: Geographic/account-based territories for lead routing
+   * **Features**:
+     * Define territories (zip codes, states, countries, named accounts)
+     * Assign users to territories
+     * Auto-assign leads based on territory rules
+     * Territory performance reporting
+   * **Effort**: 3-4 weeks
 
 6. **Predictive Lead Scoring (ML)**
-   - **Description**: Machine learning model to predict lead conversion probability
-   - **Inputs**: Historical conversion data, behavioral signals, demographic data
-   - **Output**: Conversion probability score (0-100%)
-   - **Effort**: 4-6 weeks (requires ML infrastructure)
+   * **Description**: Machine learning model to predict lead conversion probability
+   * **Inputs**: Historical conversion data, behavioral signals, demographic data
+   * **Output**: Conversion probability score (0-100%)
+   * **Effort**: 4-6 weeks (requires ML infrastructure)
 
 **Medium Priority Missing Features (P2):**
 
 7. **Lead Nurturing Campaigns**
-   - **Description**: Automated email sequences for leads not ready to convert
-   - **Features**:
-     - Drip campaign builder
-     - Behavioral triggers (email opens, link clicks)
-     - A/B testing
-     - Campaign performance tracking
-   - **Effort**: 4-5 weeks
+   * **Description**: Automated email sequences for leads not ready to convert
+   * **Features**:
+     * Drip campaign builder
+     * Behavioral triggers (email opens, link clicks)
+     * A/B testing
+     * Campaign performance tracking
+   * **Effort**: 4-5 weeks
 
 8. **Mobile Lead Capture App**
-   - **Description**: Native mobile app for field sales to capture leads
-   - **Features**:
-     - Quick lead entry form
-     - Business card scanning (OCR)
-     - GPS location tagging
-     - Offline mode with sync
-   - **Effort**: 8-12 weeks
+   * **Description**: Native mobile app for field sales to capture leads
+   * **Features**:
+     * Quick lead entry form
+     * Business card scanning (OCR)
+     * GPS location tagging
+     * Offline mode with sync
+   * **Effort**: 8-12 weeks
 
 9. **Social Selling Integration**
-   - **Description**: Integrate with LinkedIn Sales Navigator for social prospecting
-   - **Features**:
-     - LinkedIn profile import
-     - Social activity tracking
-     - InMail integration
-     - Connection request workflows
-   - **Effort**: 3-4 weeks
+   * **Description**: Integrate with LinkedIn Sales Navigator for social prospecting
+   * **Features**:
+     * LinkedIn profile import
+     * Social activity tracking
+     * InMail integration
+     * Connection request workflows
+   * **Effort**: 3-4 weeks
 
 #### 2.A.1.6 Hierarchy Enhancement Recommendations
 
@@ -2024,37 +2072,34 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
    ```
 
 2. **HQ Lead Pool Management**
-   - Add visual indicator in UI for HQ leads (franchise_id = NULL)
-   - Create "HQ Lead Pool" view for Tenant Admins
-   - Allow Tenant Admins to assign HQ leads to franchises
+   * Add visual indicator in UI for HQ leads (franchise\_id = NULL)
+   * Create "HQ Lead Pool" view for Tenant Admins
+   * Allow Tenant Admins to assign HQ leads to franchises
 
 3. **Hierarchy-Aware Lead Routing**
-   - Update auto-assignment rules to respect franchise boundaries
-   - Add franchise_id validation before assignment
-   - Tenant-level routing rules can assign to any franchise
-   - Franchise-level routing rules only assign within franchise
+   * Update auto-assignment rules to respect franchise boundaries
+   * Add franchise\_id validation before assignment
+   * Tenant-level routing rules can assign to any franchise
+   * Franchise-level routing rules only assign within franchise
 
 **Phase 2: Advanced Hierarchy Features (Weeks 4-8)**
 
 4. **Franchise-Level Lead Scoring Customization**
-   - Allow franchises to customize scoring weights
-   - Inherit base weights from tenant, override specific factors
-   - Example: NYC franchise weights "local pickups" higher
+   * Allow franchises to customize scoring weights
+   * Inherit base weights from tenant, override specific factors
+   * Example: NYC franchise weights "local pickups" higher
 
 5. **Tenant-Wide Lead Analytics**
-   - Tenant Admin dashboard showing lead performance across all franchises
-   - Franchise comparison metrics
-   - Lead conversion funnel by franchise
+   * Tenant Admin dashboard showing lead performance across all franchises
+   * Franchise comparison metrics
+   * Lead conversion funnel by franchise
 
 6. **Cross-Franchise Lead Collaboration**
-   - "Share" leads between franchises (read-only access)
-   - Use case: NYC franchise shares international shipment lead with London franchise
-   - Audit trail for shared leads
+   * "Share" leads between franchises (read-only access)
+   * Use case: NYC franchise shares international shipment lead with London franchise
+   * Audit trail for shared leads
 
----
-
-
-
+***
 
 ### 2.A.2 Tasks & Activities Management
 
@@ -2101,14 +2146,14 @@ CREATE TABLE public.activities (
 
 **Activity Types & Workflow Mapping:**
 
-| Type | Description | Key Fields | Lifecycle Trigger |
-|------|-------------|------------|-------------------|
-| `call` | Phone call log | Duration, Outcome, Call Recording URL | Manual entry post-call |
-| `meeting` | Calendar appointment | Location, Attendees, Agenda | Manual or via calendar sync (future) |
-| `email` | Email correspondence | Message ID, Thread ID, Body | Auto-created via email sync pipeline |
-| `task` | To-do item | Due Date, Priority, Checklist | Manual or system-generated (e.g., follow-up reminders) |
-| `note` | General update | Content only | Manual entry |
-| `follow_up` | Scheduled follow-up | Linked entity, Due date, Auto-reminder | Created on lead status change |
+| Type        | Description          | Key Fields                             | Lifecycle Trigger                                      |
+| ----------- | -------------------- | -------------------------------------- | ------------------------------------------------------ |
+| `call`      | Phone call log       | Duration, Outcome, Call Recording URL  | Manual entry post-call                                 |
+| `meeting`   | Calendar appointment | Location, Attendees, Agenda            | Manual or via calendar sync (future)                   |
+| `email`     | Email correspondence | Message ID, Thread ID, Body            | Auto-created via email sync pipeline                   |
+| `task`      | To-do item           | Due Date, Priority, Checklist          | Manual or system-generated (e.g., follow-up reminders) |
+| `note`      | General update       | Content only                           | Manual entry                                           |
+| `follow_up` | Scheduled follow-up  | Linked entity, Due date, Auto-reminder | Created on lead status change                          |
 
 **System Architecture:**
 
@@ -2147,14 +2192,14 @@ CREATE TABLE public.activities (
 
 **UI Components (Detailed Inventory):**
 
-| Component | File | Lines | Purpose | Data Access |
-|-----------|------|-------|---------|-------------|
-| **Activity List** | `src/pages/dashboard/Activities.tsx` | ~537 | Main list with filters, search, bulk actions | `useCRM()` → `scopedDb` ✅ |
-| **Activity Board** | `src/components/dashboard/ActivityBoard.tsx` | ~280 | Kanban board grouped by status | `useCRM()` → `scopedDb` ✅ |
-| **Activity Modal** | `src/components/dashboard/ActivityModal.tsx` | ~350 | Create/Edit modal with polymorphic entity linking | `useCRM()` → `scopedDb` ✅ |
-| **Activity Timeline** | `src/components/dashboard/ActivityTimeline.tsx` | ~200 | Chronological history on related records | `useCRM()` → `scopedDb` ✅ |
-| **Lead Activities Timeline** | `src/components/crm/LeadActivitiesTimeline.tsx` | ~280 | Paginated timeline for a specific lead | `useCRM()` → `supabase` 🔴 **Direct** |
-| **Task Scheduler** | `src/pages/dashboard/TaskScheduler.tsx` | ~150 | Upcoming tasks list (no calendar grid) | `useCRM()` → `scopedDb` ✅ |
+| Component                    | File                                            | Lines | Purpose                                           | Data Access                           |
+| ---------------------------- | ----------------------------------------------- | ----- | ------------------------------------------------- | ------------------------------------- |
+| **Activity List**            | `src/pages/dashboard/Activities.tsx`            | \~537 | Main list with filters, search, bulk actions      | `useCRM()` → `scopedDb` ✅             |
+| **Activity Board**           | `src/components/dashboard/ActivityBoard.tsx`    | \~280 | Kanban board grouped by status                    | `useCRM()` → `scopedDb` ✅             |
+| **Activity Modal**           | `src/components/dashboard/ActivityModal.tsx`    | \~350 | Create/Edit modal with polymorphic entity linking | `useCRM()` → `scopedDb` ✅             |
+| **Activity Timeline**        | `src/components/dashboard/ActivityTimeline.tsx` | \~200 | Chronological history on related records          | `useCRM()` → `scopedDb` ✅             |
+| **Lead Activities Timeline** | `src/components/crm/LeadActivitiesTimeline.tsx` | \~280 | Paginated timeline for a specific lead            | `useCRM()` → `supabase` 🔴 **Direct** |
+| **Task Scheduler**           | `src/pages/dashboard/TaskScheduler.tsx`         | \~150 | Upcoming tasks list (no calendar grid)            | `useCRM()` → `scopedDb` ✅             |
 
 **Critical Finding — `LeadActivitiesTimeline.tsx` Bypasses ScopedDataAccess:**
 
@@ -2169,6 +2214,7 @@ let query = supabase
 ```
 
 This component queries `activities` directly via `supabase` client rather than `scopedDb`, relying entirely on RLS for isolation. While RLS provides database-level protection, this pattern:
+
 1. Skips application-level audit logging
 2. Doesn't benefit from `ScopedDataAccess` filter enrichment
 3. Is inconsistent with the pattern used by `Activities.tsx` (which uses `scopedDb`)
@@ -2176,34 +2222,40 @@ This component queries `activities` directly via `supabase` client rather than `
 **Current Features (Verified):**
 
 ✅ **Task Tracking**
-- Create/Edit/Delete tasks with full CRUD operations
-- Set due dates and priorities (low, medium, high, urgent)
-- Mark as complete with `completed_at` timestamp
-- Assign tasks to other users within the same hierarchy scope
+
+* Create/Edit/Delete tasks with full CRUD operations
+* Set due dates and priorities (low, medium, high, urgent)
+* Mark as complete with `completed_at` timestamp
+* Assign tasks to other users within the same hierarchy scope
 
 ✅ **Multi-Entity Linking (Polymorphic)**
-- Link activity to Lead, Account, Contact, Opportunity, Shipment, or Quote
-- View activities contextually within those records (via `LeadActivitiesTimeline`, `ActivityTimeline`)
-- Multiple entity links per activity (e.g., a call about a Quote linked to both Account and Quote)
+
+* Link activity to Lead, Account, Contact, Opportunity, Shipment, or Quote
+* View activities contextually within those records (via `LeadActivitiesTimeline`, `ActivityTimeline`)
+* Multiple entity links per activity (e.g., a call about a Quote linked to both Account and Quote)
 
 ✅ **Automated Activity Logging**
-- `is_automated` flag distinguishes system-generated activities
-- Email sync creates `email` type activities automatically
-- Lead event webhooks (`lead-event-webhook` edge function) log engagement events
+
+* `is_automated` flag distinguishes system-generated activities
+* Email sync creates `email` type activities automatically
+* Lead event webhooks (`lead-event-webhook` edge function) log engagement events
 
 ✅ **Filtering & Search**
-- Filter by Type, Status, Priority, Owner
-- Date range filtering (Today, This Week, Overdue)
-- Paginated results (10 per page in `LeadActivitiesTimeline`)
+
+* Filter by Type, Status, Priority, Owner
+* Date range filtering (Today, This Week, Overdue)
+* Paginated results (10 per page in `LeadActivitiesTimeline`)
 
 ✅ **Views**
-- List View (Table) with sortable columns
-- Board View (Kanban by Status: Pending → In Progress → Completed → Cancelled)
-- Timeline View (Chronological, per-entity)
+
+* List View (Table) with sortable columns
+* Board View (Kanban by Status: Pending → In Progress → Completed → Cancelled)
+* Timeline View (Chronological, per-entity)
 
 ✅ **Custom Fields (JSONB)**
-- `custom_fields` column for tenant-specific extensions
-- Migration `20260118000000_fix_activities_custom_fields.sql` ensured schema stability
+
+* `custom_fields` column for tenant-specific extensions
+* Migration `20260118000000_fix_activities_custom_fields.sql` ensured schema stability
 
 #### 2.A.2.2 Hierarchy Enforcement Analysis
 
@@ -2259,12 +2311,12 @@ let query = supabase.from('activities').select('*').eq('lead_id', leadId);
 
 **Hierarchy Logic (Comprehensive Matrix):**
 
-| User Level | Activity Visibility | Create Scope | Edit Scope | Delete Scope | Assign Scope |
-|------------|---------------------|-------------|------------|-------------|--------------|
-| **Platform Admin** | ALL activities across tenants | Any tenant/franchise | Any activity | Any activity | Any user |
-| **Tenant Admin** | All activities in tenant (cross-franchise) | Any franchise in tenant | Any in tenant | Any in tenant | Any user in tenant |
-| **Franchise Admin** | All activities in their franchise | Their franchise only | Their franchise | Their franchise | Users in franchise |
-| **User** | Activities owned by or assigned to them | Their franchise only | Own activities only | Own activities only | Cannot assign |
+| User Level          | Activity Visibility                        | Create Scope            | Edit Scope          | Delete Scope        | Assign Scope       |
+| ------------------- | ------------------------------------------ | ----------------------- | ------------------- | ------------------- | ------------------ |
+| **Platform Admin**  | ALL activities across tenants              | Any tenant/franchise    | Any activity        | Any activity        | Any user           |
+| **Tenant Admin**    | All activities in tenant (cross-franchise) | Any franchise in tenant | Any in tenant       | Any in tenant       | Any user in tenant |
+| **Franchise Admin** | All activities in their franchise          | Their franchise only    | Their franchise     | Their franchise     | Users in franchise |
+| **User**            | Activities owned by or assigned to them    | Their franchise only    | Own activities only | Own activities only | Cannot assign      |
 
 **Hierarchy Enforcement Diagram:**
 
@@ -2292,81 +2344,89 @@ let query = supabase.from('activities').select('*').eq('lead_id', leadId);
 **Current Hierarchy Issues:**
 
 🔴 **No "Team View" for Managers (Critical Gap)**
-- Standard users can only see *their* tasks (owned or assigned).
-- Managers (who are not Franchise Admins) cannot see their direct reports' tasks.
-- The `profiles` table lacks a `reports_to` column, making organizational hierarchy invisible.
-- **Impact**: Managers cannot effectively supervise team workload, identify bottlenecks, or redistribute tasks.
-- **Business Scenario**: A Sales Manager with 5 reps has no visibility into whether overdue tasks are blocking deals.
-- **Workaround**: Promote managers to `franchise_admin` role — but this grants excessive permissions (full CRUD on all franchise data).
+
+* Standard users can only see *their* tasks (owned or assigned).
+* Managers (who are not Franchise Admins) cannot see their direct reports' tasks.
+* The `profiles` table lacks a `reports_to` column, making organizational hierarchy invisible.
+* **Impact**: Managers cannot effectively supervise team workload, identify bottlenecks, or redistribute tasks.
+* **Business Scenario**: A Sales Manager with 5 reps has no visibility into whether overdue tasks are blocking deals.
+* **Workaround**: Promote managers to `franchise_admin` role — but this grants excessive permissions (full CRUD on all franchise data).
 
 🔴 **Activity History Orphaning on Lead Transfer**
-- When a Lead is transferred between franchises (via Tenant Admin updating `franchise_id`), historical activities remain scoped to the **old** franchise.
-- The `franchise_id` on activity records is NOT updated when the parent Lead moves.
-- **Impact**: New franchise owner loses context of previous interactions. The activity timeline appears empty.
-- **Business Scenario**: NYC franchise qualifies a lead and logs 15 activities. Lead is transferred to LA. LA franchise sees zero activity history.
-- **Migration needed**: Cascade `franchise_id` update from `leads` to related `activities`.
 
-🟡 **Inconsistent Owner vs. Assigned_to Semantics**
-- RLS grants visibility if `owner_id = auth.uid() OR assigned_to = auth.uid()`.
-- But `owner_id` (who created it) and `assigned_to` (who should do it) serve different purposes.
-- If User A creates a task and assigns it to User B, both can see it — but if User A transfers to another franchise, they may lose visibility.
-- **Impact**: Confusing permission model that doesn't align with business expectations.
+* When a Lead is transferred between franchises (via Tenant Admin updating `franchise_id`), historical activities remain scoped to the **old** franchise.
+* The `franchise_id` on activity records is NOT updated when the parent Lead moves.
+* **Impact**: New franchise owner loses context of previous interactions. The activity timeline appears empty.
+* **Business Scenario**: NYC franchise qualifies a lead and logs 15 activities. Lead is transferred to LA. LA franchise sees zero activity history.
+* **Migration needed**: Cascade `franchise_id` update from `leads` to related `activities`.
+
+🟡 **Inconsistent Owner vs. Assigned\_to Semantics**
+
+* RLS grants visibility if `owner_id = auth.uid() OR assigned_to = auth.uid()`.
+* But `owner_id` (who created it) and `assigned_to` (who should do it) serve different purposes.
+* If User A creates a task and assigns it to User B, both can see it — but if User A transfers to another franchise, they may lose visibility.
+* **Impact**: Confusing permission model that doesn't align with business expectations.
 
 🟡 **No Activity Reassignment on User Deactivation**
-- When a user is deactivated (leaves the company), their activities remain assigned to them.
-- No automatic reassignment workflow exists.
-- **Impact**: Tasks fall into a "black hole" — assigned to a ghost user, visible to no one except admins.
+
+* When a user is deactivated (leaves the company), their activities remain assigned to them.
+* No automatic reassignment workflow exists.
+* **Impact**: Tasks fall into a "black hole" — assigned to a ghost user, visible to no one except admins.
 
 #### 2.A.2.3 Technical Debt Assessment
 
 **Code Quality Issues:**
 
-| Issue | Severity | Files Affected | Impact | Estimated Fix Effort |
-|-------|----------|----------------|--------|---------------------|
-| **Manual Relation Handling (N+1)** | 🟡 MEDIUM | `Activities.tsx`, `LeadActivitiesTimeline.tsx` | Activities fetch related entity names (Lead name, Account name) via separate queries per row, not JOINs. At 100+ activities, this causes 100+ additional queries. | 1 week |
-| **ScopedDataAccess Bypass** | 🔴 HIGH | `LeadActivitiesTimeline.tsx:75` | Direct `supabase.from('activities')` call bypasses app-level scoping. Relies solely on RLS. Inconsistent with `Activities.tsx` which correctly uses `scopedDb`. | 1 day |
-| **No Recurrence Logic** | 🔴 HIGH | DB schema | No `recurrence_rule` (RRULE) column. Recurring tasks ("Call client every Monday") must be manually recreated each time. No Edge Function to generate recurring instances. | 2 weeks |
-| **Missing Calendar View** | 🟡 MEDIUM | `Calendar.tsx` | Placeholder "Coming Soon" component. Users cannot visualize tasks on a calendar grid. No FullCalendar or similar library integrated. | 2-3 weeks |
-| **No Optimistic Updates** | 🟡 MEDIUM | `ActivityBoard.tsx` | Kanban drag-and-drop triggers a full re-fetch after status change. No optimistic UI update. Users see a loading spinner on every card move. | 3 days |
-| **Large Component Files** | 🟡 MEDIUM | `Activities.tsx` (~537 lines) | Monolithic component handling list rendering, filtering, pagination, and CRUD. Should be decomposed into smaller, testable units. | 1 week |
-| **No Test Coverage** | 🔴 HIGH | All activity components | Zero unit tests for activity components. No integration tests for activity-related RLS policies. Global mock in `test/setup.ts` doesn't cover activity-specific hooks. | 2 weeks |
+| Issue                              | Severity  | Files Affected                                 | Impact                                                                                                                                                                    | Estimated Fix Effort |
+| ---------------------------------- | --------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| **Manual Relation Handling (N+1)** | 🟡 MEDIUM | `Activities.tsx`, `LeadActivitiesTimeline.tsx` | Activities fetch related entity names (Lead name, Account name) via separate queries per row, not JOINs. At 100+ activities, this causes 100+ additional queries.         | 1 week               |
+| **ScopedDataAccess Bypass**        | 🔴 HIGH   | `LeadActivitiesTimeline.tsx:75`                | Direct `supabase.from('activities')` call bypasses app-level scoping. Relies solely on RLS. Inconsistent with `Activities.tsx` which correctly uses `scopedDb`.           | 1 day                |
+| **No Recurrence Logic**            | 🔴 HIGH   | DB schema                                      | No `recurrence_rule` (RRULE) column. Recurring tasks ("Call client every Monday") must be manually recreated each time. No Edge Function to generate recurring instances. | 2 weeks              |
+| **Missing Calendar View**          | 🟡 MEDIUM | `Calendar.tsx`                                 | Placeholder "Coming Soon" component. Users cannot visualize tasks on a calendar grid. No FullCalendar or similar library integrated.                                      | 2-3 weeks            |
+| **No Optimistic Updates**          | 🟡 MEDIUM | `ActivityBoard.tsx`                            | Kanban drag-and-drop triggers a full re-fetch after status change. No optimistic UI update. Users see a loading spinner on every card move.                               | 3 days               |
+| **Large Component Files**          | 🟡 MEDIUM | `Activities.tsx` (\~537 lines)                 | Monolithic component handling list rendering, filtering, pagination, and CRUD. Should be decomposed into smaller, testable units.                                         | 1 week               |
+| **No Test Coverage**               | 🔴 HIGH   | All activity components                        | Zero unit tests for activity components. No integration tests for activity-related RLS policies. Global mock in `test/setup.ts` doesn't cover activity-specific hooks.    | 2 weeks              |
 
 **Performance Issues:**
 
-| Issue | Current Behavior | Impact at Scale | Priority |
-|-------|-----------------|-----------------|----------|
-| **No Server-Side Pagination** | `LeadActivitiesTimeline.tsx` uses `.range(from, to)` ✅, but `Activities.tsx` fetches all then paginates client-side | Slow with 10K+ activities per franchise | P0 |
-| **No Index on (tenant_id, franchise_id, due_date)** | Full table scan for "overdue tasks" queries | Degrades with 50K+ activity rows | P0 |
-| **N+1 Entity Resolution** | Each activity row fetches linked Lead/Account name in a separate query | 100 activities = 100+ extra DB round-trips | P1 |
-| **No Virtual Scrolling** | Standard `<table>` rendering for large activity lists | Browser lag with 500+ visible rows | P1 |
-| **Client-Side Sorting** | Sorting by priority/date happens in JavaScript | Memory pressure, UI jank | P2 |
+| Issue                                                  | Current Behavior                                                                                                    | Impact at Scale                            | Priority |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------- |
+| **No Server-Side Pagination**                          | `LeadActivitiesTimeline.tsx` uses `.range(from, to)` ✅, but `Activities.tsx` fetches all then paginates client-side | Slow with 10K+ activities per franchise    | P0       |
+| **No Index on (tenant\_id, franchise\_id, due\_date)** | Full table scan for "overdue tasks" queries                                                                         | Degrades with 50K+ activity rows           | P0       |
+| **N+1 Entity Resolution**                              | Each activity row fetches linked Lead/Account name in a separate query                                              | 100 activities = 100+ extra DB round-trips | P1       |
+| **No Virtual Scrolling**                               | Standard `<table>` rendering for large activity lists                                                               | Browser lag with 500+ visible rows         | P1       |
+| **Client-Side Sorting**                                | Sorting by priority/date happens in JavaScript                                                                      | Memory pressure, UI jank                   | P2       |
 
 **Data Model Issues:**
 
 🔴 **Email Sync Gap Partially Addressed**
-- The email sync pipeline (`sync-emails-v2` Edge Function) now captures external emails (Gmail, IMAP, POP3).
-- However, synced emails are stored in the `emails` table, NOT the `activities` table.
-- The `activities` table has `activity_type = 'email'` but these are only for manually logged email activities.
-- **Result**: Two parallel systems for email tracking — the email module and the activity module — with no automatic bridging.
-- **Recommendation**: Create a trigger or Edge Function that auto-creates an `activity` record (type='email') when an email is synced, linking it to the matched Lead/Account via the email routing logic.
+
+* The email sync pipeline (`sync-emails-v2` Edge Function) now captures external emails (Gmail, IMAP, POP3).
+* However, synced emails are stored in the `emails` table, NOT the `activities` table.
+* The `activities` table has `activity_type = 'email'` but these are only for manually logged email activities.
+* **Result**: Two parallel systems for email tracking — the email module and the activity module — with no automatic bridging.
+* **Recommendation**: Create a trigger or Edge Function that auto-creates an `activity` record (type='email') when an email is synced, linking it to the matched Lead/Account via the email routing logic.
 
 🔴 **No Task Dependencies**
-- Tasks are standalone entities with no dependency chain support.
-- Cannot model "Task B starts when Task A finishes" (critical for logistics operations).
-- **Example**: "File ISF" depends on "Receive Booking Confirmation" which depends on "Confirm Rates with Carrier."
-- **Business Impact**: Operations teams must manually track sequencing, leading to missed deadlines.
-- **Recommendation**: Add `depends_on` self-referencing UUID array or `task_dependencies` join table.
+
+* Tasks are standalone entities with no dependency chain support.
+* Cannot model "Task B starts when Task A finishes" (critical for logistics operations).
+* **Example**: "File ISF" depends on "Receive Booking Confirmation" which depends on "Confirm Rates with Carrier."
+* **Business Impact**: Operations teams must manually track sequencing, leading to missed deadlines.
+* **Recommendation**: Add `depends_on` self-referencing UUID array or `task_dependencies` join table.
 
 🟡 **Missing Activity Duration Tracking**
-- No `duration_minutes` column for calls/meetings.
-- Cannot report on "Average call time" or "Time spent on account."
-- **Recommendation**: Add `duration_minutes INTEGER` column, populated on activity completion.
+
+* No `duration_minutes` column for calls/meetings.
+* Cannot report on "Average call time" or "Time spent on account."
+* **Recommendation**: Add `duration_minutes INTEGER` column, populated on activity completion.
 
 🟡 **JSONB `custom_fields` Not Schema-Validated**
-- The `custom_fields` JSONB column accepts any structure.
-- No validation schema enforces consistency.
-- Different tenants may use conflicting field names.
-- **Recommendation**: Store field definitions in `custom_field_definitions` table keyed by tenant_id.
+
+* The `custom_fields` JSONB column accepts any structure.
+* No validation schema enforces consistency.
+* Different tenants may use conflicting field names.
+* **Recommendation**: Store field definitions in `custom_field_definitions` table keyed by tenant\_id.
 
 #### 2.A.2.4 Competitive Gap Analysis
 
@@ -2390,23 +2450,23 @@ let query = supabase.from('activities').select('*').eq('lead_id', leadId);
 
 **Competitive Feature Matrix (Extended):**
 
-| Feature | Logic Nexus | Cargowise | Salesforce | Dynamics 365 | HubSpot | Gap Priority |
-|---------|-------------|-----------|------------|--------------|---------|--------------|
-| Basic Task CRUD | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| Kanban Board | ✅ | ❌ | ✅ | ✅ | ✅ | - |
-| Multi-Entity Linking | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| Activity Timeline | ✅ | ✅ | ✅ | ✅ | ✅ | - |
-| Custom Fields | ✅ (JSONB) | ✅ | ✅ | ✅ | ✅ | - |
-| Recurring Tasks | ❌ | ✅ | ✅ | ✅ | ✅ | **P1** |
-| Calendar Sync | ❌ | 🟡 | ✅ (2-way) | ✅ (Native) | ✅ | **P0** |
-| Email-to-Activity Auto-Log | ❌ | 🟡 | ✅ (Einstein) | ✅ (Outlook) | ✅ | **P0** |
-| Task Dependencies | ❌ | ✅ (Advanced) | ✅ | ✅ | ❌ | **P1** |
-| SOP/Workflow Templates | ❌ | ✅ (Core Feature) | ✅ (Flows) | ✅ (Power Automate) | ✅ (Workflows) | **P1** |
-| Automated Reminders | ❌ | ✅ | ✅ | ✅ | ✅ | **P1** |
-| SLA Timers / Escalation | ❌ | ✅ | ✅ | ✅ | ❌ | **P2** |
-| Call Logging + Recording | ❌ | 🟡 | ✅ | ✅ | ✅ (Native) | **P2** |
-| Mobile Offline Tasks | ❌ | ✅ | ✅ | ✅ | ✅ | **P2** |
-| AI Task Suggestion | ❌ | ❌ | ✅ (Einstein) | ✅ (AI Insights) | ❌ | **P3** |
+| Feature                    | Logic Nexus | Cargowise        | Salesforce   | Dynamics 365       | HubSpot       | Gap Priority |
+| -------------------------- | ----------- | ---------------- | ------------ | ------------------ | ------------- | ------------ |
+| Basic Task CRUD            | ✅           | ✅                | ✅            | ✅                  | ✅             | -            |
+| Kanban Board               | ✅           | ❌                | ✅            | ✅                  | ✅             | -            |
+| Multi-Entity Linking       | ✅           | ✅                | ✅            | ✅                  | ✅             | -            |
+| Activity Timeline          | ✅           | ✅                | ✅            | ✅                  | ✅             | -            |
+| Custom Fields              | ✅ (JSONB)   | ✅                | ✅            | ✅                  | ✅             | -            |
+| Recurring Tasks            | ❌           | ✅                | ✅            | ✅                  | ✅             | **P1**       |
+| Calendar Sync              | ❌           | 🟡               | ✅ (2-way)    | ✅ (Native)         | ✅             | **P0**       |
+| Email-to-Activity Auto-Log | ❌           | 🟡               | ✅ (Einstein) | ✅ (Outlook)        | ✅             | **P0**       |
+| Task Dependencies          | ❌           | ✅ (Advanced)     | ✅            | ✅                  | ❌             | **P1**       |
+| SOP/Workflow Templates     | ❌           | ✅ (Core Feature) | ✅ (Flows)    | ✅ (Power Automate) | ✅ (Workflows) | **P1**       |
+| Automated Reminders        | ❌           | ✅                | ✅            | ✅                  | ✅             | **P1**       |
+| SLA Timers / Escalation    | ❌           | ✅                | ✅            | ✅                  | ❌             | **P2**       |
+| Call Logging + Recording   | ❌           | 🟡               | ✅            | ✅                  | ✅ (Native)    | **P2**       |
+| Mobile Offline Tasks       | ❌           | ✅                | ✅            | ✅                  | ✅             | **P2**       |
+| AI Task Suggestion         | ❌           | ❌                | ✅ (Einstein) | ✅ (AI Insights)    | ❌             | **P3**       |
 
 **Competitive Insight**: Logic Nexus has a **strong foundation** with Kanban boards, multi-entity linking, and custom fields. However, the lack of calendar sync, recurring tasks, and SOP templates puts it behind every major competitor. **The most impactful investment is calendar/email sync** — without it, users maintain a separate calendar, and the CRM becomes a secondary system rather than the single source of truth.
 
@@ -2414,159 +2474,159 @@ let query = supabase.from('activities').select('*').eq('lead_id', leadId);
 
 **Critical Missing Features (P0) — Business Impact: Revenue Leakage / User Adoption Blocker:**
 
-1.  **Bi-Directional Calendar Sync**
-    *   **Description**: Sync CRM tasks/meetings with Google Calendar & Outlook. Changes in either system reflect in both.
-    *   **Business Impact Score**: 9/10 — Without calendar sync, sales reps maintain separate systems, leading to missed follow-ups and data fragmentation. This is the #1 reason CRM adoption fails.
-    *   **Implementation**:
-        *   Use Microsoft Graph API (OAuth2 via existing `exchange-oauth-token` Edge Function) and Google Calendar API.
-        *   Alternative: Nylas or Cronofy as middleware (reduces integration complexity by 60%).
-        *   Create `events` table with `start_time`, `end_time`, `attendees`, `external_event_id`.
-        *   Background sync job via Supabase Cron + Edge Function (`sync-calendar`).
-    *   **Hierarchy Impact**: Events must inherit `tenant_id`/`franchise_id` from the creating user. Cross-franchise events (e.g., regional sales meeting) need a `is_tenant_wide` flag.
-    *   **Effort**: 4-6 weeks (Nylas path: 2-3 weeks).
+1. **Bi-Directional Calendar Sync**
+   * **Description**: Sync CRM tasks/meetings with Google Calendar & Outlook. Changes in either system reflect in both.
+   * **Business Impact Score**: 9/10 — Without calendar sync, sales reps maintain separate systems, leading to missed follow-ups and data fragmentation. This is the #1 reason CRM adoption fails.
+   * **Implementation**:
+     * Use Microsoft Graph API (OAuth2 via existing `exchange-oauth-token` Edge Function) and Google Calendar API.
+     * Alternative: Nylas or Cronofy as middleware (reduces integration complexity by 60%).
+     * Create `events` table with `start_time`, `end_time`, `attendees`, `external_event_id`.
+     * Background sync job via Supabase Cron + Edge Function (`sync-calendar`).
+   * **Hierarchy Impact**: Events must inherit `tenant_id`/`franchise_id` from the creating user. Cross-franchise events (e.g., regional sales meeting) need a `is_tenant_wide` flag.
+   * **Effort**: 4-6 weeks (Nylas path: 2-3 weeks).
 
-2.  **Email-to-Activity Auto-Bridging**
-    *   **Description**: Automatically create `activity` records (type='email') when the email sync pipeline (`sync-emails-v2`) ingests emails, linking them to matched Leads/Accounts/Opportunities.
-    *   **Business Impact Score**: 8/10 — The email module already syncs emails, but they don't appear in activity timelines. Sales managers see an incomplete picture of rep engagement.
-    *   **Implementation**:
-        *   Add a post-sync trigger in `sync-emails-v2` or create a new Edge Function `bridge-email-activities`.
-        *   Use the existing `routing-logic.ts` email routing engine to match emails → CRM entities.
-        *   Create an `activity` record for each matched email with `is_automated = true`.
-        *   Deduplicate using `emails.message_id` to prevent duplicate activities on re-sync.
-    *   **Effort**: 2 weeks (infrastructure already exists in email pipeline).
+2. **Email-to-Activity Auto-Bridging**
+   * **Description**: Automatically create `activity` records (type='email') when the email sync pipeline (`sync-emails-v2`) ingests emails, linking them to matched Leads/Accounts/Opportunities.
+   * **Business Impact Score**: 8/10 — The email module already syncs emails, but they don't appear in activity timelines. Sales managers see an incomplete picture of rep engagement.
+   * **Implementation**:
+     * Add a post-sync trigger in `sync-emails-v2` or create a new Edge Function `bridge-email-activities`.
+     * Use the existing `routing-logic.ts` email routing engine to match emails → CRM entities.
+     * Create an `activity` record for each matched email with `is_automated = true`.
+     * Deduplicate using `emails.message_id` to prevent duplicate activities on re-sync.
+   * **Effort**: 2 weeks (infrastructure already exists in email pipeline).
 
 **High Priority Missing Features (P1) — Business Impact: Operational Efficiency:**
 
-3.  **Recurring Tasks (RRULE Support)**
-    *   **Description**: Support for "Every Monday", "Monthly on the 15th", "Every 2 weeks" recurring tasks.
-    *   **Business Impact Score**: 7/10 — Logistics operations have many repeating tasks (weekly carrier rate reviews, monthly compliance audits, daily shipment status calls).
-    *   **Implementation**:
-        *   Add `recurrence_rule TEXT` column (RFC 5545 RRULE format, e.g., `FREQ=WEEKLY;BYDAY=MO`).
-        *   Add `recurrence_end_date DATE` and `parent_activity_id UUID` (for instances).
-        *   Create Edge Function `generate-recurring-activities` triggered by Supabase Cron (daily at 00:00 UTC).
-        *   Generate instances 7 days in advance. Each instance is a standalone activity with `parent_activity_id` pointing to the template.
-    *   **Hierarchy Impact**: Recurring tasks must respect franchise scoping. A franchise-level recurring task should only generate instances visible within that franchise.
-    *   **Effort**: 2-3 weeks.
+3. **Recurring Tasks (RRULE Support)**
+   * **Description**: Support for "Every Monday", "Monthly on the 15th", "Every 2 weeks" recurring tasks.
+   * **Business Impact Score**: 7/10 — Logistics operations have many repeating tasks (weekly carrier rate reviews, monthly compliance audits, daily shipment status calls).
+   * **Implementation**:
+     * Add `recurrence_rule TEXT` column (RFC 5545 RRULE format, e.g., `FREQ=WEEKLY;BYDAY=MO`).
+     * Add `recurrence_end_date DATE` and `parent_activity_id UUID` (for instances).
+     * Create Edge Function `generate-recurring-activities` triggered by Supabase Cron (daily at 00:00 UTC).
+     * Generate instances 7 days in advance. Each instance is a standalone activity with `parent_activity_id` pointing to the template.
+   * **Hierarchy Impact**: Recurring tasks must respect franchise scoping. A franchise-level recurring task should only generate instances visible within that franchise.
+   * **Effort**: 2-3 weeks.
 
-4.  **Automated Reminders & Notifications**
-    *   **Description**: Email/Push/In-app notifications X minutes before due date. Overdue task escalation.
-    *   **Business Impact Score**: 7/10 — Without reminders, users must remember to check the CRM for upcoming tasks. This leads to missed follow-ups on time-sensitive logistics deadlines.
-    *   **Implementation**:
-        *   Create `notification_preferences` table (user_id, channel, advance_minutes).
-        *   Edge Function `process-task-reminders` triggered by Supabase Cron (every 15 minutes).
-        *   Query: `SELECT * FROM activities WHERE due_date BETWEEN NOW() AND NOW() + INTERVAL '15 min' AND status = 'pending' AND reminder_sent = false`.
-        *   Dispatch via existing `send-email` Edge Function or in-app notification system.
-    *   **Effort**: 1-2 weeks.
+4. **Automated Reminders & Notifications**
+   * **Description**: Email/Push/In-app notifications X minutes before due date. Overdue task escalation.
+   * **Business Impact Score**: 7/10 — Without reminders, users must remember to check the CRM for upcoming tasks. This leads to missed follow-ups on time-sensitive logistics deadlines.
+   * **Implementation**:
+     * Create `notification_preferences` table (user\_id, channel, advance\_minutes).
+     * Edge Function `process-task-reminders` triggered by Supabase Cron (every 15 minutes).
+     * Query: `SELECT * FROM activities WHERE due_date BETWEEN NOW() AND NOW() + INTERVAL '15 min' AND status = 'pending' AND reminder_sent = false`.
+     * Dispatch via existing `send-email` Edge Function or in-app notification system.
+   * **Effort**: 1-2 weeks.
 
-5.  **SOP Workflow Templates (Logistics-Specific)**
-    *   **Description**: Pre-defined task sequences for standard operating procedures. Example: "Ocean Import SOP" → 15 sequential tasks from "Receive Booking" to "Deliver to Customer."
-    *   **Business Impact Score**: 8/10 — This is the **single most requested feature** in logistics CRMs. New hires need step-by-step guidance; managers need to ensure nothing is skipped.
-    *   **Implementation**:
-        *   Create `workflow_templates` table (tenant_id, name, description, steps JSONB).
-        *   Create `workflow_instances` table (template_id, shipment_id/quote_id, status).
-        *   Each step in the template generates an activity with dependency logic.
-        *   UI: "Apply SOP" button on Shipment or Quote detail page.
-    *   **Hierarchy Impact**: Templates can be defined at tenant level (shared across franchises) or franchise level (local customization).
-    *   **Effort**: 4-5 weeks.
+5. **SOP Workflow Templates (Logistics-Specific)**
+   * **Description**: Pre-defined task sequences for standard operating procedures. Example: "Ocean Import SOP" → 15 sequential tasks from "Receive Booking" to "Deliver to Customer."
+   * **Business Impact Score**: 8/10 — This is the **single most requested feature** in logistics CRMs. New hires need step-by-step guidance; managers need to ensure nothing is skipped.
+   * **Implementation**:
+     * Create `workflow_templates` table (tenant\_id, name, description, steps JSONB).
+     * Create `workflow_instances` table (template\_id, shipment\_id/quote\_id, status).
+     * Each step in the template generates an activity with dependency logic.
+     * UI: "Apply SOP" button on Shipment or Quote detail page.
+   * **Hierarchy Impact**: Templates can be defined at tenant level (shared across franchises) or franchise level (local customization).
+   * **Effort**: 4-5 weeks.
 
 **Medium Priority Missing Features (P2) — Nice-to-Have / Differentiators:**
 
-6.  **Task Dependencies (Predecessor/Successor)**
-    *   **Description**: Define that "Task B cannot start until Task A is completed."
-    *   **Implementation**: Create `task_dependencies` table (`predecessor_id`, `successor_id`, `dependency_type`).
-    *   **Effort**: 2-3 weeks.
+6. **Task Dependencies (Predecessor/Successor)**
+   * **Description**: Define that "Task B cannot start until Task A is completed."
+   * **Implementation**: Create `task_dependencies` table (`predecessor_id`, `successor_id`, `dependency_type`).
+   * **Effort**: 2-3 weeks.
 
-7.  **SLA Timers & Escalation**
-    *   **Description**: Auto-escalate overdue tasks to the manager. Visual "time remaining" indicator.
-    *   **Implementation**: Add `sla_minutes INTEGER` and `escalation_user_id UUID` columns. Cron job to check overdue + escalate.
-    *   **Effort**: 2 weeks.
+7. **SLA Timers & Escalation**
+   * **Description**: Auto-escalate overdue tasks to the manager. Visual "time remaining" indicator.
+   * **Implementation**: Add `sla_minutes INTEGER` and `escalation_user_id UUID` columns. Cron job to check overdue + escalate.
+   * **Effort**: 2 weeks.
 
-8.  **Built-in Call Logging with Click-to-Call**
-    *   **Description**: Click phone number → browser initiates call via Twilio/RingCentral → auto-log activity with duration.
-    *   **Effort**: 3-4 weeks (Twilio integration).
+8. **Built-in Call Logging with Click-to-Call**
+   * **Description**: Click phone number → browser initiates call via Twilio/RingCentral → auto-log activity with duration.
+   * **Effort**: 3-4 weeks (Twilio integration).
 
 #### 2.A.2.6 Hierarchy Enhancement Recommendations
 
 **Phase 1: Visibility & Collaboration (Weeks 1-4)**
 
-1.  **Manager Role Implementation (reports_to Hierarchy)**
-    *   **Schema Change**: Add `reports_to UUID REFERENCES profiles(id)` to `profiles` table.
-    *   **RLS Update**: Create recursive CTE policy allowing managers to view tasks of all `reports_to` descendants:
-    ```sql
-    -- New RLS policy: Managers see their reports' activities
-    CREATE POLICY "Managers can view team activities" ON public.activities
-        FOR SELECT
-        USING (
-            tenant_id = public.get_user_tenant_id(auth.uid())
-            AND assigned_to IN (
-                SELECT id FROM public.profiles
-                WHERE reports_to = auth.uid()  -- Direct reports
-            )
-        );
-    ```
-    *   **UI**: Add "My Team's Tasks" tab in Activities.tsx showing aggregate view.
-    *   **Effort**: 1-2 weeks.
+1. **Manager Role Implementation (reports\_to Hierarchy)**
+   * **Schema Change**: Add `reports_to UUID REFERENCES profiles(id)` to `profiles` table.
+   * **RLS Update**: Create recursive CTE policy allowing managers to view tasks of all `reports_to` descendants:
+   ```sql
+   -- New RLS policy: Managers see their reports' activities
+   CREATE POLICY "Managers can view team activities" ON public.activities
+       FOR SELECT
+       USING (
+           tenant_id = public.get_user_tenant_id(auth.uid())
+           AND assigned_to IN (
+               SELECT id FROM public.profiles
+               WHERE reports_to = auth.uid()  -- Direct reports
+           )
+       );
+   ```
+   * **UI**: Add "My Team's Tasks" tab in Activities.tsx showing aggregate view.
+   * **Effort**: 1-2 weeks.
 
-2.  **Activity History Cascade on Lead/Entity Transfer**
-    *   **Trigger**: When `leads.franchise_id` is updated (transfer event), cascade the update to all related activities:
-    ```sql
-    CREATE OR REPLACE FUNCTION cascade_franchise_on_lead_transfer()
-    RETURNS TRIGGER AS $$
-    BEGIN
-        IF OLD.franchise_id IS DISTINCT FROM NEW.franchise_id THEN
-            UPDATE public.activities
-            SET franchise_id = NEW.franchise_id
-            WHERE lead_id = NEW.id;
-            -- Log to audit_logs
-        END IF;
-        RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-    ```
-    *   **Scope**: Apply similar cascading for Account, Opportunity, and Shipment transfers.
-    *   **Effort**: 1 week.
+2. **Activity History Cascade on Lead/Entity Transfer**
+   * **Trigger**: When `leads.franchise_id` is updated (transfer event), cascade the update to all related activities:
+   ```sql
+   CREATE OR REPLACE FUNCTION cascade_franchise_on_lead_transfer()
+   RETURNS TRIGGER AS $$
+   BEGIN
+       IF OLD.franchise_id IS DISTINCT FROM NEW.franchise_id THEN
+           UPDATE public.activities
+           SET franchise_id = NEW.franchise_id
+           WHERE lead_id = NEW.id;
+           -- Log to audit_logs
+       END IF;
+       RETURN NEW;
+   END;
+   $$ LANGUAGE plpgsql;
+   ```
+   * **Scope**: Apply similar cascading for Account, Opportunity, and Shipment transfers.
+   * **Effort**: 1 week.
 
-3.  **User Deactivation → Task Reassignment Workflow**
-    *   When a user is deactivated, trigger a "Reassignment Wizard" showing all open tasks assigned to them.
-    *   Tenant Admin selects a new assignee (or bulk-reassign to a queue).
-    *   **Effort**: 1 week.
+3. **User Deactivation → Task Reassignment Workflow**
+   * When a user is deactivated, trigger a "Reassignment Wizard" showing all open tasks assigned to them.
+   * Tenant Admin selects a new assignee (or bulk-reassign to a queue).
+   * **Effort**: 1 week.
 
 **Phase 2: Advanced Scheduling & Automation (Weeks 5-8)**
 
-4.  **Franchise-Level Team Calendar**
-    *   Replace `Calendar.tsx` placeholder with FullCalendar (React).
-    *   Data sources: `activities` (tasks, calls, meetings) + future `events` table.
-    *   Views: Day, Week, Month.
-    *   Franchise-scoped: Show all team members' activities for the franchise.
-    *   Resource view: Show availability per user (requires time-slot modeling).
-    *   **Effort**: 3 weeks.
+4. **Franchise-Level Team Calendar**
+   * Replace `Calendar.tsx` placeholder with FullCalendar (React).
+   * Data sources: `activities` (tasks, calls, meetings) + future `events` table.
+   * Views: Day, Week, Month.
+   * Franchise-scoped: Show all team members' activities for the franchise.
+   * Resource view: Show availability per user (requires time-slot modeling).
+   * **Effort**: 3 weeks.
 
-5.  **SOP Template Engine (Logistics Operations)**
-    *   Create workflow template management UI in Settings.
-    *   Pre-seed with common SOPs:
-        *   "Ocean Import FCL" (15 steps)
-        *   "Ocean Export LCL" (12 steps)
-        *   "Air Freight" (10 steps)
-        *   "Cross-Border Trucking" (8 steps)
-    *   "Apply Template" button on Shipment Detail → generates all tasks with dependencies.
-    *   **Effort**: 4 weeks.
+5. **SOP Template Engine (Logistics Operations)**
+   * Create workflow template management UI in Settings.
+   * Pre-seed with common SOPs:
+     * "Ocean Import FCL" (15 steps)
+     * "Ocean Export LCL" (12 steps)
+     * "Air Freight" (10 steps)
+     * "Cross-Border Trucking" (8 steps)
+   * "Apply Template" button on Shipment Detail → generates all tasks with dependencies.
+   * **Effort**: 4 weeks.
 
 **Phase 3: Intelligence & Automation (Weeks 9-12)**
 
-6.  **AI Activity Summarization**
-    *   Use existing AI advisor Edge Function to generate daily/weekly summaries:
-        *   "You have 5 overdue tasks. 3 are for Account X which has a quote expiring Friday."
-        *   "Team productivity: 85% task completion rate this week (down from 92% last week)."
-    *   Display on CRM Dashboard.
-    *   **Effort**: 2 weeks.
+6. **AI Activity Summarization**
+   * Use existing AI advisor Edge Function to generate daily/weekly summaries:
+     * "You have 5 overdue tasks. 3 are for Account X which has a quote expiring Friday."
+     * "Team productivity: 85% task completion rate this week (down from 92% last week)."
+   * Display on CRM Dashboard.
+   * **Effort**: 2 weeks.
 
-7.  **Automated Task Creation from Email Intent**
-    *   Leverage `classify-email` Edge Function's `intent` field.
-    *   If `intent = 'quote_request'`, auto-create task: "Prepare quote for [Contact Name]."
-    *   If `intent = 'status_update'`, auto-create task: "Update client on shipment [#]."
-    *   **Effort**: 2 weeks.
+7. **Automated Task Creation from Email Intent**
+   * Leverage `classify-email` Edge Function's `intent` field.
+   * If `intent = 'quote_request'`, auto-create task: "Prepare quote for \[Contact Name]."
+   * If `intent = 'status_update'`, auto-create task: "Update client on shipment \[#]."
+   * **Effort**: 2 weeks.
 
----
+***
 
 ### 2.A.3 Opportunities Tracking & Pipeline
 
@@ -2576,12 +2636,14 @@ let query = supabase.from('activities').select('*').eq('lead_id', leadId);
 The Opportunities module manages potential sales deals, tracking them from qualification to closure. It serves as the bridge between Leads (Marketing) and Quotes (Operations). The current implementation supports both List and Pipeline (Kanban) views and includes a specialized line-item synchronization mechanism with the Quoting engine.
 
 **Core Components:**
-*   **List View (`Opportunities.tsx`)**: Sortable data grid with status badges and probability indicators.
-*   **Pipeline View (`OpportunitiesPipeline.tsx`)**: Drag-and-drop Kanban board grouped by stage.
-*   **Detail View (`OpportunityDetail.tsx`)**: Comprehensive record view including related Contacts, Quotes, and Activity history.
-*   **Item Sync (`sync_opportunity_items_from_quote`)**: A PostgreSQL function that automatically updates `opportunity_items` when a primary quote is modified.
+
+* **List View (`Opportunities.tsx`)**: Sortable data grid with status badges and probability indicators.
+* **Pipeline View (`OpportunitiesPipeline.tsx`)**: Drag-and-drop Kanban board grouped by stage.
+* **Detail View (`OpportunityDetail.tsx`)**: Comprehensive record view including related Contacts, Quotes, and Activity history.
+* **Item Sync (`sync_opportunity_items_from_quote`)**: A PostgreSQL function that automatically updates `opportunity_items` when a primary quote is modified.
 
 **Database Schema (`public.opportunities`):**
+
 ```sql
 CREATE TABLE public.opportunities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2602,52 +2664,56 @@ CREATE TABLE public.opportunities (
 ```
 
 **Key Workflows:**
-1.  **Lead Conversion**: When a Lead is converted, an Opportunity is optionally created, inheriting the Lead's data.
-2.  **Quote Association**: An Opportunity can have multiple Quotes, but one "Primary Quote" drives the Opportunity's `amount` and `opportunity_items`.
-3.  **Stage Progression**: Users move deals through stages (Prospecting -> ... -> Closed Won), triggering probability updates.
+
+1. **Lead Conversion**: When a Lead is converted, an Opportunity is optionally created, inheriting the Lead's data.
+2. **Quote Association**: An Opportunity can have multiple Quotes, but one "Primary Quote" drives the Opportunity's `amount` and `opportunity_items`.
+3. **Stage Progression**: Users move deals through stages (Prospecting -> ... -> Closed Won), triggering probability updates.
 
 #### 2.A.3.2 Hierarchy Enforcement Analysis
 
 **Super Admin Scope:**
-*   Can view Opportunities across all Tenants and Franchises.
-*   Uses `is_platform_admin()` policy to bypass RLS.
+
+* Can view Opportunities across all Tenants and Franchises.
+* Uses `is_platform_admin()` policy to bypass RLS.
 
 **Tenant Admin Scope:**
-*   Restricted to their `tenant_id`.
-*   Can view all Franchises within their Tenant.
-*   **Gap**: Currently sees all Opportunities; needs "Private" visibility option for sensitive deals.
+
+* Restricted to their `tenant_id`.
+* Can view all Franchises within their Tenant.
+* **Gap**: Currently sees all Opportunities; needs "Private" visibility option for sensitive deals.
 
 **Franchise Admin/User Scope:**
-*   Strictly enforced via RLS: `franchise_id = auth.user_franchise_id()`.
-*   **Risk**: If an Opportunity is transferred between Franchises, the `franchise_id` must be updated, but historical logs must remain accessible to the original owner (currently not supported).
+
+* Strictly enforced via RLS: `franchise_id = auth.user_franchise_id()`.
+* **Risk**: If an Opportunity is transferred between Franchises, the `franchise_id` must be updated, but historical logs must remain accessible to the original owner (currently not supported).
 
 #### 2.A.3.3 Technical Debt Assessment
 
-1.  **Hardcoded Sales Stages (`opportunity_stage` ENUM)**
-    *   **Issue**: The stages are defined as a PostgreSQL ENUM (`prospecting`, `qualification`, etc.).
-    *   **Impact**: Tenants cannot customize their sales process. A freight forwarder might need "Awaiting Customs" while a broker needs "Carrier Negotiation".
-    *   **Remediation**: Migrate to a `sales_stages` reference table keyed by Tenant.
+1. **Hardcoded Sales Stages (`opportunity_stage` ENUM)**
+   * **Issue**: The stages are defined as a PostgreSQL ENUM (`prospecting`, `qualification`, etc.).
+   * **Impact**: Tenants cannot customize their sales process. A freight forwarder might need "Awaiting Customs" while a broker needs "Carrier Negotiation".
+   * **Remediation**: Migrate to a `sales_stages` reference table keyed by Tenant.
 
-2.  **Single Currency Assumption**
-    *   **Issue**: The `amount` field is a simple Numeric without currency code.
-    *   **Impact**: Global logistics operations dealing in USD, EUR, and CNY cannot accurately forecast pipeline value.
-    *   **Remediation**: Add `currency_code` and `exchange_rate` columns; implement multi-currency aggregation for dashboarding.
+2. **Single Currency Assumption**
+   * **Issue**: The `amount` field is a simple Numeric without currency code.
+   * **Impact**: Global logistics operations dealing in USD, EUR, and CNY cannot accurately forecast pipeline value.
+   * **Remediation**: Add `currency_code` and `exchange_rate` columns; implement multi-currency aggregation for dashboarding.
 
-3.  **Missing "Price Book" Concept**
-    *   **Issue**: `opportunity_items` are ad-hoc text fields or synced from Quotes.
-    *   **Impact**: Sales reps cannot easily add standard services (e.g., "Standard Documentation Fee") without creating a full Quote.
+3. **Missing "Price Book" Concept**
+   * **Issue**: `opportunity_items` are ad-hoc text fields or synced from Quotes.
+   * **Impact**: Sales reps cannot easily add standard services (e.g., "Standard Documentation Fee") without creating a full Quote.
 
 #### 2.A.3.4 Competitive Gap Analysis
 
-| Feature | SOS Logic Nexus | Salesforce Sales Cloud | Microsoft Dynamics 365 | Cargowise CRM |
-| :--- | :---: | :---: | :---: | :---: |
-| **Pipeline Management** | ✅ | ✅ | ✅ | ✅ |
-| **Quote Sync** | ✅ (Strong) | ⚠️ (Requires CPQ) | ⚠️ (Complex) | ✅ |
-| **AI Win Probability** | ❌ | ✅ (Einstein) | ✅ (Predictive) | ❌ |
-| **Opportunity Splits** | ❌ | ✅ | ✅ | ⚠️ |
-| **Competitor Tracking** | ❌ | ✅ | ✅ | ❌ |
-| **Stage History/Aging** | ⚠️ (Basic Logs) | ✅ | ✅ | ✅ |
-| **Buying Center** | ❌ | ✅ (Contact Roles) | ✅ | ❌ |
+| Feature                 | SOS Logic Nexus | Salesforce Sales Cloud | Microsoft Dynamics 365 | Cargowise CRM |
+| :---------------------- | :-------------: | :--------------------: | :--------------------: | :-----------: |
+| **Pipeline Management** |        ✅        |            ✅           |            ✅           |       ✅       |
+| **Quote Sync**          |    ✅ (Strong)   |    ⚠️ (Requires CPQ)   |      ⚠️ (Complex)      |       ✅       |
+| **AI Win Probability**  |        ❌        |      ✅ (Einstein)      |     ✅ (Predictive)     |       ❌       |
+| **Opportunity Splits**  |        ❌        |            ✅           |            ✅           |       ⚠️      |
+| **Competitor Tracking** |        ❌        |            ✅           |            ✅           |       ❌       |
+| **Stage History/Aging** | ⚠️ (Basic Logs) |            ✅           |            ✅           |       ✅       |
+| **Buying Center**       |        ❌        |    ✅ (Contact Roles)   |            ✅           |       ❌       |
 
 **Critical Insight**: Logic Nexus has a competitive advantage in **Quote Sync**. In generic CRMs (Salesforce), syncing complex logistics quotes (multi-leg, multi-currency) to Opportunity Revenue is difficult. Logic Nexus handles this natively via `primary_quote_id`.
 
@@ -2655,47 +2721,47 @@ CREATE TABLE public.opportunities (
 
 **Critical Missing Features (P0):**
 
-1.  **Dynamic Sales Process Configuration**
-    *   **Description**: Allow Tenants to define their own stages and probability percentages.
-    *   **Business Value**: Essential for enterprise adoption (different regions have different processes).
+1. **Dynamic Sales Process Configuration**
+   * **Description**: Allow Tenants to define their own stages and probability percentages.
+   * **Business Value**: Essential for enterprise adoption (different regions have different processes).
 
-2.  **Competitor Tracking**
-    *   **Description**: Record which competitors are bidding on the deal and why we won/lost.
-    *   **Business Value**: Critical for "Win/Loss Analysis" reports.
+2. **Competitor Tracking**
+   * **Description**: Record which competitors are bidding on the deal and why we won/lost.
+   * **Business Value**: Critical for "Win/Loss Analysis" reports.
 
 **High Priority Missing Features (P1):**
 
-3.  **Opportunity Teams & Splits**
-    *   **Description**: Allow multiple users to own an Opportunity (e.g., Sales Rep + Key Account Manager) and split the commission credit (50/50).
-    *   **Business Value**: standard in logistics where sales and ops collaborate.
+3. **Opportunity Teams & Splits**
+   * **Description**: Allow multiple users to own an Opportunity (e.g., Sales Rep + Key Account Manager) and split the commission credit (50/50).
+   * **Business Value**: standard in logistics where sales and ops collaborate.
 
-4.  **Stalled Deal Alerts**
-    *   **Description**: Highlight Opportunities that have remained in the same stage for > X days.
-    *   **Business Value**: Improves pipeline velocity.
+4. **Stalled Deal Alerts**
+   * **Description**: Highlight Opportunities that have remained in the same stage for > X days.
+   * **Business Value**: Improves pipeline velocity.
 
 #### 2.A.3.6 Enhancement Recommendations
 
 **Phase 1: Foundation (Weeks 1-4)**
 
-1.  **Refactor Stages to Table-Driven Design**
-    *   Create `sales_processes` and `sales_stages` tables.
-    *   Deprecate `opportunity_stage` enum.
-    *   Update Kanban board to fetch columns dynamically.
+1. **Refactor Stages to Table-Driven Design**
+   * Create `sales_processes` and `sales_stages` tables.
+   * Deprecate `opportunity_stage` enum.
+   * Update Kanban board to fetch columns dynamically.
 
-2.  **Implement Competitor Tracking**
-    *   Create `competitors` master table (Tenant-level).
-    *   Add `opportunity_competitors` link table.
+2. **Implement Competitor Tracking**
+   * Create `competitors` master table (Tenant-level).
+   * Add `opportunity_competitors` link table.
 
 **Phase 2: Intelligence (Weeks 5-8)**
 
-3.  **AI Win Probability Scoring**
-    *   Train model on historical `closed_won` vs `closed_lost` data.
-    *   Factors: Lead Source, Deal Size, Days in Stage, Competitor Presence.
-    *   Display "Win Score" (0-100) on Opportunity Detail.
+3. **AI Win Probability Scoring**
+   * Train model on historical `closed_won` vs `closed_lost` data.
+   * Factors: Lead Source, Deal Size, Days in Stage, Competitor Presence.
+   * Display "Win Score" (0-100) on Opportunity Detail.
 
-4.  **Deal Velocity Reporting**
-    *   Create "Stage Duration" metrics.
-    *   Visual report: "Where are deals getting stuck?"
+4. **Deal Velocity Reporting**
+   * Create "Stage Duration" metrics.
+   * Visual report: "Where are deals getting stuck?"
 
 ### 2.A.4 Account Management
 
@@ -2705,15 +2771,17 @@ CREATE TABLE public.opportunities (
 Accounts represent the organizations that the logistics provider does business with. This includes Shippers (Customers), Consignees, Carriers, Vendors, and Partners. The module is the central hub for all business interactions, linking Quotes, Shipments, Invoices, and Contacts to a single entity.
 
 **Core Components:**
-*   **Account List (`Accounts.tsx`)**: Filterable grid with support for "My Accounts" vs "All Accounts".
-*   **Account Detail (`AccountDetail.tsx`)**: The "360-degree view" component. It features a tabbed interface showing:
-    *   **Overview**: Basic info, address, key contacts.
-    *   **Activity**: Timeline of calls, emails, meetings.
-    *   **Financials**: Credit limit, payment terms, outstanding balance (synced from ERP/Finance).
-    *   **Related**: Quotes, Shipments, Opportunities.
-*   **Import/Export (`AccountsImportExport.tsx`)**: CSV handling for bulk data operations.
+
+* **Account List (`Accounts.tsx`)**: Filterable grid with support for "My Accounts" vs "All Accounts".
+* **Account Detail (`AccountDetail.tsx`)**: The "360-degree view" component. It features a tabbed interface showing:
+  * **Overview**: Basic info, address, key contacts.
+  * **Activity**: Timeline of calls, emails, meetings.
+  * **Financials**: Credit limit, payment terms, outstanding balance (synced from ERP/Finance).
+  * **Related**: Quotes, Shipments, Opportunities.
+* **Import/Export (`AccountsImportExport.tsx`)**: CSV handling for bulk data operations.
 
 **Database Schema (`public.accounts`):**
+
 ```sql
 CREATE TABLE public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2734,90 +2802,93 @@ CREATE TABLE public.accounts (
 ```
 
 **Key Workflows:**
-1.  **Prospecting**: Account starts as `type='prospect'`.
-2.  **Onboarding**: Converted to `type='customer'` upon first Quote/Booking. Triggers credit check workflow (manual).
-3.  **Hierarchy**: Parent/Child relationship linked via `parent_account_id`.
+
+1. **Prospecting**: Account starts as `type='prospect'`.
+2. **Onboarding**: Converted to `type='customer'` upon first Quote/Booking. Triggers credit check workflow (manual).
+3. **Hierarchy**: Parent/Child relationship linked via `parent_account_id`.
 
 #### 2.A.4.2 Hierarchy Enforcement Analysis
 
 **Tenant Scope:**
-*   Strict isolation. An Account `Apple Inc.` in Tenant A is distinct from `Apple Inc.` in Tenant B.
-*   **Duplicate Detection**: Currently checks `name` uniqueness within Tenant, but allows duplicates if they are legitimately different branches.
+
+* Strict isolation. An Account `Apple Inc.` in Tenant A is distinct from `Apple Inc.` in Tenant B.
+* **Duplicate Detection**: Currently checks `name` uniqueness within Tenant, but allows duplicates if they are legitimately different branches.
 
 **Franchise Scope:**
-*   Accounts belong to a specific Franchise (`franchise_id`).
-*   **Cross-Franchise Visibility**: This is a complex area.
-    *   *Current State*: A Franchise User can only see Accounts in their Franchise.
-    *   *Problem*: If "Global Logistics Inc." ships from NY (Franchise A) and LA (Franchise B), they currently exist as two separate Account records, fragmenting the data.
-    *   *Requirement*: Need a "Global Account" flag where the Account is visible to all Franchises, but specific Opportunities/Shipments are owned locally.
+
+* Accounts belong to a specific Franchise (`franchise_id`).
+* **Cross-Franchise Visibility**: This is a complex area.
+  * *Current State*: A Franchise User can only see Accounts in their Franchise.
+  * *Problem*: If "Global Logistics Inc." ships from NY (Franchise A) and LA (Franchise B), they currently exist as two separate Account records, fragmenting the data.
+  * *Requirement*: Need a "Global Account" flag where the Account is visible to all Franchises, but specific Opportunities/Shipments are owned locally.
 
 #### 2.A.4.3 Technical Debt Assessment
 
-1.  **Limited Hierarchy Visualization**
-    *   **Issue**: The schema supports `parent_account_id`, but the UI only shows a simple link. There is no visual tree view.
-    *   **Impact**: Users cannot visualize complex corporate structures (Headquarters -> Regional -> Branch).
+1. **Limited Hierarchy Visualization**
+   * **Issue**: The schema supports `parent_account_id`, but the UI only shows a simple link. There is no visual tree view.
+   * **Impact**: Users cannot visualize complex corporate structures (Headquarters -> Regional -> Branch).
 
-2.  **Hardcoded Address Format**
-    *   **Issue**: Addresses are stored as JSONB but often treated as simple text strings in older components.
-    *   **Impact**: Validation issues for countries with specific postal code formats.
+2. **Hardcoded Address Format**
+   * **Issue**: Addresses are stored as JSONB but often treated as simple text strings in older components.
+   * **Impact**: Validation issues for countries with specific postal code formats.
 
-3.  **Lack of "Partner" Logic**
-    *   **Issue**: Agents/Partners are treated as generic Accounts.
-    *   **Impact**: Missing specialized fields for Partners (e.g., "Profit Share Agreement", "WCA ID").
+3. **Lack of "Partner" Logic**
+   * **Issue**: Agents/Partners are treated as generic Accounts.
+   * **Impact**: Missing specialized fields for Partners (e.g., "Profit Share Agreement", "WCA ID").
 
 #### 2.A.4.4 Competitive Gap Analysis
 
-| Feature | SOS Logic Nexus | Salesforce Sales Cloud | Cargowise | Magaya |
-| :--- | :---: | :---: | :---: | :---: |
-| **Account 360** | ✅ | ✅ | ✅ | ✅ |
-| **Hierarchy Visualization** | ❌ | ✅ (Visual Tree) | ❌ | ❌ |
-| **Territory Management** | ❌ | ✅ (Enterprise) | ❌ | ❌ |
-| **Credit Status Integration** | ⚠️ (Manual Field) | ✅ (AppExchange) | ✅ (Native) | ✅ (Native) |
-| **Duplicate Rules** | ⚠️ (Simple Name) | ✅ (Fuzzy Logic) | ⚠️ | ⚠️ |
-| **Buying Intent** | ❌ | ✅ (Einstein) | ❌ | ❌ |
+| Feature                       |  SOS Logic Nexus  | Salesforce Sales Cloud |  Cargowise |   Magaya   |
+| :---------------------------- | :---------------: | :--------------------: | :--------: | :--------: |
+| **Account 360**               |         ✅         |            ✅           |      ✅     |      ✅     |
+| **Hierarchy Visualization**   |         ❌         |     ✅ (Visual Tree)    |      ❌     |      ❌     |
+| **Territory Management**      |         ❌         |     ✅ (Enterprise)     |      ❌     |      ❌     |
+| **Credit Status Integration** | ⚠️ (Manual Field) |     ✅ (AppExchange)    | ✅ (Native) | ✅ (Native) |
+| **Duplicate Rules**           |  ⚠️ (Simple Name) |     ✅ (Fuzzy Logic)    |     ⚠️     |     ⚠️     |
+| **Buying Intent**             |         ❌         |      ✅ (Einstein)      |      ❌     |      ❌     |
 
 #### 2.A.4.5 Missing Features Identification
 
 **Critical Missing Features (P0):**
 
-1.  **Global Account Management (Shared Accounts)**
-    *   **Description**: Allow specific "Strategic Accounts" to be shared across all Franchises while maintaining local data segregation for bookings.
-    *   **Business Value**: Essential for servicing multi-national clients.
+1. **Global Account Management (Shared Accounts)**
+   * **Description**: Allow specific "Strategic Accounts" to be shared across all Franchises while maintaining local data segregation for bookings.
+   * **Business Value**: Essential for servicing multi-national clients.
 
-2.  **Duplicate Management System**
-    *   **Description**: "Potential Duplicate" alerts based on fuzzy matching of Name + Website + Address.
-    *   **Business Value**: Data hygiene is the foundation of accurate reporting.
+2. **Duplicate Management System**
+   * **Description**: "Potential Duplicate" alerts based on fuzzy matching of Name + Website + Address.
+   * **Business Value**: Data hygiene is the foundation of accurate reporting.
 
 **High Priority Missing Features (P1):**
 
-3.  **Account Health Scoring**
-    *   **Description**: A calculated score (0-100) based on Shipment Volume, Payment History, and Engagement.
-    *   **Business Value**: Proactive churn prevention.
+3. **Account Health Scoring**
+   * **Description**: A calculated score (0-100) based on Shipment Volume, Payment History, and Engagement.
+   * **Business Value**: Proactive churn prevention.
 
-4.  **White Space Analysis**
-    *   **Description**: Visualization of "What are they NOT buying?" (e.g., Customer ships Ocean but not Air).
-    *   **Business Value**: Drives cross-selling revenue.
+4. **White Space Analysis**
+   * **Description**: Visualization of "What are they NOT buying?" (e.g., Customer ships Ocean but not Air).
+   * **Business Value**: Drives cross-selling revenue.
 
 #### 2.A.4.6 Enhancement Recommendations
 
 **Phase 1: Structure & Quality (Weeks 1-4)**
 
-1.  **Implement "Global vs Local" Account Logic**
-    *   Add `is_global` boolean to `accounts`.
-    *   Update RLS: `auth.user_franchise_id() = franchise_id OR is_global = true`.
+1. **Implement "Global vs Local" Account Logic**
+   * Add `is_global` boolean to `accounts`.
+   * Update RLS: `auth.user_franchise_id() = franchise_id OR is_global = true`.
 
-2.  **Enhance Address Management**
-    *   Standardize `billing_address` JSON schema (Street 1, Street 2, City, State, Zip, Country).
-    *   Integrate Google Places Autocomplete.
+2. **Enhance Address Management**
+   * Standardize `billing_address` JSON schema (Street 1, Street 2, City, State, Zip, Country).
+   * Integrate Google Places Autocomplete.
 
 **Phase 2: Insights (Weeks 5-8)**
 
-3.  **Build Account Hierarchy Visualizer**
-    *   Use a tree visualization library (e.g., `react-d3-tree`) to render the parent-child structure.
+3. **Build Account Hierarchy Visualizer**
+   * Use a tree visualization library (e.g., `react-d3-tree`) to render the parent-child structure.
 
-4.  **Develop "White Space" Matrix**
-    *   Aggregation query: `SELECT service_type, SUM(revenue) FROM shipments WHERE account_id = ? GROUP BY service_type`.
-    *   Compare against "All Services" list to highlight gaps.
+4. **Develop "White Space" Matrix**
+   * Aggregation query: `SELECT service_type, SUM(revenue) FROM shipments WHERE account_id = ? GROUP BY service_type`.
+   * Compare against "All Services" list to highlight gaps.
 
 ### 2.A.5 Contacts Management
 
@@ -2827,11 +2898,13 @@ CREATE TABLE public.accounts (
 Contacts represent individual people associated with Accounts. In logistics, these are Shipping Managers, Accounts Payable clerks, Warehouse Receivers, and Customs Compliance officers. The module tracks their contact details, communication history, and role within their organization.
 
 **Core Components:**
-*   **Contact List (`Contacts.tsx`)**: Card and List views.
-*   **Contact Detail (`ContactDetail.tsx`)**: Shows personal details and linked Activities.
-*   **Relationship**: Strongly coupled to `Accounts`. A Contact *usually* belongs to an Account, but can exist independently (e.g., a Consultant).
+
+* **Contact List (`Contacts.tsx`)**: Card and List views.
+* **Contact Detail (`ContactDetail.tsx`)**: Shows personal details and linked Activities.
+* **Relationship**: Strongly coupled to `Accounts`. A Contact *usually* belongs to an Account, but can exist independently (e.g., a Consultant).
 
 **Database Schema (`public.contacts`):**
+
 ```sql
 CREATE TABLE public.contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2853,86 +2926,90 @@ CREATE TABLE public.contacts (
 ```
 
 **Key Workflows:**
-1.  **Creation**: Usually created from within the Account Detail page ("Add Contact").
-2.  **Lead Conversion**: A Converted Lead becomes a Contact.
-3.  **Shipment Role**: Selected as "Shipper Contact" or "Consignee Contact" during booking.
+
+1. **Creation**: Usually created from within the Account Detail page ("Add Contact").
+2. **Lead Conversion**: A Converted Lead becomes a Contact.
+3. **Shipment Role**: Selected as "Shipper Contact" or "Consignee Contact" during booking.
 
 #### 2.A.5.2 Hierarchy Enforcement Analysis
 
 **Tenant Scope:**
-*   Strict isolation.
+
+* Strict isolation.
 
 **Franchise Scope:**
-*   Inherits `franchise_id` from the parent Account.
-*   **Gap**: If a Global Account exists, its Contacts might need to be visible across Franchises (e.g., a Central Billing Contact), but currently they are siloed by Franchise.
+
+* Inherits `franchise_id` from the parent Account.
+* **Gap**: If a Global Account exists, its Contacts might need to be visible across Franchises (e.g., a Central Billing Contact), but currently they are siloed by Franchise.
 
 **User Scope:**
-*   **Privacy Gap**: There is no "Private Contact" feature. If a Sales Rep adds a sensitive contact (e.g., for a confidential merger), other Franchise users can see it.
+
+* **Privacy Gap**: There is no "Private Contact" feature. If a Sales Rep adds a sensitive contact (e.g., for a confidential merger), other Franchise users can see it.
 
 #### 2.A.5.3 Technical Debt Assessment
 
-1.  **Missing "Reports To" Hierarchy**
-    *   **Issue**: The schema lacks a `reports_to` self-reference (though migration scripts suggest it was planned).
-    *   **Impact**: Cannot build Org Charts or understand political power structures within a client.
+1. **Missing "Reports To" Hierarchy**
+   * **Issue**: The schema lacks a `reports_to` self-reference (though migration scripts suggest it was planned).
+   * **Impact**: Cannot build Org Charts or understand political power structures within a client.
 
-2.  **Simplistic "Role" Logic**
-    *   **Issue**: Only has `is_primary` boolean.
-    *   **Impact**: Cannot distinguish between "Decision Maker", "Influencer", "Gatekeeper", or "Billing Contact".
+2. **Simplistic "Role" Logic**
+   * **Issue**: Only has `is_primary` boolean.
+   * **Impact**: Cannot distinguish between "Decision Maker", "Influencer", "Gatekeeper", or "Billing Contact".
 
-3.  **No Data Enrichment**
-    *   **Issue**: No integration with Clearbit/ZoomInfo/LinkedIn.
-    *   **Impact**: Users must manually type all data.
+3. **No Data Enrichment**
+   * **Issue**: No integration with Clearbit/ZoomInfo/LinkedIn.
+   * **Impact**: Users must manually type all data.
 
 #### 2.A.5.4 Competitive Gap Analysis
 
-| Feature | SOS Logic Nexus | Salesforce | HubSpot | Cargowise |
-| :--- | :---: | :---: | :---: | :---: |
-| **Org Charts** | ❌ | ✅ (Visual) | ❌ | ❌ |
-| **Contact Roles** | ⚠️ (Boolean) | ✅ (Opp Roles) | ✅ | ✅ (Billing/Ops) |
-| **Social Integration** | ❌ | ✅ (LinkedIn) | ✅ | ❌ |
-| **Duplicate Merge** | ❌ | ✅ | ✅ | ❌ |
-| **GDPR Compliance** | ❌ | ✅ | ✅ | ⚠️ |
+| Feature                | SOS Logic Nexus |   Salesforce  | HubSpot |    Cargowise    |
+| :--------------------- | :-------------: | :-----------: | :-----: | :-------------: |
+| **Org Charts**         |        ❌        |   ✅ (Visual)  |    ❌    |        ❌        |
+| **Contact Roles**      |   ⚠️ (Boolean)  | ✅ (Opp Roles) |    ✅    | ✅ (Billing/Ops) |
+| **Social Integration** |        ❌        |  ✅ (LinkedIn) |    ✅    |        ❌        |
+| **Duplicate Merge**    |        ❌        |       ✅       |    ✅    |        ❌        |
+| **GDPR Compliance**    |        ❌        |       ✅       |    ✅    |        ⚠️       |
 
 #### 2.A.5.5 Missing Features Identification
 
 **Critical Missing Features (P0):**
 
-1.  **Contact Roles (Buying Center)**
-    *   **Description**: Define the contact's role *in a specific Opportunity* (e.g., Economic Buyer, Technical Evaluator).
-    *   **Business Value**: Critical for complex enterprise sales.
+1. **Contact Roles (Buying Center)**
+   * **Description**: Define the contact's role *in a specific Opportunity* (e.g., Economic Buyer, Technical Evaluator).
+   * **Business Value**: Critical for complex enterprise sales.
 
-2.  **GDPR/Privacy Flags**
-    *   **Description**: Fields for `consent_given`, `do_not_call`, `opt_out_email`.
-    *   **Business Value**: Legal compliance.
+2. **GDPR/Privacy Flags**
+   * **Description**: Fields for `consent_given`, `do_not_call`, `opt_out_email`.
+   * **Business Value**: Legal compliance.
 
 **High Priority Missing Features (P1):**
 
-3.  **Organizational Chart Builder**
-    *   **Description**: Visual tree showing who reports to whom.
-    *   **Business Value**: Strategic account planning.
+3. **Organizational Chart Builder**
+   * **Description**: Visual tree showing who reports to whom.
+   * **Business Value**: Strategic account planning.
 
-4.  **"Left Company" Workflow**
-    *   **Description**: Mark contact as "No Longer at Company" and prompt to update new employer.
-    *   **Business Value**: Database hygiene.
+4. **"Left Company" Workflow**
+   * **Description**: Mark contact as "No Longer at Company" and prompt to update new employer.
+   * **Business Value**: Database hygiene.
 
 #### 2.A.5.6 Enhancement Recommendations
 
 **Phase 1: Roles & Compliance (Weeks 1-4)**
 
-1.  **Implement `reports_to` and `department`**
-    *   Add columns to `contacts` table.
-    *   Update UI to select Manager.
+1. **Implement `reports_to` and `department`**
+   * Add columns to `contacts` table.
+   * Update UI to select Manager.
 
-2.  **Add GDPR Consent Fields**
-    *   `marketing_opt_in` (Boolean), `last_consent_date` (Date).
+2. **Add GDPR Consent Fields**
+   * `marketing_opt_in` (Boolean), `last_consent_date` (Date).
 
 **Phase 2: Visualization (Weeks 5-8)**
 
-3.  **Build Org Chart Component**
-    *   Use `react-flow` or similar to visualize the `reports_to` tree.
+3. **Build Org Chart Component**
+   * Use `react-flow` or similar to visualize the `reports_to` tree.
 
-4.  **Implement Opportunity Contact Roles**
-    *   New table `opportunity_contact_roles` linking Opportunity + Contact + Role (Enum).
+4. **Implement Opportunity Contact Roles**
+   * New table `opportunity_contact_roles` linking Opportunity + Contact + Role (Enum).
 
 ### 2.A.6 Email Infrastructure & Management
 
@@ -2942,12 +3019,14 @@ CREATE TABLE public.contacts (
 Email is the lifeblood of logistics communication. The platform includes a full-featured Email Client capable of syncing with Office 365, Gmail, and IMAP providers. Unlike generic email clients, it links every message to CRM entities (Leads, Quotes, Shipments) and supports "Shared Inboxes" via delegation.
 
 **Core Components:**
-*   **Email Client (`EmailManagement.tsx`)**: Unified inbox supporting multiple accounts.
-*   **Delegation Engine (`email_account_delegations`)**: Allows a Manager to grant "Read" or "Send As" access to subordinates without sharing passwords.
-*   **Template Manager (`email_templates`)**: Canned responses with variable substitution (e.g., `{{contact.first_name}}`).
-*   **AI Routing (Backend)**: Schema supports `ai_sentiment` and `intent` classification (implemented in `routing_events`), though UI visualization is pending.
+
+* **Email Client (`EmailManagement.tsx`)**: Unified inbox supporting multiple accounts.
+* **Delegation Engine (`email_account_delegations`)**: Allows a Manager to grant "Read" or "Send As" access to subordinates without sharing passwords.
+* **Template Manager (`email_templates`)**: Canned responses with variable substitution (e.g., `{{contact.first_name}}`).
+* **AI Routing (Backend)**: Schema supports `ai_sentiment` and `intent` classification (implemented in `routing_events`), though UI visualization is pending.
 
 **Database Schema (`public.emails` & `public.email_accounts`):**
+
 ```sql
 CREATE TABLE public.email_accounts (
   id UUID PRIMARY KEY,
@@ -2985,81 +3064,83 @@ CREATE TABLE public.emails (
 #### 2.A.6.2 Hierarchy Enforcement Analysis
 
 **Super Admin & Tenant Admin Scope:**
-*   Can audit all emails for compliance purposes (via `email_audit_log`).
-*   RLS policies (`Email scope matrix`) grant read access to admins based on Tenant/Franchise hierarchy.
+
+* Can audit all emails for compliance purposes (via `email_audit_log`).
+* RLS policies (`Email scope matrix`) grant read access to admins based on Tenant/Franchise hierarchy.
 
 **Franchise Scope:**
-*   Users can only access email accounts they own OR have been delegated.
-*   **Shared Inbox**: A "Customer Service" email account can be owned by a Franchise Admin and delegated to all Franchise Users.
+
+* Users can only access email accounts they own OR have been delegated.
+* **Shared Inbox**: A "Customer Service" email account can be owned by a Franchise Admin and delegated to all Franchise Users.
 
 #### 2.A.6.3 Technical Debt Assessment
 
-1.  **Missing "Pixel Tracking"**
-    *   **Issue**: No mechanism to insert 1x1 tracking pixels or rewrite links for click tracking.
-    *   **Impact**: Sales reps don't know if their quotes have been opened.
+1. **Missing "Pixel Tracking"**
+   * **Issue**: No mechanism to insert 1x1 tracking pixels or rewrite links for click tracking.
+   * **Impact**: Sales reps don't know if their quotes have been opened.
 
-2.  **No "Thread" Visualization**
-    *   **Issue**: Emails are stored individually. The UI does not robustly group them into conversation threads (Gmail style).
-    *   **Impact**: Disjointed reading experience.
+2. **No "Thread" Visualization**
+   * **Issue**: Emails are stored individually. The UI does not robustly group them into conversation threads (Gmail style).
+   * **Impact**: Disjointed reading experience.
 
-3.  **Sync Latency**
-    *   **Issue**: Reliance on periodic cron jobs or client-side polling for IMAP sync.
-    *   **Impact**: Delays in receiving urgent shipping alerts.
+3. **Sync Latency**
+   * **Issue**: Reliance on periodic cron jobs or client-side polling for IMAP sync.
+   * **Impact**: Delays in receiving urgent shipping alerts.
 
 #### 2.A.6.4 Competitive Gap Analysis
 
-| Feature | SOS Logic Nexus | Salesforce (Inbox) | HubSpot | Front App |
-| :--- | :---: | :---: | :---: | :---: |
-| **CRM Logging** | ✅ (Automatic) | ✅ (Plugin) | ✅ (Plugin) | ✅ |
-| **Shared Inboxes** | ✅ (Native) | ❌ (Requires Case) | ✅ | ✅ (Best in Class) |
-| **Open/Click Track** | ❌ | ✅ | ✅ | ✅ |
-| **Sequences** | ❌ | ✅ (Sales Engagement) | ✅ | ✅ |
-| **AI Sentiment** | ✅ (Backend) | ✅ (Einstein) | ✅ | ❌ |
-| **Outlook Plugin** | ❌ | ✅ | ✅ | ❌ |
+| Feature              | SOS Logic Nexus |  Salesforce (Inbox)  |   HubSpot  |     Front App     |
+| :------------------- | :-------------: | :------------------: | :--------: | :---------------: |
+| **CRM Logging**      |  ✅ (Automatic)  |      ✅ (Plugin)      | ✅ (Plugin) |         ✅         |
+| **Shared Inboxes**   |    ✅ (Native)   |   ❌ (Requires Case)  |      ✅     | ✅ (Best in Class) |
+| **Open/Click Track** |        ❌        |           ✅          |      ✅     |         ✅         |
+| **Sequences**        |        ❌        | ✅ (Sales Engagement) |      ✅     |         ✅         |
+| **AI Sentiment**     |   ✅ (Backend)   |     ✅ (Einstein)     |      ✅     |         ❌         |
+| **Outlook Plugin**   |        ❌        |           ✅          |      ✅     |         ❌         |
 
 #### 2.A.6.5 Missing Features Identification
 
 **Critical Missing Features (P0):**
 
-1.  **Outlook/Gmail Sidebar Plugin**
-    *   **Description**: A browser extension/add-in that allows users to view Logic Nexus data *inside* their native email client.
-    *   **Business Value**: High user adoption barrier without this. Logistics operators live in Outlook.
+1. **Outlook/Gmail Sidebar Plugin**
+   * **Description**: A browser extension/add-in that allows users to view Logic Nexus data *inside* their native email client.
+   * **Business Value**: High user adoption barrier without this. Logistics operators live in Outlook.
 
-2.  **Email Engagement Tracking**
-    *   **Description**: Insert tracking pixel to detect "Opened" status.
-    *   **Business Value**: Essential for sales follow-up timing.
+2. **Email Engagement Tracking**
+   * **Description**: Insert tracking pixel to detect "Opened" status.
+   * **Business Value**: Essential for sales follow-up timing.
 
 **High Priority Missing Features (P1):**
 
-3.  **Automated Sequences (Drip Campaigns)**
-    *   **Description**: Send a series of emails (Day 1, Day 3, Day 7) until a reply is received.
-    *   **Business Value**: Automates lead nurturing.
+3. **Automated Sequences (Drip Campaigns)**
+   * **Description**: Send a series of emails (Day 1, Day 3, Day 7) until a reply is received.
+   * **Business Value**: Automates lead nurturing.
 
-4.  **AI Smart Compose**
-    *   **Description**: Use the stored `ai_sentiment` and `intent` to suggest one-click replies (e.g., "Draft Quote", "Acknowledge Receipt").
-    *   **Business Value**: Speed.
+4. **AI Smart Compose**
+   * **Description**: Use the stored `ai_sentiment` and `intent` to suggest one-click replies (e.g., "Draft Quote", "Acknowledge Receipt").
+   * **Business Value**: Speed.
 
 #### 2.A.6.6 Enhancement Recommendations
 
 **Phase 1: Integration (Weeks 1-4)**
 
-1.  **Develop "Nexus Connect" Outlook Add-in**
-    *   Tech Stack: React + Office.js.
-    *   Features: View Contact/Lead, Log Email to Nexus, Create Task.
+1. **Develop "Nexus Connect" Outlook Add-in**
+   * Tech Stack: React + Office.js.
+   * Features: View Contact/Lead, Log Email to Nexus, Create Task.
 
-2.  **Implement Tracking Pixel Service**
-    *   Create an Edge Function `track-email` that serves a 1x1 GIF and updates `emails.opened_at`.
+2. **Implement Tracking Pixel Service**
+   * Create an Edge Function `track-email` that serves a 1x1 GIF and updates `emails.opened_at`.
 
 **Phase 2: Automation (Weeks 5-8)**
 
-3.  **Build Sequences Engine**
-    *   New tables: `sequences`, `sequence_steps`, `sequence_enrollments`.
-    *   Cron job to process due steps.
+3. **Build Sequences Engine**
+   * New tables: `sequences`, `sequence_steps`, `sequence_enrollments`.
+   * Cron job to process due steps.
 
-4.  **Activate AI UI**
-    *   Update `EmailManagement.tsx` to display Sentiment Badges and "Suggested Reply" buttons using the existing backend data.
+4. **Activate AI UI**
+   * Update `EmailManagement.tsx` to display Sentiment Badges and "Suggested Reply" buttons using the existing backend data.
 
----
+***
 
 ### 2.A.7 Pipeline Operations, CPQ Integration & Forecasting (Extended Analysis)
 
@@ -3070,102 +3151,112 @@ CREATE TABLE public.emails (
 #### 2.A.7.1 Current Implementation Status
 
 **1. Pipeline Management (Kanban)**
-*   **Implementation**: `OpportunitiesPipeline.tsx` uses `react-beautiful-dnd` (or similar) to allow moving cards between stages.
-*   **Logic**: Updating a card's stage triggers an API call to update `stage` and optionally `probability` based on the stage default.
-*   **Gap**: No visual indicators for "stalled" deals (unchanged for X days).
+
+* **Implementation**: `OpportunitiesPipeline.tsx` uses `react-beautiful-dnd` (or similar) to allow moving cards between stages.
+* **Logic**: Updating a card's stage triggers an API call to update `stage` and optionally `probability` based on the stage default.
+* **Gap**: No visual indicators for "stalled" deals (unchanged for X days).
 
 **2. Quote Integration (CPQ-Lite)**
-*   **Implementation**: Users can create a Quote from an Opportunity. The first quote is often marked as "Primary".
-*   **Sync Logic**: When the Primary Quote's total changes, the Opportunity `amount` is updated via the `sync_opportunity_items_from_quote` RPC function.
-*   **Gap**: If a quote is deleted, the Opportunity amount logic is brittle. No support for "Opportunity Splits" (crediting multiple sales reps).
+
+* **Implementation**: Users can create a Quote from an Opportunity. The first quote is often marked as "Primary".
+* **Sync Logic**: When the Primary Quote's total changes, the Opportunity `amount` is updated via the `sync_opportunity_items_from_quote` RPC function.
+* **Gap**: If a quote is deleted, the Opportunity amount logic is brittle. No support for "Opportunity Splits" (crediting multiple sales reps).
 
 **3. Forecasting**
-*   **Implementation**: Basic `forecast_category` field.
-*   **Gap**: No time-series snapshots to track forecast changes over time (e.g., "Deal slipped from Q1 to Q2").
+
+* **Implementation**: Basic `forecast_category` field.
+* **Gap**: No time-series snapshots to track forecast changes over time (e.g., "Deal slipped from Q1 to Q2").
 
 #### 2.A.7.2 Hierarchy Enforcement Analysis
 
 **Super Admin Scope:**
-*   Can view Opportunities across all Tenants and Franchises.
-*   Uses `is_platform_admin()` policy to bypass RLS.
+
+* Can view Opportunities across all Tenants and Franchises.
+* Uses `is_platform_admin()` policy to bypass RLS.
 
 **Tenant Admin Scope:**
-*   Restricted to their `tenant_id`.
-*   Can view all Franchises within their Tenant.
+
+* Restricted to their `tenant_id`.
+* Can view all Franchises within their Tenant.
 
 **Franchise User Scope:**
-*   **Strict RLS**: `tenant_id = auth.tenant_id() AND franchise_id = auth.franchise_id()`.
-*   **Visibility**: Users can only see Opportunities they own OR are in their franchise (depending on configuration).
-*   **Risk**: If `franchise_id` is nullable on Opportunity creation, it might "float" to Tenant level visibility.
-*   **Validation**: The `Opportunities` table has `franchise_id` as a foreign key, but it's nullable in some schema versions. **Recommendation**: Enforce `franchise_id` not null for franchise-users.
+
+* **Strict RLS**: `tenant_id = auth.tenant_id() AND franchise_id = auth.franchise_id()`.
+* **Visibility**: Users can only see Opportunities they own OR are in their franchise (depending on configuration).
+* **Risk**: If `franchise_id` is nullable on Opportunity creation, it might "float" to Tenant level visibility.
+* **Validation**: The `Opportunities` table has `franchise_id` as a foreign key, but it's nullable in some schema versions. **Recommendation**: Enforce `franchise_id` not null for franchise-users.
 
 #### 2.A.7.3 Technical Debt & Code Quality
 
-1.  **Stage Probability Hardcoding**:
-    *   Probabilities for stages (e.g., Prospecting = 10%) are often hardcoded in the frontend or a simple config object.
-    *   **Fix**: Move to a database table `sales_stages` with configurable probabilities per Tenant.
+1. **Stage Probability Hardcoding**:
+   * Probabilities for stages (e.g., Prospecting = 10%) are often hardcoded in the frontend or a simple config object.
+   * **Fix**: Move to a database table `sales_stages` with configurable probabilities per Tenant.
 
-2.  **Item Sync Complexity**:
-    *   The `sync_opportunity_items_from_quote` function is a complex PL/pgSQL trigger/function.
-    *   **Risk**: Logic duplication between TypeScript (frontend calc) and SQL (backend sync).
-    *   **Fix**: Centralize calculation logic in a shared Edge Function or strictly use the SQL function.
+2. **Item Sync Complexity**:
+   * The `sync_opportunity_items_from_quote` function is a complex PL/pgSQL trigger/function.
+   * **Risk**: Logic duplication between TypeScript (frontend calc) and SQL (backend sync).
+   * **Fix**: Centralize calculation logic in a shared Edge Function or strictly use the SQL function.
 
-3.  **Missing "Opportunity Teams"**:
-    *   Current schema assumes a single `owner_id`.
-    *   **Debt**: Enterprise deals often involve a Sales Rep, a Solution Engineer, and an Account Manager.
+3. **Missing "Opportunity Teams"**:
+   * Current schema assumes a single `owner_id`.
+   * **Debt**: Enterprise deals often involve a Sales Rep, a Solution Engineer, and an Account Manager.
 
 #### 2.A.7.4 Competitive Gap Analysis
 
-| Feature | Logic Nexus | Salesforce | Dynamics 365 | Cargowise |
-| :--- | :--- | :--- | :--- | :--- |
-| **Pipeline Kanban** | ✅ Basic | ✅ Advanced | ✅ Advanced | ❌ List only |
-| **CPQ Integration** | 🟡 Partial | ✅ Native | ✅ Native | 🟡 Custom |
-| **Opportunity Splits** | ❌ None | ✅ Revenue/Overlay | ✅ Team Selling | ❌ None |
-| **AI Scoring** | ❌ None | ✅ Einstein | ✅ AI Insights | ❌ None |
-| **Stage History** | ❌ None | ✅ Field History | ✅ Audit | ❌ None |
-| **Products/Pricebooks**| 🟡 Basic | ✅ Advanced | ✅ Advanced | ❌ N/A |
+| Feature                 | Logic Nexus | Salesforce        | Dynamics 365   | Cargowise   |
+| :---------------------- | :---------- | :---------------- | :------------- | :---------- |
+| **Pipeline Kanban**     | ✅ Basic     | ✅ Advanced        | ✅ Advanced     | ❌ List only |
+| **CPQ Integration**     | 🟡 Partial  | ✅ Native          | ✅ Native       | 🟡 Custom   |
+| **Opportunity Splits**  | ❌ None      | ✅ Revenue/Overlay | ✅ Team Selling | ❌ None      |
+| **AI Scoring**          | ❌ None      | ✅ Einstein        | ✅ AI Insights  | ❌ None      |
+| **Stage History**       | ❌ None      | ✅ Field History   | ✅ Audit        | ❌ None      |
+| **Products/Pricebooks** | 🟡 Basic    | ✅ Advanced        | ✅ Advanced     | ❌ N/A       |
 
 **Critical Gaps:**
-1.  **Opportunity History Tracking**: No way to see "Time in Stage" or "Velocity".
-2.  **Product/Pricebook Management**: Only supports ad-hoc items or basic services; no versioned price lists.
-3.  **Collaborative Selling**: No concept of a "Deal Team".
+
+1. **Opportunity History Tracking**: No way to see "Time in Stage" or "Velocity".
+2. **Product/Pricebook Management**: Only supports ad-hoc items or basic services; no versioned price lists.
+3. **Collaborative Selling**: No concept of a "Deal Team".
 
 #### 2.A.7.5 Missing Features & Functionality
 
-1.  **Deal Velocity Analytics**:
-    *   Metrics: "Average days to close", "Conversion rate by stage".
-    *   **Impact**: Critical for Sales Ops to optimize the funnel.
+1. **Deal Velocity Analytics**:
+   * Metrics: "Average days to close", "Conversion rate by stage".
+   * **Impact**: Critical for Sales Ops to optimize the funnel.
 
-2.  **Competitor Tracking**:
-    *   Field exists (`competitors` text), but no structured "Competitor" entity to track win/loss reasons against specific rivals.
+2. **Competitor Tracking**:
+   * Field exists (`competitors` text), but no structured "Competitor" entity to track win/loss reasons against specific rivals.
 
-3.  **Lost Reason Analysis**:
-    *   Simple text field currently. Needs structured codes (Price, Feature, Relationship) for reporting.
+3. **Lost Reason Analysis**:
+   * Simple text field currently. Needs structured codes (Price, Feature, Relationship) for reporting.
 
 #### 2.A.7.6 Enhancement Recommendations
 
 **Phase 1: Foundation (Weeks 1-4)**
-1.  **Implement `sales_stages` Configuration Table**:
-    *   Allow Tenants to define custom stages and probabilities.
-2.  **Enforce `franchise_id`**:
-    *   Add migration to make `franchise_id` NOT NULL for franchise-scoped users.
-3.  **Structured Loss Reasons**:
-    *   Add `loss_reason_codes` table and UI dropdown.
+
+1. **Implement `sales_stages` Configuration Table**:
+   * Allow Tenants to define custom stages and probabilities.
+2. **Enforce `franchise_id`**:
+   * Add migration to make `franchise_id` NOT NULL for franchise-scoped users.
+3. **Structured Loss Reasons**:
+   * Add `loss_reason_codes` table and UI dropdown.
 
 **Phase 2: Advanced Sales Features (Weeks 5-8)**
-1.  **Opportunity History Tracking**:
-    *   Create `opportunity_history` table to track field changes (Stage, Amount, Close Date) with timestamps.
-    *   Enable "Stage Duration" reporting.
-2.  **Deal Teams**:
-    *   Create `opportunity_teams` table (`opportunity_id`, `user_id`, `role`, `split_percent`).
+
+1. **Opportunity History Tracking**:
+   * Create `opportunity_history` table to track field changes (Stage, Amount, Close Date) with timestamps.
+   * Enable "Stage Duration" reporting.
+2. **Deal Teams**:
+   * Create `opportunity_teams` table (`opportunity_id`, `user_id`, `role`, `split_percent`).
 
 **Phase 3: AI & Intelligence (Weeks 9-12)**
-1.  **Win Probability Scoring**:
-    *   Use historical data (if available) or heuristics to score deals (e.g., "High Activity" + "Decision Maker Identified" = High Score).
-2.  **Stalled Deal Alerts**:
-    *   Background job to flag deals stuck in a stage > 30 days.
 
----
+1. **Win Probability Scoring**:
+   * Use historical data (if available) or heuristics to score deals (e.g., "High Activity" + "Decision Maker Identified" = High Score).
+2. **Stalled Deal Alerts**:
+   * Background job to flag deals stuck in a stage > 30 days.
+
+***
 
 ### 2.A.8 Calendar & Scheduling
 
@@ -3173,44 +3264,49 @@ CREATE TABLE public.emails (
 The Calendar module is intended to be the central hub for all time-sensitive activities, including meetings, tasks, and follow-ups. In a CRM context, it is critical for visualizing team availability and ensuring no lead interaction is missed.
 
 **Core Components:**
-*   **Calendar View (`Calendar.tsx`)**: Currently a placeholder component labeled "Coming Soon".
-*   **Task Scheduler (`TaskScheduler.tsx`)**: Provides a list view of upcoming tasks but lacks a calendar grid visualization.
+
+* **Calendar View (`Calendar.tsx`)**: Currently a placeholder component labeled "Coming Soon".
+* **Task Scheduler (`TaskScheduler.tsx`)**: Provides a list view of upcoming tasks but lacks a calendar grid visualization.
 
 **Current Implementation Status:**
-*   **Status**: 🔴 **Non-Existent / Placeholder**
-*   **Database**: No dedicated `events` or `calendar_entries` table exists. Tasks have `due_date`, but meetings (start/end time, attendees) are not modeled.
-*   **UI**: The `Calendar` page renders a "Coming Soon" card.
+
+* **Status**: 🔴 **Non-Existent / Placeholder**
+* **Database**: No dedicated `events` or `calendar_entries` table exists. Tasks have `due_date`, but meetings (start/end time, attendees) are not modeled.
+* **UI**: The `Calendar` page renders a "Coming Soon" card.
 
 #### 2.A.8.1 Gap Analysis
 
-| Feature | Logic Nexus | Salesforce | Dynamics 365 | Outlook/Gmail |
-| :--- | :--- | :--- | :--- | :--- |
-| **Event Management** | ❌ None | ✅ Native | ✅ Native | ✅ Native |
-| **Email Sync** | ❌ None | ✅ 2-Way | ✅ Native | N/A |
-| **Shared Calendar** | ❌ None | ✅ Team View | ✅ Team View | ✅ Native |
-| **Resource Booking** | ❌ None | ✅ Resources | ✅ Resources | ✅ Native |
-| **Meeting Scheduler** | ❌ None | ✅ Scheduler | ✅ Bookings | ✅ Native |
+| Feature               | Logic Nexus | Salesforce  | Dynamics 365 | Outlook/Gmail |
+| :-------------------- | :---------- | :---------- | :----------- | :------------ |
+| **Event Management**  | ❌ None      | ✅ Native    | ✅ Native     | ✅ Native      |
+| **Email Sync**        | ❌ None      | ✅ 2-Way     | ✅ Native     | N/A           |
+| **Shared Calendar**   | ❌ None      | ✅ Team View | ✅ Team View  | ✅ Native      |
+| **Resource Booking**  | ❌ None      | ✅ Resources | ✅ Resources  | ✅ Native      |
+| **Meeting Scheduler** | ❌ None      | ✅ Scheduler | ✅ Bookings   | ✅ Native      |
 
 **Critical Gaps:**
-1.  **No Meeting Entity**: Cannot log a "Meeting" separate from a "Task".
-2.  **No External Sync**: Users live in Outlook/Gmail; without sync, the CRM calendar will be ignored.
-3.  **No Availability Check**: Cannot see if a colleague is free for a joint sales call.
+
+1. **No Meeting Entity**: Cannot log a "Meeting" separate from a "Task".
+2. **No External Sync**: Users live in Outlook/Gmail; without sync, the CRM calendar will be ignored.
+3. **No Availability Check**: Cannot see if a colleague is free for a joint sales call.
 
 #### 2.A.8.2 Enhancement Recommendations
 
 **Phase 1: Data Model & Basic View (Weeks 1-4)**
-1.  **Create `events` Table**:
-    *   Columns: `id`, `title`, `start_time`, `end_time`, `location`, `description`, `organizer_id` (User), `attendees` (JSONB), `related_to` (Polymorphic: Lead/Contact/Opp).
-2.  **Implement FullCalendar**:
-    *   Replace `Calendar.tsx` placeholder with `FullCalendar` (React).
-    *   Fetch `tasks` (as all-day or due-time items) and `events`.
+
+1. **Create `events` Table**:
+   * Columns: `id`, `title`, `start_time`, `end_time`, `location`, `description`, `organizer_id` (User), `attendees` (JSONB), `related_to` (Polymorphic: Lead/Contact/Opp).
+2. **Implement FullCalendar**:
+   * Replace `Calendar.tsx` placeholder with `FullCalendar` (React).
+   * Fetch `tasks` (as all-day or due-time items) and `events`.
 
 **Phase 2: External Integration (Weeks 5-8)**
-1.  **Microsoft Graph / Google API Integration**:
-    *   Use `oauth_configurations` to store tokens.
-    *   Implement 2-way sync for events.
 
----
+1. **Microsoft Graph / Google API Integration**:
+   * Use `oauth_configurations` to store tokens.
+   * Implement 2-way sync for events.
+
+***
 
 ### 2.A.9 CRM Dashboard & Analytics
 
@@ -3218,47 +3314,52 @@ The Calendar module is intended to be the central hub for all time-sensitive act
 The CRM Dashboard provides users with a high-level overview of their performance, pipeline health, and upcoming priorities. It serves as the landing page for most sales users.
 
 **Core Components:**
-*   **Dashboard Container (`Dashboards.tsx`)**: Main layout container.
-*   **Widget Engine (`WidgetContainer.tsx`)**: Generic wrapper for dashboard widgets.
-*   **Widgets**: `StatsCards`, `LeadsWidget`, `ActivitiesWidget`, `FinancialWidget`.
+
+* **Dashboard Container (`Dashboards.tsx`)**: Main layout container.
+* **Widget Engine (`WidgetContainer.tsx`)**: Generic wrapper for dashboard widgets.
+* **Widgets**: `StatsCards`, `LeadsWidget`, `ActivitiesWidget`, `FinancialWidget`.
 
 **Current Implementation Status:**
-*   **Status**: 🟡 **Functional but Static**
-*   **Layout**: Fixed grid layout; users cannot resize or reorder widgets.
-*   **Data**: Fetches data via `useDashboardData` hook, which aggregates data on the client side (performance risk).
-*   **Customization**: Limited. `user_settings` table exists but is not widely used for dashboard preferences.
+
+* **Status**: 🟡 **Functional but Static**
+* **Layout**: Fixed grid layout; users cannot resize or reorder widgets.
+* **Data**: Fetches data via `useDashboardData` hook, which aggregates data on the client side (performance risk).
+* **Customization**: Limited. `user_settings` table exists but is not widely used for dashboard preferences.
 
 #### 2.A.9.1 Gap Analysis
 
-| Feature | Logic Nexus | Salesforce | Dynamics 365 | Tableau/PowerBI |
-| :--- | :--- | :--- | :--- | :--- |
-| **Drag & Drop** | ❌ No | ✅ Native | ✅ Native | ✅ Native |
-| **Drill-Down** | 🟡 Partial | ✅ Deep | ✅ Deep | ✅ Deep |
-| **Custom Reports** | ❌ No | ✅ Report Builder | ✅ Query Wizard | ✅ Advanced |
-| **Role-Based Views** | 🟡 Hardcoded | ✅ Configurable | ✅ Configurable | ✅ Advanced |
+| Feature              | Logic Nexus  | Salesforce       | Dynamics 365   | Tableau/PowerBI |
+| :------------------- | :----------- | :--------------- | :------------- | :-------------- |
+| **Drag & Drop**      | ❌ No         | ✅ Native         | ✅ Native       | ✅ Native        |
+| **Drill-Down**       | 🟡 Partial   | ✅ Deep           | ✅ Deep         | ✅ Deep          |
+| **Custom Reports**   | ❌ No         | ✅ Report Builder | ✅ Query Wizard | ✅ Advanced      |
+| **Role-Based Views** | 🟡 Hardcoded | ✅ Configurable   | ✅ Configurable | ✅ Advanced      |
 
 **Critical Gaps:**
-1.  **Client-Side Aggregation**: `useDashboardData` fetches raw rows and counts them in JS. This will fail at scale (>10k records).
-2.  **No Customization**: Every user sees the same dashboard (mostly).
-3.  **Lack of Historical Trends**: "Leads this week" is a snapshot; no "Leads vs. Last Week" trendline (except simple sparklines).
+
+1. **Client-Side Aggregation**: `useDashboardData` fetches raw rows and counts them in JS. This will fail at scale (>10k records).
+2. **No Customization**: Every user sees the same dashboard (mostly).
+3. **Lack of Historical Trends**: "Leads this week" is a snapshot; no "Leads vs. Last Week" trendline (except simple sparklines).
 
 #### 2.A.9.2 Enhancement Recommendations
 
 **Phase 1: Performance & Data Architecture (Weeks 1-4)**
-1.  **Migrate to RPCs**:
-    *   Replace client-side counting with `get_dashboard_stats()` RPC.
-    *   Ensure RPCs respect RLS (Tenant/Franchise).
-2.  **Materialized Views**:
-    *   For heavy widgets (Financials), use Materialized Views refreshed periodically.
+
+1. **Migrate to RPCs**:
+   * Replace client-side counting with `get_dashboard_stats()` RPC.
+   * Ensure RPCs respect RLS (Tenant/Franchise).
+2. **Materialized Views**:
+   * For heavy widgets (Financials), use Materialized Views refreshed periodically.
 
 **Phase 2: User Customization (Weeks 5-8)**
-1.  **Implement `react-grid-layout`**:
-    *   Allow users to drag/resize widgets.
-    *   Persist layout to `user_settings.dashboard_layout` (JSONB).
-2.  **Widget Gallery**:
-    *   Create a library of available widgets users can add/remove.
 
----
+1. **Implement `react-grid-layout`**:
+   * Allow users to drag/resize widgets.
+   * Persist layout to `user_settings.dashboard_layout` (JSONB).
+2. **Widget Gallery**:
+   * Create a library of available widgets users can add/remove.
+
+***
 
 ## Section 2.B: Post-Quotation Operations Workflows
 
@@ -3270,20 +3371,22 @@ The CRM Dashboard provides users with a high-level overview of their performance
 The Quotation System is the central nervous system of the Logic Nexus platform, bridging the gap between Sales (CRM) and Operations (Logistics). It is responsible for pricing complex multi-modal shipments, managing carrier rates, enforcing margin rules, and generating legally binding offer documents.
 
 **Core Components:**
-*   **Quote Wizard (`QuoteNew.tsx`)**: A multi-step React Hook Form wizard that guides users through:
-    1.  **Route Selection**: Origin/Destination ports, Pick-up/Delivery locations.
-    2.  **Cargo Details**: Container types (FCL), package details (LCL), commodities.
-    3.  **Charge Selection**: Auto-populated from Rate Sheets + Manual Ad-hoc charges.
-    4.  **Analysis**: Profit/Loss visualization, Margin adjustment.
-    5.  **Review**: Final document preview and generation.
-*   **Quick Quote (`QuickQuoteModal.tsx`)**: A streamlined, single-page interface designed for rapid spot quoting ( < 30 seconds). It bypasses deep validation for speed but creates technical debt by maintaining a separate state model.
-*   **Rate Engine (`QuoteOptionService.ts`)**: A complex TypeScript service that:
-    *   Fetches rates from `carrier_rates` table.
-    *   Matches rates based on Port Pairs + Container Size + Commodity.
-    *   Bifurcates charges into "Buy Rates" (Payable to Carrier) and "Sell Rates" (Receivable from Customer).
-*   **AI Estimator (`handleAiAnalyze`)**: Uses LLM heuristics to suggest missing charges (e.g., "You forgot Drayage for this Door-to-Door move").
+
+* **Quote Wizard (`QuoteNew.tsx`)**: A multi-step React Hook Form wizard that guides users through:
+  1. **Route Selection**: Origin/Destination ports, Pick-up/Delivery locations.
+  2. **Cargo Details**: Container types (FCL), package details (LCL), commodities.
+  3. **Charge Selection**: Auto-populated from Rate Sheets + Manual Ad-hoc charges.
+  4. **Analysis**: Profit/Loss visualization, Margin adjustment.
+  5. **Review**: Final document preview and generation.
+* **Quick Quote (`QuickQuoteModal.tsx`)**: A streamlined, single-page interface designed for rapid spot quoting ( < 30 seconds). It bypasses deep validation for speed but creates technical debt by maintaining a separate state model.
+* **Rate Engine (`QuoteOptionService.ts`)**: A complex TypeScript service that:
+  * Fetches rates from `carrier_rates` table.
+  * Matches rates based on Port Pairs + Container Size + Commodity.
+  * Bifurcates charges into "Buy Rates" (Payable to Carrier) and "Sell Rates" (Receivable from Customer).
+* **AI Estimator (`handleAiAnalyze`)**: Uses LLM heuristics to suggest missing charges (e.g., "You forgot Drayage for this Door-to-Door move").
 
 **Database Schema (`public.quotes` & related):**
+
 ```sql
 CREATE TABLE public.quotes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3346,101 +3449,109 @@ CREATE TABLE public.quote_charges (
 #### 2.B.1.2 Hierarchy Enforcement Analysis
 
 **Tenant Scope:**
-*   **Strict Isolation**: `quotes` table has RLS enforcing `tenant_id`. Rate sheets are also strictly tenant-scoped.
-*   **Risk**: If a tenant has multiple branches (Franchises), they currently share the *same* Rate Sheet database unless specifically filtered.
+
+* **Strict Isolation**: `quotes` table has RLS enforcing `tenant_id`. Rate sheets are also strictly tenant-scoped.
+* **Risk**: If a tenant has multiple branches (Franchises), they currently share the *same* Rate Sheet database unless specifically filtered.
 
 **Franchise Scope:**
-*   **Gap**: The current `QuoteOptionService` does not robustly filter `carrier_rates` by `franchise_id`.
-*   **Scenario**: Franchise A (New York) and Franchise B (Los Angeles) both have "Drayage" rates. Currently, a user in NY might accidentally see LA drayage rates if the query only filters by `tenant_id`.
-*   **Fix Required**: All rate lookups must include `AND (franchise_id IS NULL OR franchise_id = current_franchise_id)`.
+
+* **Gap**: The current `QuoteOptionService` does not robustly filter `carrier_rates` by `franchise_id`.
+* **Scenario**: Franchise A (New York) and Franchise B (Los Angeles) both have "Drayage" rates. Currently, a user in NY might accidentally see LA drayage rates if the query only filters by `tenant_id`.
+* **Fix Required**: All rate lookups must include `AND (franchise_id IS NULL OR franchise_id = current_franchise_id)`.
 
 **User Scope:**
-*   **Commission Visibility**: Sales reps should see the "Sell Rate" but maybe not the "Buy Rate" (Net) depending on company policy.
-*   **Current State**: The UI exposes full margin analysis to any user with "View Quote" permission. Need a `hide_financials` permission bit.
+
+* **Commission Visibility**: Sales reps should see the "Sell Rate" but maybe not the "Buy Rate" (Net) depending on company policy.
+* **Current State**: The UI exposes full margin analysis to any user with "View Quote" permission. Need a `hide_financials` permission bit.
 
 #### 2.B.1.3 Technical Debt Assessment
 
-1.  **"Split Brain" Architecture (Critical)**
-    *   **Issue**: `QuickQuoteModal` and `QuoteNew` use different form schemas and validation logic.
-    *   **Impact**: Features added to the main wizard (e.g., Hazmat validation) are often missing from Quick Quote, leading to data quality issues.
-    *   **Remediation**: Refactor `QuickQuote` to be a "Preset View" of the main `QuoteNew` component, sharing the same `useForm` context and Zod schema.
+1. **"Split Brain" Architecture (Critical)**
+   * **Issue**: `QuickQuoteModal` and `QuoteNew` use different form schemas and validation logic.
+   * **Impact**: Features added to the main wizard (e.g., Hazmat validation) are often missing from Quick Quote, leading to data quality issues.
+   * **Remediation**: Refactor `QuickQuote` to be a "Preset View" of the main `QuoteNew` component, sharing the same `useForm` context and Zod schema.
 
-2.  **Client-Side Rate Calculation**
-    *   **Issue**: `QuoteOptionService` runs entirely in the browser. It fetches *all* potentially matching rates and filters them in JavaScript.
-    *   **Impact**:
-        *   **Performance**: Slow for rate sheets with >10k rows.
-        *   **Security**: savvy users could inspect network traffic to see full vendor pricing lists.
-    *   **Remediation**: Move logic to a Supabase RPC `calculate_quote_rates(params)`.
+2. **Client-Side Rate Calculation**
+   * **Issue**: `QuoteOptionService` runs entirely in the browser. It fetches *all* potentially matching rates and filters them in JavaScript.
+   * **Impact**:
+     * **Performance**: Slow for rate sheets with >10k rows.
+     * **Security**: savvy users could inspect network traffic to see full vendor pricing lists.
+   * **Remediation**: Move logic to a Supabase RPC `calculate_quote_rates(params)`.
 
-3.  **JSONB Overuse**
-    *   **Issue**: `route_details` stored as JSONB prevents efficient SQL querying (e.g., "Show me all quotes from Shanghai to LA").
-    *   **Remediation**: Extract `origin_port_id`, `dest_port_id`, `etd` to top-level columns.
+3. **JSONB Overuse**
+   * **Issue**: `route_details` stored as JSONB prevents efficient SQL querying (e.g., "Show me all quotes from Shanghai to LA").
+   * **Remediation**: Extract `origin_port_id`, `dest_port_id`, `etd` to top-level columns.
 
 #### 2.B.1.4 Competitive Gap Analysis
 
-| Feature | Logic Nexus | Cargowise | Magaya | Freightos |
-| :--- | :--- | :--- | :--- | :--- |
-| **Visual Route Map** | ❌ None | ✅ Native | ✅ Native | ❌ N/A |
-| **Spot Rate API** | ❌ Manual | ✅ CargoSphere | ✅ Native | ✅ Core |
-| **Tiered Approval** | ❌ None | ✅ Workflow | ✅ Workflow | ❌ N/A |
-| **Multi-Option Quote** | 🟡 Versions | ✅ Native | ✅ Native | ✅ Native |
-| **Customer Portal** | 🟡 Static PDF | ✅ Web Booking | ✅ Digital | ✅ Digital |
+| Feature                | Logic Nexus   | Cargowise     | Magaya     | Freightos |
+| :--------------------- | :------------ | :------------ | :--------- | :-------- |
+| **Visual Route Map**   | ❌ None        | ✅ Native      | ✅ Native   | ❌ N/A     |
+| **Spot Rate API**      | ❌ Manual      | ✅ CargoSphere | ✅ Native   | ✅ Core    |
+| **Tiered Approval**    | ❌ None        | ✅ Workflow    | ✅ Workflow | ❌ N/A     |
+| **Multi-Option Quote** | 🟡 Versions   | ✅ Native      | ✅ Native   | ✅ Native  |
+| **Customer Portal**    | 🟡 Static PDF | ✅ Web Booking | ✅ Digital  | ✅ Digital |
 
 **Key Advantage to Exploit:**
-*   **Logic Nexus** has a cleaner, more modern UI than Cargowise. If we solve the "Spot Rate API" gap, we can win on usability.
+
+* **Logic Nexus** has a cleaner, more modern UI than Cargowise. If we solve the "Spot Rate API" gap, we can win on usability.
 
 #### 2.B.1.5 Missing Features Identification
 
 **Critical Missing Features (P0):**
 
-1.  **Quote Approval Workflow**
-    *   **Description**: Prevent sending quotes with Negative Margin or <5% Margin without Manager Approval.
-    *   **Mechanism**: `quote_status` transitions to `pending_approval`. Trigger email to Manager. Manager clicks "Approve" -> Status becomes `approved` -> User can Send.
-    *   **Business Value**: Profit protection.
+1. **Quote Approval Workflow**
+   * **Description**: Prevent sending quotes with Negative Margin or <5% Margin without Manager Approval.
+   * **Mechanism**: `quote_status` transitions to `pending_approval`. Trigger email to Manager. Manager clicks "Approve" -> Status becomes `approved` -> User can Send.
+   * **Business Value**: Profit protection.
 
-2.  **PDF Generation Engine (Server-Side)**
-    *   **Description**: Generate professional PDFs with:
-        *   Terms & Conditions (configurable per Tenant).
-        *   Bank Details.
-        *   Carrier Logos.
-    *   **Current**: Client-side `react-pdf` is buggy with page breaks.
+2. **PDF Generation Engine (Server-Side)**
+   * **Description**: Generate professional PDFs with:
+     * Terms & Conditions (configurable per Tenant).
+     * Bank Details.
+     * Carrier Logos.
+   * **Current**: Client-side `react-pdf` is buggy with page breaks.
 
 **High Priority Missing Features (P1):**
 
-3.  **Alternative Routings (Options)**
-    *   **Description**: Present "Fastest" (Air), "Cheapest" (Sea - Indirect), and "Balanced" (Sea - Direct) options in a single Quote.
-    *   **Business Value**: Increases win rate by giving customers choice.
+3. **Alternative Routings (Options)**
+   * **Description**: Present "Fastest" (Air), "Cheapest" (Sea - Indirect), and "Balanced" (Sea - Direct) options in a single Quote.
+   * **Business Value**: Increases win rate by giving customers choice.
 
-4.  **Incoterms Logic**
-    *   **Description**: Auto-select charges based on Incoterms.
-    *   **Example**: If Incoterm is "FOB", do not charge Origin Drayage to the Consignee.
-    *   **Business Value**: Reduces billing errors.
+4. **Incoterms Logic**
+   * **Description**: Auto-select charges based on Incoterms.
+   * **Example**: If Incoterm is "FOB", do not charge Origin Drayage to the Consignee.
+   * **Business Value**: Reduces billing errors.
 
 #### 2.B.1.6 Enhancement Recommendations
 
 **Phase 1: Stabilization (Weeks 1-4)**
-1.  **Unify Form State**: Create `QuoteContext` to share state between Quick and Full workflows.
-2.  **Migrate Rate Logic**: Implement `rpc/get_applicable_rates` to handle matching logic on the server.
-3.  **Fix JSONB**: Migration script to extract route columns.
+
+1. **Unify Form State**: Create `QuoteContext` to share state between Quick and Full workflows.
+2. **Migrate Rate Logic**: Implement `rpc/get_applicable_rates` to handle matching logic on the server.
+3. **Fix JSONB**: Migration script to extract route columns.
 
 **Phase 2: Commercial Controls (Weeks 5-8)**
-1.  **Approval System**:
-    *   New Table: `approval_requests` (`entity_id`, `requested_by`, `status`, `reason`).
-    *   UI: "Approvals" inbox for Managers.
-2.  **Incoterms Engine**:
-    *   Rule engine: `incoterm_rules` table defining which Charge Groups apply to which Incoterm.
+
+1. **Approval System**:
+   * New Table: `approval_requests` (`entity_id`, `requested_by`, `status`, `reason`).
+   * UI: "Approvals" inbox for Managers.
+2. **Incoterms Engine**:
+   * Rule engine: `incoterm_rules` table defining which Charge Groups apply to which Incoterm.
 
 **Phase 3: Digital Experience (Weeks 9-12)**
-1.  **Interactive Quote Link**:
-    *   Send a magic link to the customer.
-    *   Customer can "Accept" or "Reject" specific Options online.
-    *   Auto-convert to Booking upon acceptance.
+
+1. **Interactive Quote Link**:
+   * Send a magic link to the customer.
+   * Customer can "Accept" or "Reject" specific Options online.
+   * Auto-convert to Booking upon acceptance.
 
 ### 2.B.2 Booking System
 
 **Current Implementation Status:**
-*   **Status:** 🟢 **Implemented — Core CRUD Complete**
-*   **Verdict:** The system has a fully functional Booking module with database table, three UI pages (list, create, detail), quote-to-booking conversion via RPC, and manual booking creation. This bridges the gap between "Quote Accepted" and "Cargo Received."
+
+* **Status:** 🟢 **Implemented — Core CRUD Complete**
+* **Verdict:** The system has a fully functional Booking module with database table, three UI pages (list, create, detail), quote-to-booking conversion via RPC, and manual booking creation. This bridges the gap between "Quote Accepted" and "Cargo Received."
 
 #### 2.B.2.1 Core Components & Data Model
 
@@ -3474,73 +3585,80 @@ bookings (
 
 **2. UI Pages (Verified)**
 
-| Page | File | Functionality |
-| :--- | :--- | :--- |
-| **Bookings List** | `src/pages/dashboard/Bookings.tsx` | Paginated list, status filters, tenant-scoped |
-| **New Booking** | `src/pages/dashboard/BookingNew.tsx` | Two creation paths: manual (blank draft) or from approved/accepted quote |
+| Page               | File                                    | Functionality                                                                        |
+| :----------------- | :-------------------------------------- | :----------------------------------------------------------------------------------- |
+| **Bookings List**  | `src/pages/dashboard/Bookings.tsx`      | Paginated list, status filters, tenant-scoped                                        |
+| **New Booking**    | `src/pages/dashboard/BookingNew.tsx`    | Two creation paths: manual (blank draft) or from approved/accepted quote             |
 | **Booking Detail** | `src/pages/dashboard/BookingDetail.tsx` | View/edit booking fields, shows carrier status badge, linked quote/carrier/franchise |
 
 **3. Quote-to-Booking Conversion**
-*   **RPC:** `convert_quote_to_booking(p_quote_id, p_tenant_id)` — server-side function that creates a booking linked to the source quote.
-*   **Quote Filter:** Only quotes with status `approved` or `accepted` are eligible for conversion.
-*   **Navigation:** After conversion, user is redirected to `/dashboard/bookings/{id}`.
+
+* **RPC:** `convert_quote_to_booking(p_quote_id, p_tenant_id)` — server-side function that creates a booking linked to the source quote.
+* **Quote Filter:** Only quotes with status `approved` or `accepted` are eligible for conversion.
+* **Navigation:** After conversion, user is redirected to `/dashboard/bookings/{id}`.
 
 **4. Autonomous Agents (`booking_agents`) Integration**
 The existing `booking_agents` table (for autonomous logistics) operates alongside the manual layer.
-*   **Current:** Agents can execute quotes independently.
-*   **Recommended:** Agents should generate `bookings` records with `source = 'ai_agent'`, allowing human review before EDI transmission.
+
+* **Current:** Agents can execute quotes independently.
+* **Recommended:** Agents should generate `bookings` records with `source = 'ai_agent'`, allowing human review before EDI transmission.
 
 #### 2.B.2.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Cargowise/Magaya) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **Booking Entity** | ✅ Full CRUD (manual + from-quote) | ✅ Dedicated Module | ✅ Closed |
-| **Quote-to-Booking** | ✅ RPC conversion with status filter | ✅ Automated pipeline | ✅ Closed |
-| **Booking Detail View** | ✅ Status, carrier, linked entities | ✅ Comprehensive | 🟡 Partial (no schedule editing) |
-| **EDI Connectivity** | ❌ None | ✅ INTTRA / Descartes / Direct Carrier API | 🔴 High |
-| **Allocation Tracking** | ❌ None | ✅ Contract Mgmt (NAC) | 🟡 Medium |
-| **Split/Rollover** | ❌ None | ✅ "Split Booking" Wizard | 🟡 Medium |
-| **SI Generation** | ❌ Manual PDF Upload | ✅ Auto-generate EDI 304 / PDF | 🔴 High |
+| Feature                 | Logic Nexus (Current)               | Market Standard (Cargowise/Magaya)        | Gap Severity                     |
+| :---------------------- | :---------------------------------- | :---------------------------------------- | :------------------------------- |
+| **Booking Entity**      | ✅ Full CRUD (manual + from-quote)   | ✅ Dedicated Module                        | ✅ Closed                         |
+| **Quote-to-Booking**    | ✅ RPC conversion with status filter | ✅ Automated pipeline                      | ✅ Closed                         |
+| **Booking Detail View** | ✅ Status, carrier, linked entities  | ✅ Comprehensive                           | 🟡 Partial (no schedule editing) |
+| **EDI Connectivity**    | ❌ None                              | ✅ INTTRA / Descartes / Direct Carrier API | 🔴 High                          |
+| **Allocation Tracking** | ❌ None                              | ✅ Contract Mgmt (NAC)                     | 🟡 Medium                        |
+| **Split/Rollover**      | ❌ None                              | ✅ "Split Booking" Wizard                  | 🟡 Medium                        |
+| **SI Generation**       | ❌ Manual PDF Upload                 | ✅ Auto-generate EDI 304 / PDF             | 🔴 High                          |
 
 #### 2.B.2.3 Enhancement Recommendations
 
 **Phase 1: Booking Enrichment (Weeks 5-6)**
-*   **Objective:** Enhance the existing booking UI with richer editing and workflow capabilities.
-*   **Action Items:**
-    1.  **Inline Editing:** Allow editing of vessel/voyage, dates, and container allocations directly in BookingDetail.
-    2.  **State Machine:** Enforce `draft` → `submitted` → `confirmed` → `completed` lifecycle with status guards.
-    3.  **Audit Trail:** Log all status transitions with user/timestamp to `audit_logs`.
+
+* **Objective:** Enhance the existing booking UI with richer editing and workflow capabilities.
+* **Action Items:**
+  1. **Inline Editing:** Allow editing of vessel/voyage, dates, and container allocations directly in BookingDetail.
+  2. **State Machine:** Enforce `draft` → `submitted` → `confirmed` → `completed` lifecycle with status guards.
+  3. **Audit Trail:** Log all status transitions with user/timestamp to `audit_logs`.
 
 **Phase 2: Digital Connectivity (Weeks 7-10)**
-*   **Objective:** Replace manual email/portal entry with electronic booking.
-*   **Action Items:**
-    1.  **Email Automation:** "Send Booking Request" button that generates a standardized HTML email to the carrier booking desk with attached PDF.
-    2.  **EDI 300 (Booking Request):** Implement XML/EDIFACT map for INTTRA integration (using existing `provider_api_configs`).
+
+* **Objective:** Replace manual email/portal entry with electronic booking.
+* **Action Items:**
+  1. **Email Automation:** "Send Booking Request" button that generates a standardized HTML email to the carrier booking desk with attached PDF.
+  2. **EDI 300 (Booking Request):** Implement XML/EDIFACT map for INTTRA integration (using existing `provider_api_configs`).
 
 **Phase 3: Automated Allocations (Weeks 11-14)**
-*   **Objective:** Manage carrier contracts and space protection.
-*   **Action Items:**
-    1.  **Allocation Ledger:** Track "Committed TEUs" vs "Booked TEUs" per carrier/lane.
-    2.  **Rollover Management:** "Split Booking" tool to move containers to the next vessel if rolled, preserving the original BN reference.
+
+* **Objective:** Manage carrier contracts and space protection.
+* **Action Items:**
+  1. **Allocation Ledger:** Track "Committed TEUs" vs "Booked TEUs" per carrier/lane.
+  2. **Rollover Management:** "Split Booking" tool to move containers to the next vessel if rolled, preserving the original BN reference.
 
 ### 2.B.3 Shipment Management
 
 **Current Implementation Status:**
-*   **Status:** 🟡 **Functional but Basic**
-*   **Verdict:** The foundational schema (`shipments`, `shipment_containers`) is robust, but the workflow is heavily manual. It acts as a digital filing cabinet rather than an active operating system.
-*   **Risk:** High operational cost due to manual data entry (tracking updates, document creation) and risk of missed exceptions (demurrage/detention).
+
+* **Status:** 🟡 **Functional but Basic**
+* **Verdict:** The foundational schema (`shipments`, `shipment_containers`) is robust, but the workflow is heavily manual. It acts as a digital filing cabinet rather than an active operating system.
+* **Risk:** High operational cost due to manual data entry (tracking updates, document creation) and risk of missed exceptions (demurrage/detention).
 
 #### 2.B.3.1 Core Components & Data Model
 
 **1. Database Schema (Existing & Verified)**
 The schema is well-structured for multi-modal operations, linking cargo configurations to actual containers.
 
-*   **`shipments`**: The parent entity containing route, dates, and parties.
-*   **`shipment_cargo_configurations`**: The *planned* cargo (e.g., "Request for 2x 40HC").
-*   **`shipment_containers`**: The *actual* execution (e.g., "Container MSCU1234567").
-*   **`tracking_events`**: A unified log for milestones (Gate In, Loaded, Discharged).
+* **`shipments`**: The parent entity containing route, dates, and parties.
+* **`shipment_cargo_configurations`**: The *planned* cargo (e.g., "Request for 2x 40HC").
+* **`shipment_containers`**: The *actual* execution (e.g., "Container MSCU1234567").
+* **`tracking_events`**: A unified log for milestones (Gate In, Loaded, Discharged).
 
 **2. Key Relationships**
+
 ```sql
 shipments (id)
   ├── shipment_cargo_configurations (shipment_id) -- Plan
@@ -3552,51 +3670,56 @@ shipments (id)
 
 #### 2.B.3.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Project44/Vizion) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **Container Tracking** | 🟡 Inventory UI + Event Log (no API integration) | ✅ Real-time API / AIS | 🔴 High |
-| **Document Creation** | ❌ Upload Only | ✅ Auto-gen HBL/AWB/Manifest | 🔴 High |
-| **Exception Alerts** | ❌ None | ✅ Predictive ETA / Delay Alerts | 🟡 Medium |
-| **Profit Share** | ❌ None | ✅ Auto-calculated per shipment | 🟡 Medium |
+| Feature                | Logic Nexus (Current)                            | Market Standard (Project44/Vizion) | Gap Severity |
+| :--------------------- | :----------------------------------------------- | :--------------------------------- | :----------- |
+| **Container Tracking** | 🟡 Inventory UI + Event Log (no API integration) | ✅ Real-time API / AIS              | 🔴 High      |
+| **Document Creation**  | ❌ Upload Only                                    | ✅ Auto-gen HBL/AWB/Manifest        | 🔴 High      |
+| **Exception Alerts**   | ❌ None                                           | ✅ Predictive ETA / Delay Alerts    | 🟡 Medium    |
+| **Profit Share**       | ❌ None                                           | ✅ Auto-calculated per shipment     | 🟡 Medium    |
 
 #### 2.B.3.3 Enhancement Recommendations
 
 **Phase 1: Real-Time Visibility (Weeks 7-10)**
-*   **Objective:** Eliminate manual "Track & Trace".
-*   **Action Items:**
-    1.  **Aggregator Integration:** Connect `tracking_events` table to a provider (Vizion, Terminal49, or Project44) via Webhook.
-    2.  **Webhook Handler:** Create an Edge Function `on-tracking-update` to:
-        *   Insert row into `tracking_events`.
-        *   Update `shipments.current_status` and `shipments.eta`.
-        *   Trigger notification if `new_eta > old_eta + 2 days`.
+
+* **Objective:** Eliminate manual "Track & Trace".
+* **Action Items:**
+  1. **Aggregator Integration:** Connect `tracking_events` table to a provider (Vizion, Terminal49, or Project44) via Webhook.
+  2. **Webhook Handler:** Create an Edge Function `on-tracking-update` to:
+     * Insert row into `tracking_events`.
+     * Update `shipments.current_status` and `shipments.eta`.
+     * Trigger notification if `new_eta > old_eta + 2 days`.
 
 **Phase 2: Documentation Engine (Weeks 11-14)**
-*   **Objective:** Click-to-generate legal documents.
-*   **Action Items:**
-    1.  **PDF Generation:** Implement `react-pdf` templates for:
-        *   House Bill of Lading (HBL) - Ocean
-        *   House Air Waybill (HAWB) - Air
-        *   Cargo Manifest
-    2.  **Data Mapping:** Map `shipment_items` and `shipment_containers` to the PDF templates.
+
+* **Objective:** Click-to-generate legal documents.
+* **Action Items:**
+  1. **PDF Generation:** Implement `react-pdf` templates for:
+     * House Bill of Lading (HBL) - Ocean
+     * House Air Waybill (HAWB) - Air
+     * Cargo Manifest
+  2. **Data Mapping:** Map `shipment_items` and `shipment_containers` to the PDF templates.
 
 **Phase 3: Operational Automation (Weeks 15-18)**
-*   **Objective:** Proactive exception management.
-*   **Action Items:**
-    1.  **Detention/Demurrage Monitor:** Calculate "Free Time Remaining" based on `discharge_date` vs. `gate_out_date`.
-    2.  **Milestone Workflow:** Auto-update Shipment Status (e.g., "Arrived" -> "Customs Cleared") based on specific `tracking_event` codes.
+
+* **Objective:** Proactive exception management.
+* **Action Items:**
+  1. **Detention/Demurrage Monitor:** Calculate "Free Time Remaining" based on `discharge_date` vs. `gate_out_date`.
+  2. **Milestone Workflow:** Auto-update Shipment Status (e.g., "Arrived" -> "Customs Cleared") based on specific `tracking_event` codes.
 
 ### 2.B.4 Fulfillment & Execution
 
 **Current Implementation Status:**
-*   **Status:** 🟡 **Partial Implementation**
-*   **Verdict:** Basic warehousing capability exists (`warehouses`, `warehouse_inventory`), allowing for static inventory visibility. However, it lacks transactional depth (Goods Receipt Notes, Pick Tickets) required for active 3PL operations.
-*   **Risk:** Cannot audit *who* received cargo or *when* it left, only what is currently sitting there.
+
+* **Status:** 🟡 **Partial Implementation**
+* **Verdict:** Basic warehousing capability exists (`warehouses`, `warehouse_inventory`), allowing for static inventory visibility. However, it lacks transactional depth (Goods Receipt Notes, Pick Tickets) required for active 3PL operations.
+* **Risk:** Cannot audit *who* received cargo or *when* it left, only what is currently sitting there.
 
 #### 2.B.4.1 Core Components & Data Model
 
 **1. Database Schema (Existing)**
-*   **`warehouses`**: Master data for facilities (Capacity, Operating Hours).
-*   **`warehouse_inventory`**: A snapshot table linking cargo to a warehouse location.
+
+* **`warehouses`**: Master data for facilities (Capacity, Operating Hours).
+* **`warehouse_inventory`**: A snapshot table linking cargo to a warehouse location.
 
 ```sql
 warehouse_inventory (
@@ -3611,35 +3734,38 @@ warehouse_inventory (
 ```
 
 **2. Missing Entities (Critical)**
-*   **`warehouse_receipts` (GRN)**: To document the *act* of receiving cargo (Time, Trucker, Damage Check).
-*   **`warehouse_orders` (Pick Ticket)**: To document the instruction to release cargo.
+
+* **`warehouse_receipts` (GRN)**: To document the *act* of receiving cargo (Time, Trucker, Damage Check).
+* **`warehouse_orders` (Pick Ticket)**: To document the instruction to release cargo.
 
 #### 2.B.4.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Magaya WMS) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **Inventory Visibility** | 🟡 Static Snapshot | ✅ Transactional Ledger | 🔴 High |
-| **Inbound Workflow** | ❌ Manual "Add Item" | ✅ GRN / Tally Sheet | 🔥 **Critical** |
-| **Outbound Workflow** | ❌ None | ✅ Pick/Pack/Ship Wizard | 🔥 **Critical** |
-| **Location Mgmt** | 🟡 Text Field | ✅ Hierarchical (Zone/Row/Bin) | 🟡 Medium |
+| Feature                  | Logic Nexus (Current) | Market Standard (Magaya WMS)  | Gap Severity    |
+| :----------------------- | :-------------------- | :---------------------------- | :-------------- |
+| **Inventory Visibility** | 🟡 Static Snapshot    | ✅ Transactional Ledger        | 🔴 High         |
+| **Inbound Workflow**     | ❌ Manual "Add Item"   | ✅ GRN / Tally Sheet           | 🔥 **Critical** |
+| **Outbound Workflow**    | ❌ None                | ✅ Pick/Pack/Ship Wizard       | 🔥 **Critical** |
+| **Location Mgmt**        | 🟡 Text Field         | ✅ Hierarchical (Zone/Row/Bin) | 🟡 Medium       |
 
 #### 2.B.4.3 Enhancement Recommendations
 
 **Phase 1: Transactional WMS (Weeks 11-14)**
-*   **Objective:** Audit trail for all cargo movements.
-*   **Action Items:**
-    1.  **Create `warehouse_receipts`:**
-        *   Header: `warehouse_id`, `trucker_bol`, `arrival_time`.
-        *   Items: Link to `warehouse_inventory` (creation).
-    2.  **Create `warehouse_orders`:**
-        *   Header: `customer_id`, `carrier_id`, `required_date`.
-        *   Items: Link to `warehouse_inventory` (allocation).
+
+* **Objective:** Audit trail for all cargo movements.
+* **Action Items:**
+  1. **Create `warehouse_receipts`:**
+     * Header: `warehouse_id`, `trucker_bol`, `arrival_time`.
+     * Items: Link to `warehouse_inventory` (creation).
+  2. **Create `warehouse_orders`:**
+     * Header: `customer_id`, `carrier_id`, `required_date`.
+     * Items: Link to `warehouse_inventory` (allocation).
 
 **Phase 2: Mobile Operations (Weeks 15-18)**
-*   **Objective:** Floor-level execution.
-*   **Action Items:**
-    1.  **Mobile Web View:** Simple interface for warehouse staff.
-    2.  **Barcode Logic:** Generate QR codes for `warehouse_inventory` IDs to allow "Scan-to-Pick".
+
+* **Objective:** Floor-level execution.
+* **Action Items:**
+  1. **Mobile Web View:** Simple interface for warehouse staff.
+  2. **Barcode Logic:** Generate QR codes for `warehouse_inventory` IDs to allow "Scan-to-Pick".
 
 ### 2.B.5 Financial Operations (AR & AP)
 
@@ -3647,19 +3773,22 @@ warehouse_inventory (
 The Financial Operations module manages the lifeblood of the logistics enterprise: Cash Inflow (Accounts Receivable) and Cash Outflow (Accounts Payable). Unlike generic invoicing software, a Logistics Financial System must handle complex multi-currency transactions, pass-through charges (duty/tax), and profit margin analysis per shipment.
 
 **Core Components:**
-1.  **Accounts Receivable (AR):** Generation of Commercial Invoices, Freight Invoices, and Duty Invoices.
-2.  **Accounts Payable (AP):** Recording Vendor Bills (Carrier Freight, Terminal Charges, Customs Duties).
-3.  **Treasury Management:** Recording Payments Received (AR) and Payments Made (AP).
-4.  **Credit Control:** Credit limits, hold status, and dunning letters.
+
+1. **Accounts Receivable (AR):** Generation of Commercial Invoices, Freight Invoices, and Duty Invoices.
+2. **Accounts Payable (AP):** Recording Vendor Bills (Carrier Freight, Terminal Charges, Customs Duties).
+3. **Treasury Management:** Recording Payments Received (AR) and Payments Made (AP).
+4. **Credit Control:** Credit limits, hold status, and dunning letters.
 
 #### 2.B.5.1 Current Architecture & Implementation Status
 
 **Current State:** 🟡 **Partial (AR Only)**
-*   **Invoicing (AR):** Implemented via `invoices` and `invoice_line_items` tables.
-*   **Vendor Bills (AP):** 🔴 **Non-Existent**. There is no mechanism to record incoming bills from carriers.
-*   **Payments:** Basic `payments` table exists but lacks "Allocation" logic (matching payment to specific invoices).
+
+* **Invoicing (AR):** Implemented via `invoices` and `invoice_line_items` tables.
+* **Vendor Bills (AP):** 🔴 **Non-Existent**. There is no mechanism to record incoming bills from carriers.
+* **Payments:** Basic `payments` table exists but lacks "Allocation" logic (matching payment to specific invoices).
 
 **Existing Schema (Verified):**
+
 ```sql
 -- Invoices (AR)
 CREATE TABLE invoices (
@@ -3687,48 +3816,52 @@ CREATE TABLE payments (
 
 #### 2.B.5.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Cargowise/Magaya) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **Vendor Bill Entry** | ❌ None | ✅ Auto-match to Accruals | 🔥 **Critical** |
-| **Profit Calculation** | ❌ None (Revenue Only) | ✅ Real-time (Rev - Cost) | 🔥 **Critical** |
-| **Duty Management** | 🟡 Metadata Only | ✅ Dedicated "Duty Invoice" | 🔴 High |
-| **Multi-Currency** | 🟡 Manual Rate | ✅ Daily FOREX Feed | 🟡 Medium |
-| **Payment Allocation** | ❌ Manual Note | ✅ Partial Pay / Split Pay | 🔴 High |
+| Feature                | Logic Nexus (Current) | Market Standard (Cargowise/Magaya) | Gap Severity    |
+| :--------------------- | :-------------------- | :--------------------------------- | :-------------- |
+| **Vendor Bill Entry**  | ❌ None                | ✅ Auto-match to Accruals           | 🔥 **Critical** |
+| **Profit Calculation** | ❌ None (Revenue Only) | ✅ Real-time (Rev - Cost)           | 🔥 **Critical** |
+| **Duty Management**    | 🟡 Metadata Only      | ✅ Dedicated "Duty Invoice"         | 🔴 High         |
+| **Multi-Currency**     | 🟡 Manual Rate        | ✅ Daily FOREX Feed                 | 🟡 Medium       |
+| **Payment Allocation** | ❌ Manual Note         | ✅ Partial Pay / Split Pay          | 🔴 High         |
 
 **Critical Risks:**
-1.  **Financial Blindness:** Without AP (Vendor Bills), the system cannot calculate Gross Profit per shipment. Users might be losing money on shipments and not know it.
-2.  **Double Payment Risk:** No tracking of which carrier bills have been paid.
-3.  **Compliance:** Inability to generate correct tax documents (1099s for truckers) due to lack of vendor data.
+
+1. **Financial Blindness:** Without AP (Vendor Bills), the system cannot calculate Gross Profit per shipment. Users might be losing money on shipments and not know it.
+2. **Double Payment Risk:** No tracking of which carrier bills have been paid.
+3. **Compliance:** Inability to generate correct tax documents (1099s for truckers) due to lack of vendor data.
 
 #### 2.B.5.3 Enhancement Recommendations
 
 **Phase 1: Accounts Payable (Weeks 9-12)**
-*   **Objective:** Enable cost tracking to calculate profitability.
-*   **Action Items:**
-    1.  **Create `vendor_bills` Table:**
-        *   Fields: `vendor_id` (Carrier), `vendor_invoice_number`, `invoice_date`, `due_date`, `currency`, `total_amount`.
-        *   Link to `shipments` (One bill might cover multiple shipments, or one shipment might have multiple bills).
-    2.  **Create `bill_line_items`:**
-        *   Fields: `charge_code` (e.g., OFR, DTHC), `amount`, `gl_account_id`.
-        *   **Three-Way Match:** Validate Bill Amount vs. Quoted Cost vs. Received Service.
+
+* **Objective:** Enable cost tracking to calculate profitability.
+* **Action Items:**
+  1. **Create `vendor_bills` Table:**
+     * Fields: `vendor_id` (Carrier), `vendor_invoice_number`, `invoice_date`, `due_date`, `currency`, `total_amount`.
+     * Link to `shipments` (One bill might cover multiple shipments, or one shipment might have multiple bills).
+  2. **Create `bill_line_items`:**
+     * Fields: `charge_code` (e.g., OFR, DTHC), `amount`, `gl_account_id`.
+     * **Three-Way Match:** Validate Bill Amount vs. Quoted Cost vs. Received Service.
 
 **Phase 2: Payment Allocation (Weeks 13-16)**
-*   **Objective:** Robust Treasury Management.
-*   **Action Items:**
-    1.  **Create `payment_allocations`:**
-        *   Many-to-Many link between `payments` and `invoices` (or `vendor_bills`).
-        *   Fields: `amount_applied`, `date_applied`.
-    2.  **Implement "Pay" UI:**
-        *   "Receive Payment" wizard for AR.
-        *   "Pay Vendor" wizard for AP (Batch payments, Check printing).
+
+* **Objective:** Robust Treasury Management.
+* **Action Items:**
+  1. **Create `payment_allocations`:**
+     * Many-to-Many link between `payments` and `invoices` (or `vendor_bills`).
+     * Fields: `amount_applied`, `date_applied`.
+  2. **Implement "Pay" UI:**
+     * "Receive Payment" wizard for AR.
+     * "Pay Vendor" wizard for AP (Batch payments, Check printing).
 
 **Phase 3: Automated Profitability (Weeks 17-20)**
-*   **Objective:** Real-time financial analytics.
-*   **Action Items:**
-    1.  **Job Costing View:**
-        *   On Shipment Dashboard, show: `Invoiced Revenue` - `Recorded Bills` = `Gross Profit`.
-    2.  **Margin Protection:**
-        *   Alert users if `Estimated Cost` < `Actual Bill Amount` (Cost creep).
+
+* **Objective:** Real-time financial analytics.
+* **Action Items:**
+  1. **Job Costing View:**
+     * On Shipment Dashboard, show: `Invoiced Revenue` - `Recorded Bills` = `Gross Profit`.
+  2. **Margin Protection:**
+     * Alert users if `Estimated Cost` < `Actual Bill Amount` (Cost creep).
 
 ### 2.B.6 Financial Accounting & Revenue Management
 
@@ -3736,20 +3869,23 @@ CREATE TABLE payments (
 While 2.B.5 handles the *transactional* cash flow, 2.B.6 manages the *accounting* truth. For logistics companies, this means accrual-based accounting (recognizing revenue/cost when the ship sails, not when the invoice is printed) to match revenue with expenses in the same period (GAAP/IFRS compliance).
 
 **Core Components:**
-1.  **Chart of Accounts (COA):** The backbone of financial reporting (Assets, Liabilities, Equity, Revenue, Expenses).
-2.  **General Ledger (GL):** The repository of all financial transactions (Journal Entries).
-3.  **Accrual Engine:** Automating WIP (Work in Progress) calculations.
-4.  **Period Management:** Locking fiscal periods to prevent retroactive changes.
+
+1. **Chart of Accounts (COA):** The backbone of financial reporting (Assets, Liabilities, Equity, Revenue, Expenses).
+2. **General Ledger (GL):** The repository of all financial transactions (Journal Entries).
+3. **Accrual Engine:** Automating WIP (Work in Progress) calculations.
+4. **Period Management:** Locking fiscal periods to prevent retroactive changes.
 
 #### 2.B.6.1 Current Architecture & Implementation Status
 
 **Current State:** 🟡 **Partially Implemented (Journal Entries Only)**
-*   **GL Structure:** No `chart_of_accounts` or `gl_codes` tables exist. However, `finance.journal_entries` table EXISTS in the `finance` schema with columns for `tenant_id`, `reference_id`, `reference_type`, `sync_status`, `retry_count`, `synced_at`, `external_id`.
-*   **GL Sync Service:** `src/services/gl/GLSyncService.ts` implements transaction sync with retry logic. Creates journal entry records, tracks status (PENDING → SYNCED / FAILED), includes retry count tracking. External connector is mocked (awaits Xero/QBO/SAP integration).
-*   **Revenue Recognition:** System currently operates on a "Cash-Basis approximation" (Revenue = Invoice Date), which is incorrect for freight forwarding.
-*   **WIP:** No concept of "Unbilled Revenue" or "Accrued Expenses".
+
+* **GL Structure:** No `chart_of_accounts` or `gl_codes` tables exist. However, `finance.journal_entries` table EXISTS in the `finance` schema with columns for `tenant_id`, `reference_id`, `reference_type`, `sync_status`, `retry_count`, `synced_at`, `external_id`.
+* **GL Sync Service:** `src/services/gl/GLSyncService.ts` implements transaction sync with retry logic. Creates journal entry records, tracks status (PENDING → SYNCED / FAILED), includes retry count tracking. External connector is mocked (awaits Xero/QBO/SAP integration).
+* **Revenue Recognition:** System currently operates on a "Cash-Basis approximation" (Revenue = Invoice Date), which is incorrect for freight forwarding.
+* **WIP:** No concept of "Unbilled Revenue" or "Accrued Expenses".
 
 **Proposed Schema (Standard ERP Model):**
+
 ```sql
 -- Chart of Accounts
 CREATE TABLE chart_of_accounts (
@@ -3782,41 +3918,45 @@ CREATE TABLE journal_entry_lines (
 
 #### 2.B.6.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Cargowise) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **Accruals** | ❌ None | ✅ Auto-accrue on ETD/ETA | 🔥 **Critical** |
-| **GL Mapping** | 🟡 Journal entries exist, no COA mapping | ✅ Charge Code -> GL Code | 🔴 High |
-| **Period Closing** | ❌ None | ✅ Soft/Hard Close | 🔴 High |
-| **Financial Reports** | ❌ None | ✅ Trial Balance / P&L | 🔴 High |
+| Feature               | Logic Nexus (Current)                    | Market Standard (Cargowise) | Gap Severity    |
+| :-------------------- | :--------------------------------------- | :-------------------------- | :-------------- |
+| **Accruals**          | ❌ None                                   | ✅ Auto-accrue on ETD/ETA    | 🔥 **Critical** |
+| **GL Mapping**        | 🟡 Journal entries exist, no COA mapping | ✅ Charge Code -> GL Code    | 🔴 High         |
+| **Period Closing**    | ❌ None                                   | ✅ Soft/Hard Close           | 🔴 High         |
+| **Financial Reports** | ❌ None                                   | ✅ Trial Balance / P\&L      | 🔴 High         |
 
 **Critical Risks:**
-1.  **Misstated Profit:** Without accruals, a month with high shipments but low invoicing will look like a loss, followed by a month of fake "super-profit".
-2.  **Audit Failure:** Lack of immutable journal entries makes the system non-compliant with standard accounting audits.
+
+1. **Misstated Profit:** Without accruals, a month with high shipments but low invoicing will look like a loss, followed by a month of fake "super-profit".
+2. **Audit Failure:** Lack of immutable journal entries makes the system non-compliant with standard accounting audits.
 
 #### 2.B.6.3 Enhancement Recommendations
 
 **Phase 1: Foundation (Weeks 13-16)**
-*   **Objective:** Establish the GL structure.
-*   **Action Items:**
-    1.  **Seed COA:** Import standard Logistics COA (Freight Revenue, Carrier Costs, Duty Payable).
-    2.  **GL Mapping:** Add `gl_account_id` to `charge_types` table.
-    3.  **Manual Journals:** UI to create/edit journal entries.
+
+* **Objective:** Establish the GL structure.
+* **Action Items:**
+  1. **Seed COA:** Import standard Logistics COA (Freight Revenue, Carrier Costs, Duty Payable).
+  2. **GL Mapping:** Add `gl_account_id` to `charge_types` table.
+  3. **Manual Journals:** UI to create/edit journal entries.
 
 **Phase 2: The Accrual Engine (Weeks 17-20)**
-*   **Objective:** Automate the "Matching Principle".
-*   **Action Items:**
-    1.  **Revenue Accrual Trigger:**
-        *   When Shipment = 'Departed': Debit `Unbilled Receivables`, Credit `Freight Revenue`.
-        *   When Invoice = 'Issued': Debit `Accounts Receivable`, Credit `Unbilled Receivables`.
-    2.  **Cost Accrual Trigger:**
-        *   When Shipment = 'Arrived': Debit `Freight Expense`, Credit `Accrued Liability`.
-        *   When Bill = 'Received': Debit `Accrued Liability`, Credit `Accounts Payable`.
+
+* **Objective:** Automate the "Matching Principle".
+* **Action Items:**
+  1. **Revenue Accrual Trigger:**
+     * When Shipment = 'Departed': Debit `Unbilled Receivables`, Credit `Freight Revenue`.
+     * When Invoice = 'Issued': Debit `Accounts Receivable`, Credit `Unbilled Receivables`.
+  2. **Cost Accrual Trigger:**
+     * When Shipment = 'Arrived': Debit `Freight Expense`, Credit `Accrued Liability`.
+     * When Bill = 'Received': Debit `Accrued Liability`, Credit `Accounts Payable`.
 
 **Phase 3: Financial Reporting (Weeks 21-24)**
-*   **Objective:** Replace external spreadsheets.
-*   **Action Items:**
-    1.  **Trial Balance Generator:** SQL View summing debits/credits per account.
-    2.  **P&L Widget:** Real-time Income Statement on the dashboard.
+
+* **Objective:** Replace external spreadsheets.
+* **Action Items:**
+  1. **Trial Balance Generator:** SQL View summing debits/credits per account.
+  2. **P\&L Widget:** Real-time Income Statement on the dashboard.
 
 ### 2.B.7 Financial Integration & Interoperability
 
@@ -3824,20 +3964,23 @@ CREATE TABLE journal_entry_lines (
 While 2.B.6 establishes the *internal* ledger, 2.B.7 manages the bridge to *external* ERP systems (QuickBooks, Xero, NetSuite, SAP). For many clients, Logic Nexus will act as the "Operational Sub-Ledger," syncing summarized or detailed financial data to the Corporate ERP.
 
 **Core Components:**
-1.  **Connector Hub:** OAuth2 management for cloud accounting apps.
-2.  **Mapping Engine:** Translating "Logic Nexus Charge Codes" to "QuickBooks Item Codes".
-3.  **Sync Manager:** Queue-based background jobs for data synchronization.
-4.  **Audit Trail:** Logs of what was synced, when, and by whom.
+
+1. **Connector Hub:** OAuth2 management for cloud accounting apps.
+2. **Mapping Engine:** Translating "Logic Nexus Charge Codes" to "QuickBooks Item Codes".
+3. **Sync Manager:** Queue-based background jobs for data synchronization.
+4. **Audit Trail:** Logs of what was synced, when, and by whom.
 
 #### 2.B.7.1 Current Architecture & Implementation Status
 
 **Current State:** 🟡 **Foundation Exists (Simulated Sync)**
-*   **Infrastructure:** `GLSyncService` (`src/services/gl/GLSyncService.ts`) provides the sync pipeline framework. Creates `finance.journal_entries` records with `sync_status` (PENDING/SYNCED/FAILED), `retry_count`, `synced_at`, and `external_id`. Type definitions in `src/services/gl/types.ts`. Unit tests in `GLSyncService.test.ts`.
-*   **Mock Connector:** External API call is simulated (`mockExternalSync`) — no real Xero/QBO/NetSuite connector is wired.
-*   **Placeholders:** The `invoices` table has a `metadata` column intended for external IDs (e.g., `xero_id`), but no logic populates it.
-*   **Manual Process:** Users currently export PDF invoices and manually re-key them into their accounting software.
+
+* **Infrastructure:** `GLSyncService` (`src/services/gl/GLSyncService.ts`) provides the sync pipeline framework. Creates `finance.journal_entries` records with `sync_status` (PENDING/SYNCED/FAILED), `retry_count`, `synced_at`, and `external_id`. Type definitions in `src/services/gl/types.ts`. Unit tests in `GLSyncService.test.ts`.
+* **Mock Connector:** External API call is simulated (`mockExternalSync`) — no real Xero/QBO/NetSuite connector is wired.
+* **Placeholders:** The `invoices` table has a `metadata` column intended for external IDs (e.g., `xero_id`), but no logic populates it.
+* **Manual Process:** Users currently export PDF invoices and manually re-key them into their accounting software.
 
 **Proposed Schema:**
+
 ```sql
 -- Integration Settings
 CREATE TABLE integration_configs (
@@ -3873,38 +4016,42 @@ CREATE TABLE sync_logs (
 
 #### 2.B.7.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Magaya) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **QBO/Xero Sync** | ❌ None | ✅ Native Plug-in | 🔥 **Critical** |
-| **Tax Code Mapping** | ❌ None | ✅ Auto-map Tax Rates | 🔴 High |
-| **Payment Sync** | ❌ None | ✅ Two-way Sync | 🔴 High |
-| **Error Handling** | 🟡 GLSyncService has retry count tracking | ✅ Retry Queue | 🟡 Low |
+| Feature              | Logic Nexus (Current)                     | Market Standard (Magaya) | Gap Severity    |
+| :------------------- | :---------------------------------------- | :----------------------- | :-------------- |
+| **QBO/Xero Sync**    | ❌ None                                    | ✅ Native Plug-in         | 🔥 **Critical** |
+| **Tax Code Mapping** | ❌ None                                    | ✅ Auto-map Tax Rates     | 🔴 High         |
+| **Payment Sync**     | ❌ None                                    | ✅ Two-way Sync           | 🔴 High         |
+| **Error Handling**   | 🟡 GLSyncService has retry count tracking | ✅ Retry Queue            | 🟡 Low          |
 
 **Critical Risks:**
-1.  **Data Discrepancy:** Manual entry leads to typing errors, causing the Operational System and Financial System to disagree.
-2.  **High Labor Cost:** Bookkeepers spend hours re-keying data instead of managing exceptions.
+
+1. **Data Discrepancy:** Manual entry leads to typing errors, causing the Operational System and Financial System to disagree.
+2. **High Labor Cost:** Bookkeepers spend hours re-keying data instead of managing exceptions.
 
 #### 2.B.7.3 Enhancement Recommendations
 
 **Phase 1: One-Way Push (Weeks 13-16)**
-*   **Objective:** Eliminate manual invoice entry.
-*   **Action Items:**
-    1.  **Build Connectors:** Implement `QuickBooksService` and `XeroService` classes.
-    2.  **Invoice Push:** When Invoice Status -> 'Issued', trigger background job to create invoice in ERP.
-    3.  **Store ID:** Save the returned `qbo_invoice_id` in `invoices.metadata`.
+
+* **Objective:** Eliminate manual invoice entry.
+* **Action Items:**
+  1. **Build Connectors:** Implement `QuickBooksService` and `XeroService` classes.
+  2. **Invoice Push:** When Invoice Status -> 'Issued', trigger background job to create invoice in ERP.
+  3. **Store ID:** Save the returned `qbo_invoice_id` in `invoices.metadata`.
 
 **Phase 2: Two-Way Sync (Weeks 17-20)**
-*   **Objective:** Keep payment status up to date.
-*   **Action Items:**
-    1.  **Payment Webhooks:** Listen for "Payment Received" events from QBO/Xero.
-    2.  **Auto-Update:** Update Logic Nexus invoice status to 'Paid' when paid in ERP.
-    3.  **Customer Sync:** Sync new accounts created in either system.
+
+* **Objective:** Keep payment status up to date.
+* **Action Items:**
+  1. **Payment Webhooks:** Listen for "Payment Received" events from QBO/Xero.
+  2. **Auto-Update:** Update Logic Nexus invoice status to 'Paid' when paid in ERP.
+  3. **Customer Sync:** Sync new accounts created in either system.
 
 **Phase 3: Enterprise Connectors (Weeks 21-24)**
-*   **Objective:** Support larger clients.
-*   **Action Items:**
-    1.  **NetSuite/Dynamics:** Implement connectors for mid-market ERPs.
-    2.  **Batch Sync:** Instead of real-time, implement nightly batch files (CSV/XML) for legacy systems.
+
+* **Objective:** Support larger clients.
+* **Action Items:**
+  1. **NetSuite/Dynamics:** Implement connectors for mid-market ERPs.
+  2. **Batch Sync:** Instead of real-time, implement nightly batch files (CSV/XML) for legacy systems.
 
 ### 2.B.8 Compliance & Regulatory Filing
 
@@ -3912,19 +4059,22 @@ CREATE TABLE sync_logs (
 Compliance is the "License to Operate" for a freight forwarder. This module handles mandatory government filings (AES, ISF, AMS) and security screenings (Denied Party Screening). Failure here results in severe penalties ($10,000+ per violation) and cargo seizures.
 
 **Core Components:**
-1.  **AES (Automated Export System):** Mandatory US Census filing for exports >$2,500. Returns an ITN (Internal Transaction Number).
-2.  **ISF (Importer Security Filing):** "10+2" rule for ocean imports to the US. Must be filed 24h before loading.
-3.  **AMS (Automated Manifest System):** Cargo manifest declaration for NVOCCs.
-4.  **Denied Party Screening (DPS):** Checking entities against OFAC/BIS watchlists.
+
+1. **AES (Automated Export System):** Mandatory US Census filing for exports >$2,500. Returns an ITN (Internal Transaction Number).
+2. **ISF (Importer Security Filing):** "10+2" rule for ocean imports to the US. Must be filed 24h before loading.
+3. **AMS (Automated Manifest System):** Cargo manifest declaration for NVOCCs.
+4. **Denied Party Screening (DPS):** Checking entities against OFAC/BIS watchlists.
 
 #### 2.B.8.1 Current Architecture & Implementation Status
 
 **Current State:** 🟡 **Master Data Only**
-*   **HTS Codes:** `aes_hts_codes` table exists and is populated.
-*   **Filing Logic:** 🔴 **Non-Existent**. There is no capability to transmit data to CBP (Customs & Border Protection) or ACE (Automated Commercial Environment).
-*   **Workflow:** Users must re-key shipment data into the ACE Web Portal manually, then copy-paste the ITN back into Logic Nexus.
+
+* **HTS Codes:** `aes_hts_codes` table exists and is populated.
+* **Filing Logic:** 🔴 **Non-Existent**. There is no capability to transmit data to CBP (Customs & Border Protection) or ACE (Automated Commercial Environment).
+* **Workflow:** Users must re-key shipment data into the ACE Web Portal manually, then copy-paste the ITN back into Logic Nexus.
 
 **Proposed Schema:**
+
 ```sql
 -- Customs Filings Header
 CREATE TABLE customs_filings (
@@ -3965,39 +4115,43 @@ CREATE TABLE isf_details (
 
 #### 2.B.8.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Magaya/Descartes) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **AES Filing** | ❌ Manual Portal | ✅ Integrated EDI | 🔥 **Critical** |
-| **ISF Filing** | ❌ Manual Portal | ✅ Integrated EDI | 🔥 **Critical** |
-| **Watchlist Screening** | ❌ None | ✅ Auto-screen on Save | 🔴 High |
-| **HTS Classification** | ✅ Database Search | ✅ AI-Assisted | 🟢 Good |
+| Feature                 | Logic Nexus (Current) | Market Standard (Magaya/Descartes) | Gap Severity    |
+| :---------------------- | :-------------------- | :--------------------------------- | :-------------- |
+| **AES Filing**          | ❌ Manual Portal       | ✅ Integrated EDI                   | 🔥 **Critical** |
+| **ISF Filing**          | ❌ Manual Portal       | ✅ Integrated EDI                   | 🔥 **Critical** |
+| **Watchlist Screening** | ❌ None                | ✅ Auto-screen on Save              | 🔴 High         |
+| **HTS Classification**  | ✅ Database Search     | ✅ AI-Assisted                      | 🟢 Good         |
 
 **Critical Risks:**
-1.  **Data Mismatch:** If the AES filing details (weight, value) differ from the Bill of Lading, fines can be issued. Manual re-keying increases this risk.
-2.  **Missed Deadlines:** ISF must be filed 24 hours *before* loading. Without system alerts, late filings ($5,000 fine) are likely.
+
+1. **Data Mismatch:** If the AES filing details (weight, value) differ from the Bill of Lading, fines can be issued. Manual re-keying increases this risk.
+2. **Missed Deadlines:** ISF must be filed 24 hours *before* loading. Without system alerts, late filings ($5,000 fine) are likely.
 
 #### 2.B.8.3 Enhancement Recommendations
 
 **Phase 1: ISF Filing (Weeks 21-24)**
-*   **Objective:** Secure the Import workflow.
-*   **Action Items:**
-    1.  **EDI Integration:** Connect to a CSP (Customs Service Provider) like Descartes or Kleinschmidt (Direct CBP connection is too complex for Phase 1).
-    2.  **ISF Form:** Create a dedicated "ISF Worksheet" in the Shipment Dashboard.
-    3.  **Validation:** Ensure all "10+2" data points are present before submission.
+
+* **Objective:** Secure the Import workflow.
+* **Action Items:**
+  1. **EDI Integration:** Connect to a CSP (Customs Service Provider) like Descartes or Kleinschmidt (Direct CBP connection is too complex for Phase 1).
+  2. **ISF Form:** Create a dedicated "ISF Worksheet" in the Shipment Dashboard.
+  3. **Validation:** Ensure all "10+2" data points are present before submission.
 
 **Phase 2: AES Integration (Weeks 25-28)**
-*   **Objective:** Streamline Exports.
-*   **Action Items:**
-    1.  **Auto-Populate:** Map Shipment/Invoice data to the AES form (USPPI, Value, Weight).
-    2.  **ITN Capture:** Automatically parse the EDI response and save the ITN to the Shipment record.
-    3.  **AESDirect:** Evaluate direct certification with CBP if volume justifies it.
+
+* **Objective:** Streamline Exports.
+* **Action Items:**
+  1. **Auto-Populate:** Map Shipment/Invoice data to the AES form (USPPI, Value, Weight).
+  2. **ITN Capture:** Automatically parse the EDI response and save the ITN to the Shipment record.
+  3. **AESDirect:** Evaluate direct certification with CBP if volume justifies it.
 
 **Phase 3: Automated Screening (Weeks 29-32)**
-*   **Objective:** Risk Management.
-*   **Action Items:**
-    1.  **Real-time API:** Integrate with `MK Data` or `Visual Compliance` API.
-    2.  **Trigger:** Run screening whenever a new Contact or Account is created.
-    3.  **Block:** Prevent shipment creation if a party is on the Denied Persons List.
+
+* **Objective:** Risk Management.
+* **Action Items:**
+  1. **Real-time API:** Integrate with `MK Data` or `Visual Compliance` API.
+  2. **Trigger:** Run screening whenever a new Contact or Account is created.
+  3. **Block:** Prevent shipment creation if a party is on the Denied Persons List.
 
 ### 2.B.9 Analytics & Business Intelligence (BI)
 
@@ -4005,20 +4159,23 @@ CREATE TABLE isf_details (
 Data is the competitive advantage of modern logistics. This module transforms raw shipment data into actionable insights for three distinct audiences: Operations (Traffic Management), Management (Profitability/Strategy), and Customers (Visibility).
 
 **Core Components:**
-1.  **Operational Dashboards:** Real-time counters (e.g., "5 Shipments Arriving Today").
-2.  **Visual Workflow (Kanban):** Drag-and-drop management of shipment lifecycle (Booked -> In Transit -> Arrived).
-3.  **Financial Reporting:** Sales performance, carrier spend analysis, and profit margin reports.
-4.  **Customer Intelligence:** Automated "Weekly Status Reports" emailed to clients.
+
+1. **Operational Dashboards:** Real-time counters (e.g., "5 Shipments Arriving Today").
+2. **Visual Workflow (Kanban):** Drag-and-drop management of shipment lifecycle (Booked -> In Transit -> Arrived).
+3. **Financial Reporting:** Sales performance, carrier spend analysis, and profit margin reports.
+4. **Customer Intelligence:** Automated "Weekly Status Reports" emailed to clients.
 
 #### 2.B.9.1 Current Architecture & Implementation Status
 
 **Current State:** 🟡 **Generic / Hardcoded**
-*   **Infrastructure:** `dashboardAnalyticsService.ts` calls RPC functions like `get_dashboard_stats`.
-*   **UI:** `Reports.tsx` and `Dashboards.tsx` exist but are hardcoded to specific widgets.
-*   **Flexibility:** 🔴 **Low**. Users cannot create custom reports or save filter sets.
-*   **Visuals:** No Kanban board or Map view exists.
+
+* **Infrastructure:** `dashboardAnalyticsService.ts` calls RPC functions like `get_dashboard_stats`.
+* **UI:** `Reports.tsx` and `Dashboards.tsx` exist but are hardcoded to specific widgets.
+* **Flexibility:** 🔴 **Low**. Users cannot create custom reports or save filter sets.
+* **Visuals:** No Kanban board or Map view exists.
 
 **Proposed Schema (Reporting Layer):**
+
 ```sql
 -- Saved Reports / Filters
 CREATE TABLE saved_reports (
@@ -4044,40 +4201,44 @@ CREATE TABLE scheduled_reports (
 
 #### 2.B.9.2 Technical Debt & Gap Analysis
 
-| Feature | Logic Nexus (Current) | Market Standard (Cargowise/PowerBI) | Gap Severity |
-| :--- | :--- | :--- | :--- |
-| **Custom Reports** | ❌ None | ✅ Drag-and-Drop Builder | 🔥 **Critical** |
-| **Kanban View** | ❌ List Only | ✅ Visual Board | 🔴 High |
-| **Scheduled Emails** | ❌ Manual | ✅ Auto-send Weekly | 🔴 High |
-| **Map View** | ❌ None | ✅ Live Vessel Tracking | 🟡 Medium |
+| Feature              | Logic Nexus (Current) | Market Standard (Cargowise/PowerBI) | Gap Severity    |
+| :------------------- | :-------------------- | :---------------------------------- | :-------------- |
+| **Custom Reports**   | ❌ None                | ✅ Drag-and-Drop Builder             | 🔥 **Critical** |
+| **Kanban View**      | ❌ List Only           | ✅ Visual Board                      | 🔴 High         |
+| **Scheduled Emails** | ❌ Manual              | ✅ Auto-send Weekly                  | 🔴 High         |
+| **Map View**         | ❌ None                | ✅ Live Vessel Tracking              | 🟡 Medium       |
 
 **Critical Risks:**
-1.  **Customer Churn:** Competitors provide automated "Monday Morning Reports". Logic Nexus requires manual email composition.
-2.  **Operational Bottlenecks:** Without a Kanban board, "at-risk" shipments (e.g., stuck in customs) are buried in paginated lists.
+
+1. **Customer Churn:** Competitors provide automated "Monday Morning Reports". Logic Nexus requires manual email composition.
+2. **Operational Bottlenecks:** Without a Kanban board, "at-risk" shipments (e.g., stuck in customs) are buried in paginated lists.
 
 #### 2.B.9.3 Enhancement Recommendations
 
 **Phase 1: Visual Operations (Weeks 13-16)**
-*   **Objective:** Make traffic management intuitive.
-*   **Action Items:**
-    1.  **Kanban Board:** Implement `react-beautiful-dnd` for Shipments. Columns = Status (Booked, Departed, Arrived, Released).
-    2.  **Exception Dashboard:** A "Red Light" widget showing only shipments with missed ETAs or missing docs.
+
+* **Objective:** Make traffic management intuitive.
+* **Action Items:**
+  1. **Kanban Board:** Implement `react-beautiful-dnd` for Shipments. Columns = Status (Booked, Departed, Arrived, Released).
+  2. **Exception Dashboard:** A "Red Light" widget showing only shipments with missed ETAs or missing docs.
 
 **Phase 2: Report Builder (Weeks 17-20)**
-*   **Objective:** Self-service analytics.
-*   **Action Items:**
-    1.  **Filter Logic:** Enhance the backend `ScopedDataAccess` to accept complex JSON filters.
-    2.  **Save View:** Allow users to save current grid filters as a "Report".
-    3.  **Export Engine:** Robust CSV/Excel export respecting the user's selected columns.
+
+* **Objective:** Self-service analytics.
+* **Action Items:**
+  1. **Filter Logic:** Enhance the backend `ScopedDataAccess` to accept complex JSON filters.
+  2. **Save View:** Allow users to save current grid filters as a "Report".
+  3. **Export Engine:** Robust CSV/Excel export respecting the user's selected columns.
 
 **Phase 3: Automated Distribution (Weeks 21-24)**
-*   **Objective:** Proactive customer service.
-*   **Action Items:**
-    1.  **Scheduler:** Cron job to run `saved_reports` queries.
-    2.  **Emailer:** Send results via SendGrid/AWS SES.
-    3.  **Customer Portal:** Expose read-only versions of these dashboards to external users.
 
----
+* **Objective:** Proactive customer service.
+* **Action Items:**
+  1. **Scheduler:** Cron job to run `saved_reports` queries.
+  2. **Emailer:** Send results via SendGrid/AWS SES.
+  3. **Customer Portal:** Expose read-only versions of these dashboards to external users.
+
+***
 
 ## Section 3: Logistics Domain Feature Inventory
 
@@ -4085,29 +4246,29 @@ CREATE TABLE scheduled_reports (
 
 **Transportation & Operations:**
 
-| Feature | Status | Key Components | Code References |
-|---------|--------|---------------|-----------------|
-| Multi-modal transport (Ocean, Air, Road, Rail) | ✅ Complete | `shipment_type` ENUM, mode selection in quotes | `shipments.shipment_type`, `service_types.mode` |
-| FCL/LCL container management | ✅ Complete | Container sizes, types, cargo configurations | `shipment_containers`, `shipment_cargo_configurations` |
-| Port/location master data | ✅ Complete | Global ports database (ocean, air, rail, road) | `ports_locations` table (global, no tenant_id) |
-| Carrier management | ✅ Complete | Carrier CRUD with SCAC/IATA codes, mode filtering | `carriers` table, tenant-scoped |
-| Rate engine (AI-enhanced) | ✅ Complete | Multi-modal pricing with margin calculation | `rate-engine` Edge Function (v2.1) |
-| Container tracking (events) | ✅ Complete | Milestone-based tracking event log | `tracking_events` table |
-| Customs documentation | ✅ Complete | Document upload and management | `customs_documents` table |
-| Hazmat handling | ✅ Complete | UN numbers, hazmat class classification | `cargo_details.hazmat_class`, `hazmat_un_number` |
-| Container types/sizes | ✅ Complete | 20GP, 40HC, 45HC, etc. | Container type reference tables |
-| CO2 emissions tracking | ✅ Complete | Per-shipment carbon footprint estimation | `co2_kg` field in rate engine responses |
-| Vendor management (CLM) | ✅ Complete | Contracts, documents, preferred carriers, e-signatures | `vendors`, `vendor_contracts`, `vendor_documents` |
-| Shipment delay detection | ✅ Complete | Auto-detect overdue shipments, severity classification | `shipment_delays` table, `check_shipment_delays()` RPC |
-| Quote-to-Shipment conversion | ✅ Complete | RPC converts quote to shipment with cargo mapping | `convert_quote_to_shipment()` RPC |
-| Shipment-to-Invoice generation | ✅ Complete | Auto-generates invoice from shipment charges | `create_invoice_from_shipment()` RPC |
-| Document sequencing | ✅ Complete | Auto-numbering per tenant (INV-000001, SHP-000001) | `get_next_document_number()` RPC |
-| Incoterms management | ✅ Complete | Standard trade terms with charge implications | Incoterms reference data |
-| AI-powered mode suggestion | ✅ Complete | Recommends optimal transport mode | `suggest-transport-mode` Edge Function |
-| Demand forecasting (AI) | ✅ Complete | Predictive volume analysis with confidence scores | `demand_predictions` table, `forecast-demand` Edge Function |
-| Landed cost calculation | ✅ Complete | Freight + duty + insurance + fees computation | `calculate_landed_cost_rpc()` |
-| HTS code search & classification | ✅ Complete | Full-text search with hierarchy parsing | `search_hts_codes()` RPC, `aes_hts_codes` table |
-| Restricted party screening | ✅ Complete | Fuzzy matching against OFAC/BIS watchlists | `screen_restricted_party()` RPC, `compliance_screenings` |
+| Feature                                        | Status     | Key Components                                         | Code References                                             |
+| ---------------------------------------------- | ---------- | ------------------------------------------------------ | ----------------------------------------------------------- |
+| Multi-modal transport (Ocean, Air, Road, Rail) | ✅ Complete | `shipment_type` ENUM, mode selection in quotes         | `shipments.shipment_type`, `service_types.mode`             |
+| FCL/LCL container management                   | ✅ Complete | Container sizes, types, cargo configurations           | `shipment_containers`, `shipment_cargo_configurations`      |
+| Port/location master data                      | ✅ Complete | Global ports database (ocean, air, rail, road)         | `ports_locations` table (global, no tenant\_id)             |
+| Carrier management                             | ✅ Complete | Carrier CRUD with SCAC/IATA codes, mode filtering      | `carriers` table, tenant-scoped                             |
+| Rate engine (AI-enhanced)                      | ✅ Complete | Multi-modal pricing with margin calculation            | `rate-engine` Edge Function (v2.1)                          |
+| Container tracking (events)                    | ✅ Complete | Milestone-based tracking event log                     | `tracking_events` table                                     |
+| Customs documentation                          | ✅ Complete | Document upload and management                         | `customs_documents` table                                   |
+| Hazmat handling                                | ✅ Complete | UN numbers, hazmat class classification                | `cargo_details.hazmat_class`, `hazmat_un_number`            |
+| Container types/sizes                          | ✅ Complete | 20GP, 40HC, 45HC, etc.                                 | Container type reference tables                             |
+| CO2 emissions tracking                         | ✅ Complete | Per-shipment carbon footprint estimation               | `co2_kg` field in rate engine responses                     |
+| Vendor management (CLM)                        | ✅ Complete | Contracts, documents, preferred carriers, e-signatures | `vendors`, `vendor_contracts`, `vendor_documents`           |
+| Shipment delay detection                       | ✅ Complete | Auto-detect overdue shipments, severity classification | `shipment_delays` table, `check_shipment_delays()` RPC      |
+| Quote-to-Shipment conversion                   | ✅ Complete | RPC converts quote to shipment with cargo mapping      | `convert_quote_to_shipment()` RPC                           |
+| Shipment-to-Invoice generation                 | ✅ Complete | Auto-generates invoice from shipment charges           | `create_invoice_from_shipment()` RPC                        |
+| Document sequencing                            | ✅ Complete | Auto-numbering per tenant (INV-000001, SHP-000001)     | `get_next_document_number()` RPC                            |
+| Incoterms management                           | ✅ Complete | Standard trade terms with charge implications          | Incoterms reference data                                    |
+| AI-powered mode suggestion                     | ✅ Complete | Recommends optimal transport mode                      | `suggest-transport-mode` Edge Function                      |
+| Demand forecasting (AI)                        | ✅ Complete | Predictive volume analysis with confidence scores      | `demand_predictions` table, `forecast-demand` Edge Function |
+| Landed cost calculation                        | ✅ Complete | Freight + duty + insurance + fees computation          | `calculate_landed_cost_rpc()`                               |
+| HTS code search & classification               | ✅ Complete | Full-text search with hierarchy parsing                | `search_hts_codes()` RPC, `aes_hts_codes` table             |
+| Restricted party screening                     | ✅ Complete | Fuzzy matching against OFAC/BIS watchlists             | `screen_restricted_party()` RPC, `compliance_screenings`    |
 
 **Rate Engine Capabilities (Edge Function `rate-engine` v2.1):**
 
@@ -4131,34 +4292,37 @@ Carrier Coverage:
 
 ### 3.2 Logistics Gaps vs. Industry Leaders
 
-| Feature | Logic Nexus | Cargowise | Magaya | Freightos | Gap Severity | Priority |
-|---------|-------------|-----------|--------|-----------|-------------|----------|
-| **Vessel schedule integration** | ❌ | ✅ | ✅ | ✅ | 🔴 High | P1 |
-| **Container yard management** | ❌ | ✅ | ✅ | ❌ | 🟡 Medium | P2 |
-| **Drayage optimization** | ❌ | ✅ | 🟡 | ❌ | 🟡 Medium | P2 |
-| **Demurrage/detention tracking** | ❌ | ✅ | ✅ | ❌ | 🔴 High | P1 |
-| **Equipment management** | ❌ | ✅ | ✅ | ❌ | 🟡 Medium | P2 |
-| **WMS (Warehouse operations)** | 🟡 Basic | ✅ | ✅ (Core) | ❌ | 🔴 High | P1 |
-| **EDI connectivity (INTTRA)** | ❌ | ✅ | ✅ | ✅ | 🔥 Critical | P0 |
-| **Real-time tracking API** | ❌ | ✅ | ✅ | ✅ | 🔥 Critical | P0 |
-| **Booking portal (customer)** | 🟡 Quote Portal (token-based view + accept) | ✅ | ✅ | ✅ | 🟡 Medium | P2 |
-| **Multi-leg routing** | 🟡 Basic | ✅ | ✅ | ✅ | 🟡 Medium | P1 |
-| **B/L generation (HBL/MBL)** | ❌ | ✅ | ✅ | ❌ | 🔴 High | P1 |
-| **Carbon footprint calculator** | 🟡 Basic (CO2/kg) | ✅ (Full lifecycle) | ❌ | ❌ | 🟡 Medium | P2 |
+| Feature                          | Logic Nexus                                 | Cargowise          | Magaya   | Freightos | Gap Severity | Priority |
+| -------------------------------- | ------------------------------------------- | ------------------ | -------- | --------- | ------------ | -------- |
+| **Vessel schedule integration**  | ❌                                           | ✅                  | ✅        | ✅         | 🔴 High      | P1       |
+| **Container yard management**    | ❌                                           | ✅                  | ✅        | ❌         | 🟡 Medium    | P2       |
+| **Drayage optimization**         | ❌                                           | ✅                  | 🟡       | ❌         | 🟡 Medium    | P2       |
+| **Demurrage/detention tracking** | ❌                                           | ✅                  | ✅        | ❌         | 🔴 High      | P1       |
+| **Equipment management**         | ❌                                           | ✅                  | ✅        | ❌         | 🟡 Medium    | P2       |
+| **WMS (Warehouse operations)**   | 🟡 Basic                                    | ✅                  | ✅ (Core) | ❌         | 🔴 High      | P1       |
+| **EDI connectivity (INTTRA)**    | ❌                                           | ✅                  | ✅        | ✅         | 🔥 Critical  | P0       |
+| **Real-time tracking API**       | ❌                                           | ✅                  | ✅        | ✅         | 🔥 Critical  | P0       |
+| **Booking portal (customer)**    | 🟡 Quote Portal (token-based view + accept) | ✅                  | ✅        | ✅         | 🟡 Medium    | P2       |
+| **Multi-leg routing**            | 🟡 Basic                                    | ✅                  | ✅        | ✅         | 🟡 Medium    | P1       |
+| **B/L generation (HBL/MBL)**     | ❌                                           | ✅                  | ✅        | ❌         | 🔴 High      | P1       |
+| **Carbon footprint calculator**  | 🟡 Basic (CO2/kg)                           | ✅ (Full lifecycle) | ❌        | ❌         | 🟡 Medium    | P2       |
 
 ### 3.3 Logistics Enhancement Roadmap
 
 **Phase 1: Digital Connectivity (Weeks 1-8)**
+
 1. Real-time tracking API integration (Vizion/Project44)
 2. EDI booking request (INTTRA)
 3. B/L document generation engine
 
 **Phase 2: Operational Depth (Weeks 9-16)**
+
 1. Demurrage/detention calculator with free-time tracking
 2. WMS transactional layer (GRN, Pick Tickets)
 3. Vessel schedule integration (MarineTraffic/FleetMon)
 
 **Phase 3: Customer Experience (Weeks 17-24)**
+
 1. Customer booking portal (self-service)
 2. Automated "Monday Morning" shipment status reports
 3. Carbon footprint dashboard
@@ -4169,95 +4333,95 @@ The following features span the entire platform (not specific to Logistics) and 
 
 #### 3.4.1 Fully Implemented Features
 
-| # | Feature | Status | Key Files | Description |
-|---|---------|--------|-----------|-------------|
-| 1 | **Entity Transfer Center** | ✅ 100% | `TransferCenter.tsx`, `TransferWizard.tsx`, `TransferService.ts`, 7 components in `src/components/transfers/` | Multi-step wizard for transferring entities (Quotes, Shipments, Opportunities) between tenants and franchises. Includes entity selection, destination picker, review step, approval workflow, status tracking (pending/approved/completed/rejected/failed), statistics dashboard, and transfer history. |
-| 2 | **Debug Console** | ✅ 100% | `DebugConsole.tsx`, `src/lib/debug-store.ts` | Admin-only diagnostic tool with 5 tabs (Logs, Network, DB, Server, System). Features log-level filtering, real-time search, syntax highlighting, error boundary protection, log export/download, pause/resume streaming, and performance monitoring. |
-| 3 | **Customer Quote Portal** | ✅ 90% | `src/pages/portal/QuotePortal.tsx`, `src/hooks/useQuotePortal.ts` | Token-based external portal at `/portal/:token` route. Customers can view quote details (number, status, amount, account) and accept quotes via dialog (captures name + email). Uses `get_quote_by_token` RPC. Rate-limited refresh. No authentication required (token is the auth). |
-| 4 | **Container Tracking & Inventory** | ✅ 95% | `ContainerTracking.tsx`, `ContainerAnalytics.tsx`, `src/lib/container-utils.ts` | Real-time container inventory management: add/update containers by size/status/location, view `view_container_inventory_summary` DB view. Analytics dashboard with KPIs (total containers, TEUs, distinct types), bar/pie charts for distribution, vessel class capacity planning. Supports container statuses: empty, loaded, in-transit. |
-| 5 | **Theme Management** | ✅ 100% | `ThemeManagement.tsx`, `src/hooks/useTheme.ts`, `src/theme/themes.ts` | Multi-scope theme customization (user, franchise, tenant, platform). HSL color picker for gradients (primary, accent, sidebar, table headers). Theme presets, dark mode toggle, custom border radius, gradient angle config, background overrides. Themes persist per scope. |
-| 6 | **Permissions Matrix Viewer** | ✅ 100% | `PermissionsMatrix.tsx`, `src/config/permissions.ts` | Read-only RBAC matrix showing all permissions across 4 roles (platform_admin, tenant_admin, franchise_admin, user). Auto-groups permissions by module, displays check/cross indicators. Links to user management for role changes. |
-| 7 | **Reports & Analytics Dashboard** | ✅ 100% | `Reports.tsx`, `src/services/dashboardAnalytics.ts` | Financial + Operational reporting with dual-tab interface. Financial tab: Revenue, Gross Profit, Total Costs, Net Margin. Operations tab: Carrier volume, shipment statistics. Uses Recharts (Bar/Line charts). Backed by `get_dashboard_stats` RPC. |
-| 8 | **Audit Trail (Activity & System Logs)** | ✅ 100% | `audit/ActivityLogs.tsx`, `audit/SystemLogs.tsx`, `src/lib/audit.ts` | Comprehensive audit logging: action filtering (INSERT/UPDATE/DELETE), resource type filtering, date range picker (7-day default), sensitive data masking (passwords, tokens, SSN, credit cards), CSV export, pagination (50/page), tenant-scoped. Backed by `audit_logs` table. |
-| 9 | **Tax Management Engine** | ✅ 100% | `finance/TaxRules.tsx`, `finance/TaxJurisdictions.tsx`, `finance/TaxJurisdictionDetail.tsx`, `finance/TaxRuleDialog.tsx`, `src/services/taxation/TaxEngine.ts`, `TaxManagementService.ts` | Full tax computation system: tax rule configuration (rates, categories), jurisdiction management with detail views, duty calculation integration. `TaxEngine` service computes taxes per line item. |
-| 10 | **Invoice System** | ✅ 100% | `finance/Invoices.tsx`, `finance/InvoiceDetail.tsx`, `src/services/invoicing/InvoiceService.ts` | Complete invoicing with ScopedDataAccess integration, line items, charge management, status lifecycle, document linking. `create_invoice_from_shipment()` RPC for auto-generation. |
-| 11 | **Margin Rules** | ✅ 100% | `finance/MarginRules.tsx` | Configurable margin/markup rules for pricing. Integrates with quotation engines. |
-| 12 | **Document Management** | ✅ 85% | `DocumentManager.tsx` | General document upload, preview, and organization. File management with metadata. |
-| 13 | **Data Import/Export** | ✅ 100% | `src/components/system/DataImportExport.tsx`, `ImportReportDialog.tsx`, `src/lib/import-export.ts`, `src/utils/pgDumpExport.ts`, `data-management/DatabaseExport.tsx` | Multi-format import/export: CSV for Leads, Contacts, Accounts, Cargo. PgDump export with options (data, schema, structure). External DB migration support. Import conflict resolution and validation reports. |
-| 14 | **Lead Assignment & Routing** | ✅ 100% | `LeadAssignment.tsx`, `LeadRouting.tsx`, 7 components in `src/components/assignment/` (Rules, Queue, Territory, Manual, Analytics, History, Form) | Rule-based lead assignment engine, territory management with geography, manual override, queue management, capacity tracking, assignment analytics and history. |
-| 15 | **Restricted Party Screening** | ✅ 100% | `RestrictedPartyScreening.tsx`, `src/services/compliance/RestrictedPartyScreeningService.ts`, `ScreeningButton.tsx` | OFAC/BIS trade compliance screening with fuzzy matching. Inline screening button for contacts/accounts. Results stored in `compliance_screenings` table. |
-| 16 | **Vendor Management (CLM)** | ✅ 100% | `Vendors.tsx`, `VendorDetail.tsx`, vendor contract components, `src/services/eSignatureService.ts`, `src/services/contractPdfService.ts` | Contract lifecycle management: vendor CRUD, contract management, document tracking, preferred carrier flagging. E-signature service (simulated DocuSign integration) generates PDF contracts with clauses, terms, and signature blocks. |
+| #  | Feature                                  | Status | Key Files                                                                                                                                                                                 | Description                                                                                                                                                                                                                                                                                                                                |
+| -- | ---------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1  | **Entity Transfer Center**               | ✅ 100% | `TransferCenter.tsx`, `TransferWizard.tsx`, `TransferService.ts`, 7 components in `src/components/transfers/`                                                                             | Multi-step wizard for transferring entities (Quotes, Shipments, Opportunities) between tenants and franchises. Includes entity selection, destination picker, review step, approval workflow, status tracking (pending/approved/completed/rejected/failed), statistics dashboard, and transfer history.                                    |
+| 2  | **Debug Console**                        | ✅ 100% | `DebugConsole.tsx`, `src/lib/debug-store.ts`                                                                                                                                              | Admin-only diagnostic tool with 5 tabs (Logs, Network, DB, Server, System). Features log-level filtering, real-time search, syntax highlighting, error boundary protection, log export/download, pause/resume streaming, and performance monitoring.                                                                                       |
+| 3  | **Customer Quote Portal**                | ✅ 90%  | `src/pages/portal/QuotePortal.tsx`, `src/hooks/useQuotePortal.ts`                                                                                                                         | Token-based external portal at `/portal/:token` route. Customers can view quote details (number, status, amount, account) and accept quotes via dialog (captures name + email). Uses `get_quote_by_token` RPC. Rate-limited refresh. No authentication required (token is the auth).                                                       |
+| 4  | **Container Tracking & Inventory**       | ✅ 95%  | `ContainerTracking.tsx`, `ContainerAnalytics.tsx`, `src/lib/container-utils.ts`                                                                                                           | Real-time container inventory management: add/update containers by size/status/location, view `view_container_inventory_summary` DB view. Analytics dashboard with KPIs (total containers, TEUs, distinct types), bar/pie charts for distribution, vessel class capacity planning. Supports container statuses: empty, loaded, in-transit. |
+| 5  | **Theme Management**                     | ✅ 100% | `ThemeManagement.tsx`, `src/hooks/useTheme.ts`, `src/theme/themes.ts`                                                                                                                     | Multi-scope theme customization (user, franchise, tenant, platform). HSL color picker for gradients (primary, accent, sidebar, table headers). Theme presets, dark mode toggle, custom border radius, gradient angle config, background overrides. Themes persist per scope.                                                               |
+| 6  | **Permissions Matrix Viewer**            | ✅ 100% | `PermissionsMatrix.tsx`, `src/config/permissions.ts`                                                                                                                                      | Read-only RBAC matrix showing all permissions across 4 roles (platform\_admin, tenant\_admin, franchise\_admin, user). Auto-groups permissions by module, displays check/cross indicators. Links to user management for role changes.                                                                                                      |
+| 7  | **Reports & Analytics Dashboard**        | ✅ 100% | `Reports.tsx`, `src/services/dashboardAnalytics.ts`                                                                                                                                       | Financial + Operational reporting with dual-tab interface. Financial tab: Revenue, Gross Profit, Total Costs, Net Margin. Operations tab: Carrier volume, shipment statistics. Uses Recharts (Bar/Line charts). Backed by `get_dashboard_stats` RPC.                                                                                       |
+| 8  | **Audit Trail (Activity & System Logs)** | ✅ 100% | `audit/ActivityLogs.tsx`, `audit/SystemLogs.tsx`, `src/lib/audit.ts`                                                                                                                      | Comprehensive audit logging: action filtering (INSERT/UPDATE/DELETE), resource type filtering, date range picker (7-day default), sensitive data masking (passwords, tokens, SSN, credit cards), CSV export, pagination (50/page), tenant-scoped. Backed by `audit_logs` table.                                                            |
+| 9  | **Tax Management Engine**                | ✅ 100% | `finance/TaxRules.tsx`, `finance/TaxJurisdictions.tsx`, `finance/TaxJurisdictionDetail.tsx`, `finance/TaxRuleDialog.tsx`, `src/services/taxation/TaxEngine.ts`, `TaxManagementService.ts` | Full tax computation system: tax rule configuration (rates, categories), jurisdiction management with detail views, duty calculation integration. `TaxEngine` service computes taxes per line item.                                                                                                                                        |
+| 10 | **Invoice System**                       | ✅ 100% | `finance/Invoices.tsx`, `finance/InvoiceDetail.tsx`, `src/services/invoicing/InvoiceService.ts`                                                                                           | Complete invoicing with ScopedDataAccess integration, line items, charge management, status lifecycle, document linking. `create_invoice_from_shipment()` RPC for auto-generation.                                                                                                                                                         |
+| 11 | **Margin Rules**                         | ✅ 100% | `finance/MarginRules.tsx`                                                                                                                                                                 | Configurable margin/markup rules for pricing. Integrates with quotation engines.                                                                                                                                                                                                                                                           |
+| 12 | **Document Management**                  | ✅ 85%  | `DocumentManager.tsx`                                                                                                                                                                     | General document upload, preview, and organization. File management with metadata.                                                                                                                                                                                                                                                         |
+| 13 | **Data Import/Export**                   | ✅ 100% | `src/components/system/DataImportExport.tsx`, `ImportReportDialog.tsx`, `src/lib/import-export.ts`, `src/utils/pgDumpExport.ts`, `data-management/DatabaseExport.tsx`                     | Multi-format import/export: CSV for Leads, Contacts, Accounts, Cargo. PgDump export with options (data, schema, structure). External DB migration support. Import conflict resolution and validation reports.                                                                                                                              |
+| 14 | **Lead Assignment & Routing**            | ✅ 100% | `LeadAssignment.tsx`, `LeadRouting.tsx`, 7 components in `src/components/assignment/` (Rules, Queue, Territory, Manual, Analytics, History, Form)                                         | Rule-based lead assignment engine, territory management with geography, manual override, queue management, capacity tracking, assignment analytics and history.                                                                                                                                                                            |
+| 15 | **Restricted Party Screening**           | ✅ 100% | `RestrictedPartyScreening.tsx`, `src/services/compliance/RestrictedPartyScreeningService.ts`, `ScreeningButton.tsx`                                                                       | OFAC/BIS trade compliance screening with fuzzy matching. Inline screening button for contacts/accounts. Results stored in `compliance_screenings` table.                                                                                                                                                                                   |
+| 16 | **Vendor Management (CLM)**              | ✅ 100% | `Vendors.tsx`, `VendorDetail.tsx`, vendor contract components, `src/services/eSignatureService.ts`, `src/services/contractPdfService.ts`                                                  | Contract lifecycle management: vendor CRUD, contract management, document tracking, preferred carrier flagging. E-signature service (simulated DocuSign integration) generates PDF contracts with clauses, terms, and signature blocks.                                                                                                    |
 
 #### 3.4.2 Partially Implemented / Simulated Features
 
-| # | Feature | Status | Key Files | Description |
-|---|---------|--------|-----------|-------------|
-| 1 | **E-Signature Service** | 🟡 40% (Simulated) | `src/services/eSignatureService.ts`, `src/services/contractPdfService.ts` | Mock e-signature workflow simulating DocuSign/HelloSign: envelope creation, party signing, status tracking (sent/signed/declined). PDF contract generation with party details, clauses, terms, and signature blocks. Integration is mocked — no real provider connected. |
-| 2 | **General Ledger Sync** | 🟡 40% (Simulated) | `src/services/gl/GLSyncService.ts` | Syncs finalized financial documents (Invoices/Payments) to external GL as `finance.journal_entries`. Tracks sync status (PENDING/SYNCED/FAILED) with retry logic. External GL API call is mocked — awaits real integration (Xero, QuickBooks, SAP). |
-| 3 | **Notification Center** | 🟡 40% (Stub) | `src/components/crm/NotificationCenter.tsx` | Component structure with notification types ('system', 'activity', 'alert'), filtering, read/unread status, dismissal. No real-time backend (no WebSocket/SSE). Stories exist for visual testing. |
-| 4 | **Interaction Timeline** | 🟡 30% (Stub) | `src/components/crm/InteractionTimeline.tsx` | Timeline display of activities/interactions. Component exists with stories but limited backend data integration. |
-| 5 | **Multiple Quotation Engines** | 🟡 60% | `src/services/quotation/engines/` (Logistics, Banking, Telecom, Ecommerce, RealEstate) | Plugin-based multi-domain quotation: `LogisticsQuotationEngine` is fully operational (~95%). Banking, Telecom, E-commerce, Real Estate engines have structure but limited business logic (~20% each). |
+| # | Feature                        | Status             | Key Files                                                                              | Description                                                                                                                                                                                                                                                              |
+| - | ------------------------------ | ------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 | **E-Signature Service**        | 🟡 40% (Simulated) | `src/services/eSignatureService.ts`, `src/services/contractPdfService.ts`              | Mock e-signature workflow simulating DocuSign/HelloSign: envelope creation, party signing, status tracking (sent/signed/declined). PDF contract generation with party details, clauses, terms, and signature blocks. Integration is mocked — no real provider connected. |
+| 2 | **General Ledger Sync**        | 🟡 40% (Simulated) | `src/services/gl/GLSyncService.ts`                                                     | Syncs finalized financial documents (Invoices/Payments) to external GL as `finance.journal_entries`. Tracks sync status (PENDING/SYNCED/FAILED) with retry logic. External GL API call is mocked — awaits real integration (Xero, QuickBooks, SAP).                      |
+| 3 | **Notification Center**        | 🟡 40% (Stub)      | `src/components/crm/NotificationCenter.tsx`                                            | Component structure with notification types ('system', 'activity', 'alert'), filtering, read/unread status, dismissal. No real-time backend (no WebSocket/SSE). Stories exist for visual testing.                                                                        |
+| 4 | **Interaction Timeline**       | 🟡 30% (Stub)      | `src/components/crm/InteractionTimeline.tsx`                                           | Timeline display of activities/interactions. Component exists with stories but limited backend data integration.                                                                                                                                                         |
+| 5 | **Multiple Quotation Engines** | 🟡 60%             | `src/services/quotation/engines/` (Logistics, Banking, Telecom, Ecommerce, RealEstate) | Plugin-based multi-domain quotation: `LogisticsQuotationEngine` is fully operational (\~95%). Banking, Telecom, E-commerce, Real Estate engines have structure but limited business logic (\~20% each).                                                                  |
 
 #### 3.4.3 Placeholder / Coming-Soon Features
 
-| # | Feature | Status | Key Files | Description |
-|---|---------|--------|-----------|-------------|
-| 1 | **Calendar & Scheduling** | 🔴 5% (Placeholder) | `Calendar.tsx` | "Coming Soon" card. No `events` table. Tasks have `due_date` but no meeting/attendee model. See Section 2.A.8 for full gap analysis. |
-| 2 | **Chatter / Collaboration Feed** | 🔴 5% (Placeholder) | `Chatter.tsx` | Salesforce-like collaboration feed for comments and @mentions. Structure only, no implementation. |
-| 3 | **Campaign Management** | 🔴 5% (Placeholder) | `Campaigns.tsx` | Marketing campaign management interface. Structure only, no implementation. |
-| 4 | **Files / Document Storage** | 🔴 5% (Placeholder) | `Files.tsx` | "Coming Soon" — needs Supabase Storage integration for centralized document repository. |
-| 5 | **Groups / Team Management** | 🔴 0% (Empty) | `Groups.tsx` | Team/group management page. No implementation found. |
-| 6 | **CRM Workspace** | 🔴 10% (Prototype) | `CRMWorkspace.tsx` | Prototype layout shell rendering design stories. Purpose unclear — may be for internal design exploration. |
+| # | Feature                          | Status              | Key Files          | Description                                                                                                                          |
+| - | -------------------------------- | ------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 | **Calendar & Scheduling**        | 🔴 5% (Placeholder) | `Calendar.tsx`     | "Coming Soon" card. No `events` table. Tasks have `due_date` but no meeting/attendee model. See Section 2.A.8 for full gap analysis. |
+| 2 | **Chatter / Collaboration Feed** | 🔴 5% (Placeholder) | `Chatter.tsx`      | Salesforce-like collaboration feed for comments and @mentions. Structure only, no implementation.                                    |
+| 3 | **Campaign Management**          | 🔴 5% (Placeholder) | `Campaigns.tsx`    | Marketing campaign management interface. Structure only, no implementation.                                                          |
+| 4 | **Files / Document Storage**     | 🔴 5% (Placeholder) | `Files.tsx`        | "Coming Soon" — needs Supabase Storage integration for centralized document repository.                                              |
+| 5 | **Groups / Team Management**     | 🔴 0% (Empty)       | `Groups.tsx`       | Team/group management page. No implementation found.                                                                                 |
+| 6 | **CRM Workspace**                | 🔴 10% (Prototype)  | `CRMWorkspace.tsx` | Prototype layout shell rendering design stories. Purpose unclear — may be for internal design exploration.                           |
 
 #### 3.4.4 AI & Intelligence Edge Functions
 
 These Edge Functions provide AI/ML capabilities but are not directly surfaced as UI pages:
 
-| Function | Purpose | Backend | UI Surface |
-|----------|---------|---------|------------|
-| `ai-advisor` | AI-powered business recommendations | OpenAI API | Integrated into dashboards |
-| `anomaly-detector` | Detect anomalies in data streams | Statistical analysis | Alert triggers |
-| `forecast-demand` | Demand prediction with confidence scores | `demand_predictions` table | Analytics widgets |
-| `suggest-transport-mode` | Optimal transport mode recommendation | Multi-factor scoring | Quote composer |
-| `calculate-lead-score` | Rule-based lead scoring | Weighted heuristics | Lead list badges |
-| `classify-email` | AI email categorization | OpenAI API | Email inbox |
-| `analyze-cargo-damage` | AI cargo damage assessment | Vision API | Shipment detail |
-| `extract-invoice-items` | OCR invoice line items | OpenAI API | Invoice creation |
+| Function                 | Purpose                                  | Backend                    | UI Surface                 |
+| ------------------------ | ---------------------------------------- | -------------------------- | -------------------------- |
+| `ai-advisor`             | AI-powered business recommendations      | OpenAI API                 | Integrated into dashboards |
+| `anomaly-detector`       | Detect anomalies in data streams         | Statistical analysis       | Alert triggers             |
+| `forecast-demand`        | Demand prediction with confidence scores | `demand_predictions` table | Analytics widgets          |
+| `suggest-transport-mode` | Optimal transport mode recommendation    | Multi-factor scoring       | Quote composer             |
+| `calculate-lead-score`   | Rule-based lead scoring                  | Weighted heuristics        | Lead list badges           |
+| `classify-email`         | AI email categorization                  | OpenAI API                 | Email inbox                |
+| `analyze-cargo-damage`   | AI cargo damage assessment               | Vision API                 | Shipment detail            |
+| `extract-invoice-items`  | OCR invoice line items                   | OpenAI API                 | Invoice creation           |
 
 #### 3.4.5 Operational & Administrative Features
 
 These pages provide core operational workflows and admin capabilities:
 
-| # | Feature | Status | Key Files | Description |
-|---|---------|--------|-----------|-------------|
-| 1 | **Customs Clearance Pipeline** | ✅ 100% | `CustomsClearancePipeline.tsx` | Kanban-style pipeline for customs clearance stages. Drag-and-drop workflow management. |
-| 2 | **Rate Management** | ✅ 100% | `RateManagement.tsx`, `RateSheetsTab` | Rate sheet analysis and management with AI advisor integration (`useAiAdvisor` hook). |
-| 3 | **Security Overview** | ✅ 100% | `SecurityOverview.tsx` | Admin security dashboard: RLS policy viewer, SQL query capability, data management. |
-| 4 | **Subscription Management** | ✅ 100% | `SubscriptionManagement.tsx`, `MasterDataSubscriptionPlans.tsx`, `MasterDataSubscriptions.tsx`, `TenantSubscription.tsx` | Tenant subscription lifecycle: plan management, subscription instances, usage metrics. |
-| 5 | **Queue Management** | ✅ 100% | `QueueManagement.tsx` | Email queue management with round-robin and holding queue types. |
-| 6 | **Domain Management** | ✅ 100% | `DomainManagement.tsx`, `PlatformDomains.tsx`, `PlatformDomainDetail.tsx` | Platform domain configuration, plugin activation per domain. |
-| 7 | **System Logs Dashboard** | ✅ 100% | `SystemLogs.tsx` | Real-time system event logging with time-series charts, severity filtering, date range picker, export, and Recharts visualizations. |
-| 8 | **Custom Roles** | ✅ 100% | `CustomRoles.tsx`, `RolesPermissions.tsx` | Custom role creation and management beyond the 4 base roles. |
-| 9 | **Pipeline Views** | ✅ 100% | `OpportunitiesPipeline.tsx`, `ShipmentsPipeline.tsx`, `QuotesPipeline.tsx`, `AccountsPipeline.tsx`, `ContactsPipeline.tsx`, `LeadsPipeline.tsx` | Kanban boards for all major entities (drag-and-drop stage progression). |
-| 10 | **Shipment Document Viewer** | ✅ 100% | `ShipmentDocumentViewer.tsx` | Document viewer for shipment-related documents with preview/download. |
+| #  | Feature                        | Status | Key Files                                                                                                                                       | Description                                                                                                                         |
+| -- | ------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | **Customs Clearance Pipeline** | ✅ 100% | `CustomsClearancePipeline.tsx`                                                                                                                  | Kanban-style pipeline for customs clearance stages. Drag-and-drop workflow management.                                              |
+| 2  | **Rate Management**            | ✅ 100% | `RateManagement.tsx`, `RateSheetsTab`                                                                                                           | Rate sheet analysis and management with AI advisor integration (`useAiAdvisor` hook).                                               |
+| 3  | **Security Overview**          | ✅ 100% | `SecurityOverview.tsx`                                                                                                                          | Admin security dashboard: RLS policy viewer, SQL query capability, data management.                                                 |
+| 4  | **Subscription Management**    | ✅ 100% | `SubscriptionManagement.tsx`, `MasterDataSubscriptionPlans.tsx`, `MasterDataSubscriptions.tsx`, `TenantSubscription.tsx`                        | Tenant subscription lifecycle: plan management, subscription instances, usage metrics.                                              |
+| 5  | **Queue Management**           | ✅ 100% | `QueueManagement.tsx`                                                                                                                           | Email queue management with round-robin and holding queue types.                                                                    |
+| 6  | **Domain Management**          | ✅ 100% | `DomainManagement.tsx`, `PlatformDomains.tsx`, `PlatformDomainDetail.tsx`                                                                       | Platform domain configuration, plugin activation per domain.                                                                        |
+| 7  | **System Logs Dashboard**      | ✅ 100% | `SystemLogs.tsx`                                                                                                                                | Real-time system event logging with time-series charts, severity filtering, date range picker, export, and Recharts visualizations. |
+| 8  | **Custom Roles**               | ✅ 100% | `CustomRoles.tsx`, `RolesPermissions.tsx`                                                                                                       | Custom role creation and management beyond the 4 base roles.                                                                        |
+| 9  | **Pipeline Views**             | ✅ 100% | `OpportunitiesPipeline.tsx`, `ShipmentsPipeline.tsx`, `QuotesPipeline.tsx`, `AccountsPipeline.tsx`, `ContactsPipeline.tsx`, `LeadsPipeline.tsx` | Kanban boards for all major entities (drag-and-drop stage progression).                                                             |
+| 10 | **Shipment Document Viewer**   | ✅ 100% | `ShipmentDocumentViewer.tsx`                                                                                                                    | Document viewer for shipment-related documents with preview/download.                                                               |
 
 #### 3.4.6 Master Data & Reference Pages
 
 The platform includes 20+ master data management pages for reference data:
 
-| Category | Pages | Description |
-|----------|-------|-------------|
-| **Commodity Data** | `Commodities.tsx`, `CommodityDetail.tsx` | Product/commodity master data with search, filter, and detail views |
-| **Tariff & Classification** | `MasterDataHTS.tsx`, `AESHTSCodeManager`, `VisualHTSBrowser` | Harmonized Tariff Schedule code browser with hierarchical visualization |
-| **Geography** | `MasterDataGeography.tsx`, `PortsLocations.tsx` | Continents, countries, states, cities, and port locations with import/seed capabilities |
-| **Container References** | `ContainerSizes.tsx`, `ContainerTypes.tsx`, `VesselClasses.tsx`, `VesselTypes.tsx`, `Vessels.tsx` | Container dimensions, vessel specifications, and fleet data |
-| **Logistics References** | `Carriers.tsx`, `Services.tsx`, `ServiceTypes.tsx`, `ServiceTypeMappings.tsx`, `TransportModes.tsx`, `Incoterms.tsx` | Carrier registry, service catalogs, transport mode configuration |
-| **Financial References** | `Currencies.tsx`, `ChargeCategories.tsx`, `ChargeBases.tsx`, `ChargeSides.tsx` | Currency master, charge classification taxonomy |
-| **Packaging** | `PackageCategories.tsx`, `PackageSizes.tsx`, `CargoTypes.tsx`, `CargoDetails.tsx` | Package dimensions, cargo classification |
-| **Vehicle & Warehouse** | `Vehicles.tsx`, `VehicleNew.tsx`, `Warehouses.tsx`, `WarehouseNew.tsx` | Fleet and warehouse management |
-| **System Config** | `Settings.tsx`, `QuoteNumberSettings.tsx`, `QuoteTemplates.tsx` | Platform settings, document numbering, quote templates |
-| **User & Tenant Admin** | `Users.tsx`, `UserNew.tsx`, `UserDetail.tsx`, `Tenants.tsx`, `TenantNew.tsx`, `TenantDetail.tsx`, `Franchises.tsx`, `FranchiseNew.tsx`, `FranchiseDetail.tsx` | Multi-tier user and organization administration |
-| **Dev/QA Utilities** | `UIDemoAdvanced.tsx`, `UIDemoForms.tsx`, `LogTest.tsx`, `More.tsx`, `DataManagement.tsx` | Internal dev tools, UI showcases, and utility pages |
+| Category                    | Pages                                                                                                                                                         | Description                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Commodity Data**          | `Commodities.tsx`, `CommodityDetail.tsx`                                                                                                                      | Product/commodity master data with search, filter, and detail views                     |
+| **Tariff & Classification** | `MasterDataHTS.tsx`, `AESHTSCodeManager`, `VisualHTSBrowser`                                                                                                  | Harmonized Tariff Schedule code browser with hierarchical visualization                 |
+| **Geography**               | `MasterDataGeography.tsx`, `PortsLocations.tsx`                                                                                                               | Continents, countries, states, cities, and port locations with import/seed capabilities |
+| **Container References**    | `ContainerSizes.tsx`, `ContainerTypes.tsx`, `VesselClasses.tsx`, `VesselTypes.tsx`, `Vessels.tsx`                                                             | Container dimensions, vessel specifications, and fleet data                             |
+| **Logistics References**    | `Carriers.tsx`, `Services.tsx`, `ServiceTypes.tsx`, `ServiceTypeMappings.tsx`, `TransportModes.tsx`, `Incoterms.tsx`                                          | Carrier registry, service catalogs, transport mode configuration                        |
+| **Financial References**    | `Currencies.tsx`, `ChargeCategories.tsx`, `ChargeBases.tsx`, `ChargeSides.tsx`                                                                                | Currency master, charge classification taxonomy                                         |
+| **Packaging**               | `PackageCategories.tsx`, `PackageSizes.tsx`, `CargoTypes.tsx`, `CargoDetails.tsx`                                                                             | Package dimensions, cargo classification                                                |
+| **Vehicle & Warehouse**     | `Vehicles.tsx`, `VehicleNew.tsx`, `Warehouses.tsx`, `WarehouseNew.tsx`                                                                                        | Fleet and warehouse management                                                          |
+| **System Config**           | `Settings.tsx`, `QuoteNumberSettings.tsx`, `QuoteTemplates.tsx`                                                                                               | Platform settings, document numbering, quote templates                                  |
+| **User & Tenant Admin**     | `Users.tsx`, `UserNew.tsx`, `UserDetail.tsx`, `Tenants.tsx`, `TenantNew.tsx`, `TenantDetail.tsx`, `Franchises.tsx`, `FranchiseNew.tsx`, `FranchiseDetail.tsx` | Multi-tier user and organization administration                                         |
+| **Dev/QA Utilities**        | `UIDemoAdvanced.tsx`, `UIDemoForms.tsx`, `LogTest.tsx`, `More.tsx`, `DataManagement.tsx`                                                                      | Internal dev tools, UI showcases, and utility pages                                     |
 
 #### 3.4.7 Platform Feature Completeness Summary
 
@@ -4275,99 +4439,107 @@ Total Feature Surface Area: 47 distinct features + 8 AI functions + 20+ master d
 Implementation Coverage:     ~70% of feature surface area is production-ready
 ```
 
----
+***
 
 ## Section 4: Multi-Domain Capability Gap Analysis
 
 ### 4.1 Plugin Architecture Assessment
 
 **Current State:**
-- 8 domains registered via `PluginRegistry` in `src/plugins/init.ts`
-- **3 plugins with real quotation engines**: Logistics, Telecom, Real Estate, E-commerce
-- **4 plugins with stub engines**: Banking, Trading, Insurance, Customs
-- All plugins implement `IPlugin` interface with `getQuotationEngine()` and `getFormConfig()`
+
+* 8 domains registered via `PluginRegistry` in `src/plugins/init.ts`
+* **3 plugins with real quotation engines**: Logistics, Telecom, Real Estate, E-commerce
+* **4 plugins with stub engines**: Banking, Trading, Insurance, Customs
+* All plugins implement `IPlugin` interface with `getQuotationEngine()` and `getFormConfig()`
 
 **Plugin Implementation Matrix:**
 
-| Plugin | Engine Status | Form Config | Domain Code | Route Support | State Mgmt | Lifecycle Hooks |
-|--------|-------------|-------------|-------------|---------------|------------|-----------------|
-| **Logistics** | ✅ Full (`LogisticsQuotationEngine`) | ✅ Route + Service sections | `LOGISTICS` | ❌ | ❌ | ❌ |
-| **Telecom** | ✅ Full (`TelecomQuotationEngine`) | ✅ Service + Bandwidth | `TELECOM` | ❌ | ❌ | ❌ |
-| **Real Estate** | ✅ Full (`RealEstateQuotationEngine`) | ✅ Property + Location | `REAL_ESTATE` | ❌ | ❌ | ❌ |
-| **E-commerce** | ✅ Full (`EcommerceQuotationEngine`) | ✅ Store + Fulfillment | `ECOMMERCE` | ❌ | ❌ | ❌ |
-| **Banking** | 🟡 Stub (`BaseQuotationEngine`) | ✅ Loan fields | `BANKING` | ❌ | ❌ | ❌ |
-| **Trading** | 🟡 Stub (`BaseQuotationEngine`) | ✅ Trade fields | `TRADING` | ❌ | ❌ | ❌ |
-| **Insurance** | 🟡 Stub (`BaseQuotationEngine`) | ✅ Risk fields | `INSURANCE` | ❌ | ❌ | ❌ |
-| **Customs** | 🟡 Stub (`BaseQuotationEngine`) | ✅ Compliance fields | `CUSTOMS` | ❌ | ❌ | ❌ |
+| Plugin          | Engine Status                        | Form Config                | Domain Code   | Route Support | State Mgmt | Lifecycle Hooks |
+| --------------- | ------------------------------------ | -------------------------- | ------------- | ------------- | ---------- | --------------- |
+| **Logistics**   | ✅ Full (`LogisticsQuotationEngine`)  | ✅ Route + Service sections | `LOGISTICS`   | ❌             | ❌          | ❌               |
+| **Telecom**     | ✅ Full (`TelecomQuotationEngine`)    | ✅ Service + Bandwidth      | `TELECOM`     | ❌             | ❌          | ❌               |
+| **Real Estate** | ✅ Full (`RealEstateQuotationEngine`) | ✅ Property + Location      | `REAL_ESTATE` | ❌             | ❌          | ❌               |
+| **E-commerce**  | ✅ Full (`EcommerceQuotationEngine`)  | ✅ Store + Fulfillment      | `ECOMMERCE`   | ❌             | ❌          | ❌               |
+| **Banking**     | 🟡 Stub (`BaseQuotationEngine`)      | ✅ Loan fields              | `BANKING`     | ❌             | ❌          | ❌               |
+| **Trading**     | 🟡 Stub (`BaseQuotationEngine`)      | ✅ Trade fields             | `TRADING`     | ❌             | ❌          | ❌               |
+| **Insurance**   | 🟡 Stub (`BaseQuotationEngine`)      | ✅ Risk fields              | `INSURANCE`   | ❌             | ❌          | ❌               |
+| **Customs**     | 🟡 Stub (`BaseQuotationEngine`)      | ✅ Compliance fields        | `CUSTOMS`     | ❌             | ❌          | ❌               |
 
 ### 4.2 Domain Abstraction Layer Gaps
 
 **1. Hardcoded Logistics Dependencies (Critical)**
 
-| Area | Current State | Impact | Fix Required |
-|------|--------------|--------|-------------|
-| Quote form assumptions | Origin/destination ports, container types hardcoded | Non-logistics domains can't use quote system | Plugin form configs must fully control quote UI |
-| Shipment tracking | Assumes container/vessel data model | Telecom/Banking have no shipments | Domain-specific "fulfillment" abstraction needed |
-| Rate engine | Ocean/Air/Road/Rail modes hardcoded in Edge Function | Cannot price telecom bandwidth or insurance premiums | Rate engine must delegate to plugin engines |
-| Navigation menu | Logistics menu items hardcoded in `navigation.ts` | Other domains see irrelevant menu items | Plugin-driven menu registration |
+| Area                   | Current State                                        | Impact                                               | Fix Required                                     |
+| ---------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| Quote form assumptions | Origin/destination ports, container types hardcoded  | Non-logistics domains can't use quote system         | Plugin form configs must fully control quote UI  |
+| Shipment tracking      | Assumes container/vessel data model                  | Telecom/Banking have no shipments                    | Domain-specific "fulfillment" abstraction needed |
+| Rate engine            | Ocean/Air/Road/Rail modes hardcoded in Edge Function | Cannot price telecom bandwidth or insurance premiums | Rate engine must delegate to plugin engines      |
+| Navigation menu        | Logistics menu items hardcoded in `navigation.ts`    | Other domains see irrelevant menu items              | Plugin-driven menu registration                  |
 
 **2. Missing Infrastructure for Multi-Domain:**
 
-| Gap | Impact | Priority | Effort |
-|-----|--------|----------|--------|
-| No tenant-level plugin activation | All tenants see all 8 domains regardless of subscription | P0 | 2 weeks |
-| No plugin routing integration | Plugin routes not isolated, no dynamic registration | P1 | 3 weeks |
-| No plugin state management | Plugins can't maintain domain-specific state | P1 | 2 weeks |
-| No plugin lifecycle hooks | Can't run setup/teardown on plugin activation | P1 | 1 week |
-| No plugin-specific permissions | Permissions model doesn't scope to active plugins | P1 | 2 weeks |
-| No plugin dependency management | Customs plugin should depend on Logistics plugin | P2 | 2 weeks |
-| No plugin versioning | Can't upgrade plugins independently | P2 | 1 week |
+| Gap                               | Impact                                                   | Priority | Effort  |
+| --------------------------------- | -------------------------------------------------------- | -------- | ------- |
+| No tenant-level plugin activation | All tenants see all 8 domains regardless of subscription | P0       | 2 weeks |
+| No plugin routing integration     | Plugin routes not isolated, no dynamic registration      | P1       | 3 weeks |
+| No plugin state management        | Plugins can't maintain domain-specific state             | P1       | 2 weeks |
+| No plugin lifecycle hooks         | Can't run setup/teardown on plugin activation            | P1       | 1 week  |
+| No plugin-specific permissions    | Permissions model doesn't scope to active plugins        | P1       | 2 weeks |
+| No plugin dependency management   | Customs plugin should depend on Logistics plugin         | P2       | 2 weeks |
+| No plugin versioning              | Can't upgrade plugins independently                      | P2       | 1 week  |
 
 ### 4.3 Enterprise Capability Gap Analysis
 
 **4.3.1 Multi-Tenancy & Data Isolation**
-*   **Gap**: "Franchise" level is logical (shared DB), not physical. RLS policies are the sole isolation mechanism.
-*   **Risk**: Complex RLS policies can have bugs, leading to data leakage between franchises under the same tenant.
-*   **Current Mitigation**: 145 tables with RLS enabled, 132 with full CRUD policies. Dual-layer enforcement (RLS + `ScopedDataAccess`).
-*   **Remediation**: Implement comprehensive RLS regression test suite (Testcontainers) to verify isolation rules before every deploy. Build `src/lib/db/__tests__/rls-regression.test.ts` (file already created but empty).
+
+* **Gap**: "Franchise" level is logical (shared DB), not physical. RLS policies are the sole isolation mechanism.
+* **Risk**: Complex RLS policies can have bugs, leading to data leakage between franchises under the same tenant.
+* **Current Mitigation**: 145 tables with RLS enabled, 132 with full CRUD policies. Dual-layer enforcement (RLS + `ScopedDataAccess`).
+* **Remediation**: Implement comprehensive RLS regression test suite (Testcontainers) to verify isolation rules before every deploy. Build `src/lib/db/__tests__/rls-regression.test.ts` (file already created but empty).
 
 **4.3.2 API Management & Rate Limiting**
-*   **Gap**: No centralized API Gateway. Clients hit Supabase PostgREST directly.
-*   **Risk**: No ability to throttle abusive tenants, version APIs, or enforce standardized error responses. A single tenant running heavy analytics queries can degrade performance for all.
-*   **Remediation**: Introduce an API Gateway (Kong or Supabase Edge Functions Middleware) for:
-    *   Per-tenant rate limiting (X requests/minute)
-    *   API versioning (v1, v2 endpoints)
-    *   Standardized error response format
-    *   Request/response logging for compliance
+
+* **Gap**: No centralized API Gateway. Clients hit Supabase PostgREST directly.
+* **Risk**: No ability to throttle abusive tenants, version APIs, or enforce standardized error responses. A single tenant running heavy analytics queries can degrade performance for all.
+* **Remediation**: Introduce an API Gateway (Kong or Supabase Edge Functions Middleware) for:
+  * Per-tenant rate limiting (X requests/minute)
+  * API versioning (v1, v2 endpoints)
+  * Standardized error response format
+  * Request/response logging for compliance
 
 **4.3.3 Audit & Forensics**
-*   **Gap**: Audit logs track *writes* (INSERTs, UPDATEs, DELETEs via triggers) but not *reads*. No "Reason for Access" logging.
-*   **Risk**: Fails HIPAA/SOC 2 requirements for sensitive data access monitoring. Cannot prove "who accessed client financial data and why."
-*   **Remediation**: Implement "Access Intent" logging for sensitive tables (credit_limit, payment_terms, email credentials). Log SELECT queries on flagged tables via RLS policy + pg_audit extension.
+
+* **Gap**: Audit logs track *writes* (INSERTs, UPDATEs, DELETEs via triggers) but not *reads*. No "Reason for Access" logging.
+* **Risk**: Fails HIPAA/SOC 2 requirements for sensitive data access monitoring. Cannot prove "who accessed client financial data and why."
+* **Remediation**: Implement "Access Intent" logging for sensitive tables (credit\_limit, payment\_terms, email credentials). Log SELECT queries on flagged tables via RLS policy + pg\_audit extension.
 
 **4.3.4 Disaster Recovery & Business Continuity**
-*   **Gap**: Relies on Supabase managed backups (daily). No defined RTO or RPO. No cross-region failover.
-*   **Risk**: A datacenter outage causes complete platform unavailability. No tested recovery procedure.
-*   **Remediation**: Define RTO=1 hour, RPO=15 minutes. Implement point-in-time recovery (PITR). Test failover drills quarterly. Maintain warm standby in secondary region.
+
+* **Gap**: Relies on Supabase managed backups (daily). No defined RTO or RPO. No cross-region failover.
+* **Risk**: A datacenter outage causes complete platform unavailability. No tested recovery procedure.
+* **Remediation**: Define RTO=1 hour, RPO=15 minutes. Implement point-in-time recovery (PITR). Test failover drills quarterly. Maintain warm standby in secondary region.
 
 **4.3.5 Observability Stack**
-*   **Current**: Sentry for error tracking, PostHog for product analytics, `src/lib/logger.ts` with PII masking.
-*   **Gap**: No distributed tracing (OpenTelemetry). Cannot trace a request from UI → Edge Function → Database → External API.
-*   **Remediation**: Instrument Edge Functions with OpenTelemetry. Add correlation IDs to all API calls. Integrate with Datadog or Grafana Cloud.
 
----
+* **Current**: Sentry for error tracking, PostHog for product analytics, `src/lib/logger.ts` with PII masking.
+* **Gap**: No distributed tracing (OpenTelemetry). Cannot trace a request from UI → Edge Function → Database → External API.
+* **Remediation**: Instrument Edge Functions with OpenTelemetry. Add correlation IDs to all API calls. Integrate with Datadog or Grafana Cloud.
+
+***
 
 ## Section 5: Competitive Benchmarking
 
 ### 5.0 Market Context
 
 **Global Logistics Software Market:**
-- Market size: USD 16.3B in 2025, projected to reach USD 35.8B by 2033 (CAGR 9.4%)
-- Freight forwarding software segment: USD 591M in 2025, projected USD 1.38B by 2033 (CAGR 11.2%)
-- Cloud-based deployment: 64% market share in 2025
-- Transportation & freight operations: 31% of total market by application
+
+* Market size: USD 16.3B in 2025, projected to reach USD 35.8B by 2033 (CAGR 9.4%)
+* Freight forwarding software segment: USD 591M in 2025, projected USD 1.38B by 2033 (CAGR 11.2%)
+* Cloud-based deployment: 64% market share in 2025
+* Transportation & freight operations: 31% of total market by application
 
 **Industry Megatrends (2025-2026):**
+
 1. **AI-Native Workflows**: Vendors shifting from bolt-on copilots to AI embedded directly into planning, booking, and compliance workflows
 2. **API-First Architecture**: Breaking down silos between EDI, TMS, CRM, and partner networks via standardized APIs
 3. **Digital Freight Platforms**: Shift from relationship-based to marketplace-based booking with dynamic pricing
@@ -4381,49 +4553,52 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 **Market Position:** Dominant leader in freight forwarding software, licensed in 195 countries. WiseTech Global's stated vision is to be "the operating system for global trade and logistics." Over 5,800 features and enhancements delivered in the last 5 years.
 
 **Key Features:**
-- 216+ modules for logistics service providers across forwarding, customs, warehousing, and land transport
-- AI workflow engine, AI management engine, AI Classification Assistant, ComplianceWise
-- "Ace" AI assistant built on WiseTech Academy knowledge base
-- CarrierConnect for automated buy-rate access
-- Full lifecycle: forwarding automation, real-time visibility, customs compliance, TMS, WMS, analytics
-- e2open supply chain modules integrated (post-acquisition)
+
+* 216+ modules for logistics service providers across forwarding, customs, warehousing, and land transport
+* AI workflow engine, AI management engine, AI Classification Assistant, ComplianceWise
+* "Ace" AI assistant built on WiseTech Academy knowledge base
+* CarrierConnect for automated buy-rate access
+* Full lifecycle: forwarding automation, real-time visibility, customs compliance, TMS, WMS, analytics
+* e2open supply chain modules integrated (post-acquisition)
 
 **Pricing (2025-2026):**
-- **New "Value Packs" model** launched December 2025, replacing the legacy seat + transaction license (STL) model
-- Transaction-based pricing linked to actual logistics operations performed
-- No separate cloud hosting costs or seat fees under Value Packs
-- Industry reaction: Mixed. Some forwarders report 25-35% cost increases. Analysts estimate 6% annualized revenue uplift for WiseTech
-- High-volume shippers (100K TEU/yr) face $1.5M-$2.4M in additional costs depending on tier
+
+* **New "Value Packs" model** launched December 2025, replacing the legacy seat + transaction license (STL) model
+* Transaction-based pricing linked to actual logistics operations performed
+* No separate cloud hosting costs or seat fees under Value Packs
+* Industry reaction: Mixed. Some forwarders report 25-35% cost increases. Analysts estimate 6% annualized revenue uplift for WiseTech
+* High-volume shippers (100K TEU/yr) face $1.5M-$2.4M in additional costs depending on tier
 
 **Target Market:** Large freight forwarders, customs brokers, 3PLs, and enterprise logistics operators
 
 **SWOT Analysis:**
 
-| Strengths | Weaknesses |
-|-----------|------------|
-| Unmatched feature depth (216+ modules) | Extremely complex; steep learning curve |
-| Global regulatory compliance built-in | New pricing model causing customer backlash |
+| Strengths                                | Weaknesses                                      |
+| ---------------------------------------- | ----------------------------------------------- |
+| Unmatched feature depth (216+ modules)   | Extremely complex; steep learning curve         |
+| Global regulatory compliance built-in    | New pricing model causing customer backlash     |
 | Dominant market position creates lock-in | Perceived as "one-size-fits-all" for mid-market |
-| Strong AI/automation investment | Heavy infrastructure requirements |
+| Strong AI/automation investment          | Heavy infrastructure requirements               |
 
-| Opportunities | Threats |
-|---------------|---------|
-| e2open integration extends supply chain reach | Customer migration to cheaper alternatives |
-| Value Packs drive ARPU growth | Nimble cloud-native competitors (Freightos) |
-| Saudi logistics expansion (MoU with Elm) | Regulatory scrutiny on market dominance |
+| Opportunities                                 | Threats                                     |
+| --------------------------------------------- | ------------------------------------------- |
+| e2open integration extends supply chain reach | Customer migration to cheaper alternatives  |
+| Value Packs drive ARPU growth                 | Nimble cloud-native competitors (Freightos) |
+| Saudi logistics expansion (MoU with Elm)      | Regulatory scrutiny on market dominance     |
 
 #### 5.1.2 Magaya
 
 **Market Position:** Mid-market digital freight platform serving 1,700+ businesses in 75+ countries. Targets freight forwarders, 3PLs, NVOCCs, warehouse operators, customs brokers, and courier services.
 
 **Key Features:**
-- Magaya Supply Chain: Full forwarding and operations management
-- Magaya CRM: Integrated customer relationship management
-- Magaya Rate Management: Async rate searches, carrier contract downloads, expanded APIs for pricing and free time
-- Magaya Customs Compliance: Automated regulatory filing
-- Flow WMS: Automatic line splitting, multi-device sync, improved mobile experience
-- Digital Freight Portal: Customer-facing booking interface
-- 2025-2026 enhancements: Configurable payment terms, improved task templates, contract lifecycle management
+
+* Magaya Supply Chain: Full forwarding and operations management
+* Magaya CRM: Integrated customer relationship management
+* Magaya Rate Management: Async rate searches, carrier contract downloads, expanded APIs for pricing and free time
+* Magaya Customs Compliance: Automated regulatory filing
+* Flow WMS: Automatic line splitting, multi-device sync, improved mobile experience
+* Digital Freight Portal: Customer-facing booking interface
+* 2025-2026 enhancements: Configurable payment terms, improved task templates, contract lifecycle management
 
 **Pricing:** $100-$500/user/month (subscription-based, varies by modules and user count)
 
@@ -4431,29 +4606,30 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 
 **SWOT Analysis:**
 
-| Strengths | Weaknesses |
-|-----------|------------|
+| Strengths                                | Weaknesses                        |
+| ---------------------------------------- | --------------------------------- |
 | User-friendly interface; faster adoption | Smaller feature set vs. CargoWise |
-| Strong WMS capabilities | Limited multi-modal optimization |
-| Competitive pricing for mid-market | Fewer carrier integrations |
-| Integrated CRM module | Less AI/ML investment |
+| Strong WMS capabilities                  | Limited multi-modal optimization  |
+| Competitive pricing for mid-market       | Fewer carrier integrations        |
+| Integrated CRM module                    | Less AI/ML investment             |
 
-| Opportunities | Threats |
-|---------------|---------|
+| Opportunities                                            | Threats                                                    |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
 | CargoWise pricing backlash creates migration opportunity | CargoWise Value Packs include more features at lower entry |
-| API expansion for partner integration | Freightos marketplace model disrupting traditional TMS |
+| API expansion for partner integration                    | Freightos marketplace model disrupting traditional TMS     |
 
 #### 5.1.3 Freightos
 
 **Market Position:** Digital freight marketplace and booking platform. Publicly traded (CRGO). Q3 2025: $336M gross booking value (+54% YoY), 429K transactions (23rd consecutive record quarter, +27% YoY).
 
 **Key Features:**
-- WebCargo: Digital rate, quote, and booking platform for freight forwarders
-- WebCargo Rate & Quote Ocean: Integrations to major ocean carriers (75% faster quote times reported)
-- Marketplace for enterprise importers: Compare quotes across air, ocean, trucking
-- Dynamic contract pricing: Automatically adjusts to market fluctuations
-- Embedded payments via Visa and Transcard partnership
-- Rate benchmarks, contract rates, and live market comparisons
+
+* WebCargo: Digital rate, quote, and booking platform for freight forwarders
+* WebCargo Rate & Quote Ocean: Integrations to major ocean carriers (75% faster quote times reported)
+* Marketplace for enterprise importers: Compare quotes across air, ocean, trucking
+* Dynamic contract pricing: Automatically adjusts to market fluctuations
+* Embedded payments via Visa and Transcard partnership
+* Rate benchmarks, contract rates, and live market comparisons
 
 **Pricing:** Starts at $40/month + commission-based transaction fees. Targeting breakeven by end of 2026.
 
@@ -4461,17 +4637,17 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 
 **SWOT Analysis:**
 
-| Strengths | Weaknesses |
-|-----------|------------|
-| Modern cloud-native platform | No operational management (post-booking) |
-| Transparent real-time pricing | Limited WMS/customs capabilities |
-| Strong growth trajectory (54% GBV growth) | Not yet profitable (targeting 2026 breakeven) |
-| Embedded payments as differentiator | Marketplace model dependent on carrier participation |
+| Strengths                                 | Weaknesses                                           |
+| ----------------------------------------- | ---------------------------------------------------- |
+| Modern cloud-native platform              | No operational management (post-booking)             |
+| Transparent real-time pricing             | Limited WMS/customs capabilities                     |
+| Strong growth trajectory (54% GBV growth) | Not yet profitable (targeting 2026 breakeven)        |
+| Embedded payments as differentiator       | Marketplace model dependent on carrier participation |
 
-| Opportunities | Threats |
-|---------------|---------|
+| Opportunities                                   | Threats                                             |
+| ----------------------------------------------- | --------------------------------------------------- |
 | Shift to "full-stack freight-commerce platform" | CargoWise CarrierConnect offers similar rate access |
-| AI implementation for digital adoption | Magaya Rate Management gaining ground |
+| AI implementation for digital adoption          | Magaya Rate Management gaining ground               |
 
 ### 5.2 Enterprise CRM Platform Competitors
 
@@ -4480,23 +4656,24 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 **Market Position:** Global CRM market leader. Dominant in enterprise sales automation.
 
 **Key Features (2025-2026):**
-- **Agentforce**: Specialized AI "teammates" — Prospecting Agent (lead research + outreach), Customer Agent (frontline support), Social Media Agent
-- **Einstein AI**: Lead scoring, opportunity insights, predictive analytics, personalized email, next-best-action recommendations
-- Conversation Insights, Revenue Intelligence, Forecasting
-- AppExchange ecosystem: 7,000+ third-party integrations
-- Pre-built industry templates (Financial Services, Life Sciences — no logistics-specific template)
 
-**Pricing (August 2025 update, ~6% increase):**
+* **Agentforce**: Specialized AI "teammates" — Prospecting Agent (lead research + outreach), Customer Agent (frontline support), Social Media Agent
+* **Einstein AI**: Lead scoring, opportunity insights, predictive analytics, personalized email, next-best-action recommendations
+* Conversation Insights, Revenue Intelligence, Forecasting
+* AppExchange ecosystem: 7,000+ third-party integrations
+* Pre-built industry templates (Financial Services, Life Sciences — no logistics-specific template)
 
-| Tier | Price/User/Month | Key Features |
-|------|-----------------|--------------|
-| Enterprise | $175 | Full sales automation, workflow, API |
-| Unlimited | $350 | Advanced analytics, sandbox, premier support |
-| Agentforce 1 | $550 | Generative AI, agentic capabilities |
-| **Add-ons** | | |
-| Conversation Insights | $50 | Call analytics, transcription |
-| Revenue Intelligence | $220 | Pipeline analytics, forecasting |
-| Agentforce for Sales | $125 | Unmetered AI, pre-built agents |
+**Pricing (August 2025 update, \~6% increase):**
+
+| Tier                  | Price/User/Month | Key Features                                 |
+| --------------------- | ---------------- | -------------------------------------------- |
+| Enterprise            | $175             | Full sales automation, workflow, API         |
+| Unlimited             | $350             | Advanced analytics, sandbox, premier support |
+| Agentforce 1          | $550             | Generative AI, agentic capabilities          |
+| **Add-ons**           |                  |                                              |
+| Conversation Insights | $50              | Call analytics, transcription                |
+| Revenue Intelligence  | $220             | Pipeline analytics, forecasting              |
+| Agentforce for Sales  | $125             | Unmetered AI, pre-built agents               |
 
 **Typical Enterprise TCO:** $560/user/month (Enterprise + key add-ons), before implementation costs
 
@@ -4509,21 +4686,22 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 **Market Position:** Second-largest enterprise CRM/ERP. Deep integration with Microsoft 365 ecosystem.
 
 **Key Features (2025-2026):**
-- **Copilot Integration**: Real-time insights, workflow automation, intelligent recommendations within Outlook, Teams, Excel
-- **Supply Chain Management**: Demand Planning with Copilot, generative insights, cell-level explainability
-- **Supplier Communications Agent**: Automated vendor interactions
-- Warehouse app upgrades for operational efficiency
-- Power BI integration for analytics
-- Role-based Copilot solutions (Sales, Service, Finance) — now included free for Microsoft 365 Copilot customers
+
+* **Copilot Integration**: Real-time insights, workflow automation, intelligent recommendations within Outlook, Teams, Excel
+* **Supply Chain Management**: Demand Planning with Copilot, generative insights, cell-level explainability
+* **Supplier Communications Agent**: Automated vendor interactions
+* Warehouse app upgrades for operational efficiency
+* Power BI integration for analytics
+* Role-based Copilot solutions (Sales, Service, Finance) — now included free for Microsoft 365 Copilot customers
 
 **Pricing:**
 
-| Module | Price/User/Month |
-|--------|-----------------|
-| Sales Professional | $65 |
-| Sales Enterprise | $105 |
-| Supply Chain Management | $180 |
-| Copilot for Sales | $50 (now free for M365 Copilot users) |
+| Module                  | Price/User/Month                      |
+| ----------------------- | ------------------------------------- |
+| Sales Professional      | $65                                   |
+| Sales Enterprise        | $105                                  |
+| Supply Chain Management | $180                                  |
+| Copilot for Sales       | $50 (now free for M365 Copilot users) |
 
 **Target Market:** Enterprise organizations already in the Microsoft ecosystem
 
@@ -4542,16 +4720,18 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 **Market Position:** Leading inbound marketing + CRM platform. Strong in SMB/mid-market. Investing heavily in AI via "Breeze" suite.
 
 **Key Features (2025-2026):**
-- **Breeze Agents**: Prospecting Agent, Customer Agent, Social Media Agent (autonomous AI teammates)
-- **Breeze Intelligence**: Predictive insights, contact/company enrichment, buyer intent analysis
-- AI Credits model: $0.01/credit, typical mid-market consumption 50K-150K credits/month
-- Custom objects, multi-brand tools, permissions at Enterprise tier
+
+* **Breeze Agents**: Prospecting Agent, Customer Agent, Social Media Agent (autonomous AI teammates)
+* **Breeze Intelligence**: Predictive insights, contact/company enrichment, buyer intent analysis
+* AI Credits model: $0.01/credit, typical mid-market consumption 50K-150K credits/month
+* Custom objects, multi-brand tools, permissions at Enterprise tier
 
 **Pricing:**
-- CRM Professional: $50/user/month
-- CRM Enterprise: $75/user/month
-- Sales Hub Enterprise: $150/user/month
-- Full platform bundles: $1,200-$5,000/month (company-wide)
+
+* CRM Professional: $50/user/month
+* CRM Enterprise: $75/user/month
+* Sales Hub Enterprise: $150/user/month
+* Full platform bundles: $1,200-$5,000/month (company-wide)
 
 **Target Market:** SMB and mid-market B2B companies
 
@@ -4559,35 +4739,35 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 
 ### 5.3 Comprehensive Feature Comparison Matrix
 
-| Feature Category | Logic Nexus | CargoWise | Magaya | Freightos | Salesforce | Dynamics 365 | HubSpot |
-|------------------|-------------|-----------|--------|-----------|------------|--------------|---------|
-| **Lead Management** | ✅ Good | 🟡 Basic | ✅ Good | ❌ None | ✅ Excellent | ✅ Excellent | ✅ Excellent |
-| **Opportunity Mgmt** | ✅ Good | 🟡 Basic | ✅ Good | ❌ None | ✅ Excellent | ✅ Excellent | ✅ Good |
-| **Quote Management** | 🟡 Fair | ✅ Excellent | ✅ Good | ✅ Good | 🟡 Basic | 🟡 Basic | 🟡 Basic |
-| **Rate Engine** | ✅ Good (AI-enhanced) | ✅ Excellent | ✅ Good | ✅ Excellent | ❌ None | ❌ None | ❌ None |
-| **Booking/Orders** | ❌ DB table only | ✅ Excellent | ✅ Excellent | ✅ Good | ✅ Good | ✅ Good | 🟡 Basic |
-| **Shipment Tracking** | ✅ Good | ✅ Excellent | ✅ Excellent | 🟡 Basic | ❌ N/A | 🟡 Basic | ❌ N/A |
-| **Customs/Compliance** | ✅ Good (HTS/AES) | ✅ Excellent | ✅ Good | ❌ None | ❌ None | ❌ None | ❌ None |
-| **WMS** | 🟡 Basic | ✅ Excellent | ✅ Excellent | ❌ None | ❌ None | 🟡 Basic | ❌ None |
-| **Invoicing** | ✅ Good | ✅ Excellent | ✅ Good | 🟡 Basic | 🟡 Basic | ✅ Good | 🟡 Basic |
-| **Email Integration** | 🟡 Basic | 🟡 Basic | 🟡 Basic | ❌ None | ✅ Excellent | ✅ Excellent | ✅ Excellent |
-| **Mobile App** | ❌ None | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Excellent | ✅ Excellent | ✅ Good |
-| **AI/ML Features** | ❌ Rule-based only | ✅ AI Workflow Engine | ❌ None | 🟡 Basic | ✅ Einstein/Agentforce | ✅ Copilot | ✅ Breeze AI |
-| **Multi-Tenancy** | ✅ Excellent (3-tier) | 🟡 Fair | 🟡 Fair | ❌ N/A | ✅ Good | ✅ Good | 🟡 Fair |
-| **Multi-Domain Plugins** | ✅ Unique (8 domains) | ❌ Logistics only | ❌ Logistics only | ❌ Freight only | ✅ AppExchange | ✅ AppSource | ✅ App Marketplace |
-| **Franchise Hierarchy** | ✅ Unique | ❌ None | ❌ None | ❌ None | 🟡 Territories | 🟡 Business Units | ❌ None |
+| Feature Category         | Logic Nexus          | CargoWise            | Magaya           | Freightos      | Salesforce            | Dynamics 365      | HubSpot           |
+| ------------------------ | -------------------- | -------------------- | ---------------- | -------------- | --------------------- | ----------------- | ----------------- |
+| **Lead Management**      | ✅ Good               | 🟡 Basic             | ✅ Good           | ❌ None         | ✅ Excellent           | ✅ Excellent       | ✅ Excellent       |
+| **Opportunity Mgmt**     | ✅ Good               | 🟡 Basic             | ✅ Good           | ❌ None         | ✅ Excellent           | ✅ Excellent       | ✅ Good            |
+| **Quote Management**     | 🟡 Fair              | ✅ Excellent          | ✅ Good           | ✅ Good         | 🟡 Basic              | 🟡 Basic          | 🟡 Basic          |
+| **Rate Engine**          | ✅ Good (AI-enhanced) | ✅ Excellent          | ✅ Good           | ✅ Excellent    | ❌ None                | ❌ None            | ❌ None            |
+| **Booking/Orders**       | ❌ DB table only      | ✅ Excellent          | ✅ Excellent      | ✅ Good         | ✅ Good                | ✅ Good            | 🟡 Basic          |
+| **Shipment Tracking**    | ✅ Good               | ✅ Excellent          | ✅ Excellent      | 🟡 Basic       | ❌ N/A                 | 🟡 Basic          | ❌ N/A             |
+| **Customs/Compliance**   | ✅ Good (HTS/AES)     | ✅ Excellent          | ✅ Good           | ❌ None         | ❌ None                | ❌ None            | ❌ None            |
+| **WMS**                  | 🟡 Basic             | ✅ Excellent          | ✅ Excellent      | ❌ None         | ❌ None                | 🟡 Basic          | ❌ None            |
+| **Invoicing**            | ✅ Good               | ✅ Excellent          | ✅ Good           | 🟡 Basic       | 🟡 Basic              | ✅ Good            | 🟡 Basic          |
+| **Email Integration**    | 🟡 Basic             | 🟡 Basic             | 🟡 Basic         | ❌ None         | ✅ Excellent           | ✅ Excellent       | ✅ Excellent       |
+| **Mobile App**           | ❌ None               | ✅ Yes                | ✅ Yes            | ✅ Yes          | ✅ Excellent           | ✅ Excellent       | ✅ Good            |
+| **AI/ML Features**       | ❌ Rule-based only    | ✅ AI Workflow Engine | ❌ None           | 🟡 Basic       | ✅ Einstein/Agentforce | ✅ Copilot         | ✅ Breeze AI       |
+| **Multi-Tenancy**        | ✅ Excellent (3-tier) | 🟡 Fair              | 🟡 Fair          | ❌ N/A          | ✅ Good                | ✅ Good            | 🟡 Fair           |
+| **Multi-Domain Plugins** | ✅ Unique (8 domains) | ❌ Logistics only     | ❌ Logistics only | ❌ Freight only | ✅ AppExchange         | ✅ AppSource       | ✅ App Marketplace |
+| **Franchise Hierarchy**  | ✅ Unique             | ❌ None               | ❌ None           | ❌ None         | 🟡 Territories        | 🟡 Business Units | ❌ None            |
 
 ### 5.4 Pricing Comparison Summary
 
-| Platform | Entry Price | Enterprise Price | Pricing Model | Hidden Costs |
-|----------|------------|-----------------|---------------|-------------|
-| **Logic Nexus** | TBD | TBD | Subscription (planned) | Self-hosted infrastructure |
-| **CargoWise** | Variable (Value Pack) | $500-2,000+/user/mo | Transaction-based (new) | 25-35% increases reported |
-| **Magaya** | $100/user/mo | $500/user/mo | Per-user subscription | Module add-on fees |
-| **Freightos** | $40/mo | Commission-based | Marketplace + SaaS | Transaction commissions |
-| **Salesforce** | $175/user/mo | $550/user/mo (Agentforce) | Per-user + add-ons | Implementation ($50K-500K+) |
-| **Dynamics 365** | $65/user/mo | $180/user/mo (SCM) | Per-user + modules | Microsoft ecosystem lock-in |
-| **HubSpot** | $50/user/mo | $150/user/mo | Per-user + credits | AI credit consumption |
+| Platform         | Entry Price           | Enterprise Price          | Pricing Model           | Hidden Costs                |
+| ---------------- | --------------------- | ------------------------- | ----------------------- | --------------------------- |
+| **Logic Nexus**  | TBD                   | TBD                       | Subscription (planned)  | Self-hosted infrastructure  |
+| **CargoWise**    | Variable (Value Pack) | $500-2,000+/user/mo       | Transaction-based (new) | 25-35% increases reported   |
+| **Magaya**       | $100/user/mo          | $500/user/mo              | Per-user subscription   | Module add-on fees          |
+| **Freightos**    | $40/mo                | Commission-based          | Marketplace + SaaS      | Transaction commissions     |
+| **Salesforce**   | $175/user/mo          | $550/user/mo (Agentforce) | Per-user + add-ons      | Implementation ($50K-500K+) |
+| **Dynamics 365** | $65/user/mo           | $180/user/mo (SCM)        | Per-user + modules      | Microsoft ecosystem lock-in |
+| **HubSpot**      | $50/user/mo           | $150/user/mo              | Per-user + credits      | AI credit consumption       |
 
 ### 5.5 Competitive Positioning & Differentiation
 
@@ -4628,7 +4808,7 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 5. **Freightos validates the digital freight model** — Their 54% GBV growth proves demand for digital booking, which Logic Nexus's rate engine partially addresses
 6. **Multi-tenant franchise hierarchy is a genuine moat** — No competitor offers this out of the box
 
----
+***
 
 ## Section 6: Enterprise Implementation Roadmap
 
@@ -4636,58 +4816,66 @@ Implementation Coverage:     ~70% of feature surface area is production-ready
 This roadmap restructures the previous "80-Week Plan" into a focused **4-Phase Enterprise Maturity Model**. Each phase targets a specific level of operational capability, moving from "Fragile Startup" to "Global Enterprise Platform".
 
 ### Phase 1: Foundation (Weeks 1-12) — "Stabilize & Secure"
+
 **Goal:** Eliminate critical technical debt and enforce strict security boundaries.
-*   **Focus Areas:** Code Maintainability, Hierarchy Enforcement, Logging, CI/CD.
-*   **Milestones:**
-    *   ✅ **M1.1 Quote System Refactor:** Decouple state management, 70% test coverage.
-    *   ✅ **M1.2 Hierarchy Enforcement:** Audit 489 migrations, 100% `ScopedDataAccess`.
-    *   ✅ **M1.3 Security Hardening:** RLS Regression Suite, API Authorization.
-    *   ✅ **M1.4 Observability:** Integrate OpenTelemetry & Sentry.
-*   **Deliverables:**
-    *   `QuoteService` (Unified API).
-    *   `HierarchyAuditReport.pdf` (Clean bill of health).
-    *   SOC 2 Gap Assessment Report.
+
+* **Focus Areas:** Code Maintainability, Hierarchy Enforcement, Logging, CI/CD.
+* **Milestones:**
+  * ✅ **M1.1 Quote System Refactor:** Decouple state management, 70% test coverage.
+  * ✅ **M1.2 Hierarchy Enforcement:** Audit 489 migrations, 100% `ScopedDataAccess`.
+  * ✅ **M1.3 Security Hardening:** RLS Regression Suite, API Authorization.
+  * ✅ **M1.4 Observability:** Integrate OpenTelemetry & Sentry.
+* **Deliverables:**
+  * `QuoteService` (Unified API).
+  * `HierarchyAuditReport.pdf` (Clean bill of health).
+  * SOC 2 Gap Assessment Report.
 
 ### Phase 2: Integration (Weeks 13-24) — "Connect & Automate"
+
 **Goal:** Seamlessly integrate with external ecosystems and automate workflows.
-*   **Focus Areas:** API Gateway, Webhooks, ERP Connectors, Email Automation.
-*   **Milestones:**
-    *   ✅ **M2.1 API Gateway:** Deploy Kong/Edge Middleware for rate limiting.
-    *   ✅ **M2.2 Financial Integration:** QuickBooks/Xero Two-Way Sync.
-    *   ✅ **M2.3 Email Infrastructure:** SendGrid Templates + Tracking Webhooks.
-    *   ✅ **M2.4 Visual Operations:** Kanban Board for Shipments.
-*   **Deliverables:**
-    *   Public API Documentation (Swagger/OpenAPI).
-    *   Connector Marketplace (Beta).
-    *   Automated "Monday Morning" Reports.
+
+* **Focus Areas:** API Gateway, Webhooks, ERP Connectors, Email Automation.
+* **Milestones:**
+  * ✅ **M2.1 API Gateway:** Deploy Kong/Edge Middleware for rate limiting.
+  * ✅ **M2.2 Financial Integration:** QuickBooks/Xero Two-Way Sync.
+  * ✅ **M2.3 Email Infrastructure:** SendGrid Templates + Tracking Webhooks.
+  * ✅ **M2.4 Visual Operations:** Kanban Board for Shipments.
+* **Deliverables:**
+  * Public API Documentation (Swagger/OpenAPI).
+  * Connector Marketplace (Beta).
+  * Automated "Monday Morning" Reports.
 
 ### Phase 3: Optimization (Weeks 25-36) — "Accelerate & Intelligent"
+
 **Goal:** High-performance data processing and AI-driven insights.
-*   **Focus Areas:** Caching, Read Replicas, AI Models, Advanced Analytics.
-*   **Milestones:**
-    *   ✅ **M3.1 Performance Tuning:** Redis Caching, Virtual Scrolling (List Views).
-    *   ✅ **M3.2 AI Core:** Lead Scoring Model, OCR Invoice Extraction (Production).
-    *   ✅ **M3.3 Data Warehouse:** ETL Pipeline to Snowflake/BigQuery (optional) or Supabase Analytics.
-    *   ✅ **M3.4 Self-Service BI:** Custom Report Builder.
-*   **Deliverables:**
-    *   < 200ms API Latency (p95).
-    *   AI "Copilot" for Quote Generation.
-    *   Executive Dashboard Suite.
+
+* **Focus Areas:** Caching, Read Replicas, AI Models, Advanced Analytics.
+* **Milestones:**
+  * ✅ **M3.1 Performance Tuning:** Redis Caching, Virtual Scrolling (List Views).
+  * ✅ **M3.2 AI Core:** Lead Scoring Model, OCR Invoice Extraction (Production).
+  * ✅ **M3.3 Data Warehouse:** ETL Pipeline to Snowflake/BigQuery (optional) or Supabase Analytics.
+  * ✅ **M3.4 Self-Service BI:** Custom Report Builder.
+* **Deliverables:**
+  * < 200ms API Latency (p95).
+  * AI "Copilot" for Quote Generation.
+  * Executive Dashboard Suite.
 
 ### Phase 4: Scale (Weeks 37-48) — "Global & Compliant"
-**Goal:** Operational excellence for global deployment.
-*   **Focus Areas:** Multi-region, Edge Computing, Compliance Certifications.
-*   **Milestones:**
-    *   ✅ **M4.1 Global Distribution:** CDN for static assets, Edge Functions for routing.
-    *   ✅ **M4.2 Compliance:** SOC 2 Type II Audit, HIPAA Compliance Mode.
-    *   ✅ **M4.3 Mobile App:** React Native MVP (iOS/Android).
-    *   ✅ **M4.4 Disaster Recovery:** Automated Failover Drills (Chaos Monkey).
-*   **Deliverables:**
-    *   SOC 2 Type II Report.
-    *   Mobile App Store Listing.
-    *   99.99% SLA Guarantee.
 
----
+**Goal:** Operational excellence for global deployment.
+
+* **Focus Areas:** Multi-region, Edge Computing, Compliance Certifications.
+* **Milestones:**
+  * ✅ **M4.1 Global Distribution:** CDN for static assets, Edge Functions for routing.
+  * ✅ **M4.2 Compliance:** SOC 2 Type II Audit, HIPAA Compliance Mode.
+  * ✅ **M4.3 Mobile App:** React Native MVP (iOS/Android).
+  * ✅ **M4.4 Disaster Recovery:** Automated Failover Drills (Chaos Monkey).
+* **Deliverables:**
+  * SOC 2 Type II Report.
+  * Mobile App Store Listing.
+  * 99.99% SLA Guarantee.
+
+***
 
 ## Section 7: Technical Specifications
 
@@ -4695,61 +4883,63 @@ This roadmap restructures the previous "80-Week Plan" into a focused **4-Phase E
 
 #### 7.1.1 Frontend Architecture
 
-| Component | Technology | Version | Purpose |
-|-----------|-----------|---------|---------|
-| Framework | React | 18.3.1 | Component-based UI |
-| Build Tool | Vite | 5.4.19 | Development server + production bundling |
-| SWC Plugin | @vitejs/plugin-react-swc | 3.11.0 | Fast JSX/TSX transpilation |
-| Type System | TypeScript | 5.8.3 | Static type checking |
-| UI Components | Radix UI + shadcn/ui | Latest | Accessible component primitives (20+ primitives) |
-| Styling | Tailwind CSS | 3.4.17 | Utility-first CSS with typography plugin |
-| Routing | React Router DOM | 6.30.1 | Client-side routing with lazy loading |
-| Server State | TanStack React Query | 5.83.0 | Data fetching, caching, synchronization |
-| Form Handling | React Hook Form + Zod | 7.61.1 / 3.25.76 | Declarative forms with schema validation |
-| Icons | Lucide React | 0.462.0 | SVG icon library |
-| i18n | i18next | 25.7.4 | Multi-language support |
-| Charting | Recharts | 2.15.4 | Data visualization |
-| Animation | Framer Motion | 12.23.26 | UI animations |
-| Drag & Drop | @dnd-kit | 6.3.1+ | Accessible drag-and-drop interactions |
-| Virtualization | @tanstack/react-virtual + react-window | 3.0.0 / 2.2.6 | List virtualization for large datasets |
+| Component      | Technology                             | Version          | Purpose                                          |
+| -------------- | -------------------------------------- | ---------------- | ------------------------------------------------ |
+| Framework      | React                                  | 18.3.1           | Component-based UI                               |
+| Build Tool     | Vite                                   | 5.4.19           | Development server + production bundling         |
+| SWC Plugin     | @vitejs/plugin-react-swc               | 3.11.0           | Fast JSX/TSX transpilation                       |
+| Type System    | TypeScript                             | 5.8.3            | Static type checking                             |
+| UI Components  | Radix UI + shadcn/ui                   | Latest           | Accessible component primitives (20+ primitives) |
+| Styling        | Tailwind CSS                           | 3.4.17           | Utility-first CSS with typography plugin         |
+| Routing        | React Router DOM                       | 6.30.1           | Client-side routing with lazy loading            |
+| Server State   | TanStack React Query                   | 5.83.0           | Data fetching, caching, synchronization          |
+| Form Handling  | React Hook Form + Zod                  | 7.61.1 / 3.25.76 | Declarative forms with schema validation         |
+| Icons          | Lucide React                           | 0.462.0          | SVG icon library                                 |
+| i18n           | i18next                                | 25.7.4           | Multi-language support                           |
+| Charting       | Recharts                               | 2.15.4           | Data visualization                               |
+| Animation      | Framer Motion                          | 12.23.26         | UI animations                                    |
+| Drag & Drop    | @dnd-kit                               | 6.3.1+           | Accessible drag-and-drop interactions            |
+| Virtualization | @tanstack/react-virtual + react-window | 3.0.0 / 2.2.6    | List virtualization for large datasets           |
 
 **Dev Server Configuration** (`vite.config.ts`):
-- Host: `0.0.0.0` (accessible from LAN)
-- Port: `8081` (strict mode — fails if port unavailable)
-- Path aliases: `@` → `./src` (mapped in both Vite and TypeScript configs)
-- React deduplication: Explicit path resolution to prevent duplicate React instances
+
+* Host: `0.0.0.0` (accessible from LAN)
+* Port: `8081` (strict mode — fails if port unavailable)
+* Path aliases: `@` → `./src` (mapped in both Vite and TypeScript configs)
+* React deduplication: Explicit path resolution to prevent duplicate React instances
 
 #### 7.1.2 Backend Architecture
 
-| Component | Technology | Version | Purpose |
-|-----------|-----------|---------|---------|
-| Database | PostgreSQL | 17 | Primary data store with RLS |
-| BaaS | Supabase | 2.93.1 | Auth, RLS, Storage, Realtime, Edge Functions |
-| API Layer | PostgREST (via Supabase) | Built-in | Auto-generated REST API from PostgreSQL schema |
-| Edge Functions | Deno Runtime | 2 | Serverless functions (46 endpoints) |
-| Realtime | Supabase Realtime | Built-in | WebSocket-based change feeds (port 4000) |
-| Storage | Supabase Storage | Built-in | File uploads (50MiB per-file limit) |
-| Connection Pool | PgBouncer | Built-in | Transaction-mode pooling (default pool: 20) |
+| Component       | Technology               | Version  | Purpose                                        |
+| --------------- | ------------------------ | -------- | ---------------------------------------------- |
+| Database        | PostgreSQL               | 17       | Primary data store with RLS                    |
+| BaaS            | Supabase                 | 2.93.1   | Auth, RLS, Storage, Realtime, Edge Functions   |
+| API Layer       | PostgREST (via Supabase) | Built-in | Auto-generated REST API from PostgreSQL schema |
+| Edge Functions  | Deno Runtime             | 2        | Serverless functions (46 endpoints)            |
+| Realtime        | Supabase Realtime        | Built-in | WebSocket-based change feeds (port 4000)       |
+| Storage         | Supabase Storage         | Built-in | File uploads (50MiB per-file limit)            |
+| Connection Pool | PgBouncer                | Built-in | Transaction-mode pooling (default pool: 20)    |
 
 **Edge Functions Inventory (46 functions):**
 
-| Category | Functions | Auth Pattern |
-|----------|----------|-------------|
-| **CRM Operations** (7) | calculate-lead-score, get-account-label, get-contact-label, get-opportunity-label, get-opportunity-full, get-service-label, process-lead-assignments | `requireAuth(req)` |
-| **Email/Communication** (9) | classify-email, ingest-email, route-email, search-emails, send-email, sync-emails, sync-emails-v2, sync-all-mailboxes, process-scheduled-emails | Mixed (some bypass JWT) |
-| **Quote/Rate** (3) | calculate-quote-financials, rate-engine, suggest-transport-mode | `requireAuth(req)` |
-| **AI/Analytics** (4) | ai-advisor, analyze-cargo-damage, anomaly-detector, forecast-demand | `requireAuth(req)` |
-| **Admin/Platform** (8) | admin-reset-password, create-user, delete-user, export-data, execute-sql-external, list-edge-functions, seed-platform-admin, subscription-plans | `requireAuth(req)` + role check |
-| **Data Sync** (5) | salesforce-sync-opportunity, sync-cn-hs-data, sync-hts-data, remote-import, process-franchise-import | `requireAuth(req)` or service role |
-| **Infrastructure** (5) | alert-notifier, cleanup-logs, email-stats, lead-event-webhook, plan-event-webhook | Event-driven (some bypass JWT) |
-| **Migration** (2) | push-migrations-to-target, exchange-oauth-token | Special auth handling |
+| Category                    | Functions                                                                                                                                            | Auth Pattern                       |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **CRM Operations** (7)      | calculate-lead-score, get-account-label, get-contact-label, get-opportunity-label, get-opportunity-full, get-service-label, process-lead-assignments | `requireAuth(req)`                 |
+| **Email/Communication** (9) | classify-email, ingest-email, route-email, search-emails, send-email, sync-emails, sync-emails-v2, sync-all-mailboxes, process-scheduled-emails      | Mixed (some bypass JWT)            |
+| **Quote/Rate** (3)          | calculate-quote-financials, rate-engine, suggest-transport-mode                                                                                      | `requireAuth(req)`                 |
+| **AI/Analytics** (4)        | ai-advisor, analyze-cargo-damage, anomaly-detector, forecast-demand                                                                                  | `requireAuth(req)`                 |
+| **Admin/Platform** (8)      | admin-reset-password, create-user, delete-user, export-data, execute-sql-external, list-edge-functions, seed-platform-admin, subscription-plans      | `requireAuth(req)` + role check    |
+| **Data Sync** (5)           | salesforce-sync-opportunity, sync-cn-hs-data, sync-hts-data, remote-import, process-franchise-import                                                 | `requireAuth(req)` or service role |
+| **Infrastructure** (5)      | alert-notifier, cleanup-logs, email-stats, lead-event-webhook, plan-event-webhook                                                                    | Event-driven (some bypass JWT)     |
+| **Migration** (2)           | push-migrations-to-target, exchange-oauth-token                                                                                                      | Special auth handling              |
 
 **Shared Edge Function Helpers** (`supabase/functions/_shared/`):
-- **auth.ts** (1.8KB): `requireAuth(req)` validates JWT and creates user-scoped Supabase client (respects RLS); `createServiceClient()` creates admin client (bypasses RLS)
-- **cors.ts** (1.1KB): `getCorsHeaders(req)` with origin allowlist from `ALLOWED_ORIGINS` env var; dev fallback: localhost:3000, 5173, 5555, 8080
-- **logger.ts** (6.6KB): Structured JSON logging with PII masking (emails, phones, credit cards), correlation ID support, DB persistence (WARNING+), alert trigger (CRITICAL)
-- **classification-logic.ts** (1.9KB): Email classification utilities
-- **routing-logic.ts** (843B): Email routing rules engine
+
+* **auth.ts** (1.8KB): `requireAuth(req)` validates JWT and creates user-scoped Supabase client (respects RLS); `createServiceClient()` creates admin client (bypasses RLS)
+* **cors.ts** (1.1KB): `getCorsHeaders(req)` with origin allowlist from `ALLOWED_ORIGINS` env var; dev fallback: localhost:3000, 5173, 5555, 8080
+* **logger.ts** (6.6KB): Structured JSON logging with PII masking (emails, phones, credit cards), correlation ID support, DB persistence (WARNING+), alert trigger (CRITICAL)
+* **classification-logic.ts** (1.9KB): Email classification utilities
+* **routing-logic.ts** (843B): Email routing rules engine
 
 #### 7.1.3 State Management Architecture
 
@@ -4767,112 +4957,116 @@ This roadmap restructures the previous "80-Week Plan" into a focused **4-Phase E
 └─────────────────┴────────────────┴────────────────────────┘
 ```
 
-- **No Redux/Zustand**: State management uses Context API + React Query exclusively
-- **DomainContext** (`src/contexts/DomainContext.tsx`): Active platform domain (Logistics, Banking, etc.), persisted to `localStorage`
-- **AuthContext** (`src/hooks/useAuth`): User session, roles, permissions, profile
-- **CRMContext** (`src/hooks/useCRM`): Supabase client, scoped DB access, user preferences
-- **28+ custom hooks** in `src/hooks/` for domain-specific state (quotes, transport modes, dashboards, queues)
+* **No Redux/Zustand**: State management uses Context API + React Query exclusively
+* **DomainContext** (`src/contexts/DomainContext.tsx`): Active platform domain (Logistics, Banking, etc.), persisted to `localStorage`
+* **AuthContext** (`src/hooks/useAuth`): User session, roles, permissions, profile
+* **CRMContext** (`src/hooks/useCRM`): Supabase client, scoped DB access, user preferences
+* **28+ custom hooks** in `src/hooks/` for domain-specific state (quotes, transport modes, dashboards, queues)
 
 #### 7.1.4 Bundle Optimization Strategy
 
 **Manual Chunk Splitting** (configured in `vite.config.ts`):
 
-| Chunk Name | Libraries | Rationale |
-|-----------|-----------|-----------|
-| `recharts` | recharts, d3-* | Large charting library (~300KB); not needed on all pages |
-| `xlsx` | xlsx (CDN) | Spreadsheet processing (~500KB); used only in export flows |
-| `dnd-kit` | @dnd-kit/* | Drag-and-drop (~80KB); used in Kanban/reorder views |
-| `pdf-export` | jspdf, html2canvas | PDF generation (~400KB); used only in print/export |
-| `jszip` | jszip | ZIP compression (~100KB); used in bulk export |
+| Chunk Name   | Libraries          | Rationale                                                   |
+| ------------ | ------------------ | ----------------------------------------------------------- |
+| `recharts`   | recharts, d3-\*    | Large charting library (\~300KB); not needed on all pages   |
+| `xlsx`       | xlsx (CDN)         | Spreadsheet processing (\~500KB); used only in export flows |
+| `dnd-kit`    | @dnd-kit/\*        | Drag-and-drop (\~80KB); used in Kanban/reorder views        |
+| `pdf-export` | jspdf, html2canvas | PDF generation (\~400KB); used only in print/export         |
+| `jszip`      | jszip              | ZIP compression (\~100KB); used in bulk export              |
 
 **Route-Level Code Splitting:**
-- ~60+ dashboard pages lazy-loaded via `React.lazy()` in `App.tsx`
-- All lazy routes wrapped with `<Suspense fallback={<LoadingSpinner />}>`
-- Eagerly loaded: Landing, Auth, SetupAdmin, Unauthorized, NotFound (app shell)
+
+* \~60+ dashboard pages lazy-loaded via `React.lazy()` in `App.tsx`
+* All lazy routes wrapped with `<Suspense fallback={<LoadingSpinner />}>`
+* Eagerly loaded: Landing, Auth, SetupAdmin, Unauthorized, NotFound (app shell)
 
 **Nginx Production Caching** (`nginx.conf`):
-- Static assets (`/assets/`): Cache-Control `public, max-age=31536000` (1 year), no-transform
-- Gzip enabled: text/plain, text/css, application/json, application/javascript, text/xml
-- SPA routing: `try_files $uri $uri/ /index.html`
+
+* Static assets (`/assets/`): Cache-Control `public, max-age=31536000` (1 year), no-transform
+* Gzip enabled: text/plain, text/css, application/json, application/javascript, text/xml
+* SPA routing: `try_files $uri $uri/ /index.html`
 
 ### 7.2 Security Architecture
 
 #### 7.2.1 Authentication
 
-| Aspect | Implementation | Details |
-|--------|---------------|---------|
-| **Provider** | Supabase Auth (GoTrue) | JWT-based authentication |
-| **Token Expiry** | 3,600 seconds (1 hour) | Configurable via `supabase/config.toml` |
-| **Refresh Tokens** | Rotation enabled | 10-second reuse interval to prevent race conditions |
-| **MFA** | TOTP + Phone + WebAuthn | Up to 10 factors per user |
-| **Email** | Double-confirm changes enabled | OTP: 6 digits, 3600s expiry |
-| **Rate Limiting** | 2 emails/hour | Prevents auth email abuse |
+| Aspect             | Implementation                 | Details                                             |
+| ------------------ | ------------------------------ | --------------------------------------------------- |
+| **Provider**       | Supabase Auth (GoTrue)         | JWT-based authentication                            |
+| **Token Expiry**   | 3,600 seconds (1 hour)         | Configurable via `supabase/config.toml`             |
+| **Refresh Tokens** | Rotation enabled               | 10-second reuse interval to prevent race conditions |
+| **MFA**            | TOTP + Phone + WebAuthn        | Up to 10 factors per user                           |
+| **Email**          | Double-confirm changes enabled | OTP: 6 digits, 3600s expiry                         |
+| **Rate Limiting**  | 2 emails/hour                  | Prevents auth email abuse                           |
 
 #### 7.2.2 Authorization (Dual-Layer)
 
 **Layer 1: Database RLS (PostgreSQL)**
-- 347 RLS policies across 145+ tables
-- Policies enforce `tenant_id`, `franchise_id`, and role-based filters
-- Helper functions: `get_user_tenant_id()`, `get_user_franchise_id()`
-- Platform admins: bypass RLS (or optionally scope via admin override)
+
+* 347 RLS policies across 145+ tables
+* Policies enforce `tenant_id`, `franchise_id`, and role-based filters
+* Helper functions: `get_user_tenant_id()`, `get_user_franchise_id()`
+* Platform admins: bypass RLS (or optionally scope via admin override)
 
 **Layer 2: Application ScopedDataAccess (`src/lib/db/access.ts`)**
-- `ScopedDataAccess` class wraps Supabase client
-- Auto-injects `tenant_id`/`franchise_id` on INSERT/UPDATE/UPSERT
-- Auto-filters on SELECT/UPDATE/DELETE based on `DataAccessContext`
-- Global table exceptions: `ports_locations` (no tenant scoping)
-- Audit logging: All write operations logged to `audit_logs` table
+
+* `ScopedDataAccess` class wraps Supabase client
+* Auto-injects `tenant_id`/`franchise_id` on INSERT/UPDATE/UPSERT
+* Auto-filters on SELECT/UPDATE/DELETE based on `DataAccessContext`
+* Global table exceptions: `ports_locations` (no tenant scoping)
+* Audit logging: All write operations logged to `audit_logs` table
 
 **Role-Based Access Control:**
 
-| Role | `app_role` Value | Scope | Key Capabilities |
-|------|-----------------|-------|-----------------|
-| Super Admin | `platform_admin` | Global | All data, tenant provisioning, system config |
-| Tenant Admin | `tenant_admin` | Tenant-wide | All franchises within tenant, user management |
-| Franchise Admin | `franchise_admin` | Single franchise | Branch operations, local users |
-| User | `user` | Single franchise | Data entry, basic operations |
+| Role            | `app_role` Value  | Scope            | Key Capabilities                              |
+| --------------- | ----------------- | ---------------- | --------------------------------------------- |
+| Super Admin     | `platform_admin`  | Global           | All data, tenant provisioning, system config  |
+| Tenant Admin    | `tenant_admin`    | Tenant-wide      | All franchises within tenant, user management |
+| Franchise Admin | `franchise_admin` | Single franchise | Branch operations, local users                |
+| User            | `user`            | Single franchise | Data entry, basic operations                  |
 
 #### 7.2.3 Transport & Infrastructure Security
 
-| Aspect | Implementation |
-|--------|---------------|
-| **CORS** | Origin allowlist via `ALLOWED_ORIGINS` env var; no wildcards |
-| **HTTP Headers** | X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin |
-| **Edge Function Auth** | 42 of 46 functions require JWT validation; 8 override JWT for service-to-service calls |
-| **Admin Functions** | 7 functions require `platform_admin` role check (create-user, delete-user, admin-reset-password, export-data, etc.) |
-| **Secrets Management** | `.env` excluded from git; Docker secrets parameterized; Edge functions use `Deno.env.get()` |
-| **PII Masking** | Logger masks emails (***@***.***), phones (***-***-XXXX), credit cards (****-****-****-****) |
+| Aspect                 | Implementation                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **CORS**               | Origin allowlist via `ALLOWED_ORIGINS` env var; no wildcards                                                        |
+| **HTTP Headers**       | X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin            |
+| **Edge Function Auth** | 42 of 46 functions require JWT validation; 8 override JWT for service-to-service calls                              |
+| **Admin Functions**    | 7 functions require `platform_admin` role check (create-user, delete-user, admin-reset-password, export-data, etc.) |
+| **Secrets Management** | `.env` excluded from git; Docker secrets parameterized; Edge functions use `Deno.env.get()`                         |
+| **PII Masking**        | Logger masks emails (***@***.***), phones (***-***-XXXX), credit cards (**\*\*-****-**\*\*-*\*\*\*)                 |
 
 ### 7.3 Data Governance
 
 #### 7.3.1 Database Schema Statistics
 
-| Metric | Count | Source |
-|--------|-------|--------|
-| Migration files | 491 | `supabase/migrations/` |
-| CREATE TABLE statements | ~150+ | Migration analysis |
-| RLS policies | 347 | `CREATE POLICY` count |
-| Indexes | 141 | `CREATE INDEX` count |
-| Stored procedures/functions | 193 | `CREATE [OR REPLACE] FUNCTION` count |
-| Tables with RLS enabled | 145 | Verified |
-| Tables with full CRUD policies | 132 | Verified |
+| Metric                         | Count  | Source                               |
+| ------------------------------ | ------ | ------------------------------------ |
+| Migration files                | 491    | `supabase/migrations/`               |
+| CREATE TABLE statements        | \~150+ | Migration analysis                   |
+| RLS policies                   | 347    | `CREATE POLICY` count                |
+| Indexes                        | 141    | `CREATE INDEX` count                 |
+| Stored procedures/functions    | 193    | `CREATE [OR REPLACE] FUNCTION` count |
+| Tables with RLS enabled        | 145    | Verified                             |
+| Tables with full CRUD policies | 132    | Verified                             |
 
 #### 7.3.2 Data Retention Strategy (Planned)
 
-| Data Category | Hot Storage | Cold Archive | Deletion |
-|-------------|-------------|-------------|----------|
-| Transactional (quotes, invoices) | 1 year | 7 years (S3 Glacier) | After archive period |
-| Audit logs | Indefinite | Streamed to SIEM | Never (immutable) |
-| User data (profiles, contacts) | Active lifetime | 30 days post-deletion | GDPR hard delete |
-| System logs | 90 days | 1 year compressed | After archive period |
-| File attachments | Active lifetime | 1 year post-reference removal | Hard delete |
+| Data Category                    | Hot Storage     | Cold Archive                  | Deletion             |
+| -------------------------------- | --------------- | ----------------------------- | -------------------- |
+| Transactional (quotes, invoices) | 1 year          | 7 years (S3 Glacier)          | After archive period |
+| Audit logs                       | Indefinite      | Streamed to SIEM              | Never (immutable)    |
+| User data (profiles, contacts)   | Active lifetime | 30 days post-deletion         | GDPR hard delete     |
+| System logs                      | 90 days         | 1 year compressed             | After archive period |
+| File attachments                 | Active lifetime | 1 year post-reference removal | Hard delete          |
 
 #### 7.3.3 Audit Trail
 
-- **Write Operations**: `audit_logs` table captures INSERT/UPDATE/DELETE/UPSERT via `ScopedDataAccess`
-- **Read Operations**: Not currently logged (gap for HIPAA/SOC 2 — documented in Section 4.3.3)
-- **Correlation IDs**: `x-correlation-id` header in Edge Functions, UUID fallback
-- **Structured Logging**: JSON format with level, message, metadata, timestamp, component, environment
+* **Write Operations**: `audit_logs` table captures INSERT/UPDATE/DELETE/UPSERT via `ScopedDataAccess`
+* **Read Operations**: Not currently logged (gap for HIPAA/SOC 2 — documented in Section 4.3.3)
+* **Correlation IDs**: `x-correlation-id` header in Edge Functions, UUID fallback
+* **Structured Logging**: JSON format with level, message, metadata, timestamp, component, environment
 
 ### 7.4 Deployment Architecture
 
@@ -4895,14 +5089,16 @@ This roadmap restructures the previous "80-Week Plan" into a focused **4-Phase E
 ```
 
 **Frontend Container** (`Dockerfile`):
-- Multi-stage build: Node 20-alpine (builder) → Nginx alpine (runtime)
-- Build: `npm ci` → `npm run build` → copy `/dist` to `/usr/share/nginx/html`
-- Health check: `/health` endpoint (access log disabled)
-- Security headers applied via `nginx.conf`
+
+* Multi-stage build: Node 20-alpine (builder) → Nginx alpine (runtime)
+* Build: `npm ci` → `npm run build` → copy `/dist` to `/usr/share/nginx/html`
+* Health check: `/health` endpoint (access log disabled)
+* Security headers applied via `nginx.conf`
 
 #### 7.4.2 CI/CD Pipeline
 
 **Continuous Integration** (`.github/workflows/ci.yml`):
+
 ```
 Trigger: push to [main, master, develop] | PR against [main, master, develop]
 Runner: ubuntu-latest, Node.js 20, npm cache
@@ -4916,6 +5112,7 @@ Pipeline:
 ```
 
 **Continuous Deployment** (`.github/workflows/deploy.yml`):
+
 ```
 Trigger: push to main only
 Runner: ubuntu-latest, Node.js 20
@@ -4926,32 +5123,33 @@ Pipeline:
 ```
 
 **Current CI/CD Gaps:**
-- Deploy step is a placeholder (`echo` only) — no actual deployment configured
-- No E2E tests in CI pipeline
-- No staging environment deployment
-- No database migration automation in CI
-- No Edge Function deployment in CI
+
+* Deploy step is a placeholder (`echo` only) — no actual deployment configured
+* No E2E tests in CI pipeline
+* No staging environment deployment
+* No database migration automation in CI
+* No Edge Function deployment in CI
 
 #### 7.4.3 Environment Configuration
 
 **Required Environment Variables:**
 
-| Variable | Purpose | Layer |
-|----------|---------|-------|
-| `VITE_SUPABASE_URL` | Supabase API endpoint | Frontend |
-| `VITE_SUPABASE_ANON_KEY` | Public anon key for client-side auth | Frontend |
-| `VITE_SUPABASE_PROJECT_ID` | Project identifier for CLI operations | Frontend/CLI |
-| `SUPABASE_URL` | Supabase API endpoint (server-side) | Edge Functions |
-| `SUPABASE_SERVICE_ROLE_KEY` | Admin key (bypasses RLS) | Edge Functions |
-| `DATABASE_URL` | Pooled PostgreSQL connection string | Scripts |
-| `DIRECT_URL` | Direct PostgreSQL connection string | Migrations |
-| `GOOGLE_API_KEY` | Google Maps/Places API | Frontend |
-| `OPENAI_API_KEY` | OpenAI API for AI features | Edge Functions |
-| `VITE_SENTRY_DSN` | Sentry error tracking | Frontend |
-| `VITE_POSTHOG_KEY` | PostHog product analytics | Frontend |
-| `ALLOWED_ORIGINS` | CORS origin allowlist | Edge Functions |
+| Variable                    | Purpose                               | Layer          |
+| --------------------------- | ------------------------------------- | -------------- |
+| `VITE_SUPABASE_URL`         | Supabase API endpoint                 | Frontend       |
+| `VITE_SUPABASE_ANON_KEY`    | Public anon key for client-side auth  | Frontend       |
+| `VITE_SUPABASE_PROJECT_ID`  | Project identifier for CLI operations | Frontend/CLI   |
+| `SUPABASE_URL`              | Supabase API endpoint (server-side)   | Edge Functions |
+| `SUPABASE_SERVICE_ROLE_KEY` | Admin key (bypasses RLS)              | Edge Functions |
+| `DATABASE_URL`              | Pooled PostgreSQL connection string   | Scripts        |
+| `DIRECT_URL`                | Direct PostgreSQL connection string   | Migrations     |
+| `GOOGLE_API_KEY`            | Google Maps/Places API                | Frontend       |
+| `OPENAI_API_KEY`            | OpenAI API for AI features            | Edge Functions |
+| `VITE_SENTRY_DSN`           | Sentry error tracking                 | Frontend       |
+| `VITE_POSTHOG_KEY`          | PostHog product analytics             | Frontend       |
+| `ALLOWED_ORIGINS`           | CORS origin allowlist                 | Edge Functions |
 
----
+***
 
 ## Section 8: Quality Assurance Framework
 
@@ -4960,57 +5158,60 @@ Pipeline:
 #### 8.1.1 Test Framework Configuration
 
 **Unit & Integration Tests (Vitest):**
-- **Framework**: Vitest 4.0.16
-- **Environment**: jsdom
-- **Globals**: Enabled (no explicit imports for `describe`, `it`, `expect`)
-- **Setup file**: `test/setup.ts` (251 lines of global mocks)
-- **E2E exclusion**: `tests/e2e/**` excluded from Vitest runner
-- **Path aliases**: `@` → `./src` (consistent with Vite config)
+
+* **Framework**: Vitest 4.0.16
+* **Environment**: jsdom
+* **Globals**: Enabled (no explicit imports for `describe`, `it`, `expect`)
+* **Setup file**: `test/setup.ts` (251 lines of global mocks)
+* **E2E exclusion**: `tests/e2e/**` excluded from Vitest runner
+* **Path aliases**: `@` → `./src` (consistent with Vite config)
 
 **E2E Tests (Playwright):**
-- **Framework**: Playwright 1.57.0
-- **Test directory**: `./tests/e2e`
-- **Parallel execution**: Enabled
-- **Retry strategy**: 2 retries in CI, 0 locally
-- **Workers**: 1 in CI, auto-detect locally
-- **Reporter**: HTML
-- **Base URL**: `http://localhost:8080`
-- **Trace**: Captured on first retry
-- **Browsers**: Chromium (Desktop Chrome) only
-- **Web server**: `npm run dev` with port reuse
+
+* **Framework**: Playwright 1.57.0
+* **Test directory**: `./tests/e2e`
+* **Parallel execution**: Enabled
+* **Retry strategy**: 2 retries in CI, 0 locally
+* **Workers**: 1 in CI, auto-detect locally
+* **Reporter**: HTML
+* **Base URL**: `http://localhost:8080`
+* **Trace**: Captured on first retry
+* **Browsers**: Chromium (Desktop Chrome) only
+* **Web server**: `npm run dev` with port reuse
 
 **Test Data Generation**: `@faker-js/faker` 10.2.0
 
 #### 8.1.2 Test Inventory
 
-| Category | File Count | Lines of Code | Key Files |
-|----------|-----------|---------------|-----------|
-| **Component Tests** | 26 | ~8,000+ | `QuoteFormRefactored.test.tsx` (3,998 lines), `QuoteRepository.test.tsx` (3,926 lines) |
-| **Service/Logic Tests** | 13 | ~2,500+ | `InvoiceService.test.ts`, `LogisticsQuotationEngine.test.ts`, `TaxEngine.test.ts` |
-| **DB/RLS Tests** | 3 | ~13,150+ | `rls-regression.test.ts` (4,745 lines), `adminOverride.test.ts` (4,641 lines), `adminOverride.integration.test.ts` (3,764 lines) |
-| **Integration Tests** | 7 | ~1,095 | `quote-data-flow.test.tsx`, `container_hierarchy.test.ts`, `hierarchy.test.ts` |
-| **Utility Tests** | 6 | ~800+ | `sqlFileParser.test.ts`, `pgDumpExport.test.ts`, `subscriptionScaling.test.ts` |
-| **Hook Tests** | 2 | ~200+ | `useAuth.test.tsx`, `usePgDumpImport.test.ts` |
-| **Edge Function Tests** | 4 | ~400+ | `classify-email/tests/logic.test.ts`, `route-email/tests/logic.test.ts` |
-| **E2E Tests** | 1 | 168 | `admin-override.spec.ts` |
-| **Total** | **76 files** | **~26,000+** | **339 test cases (293 passing)** |
+| Category                | File Count   | Lines of Code | Key Files                                                                                                                        |
+| ----------------------- | ------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Component Tests**     | 26           | \~8,000+      | `QuoteFormRefactored.test.tsx` (3,998 lines), `QuoteRepository.test.tsx` (3,926 lines)                                           |
+| **Service/Logic Tests** | 13           | \~2,500+      | `InvoiceService.test.ts`, `LogisticsQuotationEngine.test.ts`, `TaxEngine.test.ts`                                                |
+| **DB/RLS Tests**        | 3            | \~13,150+     | `rls-regression.test.ts` (4,745 lines), `adminOverride.test.ts` (4,641 lines), `adminOverride.integration.test.ts` (3,764 lines) |
+| **Integration Tests**   | 7            | \~1,095       | `quote-data-flow.test.tsx`, `container_hierarchy.test.ts`, `hierarchy.test.ts`                                                   |
+| **Utility Tests**       | 6            | \~800+        | `sqlFileParser.test.ts`, `pgDumpExport.test.ts`, `subscriptionScaling.test.ts`                                                   |
+| **Hook Tests**          | 2            | \~200+        | `useAuth.test.tsx`, `usePgDumpImport.test.ts`                                                                                    |
+| **Edge Function Tests** | 4            | \~400+        | `classify-email/tests/logic.test.ts`, `route-email/tests/logic.test.ts`                                                          |
+| **E2E Tests**           | 1            | 168           | `admin-override.spec.ts`                                                                                                         |
+| **Total**               | **76 files** | **\~26,000+** | **339 test cases (293 passing)**                                                                                                 |
 
 #### 8.1.3 Global Test Setup (`test/setup.ts`)
 
 The global setup file provides mock implementations for the most commonly used dependencies:
 
-| Mock Target | Module Path | Mocked Behavior |
-|------------|-------------|-----------------|
-| **Supabase Client** | `@/integrations/supabase/client` | Full query builder chain (select, insert, update, delete, eq, order, limit, single, rpc) |
-| **useAuth Hook** | `@/hooks/useAuth` | Returns test user, session, profile, roles, permissions, auth methods |
-| **useCRM Hook** | `@/hooks/useCRM` (implied) | Returns user, context, supabase, scopedDb, preferences |
-| **DomainContext** | `@/contexts/DomainContext` | Returns domain management (currentDomain, setDomain, availableDomains) |
-| **i18next** | `react-i18next` | `useTranslation()` returns passthrough `t()` function |
-| **window.matchMedia** | Browser API | Returns mock for responsive design testing |
+| Mock Target            | Module Path                      | Mocked Behavior                                                                          |
+| ---------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Supabase Client**    | `@/integrations/supabase/client` | Full query builder chain (select, insert, update, delete, eq, order, limit, single, rpc) |
+| **useAuth Hook**       | `@/hooks/useAuth`                | Returns test user, session, profile, roles, permissions, auth methods                    |
+| **useCRM Hook**        | `@/hooks/useCRM` (implied)       | Returns user, context, supabase, scopedDb, preferences                                   |
+| **DomainContext**      | `@/contexts/DomainContext`       | Returns domain management (currentDomain, setDomain, availableDomains)                   |
+| **i18next**            | `react-i18next`                  | `useTranslation()` returns passthrough `t()` function                                    |
+| **window\.matchMedia** | Browser API                      | Returns mock for responsive design testing                                               |
 
 #### 8.1.4 Testing Patterns Used
 
 **Pattern 1: Unit Tests with Supabase Mocks**
+
 ```typescript
 // access.test.ts — Tests ScopedDataAccess for each role combination
 describe('ScopedDataAccess', () => {
@@ -5022,6 +5223,7 @@ describe('ScopedDataAccess', () => {
 ```
 
 **Pattern 2: Component Tests with React Testing Library**
+
 ```typescript
 // ComposerLogging.test.tsx — Renders components with QueryClient + MemoryRouter
 const wrapper = ({ children }) => (
@@ -5034,6 +5236,7 @@ await waitFor(() => screen.getByText('Expected'));
 ```
 
 **Pattern 3: Service Tests with ScopedDataAccess**
+
 ```typescript
 // InvoiceService.test.ts — Tests service methods via mock ScopedDataAccess
 const mockScopedDb = { from: vi.fn(), insert: vi.fn(), select: vi.fn() };
@@ -5041,6 +5244,7 @@ const service = new InvoiceService(mockScopedDb);
 ```
 
 **Pattern 4: Edge Function Tests (Pure Logic)**
+
 ```typescript
 // classify-email/tests/logic.test.ts — Tests pure functions with no mocks
 const result = classifyEmailContent(subject, body);
@@ -5048,6 +5252,7 @@ expect(result.category).toBe('feedback');
 ```
 
 **Pattern 5: E2E Tests with Playwright**
+
 ```typescript
 // admin-override.spec.ts — Full browser automation
 test('Platform Admin can override scope', async ({ page }) => {
@@ -5062,16 +5267,16 @@ test('Platform Admin can override scope', async ({ page }) => {
 
 #### 8.2.1 Critical Gaps
 
-| Gap | Severity | Impact | Remediation |
-|-----|----------|--------|-------------|
-| **No code coverage configured** | 🔴 HIGH | Cannot measure or enforce test coverage thresholds | Configure `@vitest/coverage-v8`, set 60% target |
-| **No pre-commit hooks** | 🔴 HIGH | Broken code can be committed without lint/test checks | Install `husky` + `lint-staged` |
-| **TypeScript strict mode disabled** | 🔴 HIGH | `noImplicitAny: false`, `strictNullChecks: false` — silent type errors | Enable incrementally (strict per-file) |
-| **Only 1 E2E test** | 🟡 MEDIUM | Critical user flows untested end-to-end | Add Login, Quote, Shipment, Invoice E2E flows |
-| **No E2E tests in CI** | 🟡 MEDIUM | E2E regressions not caught before merge | Add Playwright to CI with Chromium container |
-| **46 passing test delta** | 🟡 MEDIUM | 339 total, 293 passing = 46 failing tests | Triage: fix or remove broken tests |
-| **No Prettier** | 🟢 LOW | Inconsistent formatting across contributors | Add `.prettierrc` + lint-staged integration |
-| **No load testing** | 🟡 MEDIUM | Cannot validate performance under concurrent load | Implement k6 scripts for critical paths |
+| Gap                                 | Severity  | Impact                                                                 | Remediation                                     |
+| ----------------------------------- | --------- | ---------------------------------------------------------------------- | ----------------------------------------------- |
+| **No code coverage configured**     | 🔴 HIGH   | Cannot measure or enforce test coverage thresholds                     | Configure `@vitest/coverage-v8`, set 60% target |
+| **No pre-commit hooks**             | 🔴 HIGH   | Broken code can be committed without lint/test checks                  | Install `husky` + `lint-staged`                 |
+| **TypeScript strict mode disabled** | 🔴 HIGH   | `noImplicitAny: false`, `strictNullChecks: false` — silent type errors | Enable incrementally (strict per-file)          |
+| **Only 1 E2E test**                 | 🟡 MEDIUM | Critical user flows untested end-to-end                                | Add Login, Quote, Shipment, Invoice E2E flows   |
+| **No E2E tests in CI**              | 🟡 MEDIUM | E2E regressions not caught before merge                                | Add Playwright to CI with Chromium container    |
+| **46 passing test delta**           | 🟡 MEDIUM | 339 total, 293 passing = 46 failing tests                              | Triage: fix or remove broken tests              |
+| **No Prettier**                     | 🟢 LOW    | Inconsistent formatting across contributors                            | Add `.prettierrc` + lint-staged integration     |
+| **No load testing**                 | 🟡 MEDIUM | Cannot validate performance under concurrent load                      | Implement k6 scripts for critical paths         |
 
 #### 8.2.2 Testing Pyramid Strategy (Target State)
 
@@ -5096,58 +5301,61 @@ test('Platform Admin can override scope', async ({ page }) => {
 
 #### 8.2.3 Coverage Targets by Module
 
-| Module | Current Tests | Target Coverage | Priority |
-|--------|-------------|----------------|----------|
-| `src/lib/db/` (ScopedDataAccess) | 3 files, ~13K lines | 90% | P0 — Security-critical |
-| `src/services/` (business logic) | 8 files | 80% | P0 — Revenue-critical |
-| `src/hooks/` | 2 files | 70% | P1 — Core functionality |
-| `src/components/sales/` | 12 files | 70% | P1 — Highest-traffic feature |
-| `src/utils/` | 6 files | 80% | P2 — Shared utilities |
-| `supabase/functions/` | 4 files | 60% | P1 — API endpoints |
+| Module                           | Current Tests        | Target Coverage | Priority                     |
+| -------------------------------- | -------------------- | --------------- | ---------------------------- |
+| `src/lib/db/` (ScopedDataAccess) | 3 files, \~13K lines | 90%             | P0 — Security-critical       |
+| `src/services/` (business logic) | 8 files              | 80%             | P0 — Revenue-critical        |
+| `src/hooks/`                     | 2 files              | 70%             | P1 — Core functionality      |
+| `src/components/sales/`          | 12 files             | 70%             | P1 — Highest-traffic feature |
+| `src/utils/`                     | 6 files              | 80%             | P2 — Shared utilities        |
+| `supabase/functions/`            | 4 files              | 60%             | P1 — API endpoints           |
 
 ### 8.3 Linting & Static Analysis
 
 #### 8.3.1 Current Configuration
 
 **ESLint** (`eslint.config.js`):
-- Base: `@eslint/js` recommended + `typescript-eslint` recommended
-- Language: ECMAScript 2020, browser globals
-- Key rules:
-  - `react-hooks/exhaustive-deps`: warn
-  - `@typescript-eslint/no-unused-vars`: off (⚠️ should be warn)
-  - `@typescript-eslint/no-explicit-any`: warn (ignoreRestArgs)
-  - `@typescript-eslint/ban-ts-comment`: error (ts-ignore requires description)
-- Relaxed files (exempt from `no-explicit-any`): Quote Composer, ShipmentsPipeline, UIDemoForms, DatabaseExport
-- Excluded directories: `dist`, `storybook-static`, `test-results`
-- Supabase functions: `no-explicit-any` off, `ban-ts-comment` off
+
+* Base: `@eslint/js` recommended + `typescript-eslint` recommended
+* Language: ECMAScript 2020, browser globals
+* Key rules:
+  * `react-hooks/exhaustive-deps`: warn
+  * `@typescript-eslint/no-unused-vars`: off (⚠️ should be warn)
+  * `@typescript-eslint/no-explicit-any`: warn (ignoreRestArgs)
+  * `@typescript-eslint/ban-ts-comment`: error (ts-ignore requires description)
+* Relaxed files (exempt from `no-explicit-any`): Quote Composer, ShipmentsPipeline, UIDemoForms, DatabaseExport
+* Excluded directories: `dist`, `storybook-static`, `test-results`
+* Supabase functions: `no-explicit-any` off, `ban-ts-comment` off
 
 **TypeScript** (`tsconfig.json` — ⚠️ Non-strict mode):
-- `strict`: false
-- `noImplicitAny`: false
-- `strictNullChecks`: false
-- `noUnusedLocals`: false
-- `noUnusedParameters`: false
-- `noFallthroughCasesInSwitch`: false
-- `skipLibCheck`: true
-- `allowJs`: true
+
+* `strict`: false
+* `noImplicitAny`: false
+* `strictNullChecks`: false
+* `noUnusedLocals`: false
+* `noUnusedParameters`: false
+* `noFallthroughCasesInSwitch`: false
+* `skipLibCheck`: true
+* `allowJs`: true
 
 **Markdown Linting** (remark-cli):
-- `remark-preset-lint-consistent`
-- `remark-preset-lint-markdown-style-guide`
-- `remark-preset-lint-recommended`
-- `remark-preset-prettier`
+
+* `remark-preset-lint-consistent`
+* `remark-preset-lint-markdown-style-guide`
+* `remark-preset-lint-recommended`
+* `remark-preset-prettier`
 
 #### 8.3.2 Static Analysis Improvement Plan
 
-| Tool | Purpose | Priority | Effort |
-|------|---------|----------|--------|
-| **Enable TypeScript strict mode** | Catch null reference, any-type, and implicit errors | P0 | 3-4 weeks (incremental) |
-| **@vitest/coverage-v8** | Code coverage reporting with thresholds | P0 | 1 day |
-| **husky + lint-staged** | Pre-commit hooks for lint + test | P0 | 1 day |
-| **Prettier** | Consistent formatting | P1 | 1 day |
-| **SonarQube / SonarCloud** | Code smells, duplication, vulnerability detection | P1 | 1 week |
-| **Snyk / npm audit** | Dependency vulnerability scanning | P1 | 1 day (CI integration) |
-| **OWASP ZAP** | Automated penetration scanning | P2 | 1 week |
+| Tool                              | Purpose                                             | Priority | Effort                  |
+| --------------------------------- | --------------------------------------------------- | -------- | ----------------------- |
+| **Enable TypeScript strict mode** | Catch null reference, any-type, and implicit errors | P0       | 3-4 weeks (incremental) |
+| **@vitest/coverage-v8**           | Code coverage reporting with thresholds             | P0       | 1 day                   |
+| **husky + lint-staged**           | Pre-commit hooks for lint + test                    | P0       | 1 day                   |
+| **Prettier**                      | Consistent formatting                               | P1       | 1 day                   |
+| **SonarQube / SonarCloud**        | Code smells, duplication, vulnerability detection   | P1       | 1 week                  |
+| **Snyk / npm audit**              | Dependency vulnerability scanning                   | P1       | 1 day (CI integration)  |
+| **OWASP ZAP**                     | Automated penetration scanning                      | P2       | 1 week                  |
 
 ### 8.4 CI/CD Quality Gates
 
@@ -5156,8 +5364,9 @@ test('Platform Admin can override scope', async ({ page }) => {
 ```
 Push/PR → Install → Lint → Typecheck → Unit Tests → Build
 ```
-- All gates must pass for merge
-- No E2E tests, no coverage gates, no security scanning
+
+* All gates must pass for merge
+* No E2E tests, no coverage gates, no security scanning
 
 #### 8.4.2 Target Pipeline (Recommended)
 
@@ -5184,18 +5393,20 @@ Manual approval
 ### 8.5 Visual Testing & Design System
 
 **Storybook Configuration:**
-- **Version**: 8.6.15
-- **Addons**: Essentials, Viewport, Accessibility (a11y)
-- **Location**: `.storybook/`
-- **Build output**: `storybook-static/`
-- **Status**: Configured but adoption unknown; no Storybook tests found in test inventory
+
+* **Version**: 8.6.15
+* **Addons**: Essentials, Viewport, Accessibility (a11y)
+* **Location**: `.storybook/`
+* **Build output**: `storybook-static/`
+* **Status**: Configured but adoption unknown; no Storybook tests found in test inventory
 
 **Recommended Integration:**
-- Add Storybook interaction tests for core UI components
-- Integrate Chromatic or Percy for visual regression testing
-- Use Storybook a11y addon for accessibility compliance
 
----
+* Add Storybook interaction tests for core UI components
+* Integrate Chromatic or Percy for visual regression testing
+* Use Storybook a11y addon for accessibility compliance
+
+***
 
 ## Section 9: Production Readiness Checklist
 
@@ -5203,118 +5414,119 @@ Manual approval
 
 #### 9.1.1 Monitoring & Observability
 
-| Component | Tool | Status | Configuration |
-|-----------|------|--------|---------------|
-| **Error Tracking** | Sentry (@sentry/react 10.32.1) | ✅ Integrated | `VITE_SENTRY_DSN` env var; captures React errors, unhandled rejections |
-| **Product Analytics** | PostHog (posthog-js 1.313.0) | ✅ Integrated | `VITE_POSTHOG_KEY` env var; user behavior, feature usage |
-| **Application Logging** | Custom Logger (`src/lib/logger.ts`) | ✅ Implemented | Structured JSON, PII masking, 5 log levels (DEBUG→CRITICAL) |
-| **Edge Function Logging** | Custom Logger (`_shared/logger.ts`) | ✅ Implemented | Correlation IDs, DB persistence, alert triggers |
-| **Web Vitals** | web-vitals 5.1.0 | ✅ Included | LCP, FID, CLS metrics collection |
-| **Distributed Tracing** | OpenTelemetry | ❌ Not configured | Cannot trace requests across UI → Edge → DB |
-| **APM Dashboard** | Datadog/Grafana | ❌ Not configured | No centralized performance monitoring |
-| **Uptime Monitoring** | External pinger | ❌ Not configured | No automated uptime checks |
+| Component                 | Tool                                | Status           | Configuration                                                          |
+| ------------------------- | ----------------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| **Error Tracking**        | Sentry (@sentry/react 10.32.1)      | ✅ Integrated     | `VITE_SENTRY_DSN` env var; captures React errors, unhandled rejections |
+| **Product Analytics**     | PostHog (posthog-js 1.313.0)        | ✅ Integrated     | `VITE_POSTHOG_KEY` env var; user behavior, feature usage               |
+| **Application Logging**   | Custom Logger (`src/lib/logger.ts`) | ✅ Implemented    | Structured JSON, PII masking, 5 log levels (DEBUG→CRITICAL)            |
+| **Edge Function Logging** | Custom Logger (`_shared/logger.ts`) | ✅ Implemented    | Correlation IDs, DB persistence, alert triggers                        |
+| **Web Vitals**            | web-vitals 5.1.0                    | ✅ Included       | LCP, FID, CLS metrics collection                                       |
+| **Distributed Tracing**   | OpenTelemetry                       | ❌ Not configured | Cannot trace requests across UI → Edge → DB                            |
+| **APM Dashboard**         | Datadog/Grafana                     | ❌ Not configured | No centralized performance monitoring                                  |
+| **Uptime Monitoring**     | External pinger                     | ❌ Not configured | No automated uptime checks                                             |
 
 **Logger Capabilities (`src/lib/logger.ts`):**
-- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
-- PII masking patterns: Email (***@***.***), Phone (***-***-XXXX), Credit card (****-****-****-****)
-- DB persistence: WARNING and above logged to `system_logs` table
-- CRITICAL alerts: Triggers `alert-notifier` Edge Function
-- Correlation ID support via `x-correlation-id` header
+
+* Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+* PII masking patterns: Email (***@***.***), Phone (***-***-XXXX), Credit card (**\*\*-****-**\*\*-*\*\*\*)
+* DB persistence: WARNING and above logged to `system_logs` table
+* CRITICAL alerts: Triggers `alert-notifier` Edge Function
+* Correlation ID support via `x-correlation-id` header
 
 #### 9.1.2 Error Handling
 
-| Component | Implementation | Status |
-|-----------|---------------|--------|
-| **React Error Boundary** | `GlobalErrorBoundary.tsx` | ✅ Implemented |
-| **Sentry Integration** | Captures uncaught errors with context | ✅ Configured |
-| **Edge Function Errors** | try/catch with structured JSON responses | ✅ Per-function |
-| **Supabase Error Handling** | `.error` property checking on all queries | ✅ Pattern established |
-| **User-Facing Error Messages** | Toast notifications (sonner 1.7.4) | ✅ Implemented |
-| **Global 404 Handler** | NotFound component in React Router | ✅ Implemented |
-| **API Error Standardization** | Consistent error response format | ❌ Inconsistent across Edge Functions |
+| Component                      | Implementation                            | Status                               |
+| ------------------------------ | ----------------------------------------- | ------------------------------------ |
+| **React Error Boundary**       | `GlobalErrorBoundary.tsx`                 | ✅ Implemented                        |
+| **Sentry Integration**         | Captures uncaught errors with context     | ✅ Configured                         |
+| **Edge Function Errors**       | try/catch with structured JSON responses  | ✅ Per-function                       |
+| **Supabase Error Handling**    | `.error` property checking on all queries | ✅ Pattern established                |
+| **User-Facing Error Messages** | Toast notifications (sonner 1.7.4)        | ✅ Implemented                        |
+| **Global 404 Handler**         | NotFound component in React Router        | ✅ Implemented                        |
+| **API Error Standardization**  | Consistent error response format          | ❌ Inconsistent across Edge Functions |
 
 #### 9.1.3 Infrastructure
 
-| Component | Status | Details |
-|-----------|--------|---------|
-| **Containerization** | ✅ Docker multi-stage build | Node 20-alpine → Nginx alpine |
-| **Orchestration** | ✅ Docker Compose (9 services) | supabase-network bridge, persistent volumes |
-| **Health Check** | ✅ Nginx `/health` endpoint | Access log disabled for health probes |
-| **Nginx Security** | ✅ Hardened headers | DENY framing, nosniff, strict referrer |
-| **Gzip Compression** | ✅ Enabled | text, CSS, JSON, JS, XML |
-| **Static Asset Caching** | ✅ 1-year cache | Vite content-hashed filenames |
-| **SPA Routing** | ✅ try_files fallback | React Router deep-link support |
-| **SSL/TLS** | ✅ Supabase-managed | TLS 1.3 for all Supabase endpoints |
-| **CDN** | ❌ Not configured | No edge caching for global distribution |
-| **Auto-Scaling** | ❌ Not configured | Relies on Supabase managed scaling |
-| **Multi-Region** | ❌ Single region | No cross-region failover |
+| Component                | Status                        | Details                                     |
+| ------------------------ | ----------------------------- | ------------------------------------------- |
+| **Containerization**     | ✅ Docker multi-stage build    | Node 20-alpine → Nginx alpine               |
+| **Orchestration**        | ✅ Docker Compose (9 services) | supabase-network bridge, persistent volumes |
+| **Health Check**         | ✅ Nginx `/health` endpoint    | Access log disabled for health probes       |
+| **Nginx Security**       | ✅ Hardened headers            | DENY framing, nosniff, strict referrer      |
+| **Gzip Compression**     | ✅ Enabled                     | text, CSS, JSON, JS, XML                    |
+| **Static Asset Caching** | ✅ 1-year cache                | Vite content-hashed filenames               |
+| **SPA Routing**          | ✅ try\_files fallback         | React Router deep-link support              |
+| **SSL/TLS**              | ✅ Supabase-managed            | TLS 1.3 for all Supabase endpoints          |
+| **CDN**                  | ❌ Not configured              | No edge caching for global distribution     |
+| **Auto-Scaling**         | ❌ Not configured              | Relies on Supabase managed scaling          |
+| **Multi-Region**         | ❌ Single region               | No cross-region failover                    |
 
 ### 9.2 Go-Live Criteria Checklist
 
 #### 9.2.1 Security Readiness
 
-| Criteria | Status | Evidence | Owner |
-|----------|--------|----------|-------|
-| [ ] Zero Critical CVEs in dependencies | ⚠️ Needs audit | Run `npm audit` + Snyk scan | DevOps |
-| [ ] **Rotate all credentials from git history** | 🔴 **NOT DONE** | `.env` was committed; all keys in git history | Security Lead |
-| [ ] Penetration test completed | ❌ Not started | Engage third-party pen-test firm | Security Lead |
-| [ ] RLS regression test suite passing | ✅ File exists | `src/lib/db/__tests__/rls-regression.test.ts` (4,745 lines) | Backend Lead |
-| [ ] All Edge Functions authenticated | ✅ Done | 44/45 functions secured (seed-platform-admin excluded by design) | Backend Lead |
-| [ ] CORS origin allowlist configured | ✅ Done | `getCorsHeaders(req)` with `ALLOWED_ORIGINS` env var | Backend Lead |
-| [ ] No wildcard CORS | ✅ Done | Legacy wildcard export removed from `_shared/cors.ts` | Backend Lead |
-| [ ] PII masking in all log outputs | ✅ Done | Logger masks emails, phones, credit cards | Backend Lead |
-| [ ] MFA enforcement for admin roles | ⚠️ Available, not enforced | Supabase supports TOTP/Phone/WebAuthn (up to 10 factors) | Product |
-| [ ] Set `ALLOWED_ORIGINS` in production | ❌ Not configured | Must be set before go-live | DevOps |
+| Criteria                                         | Status                     | Evidence                                                         | Owner         |
+| ------------------------------------------------ | -------------------------- | ---------------------------------------------------------------- | ------------- |
+| \[ ] Zero Critical CVEs in dependencies          | ⚠️ Needs audit             | Run `npm audit` + Snyk scan                                      | DevOps        |
+| \[ ] **Rotate all credentials from git history** | 🔴 **NOT DONE**            | `.env` was committed; all keys in git history                    | Security Lead |
+| \[ ] Penetration test completed                  | ❌ Not started              | Engage third-party pen-test firm                                 | Security Lead |
+| \[ ] RLS regression test suite passing           | ✅ File exists              | `src/lib/db/__tests__/rls-regression.test.ts` (4,745 lines)      | Backend Lead  |
+| \[ ] All Edge Functions authenticated            | ✅ Done                     | 44/45 functions secured (seed-platform-admin excluded by design) | Backend Lead  |
+| \[ ] CORS origin allowlist configured            | ✅ Done                     | `getCorsHeaders(req)` with `ALLOWED_ORIGINS` env var             | Backend Lead  |
+| \[ ] No wildcard CORS                            | ✅ Done                     | Legacy wildcard export removed from `_shared/cors.ts`            | Backend Lead  |
+| \[ ] PII masking in all log outputs              | ✅ Done                     | Logger masks emails, phones, credit cards                        | Backend Lead  |
+| \[ ] MFA enforcement for admin roles             | ⚠️ Available, not enforced | Supabase supports TOTP/Phone/WebAuthn (up to 10 factors)         | Product       |
+| \[ ] Set `ALLOWED_ORIGINS` in production         | ❌ Not configured           | Must be set before go-live                                       | DevOps        |
 
 #### 9.2.2 Performance Readiness
 
-| Criteria | Target | Current Status | Action Required |
-|----------|--------|---------------|-----------------|
-| [ ] API response time (p95) | < 500ms | Unknown (no APM) | Implement APM monitoring |
-| [ ] Lighthouse Performance Score | > 90 | Unknown | Run audit, optimize LCP |
-| [ ] Initial bundle size | < 2MB (gzipped) | Unknown (bundle split in place) | Measure with `vite build --report` |
-| [ ] Database query time (p95) | < 100ms | Unknown | Add `pg_stat_statements` monitoring |
-| [ ] Edge Function cold start | < 500ms | Unknown | Benchmark all 46 functions |
-| [ ] Concurrent user capacity | 100+ simultaneous | Unknown | Load test with k6 |
-| [ ] Virtual scrolling for large lists | Implemented | ✅ react-window + @tanstack/react-virtual | Verify on 10K+ row datasets |
-| [ ] Route-level code splitting | Implemented | ✅ ~60 pages lazy-loaded | Verify chunk sizes |
+| Criteria                               | Target            | Current Status                           | Action Required                     |
+| -------------------------------------- | ----------------- | ---------------------------------------- | ----------------------------------- |
+| \[ ] API response time (p95)           | < 500ms           | Unknown (no APM)                         | Implement APM monitoring            |
+| \[ ] Lighthouse Performance Score      | > 90              | Unknown                                  | Run audit, optimize LCP             |
+| \[ ] Initial bundle size               | < 2MB (gzipped)   | Unknown (bundle split in place)          | Measure with `vite build --report`  |
+| \[ ] Database query time (p95)         | < 100ms           | Unknown                                  | Add `pg_stat_statements` monitoring |
+| \[ ] Edge Function cold start          | < 500ms           | Unknown                                  | Benchmark all 46 functions          |
+| \[ ] Concurrent user capacity          | 100+ simultaneous | Unknown                                  | Load test with k6                   |
+| \[ ] Virtual scrolling for large lists | Implemented       | ✅ react-window + @tanstack/react-virtual | Verify on 10K+ row datasets         |
+| \[ ] Route-level code splitting        | Implemented       | ✅ \~60 pages lazy-loaded                 | Verify chunk sizes                  |
 
 #### 9.2.3 Reliability Readiness
 
-| Criteria | Target | Current Status | Action Required |
-|----------|--------|---------------|-----------------|
-| [ ] Backup frequency | PITR (15-min RPO) | Daily (Supabase managed) | Upgrade to PITR plan |
-| [ ] Backup restore tested | Verified quarterly | ❌ Never tested | Schedule first drill |
-| [ ] Recovery Time Objective (RTO) | < 1 hour | Undefined | Define and test recovery playbook |
-| [ ] Recovery Point Objective (RPO) | < 15 minutes | ~24 hours (daily backup) | Upgrade backup frequency |
-| [ ] Database failover | Automated | ❌ Single instance | Configure Supabase HA (if available) |
-| [ ] Feature flags system | Operational | ❌ None | Implement (LaunchDarkly or custom) |
-| [ ] Rollback procedure documented | Tested | ❌ Not documented | Write runbook |
-| [ ] Health check monitoring | 24/7 external | ✅ `/health` exists, ❌ no monitoring | Set up Pingdom/UptimeRobot |
+| Criteria                            | Target             | Current Status                      | Action Required                      |
+| ----------------------------------- | ------------------ | ----------------------------------- | ------------------------------------ |
+| \[ ] Backup frequency               | PITR (15-min RPO)  | Daily (Supabase managed)            | Upgrade to PITR plan                 |
+| \[ ] Backup restore tested          | Verified quarterly | ❌ Never tested                      | Schedule first drill                 |
+| \[ ] Recovery Time Objective (RTO)  | < 1 hour           | Undefined                           | Define and test recovery playbook    |
+| \[ ] Recovery Point Objective (RPO) | < 15 minutes       | \~24 hours (daily backup)           | Upgrade backup frequency             |
+| \[ ] Database failover              | Automated          | ❌ Single instance                   | Configure Supabase HA (if available) |
+| \[ ] Feature flags system           | Operational        | ❌ None                              | Implement (LaunchDarkly or custom)   |
+| \[ ] Rollback procedure documented  | Tested             | ❌ Not documented                    | Write runbook                        |
+| \[ ] Health check monitoring        | 24/7 external      | ✅ `/health` exists, ❌ no monitoring | Set up Pingdom/UptimeRobot           |
 
 #### 9.2.4 Operational Readiness
 
-| Criteria | Status | Action Required |
-|----------|--------|-----------------|
-| [ ] On-call rotation established | ❌ Not established | Define rotation schedule + escalation path |
-| [ ] Incident response playbook | ❌ Not documented | Write playbooks for: DB down, Auth failure, Edge Function errors, data breach |
-| [ ] Runbook for common operations | ❌ Not documented | Document: deploy, rollback, DB migration, user provisioning, credential rotation |
-| [ ] Alerting rules configured | ⚠️ Partial (CRITICAL → alert-notifier) | Add PagerDuty/Opsgenie integration for structured alerting |
-| [ ] Log aggregation centralized | ⚠️ Partial (system_logs table) | Add Datadog/Grafana Loki for full-stack log search |
-| [ ] Help center / documentation | ❌ Not created | Build user-facing documentation |
-| [ ] SLA defined | ❌ Not defined | Define 99.9% uptime SLA with penalty terms |
+| Criteria                           | Status                                 | Action Required                                                                  |
+| ---------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------- |
+| \[ ] On-call rotation established  | ❌ Not established                      | Define rotation schedule + escalation path                                       |
+| \[ ] Incident response playbook    | ❌ Not documented                       | Write playbooks for: DB down, Auth failure, Edge Function errors, data breach    |
+| \[ ] Runbook for common operations | ❌ Not documented                       | Document: deploy, rollback, DB migration, user provisioning, credential rotation |
+| \[ ] Alerting rules configured     | ⚠️ Partial (CRITICAL → alert-notifier) | Add PagerDuty/Opsgenie integration for structured alerting                       |
+| \[ ] Log aggregation centralized   | ⚠️ Partial (system\_logs table)        | Add Datadog/Grafana Loki for full-stack log search                               |
+| \[ ] Help center / documentation   | ❌ Not created                          | Build user-facing documentation                                                  |
+| \[ ] SLA defined                   | ❌ Not defined                          | Define 99.9% uptime SLA with penalty terms                                       |
 
 #### 9.2.5 Legal & Compliance Readiness
 
-| Criteria | Status | Action Required |
-|----------|--------|-----------------|
-| [ ] Terms of Service | ❌ Not drafted | Engage legal counsel |
-| [ ] Privacy Policy (GDPR-compliant) | ❌ Not drafted | Include data retention, right to erasure, DPO contact |
-| [ ] Data Processing Agreement (DPA) | ❌ Not drafted | Required for enterprise customers |
-| [ ] Cookie consent mechanism | ❌ Not implemented | PostHog and analytics require consent |
-| [ ] SOC 2 Type I readiness | ❌ Not assessed | Begin gap assessment |
-| [ ] GDPR data export capability | ⚠️ Partial (`export-data` function exists) | Verify completeness for user data portability |
-| [ ] Data retention policy documented | ❌ Not implemented | Implement soft-delete + hard-delete lifecycle |
+| Criteria                              | Status                                     | Action Required                                       |
+| ------------------------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| \[ ] Terms of Service                 | ❌ Not drafted                              | Engage legal counsel                                  |
+| \[ ] Privacy Policy (GDPR-compliant)  | ❌ Not drafted                              | Include data retention, right to erasure, DPO contact |
+| \[ ] Data Processing Agreement (DPA)  | ❌ Not drafted                              | Required for enterprise customers                     |
+| \[ ] Cookie consent mechanism         | ❌ Not implemented                          | PostHog and analytics require consent                 |
+| \[ ] SOC 2 Type I readiness           | ❌ Not assessed                             | Begin gap assessment                                  |
+| \[ ] GDPR data export capability      | ⚠️ Partial (`export-data` function exists) | Verify completeness for user data portability         |
+| \[ ] Data retention policy documented | ❌ Not implemented                          | Implement soft-delete + hard-delete lifecycle         |
 
 ### 9.3 Data Migration Plan
 
@@ -5356,14 +5568,14 @@ Phase 3: Post-Migration (1 week)
 
 #### 9.3.2 Available Migration Tools
 
-| Tool | Location | Purpose |
-|------|----------|---------|
-| `pgdump:export` script | `scripts/pgdump-export.js` | Export PostgreSQL data |
-| `push-migrations-to-target` | Edge Function | Push migrations to remote Supabase |
-| `remote-import` | Edge Function | Import data from external sources |
-| `process-franchise-import` | Edge Function | Bulk franchise data import |
-| `supabase:db:push` | npm script | Push schema changes to production |
-| `supabase:db:reset` | npm script | Reset local development database |
+| Tool                        | Location                   | Purpose                            |
+| --------------------------- | -------------------------- | ---------------------------------- |
+| `pgdump:export` script      | `scripts/pgdump-export.js` | Export PostgreSQL data             |
+| `push-migrations-to-target` | Edge Function              | Push migrations to remote Supabase |
+| `remote-import`             | Edge Function              | Import data from external sources  |
+| `process-franchise-import`  | Edge Function              | Bulk franchise data import         |
+| `supabase:db:push`          | npm script                 | Push schema changes to production  |
+| `supabase:db:reset`         | npm script                 | Reset local development database   |
 
 #### 9.3.3 Rollback Procedure
 
@@ -5381,181 +5593,181 @@ Steps:
 
 ### 9.4 Go-Live Readiness Score
 
-| Category | Weight | Ready Items | Total Items | Score |
-|----------|--------|------------|------------|-------|
-| **Security** | 30% | 6 | 10 | 60% |
-| **Performance** | 20% | 2 | 8 | 25% |
-| **Reliability** | 20% | 1 | 8 | 13% |
-| **Operations** | 15% | 0 | 6 | 0% |
-| **Legal/Compliance** | 15% | 0 | 7 | 0% |
-| **Weighted Total** | 100% | — | — | **~22%** |
+| Category             | Weight | Ready Items | Total Items | Score     |
+| -------------------- | ------ | ----------- | ----------- | --------- |
+| **Security**         | 30%    | 6           | 10          | 60%       |
+| **Performance**      | 20%    | 2           | 8           | 25%       |
+| **Reliability**      | 20%    | 1           | 8           | 13%       |
+| **Operations**       | 15%    | 0           | 6           | 0%        |
+| **Legal/Compliance** | 15%    | 0           | 7           | 0%        |
+| **Weighted Total**   | 100%   | —           | —           | **\~22%** |
 
 **Assessment:** The platform is **NOT production-ready**. Security foundations are strong (RLS, CORS, auth hardening), but critical gaps in monitoring, reliability, operations, and legal compliance must be addressed before go-live. Estimated effort to reach 80% readiness: **8-12 weeks** with dedicated DevOps and legal resources.
 
----
+***
 
 # APPENDICES
 
 ## Appendix A: Glossary of Terms
 
-| Term | Definition |
-|------|-----------|
-| **BaaS** | Backend-as-a-Service — Supabase provides database, auth, storage, and edge functions as a managed service |
-| **CORS** | Cross-Origin Resource Sharing — HTTP headers controlling which domains can access the API |
-| **Edge Function** | Serverless function running on Supabase's Deno runtime, deployed globally |
-| **Franchise** | Third tier of the hierarchy; represents a physical branch/location within a Tenant |
-| **HTS Code** | Harmonized Tariff Schedule code — used for customs classification of goods |
-| **JWT** | JSON Web Token — used for stateless authentication between client and server |
-| **MFA** | Multi-Factor Authentication — TOTP, Phone, or WebAuthn second factors |
-| **PITR** | Point-in-Time Recovery — database backup allowing restore to any moment |
-| **Plugin** | Domain-specific module registered in `PluginRegistry` with form config and quotation engine |
-| **PostgREST** | Automatic REST API generation from PostgreSQL schema (Supabase core component) |
-| **RLS** | Row-Level Security — PostgreSQL feature enforcing data access rules at the database row level |
-| **RPC** | Remote Procedure Call — PostgreSQL stored functions invoked via Supabase `supabase.rpc()` |
-| **ScopedDataAccess** | Application-layer class that auto-injects tenant/franchise filters into database queries |
-| **Tenant** | Second tier of the hierarchy; represents a company/organization using the platform |
-| **Super Admin** | Top tier; platform owner (SOS Services) with global visibility across all tenants |
+| Term                 | Definition                                                                                                |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| **BaaS**             | Backend-as-a-Service — Supabase provides database, auth, storage, and edge functions as a managed service |
+| **CORS**             | Cross-Origin Resource Sharing — HTTP headers controlling which domains can access the API                 |
+| **Edge Function**    | Serverless function running on Supabase's Deno runtime, deployed globally                                 |
+| **Franchise**        | Third tier of the hierarchy; represents a physical branch/location within a Tenant                        |
+| **HTS Code**         | Harmonized Tariff Schedule code — used for customs classification of goods                                |
+| **JWT**              | JSON Web Token — used for stateless authentication between client and server                              |
+| **MFA**              | Multi-Factor Authentication — TOTP, Phone, or WebAuthn second factors                                     |
+| **PITR**             | Point-in-Time Recovery — database backup allowing restore to any moment                                   |
+| **Plugin**           | Domain-specific module registered in `PluginRegistry` with form config and quotation engine               |
+| **PostgREST**        | Automatic REST API generation from PostgreSQL schema (Supabase core component)                            |
+| **RLS**              | Row-Level Security — PostgreSQL feature enforcing data access rules at the database row level             |
+| **RPC**              | Remote Procedure Call — PostgreSQL stored functions invoked via Supabase `supabase.rpc()`                 |
+| **ScopedDataAccess** | Application-layer class that auto-injects tenant/franchise filters into database queries                  |
+| **Tenant**           | Second tier of the hierarchy; represents a company/organization using the platform                        |
+| **Super Admin**      | Top tier; platform owner (SOS Services) with global visibility across all tenants                         |
 
 ## Appendix B: Technology Stack Reference
 
 ### B.1 Production Dependencies (32 packages)
 
-| Package | Version | Category |
-|---------|---------|----------|
-| react / react-dom | 18.3.1 | Core framework |
-| @supabase/supabase-js | 2.93.1 | Backend client |
-| @tanstack/react-query | 5.83.0 | Server state management |
-| react-router-dom | 6.30.1 | Client-side routing |
-| react-hook-form | 7.61.1 | Form handling |
-| zod | 3.25.76 | Schema validation |
-| tailwind-merge / clsx | 2.6.0 / 2.1.1 | CSS utilities |
-| recharts | 2.15.4 | Charts and data visualization |
-| i18next / react-i18next | 25.7.4 / 16.5.1 | Internationalization |
-| framer-motion | 12.23.26 | Animations |
-| @sentry/react | 10.32.1 | Error tracking |
-| posthog-js | 1.313.0 | Product analytics |
-| date-fns | 3.6.0 | Date utilities |
-| lucide-react | 0.462.0 | Icon library |
-| jspdf / jspdf-autotable | 4.0.0 / 5.0.7 | PDF generation |
-| xlsx | latest (CDN) | Spreadsheet import/export |
-| jszip | 3.10.1 | ZIP compression |
-| @dnd-kit/* | 6.3.1+ | Drag and drop |
-| @tanstack/react-virtual / react-window | 3.0.0 / 2.2.6 | List virtualization |
-| web-vitals | 5.1.0 | Performance metrics |
-| sonner | 1.7.4 | Toast notifications |
-| cmdk | 1.1.1 | Command palette |
-| papaparse | 5.5.3 | CSV parsing |
-| uuid | 13.0.0 | UUID generation |
-| Radix UI (20+ packages) | Latest | Accessible component primitives |
+| Package                                | Version         | Category                        |
+| -------------------------------------- | --------------- | ------------------------------- |
+| react / react-dom                      | 18.3.1          | Core framework                  |
+| @supabase/supabase-js                  | 2.93.1          | Backend client                  |
+| @tanstack/react-query                  | 5.83.0          | Server state management         |
+| react-router-dom                       | 6.30.1          | Client-side routing             |
+| react-hook-form                        | 7.61.1          | Form handling                   |
+| zod                                    | 3.25.76         | Schema validation               |
+| tailwind-merge / clsx                  | 2.6.0 / 2.1.1   | CSS utilities                   |
+| recharts                               | 2.15.4          | Charts and data visualization   |
+| i18next / react-i18next                | 25.7.4 / 16.5.1 | Internationalization            |
+| framer-motion                          | 12.23.26        | Animations                      |
+| @sentry/react                          | 10.32.1         | Error tracking                  |
+| posthog-js                             | 1.313.0         | Product analytics               |
+| date-fns                               | 3.6.0           | Date utilities                  |
+| lucide-react                           | 0.462.0         | Icon library                    |
+| jspdf / jspdf-autotable                | 4.0.0 / 5.0.7   | PDF generation                  |
+| xlsx                                   | latest (CDN)    | Spreadsheet import/export       |
+| jszip                                  | 3.10.1          | ZIP compression                 |
+| @dnd-kit/\*                            | 6.3.1+          | Drag and drop                   |
+| @tanstack/react-virtual / react-window | 3.0.0 / 2.2.6   | List virtualization             |
+| web-vitals                             | 5.1.0           | Performance metrics             |
+| sonner                                 | 1.7.4           | Toast notifications             |
+| cmdk                                   | 1.1.1           | Command palette                 |
+| papaparse                              | 5.5.3           | CSV parsing                     |
+| uuid                                   | 13.0.0          | UUID generation                 |
+| Radix UI (20+ packages)                | Latest          | Accessible component primitives |
 
 ### B.2 Development Dependencies (26 packages)
 
-| Package | Version | Category |
-|---------|---------|----------|
-| vite | 5.4.19 | Build tool |
-| typescript | 5.8.3 | Type system |
-| vitest | 4.0.16 | Unit test framework |
-| @playwright/test | 1.57.0 | E2E test framework |
-| @testing-library/react | 16.3.1 | Component test utilities |
-| @testing-library/jest-dom | 6.9.1 | DOM assertions |
-| @faker-js/faker | 10.2.0 | Test data generation |
-| jsdom | 27.4.0 | Browser environment for tests |
-| eslint | 9.32.0 | Linting |
-| typescript-eslint | 8.38.0 | TypeScript ESLint integration |
-| tailwindcss | 3.4.17 | CSS framework |
-| storybook | 8.6.15 | Component development |
-| supabase (CLI) | 2.72.8 | Database management |
-| remark-cli + presets | 12.0.1 | Markdown linting |
+| Package                   | Version | Category                      |
+| ------------------------- | ------- | ----------------------------- |
+| vite                      | 5.4.19  | Build tool                    |
+| typescript                | 5.8.3   | Type system                   |
+| vitest                    | 4.0.16  | Unit test framework           |
+| @playwright/test          | 1.57.0  | E2E test framework            |
+| @testing-library/react    | 16.3.1  | Component test utilities      |
+| @testing-library/jest-dom | 6.9.1   | DOM assertions                |
+| @faker-js/faker           | 10.2.0  | Test data generation          |
+| jsdom                     | 27.4.0  | Browser environment for tests |
+| eslint                    | 9.32.0  | Linting                       |
+| typescript-eslint         | 8.38.0  | TypeScript ESLint integration |
+| tailwindcss               | 3.4.17  | CSS framework                 |
+| storybook                 | 8.6.15  | Component development         |
+| supabase (CLI)            | 2.72.8  | Database management           |
+| remark-cli + presets      | 12.0.1  | Markdown linting              |
 
 ## Appendix C: Edge Function Inventory
 
-| # | Function Name | Auth Required | Admin Only | Purpose |
-|---|-------------|--------------|-----------|---------|
-| 1 | admin-reset-password | Yes | Yes (platform_admin) | Reset user passwords |
-| 2 | ai-advisor | Yes | No | AI-powered business advice |
-| 3 | alert-notifier | No (service) | N/A | Send critical alerts |
-| 4 | analyze-cargo-damage | Yes | No | AI cargo damage analysis |
-| 5 | anomaly-detector | No (service) | N/A | Detect data anomalies |
-| 6 | calculate-lead-score | Yes | No | Rule-based lead scoring |
-| 7 | calculate-quote-financials | Yes | No | Quote pricing calculations |
-| 8 | check-expiring-documents | Yes | No | Document expiry alerts |
-| 9 | classify-email | Yes | No | AI email classification |
-| 10 | cleanup-logs | Yes | Yes | Purge old system logs |
-| 11 | create-user | Yes | Yes (platform_admin) | Provision new users |
-| 12 | delete-user | Yes | Yes (platform_admin) | Remove users |
-| 13 | email-stats | Yes | No | Email analytics |
-| 14 | exchange-oauth-token | Special | N/A | OAuth token exchange |
-| 15 | execute-sql-external | Yes | Yes | Run SQL on external DBs |
-| 16 | export-data | Yes | Yes (platform_admin) | Platform data export |
-| 17 | extract-invoice-items | Yes | No | AI invoice OCR |
-| 18 | forecast-demand | Yes | No | AI demand prediction |
-| 19 | get-account-label | Yes | No | Account display name |
-| 20 | get-contact-label | Yes | No | Contact display name |
-| 21 | get-opportunity-full | Yes | No | Full opportunity data |
-| 22 | get-opportunity-label | Yes | No | Opportunity display name |
-| 23 | get-service-label | Yes | No | Service type display |
-| 24 | ingest-email | Yes | No | Process incoming emails |
-| 25 | lead-event-webhook | Yes | No | Lead event processing |
-| 26 | list-edge-functions | Yes | No | List available functions |
-| 27 | plan-event-webhook | Yes | No | Subscription event hook |
-| 28 | process-franchise-import | Yes | No | Bulk franchise import |
-| 29 | process-lead-assignments | Yes | No | Auto-assign leads |
-| 30 | process-scheduled-emails | Yes | No | Send scheduled emails |
-| 31 | push-migrations-to-target | Special | N/A | Remote DB migration |
-| 32 | rate-engine | Yes | No | Multi-modal rate calculation |
-| 33 | remote-import | Yes | No | External data import |
-| 34 | route-email | Yes | No | Email routing rules |
-| 35 | salesforce-sync-opportunity | Yes | No | Salesforce bidirectional sync |
-| 36 | search-emails | No (service) | N/A | Full-text email search |
-| 37 | seed-platform-admin | No (setup) | N/A | Initial admin provisioning |
-| 38 | send-email | No (service) | N/A | Transactional email sending |
-| 39 | subscription-plans | Yes | No | Plan management |
-| 40 | suggest-transport-mode | Yes | No | AI mode recommendation |
-| 41 | sync-all-mailboxes | No (service) | N/A | Mailbox synchronization |
-| 42 | sync-cn-hs-data | Yes/Service | No | CN HS code sync |
-| 43 | sync-emails | No (service) | N/A | Email sync (v1) |
-| 44 | sync-emails-v2 | No (service) | N/A | Email sync (v2, improved) |
-| 45 | sync-hts-data | Yes/Service | No | US HTS code sync |
+| #  | Function Name               | Auth Required | Admin Only            | Purpose                       |
+| -- | --------------------------- | ------------- | --------------------- | ----------------------------- |
+| 1  | admin-reset-password        | Yes           | Yes (platform\_admin) | Reset user passwords          |
+| 2  | ai-advisor                  | Yes           | No                    | AI-powered business advice    |
+| 3  | alert-notifier              | No (service)  | N/A                   | Send critical alerts          |
+| 4  | analyze-cargo-damage        | Yes           | No                    | AI cargo damage analysis      |
+| 5  | anomaly-detector            | No (service)  | N/A                   | Detect data anomalies         |
+| 6  | calculate-lead-score        | Yes           | No                    | Rule-based lead scoring       |
+| 7  | calculate-quote-financials  | Yes           | No                    | Quote pricing calculations    |
+| 8  | check-expiring-documents    | Yes           | No                    | Document expiry alerts        |
+| 9  | classify-email              | Yes           | No                    | AI email classification       |
+| 10 | cleanup-logs                | Yes           | Yes                   | Purge old system logs         |
+| 11 | create-user                 | Yes           | Yes (platform\_admin) | Provision new users           |
+| 12 | delete-user                 | Yes           | Yes (platform\_admin) | Remove users                  |
+| 13 | email-stats                 | Yes           | No                    | Email analytics               |
+| 14 | exchange-oauth-token        | Special       | N/A                   | OAuth token exchange          |
+| 15 | execute-sql-external        | Yes           | Yes                   | Run SQL on external DBs       |
+| 16 | export-data                 | Yes           | Yes (platform\_admin) | Platform data export          |
+| 17 | extract-invoice-items       | Yes           | No                    | AI invoice OCR                |
+| 18 | forecast-demand             | Yes           | No                    | AI demand prediction          |
+| 19 | get-account-label           | Yes           | No                    | Account display name          |
+| 20 | get-contact-label           | Yes           | No                    | Contact display name          |
+| 21 | get-opportunity-full        | Yes           | No                    | Full opportunity data         |
+| 22 | get-opportunity-label       | Yes           | No                    | Opportunity display name      |
+| 23 | get-service-label           | Yes           | No                    | Service type display          |
+| 24 | ingest-email                | Yes           | No                    | Process incoming emails       |
+| 25 | lead-event-webhook          | Yes           | No                    | Lead event processing         |
+| 26 | list-edge-functions         | Yes           | No                    | List available functions      |
+| 27 | plan-event-webhook          | Yes           | No                    | Subscription event hook       |
+| 28 | process-franchise-import    | Yes           | No                    | Bulk franchise import         |
+| 29 | process-lead-assignments    | Yes           | No                    | Auto-assign leads             |
+| 30 | process-scheduled-emails    | Yes           | No                    | Send scheduled emails         |
+| 31 | push-migrations-to-target   | Special       | N/A                   | Remote DB migration           |
+| 32 | rate-engine                 | Yes           | No                    | Multi-modal rate calculation  |
+| 33 | remote-import               | Yes           | No                    | External data import          |
+| 34 | route-email                 | Yes           | No                    | Email routing rules           |
+| 35 | salesforce-sync-opportunity | Yes           | No                    | Salesforce bidirectional sync |
+| 36 | search-emails               | No (service)  | N/A                   | Full-text email search        |
+| 37 | seed-platform-admin         | No (setup)    | N/A                   | Initial admin provisioning    |
+| 38 | send-email                  | No (service)  | N/A                   | Transactional email sending   |
+| 39 | subscription-plans          | Yes           | No                    | Plan management               |
+| 40 | suggest-transport-mode      | Yes           | No                    | AI mode recommendation        |
+| 41 | sync-all-mailboxes          | No (service)  | N/A                   | Mailbox synchronization       |
+| 42 | sync-cn-hs-data             | Yes/Service   | No                    | CN HS code sync               |
+| 43 | sync-emails                 | No (service)  | N/A                   | Email sync (v1)               |
+| 44 | sync-emails-v2              | No (service)  | N/A                   | Email sync (v2, improved)     |
+| 45 | sync-hts-data               | Yes/Service   | No                    | US HTS code sync              |
 
 ## Appendix D: Database Migration Statistics
 
-| Metric | Count |
-|--------|-------|
-| Total migration files | 491 |
-| CREATE TABLE statements | ~150+ |
-| CREATE POLICY statements | 347 |
-| CREATE INDEX statements | 141 |
-| CREATE FUNCTION statements | 193 |
-| Tables with RLS enabled | 145 |
-| Tables with full CRUD policies | 132 |
-| Tables with tenant_id column | ~130+ |
-| Tables with franchise_id column | ~120+ |
+| Metric                           | Count  |
+| -------------------------------- | ------ |
+| Total migration files            | 491    |
+| CREATE TABLE statements          | \~150+ |
+| CREATE POLICY statements         | 347    |
+| CREATE INDEX statements          | 141    |
+| CREATE FUNCTION statements       | 193    |
+| Tables with RLS enabled          | 145    |
+| Tables with full CRUD policies   | 132    |
+| Tables with tenant\_id column    | \~130+ |
+| Tables with franchise\_id column | \~120+ |
 
 ## Appendix E: Key Configuration File Locations
 
-| File | Purpose |
-|------|---------|
-| `vite.config.ts` | Build configuration, bundle splitting, dev server, path aliases |
-| `tsconfig.json` + `tsconfig.app.json` | TypeScript compiler options |
-| `eslint.config.js` | Linting rules and exemptions |
-| `vitest.config.ts` | Unit test framework configuration |
-| `playwright.config.ts` | E2E test configuration |
-| `test/setup.ts` | Global test mocks (Supabase, Auth, CRM, i18n) |
-| `supabase/config.toml` | Supabase local development configuration |
-| `Dockerfile` | Multi-stage frontend container build |
-| `docker-compose.yml` | 9-service local development orchestration |
-| `nginx.conf` | Production web server configuration |
-| `.env.example` | Environment variable template |
-| `.github/workflows/ci.yml` | CI pipeline (lint → typecheck → test → build) |
-| `.github/workflows/deploy.yml` | CD pipeline (placeholder) |
-| `src/config/permissions.ts` | Role → permission mapping matrix |
-| `src/lib/db/access.ts` | ScopedDataAccess class (dual-layer data isolation) |
-| `src/lib/logger.ts` | Application logger with PII masking |
-| `supabase/functions/_shared/auth.ts` | Edge Function authentication helpers |
-| `supabase/functions/_shared/cors.ts` | CORS origin allowlist helpers |
-| `supabase/functions/_shared/logger.ts` | Edge Function structured logging |
+| File                                   | Purpose                                                         |
+| -------------------------------------- | --------------------------------------------------------------- |
+| `vite.config.ts`                       | Build configuration, bundle splitting, dev server, path aliases |
+| `tsconfig.json` + `tsconfig.app.json`  | TypeScript compiler options                                     |
+| `eslint.config.js`                     | Linting rules and exemptions                                    |
+| `vitest.config.ts`                     | Unit test framework configuration                               |
+| `playwright.config.ts`                 | E2E test configuration                                          |
+| `test/setup.ts`                        | Global test mocks (Supabase, Auth, CRM, i18n)                   |
+| `supabase/config.toml`                 | Supabase local development configuration                        |
+| `Dockerfile`                           | Multi-stage frontend container build                            |
+| `docker-compose.yml`                   | 9-service local development orchestration                       |
+| `nginx.conf`                           | Production web server configuration                             |
+| `.env.example`                         | Environment variable template                                   |
+| `.github/workflows/ci.yml`             | CI pipeline (lint → typecheck → test → build)                   |
+| `.github/workflows/deploy.yml`         | CD pipeline (placeholder)                                       |
+| `src/config/permissions.ts`            | Role → permission mapping matrix                                |
+| `src/lib/db/access.ts`                 | ScopedDataAccess class (dual-layer data isolation)              |
+| `src/lib/logger.ts`                    | Application logger with PII masking                             |
+| `supabase/functions/_shared/auth.ts`   | Edge Function authentication helpers                            |
+| `supabase/functions/_shared/cors.ts`   | CORS origin allowlist helpers                                   |
+| `supabase/functions/_shared/logger.ts` | Edge Function structured logging                                |
 
----
+***
 
 # CONCLUSION
 
@@ -5563,14 +5775,14 @@ Logic Nexus AI is positioned to occupy a unique strategic niche: **the only plat
 
 **Platform Maturity Assessment:**
 
-| Dimension | Current State | Target State | Gap |
-|-----------|--------------|-------------|-----|
-| **Security** | Strong foundation (RLS, CORS hardening, Edge Function auth) | SOC 2 Type II compliant | Credential rotation, pen testing, audit logging |
-| **Architecture** | Solid multi-tenant with plugin system | Fully domain-agnostic, enterprise-scale | Plugin completion, API gateway, rate limiting |
-| **Testing** | 339 tests (293 passing), 76 test files | 80% coverage, full E2E suite, CI gates | Coverage tooling, pre-commit hooks, TypeScript strict |
-| **Operations** | Docker-based, GitHub Actions CI | Automated deploy, monitoring, incident response | APM, alerting, runbooks, on-call rotation |
-| **Features** | 161 dashboard pages, 47 features (26 complete, 5 partial, 6 placeholder) + 8 AI functions + 20+ master data pages | Industry-leading quote-to-cash workflow | Mobile app, real-time tracking API, EDI connectivity, ML models |
-| **Production** | ~22% ready (weighted score) | >90% ready | 8-12 weeks focused effort |
+| Dimension        | Current State                                                                                                     | Target State                                    | Gap                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| **Security**     | Strong foundation (RLS, CORS hardening, Edge Function auth)                                                       | SOC 2 Type II compliant                         | Credential rotation, pen testing, audit logging                 |
+| **Architecture** | Solid multi-tenant with plugin system                                                                             | Fully domain-agnostic, enterprise-scale         | Plugin completion, API gateway, rate limiting                   |
+| **Testing**      | 339 tests (293 passing), 76 test files                                                                            | 80% coverage, full E2E suite, CI gates          | Coverage tooling, pre-commit hooks, TypeScript strict           |
+| **Operations**   | Docker-based, GitHub Actions CI                                                                                   | Automated deploy, monitoring, incident response | APM, alerting, runbooks, on-call rotation                       |
+| **Features**     | 161 dashboard pages, 47 features (26 complete, 5 partial, 6 placeholder) + 8 AI functions + 20+ master data pages | Industry-leading quote-to-cash workflow         | Mobile app, real-time tracking API, EDI connectivity, ML models |
+| **Production**   | \~22% ready (weighted score)                                                                                      | >90% ready                                      | 8-12 weeks focused effort                                       |
 
 **Critical Path to Production (Priority Order):**
 
@@ -5582,6 +5794,7 @@ Logic Nexus AI is positioned to occupy a unique strategic niche: **the only plat
 6. **Phase 4 (Weeks 25-48)**: AI/ML feature development, multi-region deployment, compliance certifications
 
 **Immediate Next Steps:**
+
 1. **Hire**: 1 Staff Engineer (Lead Architect), 1 DevOps/SRE Engineer
 2. **Freeze**: No new features until Phase 1 Foundation is complete
 3. **Rotate**: All credentials that were exposed in `.env` git history (CRITICAL)
@@ -5590,6 +5803,6 @@ Logic Nexus AI is positioned to occupy a unique strategic niche: **the only plat
 
 **Market Window:** CargoWise's December 2025 pricing disruption (25-35% cost increases for mid-market forwarders) creates a unique acquisition opportunity. Logic Nexus must reach minimum viable production readiness within 12-16 weeks to capitalize on forwarder migration interest.
 
----
-END OF COMPREHENSIVE STRATEGIC ANALYSIS DOCUMENT (v2.1)
----
+***
+
+## END OF COMPREHENSIVE STRATEGIC ANALYSIS DOCUMENT (v2.1)

@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { QuoteDataProvider, useQuoteContext } from './QuoteContext';
 import { QuoteHeader } from './QuoteHeader';
 import { QuoteLogistics } from './QuoteLogistics';
-import { QuoteLineItems } from './QuoteLineItems';
-import { QuoteFinancials } from './QuoteFinancials';
+// Lazy load non-critical components
+const QuoteLineItems = lazy(() => import('./QuoteLineItems').then(module => ({ default: module.QuoteLineItems })));
+const QuoteFinancials = lazy(() => import('./QuoteFinancials').then(module => ({ default: module.QuoteFinancials })));
+
 import { quoteSchema, QuoteFormValues } from './types';
 import { QuoteErrorBoundary } from './QuoteErrorBoundary';
 import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
@@ -94,15 +96,70 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
 
   // Auto-save logic for Quick Quote conversion
   useEffect(() => {
-    if (autoSave && !hasAutoSaved && !quoteId && initialData && !isSubmitting) {
-      console.log('[QuoteForm] Triggering auto-save from Quick Quote data...');
-      const timer = setTimeout(() => {
-        form.handleSubmit(onSubmit)();
-        setHasAutoSaved(true);
-      }, 500); // Small delay to ensure form state is settled
-      return () => clearTimeout(timer);
+    if (
+      autoSave && 
+      !hasAutoSaved && 
+      !quoteId && 
+      initialData && 
+      !isSubmitting
+    ) {
+      const hasPortsResolved = !!initialData.origin_port_id && !!initialData.destination_port_id;
+      const legs = Array.isArray(initialData.options) ? (initialData.options[0]?.legs || []) : [];
+      const hasLegsResolved = legs.length > 0 && legs.every((l: any) => !!l.origin_location_id && !!l.destination_location_id);
+      
+      if (hasPortsResolved || hasLegsResolved) {
+        const timer = setTimeout(() => {
+          form.handleSubmit(onSubmit)();
+          setHasAutoSaved(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
   }, [autoSave, hasAutoSaved, quoteId, initialData, form]);
+
+  const flattenErrors = (obj: any, parentPath = ''): string[] => {
+    let messages: string[] = [];
+    
+    if (!obj) return messages;
+
+    if (obj.message && typeof obj.message === 'string') {
+        return [`${parentPath}: ${obj.message}`];
+    }
+
+    if (typeof obj === 'object') {
+        Object.keys(obj).forEach(key => {
+            if (key === 'ref') return;
+            
+            // Format path: if key is number, use [key], else .key
+            let currentPath = parentPath;
+            if (!isNaN(Number(key))) {
+                currentPath = `${parentPath}[${key}]`;
+            } else {
+                currentPath = parentPath ? `${parentPath}.${key}` : key;
+            }
+
+            messages = [...messages, ...flattenErrors(obj[key], currentPath)];
+        });
+    }
+    return messages;
+  };
+
+  const onInvalid = (errors: any) => {
+    console.error('Validation errors:', errors);
+    const errorMessages = flattenErrors(errors);
+    const errorCount = errorMessages.length;
+    
+    toast.error(`Please fix ${errorCount} error${errorCount > 1 ? 's' : ''} in the form`, {
+      description: (
+        <ul className="list-disc pl-4 max-h-[200px] overflow-y-auto text-sm mt-2">
+            {errorMessages.map((msg, i) => (
+                <li key={i}>{msg}</li>
+            ))}
+        </ul>
+      ),
+      duration: 5000,
+    });
+  };
 
   const onSubmit = async (data: QuoteFormValues): Promise<boolean> => {
     setIsSubmitting(true);
@@ -111,6 +168,11 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
 
     try {
       const savedId = await saveQuote({ quoteId, data });
+      
+      // Reset form with the submitted data to clear dirty state
+      // This ensures that subsequent hydrations (e.g. after switching back from Composer)
+      // are not blocked by the dirty check.
+      form.reset(data);
       
       const duration = performance.now() - startTime;
       formDebug.logResponse(
@@ -149,7 +211,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-20">
+      <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-8 pb-20">
         <CatalogSaveDialog 
             open={showCatalogDialog} 
             onOpenChange={setShowCatalogDialog} 
@@ -167,7 +229,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                         {quoteId ? 'Edit Quote' : 'New Quote'}
                     </h2>
                     <p className="text-sm text-muted-foreground hidden md:block">
-                        {quoteId ? `Ref: ${quoteId.slice(0, 8)}...` : 'Create a new logistics quotation'}
+                        {quoteId ? `Quote #: ${quoteNumber || quoteId}` : 'Create a new logistics quotation'}
                     </p>
                 </div>
             </div>
@@ -182,11 +244,15 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                         <Button 
                             type="button" 
                             variant="outline" 
-                            onClick={() => setViewMode(viewMode === 'form' ? 'composer' : 'form')} 
+                            onClick={viewMode === 'form' ? form.handleSubmit(async (data) => {
+                                const success = await onSubmit(data);
+                                if (success) setViewMode('composer');
+                            }, onInvalid) : () => setViewMode('form')}
                             className="gap-2"
+                            disabled={isSubmitting || isHydrating}
                         >
                             <LayoutDashboard className="h-4 w-4" />
-                            {viewMode === 'form' ? 'Switch to Composer' : 'Back to Form'}
+                            {isSubmitting ? 'Saving...' : (viewMode === 'form' ? 'Save & Switch to Composer' : 'Back to Form')}
                         </Button>
                     </>
                  )}
@@ -199,7 +265,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                             if (success) {
                                 setViewMode('composer');
                             }
-                        })}
+                        }, onInvalid)}
                         disabled={isSubmitting || isHydrating}
                         className="gap-2"
                      >
@@ -242,7 +308,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">1</span>
                     <h3>General Information</h3>
                 </div>
-                <QuoteHeader />
+                <QuoteHeader quoteNumber={quoteNumber || quoteId} />
             </section>
             
             <section className="space-y-4">
@@ -258,7 +324,9 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">3</span>
                     <h3>Cargo & Commodity Details</h3>
                 </div>
-                <QuoteLineItems />
+                <Suspense fallback={<div className="h-40 flex items-center justify-center border rounded-lg bg-muted/10"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+                    <QuoteLineItems />
+                </Suspense>
             </section>
             
             <section className="space-y-4">
@@ -266,7 +334,9 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">4</span>
                     <h3>Financials</h3>
                 </div>
-                <QuoteFinancials />
+                <Suspense fallback={<div className="h-40 flex items-center justify-center border rounded-lg bg-muted/10"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+                    <QuoteFinancials />
+                </Suspense>
             </section>
         </div>
         )}

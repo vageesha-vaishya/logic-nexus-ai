@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plane, Ship, Truck, Train, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown } from 'lucide-react';
+import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
@@ -21,19 +21,18 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { QuoteResultsList } from './QuoteResultsList';
 import { QuoteComparisonView } from './QuoteComparisonView';
-import { QuoteTransformService } from '@/lib/services/quote-transform.service';
-import { logger } from '@/lib/logger';
-import { mapOptionToQuote } from '@/lib/quote-mapper';
-import { PricingService } from '@/services/pricing.service';
-import { RateOption } from '@/types/quote-breakdown';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
-import { SmartCargoInput, CommoditySelection } from '@/components/logistics/SmartCargoInput';
-import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
-import { CargoItem } from '@/types/cargo';
+import { SmartCargoInput } from '@/components/logistics/SmartCargoInput';
+import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
+import { logger } from '@/lib/logger';
+import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
+import { RateOption } from '@/types/quote-breakdown';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
-import { useDebug } from '@/hooks/useDebug';
-import { formatContainerSize } from '@/lib/container-utils';
-import { generateSimulatedRates } from '@/lib/simulation-engine';
+
+const CARRIER_OPTIONS = [
+  "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
+  "ONE", "Evergreen", "HMM", "Yang Ming", "ZIM"
+];
 
 // --- Zod Schemas ---
 
@@ -58,7 +57,7 @@ const quickQuoteSchema = baseSchema.superRefine((data, ctx) => {
     }
   }
   // Ocean Requirements
-  if (data.mode === 'ocean' || data.mode === 'rail') {
+  if (data.mode === 'ocean') {
      // Ensure container details are checked in UI state, but basic validation here
      // We might want to enforce weight OR volume if LCL, or Container count if FCL
   }
@@ -70,7 +69,6 @@ type QuickQuoteValues = z.infer<typeof baseSchema> & {
     containerSize?: string;
     containerQty?: string;
     htsCode?: string;
-    masterCommodityId?: string;
     scheduleB?: string;
     dims?: string;
     dangerousGoods?: boolean;
@@ -84,7 +82,6 @@ interface QuickQuoteModalProps {
 }
 
 export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
-  const debug = useDebug('Sales', 'QuickQuoteModal');
   const [isOpen, setIsOpen] = useState(false);
   const [results, setResults] = useState<RateOption[] | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
@@ -95,6 +92,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<{ unit: string; confidence: number } | null>(null);
   const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
+  const [codeSuggestions, setCodeSuggestions] = useState<any[]>([]);
   
   // AI Analysis State
   const [marketAnalysis, setMarketAnalysis] = useState<string | null>(null);
@@ -106,12 +104,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
   // Extended Form State
   const [extendedData, setExtendedData] = useState({
-    containerType: '', // Normalized to store UUID
-    containerSize: '', // Normalized to store UUID
+    containerType: 'dry',
+    containerSize: '20ft',
     containerQty: '1',
-    containerCombos: [] as Array<{ type: string; size: string; qty: number }>, // Normalized to store UUIDs
     htsCode: '',
-    aes_hts_id: '',
     scheduleB: '',
     dims: '',
     dangerousGoods: false,
@@ -119,7 +115,6 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     vehicleType: 'van',
     pickupDate: '',
     deliveryDeadline: '',
-    incoterms: '',
     originDetails: null as any,
     destinationDetails: null as any,
   });
@@ -128,30 +123,9 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const { toast } = useToast();
   const { supabase, context } = useCRM();
   const { containerTypes, containerSizes } = useContainerRefs();
-  const [carriers, setCarriers] = useState<{ id: string; carrier_name: string; carrier_type: string }[]>([]);
-
-  const uniqueByCarrierName = (arr: any[], preferredTenantId?: string | null) => {
-    try {
-      const map: Record<string, any> = {};
-      for (const item of arr || []) {
-        const key = String((item as any)?.carrier_name || '').trim().toLowerCase();
-        if (!key) continue;
-        const existing = map[key];
-        if (!existing) {
-          map[key] = item;
-        } else {
-          const existingTenant = (existing as any)?.tenant_id ?? null;
-          const currentTenant = (item as any)?.tenant_id ?? null;
-          if (preferredTenantId && existingTenant !== preferredTenantId && currentTenant === preferredTenantId) {
-            map[key] = item;
-          }
-        }
-      }
-      return Object.values(map);
-    } catch {
-      return arr || [];
-    }
-  };
+  const [containerCombos, setContainerCombos] = useState<Array<{id:string,typeId:string,sizeId:string,quantity:number}>>([
+    { id: crypto.randomUUID(), typeId: containerTypes[0]?.id || '', sizeId: containerSizes.find(s => s.type_id === (containerTypes[0]?.id || ''))?.id || '', quantity: 1 }
+  ]);
 
   const form = useForm<QuickQuoteValues>({
     resolver: zodResolver(quickQuoteSchema),
@@ -162,166 +136,105 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     },
   });
 
-  const [cargoItem, setCargoItem] = useState<CargoItem>({
-      id: '1',
-      type: 'container',
-      quantity: 1,
-      dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
-      weight: { value: 0, unit: 'kg' },
-      stackable: false,
-      containerDetails: { typeId: '', sizeId: '' }
-  });
-
-  // Sync CargoItem to Form/ExtendedData
-  useEffect(() => {
-      // Sync Commodity
-      if (cargoItem.commodity?.description) {
-          form.setValue('commodity', cargoItem.commodity.description);
-      }
-
-      // Sync Hazmat
-      setExtendedData(prev => ({ ...prev, dangerousGoods: !!cargoItem.hazmat }));
-
-      // Sync Mode Specifics
-      const mode = form.getValues('mode');
-      if (mode === 'ocean' || mode === 'rail') {
-          if (cargoItem.type === 'container' && cargoItem.containerDetails?.typeId && cargoItem.containerDetails?.sizeId) {
-             const combo = {
-                 type: cargoItem.containerDetails.typeId,
-                 size: cargoItem.containerDetails.sizeId,
-                 qty: cargoItem.quantity
-             };
-             setExtendedData(prev => ({
-                 ...prev,
-                 containerType: combo.type,
-                 containerSize: combo.size,
-                 containerQty: String(combo.qty),
-                 containerCombos: [combo] // Overwrite for now, assuming single line item
-             }));
-          }
-      } else {
-          // Air/Road
-           setExtendedData(prev => ({
-                 ...prev,
-                 weight: String(cargoItem.weight.value),
-                 volume: String(cargoItem.volume || 0),
-                 containerQty: String(cargoItem.quantity),
-                 dims: cargoItem.dimensions ? `${cargoItem.dimensions.l}x${cargoItem.dimensions.w}x${cargoItem.dimensions.h}` : ''
-             }));
-           form.setValue('weight', String(cargoItem.weight.value)); 
-           form.setValue('volume', String(cargoItem.volume || 0));
-      }
-  }, [cargoItem, form.watch('mode')]);
-
   const mode = form.watch("mode");
-  const filteredCarriers = useMemo(() => {
-    return carriers
-      .filter(c => {
-        if (!mode) return true;
-        const map: Record<string, string> = { 
-          'ocean': 'ocean', 
-          'air': 'air_cargo', 
-          'road': 'trucking', 
-          'rail': 'rail' 
-        };
-        const targetType = map[mode];
-        return c.carrier_type === targetType;
-      })
-      .map(c => ({ id: c.id, name: c.carrier_name }));
-  }, [carriers, mode]);
   const commodity = form.watch("commodity");
   const origin = form.watch("origin");
   const destination = form.watch("destination");
-
-  // Helper to resolve UUID to Code/Name for legacy APIs
-  const resolveContainerInfo = (typeId: string, sizeId: string) => {
-    const typeObj = containerTypes.find(t => t.id === typeId);
-    const sizeObj = containerSizes.find(s => s.id === sizeId);
-    return {
-      type: typeObj?.code || typeObj?.name || typeId, // Fallback to ID if not found
-      size: sizeObj?.name || sizeId,
-      iso_code: sizeObj?.iso_code
-    };
-  };
-
-  // Log Mode Toggle
-  useEffect(() => {
-    if (isOpen) {
-        debug.info('QuickQuote Modal Opened', { mode: viewMode, smartMode });
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    debug.info('Smart Mode Toggled', { enabled: smartMode });
-  }, [smartMode]);
 
   // Reset/Adjust when mode changes
   useEffect(() => {
     setResults(null);
     setComplianceCheck(null);
-    debug.log('Transport Mode Changed', { mode });
+    setCodeSuggestions([]);
   }, [mode]);
+
   useEffect(() => {
-    const loadCarriers = async () => {
-      try {
-        const { data: carrierData } = await supabase
-          .from('carriers')
-          .select('id, carrier_name, carrier_type, tenant_id')
-          .eq('is_active', true)
-          .order('carrier_name');
-        setCarriers(uniqueByCarrierName(carrierData || [], context?.tenantId));
-      } catch (e) {
-        console.error('Failed to load carriers', e);
+    const totalQty = containerCombos.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
+    const first = containerCombos[0];
+    setExtendedData(prev => ({
+      ...prev,
+      containerType: first?.typeId || prev.containerType,
+      containerSize: first?.sizeId || prev.containerSize,
+      containerQty: String(totalQty || prev.containerQty)
+    }));
+  }, [containerCombos]);
+
+  const addCombo = () => {
+    const typeId = containerTypes[0]?.id || '';
+    const sizeId = containerSizes.find(s => s.type_id === typeId)?.id || '';
+    setContainerCombos(prev => [...prev, { id: crypto.randomUUID(), typeId, sizeId, quantity: 1 }]);
+  };
+  const updateCombo = (index: number, field: 'typeId'|'sizeId'|'quantity', val: string|number) => {
+    setContainerCombos(prev => {
+      const next = [...prev];
+      const curr = next[index];
+      next[index] = { ...curr, [field]: val as any };
+      if (field === 'typeId') {
+        const matched = containerSizes.find(s => s.type_id === (val as string));
+        next[index].sizeId = matched?.id || next[index].sizeId;
       }
+      return next;
+    });
+  };
+  const removeCombo = (index: number) => {
+    setContainerCombos(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== index));
+  };
+
+  // AI: Lookup Codes (Debounced)
+  useEffect(() => {
+    const lookup = async (query: string, field: 'origin' | 'destination') => {
+        if (query.length < 3) return;
+        try {
+            const { data } = await invokeAiAdvisor({
+                action: 'lookup_codes', payload: { query, mode }
+            });
+            if (data?.suggestions && data.suggestions.length > 0) {
+                setCodeSuggestions(data.suggestions);
+                
+                // Auto-populate details from best match to ensure QuoteNew has full address
+                const bestMatch = data.suggestions[0];
+                setExtendedData(prev => ({
+                    ...prev,
+                    [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
+                        name: bestMatch.label,
+                        formatted_address: bestMatch.details || bestMatch.label, // Ensure formatted_address exists
+                        ...bestMatch
+                    }
+                }));
+            }
+        } catch (e) { console.error(e); }
     };
-    loadCarriers();
-  }, [supabase]);
+
+    const timer = setTimeout(() => {
+        if (origin) lookup(origin, 'origin');
+        if (destination) lookup(destination, 'destination');
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [origin, destination, mode]);
 
   const handleLocationChange = (field: 'origin' | 'destination', value: string, location?: any) => {
     form.setValue(field, value);
     if (location) {
-        debug.log(`Location Selected: ${field}`, { location: location.location_name, code: location.location_code });
-        setExtendedData(prev => ({
-            ...prev,
-            [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
-                name: location.location_name,
-                formatted_address: [location.city, location.state_province, location.country].filter(Boolean).join(", "),
-                code: location.location_code,
-                type: location.location_type,
-                country: location.country,
-                city: location.city
-            }
-        }));
-    }
-  };
-
-  const handleCommoditySelect = (selection: CommoditySelection) => {
-    // Ensure dual visibility in the form field (Description - HTS Code)
-    const displayValue = selection.hts_code 
-      ? `${selection.description} - ${selection.hts_code}`
-      : selection.description;
-
-    form.setValue("commodity", displayValue);
-    setExtendedData(prev => ({
+      setExtendedData(prev => ({
         ...prev,
-        htsCode: selection.hts_code || prev.htsCode,
-        aes_hts_id: selection.aes_hts_id || prev.aes_hts_id,
-        masterCommodityId: selection.master_commodity_id
-    }));
-    if (selection.hts_code) {
-        debug.log('Commodity Selected with HTS', { code: selection.hts_code });
+        [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
+          id: location.id,
+          name: location.location_name,
+          formatted_address: [location.city, location.state_province, location.country].filter(Boolean).join(", "),
+          code: location.location_code,
+          type: location.location_type,
+          country: location.country,
+          city: location.city
+        }
+      }));
     }
   };
-
 
   // AI: Classify Commodity & Suggest HTS
   const handleAiSuggest = async () => {
     if (!commodity || commodity.length < 3) return;
 
-    debug.info('Starting AI Suggestion', { commodity });
     setAiLoading(true);
-    const startTime = performance.now();
-
     try {
         // Parallel calls for Unit and Classification
         const [unitRes, classRes] = await Promise.all([
@@ -333,14 +246,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
             })
         ]);
 
-        const duration = performance.now() - startTime;
-        debug.log('AI Suggestion Completed', { duration: `${duration.toFixed(2)}ms` });
-
         // Handle Unit
         if (unitRes.data?.unit) {
             setAiSuggestion(unitRes.data);
             form.setValue('unit', unitRes.data.unit);
-            debug.log('AI Suggested Unit', unitRes.data);
         }
 
         // Handle Classification
@@ -350,7 +259,6 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                 htsCode: classRes.data.hts,
                 scheduleB: classRes.data.scheduleB || prev.scheduleB
             }));
-            debug.log('AI Classified Commodity', classRes.data);
             toast({
                 title: "AI Analysis Complete",
                 description: `Classified as ${classRes.data.type} (HTS: ${classRes.data.hts})`,
@@ -358,7 +266,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         }
 
     } catch (err) {
-        debug.error("AI Suggest Error", err);
+        console.error("AI Suggest Error:", err);
     } finally {
         setAiLoading(false);
     }
@@ -381,19 +289,20 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         const { data: { session } } = await supabase.auth.getSession();
         sessionToken = session?.access_token;
     } catch (e) {
-        debug.warn("Failed to get session for AI Advisor", e);
+        console.warn("Failed to get session for AI Advisor", e);
     }
 
     if (!anonKey) {
-        debug.error("Missing Supabase Anon/Publishable Key");
+        console.error("Missing Supabase Anon/Publishable Key");
         return { data: null, error: new Error("Configuration Error: Missing API Key") };
     }
 
     // Function to perform the fetch
     const doFetch = async (token: string | null | undefined, useAnon: boolean) => {
         const keyToUse = useAnon ? anonKey : (token || anonKey);
-        // debug.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
-        
+        console.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
+        // console.log(`[AI-Advisor] Using Key Prefix: ${keyToUse?.substring(0, 10)}...`); // Debug only
+
         return fetch(functionUrl, {
             method: 'POST',
             headers: {
@@ -413,12 +322,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
             
             // If 401, retry with Anon Key
             if (response.status === 401) {
-                debug.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
+                console.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
                 response = await doFetch(anonKey, true);
             }
         } else {
             // No session, try Anon Key directly
-            debug.warn("[AI-Advisor] No active session. Using Anon Key.");
+            console.warn("[AI-Advisor] No active session. Using Anon Key.");
             response = await doFetch(anonKey, true);
         }
 
@@ -436,7 +345,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         const data = await response.json();
         return { data, error: null };
     } catch (err) {
-        debug.error("AI Advisor Invocation Error", err);
+        console.error("AI Advisor Invocation Error:", err);
         return { data: null, error: err };
     }
   };
@@ -456,26 +365,20 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         });
 
         if (error) {
-            debug.error("Compliance Check Failed", error);
+            console.error("Compliance Check Failed:", error);
             // Fallback to true (allow user to proceed if AI fails)
             return true;
         }
 
         setComplianceCheck(data);
-        if (data?.compliant === false) {
-             debug.warn("Compliance Issues Found", data.issues);
-        }
         return data?.compliant !== false; // Default true if error
     } catch (e) {
-        debug.error("Compliance Check Exception", e);
+        console.error(e);
         return true;
     }
   };
 
   const onSubmit = async (data: QuickQuoteValues) => {
-    const submitStartTime = performance.now();
-    debug.info('Quote Submission Initiated', { data, extendedData });
-
     // 1. Compliance Check
     const isCompliant = await validateCompliance();
     if (!isCompliant) {
@@ -495,114 +398,79 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     setComplianceCheck(null);
 
     try {
+      console.log('Form Submitted:', data);
+      console.log('Extended Data:', extendedData);
+
       const payload = {
         ...data,
         ...extendedData,
         account_id: accountId
       };
 
-      debug.log('Invoking Rate Engines', { payload, smartMode });
+      console.log('Invoking Edge Functions with payload:', payload);
 
-      const combos = ((payload.mode === 'ocean' || payload.mode === 'rail') && extendedData.containerCombos.length > 0)
-        ? extendedData.containerCombos
-        : [{ type: extendedData.containerType, size: extendedData.containerSize, qty: Number(extendedData.containerQty) || 1 }];
-      const legacyPromises = combos.map(c => {
-        // Resolve UUIDs to Names/Codes for Legacy Rate Engine
-        const { type: typeName, size: sizeName } = resolveContainerInfo(c.type, c.size);
-        return supabase.functions.invoke('rate-engine', {
-          body: { 
-            ...payload, 
-            containerType: typeName, 
-            containerSize: sizeName, 
-            containerQty: String(c.qty),
-            // Pass UUIDs as well for future-proofing
-            containerTypeId: c.type,
-            containerSizeId: c.size
-          }
-        });
-      });
+      // Define promises for parallel execution
+      const legacyPromise = supabase.functions.invoke('rate-engine', { body: payload });
       const aiPromise = smartMode 
         ? invokeAiAdvisor({ action: 'generate_smart_quotes', payload: payload })
         : Promise.resolve({ data: null, error: null });
 
-      const [legacyResList, aiRes] = await Promise.all([Promise.all(legacyPromises), aiPromise]);
-      const duration = performance.now() - submitStartTime;
-      debug.info('Rate Engines Completed', { duration: `${duration.toFixed(2)}ms` });
-
-      const pricingService = new PricingService(supabase);
+      const [legacyRes, aiRes] = await Promise.all([legacyPromise, aiPromise]);
 
       let combinedOptions: RateOption[] = [];
 
+      // 1. Process Legacy Results
       let legacyErrorMsg = '';
-      for (let i = 0; i < legacyResList.length; i++) {
-        const legacyRes = legacyResList[i] as any;
-        const combo = combos[i];
-        
-        let rawOptions = legacyRes.data?.options || [];
-
-        if (legacyRes.error || !rawOptions.length) {
-          if (legacyRes.error) {
-             console.warn(`[QuickQuote] Legacy Rate Engine failed for combo ${i}:`, legacyRes.error);
-             legacyErrorMsg += `${legacyRes.error.message || 'Fetch Failed'}; `;
+      if (legacyRes.error) {
+          console.error("[QuickQuote] Legacy Rate Engine Error:", legacyRes.error);
+          
+          // Try to extract body from the error context
+          try {
+             if (legacyRes.error.context && typeof legacyRes.error.context.json === 'function') {
+                 const body = await legacyRes.error.context.json();
+                 legacyErrorMsg = body.error || body.message || legacyRes.error.message;
+             } else {
+                 legacyErrorMsg = legacyRes.error.message || 'Unknown Error';
+             }
+          } catch (e) {
+             legacyErrorMsg = legacyRes.error.message || 'Unknown Error';
           }
-          
-          // Fallback to Simulation Engine
-          debug.info(`[QuickQuote] Using Simulation Engine fallback for combo ${i}`);
-          const { type: typeName, size: sizeName } = resolveContainerInfo(combo.type, combo.size);
-          
-          rawOptions = generateSimulatedRates({
-            mode: payload.mode as any,
-            origin: payload.origin,
-            destination: payload.destination,
-            weightKg: Number(payload.weight) || undefined,
-            containerQty: combo.qty,
-            containerSize: sizeName,
-            vehicleType: extendedData.vehicleType
+
+          toast({
+              title: "Rate Engine Error",
+              description: `Legacy Engine Failed: ${legacyErrorMsg}`,
+              variant: "destructive"
           });
-        }
-
-        if (rawOptions.length > 0) {
-          const { type: typeName, size: sizeName } = resolveContainerInfo(combo.type, combo.size);
-          const formattedSize = formatContainerSize(sizeName);
-
-          let legacyOptions = await Promise.all(rawOptions.map(async (opt: any) => {
-            const mapped = mapOptionToQuote(opt);
-            const qty = combo.qty || 1;
-            const sell = (mapped.total_amount || 0) * qty;
-            const calc = await pricingService.calculateFinancials(sell, 15, false);
-            let markupPercent = 0;
-            if (calc.buyPrice > 0) {
-              markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
-            }
-            return {
-              ...mapped,
-              // Ensure core fields are populated for validation
-              price: sell,
-              currency: mapped.currency || 'USD',
-              carrier: mapped.carrier || 'Unknown Carrier',
-              
-              markupPercent,
-              verified: true,
-              verificationTimestamp: new Date().toISOString()
-            };
-          }));
-          legacyOptions = legacyOptions.sort((a: any, b: any) => {
-            if (a.price !== b.price) return a.price - b.price;
-            const getDays = (s?: string) => {
-              if (!s) return 999;
-              const match = s.match(/(\d+)/);
-              return match ? parseInt(match[1]) : 999;
-            };
-            return getDays(a.transitTime) - getDays(b.transitTime);
-          }).slice(0, 2);
+      } else if (legacyRes.data?.options) {
+          console.log("[QuickQuote] Legacy Rate Engine Data:", legacyRes.data);
+          const legacyOptions = legacyRes.data.options.map((opt: any) => {
+              const mapped = mapOptionToQuote(opt);
+              const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
+              return {
+                  ...mapped,
+                  id: mapped.id || `std-${Math.random().toString(36).substr(2, 9)}`,
+                  source_attribution: 'Standard Rate Engine',
+                  carrier: mapped.carrier_name, // Ensure carrier is a string for validation
+                  price: mapped.total_amount, // Ensure price field is populated for UI
+                  currency: mapped.currency || 'USD', // Ensure currency is present
+                  name: mapped.option_name,
+                  transitTime: mapped.transit_time?.details,
+                  co2_kg: mapped.total_co2_kg,
+                  legs: mapped.legs,
+                  charges: mapped.charges,
+                  buyPrice,
+                  marginAmount,
+                  marginPercent,
+                  markupPercent
+              };
+          });
           combinedOptions = [...combinedOptions, ...legacyOptions];
-        }
       }
 
       // 2. Process AI Results
       if (smartMode) {
           if (aiRes.error) {
-              debug.error("[QuickQuote] AI Advisor Error", aiRes.error);
+              console.error("[QuickQuote] AI Advisor Error:", aiRes.error);
               
               let errorMsg = "Could not generate smart quotes, showing standard rates only.";
               
@@ -616,20 +484,13 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   variant: "destructive" 
               });
           } else if (aiRes.data) {
-              debug.log("[QuickQuote] AI Advisor Data Received", { data: aiRes.data });
+              console.log("[QuickQuote] AI Advisor Data:", aiRes.data);
               const aiData = aiRes.data;
               
               if (aiData.options) {
-                  let aiOptions = await Promise.all(aiData.options.map(async (opt: any) => {
+                  const aiOptions = aiData.options.map((opt: any) => {
                       const mapped = mapOptionToQuote(opt);
-                      // Replace synchronous legacy calc with async PricingService
-                      const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
-
-                      let markupPercent = 0;
-                      if (calc.buyPrice > 0) {
-                          markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
-                      }
-
+                      const { buyPrice, marginAmount, marginPercent, markupPercent } = calculateQuoteFinancials(mapped.total_amount);
                       return {
                           ...mapped,
                           id: mapped.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
@@ -642,33 +503,14 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                           co2_kg: mapped.total_co2_kg,
                           legs: mapped.legs,
                           charges: mapped.charges,
-                          buyPrice: calc.buyPrice,
-                          marginAmount: calc.marginAmount,
-                          marginPercent: calc.marginPercent,
-                          markupPercent: markupPercent
+                          buyPrice,
+                          marginAmount,
+                          marginPercent,
+                          markupPercent
                       };
-                  }));
-                  
-                  // Filter AI Rates: Top 5 per carrier
-                  const aiOptionsByCarrier: Record<string, RateOption[]> = {};
-                  aiOptions.forEach((opt: RateOption) => {
-                      const carrier = opt.carrier || 'Unknown';
-                      if (!aiOptionsByCarrier[carrier]) aiOptionsByCarrier[carrier] = [];
-                      aiOptionsByCarrier[carrier].push(opt);
-                  });
-
-                  const filteredAiOptions: RateOption[] = [];
-                  Object.values(aiOptionsByCarrier).forEach((rates) => {
-                      // Sort by Tier (Best Value first) then Price
-                      const sorted = rates.sort((a, b) => {
-                          if (a.tier === 'best_value' && b.tier !== 'best_value') return -1;
-                          if (a.tier !== 'best_value' && b.tier === 'best_value') return 1;
-                          return a.price - b.price;
-                      });
-                      filteredAiOptions.push(...sorted.slice(0, 5));
                   });
                   
-                  combinedOptions = [...combinedOptions, ...filteredAiOptions];
+                  combinedOptions = [...combinedOptions, ...aiOptions];
                   setMarketAnalysis(aiData.market_analysis);
                   setConfidenceScore(aiData.confidence_score);
                   setAnomalies(aiData.anomalies || []);
@@ -687,6 +529,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       try {
           const user = (await supabase.auth.getUser()).data.user;
           if (user && context?.tenantId) {
+              const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+              const userId = String(user.id);
+              const tenantId = String(context.tenantId);
+              if (!isUUID(userId) || !isUUID(tenantId)) {
+                  return;
+              }
               const historyPayload = {
                   options: combinedOptions,
                   market_analysis: smartMode && aiRes?.data?.market_analysis ? aiRes.data.market_analysis : null,
@@ -695,8 +543,8 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               };
 
               await supabase.from('ai_quote_requests').insert({
-                  user_id: user.id,
-                  tenant_id: context.tenantId,
+                  user_id: userId,
+                  tenant_id: tenantId,
                   request_payload: payload,
                   response_payload: historyPayload,
                   status: 'generated'
@@ -753,7 +601,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     const transferPayload = { 
       ...form.getValues(),
       ...extendedData,
-      commodity_description: form.getValues().commodity,
+      containerCombos: containerCombos.map(c => ({ type: c.typeId, size: c.sizeId, qty: c.quantity })),
       selectedRates: selectedOptions.map(opt => ({
         ...opt,
         // Ensure AI fields are explicitly passed
@@ -769,14 +617,12 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
     // 1. Validation
     try {
-        // Debug logging for payload structure
-        console.log('Validating Transfer Payload:', transferPayload);
-
-        // Use centralized service for validation
-        const validatedData = QuoteTransformService.validatePayload(transferPayload);
+        // Use safeParse to allow handling errors gracefully without crashing if needed, 
+        // but here we want to block invalid data.
+        const validatedData = QuoteTransferSchema.parse(transferPayload);
         
         // 2. Logging
-        debug.info('Initiating Quick Quote to New Quote Transfer', {
+        logger.info('Initiating Quick Quote to New Quote Transfer', {
             origin: validatedData.origin,
             destination: validatedData.destination,
             mode: validatedData.mode,
@@ -793,18 +639,19 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         });
     } catch (error) {
         if (error instanceof z.ZodError) {
-            console.error('Quote Transfer Validation Failed', { errors: error.errors });
-            debug.error('Quote Transfer Validation Failed', { errors: error.errors });
+            logger.error('Quote Transfer Validation Failed', { errors: error.errors });
+            const errorMessages = error.errors.map(err => {
+                const path = err.path.join('.');
+                return `${path}: ${err.message}`;
+            }).join('\n');
             toast({
                 title: "Data Validation Error",
-                description: "Cannot proceed: Missing required fields for quote generation.",
+                description: `Cannot proceed. Missing or invalid fields:\n${errorMessages}`,
                 variant: "destructive"
             });
-            // Detailed log for debugging
-            console.error("Validation details:", JSON.stringify(error.errors, null, 2));
-            debug.error("Validation details:", error.errors);
+            console.error("Validation details:", error.errors);
         } else {
-            debug.error('Unexpected Transfer Error', { error });
+            logger.error('Unexpected Transfer Error', { error });
             toast({
                 title: "Transfer Error",
                 description: "An unexpected error occurred preparing the quote.",
@@ -827,22 +674,11 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
     form.reset();
     setSelectedIds([]);
     setExtendedData({
-        containerType: '',
-        containerSize: '',
-        containerQty: '1',
-        containerCombos: [],
-        htsCode: '',
-        aes_hts_id: '',
-        scheduleB: '',
-        dims: '',
-        dangerousGoods: false,
-        specialHandling: '',
-        vehicleType: 'van',
-        incoterms: '',
-        pickupDate: '',
-        deliveryDeadline: '',
-        originDetails: null,
-        destinationDetails: null
+        containerType: 'dry', containerSize: '20ft', containerQty: '1',
+        htsCode: '', scheduleB: '', dims: '', dangerousGoods: false,
+        specialHandling: '', vehicleType: 'van',
+        pickupDate: '', deliveryDeadline: '',
+        originDetails: null, destinationDetails: null
     });
     setAiSuggestion(null);
     setComplianceCheck(null);
@@ -882,7 +718,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                           <span className="text-[10px] text-purple-600">AI-optimized routes & pricing</span>
                       </div>
                   </div>
-                  <Switch checked={smartMode} onCheckedChange={setSmartMode} data-testid="smart-mode-switch" />
+                  <Switch checked={smartMode} onCheckedChange={setSmartMode} />
               </div>
 
               {/* Mode Selection */}
@@ -893,11 +729,10 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   onValueChange={(v) => form.setValue("mode", v as any)}
                   className="w-full"
                 >
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="ocean"><Ship className="w-4 h-4 mr-2"/>Ocean</TabsTrigger>
                     <TabsTrigger value="air"><Plane className="w-4 h-4 mr-2"/>Air</TabsTrigger>
                     <TabsTrigger value="road"><Truck className="w-4 h-4 mr-2"/>Road</TabsTrigger>
-                    <TabsTrigger value="rail"><Train className="w-4 h-4 mr-2"/>Rail</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -906,25 +741,30 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="flex justify-between">
-                    Origin
+                    {mode === 'ocean' ? 'Origin Port' : mode === 'air' ? 'Origin Airport' : 'Origin City'}
                     {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
                   </Label>
                   <LocationAutocomplete
                     data-testid="location-origin"
-                    placeholder="Search origin port, airport, or city..."
+                    placeholder={mode === 'ocean' ? 'Search origin port...' : mode === 'air' ? 'Search origin airport...' : 'Search origin city...'}
                     value={origin}
                     onChange={(value, location) => handleLocationChange('origin', value, location)}
                   />
                   <input type="hidden" {...form.register("origin")} />
+                  {codeSuggestions.length > 0 && origin && (
+                    <div className="text-[10px] text-muted-foreground truncate">
+                        Suggestion: {codeSuggestions[0].label}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="flex justify-between">
-                    Destination
+                    {mode === 'ocean' ? 'Dest Port' : mode === 'air' ? 'Dest Airport' : 'Dest City'}
                     {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
                   </Label>
                   <LocationAutocomplete
                     data-testid="location-destination"
-                    placeholder="Search destination port, airport, or city..."
+                    placeholder={mode === 'ocean' ? 'Search destination port...' : mode === 'air' ? 'Search destination airport...' : 'Search destination city...'}
                     value={destination}
                     onChange={(value, location) => handleLocationChange('destination', value, location)}
                   />
@@ -935,44 +775,18 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
               {/* Commodity & AI */}
               <div className="space-y-2">
                  <Label className="flex justify-between">
-                    <span>Commodity & Cargo {form.formState.errors.commodity && <span className="text-destructive text-xs ml-2">{form.formState.errors.commodity.message}</span>}</span>
+                    <span>Commodity {form.formState.errors.commodity && <span className="text-destructive text-xs ml-2">{form.formState.errors.commodity.message}</span>}</span>
                     <button type="button" onClick={handleAiSuggest} className="text-xs text-primary flex items-center gap-1 hover:underline">
                         <Sparkles className="w-3 h-3" /> AI Analyze
                     </button>
                  </Label>
-                 <SharedCargoInput 
-                    value={cargoItem} 
-                    onChange={setCargoItem}
-                    errors={form.formState.errors as any}
-                 />
-                 <input type="hidden" {...form.register("commodity")} />
-              </div>
-
-              {/* Incoterms */}
-              <div className="space-y-2">
-                 <Label>Incoterms</Label>
-                 <Select 
-                    value={extendedData.incoterms} 
-                    onValueChange={(v) => setExtendedData(prev => ({...prev, incoterms: v}))}
-                    data-testid="incoterms-select"
-                 >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select Incoterms (Optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="EXW">EXW - Ex Works</SelectItem>
-                        <SelectItem value="FCA">FCA - Free Carrier</SelectItem>
-                        <SelectItem value="CPT">CPT - Carriage Paid To</SelectItem>
-                        <SelectItem value="CIP">CIP - Carriage and Insurance Paid To</SelectItem>
-                        <SelectItem value="DAP">DAP - Delivered at Place</SelectItem>
-                        <SelectItem value="DPU">DPU - Delivered at Place Unloaded</SelectItem>
-                        <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
-                        <SelectItem value="FAS">FAS - Free Alongside Ship</SelectItem>
-                        <SelectItem value="FOB">FOB - Free on Board</SelectItem>
-                        <SelectItem value="CFR">CFR - Cost and Freight</SelectItem>
-                        <SelectItem value="CIF">CIF - Cost, Insurance and Freight</SelectItem>
-                    </SelectContent>
-                 </Select>
+     <SmartCargoInput
+       placeholder="Search commodities or HTS codes..."
+       onSelect={(sel: { description: string }) => {
+         form.setValue("commodity", sel.description, { shouldDirty: true, shouldValidate: true });
+         handleAiSuggest();
+       }}
+     />
               </div>
 
               {/* Preferred Carriers */}
@@ -992,22 +806,22 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                     <DropdownMenuContent className="w-56" align="start">
                         <DropdownMenuLabel>Select Carriers</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {filteredCarriers.map((carrier) => {
+                        {CARRIER_OPTIONS.map((carrier) => {
                             const current = form.watch("preferredCarriers") || [];
-                            const isSelected = current.includes(carrier.name);
+                            const isSelected = current.includes(carrier);
                             return (
                                 <DropdownMenuCheckboxItem
-                                    key={carrier.id}
+                                    key={carrier}
                                     checked={isSelected}
                                     onCheckedChange={(checked) => {
                                         if (checked) {
-                                            form.setValue("preferredCarriers", [...current, carrier.name]);
+                                            form.setValue("preferredCarriers", [...current, carrier]);
                                         } else {
-                                            form.setValue("preferredCarriers", current.filter(c => c !== carrier.name));
+                                            form.setValue("preferredCarriers", current.filter(c => c !== carrier));
                                         }
                                     }}
                                 >
-                                    {carrier.name}
+                                    {carrier}
                                 </DropdownMenuCheckboxItem>
                             );
                         })}
@@ -1017,9 +831,95 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
 
               {/* Dynamic Fields based on Mode */}
               
-              {/* OCEAN / RAIL FIELDS - Handled by SharedCargoInput */}
+              {/* OCEAN FIELDS */}
+              {mode === 'ocean' && (
+                <div className="space-y-4 p-4 border rounded-md bg-background">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium flex items-center gap-2"><Ship className="w-3 h-3"/> Ocean Containers</h4>
+                    <Button variant="ghost" size="sm" onClick={addCombo} className="h-7 text-xs px-2">
+                      <Plus className="w-3 h-3 mr-1" /> Add Container
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {containerCombos.map((combo, idx) => (
+                      <div key={combo.id} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5 space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Type</Label>
+                          <Select value={combo.typeId} onValueChange={(v) => updateCombo(idx, 'typeId', v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
+                            <SelectContent>
+                              {containerTypes.length === 0 ? (
+                                <SelectItem value="__empty" disabled>No types</SelectItem>
+                              ) : (
+                                containerTypes.map(t => (
+                                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-4 space-y-1">
+                          <Label className="text=[10px] text-muted-foreground">Size</Label>
+                          <Select value={combo.sizeId} onValueChange={(v) => updateCombo(idx, 'sizeId', v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Size" /></SelectTrigger>
+                            <SelectContent>
+                              {(containerSizes.filter(s => !combo.typeId || s.type_id === combo.typeId)).map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Qty</Label>
+                          <Input type="number" min={1} className="h-8 text-xs" value={combo.quantity} onChange={(e) => updateCombo(idx, 'quantity', parseInt(e.target.value) || 1)} />
+                        </div>
+                        <div className="col-span-1 pb-1">
+                          <Button variant="ghost" size="icon" onClick={() => removeCombo(idx)} disabled={containerCombos.length === 1} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs flex justify-between">
+                        Weight (Total kg)
+                        {form.formState.errors.weight && <span className="text-destructive text-[10px]">{form.formState.errors.weight.message}</span>}
+                      </Label>
+                      <Input {...form.register("weight")} className="h-8" />
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              {/* AIR FIELDS - Handled by SharedCargoInput */}
+              {/* AIR FIELDS */}
+              {mode === 'air' && (
+                  <div className="space-y-4 p-4 border rounded-md bg-background">
+                      <h4 className="text-sm font-medium flex items-center gap-2"><Plane className="w-3 h-3"/> Air Cargo Details</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                              <Label className="text-xs flex justify-between">
+                                  Total Weight (kg)
+                                  {form.formState.errors.weight && <span className="text-destructive text-[10px]">{form.formState.errors.weight.message}</span>}
+                              </Label>
+                              <Input {...form.register("weight")} className="h-8" />
+                          </div>
+                          <div className="space-y-1">
+                              <Label className="text-xs">Volume (cbm)</Label>
+                              <Input {...form.register("volume")} className="h-8" />
+                          </div>
+                      </div>
+                      <div className="space-y-1">
+                          <Label className="text-xs">Dimensions (L x W x H cm)</Label>
+                          <Input placeholder="e.g. 100x50x50" value={extendedData.dims} onChange={(e) => setExtendedData({...extendedData, dims: e.target.value})} className="h-8" />
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                          <Checkbox id="dg" checked={extendedData.dangerousGoods} onCheckedChange={(c) => setExtendedData({...extendedData, dangerousGoods: !!c})} />
+                          <Label htmlFor="dg" className="text-xs">Dangerous Goods (DGR)</Label>
+                      </div>
+                  </div>
+              )}
 
               {/* ROAD FIELDS */}
               {mode === 'road' && (
@@ -1035,6 +935,16 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                                   <SelectItem value="reefer">Reefer Truck</SelectItem>
                               </SelectContent>
                           </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                              <Label className="text-xs">Weight (kg)</Label>
+                              <Input {...form.register("weight")} className="h-8" />
+                          </div>
+                          <div className="space-y-1">
+                              <Label className="text-xs">Pallets/Units</Label>
+                              <Input type="number" value={extendedData.containerQty} onChange={(e) => setExtendedData({...extendedData, containerQty: e.target.value})} className="h-8" />
+                          </div>
                       </div>
                   </div>
               )}
@@ -1069,7 +979,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   </div>
               </div>
 
-              <Button type="submit" className="w-full mt-4" disabled={loading || aiLoading} data-testid="generate-quote-btn">
+              <Button type="submit" className="w-full mt-4" disabled={loading}>
                 {loading ? (
                     <>
                         <Timer className="w-4 h-4 mr-2 animate-spin"/> Calculating...

@@ -1,28 +1,39 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Ship, Plane, Truck, Train } from 'lucide-react';
+import type { ComponentType } from 'react';
 
 export interface TransportMode {
   id: string;
   code: string;
   name: string;
-  icon_name: string;
-  color: string;
-  display_order: number;
-  is_active: boolean;
+  icon_name?: string | null;
 }
 
-export const useTransportModes = () => {
-  return useQuery({
-    queryKey: ['transport-modes'],
-    queryFn: async () => {
+export function useTransportModes() {
+  const { data = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['transport_modes'],
+    queryFn: async (): Promise<TransportMode[]> => {
       const { data, error } = await supabase
         .from('transport_modes')
-        .select('*')
+        .select('id, code, name, icon_name')
         .eq('is_active', true)
-        .order('display_order');
-      
-      if (error) throw error;
-      return data as TransportMode[];
-    }
+        .order('display_order', { ascending: true });
+      if (error) return [];
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 60,
   });
-};
+
+  return { modes: data, loading: isLoading, error, refetch };
+}
+
+export function getTransportModeIcon(iconName?: string | null) {
+  const key = String(iconName || '').toLowerCase();
+  const Icon: ComponentType<{ className?: string }> =
+    key.includes('plane') || key.includes('air') ? Plane :
+    key.includes('truck') || key.includes('road') ? Truck :
+    key.includes('train') || key.includes('rail') ? Train :
+    Ship;
+  return Icon;
+}
