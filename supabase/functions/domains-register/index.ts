@@ -2,7 +2,7 @@
 import { serve } from "std/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { SESClient, CreateEmailIdentityCommand } from "https://esm.sh/@aws-sdk/client-ses@3.400.0";
+import { SESClient, VerifyDomainDkimCommand } from "npm:@aws-sdk/client-ses";
 
 // @ts-ignore
 declare const Deno: any;
@@ -75,30 +75,17 @@ serve(async (req: Request) => {
             },
         });
 
-        const command = new CreateEmailIdentityCommand({
-            EmailIdentity: domain_name,
-        });
+        const command = new VerifyDomainDkimCommand({ Domain: domain_name });
 
         const response = await ses.send(command);
         
-        // AWS SES v2 returns DkimAttributes in the response or requires a separate call depending on SDK version
-        // For CreateEmailIdentity (v2), it returns DkimAttributes.
-        // Wait, SDK v3 usually maps to API v2. Let's check response structure.
-        // If using V1 (VerifyDomainDkim), it returns tokens directly.
-        // If using V2 (CreateEmailIdentity), it returns DkimAttributes.
-        
-        // For simplicity and standard compliance, we assume CreateEmailIdentity returns necessary info
-        // or we default to a standard set if immediate tokens aren't returned (some setups use Easy DKIM).
-        
-        // Actually, CreateEmailIdentity response contains DkimAttributes which has Tokens.
-        dkimTokens = response.DkimAttributes?.Tokens || [];
-        identityArn = response.IdentityType === 'DOMAIN' ? `arn:aws:ses:${awsRegion}:identity/${domain_name}` : ""; // ARN might not be in response directly
+        dkimTokens = response.DkimTokens || [];
+        identityArn = `arn:aws:ses:${awsRegion}:identity/${domain_name}`;
         
         providerMetadata = {
             provider: 'aws_ses',
-            identity_type: response.IdentityType,
-            verified_for_sending_status: response.VerifiedForSendingStatus,
-            dkim_attributes: response.DkimAttributes,
+            identity_type: 'DOMAIN',
+            dkim_tokens: dkimTokens,
             registered_at: new Date().toISOString()
         };
     } else {

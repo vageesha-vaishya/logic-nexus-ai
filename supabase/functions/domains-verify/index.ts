@@ -114,7 +114,7 @@ class SendGridEmailProvider implements EmailServiceProvider {
   }
 }
 
-import { SESClient, CreateEmailIdentityCommand } from "https://esm.sh/@aws-sdk/client-ses@3.400.0";
+import { SESClient, VerifyDomainDkimCommand } from "npm:@aws-sdk/client-ses";
 
 class AwsSesEmailProvider implements EmailServiceProvider {
   name = 'aws-ses';
@@ -140,24 +140,20 @@ class AwsSesEmailProvider implements EmailServiceProvider {
             },
         });
 
-        const command = new CreateEmailIdentityCommand({
-            EmailIdentity: domain,
-        });
+        const command = new VerifyDomainDkimCommand({ Domain: domain });
 
         const response = await ses.send(command);
         
-        // AWS SES v2 returns DkimAttributes
-        const dkimTokens = response.DkimAttributes?.Tokens || [];
-        const identityArn = response.IdentityType === 'DOMAIN' ? `arn:aws:ses:${this.region}:identity/${domain}` : "";
+        const dkimTokens = response.DkimTokens || [];
+        const identityArn = `arn:aws:ses:${this.region}:identity/${domain}`;
 
         return {
           dkim_tokens: dkimTokens,
           identity_arn: identityArn,
           provider_metadata: {
             provider: 'aws_ses',
-            identity_type: response.IdentityType,
-            verified_for_sending_status: response.VerifiedForSendingStatus,
-            dkim_attributes: response.DkimAttributes,
+            identity_type: 'DOMAIN',
+            dkim_tokens: dkimTokens,
             registered_at: new Date().toISOString()
           }
         };
