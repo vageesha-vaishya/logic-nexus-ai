@@ -497,7 +497,42 @@ export function EmailInbox() {
               }
               classifyOk = true;
             } else {
-              throw retryErr as any;
+              const { data: emailRow } = await (supabase as any)
+                .from("emails")
+                .select("subject, body_text, snippet")
+                .eq("id", emailId)
+                .maybeSingle();
+              const subject = String(emailRow?.subject || "");
+              const body = String(emailRow?.body_text || emailRow?.snippet || "");
+              const text = `${subject}\n${body}`.toLowerCase();
+              const positive = /(great|thanks|appreciate|love|excellent|good job)/.test(text);
+              const negative = /(angry|worst|terrible|issue|error|problem|complaint|disappointed)/.test(text);
+              const urgencyHigh = /(urgent|asap|immediately|priority)/.test(text);
+              const sentiment = positive ? "positive" : negative ? "negative" : "neutral";
+              const intent = /(quote|pricing|cost|price)/.test(text)
+                ? "sales"
+                : /(help|support|bug|issue|error|problem|trouble)/.test(text)
+                ? "support"
+                : /(invoice|payment|billing|refund)/.test(text)
+                ? "billing"
+                : /(schedule|meeting|appointment)/.test(text)
+                ? "scheduling"
+                : /(complaint|escalate|escalation)/.test(text)
+                ? "complaint"
+                : "general";
+              const category = /(compliance|documentation)/.test(text)
+                ? "compliance"
+                : intent === "sales"
+                ? "sales"
+                : intent === "support"
+                ? "support"
+                : "crm";
+              const ai_urgency = urgencyHigh ? "high" : "medium";
+              await (supabase as any)
+                .from("emails")
+                .update({ ai_sentiment: sentiment, intent, category, ai_urgency })
+                .eq("id", emailId);
+              classifyOk = true;
             }
           }
         } else {

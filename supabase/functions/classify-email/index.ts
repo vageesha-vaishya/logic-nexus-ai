@@ -4,6 +4,9 @@ import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickClassifier } from "../_shared/model-router.ts";
 import { logAiCall } from "../_shared/audit.ts";
 
+// @ts-ignore
+declare const Deno: any;
+
 Deno.serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
