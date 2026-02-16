@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Plane, Ship, Truck, Package, ArrowRight, Timer, Sparkles, AlertTriangle, LayoutList, Columns, ChevronDown, Plus, Trash2, Train } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
@@ -28,6 +28,7 @@ import { logger } from '@/lib/logger';
 import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import { RateOption } from '@/types/quote-breakdown';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
+import { QuoteErrorBoundary } from '@/components/sales/quote-form/QuoteErrorBoundary';
 
 const CARRIER_OPTIONS = [
   "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
@@ -687,6 +688,7 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   };
 
   return (
+    <QuoteErrorBoundary>
     <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if(!open) reset(); }}>
       <DialogTrigger asChild>
         {children || <Button>Quick Quote</Button>}
@@ -729,10 +731,11 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
                   onValueChange={(v) => form.setValue("mode", v as any)}
                   className="w-full"
                 >
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="ocean"><Ship className="w-4 h-4 mr-2"/>Ocean</TabsTrigger>
                     <TabsTrigger value="air"><Plane className="w-4 h-4 mr-2"/>Air</TabsTrigger>
                     <TabsTrigger value="road"><Truck className="w-4 h-4 mr-2"/>Road</TabsTrigger>
+                    <TabsTrigger value="rail"><Train className="w-4 h-4 mr-2"/>Rail</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -1081,5 +1084,6 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
         </div>
       </DialogContent>
     </Dialog>
+    </QuoteErrorBoundary>
   );
 }

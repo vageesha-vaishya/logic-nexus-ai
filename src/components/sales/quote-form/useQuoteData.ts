@@ -214,6 +214,31 @@ export function useQuoteData() {
             }));
           }
         }
+
+        const hasRailType = serviceTypesForDropdown.some((t: any) => {
+          const code = String(t.code || '').toLowerCase();
+          const name = String(t.name || '').toLowerCase();
+          return code === 'railway_transport' || name.includes('rail');
+        });
+
+        if (!hasRailType) {
+          const { data: railRows, error: railErr } = await supabase
+            .from('service_types')
+            .select('id, name, code')
+            .eq('code', 'railway_transport')
+            .eq('is_active', true)
+            .limit(1);
+
+          if (!railErr && Array.isArray(railRows) && railRows.length > 0) {
+            const rail = railRows[0] as any;
+            const railEntry = {
+              id: String(rail.id),
+              code: String(rail.code),
+              name: rail.name || String(rail.code),
+            };
+            serviceTypesForDropdown.push(railEntry);
+          }
+        }
         
         const servicesForDropdown = mappingRows
           .map((m: any) => {

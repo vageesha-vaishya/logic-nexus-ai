@@ -107,8 +107,8 @@ export function QuoteLogistics() {
     return <Ship className="h-5 w-5 text-blue-600" />;
   };
 
-  // Resolve placeholders for blank fields if we have leg data
-  const mainLeg = legs.find((l: Leg) => l.transport_mode === 'ocean' || l.transport_mode === 'air') || legs[0];
+  const preferredModes = ['ocean', 'air', 'rail', 'road'];
+  const mainLeg = legs.find((l: Leg) => preferredModes.includes((l.transport_mode || '').toLowerCase())) || legs[0];
   const firstLeg = legs[0];
   const lastLeg = legs[legs.length - 1];
 

@@ -1349,21 +1349,17 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
         dispatch({ type: 'SET_LEGS', payload: legsWithCharges });
       } else {
-        // Fallback: If no legs exist but we have quote data, create a default leg
-        
-        // Robust resolution of Origin/Destination
         let originName = quoteData.origin;
         let destinationName = quoteData.destination;
         
-        // Try to resolve from ports if names are missing
         if (!originName && quoteData.origin_port_id) {
             const port = ports.find(p => p.id === quoteData.origin_port_id);
-            if (port) originName = port.name || port.port_name || port.code;
+            if (port) originName = port.name || port.location_name || port.code;
         }
         
         if (!destinationName && quoteData.destination_port_id) {
             const port = ports.find(p => p.id === quoteData.destination_port_id);
-            if (port) destinationName = port.name || port.port_name || port.code;
+            if (port) destinationName = port.name || port.location_name || port.code;
         }
 
         const shippingAmount = Number(quoteData.shipping_amount) || 0;
@@ -1961,10 +1957,9 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     // Initialize progress tracking
     const progressSteps = [
       { label: 'Validating data...', completed: false },
-      { label: 'Creating quotation option...', completed: false },
-      { label: 'Cleaning up deleted items...', completed: false },
-      { label: 'Saving transport legs...', completed: false },
-      { label: 'Saving charges...', completed: false },
+      { label: 'Ensuring quotation option...', completed: false },
+      { label: 'Preparing atomic payload...', completed: false },
+      { label: 'Saving quote via RPC...', completed: false },
       { label: 'Finalizing...', completed: false }
     ];
     
@@ -1989,7 +1984,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         return;
       }
 
-      updateProgress(0); // Validation complete
+      updateProgress(0);
 
       // Ensure we have an option to save to
       debug.debug('[Composer] Ensuring option exists before save. Current optionId:', optionId);
@@ -2046,535 +2041,141 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         debug.debug('[Composer] Using existing optionId:', currentOptionId);
       }
       
-      updateProgress(1); // Option created
+      updateProgress(1);
 
-      // Delete tracked charges first
-      if (deletedChargeIds.length > 0) {
-        const validDeleted = deletedChargeIds.filter((id) => isUUID(id));
-        if (validDeleted.length > 0) {
-          const { error: deleteError } = await scopedDb
-            .from('quote_charges')
-            .delete()
-            .in('id', validDeleted);
-          if (deleteError) {
-            debug.error('Error deleting charges:', deleteError);
-            throw new Error(`Failed to delete charges: ${deleteError.message}`);
-          }
+      const serializeCharge = (charge: any) => {
+        const basis = chargeBases.find((b) => b.id === charge.basis_id);
+        const base = {
+          charge_code: charge.category_id || undefined,
+          basis: basis?.code || undefined,
+          currency: undefined,
+          unit: charge.unit || undefined,
+          note: charge.note || undefined,
+        };
+
+        const entries: any[] = [];
+
+        if (charge.buy && typeof charge.buy.rate === 'number' && typeof charge.buy.quantity === 'number') {
+          entries.push({
+            ...base,
+            side: 'buy',
+            unit_price: charge.buy.rate,
+            quantity: charge.buy.quantity,
+            amount: typeof charge.buy.amount === 'number' ? charge.buy.amount : undefined,
+          });
         }
-        
-      }
 
-      // Get charge side IDs
-      const [buySideRes, sellSideRes] = await Promise.all([
-        scopedDb.from('charge_sides', true).select('id').eq('code', 'buy').single(),
-        scopedDb.from('charge_sides', true).select('id').eq('code', 'sell').single()
-      ]);
+        if (charge.sell && typeof charge.sell.rate === 'number' && typeof charge.sell.quantity === 'number') {
+          entries.push({
+            ...base,
+            side: 'sell',
+            unit_price: charge.sell.rate,
+            quantity: charge.sell.quantity,
+            amount: typeof charge.sell.amount === 'number' ? charge.sell.amount : undefined,
+          });
+        }
 
-      if (buySideRes.error || sellSideRes.error || !buySideRes.data || !sellSideRes.data) {
-        throw new Error('Failed to fetch charge sides');
-      }
+        return entries;
+      };
 
-      const buySideId = buySideRes.data.id;
-      const sellSideId = sellSideRes.data.id;
+      const legChargesPayload = legs.map((leg) => ({
+        id: isUUID(leg.id) ? leg.id : undefined,
+        carrier_id: isUUID(leg.carrierId) ? leg.carrierId : null,
+        transport_mode: leg.mode,
+        service_only_category: leg.serviceOnlyCategory || null,
+        leg_type: leg.legType || 'transport',
+        origin_location_name: leg.origin,
+        destination_location_name: leg.destination,
+        transit_time_hours: null,
+        flight_number: null,
+        voyage_number: null,
+        departure_date: null,
+        arrival_date: null,
+        charges: (leg.charges || []).flatMap((charge: any) => serializeCharge(charge)),
+      }));
 
-      // Clean up orphaned legs and their charges
-      let existingLegs: any[] | null = null;
-      if (isUUID(currentOptionId)) {
-        const resLegs = await scopedDb
-          .from('quotation_version_option_legs')
-          .select('id')
-          .eq('quotation_version_option_id', currentOptionId);
-        existingLegs = resLegs.data || null;
-      }
-      
-      const stateLegIds = new Set(
-        (legs || [])
-          .filter(l => !String(l.id).startsWith('leg-'))
-          .map(l => String(l.id))
+      const combinedChargesPayload = (combinedCharges || []).flatMap((charge: any) =>
+        serializeCharge(charge)
       );
-      
-      const toDeleteLegIds = (existingLegs || [])
-        .map((l: any) => String(l.id))
-        .filter((id: string) => isUUID(id))
-        .filter((id: string) => !stateLegIds.has(id));
-      
-      if (toDeleteLegIds.length > 0) {
-        // Delete charges associated with removed legs
-        if (isUUID(currentOptionId)) {
-          const { error: chargeDeleteError } = await scopedDb
-            .from('quote_charges')
-            .delete()
-            .in('leg_id', toDeleteLegIds)
-            .eq('quote_option_id', currentOptionId);
-          
-          if (chargeDeleteError) {
-            debug.error('Error deleting leg charges:', chargeDeleteError);
-            throw new Error(`Failed to delete leg charges: ${chargeDeleteError.message}`);
-          }
-        }
-        
-        // Delete the legs themselves
-        const { error: legDeleteError } = await scopedDb
-          .from('quotation_version_option_legs')
-          .delete()
-          .in('id', toDeleteLegIds);
-        
-        if (legDeleteError) {
-          debug.error('Error deleting legs:', legDeleteError);
-          throw new Error(`Failed to delete legs: ${legDeleteError.message}`);
-        }
-      }
-      
-      updateProgress(2); // Cleanup complete
 
-      // Save legs and charges
-      for (let i = 0; i < legs.length; i++) {
-        const leg = legs[i];
-        let legId = leg.id;
-        
-        if (leg.id.startsWith('leg-')) {
-          // New leg
-          if (!isUUID(currentOptionId)) {
-            throw new Error('Invalid option identifier for leg insert');
-          }
-          const { data: newLeg, error: legError } = await scopedDb
-            .from('quotation_version_option_legs')
-            .insert({
-              quotation_version_option_id: currentOptionId,
-              mode: leg.mode,
-              service_type_id: leg.serviceTypeId || null,
-              origin_location: leg.origin,
-              destination_location: leg.destination,
-              leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
-              service_only_category: leg.serviceOnlyCategory || null,
-              tenant_id: finalTenantId,
-              franchise_id: context.franchiseId,
-              sort_order: i,
-              carrier_id: leg.carrierId || null,
-              carrier_name: leg.carrierName || null
-            })
-            .select()
-            .single();
-          
-          if (legError) throw legError;
-          if (!newLeg) throw new Error('Failed to create leg');
-          legId = (newLeg as any).id;
-        } else {
-          // Update existing leg
-          if (isUUID(legId)) {
-            const { error: updateError } = await scopedDb
-              .from('quotation_version_option_legs')
-              .update({
-                mode: leg.mode,
-                service_type_id: leg.serviceTypeId || null,
-                origin_location: leg.origin,
-                destination_location: leg.destination,
-                leg_type: (leg.legType === 'service' ? 'service' : 'transport'),
-                service_only_category: leg.serviceOnlyCategory || null,
-                sort_order: i,
-                carrier_id: leg.carrierId || null,
-                carrier_name: leg.carrierName || null
-              })
-              .eq('id', legId);
-            
-            if (updateError) throw updateError;
-          }
-        }
+      const rpcPayload: any = {
+        quote: {
+          id: isUUID(quoteId) ? quoteId : undefined,
+          title: quoteData.title || null,
+          description: quoteData.description || null,
+          service_type_id: quoteData.service_type_id || null,
+          service_id: quoteData.service_id || null,
+          incoterms: quoteData.incoterms || null,
+          shipping_term_id: quoteData.shipping_term_id || null,
+          incoterm_id: quoteData.shipping_term_id || null,
+          currency_id: quoteData.currencyId || null,
+          carrier_id: quoteData.carrier_id || null,
+          consignee_id: quoteData.consignee_id || null,
+          origin_port_id: quoteData.origin_port_id || null,
+          destination_port_id: quoteData.destination_port_id || null,
+          account_id: quoteData.account_id || null,
+          contact_id: quoteData.contact_id || null,
+          opportunity_id: quoteData.opportunity_id || null,
+          status: quoteData.status || 'draft',
+          valid_until: quoteData.validUntil || null,
+          pickup_date: quoteData.pickup_date || null,
+          delivery_deadline: quoteData.delivery_deadline || null,
+          vehicle_type: quoteData.vehicle_type || null,
+          special_handling: quoteData.special_handling || null,
+          tax_percent: quoteData.tax_percent ? Number(quoteData.tax_percent) : 0,
+          shipping_amount: quoteData.shipping_amount ? Number(quoteData.shipping_amount) : 0,
+          terms_conditions: quoteData.terms_conditions || null,
+          notes: quoteData.notes || null,
+          billing_address: quoteData.billing_address || {},
+          shipping_address: quoteData.shipping_address || {},
+          tenant_id: finalTenantId,
+          regulatory_data: {
+            trade_direction: quoteData.trade_direction || null,
+          },
+        },
+        items: [],
+        cargo_configurations: [],
+        options: [
+          {
+            id: isUUID(currentOptionId) ? currentOptionId : undefined,
+            is_selected: true,
+            total_amount: undefined,
+            currency: undefined,
+            transit_time_days: undefined,
+            legs: legChargesPayload,
+            combined_charges: combinedChargesPayload,
+          },
+        ],
+      };
 
-        // Save charges with UPDATE/INSERT logic
-        for (const charge of leg.charges) {
-          const chargeData = {
-            quote_option_id: currentOptionId,
-            leg_id: legId,
-            category_id: charge.category_id || null,
-            basis_id: charge.basis_id || null,
-            currency_id: charge.currency_id || null,
-            unit: charge.unit || null,
-            note: charge.note || null,
-            tenant_id: finalTenantId,
-            franchise_id: context.franchiseId
-          };
+      updateProgress(2);
 
-          // Handle buy side
-          if (charge.buy?.dbChargeId) {
-            // Update existing
-            if (isUUID(charge.buy.dbChargeId)) {
-              const { error: updateError } = await scopedDb
-                .from('quote_charges')
-                .update({
-                  ...chargeData,
-                  quantity: charge.buy.quantity || 1,
-                  rate: charge.buy.rate || 0,
-                  amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
-                })
-                .eq('id', charge.buy.dbChargeId);
-              if (updateError) throw updateError;
-            } else {
-              const { error: insertError } = await scopedDb
-                .from('quote_charges')
-                .insert({
-                  ...chargeData,
-                  charge_side_id: buySideId,
-                  quantity: charge.buy?.quantity || 1,
-                  rate: charge.buy?.rate || 0,
-                  amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
-                });
-              if (insertError) throw insertError;
-            }
-          } else {
-            // Insert new
-            if (isUUID(currentOptionId) && isUUID(legId)) {
-              const { error: insertError } = await scopedDb
-                .from('quote_charges')
-                .insert({
-                  ...chargeData,
-                  charge_side_id: buySideId,
-                  quantity: charge.buy?.quantity || 1,
-                  rate: charge.buy?.rate || 0,
-                  amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
-                });
-              if (insertError) throw insertError;
-            }
-          }
-
-          // Handle sell side
-          if (charge.sell?.dbChargeId) {
-            // Update existing
-            if (isUUID(charge.sell.dbChargeId)) {
-              const { error: updateError } = await scopedDb
-                .from('quote_charges')
-                .update({
-                  ...chargeData,
-                  quantity: charge.sell.quantity || 1,
-                  rate: charge.sell.rate || 0,
-                  amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
-                })
-                .eq('id', charge.sell.dbChargeId);
-              if (updateError) throw updateError;
-            } else {
-              if (isUUID(currentOptionId) && isUUID(legId)) {
-                const { error: insertError } = await scopedDb
-                  .from('quote_charges')
-                  .insert({
-                    ...chargeData,
-                    charge_side_id: sellSideId,
-                    quantity: charge.sell?.quantity || 1,
-                    rate: charge.sell?.rate || 0,
-                    amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
-                  });
-                if (insertError) throw insertError;
-              }
-            }
-          } else {
-            // Insert new
-            if (isUUID(currentOptionId) && isUUID(legId)) {
-              const { error: insertError } = await scopedDb
-                .from('quote_charges')
-                .insert({
-                  ...chargeData,
-                  charge_side_id: sellSideId,
-                  quantity: charge.sell?.quantity || 1,
-                  rate: charge.sell?.rate || 0,
-                  amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
-                });
-              if (insertError) throw insertError;
-            }
-          }
-        }
-      }
-      
-      updateProgress(3); // Legs saved
-
-      // Update Quotation Version (Header)
-      if (isUUID(versionId)) {
-        const { error: versionError } = await scopedDb
-          .from('quotation_versions')
-          .update({
-            valid_until: quoteData.validUntil || null,
-            total_weight: quoteData.total_weight ? Number(quoteData.total_weight) : null,
-            total_volume: quoteData.total_volume ? Number(quoteData.total_volume) : null,
-            incoterms: quoteData.incoterms || null,
-            commodity: quoteData.commodity || null,
-            notes: quoteData.notes || null,
-            aes_hts_id: quoteData.aes_hts_id || null,
-          })
-          .eq('id', versionId);
-        if (versionError) {
-          debug.error('Error updating version:', versionError);
-        }
-      }
-
-      // SYNC: Update Parent Quote Header with Totals and Status
-      // This ensures the "Form" view reflects the latest calculations from Composer
-      if (quoteId) {
-          const parentUpdatePayload: any = {
-              total_weight: quoteData.total_weight ? Number(quoteData.total_weight) : null,
-              total_volume: quoteData.total_volume ? Number(quoteData.total_volume) : null,
-              incoterms: quoteData.incoterms || null,
-              // If we have a valid until date, sync it
-              valid_until: quoteData.validUntil || null,
-          };
-
-          // If we have a calculated total (Sell Price), update shipping_amount
-          // We calculate this from the current state's legs and charges
-          const currentTotalSell = legs.reduce((acc, leg) => {
-              return acc + leg.charges.reduce((sum, c) => sum + ((c.sell?.quantity || 0) * (c.sell?.rate || 0)), 0);
-          }, 0) + combinedCharges.reduce((acc, c) => acc + ((c.sell?.quantity || 0) * (c.sell?.rate || 0)), 0);
-
-          if (currentTotalSell > 0) {
-              parentUpdatePayload.shipping_amount = currentTotalSell;
-          }
-
-          if (isUUID(quoteId)) {
-            const { error: parentError } = await scopedDb
-                .from('quotes')
-                .update(parentUpdatePayload)
-                .eq('id', quoteId);
-
-            if (parentError) {
-                debug.warn('[Composer] Failed to sync parent quote header:', parentError);
-            } else {
-                debug.log('[Composer] Synced parent quote header with new totals');
-            }
-          }
-      }
-
-      // Update Current Option Details
-      if (currentOptionId) {
-        // Recalculate Option Financials from Charges to ensure sync
-        let newTotalBuy = 0;
-        let newTotalSell = 0;
-
-        // Sum from Legs
-        legs.forEach(leg => {
-            leg.charges.forEach((c: any) => {
-                newTotalBuy += (c.buy?.quantity || 1) * (c.buy?.rate || 0);
-                newTotalSell += (c.sell?.quantity || 1) * (c.sell?.rate || 0);
-            });
-        });
-
-        // Sum from Combined Charges
-        combinedCharges.forEach((c: any) => {
-            newTotalBuy += (c.buy?.quantity || 1) * (c.buy?.rate || 0);
-            newTotalSell += (c.sell?.quantity || 1) * (c.sell?.rate || 0);
-        });
-
-        const newMarginAmount = newTotalSell - newTotalBuy;
-        const newMarginPercent = newTotalSell > 0 ? (newMarginAmount / newTotalSell) * 100 : 0;
-
-        if (isUUID(currentOptionId)) {
-          const { error: optionError } = await scopedDb
-            .from('quotation_version_options')
-            .update({
-              carrier_id: quoteData.carrier_id || null,
-              carrier_name: quoteData.carrier_name || null,
-              service_type: quoteData.service_type || null,
-              transit_time: quoteData.transit_time || null,
-              valid_until: quoteData.validUntil || null,
-              currency: quoteData.currencyId ? currencies.find(c => c.id === quoteData.currencyId)?.code : null,
-              option_name: quoteData.option_name || null,
-              total_buy: newTotalBuy,
-              total_sell: newTotalSell,
-              total_amount: newTotalSell,
-              margin_amount: newMarginAmount,
-              margin_percentage: newMarginPercent
-            })
-            .eq('id', currentOptionId);
-  
-          if (optionError) {
-            debug.error('Error updating option:', optionError);
-          }
-        }
-
-      }
-
-      // Save combined charges with UPDATE/INSERT logic
-      for (const charge of combinedCharges || []) {
-        const chargeData = {
-          quote_option_id: currentOptionId,
-          leg_id: null,
-          category_id: charge.category_id || null,
-          basis_id: charge.basis_id || null,
-          currency_id: charge.currency_id || null,
-          unit: charge.unit || null,
-          note: charge.note || null,
-          tenant_id: finalTenantId
-        };
-
-        // Handle buy side
-        if (charge.buy?.dbChargeId) {
-          if (isUUID(charge.buy.dbChargeId)) {
-            const { error: updateError } = await scopedDb
-              .from('quote_charges')
-              .update({
-                ...chargeData,
-                quantity: charge.buy.quantity || 1,
-                rate: charge.buy.rate || 0,
-                amount: (charge.buy.quantity || 1) * (charge.buy.rate || 0)
-              })
-              .eq('id', charge.buy.dbChargeId);
-            if (updateError) throw updateError;
-          } else {
-            if (isUUID(currentOptionId)) {
-              const { error: insertError } = await scopedDb
-                .from('quote_charges')
-                .insert({
-                  ...chargeData,
-                  charge_side_id: buySideId,
-                  quantity: charge.buy?.quantity || 1,
-                  rate: charge.buy?.rate || 0,
-                  amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
-                });
-              if (insertError) throw insertError;
-            }
-          }
-        } else {
-          if (isUUID(currentOptionId)) {
-            const { error: insertError } = await scopedDb
-              .from('quote_charges')
-              .insert({
-                ...chargeData,
-                charge_side_id: buySideId,
-                quantity: charge.buy?.quantity || 1,
-                rate: charge.buy?.rate || 0,
-                amount: (charge.buy?.quantity || 1) * (charge.buy?.rate || 0)
-              });
-            if (insertError) throw insertError;
-          }
-        }
-
-        // Handle sell side
-        if (charge.sell?.dbChargeId) {
-          if (isUUID(charge.sell.dbChargeId)) {
-            const { error: updateError } = await scopedDb
-              .from('quote_charges')
-              .update({
-                ...chargeData,
-                quantity: charge.sell.quantity || 1,
-                rate: charge.sell.rate || 0,
-                amount: (charge.sell.quantity || 1) * (charge.sell.rate || 0)
-              })
-              .eq('id', charge.sell.dbChargeId);
-            if (updateError) throw updateError;
-          } else {
-            if (isUUID(currentOptionId)) {
-              const { error: insertError } = await scopedDb
-                .from('quote_charges')
-                .insert({
-                  ...chargeData,
-                  charge_side_id: sellSideId,
-                  quantity: charge.sell?.quantity || 1,
-                  rate: charge.sell?.rate || 0,
-                  amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
-                });
-              if (insertError) throw insertError;
-            }
-          }
-        } else {
-          if (isUUID(currentOptionId)) {
-            const { error: insertError } = await scopedDb
-              .from('quote_charges')
-              .insert({
-                ...chargeData,
-                charge_side_id: sellSideId,
-                quantity: charge.sell?.quantity || 1,
-                rate: charge.sell?.rate || 0,
-                amount: (charge.sell?.quantity || 1) * (charge.sell?.rate || 0)
-              });
-            if (insertError) throw insertError;
-          }
-        }
-      }
-      
-      updateProgress(4); // Charges saved
-
-      // Calculate and save totals to option
-      try {
-        const calculateLegTotal = (leg: any, side: 'buy' | 'sell') => {
-          return leg.charges.reduce((acc: number, charge: any) => {
-            const qty = charge[side]?.quantity || 0;
-            const rate = charge[side]?.rate || 0;
-            return acc + (qty * rate);
-          }, 0);
-        };
-
-        const calculateCombinedTotal = (side: 'buy' | 'sell') => {
-          return combinedCharges.reduce((acc: number, charge: any) => {
-            const qty = charge[side]?.quantity || 0;
-            const rate = charge[side]?.rate || 0;
-            return acc + (qty * rate);
-          }, 0);
-        };
-
-        const totalBuy = legs.reduce((acc: number, leg: any) => acc + calculateLegTotal(leg, 'buy'), 0) + calculateCombinedTotal('buy');
-        const totalSell = legs.reduce((acc: number, leg: any) => acc + calculateLegTotal(leg, 'sell'), 0) + calculateCombinedTotal('sell');
-        const marginAmount = totalSell - totalBuy;
-
-        debug.info('Updating option totals', { totalBuy, totalSell, marginAmount });
-
-        const { error: optionUpdateError } = await scopedDb
-            .from('quotation_version_options')
-            .update({
-                buy_subtotal: totalBuy,
-                sell_subtotal: totalSell,
-                margin_amount: marginAmount,
-                total_amount: totalSell,
-                quote_currency_id: quoteData.currencyId || null
-            })
-            .eq('id', currentOptionId);
-            
-        if (optionUpdateError) {
-           debug.error('Failed to update option totals', optionUpdateError);
-           // Don't fail the whole save, but log it
-        }
-      } catch (calcError) {
-        debug.error('Error calculating totals', calcError);
-      }
-
-      const duration = performance.now() - startTime;
-      debug.log('Quotation saved successfully', { 
-        versionId, 
-        optionId: currentOptionId,
-        duration: `${duration.toFixed(2)}ms`
+      const { data: rpcSavedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
+        p_payload: rpcPayload,
       });
 
-      // Update parent Quote details (dates, notes, etc.)
-      if (quoteId) {
-        try {
-            const quoteUpdates: any = {
-                valid_until: quoteData.validUntil || null,
-                ready_date: quoteData.ready_date || null,
-                delivery_deadline: quoteData.deadline_date || null,
-                notes: quoteData.notes || null,
-                incoterms: quoteData.incoterms || null,
-                origin_port_id: quoteData.origin_port_id || null,
-                destination_port_id: quoteData.destination_port_id || null
-            };
-
-            // Only update if we have data to avoid overwriting with nulls if not loaded?
-            // Actually quoteData should be fully loaded.
-            
-            if (isUUID(quoteId)) {
-              const { error: quoteUpdateError } = await scopedDb
-                  .from('quotes')
-                  .update(quoteUpdates)
-                  .eq('id', quoteId);
-
-              if (quoteUpdateError) {
-                  debug.error('Failed to update parent quote details', quoteUpdateError);
-              } else {
-                  debug.log('Updated parent quote details');
-              }
-            }
-        } catch (e) {
-            debug.error('Exception updating parent quote', e);
-        }
+      if (rpcError) {
+        debug.error('[Composer] RPC save failed:', rpcError);
+        throw new Error(rpcError.message || 'Failed to save quotation via RPC');
       }
 
-      toast({ 
-        title: 'Success', 
+      if (!rpcSavedId) {
+        throw new Error('RPC save did not return a quote id');
+      }
+
+      updateProgress(3);
+
+      const duration = performance.now() - startTime;
+      debug.log('Quotation saved successfully via RPC', {
+        versionId,
+        optionId: currentOptionId,
+        duration: `${duration.toFixed(2)}ms`,
+      });
+
+      toast({
+        title: 'Success',
         description: 'Quotation saved successfully',
-        duration: 3000
+        duration: 3000,
       });
       
       // Reload data to sync with database
@@ -2588,7 +2189,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       // Clear validation feedback
       dispatch({ type: 'SET_VALIDATION', payload: { errors: [], warnings: [] } });
       
-      updateProgress(5); // Complete
+      updateProgress(4);
       
       // Keep success display for a moment
       setTimeout(() => {

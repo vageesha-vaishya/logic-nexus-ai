@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useQuoteRepositoryForm } from '../useQuoteRepository';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { buildMissingOptionsOrChargesAnomaly, useQuoteRepositoryForm } from '../useQuoteRepository';
 import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 
 const createTestQueryClient = () => new QueryClient({
     defaultOptions: {
@@ -71,6 +73,12 @@ vi.mock('@/hooks/useCRM', () => ({
   }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: {
+    warning: vi.fn(),
+  },
+}));
+
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     roles: [],
@@ -92,6 +100,18 @@ vi.mock('../QuoteContext', () => ({
   }),
 }));
 
+vi.mock('@/lib/feature-flags', async () => {
+  const actual = await vi.importActual<any>('@/lib/feature-flags');
+  return {
+    ...actual,
+    useAppFeatureFlag: vi.fn((key: string, defaultValue: boolean = false) => ({
+      enabled: defaultValue,
+      isLoading: false,
+      error: null,
+    })),
+  };
+});
+
 describe('useQuoteRepository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,6 +122,10 @@ describe('useQuoteRepository', () => {
     mockInsert.mockReturnValue({ select: () => ({ maybeSingle: mockMaybeSingle }) });
     mockUpdate.mockReturnValue({ eq: () => Promise.resolve({ error: null }) });
     mockDelete.mockReturnValue({ eq: () => Promise.resolve({ error: null }) });
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = 'test';
   });
 
   it('should save a new quote using atomic RPC', async () => {
@@ -188,13 +212,295 @@ describe('useQuoteRepository', () => {
 
     await result.current.saveQuote({ data: quoteData });
 
-    expect(mockRpc).toHaveBeenCalledWith('save_quote_atomic', expect.objectContaining({
-      p_payload: expect.objectContaining({
-        options: expect.arrayContaining([
-          expect.objectContaining({ id: 'opt-primary', is_selected: true }),
-          expect.objectContaining({ id: 'opt-secondary', is_selected: false }),
+    expect(mockRpc).toHaveBeenCalledWith(
+      'save_quote_atomic',
+      expect.objectContaining({
+        p_payload: expect.objectContaining({
+          options: expect.arrayContaining([
+            expect.objectContaining({ is_selected: true }),
+            expect.objectContaining({ is_selected: false }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('omits non-uuid option ids so new options are inserted', async () => {
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
+
+    const quoteData = {
+      title: 'Quote With New Options',
+      items: [],
+      options: [
+        { id: 'temporary-id', is_primary: true, legs: [] },
+      ],
+    } as any;
+
+    await result.current.saveQuote({ data: quoteData });
+
+    const rpcArgs = mockRpc.mock.calls[0][1] as any;
+    const optionPayload = rpcArgs.p_payload.options[0];
+
+    expect(optionPayload.id).toBeUndefined();
+    expect(optionPayload.is_selected).toBe(true);
+  });
+
+  it('maps leg charges into RPC payload with pricing fields', async () => {
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
+
+    const quoteData = {
+      title: 'Quote With Charges',
+      items: [],
+      options: [
+        {
+          id: 'opt-1',
+          is_primary: true,
+          legs: [
+            {
+              id: 'leg-1',
+              carrier_id: 'carrier-1',
+              transport_mode: 'air',
+              origin_location_name: 'JFK',
+              destination_location_name: 'LHR',
+              transit_time_days: 7,
+              charges: [
+                {
+                  id: 'temp-charge-id',
+                  amount: 100,
+                  currency: 'USD',
+                  charge_code: 'charge-cat-id',
+                  basis: 'PER_KG',
+                  unit_price: 10,
+                  quantity: 10,
+                  note: 'Test charge',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as any;
+
+    await result.current.saveQuote({ data: quoteData });
+
+    const rpcArgs = mockRpc.mock.calls[0][1] as any;
+    const chargePayload = rpcArgs.p_payload.options[0].legs[0].charges[0];
+
+    expect(chargePayload).toMatchObject({
+      amount: 100,
+      currency: 'USD',
+      charge_code: 'charge-cat-id',
+      basis: 'PER_KG',
+      unit_price: 10,
+      quantity: 10,
+      note: 'Test charge',
+    });
+    expect(chargePayload.id).toBeUndefined();
+  });
+
+  it('preserves service_only_category and leg_type in options legs payload', async () => {
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
+
+    const quoteData = {
+      title: 'Quote With Service Leg',
+      items: [],
+      options: [
+        {
+          id: 'opt-1',
+          is_primary: true,
+          legs: [
+            {
+              id: 'leg-1',
+              carrier_id: 'carrier-1',
+              transport_mode: 'service',
+              service_only_category: 'custom-service',
+              leg_type: 'service',
+              origin_location_name: 'N/A',
+              destination_location_name: 'N/A',
+              transit_time_days: 0,
+              charges: [],
+            },
+          ],
+        },
+      ],
+    } as any;
+
+    await result.current.saveQuote({ data: quoteData });
+
+    const rpcArgs = mockRpc.mock.calls[0][1] as any;
+    const legPayload = rpcArgs.p_payload.options[0].legs[0];
+
+    expect(legPayload.service_only_category).toBe('custom-service');
+    expect(legPayload.leg_type).toBe('service');
+  });
+
+  it('validateSavedQuote triggers toast and anomaly update when options or charges are missing', async () => {
+    process.env.NODE_ENV = 'development';
+
+    const mockFlag = useAppFeatureFlag as unknown as vi.Mock;
+    mockFlag.mockReturnValue({
+      enabled: false,
+      isLoading: false,
+      error: null,
+    });
+
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
+
+    const quoteData = {
+      title: 'Quote Without Charges',
+      items: [],
+      options: [],
+    } as any;
+
+    const versionRow: any = {
+      id: 'version-1',
+      quote_id: 'new-quote-id',
+      tenant_id: 'tenant-1',
+      version_number: 1,
+      anomalies: [],
+      quotation_version_options: [],
+    };
+
+    mockMaybeSingle.mockResolvedValueOnce({ data: versionRow, error: null });
+
+    await result.current.saveQuote({ data: quoteData });
+
+    const warningMock: any = (toast as any).warning;
+
+    expect(warningMock).toHaveBeenCalledWith(
+      'Quote saved but has no options or charges. Please review before sending.'
+    );
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        anomalies: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'MISSING_OPTIONS_OR_CHARGES',
+            quote_id: 'new-quote-id',
+            version_id: 'version-1',
+            severity: 'WARNING',
+          }),
         ]),
-      }),
-    }));
+      })
+    );
+  });
+
+  it('uses phase 2 guard feature flag to escalate anomaly severity to ERROR', async () => {
+    process.env.NODE_ENV = 'development';
+
+    const mockFlag = useAppFeatureFlag as unknown as vi.Mock;
+    mockFlag.mockReturnValue({
+      enabled: true,
+      isLoading: false,
+      error: null,
+    });
+
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(
+      () => useQuoteRepositoryForm({ form: mockForm }),
+      { wrapper }
+    );
+
+    const quoteData = {
+      title: 'Quote Without Charges',
+      items: [],
+      options: [],
+    } as any;
+
+    const versionRow: any = {
+      id: 'version-2',
+      quote_id: 'new-quote-id',
+      tenant_id: 'tenant-1',
+      version_number: 2,
+      anomalies: [],
+      quotation_version_options: [],
+    };
+
+    mockMaybeSingle.mockResolvedValueOnce({ data: { id: 'new-quote-id' }, error: null });
+    mockMaybeSingle.mockResolvedValueOnce({ data: versionRow, error: null });
+
+    await result.current.saveQuote({ data: quoteData });
+
+    expect(mockUpdate).toHaveBeenCalled();
+    const updateArg: any = mockUpdate.mock.calls[0][0];
+    const anomaly = Array.isArray(updateArg.anomalies) ? updateArg.anomalies[0] : null;
+    expect(anomaly).toMatchObject({
+      type: 'MISSING_OPTIONS_OR_CHARGES',
+      quote_id: 'new-quote-id',
+      severity: 'ERROR',
+    });
+  });
+
+  it('buildMissingOptionsOrChargesAnomaly builds enriched anomaly payload shape', () => {
+    vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+
+    const version: any = {
+      id: 'version-1',
+      quote_id: 'quote-1',
+      tenant_id: 'tenant-1',
+      version_number: 2,
+      quotation_version_options: [
+        {
+          id: 'opt-1',
+          quotation_version_option_legs: [
+            {
+              id: 'leg-1',
+              quotation_version_option_leg_charges: [{ id: 'ch-1' }, { id: 'ch-2' }],
+            },
+          ],
+        },
+        {
+          id: 'opt-2',
+          quotation_version_option_legs: [
+            {
+              id: 'leg-2',
+              quotation_version_option_leg_charges: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    const anomaly = buildMissingOptionsOrChargesAnomaly(version, 'quote-1');
+
+    expect(anomaly).toMatchObject({
+      type: 'MISSING_OPTIONS_OR_CHARGES',
+      severity: 'WARNING',
+      message: 'Quote version saved without options or charges',
+      quote_id: 'quote-1',
+      version_id: 'version-1',
+      version_number: 2,
+      tenant_id: 'tenant-1',
+      option_count: 2,
+      charge_count: 2,
+      timestamp: '2025-01-01T00:00:00.000Z',
+    });
+
+    const emptyVersion: any = {
+      id: 'version-2',
+      quote_id: 'quote-2',
+      tenant_id: 'tenant-2',
+      version_number: 3,
+      quotation_version_options: [],
+    };
+
+    const strictAnomaly = buildMissingOptionsOrChargesAnomaly(emptyVersion, 'quote-2', {
+      strictGuards: true,
+    });
+
+    expect(strictAnomaly).toMatchObject({
+      type: 'MISSING_OPTIONS_OR_CHARGES',
+      severity: 'ERROR',
+      quote_id: 'quote-2',
+      version_id: 'version-2',
+      version_number: 3,
+      tenant_id: 'tenant-2',
+      option_count: 0,
+      charge_count: 0,
+    });
   });
 });

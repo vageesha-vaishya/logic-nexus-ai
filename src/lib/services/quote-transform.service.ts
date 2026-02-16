@@ -109,12 +109,8 @@ export class QuoteTransformService {
      * Handles all ID resolutions, cargo unification, and structured note generation.
      */
     static transformToQuoteForm(data: QuoteTransferData, masterData: MasterData): Partial<QuoteFormValues> {
-        // Normalize selectedRates for backward compatibility
         const rates = data.selectedRates || (data.selectedRate ? [data.selectedRate] : []);
-        
-        // If no rates, we can still proceed with partial data, or return early. 
-        // But let's try to map what we can.
-        const primaryRate = rates[0];
+        const primaryRate = Array.isArray(rates) && rates.length > 0 ? rates[0] : undefined;
 
         const tradeDirection = data.trade_direction || 'export';
         const serviceTypeId = this.resolveServiceTypeId(data.mode, data.service_type_id, masterData.serviceTypes);
@@ -234,7 +230,7 @@ export class QuoteTransformService {
                 id: leg.id,
                 sequence_number: i + 1,
                 transport_mode: (leg.mode || transferData.mode || 'ocean').toLowerCase(),
-                carrier_id: leg.carrier ? this.resolveCarrierId({ carrier_name: leg.carrier } as any, masterData.carriers) : carrierId,
+                carrier_id: (leg as any).carrier ? this.resolveCarrierId({ carrier_name: (leg as any).carrier } as any, masterData.carriers) : carrierId,
                 origin_location_name: leg.origin 
                     || (i === 0 ? (transferData.originDetails?.name || transferData.origin) : undefined),
                 destination_location_name: leg.destination 

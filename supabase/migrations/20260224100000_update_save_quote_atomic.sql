@@ -16,7 +16,26 @@ DECLARE
   v_conf jsonb;
   v_opt jsonb;
   v_leg jsonb;
+  v_charge jsonb;
   v_item_id uuid;
+  v_version_id uuid;
+  v_option_id uuid;
+  v_leg_id uuid;
+  v_sort_order integer;
+  v_sell_side_id uuid;
+  v_basis_id uuid;
+  v_currency_id uuid;
+  v_basis_code text;
+  v_currency_code text;
+  v_quantity numeric;
+  v_rate numeric;
+  v_amount numeric;
+  v_charge_sort integer;
+  v_option_total_amount numeric;
+  v_payload_leg_ids uuid[];
+  v_buy_side_id uuid;
+  v_charge_side_id uuid;
+  v_charge_side text;
 BEGIN
   v_quote_data := p_payload -> 'quote';
   v_items := p_payload -> 'items';
@@ -206,32 +225,586 @@ BEGIN
     END LOOP;
   END IF;
 
-  -- Options & Legs Updates
+  -- Resolve active quotation version for this quote (latest by version_number)
+  SELECT id
+  INTO v_version_id
+  FROM quotation_versions
+  WHERE quote_id = v_quote_id
+  ORDER BY version_number DESC
+  LIMIT 1;
+
+  SELECT id
+  INTO v_sell_side_id
+  FROM charge_sides
+  WHERE lower(code) IN ('sell', 'revenue')
+  LIMIT 1;
+
+  IF v_sell_side_id IS NULL THEN
+    RAISE EXCEPTION 'save_quote_atomic: no sell-side entry found in charge_sides';
+  END IF;
+
+  SELECT id
+  INTO v_buy_side_id
+  FROM charge_sides
+  WHERE lower(code) IN ('buy', 'cost')
+  LIMIT 1;
+
+  IF v_buy_side_id IS NULL THEN
+    RAISE EXCEPTION 'save_quote_atomic: no buy-side entry found in charge_sides';
+  END IF;
+
+  -- Options & Legs Updates / Inserts
   IF v_options IS NOT NULL AND jsonb_array_length(v_options) > 0 THEN
     FOR v_opt IN SELECT * FROM jsonb_array_elements(v_options)
     LOOP
       IF (v_opt ->> 'id') IS NOT NULL THEN
-        -- Update Option Selection
-        UPDATE quotation_version_options
-        SET is_selected = COALESCE((v_opt ->> 'is_selected')::boolean, false)
-        WHERE id = (v_opt ->> 'id')::uuid;
+        v_option_id := (v_opt ->> 'id')::uuid;
+        v_option_total_amount := COALESCE((v_opt ->> 'total_amount')::numeric, NULL);
 
-        -- Update Legs
+        UPDATE quotation_version_options
+        SET 
+          is_selected = COALESCE((v_opt ->> 'is_selected')::boolean, false),
+          total_amount = COALESCE((v_opt ->> 'total_amount')::numeric, total_amount),
+          currency = COALESCE(v_opt ->> 'currency', currency),
+          total_transit_days = COALESCE((v_opt ->> 'transit_time_days')::integer, total_transit_days)
+        WHERE id = v_option_id;
+
+        -- Build list of leg ids present in payload for this option
+        v_payload_leg_ids := ARRAY[]::uuid[];
+
         IF (v_opt -> 'legs') IS NOT NULL AND jsonb_array_length(v_opt -> 'legs') > 0 THEN
           FOR v_leg IN SELECT * FROM jsonb_array_elements(v_opt -> 'legs')
           LOOP
             IF (v_leg ->> 'id') IS NOT NULL THEN
-              UPDATE quotation_version_option_legs
-              SET
-                provider_id = (v_leg ->> 'carrier_id')::uuid,
-                carrier_id = (v_leg ->> 'carrier_id')::uuid,
-                carrier_name = v_leg ->> 'carrier_name',
-                transit_time = v_leg ->> 'transit_time',
-                total_amount = (v_leg ->> 'total_amount')::numeric,
-                currency = COALESCE(v_leg ->> 'currency', 'USD')
-              WHERE id = (v_leg ->> 'id')::uuid;
+              v_payload_leg_ids := array_append(v_payload_leg_ids, (v_leg ->> 'id')::uuid);
             END IF;
           END LOOP;
+        END IF;
+
+        -- Delete legs that are no longer present in payload (and their charges)
+        DELETE FROM quote_charges
+        WHERE quote_option_id = v_option_id
+          AND leg_id IN (
+            SELECT id
+            FROM quotation_version_option_legs
+            WHERE quotation_version_option_id = v_option_id
+              AND (v_payload_leg_ids IS NULL OR id <> ALL (v_payload_leg_ids))
+          );
+
+        DELETE FROM quotation_version_option_legs
+        WHERE quotation_version_option_id = v_option_id
+          AND (v_payload_leg_ids IS NULL OR id <> ALL (v_payload_leg_ids));
+
+        -- Upsert legs and their charges from payload
+        IF (v_opt -> 'legs') IS NOT NULL AND jsonb_array_length(v_opt -> 'legs') > 0 THEN
+          v_sort_order := 0;
+          FOR v_leg IN SELECT * FROM jsonb_array_elements(v_opt -> 'legs')
+          LOOP
+            v_sort_order := v_sort_order + 1;
+
+            IF (v_leg ->> 'id') IS NOT NULL THEN
+              v_leg_id := (v_leg ->> 'id')::uuid;
+
+              UPDATE quotation_version_option_legs
+              SET
+                sort_order = v_sort_order,
+                provider_id = NULLIF(v_leg ->> 'carrier_id', '')::uuid,
+                carrier_id = NULLIF(v_leg ->> 'carrier_id', '')::uuid,
+                carrier_name = v_leg ->> 'carrier_name',
+                origin_location = v_leg ->> 'origin_location_name',
+                destination_location = v_leg ->> 'destination_location_name',
+                transport_mode = v_leg ->> 'transport_mode',
+                transit_time = v_leg ->> 'transit_time',
+                total_amount = COALESCE((v_leg ->> 'total_amount')::numeric, total_amount),
+                currency = COALESCE(v_leg ->> 'currency', currency),
+                transit_time_hours = COALESCE((v_leg ->> 'transit_time_hours')::integer, transit_time_hours),
+                flight_number = v_leg ->> 'flight_number',
+                voyage_number = v_leg ->> 'voyage_number',
+                departure_date = (v_leg ->> 'departure_date')::timestamptz,
+                arrival_date = (v_leg ->> 'arrival_date')::timestamptz
+              WHERE id = v_leg_id;
+            ELSE
+              v_leg_id := gen_random_uuid();
+
+              INSERT INTO quotation_version_option_legs (
+                id,
+                quotation_version_option_id,
+                tenant_id,
+                franchise_id,
+                sort_order,
+                provider_id,
+                carrier_id,
+                carrier_name,
+                origin_location,
+                destination_location,
+                transport_mode,
+                transit_time_hours,
+                flight_number,
+                voyage_number,
+                departure_date,
+                arrival_date
+              ) VALUES (
+                v_leg_id,
+                v_option_id,
+                v_tenant_id,
+                v_franchise_id,
+                v_sort_order,
+                NULLIF(v_leg ->> 'carrier_id', '')::uuid,
+                NULLIF(v_leg ->> 'carrier_id', '')::uuid,
+                v_leg ->> 'carrier_name',
+                v_leg ->> 'origin_location_name',
+                v_leg ->> 'destination_location_name',
+                v_leg ->> 'transport_mode',
+                (v_leg ->> 'transit_time_hours')::integer,
+                v_leg ->> 'flight_number',
+                v_leg ->> 'voyage_number',
+                (v_leg ->> 'departure_date')::timestamptz,
+                (v_leg ->> 'arrival_date')::timestamptz
+              );
+            END IF;
+
+            -- Replace charges for this leg with payload
+            DELETE FROM quote_charges
+            WHERE quote_option_id = v_option_id
+              AND leg_id = v_leg_id;
+
+            IF (v_leg -> 'charges') IS NOT NULL AND jsonb_array_length(v_leg -> 'charges') > 0 THEN
+              v_charge_sort := 0;
+              FOR v_charge IN SELECT * FROM jsonb_array_elements(v_leg -> 'charges')
+              LOOP
+                v_charge_sort := v_charge_sort + 1;
+
+                v_charge_side := coalesce(lower(v_charge ->> 'side'), 'sell');
+
+                IF v_charge_side IN ('buy', 'cost') THEN
+                  v_charge_side_id := v_buy_side_id;
+                ELSE
+                  v_charge_side_id := v_sell_side_id;
+                END IF;
+
+                v_basis_code := v_charge ->> 'basis';
+                v_basis_id := NULL;
+                IF v_basis_code IS NOT NULL AND v_basis_code <> '' THEN
+                  SELECT id
+                  INTO v_basis_id
+                  FROM charge_bases
+                  WHERE code = v_basis_code
+                    AND tenant_id = v_tenant_id
+                  LIMIT 1;
+
+                  IF v_basis_id IS NULL THEN
+                    RAISE EXCEPTION 'save_quote_atomic: unknown charge basis code % for tenant %', v_basis_code, v_tenant_id;
+                  END IF;
+                END IF;
+
+                v_currency_code := v_charge ->> 'currency';
+                v_currency_id := NULL;
+                IF v_currency_code IS NOT NULL AND v_currency_code <> '' THEN
+                  SELECT id
+                  INTO v_currency_id
+                  FROM currencies
+                  WHERE code = v_currency_code
+                  LIMIT 1;
+                END IF;
+
+                IF v_currency_id IS NULL THEN
+                  v_currency_id := (v_quote_data ->> 'currency_id')::uuid;
+                END IF;
+
+                v_quantity := COALESCE((v_charge ->> 'quantity')::numeric, 1);
+                v_rate := COALESCE((v_charge ->> 'unit_price')::numeric, 0);
+                v_amount := v_quantity * v_rate;
+
+                INSERT INTO quote_charges (
+                  quote_option_id,
+                  leg_id,
+                  tenant_id,
+                  franchise_id,
+                  category_id,
+                  basis_id,
+                  charge_side_id,
+                  currency_id,
+                  unit,
+                  quantity,
+                  rate,
+                  amount,
+                  sort_order,
+                  note
+                ) VALUES (
+                  v_option_id,
+                  v_leg_id,
+                  v_tenant_id,
+                  v_franchise_id,
+                  NULLIF(v_charge ->> 'charge_code', '')::uuid,
+                  v_basis_id,
+                  v_charge_side_id,
+                  v_currency_id,
+                  v_charge ->> 'unit',
+                  v_quantity,
+                  v_rate,
+                  v_amount,
+                  v_charge_sort,
+                  NULLIF(v_charge ->> 'note', '')
+                );
+
+                IF v_charge_side NOT IN ('buy', 'cost') THEN
+                  IF v_option_total_amount IS NULL THEN
+                    v_option_total_amount := 0;
+                  END IF;
+                  v_option_total_amount := v_option_total_amount + v_amount;
+                END IF;
+              END LOOP;
+            END IF;
+          END LOOP;
+        END IF;
+          END LOOP;
+        END IF;
+
+        IF (v_opt -> 'combined_charges') IS NOT NULL AND jsonb_array_length(v_opt -> 'combined_charges') > 0 THEN
+          v_charge_sort := 0;
+          FOR v_charge IN SELECT * FROM jsonb_array_elements(v_opt -> 'combined_charges')
+          LOOP
+            v_charge_sort := v_charge_sort + 1;
+
+            v_charge_side := coalesce(lower(v_charge ->> 'side'), 'sell');
+
+            IF v_charge_side IN ('buy', 'cost') THEN
+              v_charge_side_id := v_buy_side_id;
+            ELSE
+              v_charge_side_id := v_sell_side_id;
+            END IF;
+
+            v_basis_code := v_charge ->> 'basis';
+            v_basis_id := NULL;
+            IF v_basis_code IS NOT NULL AND v_basis_code <> '' THEN
+              SELECT id
+              INTO v_basis_id
+              FROM charge_bases
+              WHERE code = v_basis_code
+                AND tenant_id = v_tenant_id
+              LIMIT 1;
+
+              IF v_basis_id IS NULL THEN
+                RAISE EXCEPTION 'save_quote_atomic: unknown charge basis code % for tenant %', v_basis_code, v_tenant_id;
+              END IF;
+            END IF;
+
+            v_currency_code := v_charge ->> 'currency';
+            v_currency_id := NULL;
+            IF v_currency_code IS NOT NULL AND v_currency_code <> '' THEN
+              SELECT id
+              INTO v_currency_id
+              FROM currencies
+              WHERE code = v_currency_code
+              LIMIT 1;
+            END IF;
+
+            IF v_currency_id IS NULL THEN
+              v_currency_id := (v_quote_data ->> 'currency_id')::uuid;
+            END IF;
+
+            v_quantity := COALESCE((v_charge ->> 'quantity')::numeric, 1);
+            v_rate := COALESCE((v_charge ->> 'unit_price')::numeric, 0);
+            v_amount := v_quantity * v_rate;
+
+            INSERT INTO quote_charges (
+              quote_option_id,
+              leg_id,
+              tenant_id,
+              franchise_id,
+              category_id,
+              basis_id,
+              charge_side_id,
+              currency_id,
+              unit,
+              quantity,
+              rate,
+              amount,
+              sort_order,
+              note
+            ) VALUES (
+              v_option_id,
+              NULL,
+              v_tenant_id,
+              v_franchise_id,
+              NULLIF(v_charge ->> 'charge_code', '')::uuid,
+              v_basis_id,
+              v_charge_side_id,
+              v_currency_id,
+              v_charge ->> 'unit',
+              v_quantity,
+              v_rate,
+              v_amount,
+              v_charge_sort,
+              NULLIF(v_charge ->> 'note', '')
+            );
+
+            IF v_charge_side NOT IN ('buy', 'cost') THEN
+              v_option_total_amount := v_option_total_amount + v_amount;
+            END IF;
+          END LOOP;
+        END IF;
+
+        DELETE FROM quote_charges
+        WHERE quote_option_id = v_option_id
+          AND leg_id IS NULL;
+
+        IF (v_opt -> 'combined_charges') IS NOT NULL AND jsonb_array_length(v_opt -> 'combined_charges') > 0 THEN
+          v_charge_sort := 0;
+          FOR v_charge IN SELECT * FROM jsonb_array_elements(v_opt -> 'combined_charges')
+          LOOP
+            v_charge_sort := v_charge_sort + 1;
+
+            v_charge_side := coalesce(lower(v_charge ->> 'side'), 'sell');
+
+            IF v_charge_side IN ('buy', 'cost') THEN
+              v_charge_side_id := v_buy_side_id;
+            ELSE
+              v_charge_side_id := v_sell_side_id;
+            END IF;
+
+            v_basis_code := v_charge ->> 'basis';
+            v_basis_id := NULL;
+            IF v_basis_code IS NOT NULL AND v_basis_code <> '' THEN
+              SELECT id
+              INTO v_basis_id
+              FROM charge_bases
+              WHERE code = v_basis_code
+                AND tenant_id = v_tenant_id
+              LIMIT 1;
+
+              IF v_basis_id IS NULL THEN
+                RAISE EXCEPTION 'save_quote_atomic: unknown charge basis code % for tenant %', v_basis_code, v_tenant_id;
+              END IF;
+            END IF;
+
+            v_currency_code := v_charge ->> 'currency';
+            v_currency_id := NULL;
+            IF v_currency_code IS NOT NULL AND v_currency_code <> '' THEN
+              SELECT id
+              INTO v_currency_id
+              FROM currencies
+              WHERE code = v_currency_code
+              LIMIT 1;
+            END IF;
+
+            IF v_currency_id IS NULL THEN
+              v_currency_id := (v_quote_data ->> 'currency_id')::uuid;
+            END IF;
+
+            v_quantity := COALESCE((v_charge ->> 'quantity')::numeric, 1);
+            v_rate := COALESCE((v_charge ->> 'unit_price')::numeric, 0);
+            v_amount := v_quantity * v_rate;
+
+            INSERT INTO quote_charges (
+              quote_option_id,
+              leg_id,
+              tenant_id,
+              franchise_id,
+              category_id,
+              basis_id,
+              charge_side_id,
+              currency_id,
+              unit,
+              quantity,
+              rate,
+              amount,
+              sort_order,
+              note
+            ) VALUES (
+              v_option_id,
+              NULL,
+              v_tenant_id,
+              v_franchise_id,
+              NULLIF(v_charge ->> 'charge_code', '')::uuid,
+              v_basis_id,
+              v_charge_side_id,
+              v_currency_id,
+              v_charge ->> 'unit',
+              v_quantity,
+              v_rate,
+              v_amount,
+              v_charge_sort,
+              NULLIF(v_charge ->> 'note', '')
+            );
+
+            IF v_charge_side NOT IN ('buy', 'cost') THEN
+              IF v_option_total_amount IS NULL THEN
+                v_option_total_amount := 0;
+              END IF;
+              v_option_total_amount := v_option_total_amount + v_amount;
+            END IF;
+          END LOOP;
+        END IF;
+
+        IF v_option_total_amount IS NOT NULL THEN
+          UPDATE quotation_version_options
+          SET total_amount = v_option_total_amount
+          WHERE id = v_option_id;
+        END IF;
+      ELSE
+        IF v_version_id IS NULL THEN
+          RAISE EXCEPTION 'save_quote_atomic: no quotation_versions row found for quote % when inserting option', v_quote_id;
+        END IF;
+
+        v_option_id := gen_random_uuid();
+
+        v_option_total_amount := COALESCE((v_opt ->> 'total_amount')::numeric, 0);
+
+        INSERT INTO quotation_version_options (
+          id,
+          quotation_version_id,
+          tenant_id,
+          franchise_id,
+          is_selected,
+          total_amount,
+          currency,
+          total_transit_days,
+          created_at,
+          updated_at
+        ) VALUES (
+          v_option_id,
+          v_version_id,
+          v_tenant_id,
+          v_franchise_id,
+          COALESCE((v_opt ->> 'is_selected')::boolean, false),
+          v_option_total_amount,
+          v_opt ->> 'currency',
+          (v_opt ->> 'transit_time_days')::integer,
+          now(),
+          now()
+        );
+
+        IF (v_opt -> 'legs') IS NOT NULL AND jsonb_array_length(v_opt -> 'legs') > 0 THEN
+          v_sort_order := 0;
+          FOR v_leg IN SELECT * FROM jsonb_array_elements(v_opt -> 'legs')
+          LOOP
+            v_sort_order := v_sort_order + 1;
+            v_leg_id := gen_random_uuid();
+
+            INSERT INTO quotation_version_option_legs (
+              id,
+              quotation_version_option_id,
+              tenant_id,
+              franchise_id,
+              sort_order,
+              provider_id,
+              carrier_id,
+              carrier_name,
+              origin_location,
+              destination_location,
+              transport_mode,
+              transit_time_hours,
+              flight_number,
+              voyage_number,
+              departure_date,
+              arrival_date
+            ) VALUES (
+              v_leg_id,
+              v_option_id,
+              v_tenant_id,
+              v_franchise_id,
+              v_sort_order,
+              NULLIF(v_leg ->> 'carrier_id', '')::uuid,
+              NULLIF(v_leg ->> 'carrier_id', '')::uuid,
+              v_leg ->> 'carrier_name',
+              v_leg ->> 'origin_location_name',
+              v_leg ->> 'destination_location_name',
+              v_leg ->> 'transport_mode',
+              (v_leg ->> 'transit_time_hours')::integer,
+              v_leg ->> 'flight_number',
+              v_leg ->> 'voyage_number',
+              (v_leg ->> 'departure_date')::timestamptz,
+              (v_leg ->> 'arrival_date')::timestamptz
+            );
+
+            IF (v_leg -> 'charges') IS NOT NULL AND jsonb_array_length(v_leg -> 'charges') > 0 THEN
+              v_charge_sort := 0;
+              FOR v_charge IN SELECT * FROM jsonb_array_elements(v_leg -> 'charges')
+              LOOP
+                v_charge_sort := v_charge_sort + 1;
+
+                v_charge_side := coalesce(lower(v_charge ->> 'side'), 'sell');
+
+                IF v_charge_side IN ('buy', 'cost') THEN
+                  v_charge_side_id := v_buy_side_id;
+                ELSE
+                  v_charge_side_id := v_sell_side_id;
+                END IF;
+
+                v_basis_code := v_charge ->> 'basis';
+                v_basis_id := NULL;
+                IF v_basis_code IS NOT NULL AND v_basis_code <> '' THEN
+                  SELECT id
+                  INTO v_basis_id
+                  FROM charge_bases
+                  WHERE code = v_basis_code
+                    AND tenant_id = v_tenant_id
+                  LIMIT 1;
+
+                  IF v_basis_id IS NULL THEN
+                    RAISE EXCEPTION 'save_quote_atomic: unknown charge basis code % for tenant %', v_basis_code, v_tenant_id;
+                  END IF;
+                END IF;
+
+                v_currency_code := v_charge ->> 'currency';
+                v_currency_id := NULL;
+                IF v_currency_code IS NOT NULL AND v_currency_code <> '' THEN
+                  SELECT id
+                  INTO v_currency_id
+                  FROM currencies
+                  WHERE code = v_currency_code
+                  LIMIT 1;
+                END IF;
+
+                IF v_currency_id IS NULL THEN
+                  v_currency_id := (v_quote_data ->> 'currency_id')::uuid;
+                END IF;
+
+                v_quantity := COALESCE((v_charge ->> 'quantity')::numeric, 1);
+                v_rate := COALESCE((v_charge ->> 'unit_price')::numeric, 0);
+                v_amount := v_quantity * v_rate;
+
+                INSERT INTO quote_charges (
+                  quote_option_id,
+                  leg_id,
+                  tenant_id,
+                  franchise_id,
+                  category_id,
+                  basis_id,
+                  charge_side_id,
+                  currency_id,
+                  unit,
+                  quantity,
+                  rate,
+                  amount,
+                  sort_order,
+                  note
+                ) VALUES (
+                  v_option_id,
+                  v_leg_id,
+                  v_tenant_id,
+                  v_franchise_id,
+                  NULLIF(v_charge ->> 'charge_code', '')::uuid,
+                  v_basis_id,
+                  v_charge_side_id,
+                  v_currency_id,
+                  v_charge ->> 'unit',
+                  v_quantity,
+                  v_rate,
+                  v_amount,
+                  v_charge_sort,
+                  NULLIF(v_charge ->> 'note', '')
+                );
+
+                v_option_total_amount := v_option_total_amount + v_amount;
+              END LOOP;
+            END IF;
+          END LOOP;
+
+          UPDATE quotation_version_options
+          SET total_amount = v_option_total_amount
+          WHERE id = v_option_id;
         END IF;
       END IF;
     END LOOP;

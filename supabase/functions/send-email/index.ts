@@ -908,9 +908,8 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
     let finalReplyTo = reply_to;
 
     if (requestedProvider === 'resend' || (!accountId && !requestedProvider)) {
-      // System Email Strategy - Support Failover in future by adding more providers to this array
       providers.push(new ResendProvider({
-        apiKey: Deno.env.get("RESEND_API_KEY") || "re_HE1deVM5_NuVR5nihEuzSf3cMZP4n5U1R",
+        apiKey: Deno.env.get("RESEND_API_KEY"),
         supabase,
         adminSupabase,
         logger

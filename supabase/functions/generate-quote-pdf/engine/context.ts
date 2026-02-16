@@ -12,6 +12,8 @@ export const RawQuoteDataSchema = z.object({
     total_amount: z.number().optional(),
     currency: z.string().default("USD"),
     service_level: z.string().optional(),
+    notes: z.string().optional(),
+    terms_conditions: z.string().optional(),
   }),
   customer: z.object({
     company_name: z.string().optional(),
@@ -99,6 +101,8 @@ export interface SafeContext {
     expiry?: string;
     grand_total: number;
     currency: string;
+    notes?: string;
+    terms_conditions?: string;
   };
   customer: {
     name: string;
@@ -169,6 +173,8 @@ export function buildSafeContext(rawData: unknown, locale: string = "en-US"): Sa
       expiry: data.quote?.expiration_date,
       grand_total: Number(data.quote?.total_amount) || 0,
       currency: data.quote?.currency || "USD",
+      notes: data.quote?.notes,
+      terms_conditions: data.quote?.terms_conditions,
     },
     customer: {
       name: data.customer?.company_name || "Valued Customer",

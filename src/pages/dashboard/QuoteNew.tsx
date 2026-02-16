@@ -25,6 +25,8 @@ import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
 import { DataInspector } from '@/components/debug/DataInspector';
 import { useBenchmark } from '@/lib/benchmark';
+import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
+import { reconcileContainerTypeWithSize } from '@/lib/container-utils';
 
 // Module-level cache for Master Data to prevent redundant fetching
 const MASTER_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
@@ -50,6 +52,10 @@ export default function QuoteNew() {
   const [optionsInserted, setOptionsInserted] = useState(false);
   const [isInsertingOptions, setIsInsertingOptions] = useState(false);
   const [viewMode, setViewMode] = useState<'form' | 'composer'>('form');
+  const { enabled: phase2GuardsEnabled } = useAppFeatureFlag(
+    FEATURE_FLAGS.QUOTATION_PHASE2_GUARDS,
+    false
+  );
 
   // Auto-switch to composer when options are inserted
   useEffect(() => {
@@ -415,6 +421,13 @@ export default function QuoteNew() {
                 );
                 if (match) containerTypeId = match.id;
             }
+
+            containerTypeId = reconcileContainerTypeWithSize(
+                containerSizeId,
+                containerTypeId,
+                containerSizes,
+                phase2GuardsEnabled
+            );
 
             // Create enriched rate with resolved IDs to prevent UUID errors
             const enrichedRate = {

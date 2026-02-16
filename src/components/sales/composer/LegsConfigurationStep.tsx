@@ -12,6 +12,7 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { Command, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuoteStore } from './store/QuoteStore';
+import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { Leg } from './store/types';
 import { useCRM } from '@/hooks/useCRM';
 
@@ -113,9 +114,10 @@ function LocationAutocomplete({
 
 export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { state, dispatch } = useQuoteStore();
-  const { legs, validationErrors, referenceData } = state;
+  const { legs, validationErrors, referenceData, options, optionId } = state;
   const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};
   const { scopedDb } = useCRM();
+  const { enabled: multiLegAutoFillEnabled } = useAppFeatureFlag(FEATURE_FLAGS.COMPOSER_MULTI_LEG_AUTOFILL, false);
 
   const normalizeModeKey = (value: string) => {
     const v = (value || '').toLowerCase();
@@ -129,8 +131,23 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
     return v;
   };
 
+  const activeOption = Array.isArray(options)
+    ? options.find((o: any) => o.id === optionId) || options[0]
+    : undefined;
+
+  const optionLegTemplates = Array.isArray((activeOption as any)?.legs)
+    ? [...(activeOption as any).legs].sort(
+        (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      )
+    : [];
+
   const onAddLeg = (mode: string) => {
-    const targetKey = normalizeModeKey(mode);
+    const legIndex = legs.length;
+    const templateLeg = optionLegTemplates[legIndex];
+
+    const resolvedModeRaw = templateLeg?.mode || mode;
+    const targetKey = normalizeModeKey(resolvedModeRaw);
+
     const defaultServiceType = serviceTypes.find(st => {
       if (!st) return false;
       const transportMode = (st as any).transport_modes;
@@ -139,14 +156,62 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
       return codeKey === targetKey;
     });
 
+    let serviceTypeId = defaultServiceType?.id || '';
+    if (templateLeg?.service_type_id) {
+      const fromTemplate = serviceTypes.find(
+        st => st.id === templateLeg.service_type_id
+      );
+      if (fromTemplate) {
+        serviceTypeId = fromTemplate.id;
+      }
+    }
+
+    const carrierId =
+      templateLeg?.carrier_id ||
+      templateLeg?.provider_id ||
+      (activeOption as any)?.carrier_id ||
+      (activeOption as any)?.provider_id ||
+      undefined;
+
+    const carrierName =
+      (carrierId
+        ? carriers.find(c => c.id === carrierId)?.carrier_name
+        : templateLeg?.carrier_name ||
+          (templateLeg?.leg_type === 'transport'
+            ? (activeOption as any)?.carrier_name
+            : undefined)) || undefined;
+
+    const serviceOnlyCategory =
+      templateLeg?.service_only_category ||
+      (templateLeg?.leg_type === 'service'
+        ? (activeOption as any)?.service_only_category
+        : undefined);
+
+    const baseOrigin =
+      legs.length === 0
+        ? state.quoteData.origin
+        : legs[legs.length - 1]?.destination || '';
+
+    let baseDestination = '';
+    if (legs.length === 0) {
+      baseDestination = state.quoteData.destination;
+    } else if (multiLegAutoFillEnabled) {
+      baseDestination = state.quoteData.destination || legs[legs.length - 1]?.destination || '';
+    } else {
+      baseDestination = '';
+    }
+
     const newLeg: Leg = {
       id: crypto.randomUUID(),
-      mode,
-      serviceTypeId: defaultServiceType?.id || '',
-      origin: legs.length === 0 ? state.quoteData.origin : '', // Default to Quote Origin for first leg
-      destination: legs.length === 0 ? state.quoteData.destination : '', // Default to Quote Dest for first leg
+      mode: resolvedModeRaw,
+      serviceTypeId,
+      origin: baseOrigin,
+      destination: baseDestination,
       charges: [],
-      legType: 'transport'
+      legType: 'transport',
+      carrierId,
+      carrierName,
+      serviceOnlyCategory
     };
     dispatch({ type: 'ADD_LEG', payload: newLeg });
   };

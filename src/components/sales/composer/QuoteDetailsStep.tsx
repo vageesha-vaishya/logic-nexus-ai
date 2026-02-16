@@ -78,13 +78,13 @@ export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
       if (!quoteData.origin && quoteData.origin_port_id) {
         const port = ports.find((p: any) => p.id === quoteData.origin_port_id);
         if (port) {
-           onChange('origin', port.name || port.port_name || port.code);
+           onChange('origin', port.name || port.location_name || port.code);
         }
       }
       if (!quoteData.destination && quoteData.destination_port_id) {
         const port = ports.find((p: any) => p.id === quoteData.destination_port_id);
         if (port) {
-           onChange('destination', port.name || port.code);
+           onChange('destination', port.name || port.location_name || port.code);
         }
       }
     }
@@ -383,7 +383,7 @@ export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
                       // Auto-fill name if empty
                       const port = ports.find((p: any) => p.id === val);
                       if (port && !quoteData.destination) {
-                        onChange('destination', port.name || port.port_name || port.code);
+                        onChange('destination', port.name || port.location_name || port.code);
                       }
                     }}
                   >
@@ -393,7 +393,7 @@ export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
                     <SelectContent>
                       {ports.map((p: any) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name || p.port_name || p.code} ({p.code})
+                          {p.name || p.location_name || p.code} ({p.code})
                         </SelectItem>
                       ))}
                     </SelectContent>

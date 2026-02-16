@@ -1,7 +1,7 @@
 # Quotation Platform Enterprise Enhancement Design
 
-**Version**: 2.1
-**Date**: 2026-02-15 (revised)
+**Version**: 2.2
+**Date**: 2026-02-16 (revised)
 **Classification**: Internal Engineering
 **Supersedes**: QUOTATION-PLATFORM-ENHANCEMENT-DESIGN.md v1.0
 **Scope**: End-to-end quotation platform data consistency, enterprise hardening, and competitive positioning
@@ -26,6 +26,7 @@
 14. [Success Metrics and KPIs](#14-success-metrics-and-kpis)
 15. [Post-Implementation Monitoring](#15-post-implementation-monitoring)
 16. [Appendix C: v2.1 Review Findings](#appendix-c-v21-review-findings-2026-02-15)
+17. [Appendix D: Transport Mode, Carrier & Parameter Analysis](#appendix-d-transport-mode-carrier--parameter-analysis)
 
 ---
 
@@ -55,7 +56,7 @@ The Logic Nexus AI quotation platform supports multi-modal freight quoting (air,
 | Data Flow Edge Cases | 0 | 2 | 6 | 6 | 14 |
 | **Total** | **11** | **22** | **21** | **13** | **67** |
 
-*Note: v2.0 identified 38 issues. v2.1 review identified 29 additional gaps (see Appendix C).*
+*Note: v2.0 identified 38 issues. v2.1 review identified 29 additional gaps (see Appendix C). v2.2 added comprehensive transport mode, carrier, and parameter analysis with 10 additional gaps (see Appendix D).*
 
 ### 1.2 Top 5 Data Consistency Blockers
 
@@ -1581,9 +1582,855 @@ Three parallel codebase research agents analyzed:
 
 Total files analyzed: ~55 quote-related source files + 489 migrations
 
+**v2.2 Audit** (2026-02-16): Four parallel research agents analyzed:
+1. **Transport mode & location mappings** — enum definitions, ports_locations schema, service type mappings, geographic hierarchy, location search RPC, mode normalization
+2. **Carrier & rate logic** — carriers table, carrier-service type mapping, rate engine, pricing service, charge bifurcation, AI advisor, margin/markup calculation, currency handling
+3. **Mode-specific parameters** — container types/sizes (ocean), ULD types (air), vehicle specs (trucking), rail intermodal, cargo configurations, hazmat/reefer, incoterms, packaging
+4. **CRM integration & extensibility** — plugin architecture, CRM hooks, lead-to-quote pipeline, quote-to-shipment conversion, document/invoice services
+
+Total additional files analyzed: ~30 migrations + 15 source files + 3 edge functions
+
 ---
 
 *This document is a living reference. Update as issues are resolved and architecture evolves. Version history tracked in git.*
 
 *v2.0: 2026-02-15 — Initial release (38 issues)*
 *v2.1: 2026-02-15 — Codebase audit added 29 findings; total effort revised to ~367h across 18 weeks*
+*v2.2: 2026-02-16 — Appendix D added: Comprehensive transport mode, carrier, and parameter analysis*
+
+---
+
+## Appendix D: Transport Mode, Carrier & Parameter Analysis
+
+*Added in v2.2. Comprehensive research covering the business logic governing transport mode mappings, carrier assignments, mode-specific parameters, rate calculation, CRM integration, and extensibility.*
+
+### D.1 Transport Mode Definitions & Enum
+
+**Enum**: `public.transport_mode` (Postgres)
+- `ocean`, `air`, `inland_trucking`, `road`, `courier`, `movers_packers`, `rail`
+- Rail added via `20260205131000_add_rail_to_enum.sql`
+
+**Table**: `public.transport_modes`
+```
+id (uuid PK), code (text UNIQUE), name (text), icon_name (text), color (text),
+display_order (int), is_active (boolean), created_at, updated_at
+```
+
+**Icon constraint** (from `20260214_transport_modes_constraints.sql`):
+Valid icons: `Ship`, `Plane`, `Truck`, `Train`, `Package`, `Waves`, `Container`, `Navigation`, `Anchor`, `Bus`, `Network`
+
+**Service Mode Seeds** (from `20260131000001_service_architecture_overhaul.sql`):
+
+| Code | Name | Icon | Display Order |
+|------|------|------|---------------|
+| ocean | Ocean Freight | Ship | 10 |
+| air | Air Freight | Plane | 20 |
+| road | Road Transport | Truck | 30 |
+| rail | Rail Transport | Train | 40 |
+| courier | Courier Service | Package | 50 |
+| movers_packers | Moving & Packing | Package | 60 |
+
+**TypeScript Type** (`src/hooks/useTransportModes.ts`):
+```typescript
+export interface TransportMode {
+  id: string;
+  code: string;
+  name: string;
+  icon_name?: string | null;
+}
+```
+
+**Shipment Type** (`src/domain/shipments/types.ts`):
+```typescript
+export type AppShipmentType =
+  | "ocean" | "air" | "inland_trucking" | "rail" | "courier" | "movers_packers";
+```
+
+**Mode Normalization** (`LegsConfigurationStep.tsx:122-132`):
+```typescript
+const normalizeModeKey = (value: string) => {
+  const v = (value || '').toLowerCase();
+  if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
+  if (v.includes('air')) return 'air';
+  if (v.includes('rail')) return 'rail';
+  if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
+  if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
+  if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
+  return v;
+};
+```
+
+### D.2 Geographic & Location Data Model
+
+#### D.2.1 Ports & Locations
+
+**Table**: `public.ports_locations`
+```
+id (uuid PK), tenant_id (uuid, NULLABLE for global),
+location_name (text NOT NULL), location_code (text),
+location_type (text CHECK: 'seaport','airport','inland_port','warehouse','terminal'),
+country (text), city (text), state_province (text), postal_code (text),
+coordinates (jsonb DEFAULT '{}'), facilities (jsonb DEFAULT '[]'),
+operating_hours (text), customs_available (boolean DEFAULT false),
+is_active (boolean DEFAULT true), notes (text), created_at, updated_at
+```
+
+**Enhanced Columns** (from `20260130120000_enhance_ports_locations_schema.sql`):
+- `country_code` (text)
+- `iata_code` (text, regex `^[A-Z]{3}$`)
+- `icao_code` (text, regex `^[A-Z]{4}$`)
+- `un_locode` (text, regex `^[A-Z]{2}[A-Z0-9]{3}$`)
+- `region_name` (text)
+- `country_id` (uuid FK to countries, optional)
+- `city_id` (uuid FK to cities, optional)
+
+**Global Ports**: `tenant_id` is nullable. Global entries (tenant_id IS NULL) are visible to all authenticated users via dedicated RLS policy. Tenant-specific ports are scoped normally.
+
+**PortsService** (`src/services/PortsService.ts`): Uses raw client to bypass `ScopedDataAccess`, ensuring global port visibility.
+
+#### D.2.2 Geographic Hierarchy
+
+```
+countries
+    ↓ country_id FK
+cities
+    ↓ country_id FK, city_id FK
+ports_locations (location_type: seaport | airport | inland_port | warehouse | terminal)
+```
+
+#### D.2.3 Trade Directions
+
+**Table**: `public.trade_directions`
+```
+id (uuid PK), tenant_id (uuid NOT NULL), name (text), code (text),
+is_active (boolean)
+CHECK (code IN ('import', 'export', 'inland'))
+```
+
+#### D.2.4 Location Search RPC
+
+**Function**: `search_locations(search_text, limit_count DEFAULT 10)`
+- Exact code match: score 100
+- Exact name match: score 90
+- Code/name prefix match: score 80
+- City match: score 70
+- Default fallback: score 60
+- Searches `ports_locations` (active only) by `location_name`, `location_code`, `city` using ILIKE
+
+### D.3 Mode-to-Location Mapping Rules
+
+**Current State**: No explicit hardcoded rules restrict which modes are available for which routes. The system uses implicit constraints:
+
+1. **Service Type → Mode Binding**: `service_types.mode_id` FK to `transport_modes` creates implicit mode availability. A service type like `ocean_fcl` is bound to ocean mode.
+
+2. **Location Type Constraint**: `ports_locations.location_type` CHECK restricts to `seaport`, `airport`, `inland_port`, `warehouse`, `terminal`. The UI does not currently enforce mode↔location_type matching (e.g., allowing an ocean leg to use an airport location).
+
+3. **Service Type Mappings**: `service_type_mappings` table has a `conditions` JSONB field that can contain route/mode constraints, but this is currently unused (default `{}`).
+
+**Recommended Enhancement** (not yet implemented):
+
+| Transport Mode | Valid Origin Location Types | Valid Destination Location Types |
+|---------------|---------------------------|--------------------------------|
+| ocean | seaport, terminal | seaport, terminal |
+| air | airport | airport |
+| road | warehouse, inland_port, terminal, seaport, airport | warehouse, inland_port, terminal, seaport, airport |
+| rail | inland_port, terminal | inland_port, terminal |
+| courier | Any | Any |
+
+**Gap**: No backend validation enforces mode↔location_type compatibility. This should be added to the validation pipeline (Stage 2: Transformation Validation) in Section 7.1.
+
+### D.4 Service Types & Mappings
+
+**Table**: `public.service_types`
+```
+id (uuid PK), name (text NOT NULL), description (text), is_active (boolean),
+code (text NOT NULL), mode_id (uuid FK to transport_modes),
+use_dimensional_weight (boolean DEFAULT false),
+dim_divisor (numeric DEFAULT 6000, CHECK > 0),
+created_at, updated_at
+```
+
+**Table**: `public.service_type_mappings`
+```
+id (uuid PK), service_id (uuid FK), service_type_id (uuid FK NOT NULL),
+is_default (boolean), is_active (boolean), priority (int), conditions (jsonb DEFAULT '{}'),
+tenant_id (uuid NOT NULL), created_at, updated_at
+```
+
+**Seeded Service Types** (from `20260201140000_seed_logistics_services.sql`):
+
+| Code | Name | Mode |
+|------|------|------|
+| `ocean_fcl` | Ocean FCL | ocean |
+| `ocean_lcl` | Ocean LCL | ocean |
+| `air_express` | Air Express | air |
+| `air_standard` | Air Standard | air |
+| `road_ftl` | Road FTL | road |
+| `road_ltl` | Road LTL | road |
+| `rail_intermodal` | Rail Intermodal | rail |
+
+**Table**: `public.services` (tenant-specific)
+```
+id, tenant_id, service_code, service_name, service_type (text e.g. "ocean_fcl"),
+description, base_price (numeric), pricing_unit (text), transit_time_days (int),
+is_active, metadata (jsonb)
+```
+
+### D.5 Carrier Architecture
+
+#### D.5.1 Carriers Table
+
+**Table**: `public.carriers`
+```
+id (uuid PK), tenant_id (uuid NOT NULL), franchise_id (uuid),
+mode (transport_mode enum NOT NULL), name (text NOT NULL),
+scac (text), iata (text), mc_dot (text),
+created_at, updated_at
+```
+
+**Carrier Identification Codes**:
+- `scac` — Standard Carrier Alpha Code (Ocean/Road)
+- `iata` — International Air Transport Association code (Air)
+- `mc_dot` — Motor Carrier / Department of Transportation number (Trucking)
+
+#### D.5.2 Seeded Carriers
+
+**Ocean** (mode: `ocean`): Maersk (MAEU), MSC (MSCU), CMA CGM (CMACGM), Hapag-Lloyd (HLCU), COSCO (COSU)
+
+**Air** (mode: `air`): Lufthansa Cargo (LH), Emirates SkyCargo (EK), FedEx Express (FX), DHL Aviation (D0), Cathay Pacific Cargo (CX)
+
+**Trucking** (mode: `inland_trucking`): J.B. Hunt (JBHT), XPO Logistics (XPO), Schneider (SNDR)
+
+**Rail** (mode: `rail`): Union Pacific, CSX, BNSF
+
+#### D.5.3 Carrier-Service Type Mapping
+
+**Table**: `public.carrier_service_types`
+```
+id (uuid PK), tenant_id (uuid NOT NULL), carrier_id (uuid FK NOT NULL),
+service_type (text NOT NULL), code_type (text: 'SCAC','IATA','MC_DOT'),
+code_value (text), is_primary (boolean DEFAULT false), is_active (boolean DEFAULT true),
+created_at, updated_at
+UNIQUE(tenant_id, carrier_id, service_type)
+```
+
+Service types allowed: `'ocean', 'air', 'trucking', 'courier', 'moving', 'railway_transport'`
+
+Global mappings supported via RLS policy allowing `tenant_id IS NULL` entries.
+
+#### D.5.4 Preferred Carrier Assignment
+
+**Table**: `public.vendor_preferred_carriers`
+```
+id (uuid PK), vendor_id (uuid FK), carrier_id (uuid FK), mode (text),
+is_active (boolean DEFAULT true), tenant_id (uuid)
+```
+
+**RPC**: `get_vendor_preferred_carriers(p_vendor_id uuid, p_mode text)` retrieves preferred carriers per vendor and mode.
+
+**Algorithm**: Carrier preference is vendor-specific. When generating quotes:
+1. Check `vendor_preferred_carriers` for the vendor + mode combination
+2. If preferred carriers exist, prioritize those in rate lookups
+3. Fallback to all active carriers for the mode
+
+**Gap**: No scoring/ranking algorithm beyond is_active. No route-based or cargo-type-based carrier preference exists. The AI Advisor generates 5 options but uses hardcoded mock knowledge, not actual carrier preference data.
+
+#### D.5.5 Provider API Configuration
+
+**Table**: `public.provider_api_configs`
+```
+id (uuid PK), tenant_id (uuid NOT NULL), carrier_id (uuid FK NOT NULL),
+api_provider (text NOT NULL), api_version (text), base_url (text NOT NULL),
+rate_endpoint (text), tracking_endpoint (text), label_endpoint (text),
+auth_type (text NOT NULL), auth_config (jsonb NOT NULL DEFAULT '{}'),
+rate_limit_per_minute (int DEFAULT 60), rate_limit_per_day (int),
+supports_rate_shopping (boolean DEFAULT false)
+```
+
+Supports multi-carrier API integration for live rate queries, tracking, and label generation.
+
+### D.6 Rate Calculation Architecture
+
+#### D.6.1 Rate Engine (Edge Function)
+
+**File**: `supabase/functions/rate-engine/index.ts`
+
+**Rate Tiers**:
+- `contract` — Account-specific negotiated rates
+- `spot` — Market/general rates
+- `market` — Alternative competitive rates
+
+**Rate Resolution Flow**:
+```
+Query carrier_rates WHERE:
+  origin_port_id = resolved_origin
+  AND destination_port_id = resolved_destination
+  AND mode = requested_mode
+  AND status = 'active'
+  AND (valid_to IS NULL OR valid_to >= today)
+  AND (contract rates only if account_id matches)
+```
+
+**Price Calculation Per Mode**:
+- **Ocean**: `price * containerQty` (per container basis)
+- **Air/Road**: `price * weightKg` (per kg basis)
+
+**Default Breakdown**:
+- Base fare: 80% of price
+- BAF (Bunker Adjustment Factor): 10%
+- CAF (Currency Adjustment Factor): 5%
+- THC (Terminal Handling Charge): 5%
+- DOC (Documentation fee): fixed $50
+
+#### D.6.2 Carrier Rates Table
+
+**Table**: `public.carrier_rates` (enhanced via `20251012120000_carrier_rates_module.sql`)
+```
+carrier_id (uuid FK), origin_port_id (uuid FK), destination_port_id (uuid FK),
+container_category_id (uuid FK), container_size_id (uuid FK),
+service_name (text), scac_code (text), vessel_flight_no (text),
+rate_reference_id (text), exchange_rate (numeric),
+markup_amount (numeric DEFAULT 0), charges_subtotal (numeric DEFAULT 0),
+total_amount (numeric DEFAULT 0),
+etd (date), eta (date), sailing_frequency (text), cut_off_date (date),
+payment_terms (text), free_time_days (int),
+demurrage_rate (numeric), detention_rate (numeric),
+status (text CHECK: 'active','expiring','expired','removed','selected'),
+removed_reason (text), created_by (uuid), valid_to (date)
+```
+
+**Total Calculation Trigger**:
+```
+total_amount = base_rate + markup_amount + charges_subtotal
+charges_subtotal = SUM(charge.amount * charge.quantity)
+```
+
+#### D.6.3 Pricing Service (Application Layer)
+
+**File**: `src/services/pricing.service.ts`
+
+**Two Pricing Models**:
+
+1. **Cost-Plus Model** (`isCostBased = true`):
+   ```
+   Sell = Cost / (1 - Margin%)
+   Margin Amount = Sell - Cost
+   ```
+
+2. **Sell-Based/Discount Model** (`isCostBased = false`):
+   ```
+   Margin Amount = Sell * (Margin% / 100)
+   Buy = Sell - Margin Amount
+   ```
+
+**Key Methods**:
+- `calculatePrice()` — RPC-first with client-side fallback (lines 174-264)
+- `calculateFinancials()` — Calculates sell, buy, margin (lines 271-328)
+- `calculatePriceWithRules()` — Applies dynamic margin rules (lines 109-140)
+- `getMarginRules()` — Fetches from `margin_rules` table with 5-minute cache (lines 52-76)
+
+**Margin Rules Application** (priority order):
+- Percentage markup compounds on running price
+- Fixed markup added linearly
+- Edge cases handled: 0%, 100%, >100% margin; `.toFixed(2)` rounding
+
+**Default Margin**: 15% of sell price (sell-based model) in `QuoteOptionService`
+
+#### D.6.4 Charge Bifurcation Engine
+
+**File**: `src/lib/charge-bifurcation.ts`
+
+**Keyword-Based Rules** (priority order):
+
+1. **High-Priority Transport Charges**:
+   - THC, Terminal, Wharfage, BAF, Bunker, ISF, AMS, IMO, BL fee, Doc fee → `transport` leg, `ocean` mode
+   - Air freight, FSC, Fuel surcharge, MYC, Screening, Security → `transport` leg, `air` mode
+   - Rail freight → `transport` leg, `rail` mode
+
+2. **Main Freight Keywords**:
+   - Ocean/Sea/Freight/Base fare → `transport` leg, `ocean` mode
+
+3. **Positional Keywords**:
+   - Pickup, Origin, Export, Drayage origin, Pre-carriage → `pickup` leg, `road` mode
+   - Delivery, Destination, Import, Drayage dest, On-carriage → `delivery` leg, `road` mode
+
+4. **Mode-Specific**:
+   - Trucking, Haulage, Road freight → `transport` leg, `road` mode
+   - Customs, Duty, Tax, VAT → `delivery` leg, `road` mode
+
+**Fallback Logic**:
+- If no explicit `leg_id`, match by description keywords
+- Positional fallback: first leg = pickup, last leg = delivery
+- Unmatched charges → Global/Unassigned
+
+#### D.6.5 AI Advisor Rate Generation
+
+**File**: `supabase/functions/ai-advisor/index.ts`
+
+**Smart Quote Generation Flow**:
+1. **Cache Check** — Hash on route + mode + commodity + weight + volume
+2. **Historical Context** — Query `rates` table for past averages
+3. **GPT-4o System Prompt** requires 5 options: Best Value, Cheapest, Fastest, Greenest, Reliable
+4. **Mode-Specific Rate Ranges** (from system prompt):
+   - **Road**: $1.50-$4.00/km + fixed fees
+   - **Air**: $2.50-$12.00/kg (chargeable weight)
+   - **Ocean**: Market rates per TEU/FEU + BAF/CAF
+   - **Rail**: Distance-based tariffs
+5. **Leg-Level Pricing**: Every leg MUST have charges (granular breakdown: Pickup, Terminal Origin, Main Freight, Terminal Dest, Delivery)
+
+**Dynamic Pricing** (post-AI response):
+- Fuel surcharge: 12% of base (HARDCODED — see Task 4.12)
+- Currency adjustment: 2% of base
+- Injected into main leg charges
+- Totals recalculated after injection
+
+**AI Output Schema**:
+```json
+{
+  "options": [{
+    "id", "tier", "transport_mode", "carrier",
+    "transit_time": { "total_days", "details" },
+    "legs": [{
+      "sequence", "from", "to", "mode", "carrier",
+      "transit_time", "distance_km", "co2_kg",
+      "border_crossing", "instructions",
+      "charges": [{ "name", "amount", "currency", "unit" }]
+    }],
+    "price_breakdown": {
+      "base_fare", "surcharges": { "baf", "caf", "peak_season", "fuel_road" },
+      "fees": { "pickup", "thc_origin", "thc_dest", "docs", "customs" },
+      "taxes", "currency", "total"
+    },
+    "reliability": { "score", "on_time_performance" },
+    "environmental": { "co2_emissions", "rating" },
+    "ai_explanation"
+  }],
+  "market_analysis", "confidence_score", "anomalies"
+}
+```
+
+#### D.6.6 Standard Charge Types
+
+**Charge Master** (from `20251012120000_carrier_rates_module.sql`):
+
+| Code | Description | Applicable Modes |
+|------|-------------|-----------------|
+| OFT | Ocean Freight | Ocean |
+| AFT | Air Freight | Air |
+| THC | Terminal Handling Charge (Origin/Dest) | Ocean, Air |
+| BAF | Bunker Adjustment Factor (Fuel surcharge) | Ocean |
+| CAF | Currency Adjustment Factor | Ocean |
+| DOC | Documentation | All |
+| AMS | Automated Manifest System | Ocean (US) |
+| ISF | Importer Security Filing | Ocean (US) |
+| ISPS | International Ship & Port Security | Ocean |
+
+**Charge Tables**:
+- `carrier_rate_charges`: Per-rate charges (id, tenant_id, carrier_rate_id, charge_type, basis, quantity, amount, currency, notes)
+- `quote_charges`: Per-quote charges with buy/sell side (charge_side_id, category_id, basis_id, quantity, unit, rate, amount, currency_id, min_amount, max_amount)
+
+**Charge Sides**: `charge_sides` table — Buy (cost price) vs Sell (customer price)
+
+### D.7 Mode-Specific Parameters
+
+#### D.7.1 Ocean Freight Parameters
+
+**Container Types** (`public.container_types`, seeded globally):
+
+| Code | Name |
+|------|------|
+| `dry` | Standard Dry |
+| `hc` | High Cube |
+| `reefer` | Refrigerated |
+| `open_top` | Open Top |
+| `flat_rack` | Flat Rack (breakbulk) |
+| `iso_tank` | ISO Tank (liquids) |
+
+**Container Sizes** (`public.container_sizes`, seeded globally):
+
+| Code | Name |
+|------|------|
+| `20_std` | 20' Standard dry container |
+| `40_std` | 40' Standard dry container |
+| `40_hc` | 40' High Cube dry container |
+| `45_hc` | 45' High Cube dry container |
+| `20_reefer` | 20' Refrigerated container |
+| `40_reefer` | 40' Refrigerated container |
+
+**Cargo Types**:
+- FCL (Full Container Load)
+- LCL (Less than Container Load)
+- Breakbulk
+- RoRo (Roll-on/Roll-off)
+
+**Ocean-Specific Carrier Rate Fields**:
+- `sailing_frequency`, `cut_off_date`, `free_time_days`, `demurrage_rate`, `detention_rate`
+- `vessel_flight_no`, `etd`, `eta`
+
+#### D.7.2 Air Freight Parameters
+
+**ULD Types** (supported via `quote_cargo_configurations`):
+- Container type: `ULD`
+- Container sizes: `LD3`, `LD7`
+
+**Service Types**: `air_express` (expedited), `air_standard` (standard)
+
+**Dimensional Weight**:
+- `service_types.use_dimensional_weight` (boolean)
+- `service_types.dim_divisor` (numeric, default 6000, CHECK > 0)
+- Standard formula: Chargeable weight = MAX(actual_weight_kg, L×W×H / dim_divisor)
+- Currently calculated in application layer, not enforced in DB
+
+**Air-Specific Rate Calculation**: `price * weightKg` (per kg, chargeable weight)
+
+#### D.7.3 Road/Trucking Parameters
+
+**Service Types**: `road_ftl` (Full Truck Load), `road_ltl` (Less than Truck Load)
+
+**Vehicle Specification Support**:
+- `vehicleType` field in QuickQuoteModal form state (default: `van`)
+- `package_sizes.max_weight_kg` — capacity limit per vehicle type
+- `package_sizes.length_ft`, `width_ft`, `height_ft` — dimensional constraints
+
+**Carrier Identification**: `mc_dot` (Motor Carrier / DOT number)
+
+**Road-Specific Rate Calculation**: `price * weightKg` (per kg basis) or distance-based ($1.50-$4.00/km for AI)
+
+#### D.7.4 Rail Parameters
+
+**Enum Addition**: `ALTER TYPE public.transport_mode ADD VALUE IF NOT EXISTS 'rail'` (2026-02-05)
+
+**Service Type**: `rail_intermodal` — Containerized rail transport
+
+**Rail Carriers**: Union Pacific, CSX, BNSF (seeded in carrier migration)
+
+**Rail Cargo Configuration**:
+- Uses container specifications (20ft, 40ft standard intermodal units)
+- `transport_mode = 'rail'` in `quote_cargo_configurations`
+- **Gap**: No wagon-specific table exists — rail uses ocean container abstractions
+
+**Missing Rail-Specific Fields** (identified as gaps):
+- No wagon capacity / tare weight columns
+- No gauge type (standard/broad/narrow)
+- No train scheduling/slot information
+- No border crossing / customs transit fields specific to rail corridors
+
+**Rail in Cargo Details**: `cargo_details.service_type` CHECK includes `'railway_transport'`
+
+**Rail in UI**: `Train` icon imported in QuickQuoteModal; normalization via `normalizeModeKey()` handles `'rail'` keyword
+
+### D.8 Cargo Configuration Model
+
+#### D.8.1 Quote Cargo Configurations
+
+**Table**: `public.quote_cargo_configurations` (from `20260215000000`)
+```
+id (uuid PK), quote_id (uuid FK), tenant_id (uuid),
+transport_mode ('ocean','air','road','rail'),
+cargo_type ('FCL','LCL','Breakbulk','RoRo'),
+container_type ('Standard','High Cube','Open Top','Flat Rack','Reefer','Tank','ULD','Trailer'),
+container_size ('20','40','45','LD3','LD7','53'),
+quantity (int),
+unit_weight_kg (numeric), unit_volume_cbm (numeric),
+length_cm (numeric), width_cm (numeric), height_cm (numeric),
+is_hazardous (boolean), hazmat_class (text), un_number (text),
+is_temperature_controlled (boolean), temperature_min (numeric), temperature_max (numeric),
+temperature_unit ('C' or 'F'),
+package_category_id (uuid FK), package_size_id (uuid FK),
+remarks (text)
+```
+
+#### D.8.2 Shipment Cargo Configurations (Mirror)
+
+**Table**: `public.shipment_cargo_configurations` — Identical schema to quote version, used during execution tracking.
+
+#### D.8.3 Dangerous Goods / Special Cargo
+
+- `is_hazardous`, `hazmat_class` (e.g., "Class 3", "Class 8"), `un_number` (e.g., "UN1203")
+- `cargo_types.requires_special_handling`, `cargo_types.hazmat_class`
+- `is_temperature_controlled`, `temperature_min`, `temperature_max`, `temperature_unit`
+- `compliance_screenings` table: screening_type `'HTS_VALIDATION', 'RPS', 'LICENSE_CHECK', 'OGA'`; status `'PASSED', 'WARNING', 'FAILED', 'PENDING'`
+
+#### D.8.4 Packaging Types
+
+**`package_categories`**: category_name (Pallet, Crate, Drum, Box), category_code, description, is_active
+
+**`package_sizes`**: size_name, size_code, length_ft, width_ft, height_ft, max_weight_kg, description
+
+### D.9 Multi-Modal Transport Combination Logic
+
+#### D.9.1 Leg-Based Multi-Modal Architecture
+
+The system supports multi-modal transport via ordered legs within each quote option.
+
+**Quote Option Legs** (`public.quote_option_legs`):
+```
+id, tenant_id, quote_option_id, leg_order (int),
+mode_id (uuid FK to transport_modes), service_id (uuid FK),
+origin_location (text), destination_location (text),
+origin_location_id (uuid FK to ports_locations),
+destination_location_id (uuid FK to ports_locations),
+provider_id (uuid FK to carriers), carrier_id (uuid FK),
+planned_departure, planned_arrival,
+service_type_id (uuid FK), container_type_id (uuid FK),
+container_size_id (uuid FK), trade_direction_id (uuid FK),
+leg_currency_id (uuid FK),
+transport_mode (text), sequence_number (int),
+transit_time (text), total_amount (numeric), currency (text DEFAULT 'USD')
+```
+
+**Quotation Version Option Legs** (alternate structure):
+- Similar columns with `quotation_version_option_id` FK
+- `leg_type` (text, e.g., 'transport')
+- `transit_time_hours`, `co2_kg`, `voyage_number`
+
+**Leg Type** (`src/components/sales/composer/store/types.ts`):
+```typescript
+export interface Leg {
+  id: string;
+  mode: string;
+  serviceTypeId: string;
+  origin: string;
+  destination: string;
+  charges: any[];
+  legType?: 'transport' | 'service' | 'pickup' | 'delivery' | 'main';
+  serviceOnlyCategory?: string;
+  carrierName?: string;
+  carrierId?: string;
+}
+```
+
+#### D.9.2 Multi-Modal Routing Pattern
+
+1. Legs ordered by `leg_order` / `sequence_number`
+2. Each leg's destination = next leg's origin (geographic continuity)
+3. Modal transitions supported (e.g., road → ocean → road)
+4. Each leg has independent mode, carrier, charges, and transit time
+5. Total transit = sum of leg transit times + any connection time
+
+**Common Multi-Modal Patterns**:
+
+| Pattern | Leg 1 | Leg 2 | Leg 3 | Example |
+|---------|-------|-------|-------|---------|
+| Door-to-Door (Ocean) | Road (pickup) | Ocean (main) | Road (delivery) | Factory → Port → Port → Warehouse |
+| Door-to-Door (Air) | Road (pickup) | Air (main) | Road (delivery) | Warehouse → Airport → Airport → Customer |
+| Rail Intermodal | Road (drayage) | Rail (main) | Road (delivery) | Depot → Rail Terminal → Rail Terminal → Distribution Center |
+| Sea-Air | Road (pickup) | Ocean (to hub) | Air (to destination) | Origin → Transship Port → Destination Airport |
+
+#### D.9.3 Charge Assignment to Legs
+
+Charges are assigned to legs via the charge bifurcation engine (Section D.6.4). Each charge has:
+- `leg_id` (FK to specific leg) or global (no leg assignment)
+- `charge_side_id` (buy/sell)
+- Leg-specific charges take priority over global charges in `QuoteOptionService.insertCharges()`
+
+### D.10 Incoterms
+
+**Table**: `public.incoterms`
+```
+id (uuid PK), tenant_id (uuid NOT NULL), incoterm_code (text NOT NULL),
+incoterm_name (text NOT NULL), description (text), is_active (boolean),
+created_at, updated_at
+UNIQUE INDEX on (tenant_id, incoterm_code)
+```
+
+**Integration**:
+- `quotes.incoterm_id` (uuid FK to incoterms) — canonical reference
+- `quotes.incoterms` (text, legacy) — deprecated, to be removed in Phase 4 (Task 4.3)
+- `shipments` inherit incoterm from quote during conversion
+
+**Gap**: No mode-specific incoterm constraints. Incoterms apply globally across all modes (which is correct per ICC Incoterms 2020 rules).
+
+### D.11 Currency & FX
+
+**Table**: `public.currencies`
+```
+id (uuid PK), code (text UNIQUE), name (text), symbol (text),
+is_active (boolean), created_at
+```
+
+**Current State**:
+- `carrier_rates.exchange_rate` field exists (numeric)
+- `quotation_version_options` has both `currency_id` and `quote_currency_id` (to be unified in Phase 4)
+- `carrier_rate_charges.currency` (text field)
+- Default currency: USD
+- **No FX conversion infrastructure exists** — all prices single-currency per transaction
+- `formatCurrency` in `src/lib/utils.ts` only formats display, never converts
+
+**Gap**: Multi-currency quotes (e.g., EUR for origin drayage + USD for ocean) have no mechanism to convert, display, or aggregate across currencies. See Task 6.2 (revised to 16h).
+
+### D.12 Quotation Version & Options Structure
+
+#### D.12.1 Versions
+
+**Table**: `public.quotation_versions`
+```
+id, tenant_id, quote_id (FK), version_number (int), major_version (int),
+minor_version (int), change_reason (text), valid_until (timestamptz),
+created_by (uuid FK to profiles), created_at
+UNIQUE(quote_id, version_number)
+```
+
+#### D.12.2 Version Options
+
+**Table**: `public.quotation_version_options`
+```
+id, tenant_id, quotation_version_id (FK), carrier_rate_id (FK),
+franchise_id, carrier_id,
+option_name (text), sort_order (int),
+total_amount, total_sell, total_buy, margin_amount, margin_percentage,
+transit_time, total_transit_days, valid_until,
+reliability_score, ai_generated, ai_explanation, source, source_attribution,
+container_size_id, container_type_id, total_co2_kg,
+quote_currency_id, currency,
+status ('active','removed','selected'),
+created_at
+```
+
+#### D.12.3 Quote Option Service Flow
+
+**File**: `src/services/QuoteOptionService.ts` — `addOptionToVersion()`
+
+1. **Normalize Rate** → `mapOptionToQuote()`
+2. **Calculate Financials** → `pricingService.calculateFinancials()` (default 15% margin, sell-based)
+3. **Insert Option Header** → `quotation_version_options`
+4. **Insert Legs** → resolve service_type_id, provider_id, location_ids per leg
+5. **Insert Charges** → priority: leg-specific > global > price_breakdown > balancing charge
+6. **Reconciliation** → recalculate totals from inserted charges; update option header; flag anomalies
+
+### D.13 CRM Integration Points
+
+#### D.13.1 CRM Context & Hooks
+
+- **`useCRM()`** hook provides: `supabase` client, `context` (tenant/franchise scope), `scopedDb` (ScopedDataAccess instance), `preferences` (user settings)
+- **`useAuth()`** hook provides: roles, permissions, profile
+- All quote components consume CRM context for tenant scoping and data access
+
+#### D.13.2 Plugin Architecture
+
+**`src/services/plugins/PluginRegistry.ts`**: 8 registered plugins (Logistics = real implementation, 7 stubs)
+
+The plugin system provides an extensibility framework where new logistics types can be registered as plugins. The Logistics plugin handles quote-related functionality.
+
+#### D.13.3 Leads → Quotes Pipeline
+
+The CRM manages leads via `src/pages/dashboard/Leads.tsx` (~715 lines). Lead scoring is rule-based (not AI/ML). Quotes can be created from leads via Quick Quote or the detailed quote form.
+
+#### D.13.4 Quote → Shipment Conversion
+
+`shipment_cargo_configurations` mirrors `quote_cargo_configurations` schema. The RPC in `20260216000000_shipment_cargo_configurations.sql` converts quote data to shipment data, inheriting incoterms, cargo configurations, and commercial terms.
+
+#### D.13.5 Document & Invoice Services
+
+- `DocumentService` and `InvoiceService` accept `scopedDb: ScopedDataAccess` parameter
+- Quote PDFs generated via `generate-quote-pdf` edge function
+- Email dispatch via `send-email` edge function with multi-provider support
+
+### D.14 Extensibility Framework
+
+#### D.14.1 Adding a New Transport Mode
+
+**Steps to add a new mode** (e.g., "barge", "drone"):
+
+1. **Enum**: `ALTER TYPE public.transport_mode ADD VALUE IF NOT EXISTS 'new_mode';`
+2. **Transport Modes table**: INSERT new row with code, name, icon_name, display_order
+3. **Service Types**: INSERT new service type(s) with `mode_id` FK (e.g., `barge_fcl`)
+4. **Carriers**: Seed carriers with mode = `new_mode` and appropriate code fields
+5. **Carrier Service Types**: Map carriers to new service types
+6. **UI normalization**: Add keyword match in `normalizeModeKey()` function
+7. **Charge Bifurcation**: Add keyword rules for the new mode in `charge-bifurcation.ts`
+8. **AI Advisor**: Update system prompt with mode-specific rate ranges
+9. **Rate Engine**: Add mode-specific price calculation logic
+
+**Architecture supports this** because:
+- Transport modes are DB-driven, not hardcoded enums in TypeScript
+- Service types link to modes via FK
+- Legs accept any valid mode
+- Charge bifurcation uses keyword matching (extensible)
+
+#### D.14.2 Adding Mode-Specific Parameters
+
+The `quote_cargo_configurations` table's `container_type` and `container_size` fields accept free text, allowing new equipment types without schema changes. For structured validation, add CHECK constraints or reference tables.
+
+**For new container/equipment types**:
+1. INSERT into `container_types` (global, tenant_id = NULL)
+2. INSERT into `container_sizes` (global)
+3. Update UI dropdowns (they read from DB)
+
+#### D.14.3 Adding New Charge Types
+
+1. INSERT into charge master tables (charge_categories, charge_bases)
+2. Add keyword rules in `charge-bifurcation.ts` if auto-assignment is needed
+3. Charge types are referenced by ID, so no code changes needed for basic CRUD
+
+#### D.14.4 Adding New Carrier API Integrations
+
+1. INSERT into `provider_api_configs` with carrier_id, endpoints, auth config
+2. Implement provider-specific adapter in rate engine
+3. `supports_rate_shopping` flag enables live rate queries
+
+### D.15 Identified Gaps & Recommendations
+
+| # | Gap | Impact | Recommendation | Priority |
+|---|-----|--------|----------------|----------|
+| D1 | No mode↔location_type validation | Ocean leg can reference airport | Add validation in TransformService Stage 2 | Medium |
+| D2 | No wagon-specific fields for rail | Rail uses container abstractions only | Add `wagon_capacity_tons`, `tare_weight_tons`, `gauge_type` to cargo config or new table | Low |
+| D3 | No carrier scoring/ranking algorithm | Carrier preference is binary (preferred or not) | Build scoring based on: on-time %, price competitiveness, capacity, historical performance | Medium |
+| D4 | AI Advisor uses mock knowledge base | Real carrier preferences not used in AI rate generation | Feed actual `carrier_rates` and `vendor_preferred_carriers` data to AI prompt | High |
+| D5 | No dimensional weight enforcement | `dim_divisor` exists but no DB-level chargeable weight calculation | Add computed column or RPC for chargeable weight | Low |
+| D6 | `cargo_details.service_type` CHECK doesn't match transport_mode enum | Uses `'railway_transport'` vs enum `'rail'` | Align via migration; add mapping | Low |
+| D7 | `service_type_mappings.conditions` JSONB unused | No route-based service availability rules | Implement condition evaluation engine for mode+route restrictions | Medium |
+| D8 | No multi-currency aggregation | Charges in different currencies can't be totaled | Build FX service (already Task 6.2, 16h) | High |
+| D9 | Container type+size not validated against mode | Air cargo could have ocean container | Add cross-validation in cargo config save | Medium |
+| D10 | No historical rate trend storage | Rate engine queries only active rates, no history | Add rate archival and trend analysis | Low |
+
+### D.16 Testing Scenarios for Transport/Carrier Logic
+
+#### D.16.1 Mode-Specific Validation Tests
+
+```
+1. Ocean FCL: 2x40HC containers, Maersk, Shanghai → Rotterdam, BAF+THC+DOC charges
+2. Ocean LCL: 5 CBM loose cargo, CMA CGM, Mumbai → Hamburg
+3. Air Express: 200kg chargeable weight, Emirates, Dubai → London, FSC+screening
+4. Air Standard: ULD LD3, DHL, Frankfurt → New York
+5. Road FTL: 20-ton truck, J.B. Hunt, Chicago → Dallas
+6. Road LTL: 2 pallets (500kg), XPO, LA warehouse → SF warehouse
+7. Rail Intermodal: 1x40' container, Union Pacific, LA → Chicago
+8. Multi-Modal: Road pickup → Ocean main → Road delivery (door-to-door)
+9. Sea-Air: Ocean leg + Air leg with different carriers and charge sets
+10. Rail + Road: Rail main haul + road last-mile delivery
+```
+
+#### D.16.2 Carrier Assignment Tests
+
+```
+1. Preferred carrier exists for mode → should be prioritized
+2. No preferred carrier → all active carriers for mode returned
+3. Carrier with expired rates → should be excluded
+4. Multi-tenant: Carrier assigned to Tenant A → not visible to Tenant B
+5. Global carrier (tenant_id NULL) → visible to all tenants
+```
+
+#### D.16.3 Rate Calculation Tests
+
+```
+1. Cost-plus: cost=$1000, margin=20% → sell=$1250
+2. Sell-based: sell=$1000, margin=15% → buy=$850, margin=$150
+3. Zero margin → sell=cost (no division by zero)
+4. 100% margin → sell=Infinity guard (handled in pricing.service.ts)
+5. Contract rate priority over spot rate for same route
+6. Rate expiry: expired rate excluded from results
+7. Multi-leg total: sum of leg charges = option total
+8. Charge bifurcation: THC assigned to transport leg, pickup fee to pickup leg
+```
+
+#### D.16.4 Performance Benchmarks
+
+| Operation | Target | Measurement |
+|-----------|--------|-------------|
+| Rate lookup (single route, single mode) | < 200ms | rate-engine edge function response |
+| AI Advisor (5 options generation) | < 8s | ai-advisor edge function response |
+| Carrier rates query (10 active rates) | < 100ms | Postgres query time |
+| Port search (fuzzy, 10 results) | < 50ms | search_locations RPC |
+| Charge bifurcation (20 charges) | < 10ms | Client-side computation |
+| Full multi-modal quote save | < 1s | save_quote_atomic RPC |
