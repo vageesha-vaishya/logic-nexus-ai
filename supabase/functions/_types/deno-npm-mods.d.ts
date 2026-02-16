@@ -31,3 +31,8 @@ declare module "npm:@aws-sdk/client-ses" {
     constructor(opts: any)
   }
 }
+
+declare module "https://esm.sh/@supabase/supabase-js@2" {
+  export function createClient(url: string, key: string, opts?: any): any
+  export type SupabaseClient = any
+}

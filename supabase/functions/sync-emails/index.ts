@@ -162,6 +162,18 @@ Deno.serve(async (req: Request) => {
       }
     };
 
+    const normalizeEmail = (v?: string) => String(v || "").trim().toLowerCase();
+    const findLinkedLeadId = async (addr?: string | null) => {
+      const e = normalizeEmail(addr || undefined);
+      if (!e) return null;
+      let query = supabase.from("leads").select("id").eq("email", e);
+      if (account?.tenant_id) query = query.eq("tenant_id", account.tenant_id);
+      if (account?.franchise_id) query = query.eq("franchise_id", account.franchise_id);
+      const { data, error } = await query.limit(1);
+      if (error || !data || data.length === 0) return null;
+      return data[0]?.id ?? null;
+    };
+
     let syncedCount = 0;
 
     // Sync emails based on provider
@@ -489,6 +501,7 @@ Deno.serve(async (req: Request) => {
               folder: "inbox",
               received_at: receivedAt,
               last_sync_attempt: new Date().toISOString(),
+              lead_id: await findLinkedLeadId(fromEmail),
             });
 
             if (insertError) {
@@ -792,6 +805,7 @@ Deno.serve(async (req: Request) => {
               has_inline_images: hasInlineImages,
               last_sync_attempt: new Date().toISOString(),
             };
+            emailPayload.lead_id = await findLinkedLeadId(emailPayload.direction === "inbound" ? emailPayload.from_email : (emailPayload.to_emails[0]?.email));
 
             const { error: insertError } = await supabase
               .from("emails")
@@ -959,6 +973,7 @@ Deno.serve(async (req: Request) => {
               folder: "inbox",
               received_at: receivedAt,
               last_sync_attempt: new Date().toISOString(),
+              lead_id: await findLinkedLeadId(fromEmail),
             });
             if (!insErr && pop3.deletePolicy === "delete_after_fetch") {
               await send(`DELE ${id}`);
