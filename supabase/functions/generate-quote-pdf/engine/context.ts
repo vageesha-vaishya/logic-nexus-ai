@@ -1,8 +1,6 @@
 
 import { z } from "zod";
 
-// Define the shape of the raw input data (from DB)
-// This is a loose schema to validate what we expect from the caller
 export const RawQuoteDataSchema = z.object({
   quote: z.object({
     quote_number: z.string(),
@@ -57,6 +55,61 @@ export const RawQuoteDataSchema = z.object({
 });
 
 export type RawQuoteData = z.infer<typeof RawQuoteDataSchema>;
+
+export class ValidationBlockError extends Error {
+  issues: string[];
+
+  constructor(issues: string[]) {
+    super("PDF pre-render validation failed");
+    this.name = "ValidationBlockError";
+    this.issues = issues;
+  }
+}
+
+function validateForPdf(raw: any): string[] {
+  const issues: string[] = [];
+
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  const charges = Array.isArray(raw.charges) ? raw.charges : [];
+
+  if (items.length > 0) {
+    items.forEach((item: any, index: number) => {
+      const commodity = item?.commodity;
+      if (!commodity || commodity === "General Cargo") {
+        issues.push(`Item ${index + 1}: commodity missing or too generic`);
+      }
+
+      const weight = Number(item?.weight ?? 0);
+      const volume = Number(item?.volume ?? 0);
+
+      if (!(weight > 0)) {
+        issues.push(`Item ${index + 1}: weight must be greater than 0`);
+      }
+      if (volume < 0) {
+        issues.push(`Item ${index + 1}: volume must be zero or greater`);
+      }
+    });
+  }
+
+  if (charges.length === 0) {
+    issues.push("No sell-side charges available for PDF");
+  } else {
+    const totalAmount = charges.reduce(
+      (sum: number, c: any) => sum + Number(c?.amount ?? 0),
+      0
+    );
+    if (!(totalAmount > 0)) {
+      issues.push("Total charge amount must be greater than 0");
+    }
+  }
+
+  const companyName = raw?.branding?.company_name;
+  if (!companyName || String(companyName).trim().length === 0) {
+    issues.push("Branding company name is missing");
+  }
+
+  return issues;
+}
 
 export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
   if (!items) return [];
@@ -131,14 +184,6 @@ export interface SafeContext {
   }>;
 }
 
-/**
- * Safe Context Builder
- * 
- * Transforms raw DB data into a safe, structured context for the template engine.
- * - Removes sensitive internal IDs
- * - Standardizes field names
- * - Handles missing values gracefully
- */
 export function buildSafeContext(rawData: unknown, locale: string = "en-US"): SafeContext {
   // 1. Validate Input
   const result = RawQuoteDataSchema.safeParse(rawData);
@@ -151,6 +196,11 @@ export function buildSafeContext(rawData: unknown, locale: string = "en-US"): Sa
   }
 
   const data = result.success ? result.data : (rawData as any);
+
+  const validationIssues = validateForPdf(data);
+  if (validationIssues.length > 0) {
+    throw new ValidationBlockError(validationIssues);
+  }
 
   // 2. Transform & Sanitize
   const safeCtx: SafeContext = {

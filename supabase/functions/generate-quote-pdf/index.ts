@@ -1,7 +1,7 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { PdfRenderer } from "./engine/renderer.ts";
-import { buildSafeContext, mapQuoteItemsToRawItems } from "./engine/context.ts";
+import { buildSafeContext, mapQuoteItemsToRawItems, ValidationBlockError } from "./engine/context.ts";
 import { DefaultTemplate } from "./engine/default_template.ts";
 import { getTemplate } from "./engine/template-service.ts";
 
@@ -294,9 +294,32 @@ serveWithLogger(async (req, logger, supabaseClient) => {
       items: mapQuoteItemsToRawItems(quote.items),
     };
 
-    const context = buildSafeContext(rawData);
-    const renderer = new PdfRenderer(templateContent || DefaultTemplate, context);
-    const pdfBytes = await renderer.render();
+    let pdfBytes: Uint8Array | null = null;
+
+    if (!store_result && version && (version as any).storage_path) {
+      try {
+        const storagePath = (version as any).storage_path as string;
+        const { data: file, error: downloadError } = await supabaseClient.storage
+          .from("quotations")
+          .download(storagePath);
+
+        if (!downloadError && file) {
+          const arrayBuffer = await file.arrayBuffer();
+          pdfBytes = new Uint8Array(arrayBuffer);
+          await logger.info(`Using cached PDF from storage path ${storagePath}`);
+        } else if (downloadError) {
+          await logger.warn(`Failed to download cached PDF from ${storagePath}: ${downloadError.message}`);
+        }
+      } catch (e: any) {
+        await logger.warn(`Cached PDF retrieval failed: ${e?.message || String(e)}`);
+      }
+    }
+
+    if (!pdfBytes) {
+      const context = buildSafeContext(rawData);
+      const renderer = new PdfRenderer(templateContent || DefaultTemplate, context);
+      pdfBytes = await renderer.render();
+    }
 
     const traceId = body?.trace_id;
     const idem = body?.idempotency_key;
@@ -390,6 +413,20 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     );
   } catch (error: any) {
     console.error("Critical Error in generate-quote-pdf:", error);
+
+    if (error instanceof ValidationBlockError) {
+      return new Response(
+        JSON.stringify({ error: error.message, issues: error.issues }),
+        {
+          status: 400,
+          headers: {
+            ...getCorsHeaders(req),
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: error.message, stack: error.stack }),
       { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }

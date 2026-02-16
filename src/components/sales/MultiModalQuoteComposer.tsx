@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -57,6 +57,40 @@ interface MultiModalQuoteComposerProps {
 // Module-level cache for Reference Data
 const REFERENCE_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export function computeComposerCompleteness(input: { quoteData: any; legs: any[]; charges: any[] }): number {
+  let total = 0;
+  let filled = 0;
+
+  const fields = [
+    input.quoteData?.account_id,
+    input.quoteData?.contact_id,
+    input.quoteData?.trade_direction_id,
+    input.quoteData?.origin_port_id,
+    input.quoteData?.destination_port_id,
+    input.quoteData?.incoterm_id,
+    input.quoteData?.service_level,
+  ];
+
+  fields.forEach((f) => {
+    total += 1;
+    if (f !== null && typeof f !== 'undefined' && f !== '') {
+      filled += 1;
+    }
+  });
+
+  const legsPresent = Array.isArray(input.legs) && input.legs.length > 0;
+  total += 1;
+  if (legsPresent) filled += 1;
+
+  const hasSellCharges = Array.isArray(input.charges) && input.charges.length > 0;
+  total += 1;
+  if (hasSellCharges) filled += 1;
+
+  if (total === 0) return 0;
+  const ratio = (filled / total) * 100;
+  return Math.round(ratio);
+}
 
 const STEPS = [
   { id: 1, title: 'Quote Details', description: 'Basic information' },
@@ -178,6 +212,29 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     deletedChargeIds,
     isGeneratingSmart
   } = storeState;
+
+  const completenessScore = computeComposerCompleteness({
+    quoteData,
+    legs,
+    charges: combinedCharges
+  });
+
+  const completenessLabel =
+    completenessScore >= 80 ? 'Ready to Send' : completenessScore >= 50 ? 'Good' : 'Draft';
+
+  const completenessBarClass =
+    completenessScore >= 80
+      ? 'bg-green-500'
+      : completenessScore >= 50
+      ? 'bg-yellow-500'
+      : 'bg-red-500';
+
+  const completenessTextClass =
+    completenessScore >= 80
+      ? 'text-green-700'
+      : completenessScore >= 50
+      ? 'text-yellow-700'
+      : 'text-red-700';
 
   const [connectionStatus, setConnectionStatus] = useState<'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR'>('SUBSCRIBED');
   const pricingSubRef = useRef<{ unsubscribe: () => void } | null>(null);
@@ -2543,7 +2600,30 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       </Card>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Quotation Workflow</h2>
+            <p className="text-xs text-muted-foreground">Step {currentStep} of {STEPS.length}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Completeness</span>
+                <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" title={`${completenessLabel} (${completenessScore}%)`}>
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${completenessBarClass}`}
+                    style={{ width: `${Math.min(Math.max(completenessScore, 0), 100)}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-medium ${completenessTextClass}`}>{completenessScore}%</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {completenessLabel}
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
           <QuotationWorkflowStepper
             currentStep={currentStep}
             onStepClick={setCurrentStep}

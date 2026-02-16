@@ -1,12 +1,12 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { useQuoteData } from './useQuoteData';
+import { useQuoteRepositoryContext } from './useQuoteRepository';
 
-type QuoteDataContextType = ReturnType<typeof useQuoteData>;
+type QuoteDataContextType = ReturnType<typeof useQuoteRepositoryContext>;
 
 const QuoteDataContext = createContext<QuoteDataContextType | null>(null);
 
 export function QuoteDataProvider({ children }: { children: ReactNode }) {
-  const data = useQuoteData();
+  const data = useQuoteRepositoryContext();
 
   return (
     <QuoteDataContext.Provider value={data}>
@@ -23,4 +23,4 @@ export function useQuoteContext() {
   return context;
 }
 
-export type QuoteContextType = ReturnType<typeof useQuoteData>;
+export type QuoteContextType = QuoteDataContextType;

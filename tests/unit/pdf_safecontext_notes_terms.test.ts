@@ -22,7 +22,13 @@ describe('PDF V2 SafeContext notes and terms mapping', () => {
         address: '123 Test Street'
       },
       legs: [],
-      charges: [],
+      charges: [
+        {
+          description: 'Test charge',
+          amount: 100,
+          currency: 'USD',
+        },
+      ],
       items: [],
       branding: {
         company_name: 'Acme Corp'
@@ -35,4 +41,3 @@ describe('PDF V2 SafeContext notes and terms mapping', () => {
     expect(ctx.quote.terms_conditions).toBe('These are sample terms and conditions for testing.');
   });
 });
-

@@ -91,7 +91,7 @@ describe('QuotePreviewModal', () => {
     fireEvent.click(screen.getByText('Preview PDF'));
 
     await waitFor(() => {
-      expect(screen.getByText('Temporary error')).toBeDefined();
+      expect(screen.getByText('Preview Generation Failed')).toBeDefined();
     });
 
     // Click Try Again
