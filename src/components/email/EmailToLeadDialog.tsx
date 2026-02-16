@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import optionsConfig from "@/config/Options_Transport_Mode.json";
 import interestedConfig from "@/config/Interested_Transport_Mode_checker_config.json";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
-import { sanitizeLeadDataForInsert, extractEmailAddress, parseTransportOptionsJSON, type TransportOption } from "./email-to-lead-helpers";
+import { sanitizeLeadDataForInsert, extractEmailAddress, parseTransportOptionsJSON, type TransportOption, computeLeadScoreClient } from "./email-to-lead-helpers";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -293,6 +293,8 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
   const handleSubmit = async (data: LeadFormData) => {
     try {
+      const authUser = (await supabase.auth.getUser()).data.user;
+      const nowIso = new Date().toISOString();
       if (data.email) {
         const normalizedEmail = cleanEmail(data.email).value || data.email.trim().toLowerCase();
         let query = supabase
@@ -346,12 +348,23 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
           phone: data.phone ? (cleanPhone(data.phone).value || data.phone.trim()) : null,
           tenant_id: data.tenant_id || context.tenantId,
           franchise_id: data.franchise_id || context.franchiseId,
+          owner_id: authUser?.id || null,
+          last_activity_date: nowIso,
+          lead_score: computeLeadScoreClient({
+            status: data.status,
+            estimated_value: (() => {
+              const v = sanitizeLeadDataForInsert(data).estimated_value;
+              return typeof v === 'number' ? v : null;
+            })(),
+            source: data.source,
+            last_activity_date: nowIso
+          }),
           custom_fields: Object.keys(customFields).filter((k) => customFields[k] !== undefined).length
             ? Object.fromEntries(
                 Object.entries(customFields).filter(([, v]) => v !== undefined),
               )
             : null,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
+          created_by: authUser?.id,
         })
         .select()
         .single();

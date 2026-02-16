@@ -102,3 +102,47 @@ export function extractMaxPrice(priceText: string): number | null {
   if (numbers.length === 0) return null;
   return Math.max(...numbers);
 }
+
+export function computeLeadScoreClient(input: {
+  status?: string;
+  estimated_value?: number | null;
+  source?: string;
+  last_activity_date?: string | null;
+}): number {
+  let total = 0;
+  const status = (input.status || '').toLowerCase();
+  switch (status) {
+    case 'qualified': total += 30; break;
+    case 'contacted': total += 20; break;
+    case 'proposal': total += 40; break;
+    case 'negotiation': total += 50; break;
+    case 'new': total += 10; break;
+    default: total += 0;
+  }
+  const val = input.estimated_value ?? null;
+  if (val !== null) {
+    if (val >= 100000) total += 30;
+    else if (val >= 50000) total += 20;
+    else if (val >= 10000) total += 10;
+    else total += 5;
+  }
+  const source = (input.source || '').toLowerCase();
+  switch (source) {
+    case 'referral': total += 15; break;
+    case 'website': total += 10; break;
+    case 'event': total += 12; break;
+    default: total += 5;
+  }
+  if (input.last_activity_date) {
+    try {
+      const last = new Date(input.last_activity_date);
+      const now = new Date();
+      const diffDays = (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays <= 7) total += 15;
+      else if (diffDays <= 30) total += 10;
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return total;
+}
