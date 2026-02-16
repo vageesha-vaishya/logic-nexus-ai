@@ -46,6 +46,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
   const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
 
   const parseName = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
@@ -271,6 +272,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
     setIsSuggestingService(false);
     setLoadingOptions(false);
     setSuggestionError(null);
+    setSelectedOptionIndex(null);
   }, [email.id, open]);
 
   useEffect(() => {
@@ -280,6 +282,14 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         fetchRecommendedOptions();
     }
   }, [open, email.id]);
+
+  useEffect(() => {
+    if (transportOptions.length > 0) {
+      setSelectedOptionIndex(0);
+    } else {
+      setSelectedOptionIndex(null);
+    }
+  }, [transportOptions]);
 
   const handleSubmit = async (data: LeadFormData) => {
     try {
@@ -439,7 +449,11 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
                                 </TableHeader>
                                 <TableBody>
                                     {transportOptions.map((option, index) => (
-                                        <TableRow key={index}>
+                                        <TableRow
+                                          key={index}
+                                          onClick={() => setSelectedOptionIndex(index)}
+                                          className={`cursor-pointer ${selectedOptionIndex === index ? 'bg-purple-50' : ''}`}
+                                        >
                                             <TableCell className="font-medium">{option.seqNo}</TableCell>
                                             <TableCell>{option.mode}</TableCell>
                                             <TableCell>{option.price}</TableCell>
@@ -467,6 +481,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
                 onCancel={() => onOpenChange(false)}
                 suggestedService={suggestedService}
                 isSuggestingService={isSuggestingService}
+                recommendationSelection={selectedOptionIndex !== null ? transportOptions[selectedOptionIndex] : null}
             />
         </div>
       </DialogContent>

@@ -91,3 +91,14 @@ export function parseTransportOptionsJSON(text: string): TransportOption[] {
         throw new Error("Response format invalid: expected array of options");
     }
 }
+
+export function extractMaxPrice(priceText: string): number | null {
+  if (!priceText) return null;
+  const normalized = priceText.replace(/[,₹\s]/g, '');
+  const parts = normalized.split(/–|-|to/i);
+  const numbers = parts
+    .map(p => parseFloat(p.replace(/[^\d.]/g, '')))
+    .filter(n => !isNaN(n));
+  if (numbers.length === 0) return null;
+  return Math.max(...numbers);
+}
