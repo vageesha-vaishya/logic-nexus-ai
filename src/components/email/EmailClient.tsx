@@ -71,32 +71,39 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       
       // Contextual mode (e.g. Lead Detail)
       if (emailAddress) {
-        const serverFilters: Record<string, any> = {
-          filterFrom: advancedFilters.from || undefined,
-          filterTo: advancedFilters.to || undefined,
-          filterSubject: advancedFilters.subject || undefined,
-          filterHasAttachment: advancedFilters.hasAttachment || undefined,
-          filterDateFrom: advancedFilters.dateFrom ? advancedFilters.dateFrom.toISOString() : undefined,
-          filterDateTo: advancedFilters.dateTo ? advancedFilters.dateTo.toISOString() : undefined,
-        };
-        const { data, error } = await invokeFunction("search-emails", {
-          body: { 
-            email: emailAddress, 
-            query: searchQuery,
-            page: 1, 
-            pageSize: 50,
-            ...serverFilters
-          },
-        });
+        const targetEmail = String(emailAddress || "").trim().toLowerCase();
+        const jsonFilter = JSON.stringify([targetEmail]);
+        const jsonFilterObj = JSON.stringify([{ email: targetEmail }]);
 
+        let query = supabase
+          .from("emails")
+          .select("*")
+          .or([
+            `from_email.ilike.%${targetEmail}%`,
+            `to_emails.cs.${jsonFilter}`,
+            `to_emails.cs.${jsonFilterObj}`,
+            `cc_emails.cs.${jsonFilter}`,
+            `cc_emails.cs.${jsonFilterObj}`,
+            `bcc_emails.cs.${jsonFilter}`,
+            `bcc_emails.cs.${jsonFilterObj}`,
+          ].join(","))
+          .order("received_at", { ascending: sortDirection === "asc" })
+          .limit(50);
+
+        const { data, error } = await query;
         if (error) throw error;
-        if (data && (data as any).success === false) {
-          throw new Error((data as any).error || "Email search failed");
+
+        let fetchedEmails: Email[] = (data as any) || [];
+
+        // Client-side refinement for contextual view
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          fetchedEmails = fetchedEmails.filter(e =>
+            (e.subject || "").toLowerCase().includes(q) ||
+            (e.body_text || "").toLowerCase().includes(q) ||
+            (e.snippet || "").toLowerCase().includes(q)
+          );
         }
-        
-        let fetchedEmails: Email[] = (data as any).data || [];
-        
-        // Client-side filtering for contextual view if needed (API might not handle all)
         if (filterUnread) fetchedEmails = fetchedEmails.filter(e => !e.is_read);
         if (filterFlagged) fetchedEmails = fetchedEmails.filter(e => e.is_starred);
         if (filterAttachments) fetchedEmails = fetchedEmails.filter(e => e.has_attachments);
@@ -483,12 +490,14 @@ const handleSync = async () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data, error } = await invokeFunction("email-stats", {
-          body: { folder: selectedFolder },
-        });
-        if (!error && data?.success) {
-          setUnreadStats(data.unreadByFolder || {});
-          return;
+        if (!emailAddress) {
+          const { data, error } = await invokeFunction("email-stats", {
+            body: { folder: selectedFolder },
+          });
+          if (!error && data?.success) {
+            setUnreadStats(data.unreadByFolder || {});
+            return;
+          }
         }
       } catch (e) {
         console.error(e);
