@@ -184,7 +184,7 @@ Deno.serve(async (req: Request) => {
         let greetingConsumed = false;
 
         // Connect with improved error handling and STARTTLS fallback
-        const connectImap = async (): Promise<Deno.Conn> => {
+        const connectImap = async (): Promise<any> => {
           try {
             console.log(`Attempting connection to ${imapConfig.hostname}:${imapConfig.port} (SSL: ${imapConfig.ssl})`);
             if (imapConfig.ssl) {
@@ -1292,7 +1292,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error: unknown) {
-    const logger = new Logger({ function: "sync-emails" }); // Re-instantiate if needed or just use console
+    const logger = new Logger(null, { component: "sync-emails" }); // Re-instantiate if needed or just use console
     logger.error("Error syncing emails:", { error });
     
     return new Response(
