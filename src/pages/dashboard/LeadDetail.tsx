@@ -41,6 +41,9 @@ export default function LeadDetail() {
   const [composeData, setComposeData] = useState<{ subject: string; body: string; activityId?: string } | null>(null);
   const [interactionStats, setInteractionStats] = useState<{ total: number; calls: number; emails: number; meetings: number; tasks: number; notes: number; automated: number } | null>(null);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+  const [tabValue, setTabValue] = useState<'activity' | 'email'>(() => {
+    return location.hash === '#email' ? 'email' : 'activity';
+  });
 
   useEffect(() => {
     if (location.state && (location.state as any).openComposer) {
@@ -56,6 +59,18 @@ export default function LeadDetail() {
       window.history.replaceState({}, document.title);
     }
   }, [location]);
+
+  useEffect(() => {
+    setTabValue(location.hash === '#email' ? 'email' : 'activity');
+  }, [location.hash]);
+
+  const handleTabChange = (value: string) => {
+    const next = value === 'email' ? 'email' : 'activity';
+    setTabValue(next);
+    const basePath = `/dashboard/leads/${id}`;
+    const hash = next === 'email' ? '#email' : '';
+    navigate(`${basePath}${hash}`, { replace: true });
+  };
 
   const fetchLead = useCallback(async () => {
     try {
@@ -752,7 +767,7 @@ export default function LeadDetail() {
                 </Card>
               )}
 
-              <Tabs defaultValue="activity" className="w-full">
+              <Tabs value={tabValue} onValueChange={handleTabChange} className="w-full">
                 <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent space-x-6">
                   <TabsTrigger 
                     value="activity" 

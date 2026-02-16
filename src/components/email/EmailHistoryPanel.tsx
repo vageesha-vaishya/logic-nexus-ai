@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Mail, RefreshCw, Search, Plus, ArrowUpRight, ArrowDownLeft, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
-import { invokeFunction } from "@/lib/supabase-functions";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
@@ -57,25 +57,29 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
     
     try {
       setLoading(true);
-      // We search for emails where the address is in 'from', 'to', 'cc', or 'bcc'
-      // The search-emails function handles this if we pass the email query
-      const { data, error } = await invokeFunction("search-emails", {
-        body: {
-          email: emailAddress,
-          page: 1,
-          pageSize: 50,
-        },
-      });
+      const targetEmail = String(emailAddress || "").trim().toLowerCase();
+      const jsonFilter = JSON.stringify([targetEmail]);
+      const jsonFilterObj = JSON.stringify([{ email: targetEmail }]);
 
-      if (error) {
-        // If the function returned a structured error
-        throw error;
-      }
-      if (data && (data as any).success === false) {
-        throw new Error((data as any).error || "Email search failed");
-      }
-      
-      const results = (data?.data as Email[]) || [];
+      let query = supabase
+        .from("emails")
+        .select("*")
+        .or([
+          `from_email.ilike.%${targetEmail}%`,
+          `to_emails.cs.${jsonFilter}`,
+          `to_emails.cs.${jsonFilterObj}`,
+          `cc_emails.cs.${jsonFilter}`,
+          `cc_emails.cs.${jsonFilterObj}`,
+          `bcc_emails.cs.${jsonFilter}`,
+          `bcc_emails.cs.${jsonFilterObj}`,
+        ].join(","))
+        .order("received_at", { ascending: false })
+        .limit(100);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const results = (data as Email[]) || [];
       // Sort by date desc
       const sorted = results.sort((a, b) => 
         new Date(b.received_at).getTime() - new Date(a.received_at).getTime()

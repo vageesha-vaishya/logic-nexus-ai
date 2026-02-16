@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import type { Permission } from '@/config/permissions';
@@ -21,6 +22,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
   const location = useLocation();
+  const [graceActive, setGraceActive] = useState(false);
 
   if (loading) {
     logger.debug('ProtectedRoute waiting for auth loading', { path: location.pathname, component: 'ProtectedRoute' });
@@ -32,6 +34,17 @@ export function ProtectedRoute({
   }
 
   if (requireAuth && !user) {
+    if (!graceActive) {
+      setGraceActive(true);
+      setTimeout(() => setGraceActive(false), 2500);
+    }
+    if (graceActive) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
     logger.warn('Access denied. User not authenticated.', { path: location.pathname, component: 'ProtectedRoute' });
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
