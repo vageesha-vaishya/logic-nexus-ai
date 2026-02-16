@@ -452,6 +452,30 @@ export function EmailInbox() {
       fetchEmails(); // Revert optimistic update
     }
   };
+  
+  const processEmail = async (emailId: string) => {
+    try {
+      toast({ title: "Processing email...", description: "Running classification and security scan." });
+      
+      // Classify (category, sentiment, intent)
+      const { error: classifyError } = await invokeFunction("classify-email", {
+        body: { email_id: emailId },
+      });
+      if (classifyError) throw classifyError as any;
+      
+      // Then scan for security threats
+      const { error: scanError } = await invokeFunction("email-scan", {
+        body: { email_id: emailId },
+      });
+      if (scanError) throw scanError as any;
+      
+      toast({ title: "Processed", description: "Classification and security scan complete." });
+      fetchEmails();
+    } catch (error: any) {
+      toast({ title: "Process failed", description: error.message, variant: "destructive" });
+      fetchEmails();
+    }
+  };
 
   const updateEmailPriority = async (emailId: string, priority: string) => {
     try {
@@ -810,6 +834,17 @@ export function EmailInbox() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Classify + Scan"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          processEmail(email.id);
+                        }}
+                      >
+                        Process
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
