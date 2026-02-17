@@ -19,6 +19,7 @@ import {
 } from './types';
 import { useQuoteContext } from './QuoteContext';
 import { parseTransitTimeToHours } from '@/lib/transit-time';
+import { dbField } from '@/lib/schemas/field-registry';
 import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 
 // ---------------------------------------------------------------------------
@@ -45,10 +46,21 @@ export interface QuoteRepositoryContextData {
   services: ServiceOption[];
   carriers: CarrierOption[];
   ports: PortOption[];
+  shippingTerms: any[];
+  currencies: any[];
+  chargeCategories: any[];
+  chargeSides: any[];
+  chargeBases: any[];
+  serviceModes: any[];
+   tradeDirections: any[];
+   serviceLegCategories: any[];
+  containerTypes: any[];
+  containerSizes: any[];
   accounts: AccountOption[];
   contacts: ContactOption[];
   opportunities: OpportunityOption[];
   isLoadingOpportunities: boolean;
+  isLoadingServices: boolean;
   resolvedTenantId: string | null;
   setResolvedTenantId: (id: string | null) => void;
   setAccounts: (updater: (prev: AccountOption[]) => AccountOption[]) => void;
@@ -334,15 +346,228 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     enabled: !!tenantId,
   });
 
+  // 7. Shipping Terms
+  const { data: shippingTerms = [] } = useQuery<any[]>({
+    queryKey: quoteKeys.reference.shippingTerms(),
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('incoterms')
+          .select('id, name:incoterm_name, code:incoterm_code, description')
+          .eq('is_active', true)
+          .order('incoterm_code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load shipping terms', { error: e });
+        console.error('[useQuoteRepository] Failed to load shipping terms', e);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+
+  // 8. Currencies
+  const { data: currencies = [] } = useQuery<any[]>({
+    queryKey: quoteKeys.reference.currencies(),
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('currencies')
+          .select('id, code, name, symbol')
+          .eq('is_active', true)
+          .order('code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load currencies', { error: e });
+        console.error('[useQuoteRepository] Failed to load currencies', e);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+
+  // 9. Charge Categories
+  const { data: chargeCategories = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'charge_categories'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('charge_categories', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load charge categories', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load charge categories', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 10. Charge Sides
+  const { data: chargeSides = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'charge_sides'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('charge_sides', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load charge sides', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load charge sides', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 11. Charge Bases
+  const { data: chargeBases = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'charge_bases'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('charge_bases', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load charge bases', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load charge bases', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 12. Service Modes
+  const { data: serviceModes = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'service_modes'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('service_modes', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load service modes', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load service modes', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 13. Trade Directions
+  const { data: tradeDirections = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'trade_directions'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('trade_directions', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load trade directions', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load trade directions', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 14. Service Leg Categories
+  const { data: serviceLegCategories = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'service_leg_categories'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('service_leg_categories', true)
+          .select('id, name, code, description, sort_order');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load service leg categories', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load service leg categories', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 15. Container Types
+  const { data: containerTypes = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'container_types'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('container_types', true)
+          .select('id, name, code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load container types', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load container types', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 16. Container Sizes
+  const { data: containerSizes = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'container_sizes'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('container_sizes', true)
+          .select('id, name, code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load container sizes', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load container sizes', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
   return {
     serviceTypes: serviceData.serviceTypes,
     services: deduplicateById(injectedServices, serviceData.services),
     carriers,
     ports,
+    shippingTerms,
+    currencies,
+    chargeCategories,
+    chargeSides,
+    chargeBases,
+    serviceModes,
+    tradeDirections,
+    serviceLegCategories,
+    containerTypes,
+    containerSizes,
     accounts: deduplicateById(injectedAccounts, accounts),
     contacts: deduplicateById(injectedContacts, contacts),
     opportunities: deduplicateById(injectedOpportunities, opportunities),
     isLoadingOpportunities,
+    isLoadingServices: serviceQuery.isLoading,
     setResolvedTenantId,
     resolvedTenantId: tenantId ?? null,
     setAccounts: (updater) => setInjectedAccounts(updater),
@@ -915,7 +1140,7 @@ export function useQuoteRepositoryForm(opts: {
         service_id: uuidOrNull(data.service_id),
         incoterms: data.incoterms || null,
         shipping_term_id: uuidOrNull(data.shipping_term_id),
-        incoterm_id: uuidOrNull(data.shipping_term_id),
+        [dbField('quote', 'incoterms')]: uuidOrNull(data.shipping_term_id),
         currency_id: uuidOrNull(data.currency_id),
         carrier_id: uuidOrNull(data.carrier_id),
         consignee_id: uuidOrNull(data.consignee_id),
@@ -1005,7 +1230,7 @@ export function useQuoteRepositoryForm(opts: {
         })) || [],
         options: data.options?.map((option: any) => ({
             id: uuidOrUndefined(option.id),
-            is_selected: option.is_primary,
+            [dbField('option', 'isPrimary')]: option.is_primary,
             total_amount: typeof option.total_amount === 'number' ? option.total_amount : undefined,
             currency: option.currency || undefined,
             transit_time_days: typeof option.transit_time_days === 'number' ? option.transit_time_days : undefined,
@@ -1017,7 +1242,7 @@ export function useQuoteRepositoryForm(opts: {
                 leg_type: leg.leg_type || 'transport',
                 origin_location_name: leg.origin_location_name,
                 destination_location_name: leg.destination_location_name,
-                transit_time_hours: leg.transit_time_days 
+                [dbField('leg', 'transitTime')]: leg.transit_time_days 
                     ? leg.transit_time_days * 24 
                     : parseTransitTimeToHours(leg.transit_time),
                 flight_number: leg.flight_number,
@@ -1026,6 +1251,8 @@ export function useQuoteRepositoryForm(opts: {
                 arrival_date: leg.arrival_date,
                 charges: (leg.charges || []).map((charge: any) => ({
                     id: uuidOrUndefined(charge.id),
+                    [dbField('charge', 'category')]: charge.category_id || undefined,
+                    [dbField('charge', 'side')]: charge.charge_side_id || undefined,
                     amount: typeof charge.amount === 'number' ? charge.amount : undefined,
                     currency: charge.currency || undefined,
                     charge_code: charge.charge_code || undefined,

@@ -244,13 +244,24 @@ export function buildSafeContext(rawData: unknown, locale: string = "en-US"): Sa
       commodity: i.commodity || "General Cargo",
       details: `${i.weight || 0} kg / ${i.volume || 0} cbm`
     })),
-    charges: (data.charges || []).map((c: any) => ({
-      desc: c.description || "Service Charge",
-      total: Number(c.amount) || 0,
-      curr: c.currency || "USD",
-      unit_price: Number(c.amount) / (c.quantity || 1), // Simplified logic
-      qty: c.quantity || 1,
-    })),
+    charges: (data.charges || []).map((c: any) => {
+      const amount = Number(c.amount) || 0;
+      const quantity = c.quantity || 1;
+      const currency = c.currency || "USD";
+      const description = c.description || "Service Charge";
+
+      return {
+        desc: description,
+        description,
+        total: amount,
+        amount,
+        curr: currency,
+        currency,
+        unit_price: quantity ? amount / quantity : amount,
+        qty: quantity,
+        quantity,
+      };
+    }),
   };
 
   return safeCtx;

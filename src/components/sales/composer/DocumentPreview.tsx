@@ -130,8 +130,336 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
 
   const currency = quoteData.currency || 'USD';
 
+  const buildItemsTableData = () => {
+    const items = Array.isArray(quoteData.items) ? quoteData.items : [];
+    if (!items.length && (quoteData.total_weight || quoteData.total_volume)) {
+      return [
+        {
+          type: 'Cargo',
+          qty: 1,
+          quantity: 1,
+          commodity: getSafeString(quoteData.commodity, 'General Cargo'),
+          details: `${quoteData.total_weight || 0} kg / ${quoteData.total_volume || 0} cbm`,
+        },
+      ];
+    }
+
+    return items.map((item: any) => {
+      const weight =
+        typeof item?.attributes?.weight !== 'undefined' && item?.attributes?.weight !== null
+          ? item.attributes.weight
+          : quoteData.total_weight || 0;
+      const volume =
+        typeof item?.attributes?.volume !== 'undefined' && item?.attributes?.volume !== null
+          ? item.attributes.volume
+          : quoteData.total_volume || 0;
+      const qty = Number(item.quantity || 1);
+      const type = item.type || item.container_type || 'Cargo';
+      const commodity = item.product_name || getSafeString(quoteData.commodity, 'General Cargo');
+
+      return {
+        type,
+        qty,
+        quantity: qty,
+        commodity,
+        details: `${weight || 0} kg / ${volume || 0} cbm`,
+      };
+    });
+  };
+
+  const buildChargesTableData = () => {
+    const rows: any[] = [];
+
+    legs.forEach((leg: any) => {
+      const legCharges = Array.isArray(leg.charges) ? leg.charges : [];
+      legCharges.forEach((c: any) => {
+        const qty = c?.sell?.quantity || 1;
+        const rate = c?.sell?.rate || 0;
+        const amount = qty * rate;
+        const desc = getSafeString(c?.category, 'Charge');
+        const curr = c?.sell?.currency || currency;
+
+        rows.push({
+          description: desc,
+          desc,
+          amount,
+          total: amount,
+          currency: curr,
+          curr,
+          quantity: qty,
+          qty,
+          unit_price: rate,
+        });
+      });
+    });
+
+    (combinedCharges || []).forEach((c: any) => {
+      const qty = c?.sell?.quantity || 1;
+      const rate = c?.sell?.rate || 0;
+      const amount = qty * rate;
+      const desc = getSafeString(c?.description, 'Combined Charge');
+      const curr = c?.sell?.currency || currency;
+
+      rows.push({
+        description: desc,
+        desc,
+        amount,
+        total: amount,
+        currency: curr,
+        curr,
+        quantity: qty,
+        qty,
+        unit_price: rate,
+      });
+    });
+
+    return rows;
+  };
+
+  const buildLegsTableData = () => {
+    return (legs || []).map((leg: any) => ({
+      seq: typeof leg.sequence === 'number' ? leg.sequence : legs.indexOf(leg) + 1,
+      mode: getSafeString(leg.mode),
+      origin: getSafeString(
+        leg.origin || leg.origin_location_name || leg.origin_location_id,
+        'Origin'
+      ),
+      destination: getSafeString(
+        leg.destination || leg.destination_location_name || leg.destination_location_id,
+        'Destination'
+      ),
+      carrier_name: getSafeString(leg.carrierName || leg.carrier_id, 'Carrier'),
+      carrier: getSafeString(leg.carrierName || leg.carrier_id, 'Carrier'),
+      transit_time: leg.transit_time || '',
+    }));
+  };
+
+  const buildPreviewContext = () => {
+    const legsTable = buildLegsTableData();
+    const itemsTable = buildItemsTableData();
+    const chargesTable = buildChargesTableData();
+    const firstLeg = legs[0] || {};
+    const lastLeg = legs[legs.length - 1] || {};
+
+    return {
+      meta: {
+        today,
+        currency,
+      },
+      quote: {
+        reference: quoteData.reference,
+        date: today,
+        expiry: quoteData.validUntil,
+        incoterms: quoteData.incoterms,
+      },
+      customer: {
+        name: quoteData.accounts?.name || getSafeString(quoteData.account_id, 'Client Name'),
+        contact: quoteData.contacts
+          ? `${quoteData.contacts.first_name || ''} ${quoteData.contacts.last_name || ''}`.trim()
+          : getSafeString(quoteData.contact_id, 'Contact Person'),
+        destination: getSafeString(quoteData.destination, ''),
+      },
+      shipment: {
+        total_weight: quoteData.total_weight,
+        total_volume: quoteData.total_volume,
+        commodity: quoteData.commodity,
+        origin:
+          firstLeg.origin ||
+          firstLeg.origin_location_name ||
+          firstLeg.origin_location_id ||
+          quoteData.origin,
+        destination:
+          lastLeg.destination ||
+          lastLeg.destination_location_name ||
+          lastLeg.destination_location_id ||
+          quoteData.destination,
+      },
+      legs: legsTable,
+      items: itemsTable,
+      charges: chargesTable,
+    };
+  };
+
+  const buildDynamicTableData = (source: string | undefined) => {
+    if (!source) return [];
+    if (source === 'items') return buildItemsTableData();
+    if (source === 'charges') return buildChargesTableData();
+    if (source === 'legs') return buildLegsTableData();
+    return [];
+  };
+
+  const getTableCellValue = (row: any, field: string) => {
+    if (!row) return '';
+    if (field in row) return row[field];
+    if (field === 'description') return row.desc ?? row.description;
+    if (field === 'amount') return row.amount ?? row.total;
+    if (field === 'currency') return row.currency ?? row.curr;
+    if (field === 'quantity') return row.quantity ?? row.qty;
+    return row[field];
+  };
+
+  const getKeyValueField = (path: string) => {
+    if (!path) return '';
+    const ctx = buildPreviewContext();
+    const parts = path.split('.');
+    let current: any = ctx;
+    for (const part of parts) {
+      if (current == null) return '';
+      current = current[part];
+    }
+    return current ?? '';
+  };
+
   const renderSection = (type: string, props?: any) => {
       switch(type) {
+          case 'header':
+              return (
+                <div className="mb-4">
+                    <h2 className="text-xl font-bold text-slate-800">
+                        {props?.content?.text || 'Quotation'}
+                    </h2>
+                </div>
+              );
+          case 'static_block':
+              return (
+                <div className="mb-4 text-sm whitespace-pre-wrap">
+                    {props?.content?.text || ''}
+                </div>
+              );
+          case 'key_value_grid': {
+              const fields = props?.grid_fields || [];
+              if (!fields.length) return null;
+
+              return (
+                <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
+                  {fields.map((field: any, idx: number) => {
+                    let value = getKeyValueField(field.key);
+                    if (field.format === 'currency') {
+                      const num = Number(value || 0);
+                      value = `${currency} ${num.toFixed(2)}`;
+                    } else if (field.format === 'date') {
+                      if (value) {
+                        value = new Date(value).toLocaleDateString();
+                      }
+                    }
+                    const display = value === '' || value === undefined || value === null ? '-' : String(value);
+                    return (
+                      <div key={idx} className="flex justify-between gap-4">
+                        <span className="text-slate-500">{field.label}</span>
+                        <span className="font-medium text-slate-800">{display}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+          }
+          case 'dynamic_table': {
+              const config = props?.table_config;
+              const rows = buildDynamicTableData(config?.source);
+              const columns = config?.columns || [];
+
+              if (!config || !columns.length || !rows.length) {
+                return null;
+              }
+
+              const total = config.show_subtotals
+                ? rows.reduce(
+                    (sum: number, row: any) =>
+                      sum + (Number(row.amount ?? row.total) || 0),
+                    0
+                  )
+                : 0;
+
+              return (
+                <div className="mb-8">
+                    {props?.title && (
+                      <h3 className="font-bold text-sm mb-3 text-slate-700">
+                        {props.title}
+                      </h3>
+                    )}
+                    <table className="w-full text-sm border-collapse">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                            <tr>
+                                {columns.map((col: any, idx: number) => (
+                                  <th
+                                    key={idx}
+                                    className={`p-3 font-semibold ${
+                                      col.align === 'right'
+                                        ? 'text-right'
+                                        : col.align === 'center'
+                                        ? 'text-center'
+                                        : 'text-left'
+                                    }`}
+                                  >
+                                    {col.label}
+                                  </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {rows.map((row: any, rowIdx: number) => (
+                              <tr key={rowIdx}>
+                                {columns.map((col: any, colIdx: number) => {
+                                  let value = getTableCellValue(row, col.field);
+                                  if (col.format === 'currency') {
+                                    const num = Number(value || 0);
+                                    value = `${currency} ${num.toFixed(2)}`;
+                                  }
+                                  return (
+                                    <td
+                                      key={colIdx}
+                                      className={`p-3 ${
+                                        col.align === 'right'
+                                          ? 'text-right'
+                                          : col.align === 'center'
+                                          ? 'text-center'
+                                          : 'text-left'
+                                      } text-slate-600`}
+                                    >
+                                      {value}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                        </tbody>
+                        {config.show_subtotals && (
+                          <tfoot className="border-t-2 border-slate-800">
+                            <tr>
+                              <td
+                                colSpan={columns.length - 1}
+                                className="p-3 text-right font-bold"
+                              >
+                                Total:
+                              </td>
+                              <td className="p-3 text-right font-bold text-lg">
+                                {currency} {total.toFixed(2)}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                    </table>
+                </div>
+              );
+          }
+          case 'footer':
+              return (
+                <div className="mt-8 pt-6 border-t text-center text-xs text-slate-400">
+                  {props?.content?.text || template?.footer?.text || ''}
+                </div>
+              );
+          case 'terms_block':
+              return (
+                <div className="mb-8 border-t pt-6">
+                    <h3 className="font-bold text-sm mb-3 text-slate-700">Terms & Conditions</h3>
+                    <p className="text-xs text-slate-500 whitespace-pre-wrap">
+                      {props?.content?.text ||
+                        quoteData.terms_conditions ||
+                        quoteData.notes ||
+                        'All business undertaken subject to standard trading conditions.'}
+                    </p>
+                </div>
+              );
           case 'customer_info':
               return (
                 <div className="grid grid-cols-2 gap-12 mb-8">
@@ -213,6 +541,12 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     </div>
                 </div>
                );
+          case 'customer_matrix_header':
+              return renderSection('customer_info', props);
+          case 'shipment_matrix_details':
+              return renderSection('shipment_info', props);
+          case 'rates_matrix':
+              return renderSection('dynamic_table', props);
           case 'cargo_details':
                // Specialized view for LCL/Air
                const chargeableWeight = Math.max(

@@ -63,6 +63,45 @@ vi.mock('@/hooks/useAiAdvisor', () => ({
   })
 }));
 
+vi.mock('@/hooks/useCarriersByMode', () => ({
+  useCarriersByMode: () => ({
+    carrierMap: {
+      ocean: [
+        {
+          id: 'c1',
+          carrier_name: 'Maersk',
+          carrier_code: 'MAEU',
+          carrier_type: 'ocean',
+          scac: 'MAEU',
+          iata: null,
+          mc_dot: null,
+          mode: 'ocean',
+          is_preferred: true,
+          service_types: [],
+        },
+      ],
+    },
+    getCarriersForMode: () => [
+      {
+        id: 'c1',
+        carrier_name: 'Maersk',
+        carrier_code: 'MAEU',
+        carrier_type: 'ocean',
+        scac: 'MAEU',
+        iata: null,
+        mc_dot: null,
+        mode: 'ocean',
+        is_preferred: true,
+        service_types: [],
+      },
+    ],
+    getAllCarriers: () => [],
+    hasCarriersForMode: () => true,
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 vi.mock('@/lib/feature-flags', () => ({
   FEATURE_FLAGS: {
     COMPOSER_MULTI_LEG_AUTOFILL: 'composer_multi_leg_autofill'

@@ -23,4 +23,8 @@ export function useQuoteContext() {
   return context;
 }
 
+export function useOptionalQuoteContext() {
+  return useContext(QuoteDataContext);
+}
+
 export type QuoteContextType = QuoteDataContextType;

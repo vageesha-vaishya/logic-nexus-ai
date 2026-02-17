@@ -15,6 +15,8 @@ import { useQuoteStore } from './store/QuoteStore';
 import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { Leg } from './store/types';
 import { useCRM } from '@/hooks/useCRM';
+import { normalizeModeCode } from '@/lib/mode-utils';
+import { CarrierSelect } from './CarrierSelect';
 
 interface LegsConfigurationStepProps {}
 
@@ -119,18 +121,6 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { scopedDb } = useCRM();
   const { enabled: multiLegAutoFillEnabled } = useAppFeatureFlag(FEATURE_FLAGS.COMPOSER_MULTI_LEG_AUTOFILL, false);
 
-  const normalizeModeKey = (value: string) => {
-    const v = (value || '').toLowerCase();
-    if (!v) return '';
-    if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
-    if (v.includes('air')) return 'air';
-    if (v.includes('rail')) return 'rail';
-    if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
-    if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
-    if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
-    return v;
-  };
-
   const activeOption = Array.isArray(options)
     ? options.find((o: any) => o.id === optionId) || options[0]
     : undefined;
@@ -146,12 +136,12 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
     const templateLeg = optionLegTemplates[legIndex];
 
     const resolvedModeRaw = templateLeg?.mode || mode;
-    const targetKey = normalizeModeKey(resolvedModeRaw);
+    const targetKey = normalizeModeCode(resolvedModeRaw);
 
     const defaultServiceType = serviceTypes.find(st => {
       if (!st) return false;
       const transportMode = (st as any).transport_modes;
-      const codeKey = normalizeModeKey(transportMode?.code || (st as any).mode || '');
+      const codeKey = normalizeModeCode(transportMode?.code || (st as any).mode || '');
       if (!codeKey) return false;
       return codeKey === targetKey;
     });
@@ -370,47 +360,19 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <Label className="text-sm font-medium mb-2 block">Preferred Carrier</Label>
-                          <Select
-                            value={leg.carrierId || ''}
-                            onValueChange={(val) => {
-                               const selectedCarrier = carriers?.find(c => c.id === val);
-                               onUpdateLeg(leg.id, { 
-                                 carrierId: val,
-                                 carrierName: selectedCarrier?.carrier_name 
-                               });
-                            }}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select carrier" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {carriers
-                              .filter(c => {
-                                // Map leg mode to carrier type with robust fallback
-                                const modeMap: Record<string, string> = {
-                                  'ocean': 'ocean',
-                                  'sea': 'ocean',
-                                  'air': 'air_cargo',
-                                  'air_cargo': 'air_cargo',
-                                  'road': 'trucking',
-                                  'truck': 'trucking',
-                                  'rail': 'rail',
-                                  'train': 'rail'
-                                };
-                                const legMode = (leg.mode || '').toLowerCase();
-                                const targetType = modeMap[legMode] || legMode;
-                                const carrierType = (c.carrier_type || '').toLowerCase();
-                                
-                                // Direct match or mapped match
-                                return carrierType === targetType || carrierType === legMode;
+                          <CarrierSelect
+                            mode={leg.mode}
+                            value={leg.carrierId || null}
+                            onChange={(id, name) =>
+                              onUpdateLeg(leg.id, {
+                                carrierId: id || undefined,
+                                carrierName: name || undefined,
                               })
-                              .map((carrier) => (
-                                  <SelectItem key={carrier.id} value={carrier.id}>
-                                    {carrier.carrier_name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                            }
+                            placeholder="Select carrier"
+                            showPreferred
+                            clearable
+                          />
                         </div>
 
                         <div>

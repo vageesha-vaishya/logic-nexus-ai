@@ -22,6 +22,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
+import { computeComposerCompleteness } from "./composer/completeness";
 
 interface QuotesListProps {
   quotes: Quote[];
@@ -59,6 +60,7 @@ export function QuotesList({
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Value</TableHead>
             <TableHead className="text-right">Margin</TableHead>
+            <TableHead className="text-right">Data</TableHead>
             <TableHead>Created</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
@@ -66,7 +68,7 @@ export function QuotesList({
         <TableBody>
           {quotes.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={bulkMode ? 9 : 8} className="h-24 text-center">
+              <TableCell colSpan={bulkMode ? 10 : 9} className="h-24 text-center">
                 No quotes found.
               </TableCell>
             </TableRow>
@@ -107,6 +109,58 @@ export function QuotesList({
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {quote.margin_percentage !== null && quote.margin_percentage !== undefined ? `${Math.round(quote.margin_percentage)}%` : '-'}
+                </TableCell>
+                <TableCell className="text-right">
+                  {(() => {
+                    const completenessScore = computeComposerCompleteness({
+                      quoteData: {
+                        account_id: quote.account_id,
+                        contact_id: quote.contact_id,
+                        trade_direction_id: null,
+                        origin_port_id: null,
+                        destination_port_id: null,
+                        incoterm_id: null,
+                        service_level: null,
+                        currencyId: null,
+                        total_weight: null,
+                        total_volume: null,
+                      },
+                      legs: [],
+                      charges: [],
+                    });
+
+                    const clamped = Math.min(Math.max(completenessScore, 0), 100);
+                    const colorClass =
+                      clamped >= 80
+                        ? "bg-green-500"
+                        : clamped >= 50
+                        ? "bg-yellow-500"
+                        : "bg-red-500";
+
+                    const textClass =
+                      clamped >= 80
+                        ? "text-green-700"
+                        : clamped >= 50
+                        ? "text-yellow-700"
+                        : "text-red-700";
+
+                    return (
+                      <div className="flex items-center justify-end gap-2">
+                        <div
+                          className="w-12 h-1.5 bg-muted rounded-full overflow-hidden"
+                          title={`Data completeness: ${clamped}%`}
+                        >
+                          <div
+                            className={`h-full rounded-full ${colorClass}`}
+                            style={{ width: `${clamped}%` }}
+                          />
+                        </div>
+                        <span className={`text-[10px] font-medium ${textClass}`}>
+                          {clamped}%
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDistanceToNow(new Date(quote.created_at), { addSuffix: true })}

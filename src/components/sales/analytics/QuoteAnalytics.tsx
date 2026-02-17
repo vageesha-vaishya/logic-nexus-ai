@@ -21,6 +21,7 @@ import {
   Line
 } from 'recharts';
 import { Loader2, TrendingUp, DollarSign, Activity, Calendar } from "lucide-react";
+import { computeComposerCompleteness } from '../composer/completeness';
 
 interface QuoteAnalyticsProps {
   quotes: Quote[];
@@ -37,7 +38,70 @@ export function QuoteAnalytics({ quotes }: QuoteAnalyticsProps) {
   const avgMargin = totalValue > 0 ? (totalMargin / totalValue) * 100 : 0;
   const winRate = quotes.filter(q => q.status === 'accepted').length / (quotes.filter(q => ['accepted', 'rejected', 'expired'].includes(q.status)).length || 1) * 100;
 
+  const avgCompleteness = quotes.length
+    ? quotes.reduce((sum, q) => {
+        const score = computeComposerCompleteness({
+          quoteData: {
+            account_id: q.account_id,
+            contact_id: q.contact_id,
+            trade_direction_id: null,
+            origin_port_id: null,
+            destination_port_id: null,
+            incoterm_id: null,
+            service_level: null,
+            currencyId: null,
+            total_weight: null,
+            total_volume: null,
+          },
+          legs: [],
+          charges: [],
+        });
+        return sum + score;
+      }, 0) / quotes.length
+    : 0;
+
   // 2. Prepare Chart Data
+  const completenessDistribution = quotes.length
+    ? (() => {
+        let low = 0;
+        let mid = 0;
+        let high = 0;
+
+        for (const q of quotes) {
+          const score = computeComposerCompleteness({
+            quoteData: {
+              account_id: q.account_id,
+              contact_id: q.contact_id,
+              trade_direction_id: null,
+              origin_port_id: null,
+              destination_port_id: null,
+              incoterm_id: null,
+              service_level: null,
+              currencyId: null,
+              total_weight: null,
+              total_volume: null,
+            },
+            legs: [],
+            charges: [],
+          });
+
+          if (score < 50) {
+            low += 1;
+          } else if (score < 80) {
+            mid += 1;
+          } else {
+            high += 1;
+          }
+        }
+
+        return [
+          { name: '0-49% Draft', value: low, color: '#ef4444' },
+          { name: '50-79% Good', value: mid, color: '#f59e0b' },
+          { name: '80-100% Ready', value: high, color: '#10b981' },
+        ].filter(d => d.value > 0);
+      })()
+    : [];
+
   const statusDistribution = stages.map(stage => ({
     name: statusConfig[stage].label.replace(/[^a-zA-Z ]/g, "").trim(), // Remove emojis
     count: quotes.filter(q => q.status === stage).length,
@@ -121,12 +185,12 @@ export function QuoteAnalytics({ quotes }: QuoteAnalyticsProps) {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Cycle Time</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg. Data Completeness</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-- days</div>
-            <p className="text-xs text-muted-foreground">Time to close</p>
+            <div className="text-2xl font-bold">{avgCompleteness.toFixed(0)}%</div>
+            <p className="text-xs text-muted-foreground">Based on key account and contact data</p>
           </CardContent>
         </Card>
       </div>
@@ -208,6 +272,53 @@ export function QuoteAnalytics({ quotes }: QuoteAnalyticsProps) {
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Completeness Buckets</CardTitle>
+                <CardDescription>Quotes by data completeness band</CardDescription>
+              </CardHeader>
+              <CardContent className="pl-2">
+                <div className="h-[250px]">
+                  {completenessDistribution.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={completenessDistribution}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis
+                          dataKey="name"
+                          stroke="#888888"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          stroke="#888888"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={value => `${value}`}
+                        />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+                          itemStyle={{ color: 'var(--foreground)' }}
+                          cursor={{ fill: 'var(--muted)' }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {completenessDistribution.map((entry, index) => (
+                            <Cell key={`cell-completeness-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                      Not enough data to calculate completeness distribution
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

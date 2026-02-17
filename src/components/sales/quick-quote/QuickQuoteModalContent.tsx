@@ -34,6 +34,7 @@ import { DataInspector } from '@/components/debug/DataInspector';
 import { logger } from '@/lib/logger';
 import { useBenchmark } from '@/lib/benchmark';
 import { formatContainerSize } from '@/lib/container-utils';
+import { carrierValidationMessages } from '@/lib/mode-utils';
 import { generateSimulatedRates } from '@/lib/simulation-engine';
 
 // --- Zod Schemas ---
@@ -101,6 +102,84 @@ type QuickQuoteValues = z.infer<typeof baseSchema> & {
     dangerousGoods?: boolean;
     specialHandling?: string;
     vehicleType?: string;
+};
+
+const getTransitDaysFromString = (value?: string) => {
+  if (!value) return 999;
+  const match = value.match(/(\d+)/);
+  if (!match) return 999;
+  const days = parseInt(match[1], 10);
+  if (isNaN(days)) return 999;
+  return days;
+};
+
+const getCo2FromOption = (option: RateOption) => {
+  if (typeof option.co2_kg === 'number' && !isNaN(option.co2_kg)) return option.co2_kg;
+  const raw = option.environmental?.co2_emissions;
+  if (!raw) return Number.POSITIVE_INFINITY;
+  const match = String(raw).match(/(\d+(\.\d+)?)/);
+  if (!match) return Number.POSITIVE_INFINITY;
+  const val = parseFloat(match[1]);
+  if (isNaN(val)) return Number.POSITIVE_INFINITY;
+  return val;
+};
+
+const selectMarketTrendOptions = (options: RateOption[]): RateOption[] => {
+  if (!options || options.length === 0) return [];
+  const byId = new Map<string, RateOption>();
+  options.forEach(opt => {
+    if (opt && opt.id && !byId.has(opt.id)) {
+      byId.set(opt.id, opt);
+    }
+  });
+  const unique = Array.from(byId.values());
+  if (unique.length === 0) return [];
+  const cheapest = [...unique].sort((a, b) => (a.price || 0) - (b.price || 0))[0];
+  const fastest = [...unique].sort((a, b) => getTransitDaysFromString(a.transitTime) - getTransitDaysFromString(b.transitTime))[0];
+  const greenest = [...unique].sort((a, b) => getCo2FromOption(a) - getCo2FromOption(b))[0];
+  const picked: RateOption[] = [];
+  const pushUnique = (opt?: RateOption) => {
+    if (!opt) return;
+    if (!picked.some(p => p.id === opt.id)) {
+      picked.push(opt);
+    }
+  };
+  pushUnique(cheapest);
+  pushUnique(fastest);
+  pushUnique(greenest);
+  if (picked.length < 3) {
+    const sortedByPrice = [...unique].sort((a, b) => (a.price || 0) - (b.price || 0));
+    for (const opt of sortedByPrice) {
+      if (picked.length >= 3) break;
+      if (!picked.some(p => p.id === opt.id)) {
+        picked.push(opt);
+      }
+    }
+  }
+  return picked.slice(0, 3);
+};
+
+const rankAiOptions = (options: RateOption[], preferredCarriers: string[]): RateOption[] => {
+  if (!options || options.length === 0) return [];
+  const preferredSet = new Set((preferredCarriers || []).map(name => String(name || '').toLowerCase()));
+  const getDays = (s?: string) => getTransitDaysFromString(s);
+  return [...options].sort((a, b) => {
+    const aPreferred = preferredSet.has(String(a.carrier || '').toLowerCase());
+    const bPreferred = preferredSet.has(String(b.carrier || '').toLowerCase());
+    if (aPreferred !== bPreferred) return aPreferred ? -1 : 1;
+    const aTier = String(a.tier || '');
+    const bTier = String(b.tier || '');
+    const aBest = aTier === 'best_value';
+    const bBest = bTier === 'best_value';
+    if (aBest !== bBest) return aBest ? -1 : 1;
+    const priceDiff = (a.price || 0) - (b.price || 0);
+    if (priceDiff !== 0) return priceDiff;
+    const transitDiff = getDays(a.transitTime) - getDays(b.transitTime);
+    if (transitDiff !== 0) return transitDiff;
+    const relDiff = (b.reliability?.score || 0) - (a.reliability?.score || 0);
+    if (relDiff !== 0) return relDiff;
+    return 0;
+  });
 };
 
 interface QuickQuoteModalContentProps {
@@ -437,15 +516,16 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
     }
 
     // Function to perform the fetch
-    const doFetch = async (token: string | null | undefined, useAnon: boolean) => {
-        const keyToUse = useAnon ? anonKey : (token || anonKey);
-        // debug.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
-        
+    const doFetch = async (token: string | null | undefined) => {
+        if (!token) {
+            throw new Error("Missing user session token for AI Advisor");
+        }
+
         return fetch(functionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${keyToUse}`,
+                'Authorization': `Bearer ${token}`,
                 'apikey': anonKey
             },
             body: JSON.stringify(body)
@@ -453,29 +533,30 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
     };
 
     try {
-        // 1. Try with User Token (if available)
-        let response;
-        if (sessionToken) {
-            response = await doFetch(sessionToken, false);
-            
-            // If 401, retry with Anon Key
-            if (response.status === 401) {
-                debug.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
-                response = await doFetch(anonKey, true);
+        if (!sessionToken) {
+            debug.warn("[AI-Advisor] No active session. Skipping server-side AI call.");
+            return { data: null, error: { message: "Unauthorized: No active session", status: 401 } };
+        }
+
+        let response = await doFetch(sessionToken);
+
+        if (response.status === 401 || response.status === 403) {
+            const errorText = await response.text();
+            debug.warn(`[AI-Advisor] Server returned ${response.status}: ${errorText}`);
+            try {
+                const errJson = JSON.parse(errorText);
+                return { data: null, error: { message: errJson.error || errorText, status: response.status } };
+            } catch {
+                return { data: null, error: { message: `Unauthorized (${response.status}): ${errorText}`, status: response.status } };
             }
-        } else {
-            // No session, try Anon Key directly
-            debug.warn("[AI-Advisor] No active session. Using Anon Key.");
-            response = await doFetch(anonKey, true);
         }
 
         if (!response.ok) {
             const errorText = await response.text();
-            // Try to parse JSON error if possible
             try {
                 const errJson = JSON.parse(errorText);
                 return { data: null, error: { message: errJson.error || errorText, status: response.status } };
-            } catch (e) {
+            } catch {
                  return { data: null, error: { message: `Function returned ${response.status}: ${errorText}`, status: response.status } };
             }
         }
@@ -549,6 +630,8 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
         account_id: accountId
       };
 
+      const preferredCarriers = (form.getValues("preferredCarriers") as string[] | undefined) || [];
+
       debug.log('Invoking Rate Engines', { payload, smartMode });
 
       const combos = ((payload.mode === 'ocean' || payload.mode === 'rail') && extendedData.containerCombos.length > 0)
@@ -580,6 +663,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
       const pricingService = new PricingService(supabase);
 
       let combinedOptions: RateOption[] = [];
+      let legacyOptionsAll: RateOption[] = [];
 
       let legacyErrorMsg = '';
       for (let i = 0; i < legacyResList.length; i++) {
@@ -636,15 +720,17 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
           }));
           legacyOptions = legacyOptions.sort((a: any, b: any) => {
             if (a.price !== b.price) return a.price - b.price;
-            const getDays = (s?: string) => {
-              if (!s) return 999;
-              const match = s.match(/(\d+)/);
-              return match ? parseInt(match[1]) : 999;
-            };
-            return getDays(a.transitTime) - getDays(b.transitTime);
-          }).slice(0, 2);
-          combinedOptions = [...combinedOptions, ...legacyOptions];
+            const daysA = getTransitDaysFromString(a.transitTime);
+            const daysB = getTransitDaysFromString(b.transitTime);
+            return daysA - daysB;
+          });
+          legacyOptionsAll = [...legacyOptionsAll, ...legacyOptions];
         }
+      }
+
+      if (legacyOptionsAll.length > 0) {
+        const trendOptions = selectMarketTrendOptions(legacyOptionsAll);
+        combinedOptions = [...combinedOptions, ...trendOptions];
       }
 
       // 2. Process AI Results
@@ -668,7 +754,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
               const aiData = aiRes.data;
               
               if (aiData.options) {
-                  const aiOptions = await Promise.all(aiData.options.map(async (opt: any) => {
+                  const aiOptionsRaw = await Promise.all(aiData.options.map(async (opt: any) => {
                       const mapped = mapOptionToQuote(opt);
                       // Replace synchronous legacy calc with async PricingService
                       const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
@@ -696,27 +782,9 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                           markupPercent: markupPercent
                       };
                   }));
-                  
-                  // Filter AI Rates: Top 5 per carrier
-                  const aiOptionsByCarrier: Record<string, RateOption[]> = {};
-                  aiOptions.forEach((opt: RateOption) => {
-                      const carrier = opt.carrier || 'Unknown';
-                      if (!aiOptionsByCarrier[carrier]) aiOptionsByCarrier[carrier] = [];
-                      aiOptionsByCarrier[carrier].push(opt);
-                  });
-
-                  const filteredAiOptions: RateOption[] = [];
-                  Object.values(aiOptionsByCarrier).forEach((rates) => {
-                      // Sort by Tier (Best Value first) then Price
-                      const sorted = rates.sort((a, b) => {
-                          if (a.tier === 'best_value' && b.tier !== 'best_value') return -1;
-                          if (a.tier !== 'best_value' && b.tier === 'best_value') return 1;
-                          return a.price - b.price;
-                      });
-                      filteredAiOptions.push(...sorted.slice(0, 5));
-                  });
-                  
-                  combinedOptions = [...combinedOptions, ...filteredAiOptions];
+                  const rankedAiOptions = rankAiOptions(aiOptionsRaw as RateOption[], preferredCarriers);
+                  const aiTopFive = rankedAiOptions.slice(0, 5);
+                  combinedOptions = [...combinedOptions, ...aiTopFive];
                   setMarketAnalysis(aiData.market_analysis);
                   setConfidenceScore(aiData.confidence_score);
                   setAnomalies(aiData.anomalies || []);
@@ -758,7 +826,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                 verificationTimestamp: new Date().toISOString()
               };
             }));
-            simOptions = simOptions.sort((a: any, b: any) => a.price - b.price).slice(0, 5);
+            simOptions = simOptions.sort((a: any, b: any) => a.price - b.price).slice(0, 3);
             combinedOptions = [...combinedOptions, ...simOptions];
             
             toast({
@@ -1092,9 +1160,22 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                  </Select>
               </div>
 
-              {/* Preferred Carriers */}
-              <div className="space-y-2">
-                 <Label>Preferred Carriers (Optional)</Label>
+            <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label>Preferred Carriers (Optional)</Label>
+                  {mode && carriers.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+                      {filteredCarriers.length > 0
+                        ? `${filteredCarriers.length} ${mode === 'air' ? 'Air' : mode === 'ocean' ? 'Ocean' : mode === 'road' ? 'Road' : 'Rail'} carriers`
+                        : 'All carriers'}
+                    </Badge>
+                  )}
+                </div>
+                {mode && filteredCarriers.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {carrierValidationMessages.noPreferredCarriersForMode(mode)}
+                  </p>
+                )}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full justify-between text-left font-normal h-9 bg-background">
@@ -1191,7 +1272,7 @@ export default function QuickQuoteModalContent({ accountId, contactId, onClose }
                     <>
                         <Timer className="w-4 h-4 mr-2 animate-spin"/> Calculating...
                     </>
-                ) : (smartMode ? "Generate Comprehensive Quotes" : "Get Standard Quotes")}
+                ) : (smartMode ? "Generate Comprehensive Quotes" : "Generate Market Trend Quotes")}
               </Button>
               
               <div className="flex items-center space-x-2 mt-2 justify-center">

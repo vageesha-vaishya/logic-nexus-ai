@@ -168,6 +168,24 @@ export class QuoteOptionService {
             if (!isUuid(providerId)) {
                 providerId = null;
             }
+
+            if (providerId && Array.isArray(context.carriers) && context.carriers.length > 0) {
+                const result = QuoteTransformService.validateCarrierMode(
+                    providerId,
+                    legMode,
+                    context.carriers
+                );
+                if (!result.valid && result.error) {
+                    this.debug.error('Carrier-mode validation failed for leg', {
+                        legIndex: index,
+                        legMode,
+                        carrierName,
+                        providerId,
+                        error: result.error
+                    });
+                    throw new Error(result.error);
+                }
+            }
             
             const isFirstLeg = index === 0;
             const isLastLeg = index === rateLegs.length - 1;

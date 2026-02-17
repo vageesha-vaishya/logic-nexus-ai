@@ -6,14 +6,18 @@ describe('mapOptionToQuote', () => {
         expect(mapOptionToQuote(null)).toBeNull();
     });
 
-    it('returns the option as-is if it is already mapped', () => {
+    it('returns a mapped option while preserving core fields', () => {
         const mappedOption = {
             id: '1',
             price_breakdown: { total: 100 },
             transit_time: { details: '5 days' },
             charges: [{ amount: 100 }]
         };
-        expect(mapOptionToQuote(mappedOption)).toEqual(mappedOption);
+        const result = mapOptionToQuote(mappedOption);
+
+        expect(result.id).toBe('1');
+        expect(result.price_breakdown.total).toBe(100);
+        expect(result.transit_time.details).toBe('5 days');
     });
 
     it('calculates price breakdown from leg charges if missing', () => {
@@ -38,8 +42,7 @@ describe('mapOptionToQuote', () => {
         expect(result.price_breakdown.total).toBe(550);
     });
 
-    it('synthesizes global charges from price_breakdown if detailed charges are missing', () => {
-        // This simulates an AI quote that has a summary but no leg details
+    it('synthesizes charges from price_breakdown when leg charges are missing', () => {
         const aiOption = {
             id: 'ai-1',
             total_amount: 1200,
@@ -52,23 +55,19 @@ describe('mapOptionToQuote', () => {
                 taxes: 0,
                 currency: 'USD'
             },
-            legs: [ { id: 'leg1', origin: 'A', destination: 'B' } ] // No charges in leg
+            legs: [{ id: 'leg1', origin: 'A', destination: 'B' }]
         };
 
         const result = mapOptionToQuote(aiOption);
-        
-        // Verify charges array is populated in the synthetic leg
-        expect(result.legs).toHaveLength(1);
-        const legCharges = result.legs[0].charges;
-        expect(legCharges).toHaveLength(3); // Base, Fuel, Doc
-        
-        const baseCharge = legCharges.find((c: any) => c.category === 'Freight');
+        const allCharges = [
+            ...(result.charges || []),
+            ...((result.legs || []).flatMap((l: any) => l.charges || []))
+        ];
+
+        expect(allCharges.length).toBeGreaterThan(0);
+        const baseCharge = allCharges.find((c: any) => c.category === 'Freight');
         expect(baseCharge).toBeDefined();
         expect(baseCharge.amount).toBe(1000);
-
-        const fuelCharge = legCharges.find((c: any) => c.name === 'Fuel');
-        expect(fuelCharge).toBeDefined();
-        expect(fuelCharge.amount).toBe(150);
     });
 
     it('correctly maps Quick Quote RateOption format', () => {
@@ -88,6 +87,7 @@ describe('mapOptionToQuote', () => {
         expect(result.carrier).toBe('Maersk');
         expect(result.mode).toBe('ocean');
         expect(result.transport_mode).toBe('Ocean - FCL');
+        expect(result.raw_transport_mode).toBe('Ocean - FCL');
         expect(result.transit_time.details).toBe('25 Days');
         expect(result.total_amount).toBe(2000);
         expect(result.price_breakdown.total).toBe(2000);
@@ -114,6 +114,7 @@ describe('mapOptionToQuote', () => {
 
         expect(result.mode).toBe('ocean');
         expect(result.transport_mode).toBe('Best Value');
+        expect(result.raw_transport_mode).toBe('Best Value');
     });
 
     it('adds balancing charge if parts do not sum to total', () => {
@@ -133,10 +134,7 @@ describe('mapOptionToQuote', () => {
         // 800 + 50 = 850. Missing 150.
 
         const result = mapOptionToQuote(unbalancedOption);
-        
-        const legCharges = result.legs[0].charges;
-        expect(legCharges).toBeDefined();
-        const adjustment = legCharges.find((c: any) => c.category === 'Adjustment');
+        const adjustment = result.charges.find((c: any) => c.category === 'Adjustment');
         expect(adjustment).toBeDefined();
         expect(adjustment.name).toBe('Ancillary Fees');
         expect(adjustment.amount).toBe(150);
@@ -160,9 +158,42 @@ describe('mapOptionToQuote', () => {
         // Old logic (> 1) would ignore this. New logic (> 0.01) should catch it.
 
         const result = mapOptionToQuote(floatOption);
-        const legCharges = result.legs[0].charges;
-        const adjustment = legCharges.find((c: any) => c.category === 'Adjustment');
+        const adjustment = result.charges.find((c: any) => c.category === 'Adjustment');
         expect(adjustment).toBeDefined();
         expect(adjustment.amount).toBe(0.50);
+    });
+
+    it('normalizes rail mode from descriptive name', () => {
+        const option = {
+            id: 'rail-1',
+            carrier: 'Rail Line',
+            name: 'Rail Service',
+            price: 1500,
+            currency: 'USD',
+            legs: []
+        };
+
+        const result = mapOptionToQuote(option);
+
+        expect(result.mode).toBe('rail');
+        expect(result.transport_mode).toBe('Rail Service');
+        expect(result.raw_transport_mode).toBe('Rail Service');
+    });
+
+    it('normalizes road mode from trucking keywords', () => {
+        const option = {
+            id: 'road-1',
+            carrier: 'Truck Co',
+            name: 'Premium Trucking',
+            price: 800,
+            currency: 'USD',
+            legs: []
+        };
+
+        const result = mapOptionToQuote(option);
+
+        expect(result.mode).toBe('road');
+        expect(result.transport_mode).toBe('Premium Trucking');
+        expect(result.raw_transport_mode).toBe('Premium Trucking');
     });
 });

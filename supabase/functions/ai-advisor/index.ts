@@ -48,15 +48,17 @@ serve(async (req: Request) => {
   }
 
   try {
+    const correlationId = crypto.randomUUID();
+
     const { user, error: authError } = await requireAuth(req);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+      console.warn("[AI-Advisor] Auth failed, continuing in anonymous mode", { correlationId, error: authError });
     }
 
     const { action, payload } = await req.json()
     // Check for OpenAI Key
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    console.log(`[AI-Advisor] Action: ${action}, Key Present: ${!!openAiKey}`);
+    console.log(`[AI-Advisor] Action: ${action}, Key Present: ${!!openAiKey}, correlationId: ${correlationId}, userId: ${user?.id ?? 'anonymous'}`);
 
     if (action === 'generate_smart_quotes' && !openAiKey) {
         console.warn("[AI-Advisor] Missing OpenAI Key. Returning fallback/empty response.");

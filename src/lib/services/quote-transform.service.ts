@@ -3,10 +3,11 @@ import { QuoteFormValues, QuoteItem } from '@/components/sales/quote-form/types'
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeModeCode, type ModeCarrierTypeMap, DEFAULT_MODE_CARRIER_TYPE_MAP, carrierValidationMessages } from '@/lib/mode-utils';
 
 interface MasterData {
     serviceTypes: { id: string; name: string; code: string }[];
-    carriers: { id: string; carrier_name: string; scac?: string }[];
+    carriers: { id: string; carrier_name: string; scac?: string; carrier_type?: string | null }[];
     ports?: { id: string; location_name: string; location_code?: string; country?: string }[];
     containerTypes?: { id: string; name: string; code: string }[];
     containerSizes?: { id: string; name: string; code: string }[];
@@ -67,6 +68,48 @@ export class QuoteTransformService {
     }
 
     /**
+     * Validates that a carrier is compatible with the specified transport mode.
+     * Uses the ModeCarrierTypeMap as the authoritative mapping.
+     */
+    public static validateCarrierMode(
+        carrierId: string | null | undefined,
+        mode: string | null | undefined,
+        carriers: { id: string; carrier_name: string; carrier_type?: string | null }[],
+        modeCarrierMap: ModeCarrierTypeMap = DEFAULT_MODE_CARRIER_TYPE_MAP
+    ): { valid: boolean; error?: string } {
+        if (!carrierId) {
+            return { valid: true };
+        }
+
+        const carrier = carriers.find(c => c.id === carrierId);
+        if (!carrier) {
+            return { valid: false, error: `Carrier not found: ${carrierId}` };
+        }
+
+        const normalizedMode = normalizeModeCode(mode || '');
+        const allowedTypes = modeCarrierMap[normalizedMode] || [];
+
+        if (allowedTypes.length === 0) {
+            return { valid: true };
+        }
+
+        const carrierType = String(carrier.carrier_type || '').toLowerCase();
+        if (!carrierType || !allowedTypes.includes(carrierType)) {
+            return {
+                valid: false,
+                error: carrierValidationMessages.carrierModeMismatch(
+                    carrier.carrier_name,
+                    carrierType || null,
+                    normalizedMode,
+                    allowedTypes
+                ),
+            };
+        }
+
+        return { valid: true };
+    }
+
+    /**
      * Executes an async operation with exponential backoff retry logic.
      */
     static async retryOperation<T>(
@@ -115,6 +158,17 @@ export class QuoteTransformService {
         const tradeDirection = data.trade_direction || 'export';
         const serviceTypeId = this.resolveServiceTypeId(data.mode, data.service_type_id, masterData.serviceTypes);
         const carrierId = this.resolveCarrierId(primaryRate, masterData.carriers);
+        const hasCarrierType = Array.isArray(masterData.carriers) && masterData.carriers.some(c => c.carrier_type);
+        if (carrierId && hasCarrierType) {
+            const carrierValidation = this.validateCarrierMode(
+                carrierId,
+                data.mode,
+                masterData.carriers as any
+            );
+            if (!carrierValidation.valid && carrierValidation.error) {
+                throw new Error(carrierValidation.error);
+            }
+        }
         const originPortId = this.resolvePortId(
             data.origin, 
             masterData.ports, 

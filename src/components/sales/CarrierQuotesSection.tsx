@@ -8,6 +8,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { useDebug } from '@/hooks/useDebug';
 import { useTransportModes } from '@/hooks/useTransportModes';
+import { CarrierSelect } from './composer/CarrierSelect';
+import { normalizeModeCode } from '@/lib/mode-utils';
 
 type Charge = {
   type: string;
@@ -184,30 +186,16 @@ export function CarrierQuotesSection({
 
                 <div className="space-y-2">
                   <FormLabel>Carrier</FormLabel>
-                  <Select value={cq.carrier_id} onValueChange={(v) => updateCarrierField(idx, 'carrier_id', v)}>
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select carrier" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {carriers
-                        .reduce((acc: Record<string, any>, c: any) => {
-                          acc[String(c.id)] = c;
-                          return acc;
-                        }, {})
-                        && Object.values(
-                          carriers.reduce((acc: Record<string, any>, c: any) => {
-                            acc[String(c.id)] = c;
-                            return acc;
-                          }, {}),
-                        ).map((carrier: any) => (
-                          <SelectItem key={carrier.id} value={String(carrier.id)}>
-                            {String(carrier.carrier_name || '').trim()}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <CarrierSelect
+                    mode={normalizeModeCode(cq.mode || '')}
+                    value={cq.carrier_id || null}
+                    onChange={(id, name) => {
+                      updateCarrierField(idx, 'carrier_id', id || '');
+                    }}
+                    placeholder="Select carrier"
+                    showPreferred
+                    clearable
+                  />
                 </div>
               </div>
 

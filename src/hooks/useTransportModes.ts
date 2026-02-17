@@ -8,6 +8,7 @@ export interface TransportMode {
   code: string;
   name: string;
   icon_name?: string | null;
+  color?: string | null;
 }
 
 export function useTransportModes() {
@@ -16,7 +17,7 @@ export function useTransportModes() {
     queryFn: async (): Promise<TransportMode[]> => {
       const { data, error } = await supabase
         .from('transport_modes')
-        .select('id, code, name, icon_name')
+        .select('id, code, name, icon_name, color')
         .eq('is_active', true)
         .order('display_order', { ascending: true });
       if (error) return [];

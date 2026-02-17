@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -29,11 +29,7 @@ import { mapOptionToQuote, calculateQuoteFinancials } from '@/lib/quote-mapper';
 import { RateOption } from '@/types/quote-breakdown';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { QuoteErrorBoundary } from '@/components/sales/quote-form/QuoteErrorBoundary';
-
-const CARRIER_OPTIONS = [
-  "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", 
-  "ONE", "Evergreen", "HMM", "Yang Ming", "ZIM"
-];
+import { carrierValidationMessages } from '@/lib/mode-utils';
 
 // --- Zod Schemas ---
 
@@ -103,6 +99,31 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   // Multi-Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  const [carriers, setCarriers] = useState<{ id: string; carrier_name: string; carrier_type: string; tenant_id?: string | null }[]>([]);
+
+  const uniqueByCarrierName = (arr: any[], preferredTenantId?: string | null) => {
+    try {
+      const map: Record<string, any> = {};
+      for (const item of arr || []) {
+        const key = String((item as any)?.carrier_name || '').trim().toLowerCase();
+        if (!key) continue;
+        const existing = map[key];
+        if (!existing) {
+          map[key] = item;
+        } else {
+          const existingTenant = (existing as any)?.tenant_id ?? null;
+          const currentTenant = (item as any)?.tenant_id ?? null;
+          if (preferredTenantId && existingTenant !== preferredTenantId && currentTenant === preferredTenantId) {
+            map[key] = item;
+          }
+        }
+      }
+      return Object.values(map);
+    } catch {
+      return arr || [];
+    }
+  };
+
   // Extended Form State
   const [extendedData, setExtendedData] = useState({
     containerType: 'dry',
@@ -142,12 +163,44 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
   const origin = form.watch("origin");
   const destination = form.watch("destination");
 
+  const filteredCarriers = useMemo(() => {
+    return carriers
+      .filter(c => {
+        if (!mode) return true;
+        const map: Record<string, string> = { 
+          ocean: 'ocean', 
+          air: 'air_cargo', 
+          road: 'trucking', 
+          rail: 'rail' 
+        };
+        const targetType = map[mode];
+        if (!targetType) return true;
+        return c.carrier_type === targetType;
+      })
+      .map(c => ({ id: c.id, name: c.carrier_name }));
+  }, [carriers, mode]);
+
+  const carrierOptions = filteredCarriers.length > 0
+    ? filteredCarriers
+    : carriers.map(c => ({ id: c.id, name: c.carrier_name }));
+
+  const showModeCarrierAdvisory = !!mode && filteredCarriers.length === 0 && carriers.length > 0;
+  const modeCarrierCount = filteredCarriers.length;
+
   // Reset/Adjust when mode changes
   useEffect(() => {
     setResults(null);
     setComplianceCheck(null);
     setCodeSuggestions([]);
-  }, [mode]);
+
+    const current = form.getValues("preferredCarriers") || [];
+    if (!current.length) return;
+    const allowed = new Set(carrierOptions.map(c => c.name));
+    const next = current.filter(name => allowed.has(name));
+    if (next.length !== current.length) {
+      form.setValue("preferredCarriers", next);
+    }
+  }, [mode, carrierOptions, form]);
 
   useEffect(() => {
     const totalQty = containerCombos.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
@@ -159,6 +212,22 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
       containerQty: String(totalQty || prev.containerQty)
     }));
   }, [containerCombos]);
+
+  useEffect(() => {
+    const loadCarriers = async () => {
+      try {
+        const { data: carrierData } = await supabase
+          .from('carriers')
+          .select('id, carrier_name, carrier_type, tenant_id')
+          .eq('is_active', true)
+          .order('carrier_name');
+        setCarriers(uniqueByCarrierName(carrierData || [], context?.tenantId));
+      } catch (e) {
+        logger.error('Failed to load carriers', e);
+      }
+    };
+    loadCarriers();
+  }, [supabase, context?.tenantId]);
 
   const addCombo = () => {
     const typeId = containerTypes[0]?.id || '';
@@ -792,45 +861,58 @@ export function QuickQuoteModal({ children, accountId }: QuickQuoteModalProps) {
      />
               </div>
 
-              {/* Preferred Carriers */}
-              <div className="space-y-2">
-                 <Label>Preferred Carriers (Optional)</Label>
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="w-full justify-between text-left font-normal h-9 bg-background">
-                            <span className="truncate">
-                                {(form.watch("preferredCarriers")?.length ?? 0) > 0
-                                    ? `${form.watch("preferredCarriers")?.length} Selected` 
-                                    : "Any Carrier"}
-                            </span>
-                            <ChevronDown className="w-4 h-4 opacity-50" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56" align="start">
-                        <DropdownMenuLabel>Select Carriers</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {CARRIER_OPTIONS.map((carrier) => {
-                            const current = form.watch("preferredCarriers") || [];
-                            const isSelected = current.includes(carrier);
-                            return (
-                                <DropdownMenuCheckboxItem
-                                    key={carrier}
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => {
-                                        if (checked) {
-                                            form.setValue("preferredCarriers", [...current, carrier]);
-                                        } else {
-                                            form.setValue("preferredCarriers", current.filter(c => c !== carrier));
-                                        }
-                                    }}
-                                >
-                                    {carrier}
-                                </DropdownMenuCheckboxItem>
-                            );
-                        })}
-                    </DropdownMenuContent>
-                 </DropdownMenu>
-              </div>
+             <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label>Preferred Carriers (Optional)</Label>
+                  {mode && carriers.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+                      {modeCarrierCount > 0
+                        ? `${modeCarrierCount} ${mode === 'air' ? 'Air' : mode === 'ocean' ? 'Ocean' : mode === 'road' ? 'Road' : 'Rail'} carriers`
+                        : 'All carriers'}
+                    </Badge>
+                  )}
+                </div>
+                {showModeCarrierAdvisory && (
+                  <p className="text-xs text-muted-foreground">
+                    {carrierValidationMessages.noPreferredCarriersForMode(mode)}
+                  </p>
+                )}
+                <DropdownMenu>
+                   <DropdownMenuTrigger asChild>
+                       <Button variant="outline" className="w-full justify-between text-left font-normal h-9 bg-background">
+                           <span className="truncate">
+                               {(form.watch("preferredCarriers")?.length ?? 0) > 0
+                                   ? `${form.watch("preferredCarriers")?.length} Selected` 
+                                   : "Any Carrier"}
+                           </span>
+                           <ChevronDown className="w-4 h-4 opacity-50" />
+                       </Button>
+                   </DropdownMenuTrigger>
+                   <DropdownMenuContent className="w-56" align="start">
+                       <DropdownMenuLabel>Select Carriers</DropdownMenuLabel>
+                       <DropdownMenuSeparator />
+                       {carrierOptions.map((carrier) => {
+                           const current = form.watch("preferredCarriers") || [];
+                           const isSelected = current.includes(carrier.name);
+                           return (
+                               <DropdownMenuCheckboxItem
+                                   key={carrier.id}
+                                   checked={isSelected}
+                                   onCheckedChange={(checked) => {
+                                       if (checked) {
+                                           form.setValue("preferredCarriers", [...current, carrier.name]);
+                                       } else {
+                                           form.setValue("preferredCarriers", current.filter(c => c !== carrier.name));
+                                       }
+                                   }}
+                               >
+                                   {carrier.name}
+                               </DropdownMenuCheckboxItem>
+                           );
+                       })}
+                   </DropdownMenuContent>
+                </DropdownMenu>
+             </div>
 
               {/* Dynamic Fields based on Mode */}
               

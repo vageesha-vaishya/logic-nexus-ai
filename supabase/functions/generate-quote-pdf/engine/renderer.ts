@@ -229,7 +229,7 @@ export class PdfRenderer {
 
     const config = section.table_config;
     // @ts-ignore
-    const data = this.context[config.source] as any[]; 
+    const data = this.context[config.source] as any[];
     if (!Array.isArray(data)) return;
 
     const { width } = this.currentPage.getSize();
@@ -281,14 +281,17 @@ export class PdfRenderer {
         this.drawRect(x, this.cursorY - rowHeight, tableWidth, rowHeight); // Border
 
         for (const col of cols) {
-            let val = row[col.field];
+            let val = this.getDynamicField(row, col.field);
             
-            // Formatting
             if (col.format === 'currency') {
-                val = this.i18n.formatCurrency(Number(val), this.context.quote.currency, this.context.meta.locale);
+                val = this.i18n.formatCurrency(
+                  Number(val),
+                  this.context.quote.currency,
+                  this.context.meta.locale
+                );
             }
             
-            val = String(val || '');
+            val = String(val ?? '');
             
             // Align
             let textX = x + 5;
@@ -315,7 +318,10 @@ export class PdfRenderer {
     
     // Total Row if enabled
     if (config.show_subtotals) {
-        const total = data.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        const total = data.reduce(
+          (sum, item) => sum + (Number(this.getDynamicField(item, "amount")) || 0),
+          0
+        );
         this.cursorY -= 5;
         
         this.currentPage.drawText(`Total: ${total.toFixed(2)}`, {
@@ -385,6 +391,18 @@ export class PdfRenderer {
   }
 
   // Helpers
+  private getDynamicField(row: any, field: string): any {
+    if (!row) return "";
+    if (field in row) return row[field];
+    if (field === "description") return row.description ?? row.desc;
+    if (field === "amount") return row.amount ?? row.total;
+    if (field === "currency") return row.currency ?? row.curr;
+    if (field === "quantity") return row.quantity ?? row.qty;
+    if (field === "carrier") return row.carrier ?? row.carrier_name;
+    if (field === "carrier_name") return row.carrier_name ?? row.carrier;
+    return row[field];
+  }
+
   private hexToRgb(hex: string) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (!result) return rgb(0, 0, 0); 

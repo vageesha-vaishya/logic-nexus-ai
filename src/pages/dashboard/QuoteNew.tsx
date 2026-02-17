@@ -27,11 +27,12 @@ import { DataInspector } from '@/components/debug/DataInspector';
 import { useBenchmark } from '@/lib/benchmark';
 import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { reconcileContainerTypeWithSize } from '@/lib/container-utils';
+import { QuoteDataProvider } from '@/components/sales/quote-form/QuoteContext';
+import { useQuoteData } from '@/components/sales/quote-form/useQuoteData';
 
-// Module-level cache for Master Data to prevent redundant fetching
 const MASTER_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
 
-export default function QuoteNew() {
+function QuoteNewInner() {
   useBenchmark('QuoteNew');
   const { user, isPlatformAdmin } = useAuth();
   const { supabase, context, scopedDb } = useCRM();
@@ -56,6 +57,19 @@ export default function QuoteNew() {
     FEATURE_FLAGS.QUOTATION_PHASE2_GUARDS,
     false
   );
+  const {
+    serviceTypes: refServiceTypes,
+    carriers: refCarriers,
+    ports: refPorts,
+    shippingTerms: refShippingTerms,
+    currencies: refCurrencies,
+    chargeCategories: refChargeCategories,
+    chargeSides: refChargeSides,
+    chargeBases: refChargeBases,
+    serviceModes: refServiceModes,
+    containerTypes: refContainerTypes,
+    containerSizes: refContainerSizes,
+  } = useQuoteData();
 
   // Auto-switch to composer when options are inserted
   useEffect(() => {
@@ -163,48 +177,23 @@ export default function QuoteNew() {
     shippingTerms?: any[];
   }>({ serviceTypes: [], carriers: [], ports: [] });
 
-  // Fetch master data on mount
   useEffect(() => {
     const fetchMasterData = async () => {
         try {
-            const { data: st, error: stError } = await scopedDb.from('service_types').select('id, name, code');
-            if (stError) console.error('[QuoteNew] Error fetching service types:', stError);
-
-            const { data: c, error: cError } = await scopedDb.from('carriers').select('id, carrier_name, scac');
-            if (cError) console.error('[QuoteNew] Error fetching carriers:', cError);
-
-            // Fetch ports/locations - global data so we can use raw client or scopedDb with bypass if supported
-            // Using supabase client directly for ports_locations as it's a global table
-            const { data: p, error: pError } = await supabase.from('ports_locations').select('id, location_name, location_code, country');
-            if (pError) console.error('[QuoteNew] Error fetching ports:', pError);
-
-            const { data: ct, error: ctError } = await scopedDb.from('container_types').select('id, name, code');
-            if (ctError) console.error('[QuoteNew] Error fetching container types:', ctError);
-
-            const { data: cs, error: csError } = await scopedDb.from('container_sizes').select('id, name, code');
-            if (csError) console.error('[QuoteNew] Error fetching container sizes:', csError);
-
-            const { data: terms, error: termsError } = await scopedDb
-              .from('incoterms', true)
-              .select('id, incoterm_code as code, incoterm_name as name')
-              .eq('is_active', true)
-              .order('incoterm_code');
-            if (termsError) console.error('[QuoteNew] Error fetching incoterms:', termsError);
-
             setMasterData({
-                serviceTypes: st || [],
-                carriers: c || [],
-                ports: p || [],
-                containerTypes: ct || [],
-                containerSizes: cs || [],
-                shippingTerms: terms || []
+                serviceTypes: refServiceTypes || [],
+                carriers: refCarriers || [],
+                ports: refPorts || [],
+                containerTypes: refContainerTypes || [],
+                containerSizes: refContainerSizes || [],
+                shippingTerms: refShippingTerms || []
             });
         } catch (error) {
             console.error('[QuoteNew] Unexpected error fetching master data:', error);
         }
     };
     fetchMasterData();
-  }, [scopedDb, supabase]);
+  }, [refServiceTypes, refCarriers, refPorts, refShippingTerms, refContainerTypes, refContainerSizes]);
 
   useEffect(() => {
     if (location.state) {
@@ -242,7 +231,11 @@ export default function QuoteNew() {
 
       } catch (error) {
         logger.error('[QuoteNew] Failed to transform Quick Quote state', { error });
-        toast.error('Failed to load quote details. Please verify the data.');
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to load quote details. Please verify the data.';
+        toast.error(message);
 
         // Audit Log: Transformation Failure
         supabase.auth.getUser().then(({ data }) => {
@@ -330,41 +323,38 @@ export default function QuoteNew() {
 
         let masterData = MASTER_DATA_CACHE[CACHE_KEY];
         if (!masterData || (Date.now() - masterData.timestamp > CACHE_TTL)) {
-            logger.info('[QuoteNew] Fetching master data from DB (Cache Miss/Expired)');
-            const [
-                { data: categories },
-                { data: sides },
-                { data: bases },
-                { data: currencies },
-                { data: serviceTypes },
-                { data: serviceModes },
-                { data: carriers },
-                { data: ports },
-                { data: containerTypes },
-                { data: containerSizes }
-            ] = await Promise.all([
-                scopedDb.from('charge_categories', true).select('id, code, name'),
-                scopedDb.from('charge_sides', true).select('id, code, name'),
-                scopedDb.from('charge_bases', true).select('id, code, name'),
-                scopedDb.from('currencies', true).select('id, code'),
-                scopedDb.from('service_types', true).select('id, code, name, transport_modes(code)'),
-                scopedDb.from('service_modes', true).select('id, code, name'),
-                scopedDb.from('carriers', true).select('id, carrier_name, scac'),
-                supabase.from('ports_locations').select('id, location_name, location_code, country'),
-                scopedDb.from('container_types').select('id, name, code'),
-                scopedDb.from('container_sizes').select('id, name, code')
-            ]);
-            
+            logger.info('[QuoteNew] Fetching master data from context (Cache Miss/Expired)');
             masterData = {
                 timestamp: Date.now(),
-                data: { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports, containerTypes, containerSizes }
+                data: {
+                  categories: refChargeCategories || [],
+                  sides: refChargeSides || [],
+                  bases: refChargeBases || [],
+                  currencies: refCurrencies || [],
+                  serviceTypes: refServiceTypes || [],
+                  serviceModes: refServiceModes || [],
+                  carriers: refCarriers || [],
+                  ports: refPorts || [],
+                  containerTypes: refContainerTypes || [],
+                  containerSizes: refContainerSizes || []
+                }
             };
             MASTER_DATA_CACHE[CACHE_KEY] = masterData;
         } else {
             logger.info('[QuoteNew] Using cached master data');
         }
-
-        const { categories, sides, bases, currencies, serviceTypes, serviceModes, carriers, ports, containerTypes, containerSizes } = masterData.data;
+        const {
+          categories,
+          sides,
+          bases,
+          currencies,
+          serviceTypes,
+          serviceModes,
+          carriers,
+          ports,
+          containerTypes,
+          containerSizes,
+        } = masterData.data;
 
         // Initialize Logistics Plugin Mapper
         const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
@@ -960,6 +950,14 @@ export default function QuoteNew() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function QuoteNew() {
+  return (
+    <QuoteDataProvider>
+      <QuoteNewInner />
+    </QuoteDataProvider>
   );
 }
 

@@ -6,7 +6,59 @@ import QuoteNew from '../QuoteNew';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 
-// Mock dependencies
+vi.mock('@/components/sales/quote-form/QuoteContext', () => ({
+  QuoteDataProvider: ({ children }: any) => children
+}));
+
+vi.mock('@/components/sales/quote-form/useQuoteData', () => ({
+  useQuoteData: () => ({
+    serviceTypes: [{ id: 'st-ocean', name: 'Ocean FCL', code: 'ocean' }],
+    carriers: [
+      { id: 'c-maersk', carrier_name: 'Maersk', scac: 'MAEU' },
+      { id: 'c-msc', carrier_name: 'MSC', scac: 'MSC' }
+    ],
+    ports: [
+      { id: 'port-shanghai', location_name: 'Shanghai, China', location_code: 'CNSHA', country: 'China' },
+      { id: 'port-la', location_name: 'Los Angeles, USA', location_code: 'USLAX', country: 'USA' }
+    ],
+    shippingTerms: [
+      { id: 'term-fob', code: 'FOB', name: 'Free on Board' }
+    ],
+    currencies: [{ id: 'cur-usd', code: 'USD' }],
+    chargeCategories: [],
+    chargeSides: [],
+    chargeBases: [],
+    serviceModes: [],
+    containerTypes: [],
+    containerSizes: [],
+    accounts: [],
+    opportunities: [],
+    contacts: [],
+    isLoading: false,
+    isLoadingOpportunities: false,
+    setAccounts: vi.fn(),
+    setContacts: vi.fn(),
+    setOpportunities: vi.fn(),
+    setServices: vi.fn(),
+    resolvedContactLabels: {},
+    resolvedServiceLabels: {},
+    resolvedCarrierLabels: {},
+    setResolvedContactLabels: vi.fn(),
+    setResolvedServiceLabels: vi.fn(),
+    setResolvedCarrierLabels: vi.fn(),
+    setResolvedTenantId: vi.fn(),
+    resolvedTenantId: 'test-tenant',
+    refetchAccounts: vi.fn(),
+    injectAccount: vi.fn(),
+    injectContact: vi.fn(),
+    injectOpportunity: vi.fn(),
+    resolvedPackageCategoryLabels: {},
+    resolvedPackageSizeLabels: {},
+    setResolvedPackageCategoryLabels: vi.fn(),
+    setResolvedPackageSizeLabels: vi.fn()
+  })
+}));
+
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
     supabase: {

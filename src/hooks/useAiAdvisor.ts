@@ -40,16 +40,16 @@ export function useAiAdvisor() {
         return { data: null, error: new Error("Configuration Error: Missing API Key") };
     }
 
-    // Function to perform the fetch
-    const doFetch = async (token: string | null | undefined, useAnon: boolean) => {
-        const keyToUse = useAnon ? anonKey : (token || anonKey);
-        // console.log(`[AI-Advisor] Calling ${functionUrl} (${useAnon ? 'Anon' : 'User Auth'})`);
+    const doFetch = async (token: string | null | undefined) => {
+        if (!token) {
+            throw new Error("Missing user session token for AI Advisor");
+        }
 
         return fetch(functionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${keyToUse}`,
+                'Authorization': `Bearer ${token}`,
                 'apikey': anonKey
             },
             body: JSON.stringify({ action, payload })
@@ -57,19 +57,17 @@ export function useAiAdvisor() {
     };
 
     try {
-        // 1. Try with User Token (if available)
-        let response;
-        if (sessionToken) {
-            response = await doFetch(sessionToken, false);
-            
-            if (response.status === 401 || response.status === 403) {
-                console.warn("[AI-Advisor] User token rejected (401). Retrying with Anon Key...");
-                response = await doFetch(anonKey, true);
-            }
-        } else {
-            // No session, try Anon Key directly
-            console.warn("[AI-Advisor] No active session. Using Anon Key.");
-            response = await doFetch(anonKey, true);
+        if (!sessionToken) {
+            console.warn("[AI-Advisor] No active session. Skipping server-side AI call.");
+            throw new Error("Unauthorized: No active session");
+        }
+
+        let response = await doFetch(sessionToken);
+
+        if (response.status === 401 || response.status === 403) {
+            const errorText = await response.text();
+            console.warn(`[AI-Advisor] Server returned ${response.status}: ${errorText}`);
+            throw new Error(`Unauthorized (${response.status}): ${errorText}`);
         }
 
         if (!response.ok) {

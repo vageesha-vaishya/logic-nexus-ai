@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Ship, Plane, Truck, Train } from 'lucide-react';
 import { useTransportModes } from '@/hooks/useTransportModes';
+import { getCarrierTypesForMode, normalizeModeCode } from '@/lib/mode-utils';
 
 interface Carrier {
   id: string;
@@ -31,19 +32,16 @@ export function QuoteLegRow({ prefix, leg, index, carriers, ports }: QuoteLegRow
   const { control } = useFormContext();
   const { modes, loading: modesLoading } = useTransportModes();
 
-  // Filter carriers for this leg's mode
   const watchedMode = useWatch({ control, name: `${prefix}.transport_mode` });
-  const legMode = (watchedMode || leg.transport_mode || '').toLowerCase();
-  const isAir = legMode.includes('air');
-  const isOcean = legMode.includes('ocean') || legMode.includes('sea');
+  const legModeRaw = watchedMode || leg.transport_mode || '';
+  const legMode = normalizeModeCode(legModeRaw);
 
   const legCarriers = carriers.filter((c: any) => {
     if (!legMode) return true;
-    if (isOcean) return c.carrier_type === 'ocean';
-    if (isAir) return c.carrier_type === 'air_cargo';
-    if (legMode.includes('road') || legMode.includes('truck')) return c.carrier_type === 'trucking';
-    if (legMode.includes('rail')) return c.carrier_type === 'rail';
-    return true;
+    const targets = getCarrierTypesForMode(legMode);
+    if (targets.length === 0) return true;
+    const carrierType = (c.carrier_type || '').toLowerCase();
+    return targets.includes(carrierType);
   });
 
   const departureDate = useWatch({ control, name: `${prefix}.departure_date` });
@@ -174,10 +172,14 @@ export function QuoteLegRow({ prefix, leg, index, carriers, ports }: QuoteLegRow
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-xs">
-                 {isAir ? 'Flight No.' : 'Voyage No.'}
+                 {legMode === 'air' ? 'Flight No.' : 'Voyage No.'}
               </FormLabel>
               <FormControl>
-                <Input {...field} className="h-9 bg-background" placeholder={isAir ? "e.g. AA123" : "e.g. V102"} />
+                <Input
+                  {...field}
+                  className="h-9 bg-background"
+                  placeholder={legMode === 'air' ? 'e.g. AA123' : 'e.g. V102'}
+                />
               </FormControl>
             </FormItem>
           )}

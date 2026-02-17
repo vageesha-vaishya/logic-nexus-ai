@@ -31,6 +31,8 @@ import { ErrorBoundary } from './composer/ErrorBoundary';
 import { ValidationFeedback } from './composer/ValidationFeedback';
 import { QuoteOptionsOverview } from './composer/QuoteOptionsOverview';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
+import { carrierValidationMessages } from '@/lib/mode-utils';
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
 import { PricingService } from '@/services/pricing.service';
@@ -39,10 +41,14 @@ import { useDebug } from '@/hooks/useDebug';
 import { useAuth } from '@/hooks/useAuth';
 import { formatContainerSize } from '@/lib/container-utils';
 import { DataInspector } from '@/components/debug/DataInspector';
+import { dbField } from '@/lib/schemas/field-registry';
+import { useOptionalQuoteContext } from '@/components/sales/quote-form/QuoteContext';
 
 import { QuoteStoreProvider, useQuoteStore } from './composer/store/QuoteStore';
 import { Leg } from './composer/store/types';
 import { usePipelineInterceptor } from '@/components/debug/pipeline/usePipelineInterceptor';
+
+import { computeComposerCompleteness } from './composer/completeness';
 
 interface MultiModalQuoteComposerProps {
   quoteId: string;
@@ -57,40 +63,6 @@ interface MultiModalQuoteComposerProps {
 // Module-level cache for Reference Data
 const REFERENCE_DATA_CACHE: Record<string, { timestamp: number, data: any }> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-export function computeComposerCompleteness(input: { quoteData: any; legs: any[]; charges: any[] }): number {
-  let total = 0;
-  let filled = 0;
-
-  const fields = [
-    input.quoteData?.account_id,
-    input.quoteData?.contact_id,
-    input.quoteData?.trade_direction_id,
-    input.quoteData?.origin_port_id,
-    input.quoteData?.destination_port_id,
-    input.quoteData?.incoterm_id,
-    input.quoteData?.service_level,
-  ];
-
-  fields.forEach((f) => {
-    total += 1;
-    if (f !== null && typeof f !== 'undefined' && f !== '') {
-      filled += 1;
-    }
-  });
-
-  const legsPresent = Array.isArray(input.legs) && input.legs.length > 0;
-  total += 1;
-  if (legsPresent) filled += 1;
-
-  const hasSellCharges = Array.isArray(input.charges) && input.charges.length > 0;
-  total += 1;
-  if (hasSellCharges) filled += 1;
-
-  if (total === 0) return 0;
-  const ratio = (filled / total) * 100;
-  return Math.round(ratio);
-}
 
 const STEPS = [
   { id: 1, title: 'Quote Details', description: 'Basic information' },
@@ -125,6 +97,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
   const { toast } = useToast();
   const { invokeAiAdvisor } = useAiAdvisor();
   const { user, isPlatformAdmin } = useAuth();
+  const quoteContext = useOptionalQuoteContext();
   
   // Initialize Store
   const { state: storeState, dispatch } = useQuoteStore();
@@ -333,10 +306,14 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
                // Exponential backoff reconnect (max ~8s)
                const attempt = reconnectAttemptsRef.current + 1;
                reconnectAttemptsRef.current = attempt;
-               const delay = Math.min(8000, 1000 * Math.pow(2, attempt - 1));
+              const delay = Math.min(8000, 1000 * Math.pow(2, attempt - 1));
                setTimeout(() => {
                  // Clean up previous subscription if any
-                 try { pricingSubRef.current?.unsubscribe(); } catch {}
+                 try {
+                   pricingSubRef.current?.unsubscribe();
+                 } catch (e) {
+                   debug.warn('[Composer] Failed to unsubscribe pricing updates during reconnect', e);
+                 }
                  pricingSubRef.current = pricingService.subscribeToUpdates(() => {
                    toast({ title: "Pricing Updated", description: "Market rates or pricing configurations have been updated." });
                  }, (st) => setConnectionStatus(st));
@@ -351,7 +328,11 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
     };
     subscribe();
     return () => {
-      try { pricingSubRef.current?.unsubscribe(); } catch {}
+      try {
+        pricingSubRef.current?.unsubscribe();
+      } catch (e) {
+        debug.warn('[Composer] Failed to unsubscribe pricing updates on cleanup', e);
+      }
       pricingSubRef.current = null;
     };
   }, [pricingService, toast]);
@@ -745,6 +726,43 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           contacts: [] as any[]
         };
 
+        if (quoteContext) {
+          const {
+            carriers,
+            ports,
+            shippingTerms,
+            currencies,
+            accounts,
+            contacts,
+            chargeCategories,
+            chargeSides,
+            chargeBases,
+            containerTypes,
+            containerSizes,
+            tradeDirections,
+            serviceLegCategories,
+          } = quoteContext;
+
+          (results as any).chargeCategories = chargeCategories || [];
+          (results as any).chargeBases = chargeBases || [];
+          (results as any).chargeSides = chargeSides || [];
+          (results as any).containerTypes = containerTypes || [];
+          (results as any).containerSizes = containerSizes || [];
+          (results as any).shippingTerms = shippingTerms || [];
+          (results as any).currencies = currencies || [];
+          (results as any).accounts = accounts || [];
+          (results as any).contacts = contacts || [];
+          (results as any).carriers = carriers || [];
+          (results as any).tradeDirections = tradeDirections || [];
+          (results as any).serviceLegCategories = serviceLegCategories || [];
+          (results as any).ports = (ports || []).map((p: any) => ({
+            id: p.id,
+            name: (p as any).name ?? (p as any).location_name ?? '',
+            code: (p as any).code ?? (p as any).location_code ?? '',
+            country: (p as any).country ?? (p as any).country_code ?? null,
+          }));
+        }
+
         const recordTelemetry = (table: string, status: 'success' | 'failure', attempts: number, durationMs: number, errorMsg?: string) => {
           try {
             const w = window as any;
@@ -821,21 +839,36 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           }
         };
 
+        const maybeFetchRef = (
+          table: string,
+          resultKey: keyof typeof results,
+          errorMsg: string,
+          selectQuery: string = '*'
+        ) => {
+          const existing = (results as any)[resultKey];
+          if (existing && Array.isArray(existing) && existing.length > 0) {
+            debug.debug(`[Composer] Skipping fetch for ${table}, using context data`);
+            return Promise.resolve();
+          }
+          return fetchRef(table, resultKey, errorMsg, selectQuery);
+        };
+
         await Promise.all([
           fetchRef('service_types', 'serviceTypes', 'Failed to load service types', '*, transport_modes(*)'),
-          fetchRef('transport_modes', 'transportModes', 'Failed to load transport modes'),
-          fetchRef('charge_categories', 'chargeCategories', 'Failed to load charge categories'),
-          fetchRef('charge_bases', 'chargeBases', 'Failed to load charge bases'),
-          fetchRef('currencies', 'currencies', 'Failed to load currencies'),
-          fetchRef('trade_directions', 'tradeDirections', 'Failed to load trade directions'),
-          fetchRef('container_types', 'containerTypes', 'Failed to load container types'),
-          fetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes'),
-          fetchRef('carriers', 'carriers', 'Failed to load carriers'),
-          fetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order'),
-          fetchRef('incoterms', 'shippingTerms', 'Failed to load shipping terms', 'id, incoterm_name as name, incoterm_code as code, description'),
-          fetchRef('ports_locations', 'ports', 'Failed to load ports', 'id, location_name as name, location_code as code, country'),
-          fetchRef('accounts', 'accounts', 'Failed to load accounts', 'id, name'),
-          fetchRef('contacts', 'contacts', 'Failed to load contacts', 'id, first_name, last_name, account_id')
+          maybeFetchRef('transport_modes', 'transportModes', 'Failed to load transport modes'),
+          maybeFetchRef('charge_categories', 'chargeCategories', 'Failed to load charge categories'),
+          maybeFetchRef('charge_bases', 'chargeBases', 'Failed to load charge bases'),
+          maybeFetchRef('currencies', 'currencies', 'Failed to load currencies'),
+          maybeFetchRef('trade_directions', 'tradeDirections', 'Failed to load trade directions'),
+          maybeFetchRef('container_types', 'containerTypes', 'Failed to load container types'),
+          maybeFetchRef('container_sizes', 'containerSizes', 'Failed to load container sizes'),
+          maybeFetchRef('carriers', 'carriers', 'Failed to load carriers'),
+          maybeFetchRef('charge_sides', 'chargeSides', 'Failed to load charge sides'),
+          maybeFetchRef('service_leg_categories', 'serviceLegCategories', 'Failed to load service leg categories', '*, id, name, code, description, sort_order'),
+          maybeFetchRef('incoterms', 'shippingTerms', 'Failed to load shipping terms', 'id, incoterm_name as name, incoterm_code as code, description'),
+          maybeFetchRef('ports_locations', 'ports', 'Failed to load ports', 'id, location_name as name, location_code as code, country'),
+          maybeFetchRef('accounts', 'accounts', 'Failed to load accounts', 'id, name'),
+          maybeFetchRef('contacts', 'contacts', 'Failed to load contacts', 'id, first_name, last_name, account_id')
         ]);
 
         // Cache the results if we have a tenant ID
@@ -858,21 +891,21 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
          const updates: any = {};
          let hasUpdates = false;
 
-         if (!qData.origin && qData.origin_port_id) {
-             const port = refData.ports.find(p => p.id === qData.origin_port_id);
-             if (port) {
-                 updates.origin = port.name || port.location_name || port.code;
-                 hasUpdates = true;
-             }
-         }
+        if (!qData.origin && qData.origin_port_id) {
+            const port = refData.ports.find((p: any) => p.id === qData.origin_port_id);
+            if (port) {
+                updates.origin = port[dbField('port', 'name')] || port[dbField('port', 'code')];
+                hasUpdates = true;
+            }
+        }
 
-         if (!qData.destination && qData.destination_port_id) {
-             const port = refData.ports.find(p => p.id === qData.destination_port_id);
-             if (port) {
-                 updates.destination = port.name || port.location_name || port.code;
-                 hasUpdates = true;
-             }
-         }
+        if (!qData.destination && qData.destination_port_id) {
+            const port = refData.ports.find((p: any) => p.id === qData.destination_port_id);
+            if (port) {
+                updates.destination = port[dbField('port', 'name')] || port[dbField('port', 'code')];
+                hasUpdates = true;
+            }
+        }
 
          if (hasUpdates) {
              debug.debug('[Composer] Auto-filled missing origin/destination from ports:', updates);
@@ -922,15 +955,15 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
          let originName = qData.origin;
          let destinationName = qData.destination;
 
-         if (!originName && qData.origin_port_id) {
-             const port = refData.ports.find(p => p.id === qData.origin_port_id);
-             if (port) originName = port.name || port.location_name || port.code;
-         }
+        if (!originName && qData.origin_port_id) {
+            const port = refData.ports.find((p: any) => p.id === qData.origin_port_id);
+            if (port) originName = port[dbField('port', 'name')] || port[dbField('port', 'code')];
+        }
          
-         if (!destinationName && qData.destination_port_id) {
-             const port = refData.ports.find(p => p.id === qData.destination_port_id);
-             if (port) destinationName = port.name || port.location_name || port.code;
-         }
+        if (!destinationName && qData.destination_port_id) {
+            const port = refData.ports.find((p: any) => p.id === qData.destination_port_id);
+            if (port) destinationName = port[dbField('port', 'name')] || port[dbField('port', 'code')];
+        }
 
          // Fallback if still empty but we have shipping amount (force creation to show rates)
          const shippingAmount = Number(qData.shipping_amount) || 0;
@@ -1926,7 +1959,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
       errors.push('At least one transport leg is required');
     }
 
-    legs.forEach((leg, idx) => {
+      legs.forEach((leg, idx) => {
       if (!leg.mode) errors.push(`Leg ${idx + 1}: Mode is required`);
       if (!leg.origin) errors.push(`Leg ${idx + 1}: Origin is required`);
       if (!leg.destination) errors.push(`Leg ${idx + 1}: Destination is required`);
@@ -1937,9 +1970,19 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           errors.push(`Leg ${idx + 1}: Service Category is required`);
         }
       } else {
-        // Transport leg
         if (!leg.serviceTypeId) {
           errors.push(`Leg ${idx + 1}: Service Type is required`);
+        }
+
+        if (leg.carrierId && carriers.length > 0) {
+          const result = QuoteTransformService.validateCarrierMode(
+            leg.carrierId,
+            leg.mode,
+            carriers as any[]
+          );
+          if (!result.valid && result.error) {
+            errors.push(`Leg ${idx + 1}: ${result.error}`);
+          }
         }
       }
       
@@ -1967,6 +2010,25 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
         if (charge.sell?.rate === 0) {
           warnings.push(`Leg ${idx + 1}, Charge ${chargeIdx + 1}: Sell rate is zero`);
         }
+      });
+    });
+
+    const carrierLegMap: Record<string, number[]> = {};
+    legs.forEach((leg, idx) => {
+      if (!leg.carrierId) return;
+      const key = String(leg.carrierId);
+      if (!carrierLegMap[key]) {
+        carrierLegMap[key] = [];
+      }
+      carrierLegMap[key].push(idx + 1);
+    });
+
+    Object.entries(carrierLegMap).forEach(([carrierId, legNumbers]) => {
+      if (legNumbers.length <= 1) return;
+      const carrier = carriers.find(c => c.id === carrierId);
+      const name = carrier?.carrier_name || 'Unknown Carrier';
+      legNumbers.slice(1).forEach((legNo) => {
+        warnings.push(carrierValidationMessages.duplicateCarrierAcrossLegs(name, legNo));
       });
     });
 
@@ -2102,7 +2164,17 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
 
       const serializeCharge = (charge: any) => {
         const basis = chargeBases.find((b) => b.id === charge.basis_id);
+        const getSideId = (side: 'buy' | 'sell') => {
+          const codes = side === 'buy' ? ['buy', 'cost'] : ['sell', 'revenue'];
+          const match = chargeSides?.find((s: any) => {
+            const code = (s.code || '').toLowerCase();
+            return codes.includes(code);
+          });
+          return match?.id;
+        };
+
         const base = {
+          category_id: charge.category_id || undefined,
           charge_code: charge.category_id || undefined,
           basis: basis?.code || undefined,
           currency: undefined,
@@ -2116,6 +2188,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           entries.push({
             ...base,
             side: 'buy',
+            charge_side_id: getSideId('buy'),
             unit_price: charge.buy.rate,
             quantity: charge.buy.quantity,
             amount: typeof charge.buy.amount === 'number' ? charge.buy.amount : undefined,
@@ -2126,6 +2199,7 @@ function MultiModalQuoteComposerContent({ quoteId, versionId, optionId: initialO
           entries.push({
             ...base,
             side: 'sell',
+            charge_side_id: getSideId('sell'),
             unit_price: charge.sell.rate,
             quantity: charge.sell.quantity,
             amount: typeof charge.sell.amount === 'number' ? charge.sell.amount : undefined,

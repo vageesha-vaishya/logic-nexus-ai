@@ -13,13 +13,31 @@ const createTestQueryClient = () =>
   });
 
 const mockRpc = vi.fn();
-const mockFrom = vi.fn(() => ({
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  order: vi.fn().mockReturnThis(),
-  limit: vi.fn().mockReturnThis(),
-  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-}));
+const mockFrom = vi.fn((table: string) => {
+  if (table === 'charge_sides') {
+    const response = {
+      data: [
+        { id: 'buy-side-id', code: 'buy', name: 'Buy' },
+        { id: 'sell-side-id', code: 'sell', name: 'Sell' },
+      ],
+      error: null,
+    };
+
+    return {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue(response),
+      }),
+    } as any;
+  }
+
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+  } as any;
+});
 
 const mockChannel = vi.fn(() => ({
   on: vi.fn().mockReturnThis(),
@@ -138,7 +156,8 @@ describe('MultiModalQuoteComposer - RPC save integration', () => {
     const payload = mockRpc.mock.calls[0][1].p_payload;
     const option = payload.options[0];
     const leg = option.legs[0];
-    const charge = leg.charges.find((c: any) => c.side === 'sell');
+    const sellCharge = leg.charges.find((c: any) => c.side === 'sell');
+    const buyCharge = leg.charges.find((c: any) => c.side === 'buy');
 
     expect(leg.transport_mode).toBe('air');
     expect(leg.carrier_id).toBe('00000000-0000-0000-0000-000000000000');
@@ -147,10 +166,17 @@ describe('MultiModalQuoteComposer - RPC save integration', () => {
     expect(leg.service_only_category).toBe('doc');
     expect(leg.leg_type).toBe('transport');
 
-    expect(charge.charge_code).toBe('cat-1');
-    expect(charge.side).toBe('sell');
-    expect(charge.unit_price).toBe(100);
-    expect(charge.quantity).toBe(1);
+    expect(buyCharge.category_id).toBe('cat-1');
+    expect(buyCharge.charge_code).toBe('cat-1');
+    expect(buyCharge.side).toBe('buy');
+    expect(buyCharge.charge_side_id).toBe('buy-side-id');
+
+    expect(sellCharge.category_id).toBe('cat-1');
+    expect(sellCharge.charge_code).toBe('cat-1');
+    expect(sellCharge.side).toBe('sell');
+    expect(sellCharge.charge_side_id).toBe('sell-side-id');
+    expect(sellCharge.unit_price).toBe(100);
+    expect(sellCharge.quantity).toBe(1);
   });
 
   it('serializes combined buy and sell charges into combined_charges', async () => {
@@ -225,13 +251,17 @@ describe('MultiModalQuoteComposer - RPC save integration', () => {
     const buyEntry = combined.find((c: any) => c.side === 'buy');
     const sellEntry = combined.find((c: any) => c.side === 'sell');
 
+    expect(buyEntry.category_id).toBe('cat-combined');
     expect(buyEntry.charge_code).toBe('cat-combined');
     expect(buyEntry.side).toBe('buy');
+    expect(buyEntry.charge_side_id).toBe('buy-side-id');
     expect(buyEntry.unit_price).toBe(10);
     expect(buyEntry.quantity).toBe(2);
 
+    expect(sellEntry.category_id).toBe('cat-combined');
     expect(sellEntry.charge_code).toBe('cat-combined');
     expect(sellEntry.side).toBe('sell');
+    expect(sellEntry.charge_side_id).toBe('sell-side-id');
     expect(sellEntry.unit_price).toBe(15);
     expect(sellEntry.quantity).toBe(2);
   });
