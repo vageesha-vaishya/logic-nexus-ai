@@ -31,9 +31,11 @@ export interface QueueRuleCriteria {
   from_email?: string;
   from_domain?: string;
   body_contains?: string;
+  channel?: 'email' | 'whatsapp' | 'x' | 'telegram' | 'linkedin' | 'web' | 'sms' | 'voice' | 'other';
   priority?: string;
   ai_category?: string;
   ai_sentiment?: string;
+  ai_intent?: string;
   // New fields for multi-layered classification
   header_contains?: Record<string, string>;
   metadata_flags?: string[];

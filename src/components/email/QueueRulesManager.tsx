@@ -154,6 +154,7 @@ export function QueueRulesManager() {
 
   const getCriteriaDisplay = (criteria: QueueRuleCriteria) => {
     const parts: string[] = [];
+    if (criteria.channel) parts.push(`Channel: ${criteria.channel}`);
     if (criteria.subject_contains) parts.push(`Subject: "${criteria.subject_contains}"`);
     if (criteria.from_email) parts.push(`From: ${criteria.from_email}`);
     if (criteria.from_domain) parts.push(`Domain: @${criteria.from_domain}`);
@@ -170,6 +171,7 @@ export function QueueRulesManager() {
     if (criteria.priority) parts.push(`Priority: ${criteria.priority}`);
     if (criteria.ai_category) parts.push(`Category: ${criteria.ai_category}`);
     if (criteria.ai_sentiment) parts.push(`Sentiment: ${criteria.ai_sentiment}`);
+    if (criteria.ai_intent) parts.push(`Intent: ${criteria.ai_intent}`);
     return parts.length > 0 ? parts.join(', ') : 'No criteria';
   };
 
@@ -269,6 +271,26 @@ export function QueueRulesManager() {
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label>Channel</Label>
+                    <Select
+                      value={formData.criteria.channel || ''}
+                      onValueChange={(v) => updateCriteria('channel', v || undefined)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Any</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="x">X</SelectItem>
+                        <SelectItem value="telegram">Telegram</SelectItem>
+                        <SelectItem value="linkedin">LinkedIn</SelectItem>
+                        <SelectItem value="web">Web</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Subject Contains</Label>
                     <Input
                       value={formData.criteria.subject_contains || ''}
@@ -334,6 +356,24 @@ export function QueueRulesManager() {
                         <SelectItem value="neutral">Neutral</SelectItem>
                         <SelectItem value="negative">Negative</SelectItem>
                         <SelectItem value="very_negative">Very Negative</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>AI Intent</Label>
+                    <Select
+                      value={formData.criteria.ai_intent || ''}
+                      onValueChange={(v) => updateCriteria('ai_intent', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Any</SelectItem>
+                        <SelectItem value="sales">Sales</SelectItem>
+                        <SelectItem value="support">Support</SelectItem>
+                        <SelectItem value="billing">Billing</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

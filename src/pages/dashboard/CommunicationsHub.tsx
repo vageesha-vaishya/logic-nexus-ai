@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Mail, MessageSquare, Globe, Phone } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Channel = 'all' | 'email' | 'whatsapp' | 'x' | 'telegram' | 'linkedin' | 'web';
 
@@ -37,6 +38,7 @@ export default function CommunicationsHub() {
   const [channel, setChannel] = useState<Channel>('all');
   const [queues, setQueues] = useState<string[]>([]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const { toast } = useToast();
   const { roles } = useAuth();
 
@@ -154,7 +156,7 @@ export default function CommunicationsHub() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="secondary" disabled={assigningId === m.id}>
+                  <Button variant="secondary" disabled={assigningId === m.id} onClick={() => setSelectedMessage(m)}>
                     {assigningId === m.id ? 'Assigning' : 'Open'}
                   </Button>
                 </div>
@@ -166,6 +168,29 @@ export default function CommunicationsHub() {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={!!selectedMessage} onOpenChange={(o) => !o && setSelectedMessage(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Message Detail</DialogTitle>
+          </DialogHeader>
+          {selectedMessage && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                {renderChannelBadge(selectedMessage.channel)}
+                <Badge variant="outline">{selectedMessage.queue || 'Unassigned'}</Badge>
+                <span className="text-xs text-muted-foreground">{new Date(selectedMessage.created_at).toLocaleString()}</span>
+              </div>
+              <div className="font-medium">{selectedMessage.subject || '(no subject)'}</div>
+              <div className="text-sm whitespace-pre-wrap">{selectedMessage.body_text}</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-xs">Sentiment: {selectedMessage.ai_sentiment || 'n/a'}</div>
+                <div className="text-xs">Intent: {selectedMessage.ai_intent || 'n/a'}</div>
+                <div className="text-xs">Urgency: {selectedMessage.ai_urgency || 'n/a'}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
