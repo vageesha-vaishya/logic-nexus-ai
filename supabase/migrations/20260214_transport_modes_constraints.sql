@@ -12,7 +12,7 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'transport_modes'
+    WHERE table_schema = 'public' AND table_name = 'transport_modes' AND table_type = 'BASE TABLE'
   ) THEN
     CREATE UNIQUE INDEX IF NOT EXISTS transport_modes_code_unique
       ON public.transport_modes (LOWER(code));
@@ -23,7 +23,7 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'service_modes'
+    WHERE table_schema = 'public' AND table_name = 'service_modes' AND table_type = 'BASE TABLE'
   ) THEN
     CREATE UNIQUE INDEX IF NOT EXISTS service_modes_code_unique
       ON public.service_modes (LOWER(code));
@@ -36,7 +36,7 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'transport_modes'
+    WHERE table_schema = 'public' AND table_name = 'transport_modes' AND table_type = 'BASE TABLE'
   ) THEN
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint 
@@ -58,7 +58,7 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'service_modes'
+    WHERE table_schema = 'public' AND table_name = 'service_modes' AND table_type = 'BASE TABLE'
   ) THEN
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint 
