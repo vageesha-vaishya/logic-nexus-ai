@@ -9,6 +9,7 @@ import { AccountForm } from '@/components/crm/AccountForm';
 import { EmailClient } from "@/components/email/EmailClient";
 import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel'; // Keep if needed or remove
 import { ArrowLeft, Edit, Trash2, Building2, Phone, Mail, Globe, DollarSign, Users } from 'lucide-react';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -30,6 +31,7 @@ export default function AccountDetail() {
   const [activeSegments, setActiveSegments] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [tab, setTab] = useState<'details' | 'related' | 'activities' | 'emails'>('details');
+  const [isEnriching, setIsEnriching] = useState(false);
 
   useEffect(() => {
     // Reset UI state when navigating between accounts
@@ -219,6 +221,46 @@ export default function AccountDetail() {
     }
   };
 
+  const handleEnrich = async () => {
+    try {
+      setIsEnriching(true);
+      const { data, error } = await invokeFunction<any>('enrich-company', {
+        body: {
+          account_id: id,
+          name: account?.name || '',
+          website: account?.website || '',
+          domain: (account?.email || '').split('@')[1] || '',
+          tenant_id: context.tenantId || null,
+        },
+      });
+      if (error) throw error;
+      const enriched = data || {};
+      const payload: any = {
+        website: enriched.website || account.website || null,
+        email: enriched.email || account.email || null,
+        phone: enriched.phone || account.phone || null,
+        industry: enriched.industry || account.industry || null,
+        annual_revenue: enriched.annual_revenue ?? account.annual_revenue ?? null,
+        employee_count: enriched.employee_count ?? account.employee_count ?? null,
+        custom_fields: {
+          ...(account.custom_fields || {}),
+          enrichment: enriched,
+        },
+      };
+      const { error: updateError } = await scopedDb
+        .from('accounts')
+        .update(payload)
+        .eq('id', id);
+      if (updateError) throw updateError;
+      toast.success('Company enriched');
+      fetchAccount();
+    } catch (err: any) {
+      toast.error(err?.message || 'Enrichment service unavailable');
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -257,6 +299,9 @@ export default function AccountDetail() {
           </div>
           {!isEditing && (
             <div className="flex gap-2">
+              <Button variant="default" onClick={handleEnrich} disabled={isEnriching}>
+                {isEnriching ? 'Enriching…' : 'Enrich'}
+              </Button>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
