@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Search, Building2, Phone, Mail, Globe, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +74,62 @@ export default function Accounts() {
     account.industry?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Duplicate detection (name + type + status within tenant scope)
+  const duplicateGroups = useMemo(() => {
+    const key = (a: Account) =>
+      `${(a.name || '').trim().toLowerCase()}|${(a.account_type || '').trim().toLowerCase()}|${(a.status || '').trim().toLowerCase()}`;
+    const map = new Map<string, Account[]>();
+    for (const a of accounts) {
+      const k = key(a);
+      const list = map.get(k) || [];
+      list.push(a);
+      map.set(k, list);
+    }
+    const groups = Array.from(map.entries())
+      .map(([k, list]) => list)
+      .filter((list) => list.length > 1);
+    return groups;
+  }, [accounts]);
+
+  const hasDuplicates = duplicateGroups.length > 0;
+
+  const choosePrimary = (group: Account[]) => {
+    const withSignals = group
+      .map((a) => ({ a, score: (a.email ? 2 : 0) + (a.website ? 1 : 0) }))
+      .sort((x, y) => y.score - x.score || new Date(x.a.created_at).getTime() - new Date(y.a.created_at).getTime());
+    return withSignals[0].a;
+  };
+
+  const onMergeDuplicates = async () => {
+    try {
+      if (!hasDuplicates) {
+        toast.message('No duplicates found');
+        return;
+      }
+      if (!window.confirm(`Found ${duplicateGroups.length} duplicate group(s). Merge now? This will re-link related data and delete duplicates.`)) {
+        return;
+      }
+      for (const group of duplicateGroups) {
+        const primary = choosePrimary(group);
+        const secondaries = group.filter((g) => g.id !== primary.id);
+        for (const s of secondaries) {
+          // Re-link related entities to primary account
+          await scopedDb.from('contacts').update({ account_id: primary.id }).eq('account_id', s.id);
+          await scopedDb.from('opportunities').update({ account_id: primary.id }).eq('account_id', s.id);
+          await scopedDb.from('quotes').update({ account_id: primary.id }).eq('account_id', s.id);
+          await scopedDb.from('activities').update({ account_id: primary.id }).eq('account_id', s.id);
+          // Delete secondary account
+          await scopedDb.from('accounts').delete().eq('id', s.id);
+        }
+      }
+      toast.success('Duplicates merged successfully');
+      fetchAccounts();
+    } catch (err: any) {
+      console.error('Accounts: merge error', err);
+      toast.error(err?.message || 'Failed to merge duplicates');
+    }
+  };
+
   const { sorted: sortedAccounts, sortField, sortDirection, onSort } = useSort<Account>(filteredAccounts, {
     accessors: {
       name: (a: Account) => a.name,
@@ -124,6 +180,9 @@ export default function Accounts() {
             </Button>
             <Button variant="outline" asChild>
               <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
+            </Button>
+            <Button variant={hasDuplicates ? 'default' : 'outline'} className="ml-2" onClick={onMergeDuplicates}>
+              {hasDuplicates ? `DeDup (${duplicateGroups.length})` : 'Find Duplicates'}
             </Button>
           </>
         }
@@ -211,7 +270,11 @@ export default function Accounts() {
                 title={account.name}
                 subtitle={account.industry || undefined}
                 meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
-                tags={[account.status, account.account_type].filter(Boolean)}
+                tags={[
+                  account.status,
+                  account.account_type,
+                  ...(duplicateGroups.some((g) => g.find((x) => x.id === account.id)) ? ['duplicate'] : []),
+                ].filter(Boolean)}
                 onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
               />
             ))}
@@ -224,7 +287,11 @@ export default function Accounts() {
                 title={account.name}
                 subtitle={account.industry || undefined}
                 meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
-                tags={[account.status, account.account_type].filter(Boolean)}
+                tags={[
+                  account.status,
+                  account.account_type,
+                  ...(duplicateGroups.some((g) => g.find((x) => x.id === account.id)) ? ['duplicate'] : []),
+                ].filter(Boolean)}
                 onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
               />
             ))}
