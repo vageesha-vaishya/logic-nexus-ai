@@ -496,7 +496,7 @@ export function useQuoteRepositoryForm(opts: {
             is_primary: opt.is_selected,
             total_amount: effectiveTotal,
             currency: opt.quote_currency?.code || 'USD',
-            transit_time_days: opt.total_transit_days,
+            transit_time_days: (opt.total_transit_days == null ? undefined : Number(opt.total_transit_days)),
             legs: legs.map((leg: any) => ({
                 id: leg.id,
                 sequence_number: leg.sort_order,

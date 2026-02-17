@@ -1,6 +1,5 @@
 declare const Deno: any;
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { requireAuth } from "../_shared/auth.ts"
 
 console.log("Hello from calculate-quote-financials!")
 
@@ -12,11 +11,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
-    }
-
     const { shipping_amount, tax_percent } = await req.json()
 
     // Input validation
