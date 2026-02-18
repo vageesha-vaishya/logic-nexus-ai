@@ -303,4 +303,281 @@ Optional Next
 
 ==========sarvesh phase 2 implementation plan execution ==========
 
+Builder
+
+Thought process
+
+ChannelIntegrations.tsx
+src/pages/dashboard/ChannelIntegrations.tsx
+
++ 174 - 0
+
+Open Diff
+
+App.tsx
+src/App.tsx
+
++ 10 - 1
+
+Open Diff
+
+navigation.ts
+src/config/navigation.ts
+
++ 1 - 0
+
+Open Diff
+
+logic-nexus-ai
+In Sandbox
+Terminal
+
+$ npm run typecheck
+
+> vite_react_shadcn_ts@0.0.0 typecheck
+> tsc --noEmit
+
+11/11 done
+
+Add duplicate detection and Merge/DeDup button to Accounts
+
+Add Enrich Company button to AccountDetail and integrate edge function
+
+Implement Phase 1 schema and trigger for messages and routing
+
+Add Communications Hub UI aligned with existing Email Management
+
+Extend queue rules to support channel and intent fields
+
+Add message detail dialog to Communications Hub inbox
+
+Add WhatsApp ingest edge function and message normalization
+
+Add Web chat/form intake edge function to messages
+
+Add Telegram ingest edge function and message normalization
+
+Add Channel Integrations settings page to manage channel accounts
+
+Add X and LinkedIn ingest stubs writing to messages
+
+Re-analysis
+
+- Phase 2 targets connectors: WhatsApp (Cloud API webhooks), Web chat/forms intake, Telegram bot webhooks, and initial ingestion for X and LinkedIn. It requires secure intake, per-tenant channel credentials, normalized persistence into messages, and non-disruptive coexistence with Email Management and Phase 1 Foundations.
+What’s Implemented
+
+- Connectors implemented as Supabase Edge Functions:
+  - WhatsApp ingest: validates HMAC signature and writes normalized inbound messages to messages.
+    - ingest-whatsapp/index.ts
+  - Web chat/forms ingest: accepts tenant-scoped POST, writes to messages with channel=web.
+    - ingest-web/index.ts
+  - Telegram ingest: checks webhook secret, normalizes text and attachments presence.
+    - ingest-telegram/index.ts
+  - X and LinkedIn initial stubs: permit basic JSON ingestion into messages with channel=x or linkedin.
+    - ingest-x/index.ts
+    - ingest-linkedin/index.ts
+- Shared function utilities for CORS and Supabase admin client:
+  - cors.ts
+  - supabase.ts
+- UI to manage per-tenant channel credentials:
+  - Channel Integrations page under Settings to add/edit provider entries and toggle active:
+    - ChannelIntegrations.tsx
+    - Route: App.tsx
+    - Navigation: navigation.ts
+- Communications Hub remains the unified inbox and now benefits from new channels:
+  - CommunicationsHub.tsx
+Alignment & Safety
+
+- Does not break existing Email features; Email Management unchanged.
+- Uses the Phase 1 messages schema and routing trigger; rules now include channel and ai_intent filters:
+  - Criteria type: useQueueManagement.ts
+  - Queue Rules UI updates: QueueRulesManager.tsx
+- Typecheck passes.
+How To Configure
+
+- Secrets for functions (set in Supabase Edge Functions settings):
+  - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (all connectors)
+  - WHATSAPP_APP_SECRET (WhatsApp webhook signature)
+  - TELEGRAM_WEBHOOK_SECRET (Telegram webhook auth)
+- Tenant channel accounts:
+  - Open Settings → Channel Integrations and add provider credentials JSON for whatsapp, web, telegram, x, linkedin.
+Usage
+
+- WhatsApp: Point Cloud API webhook to /functions/v1/ingest-whatsapp with x-tenant-id and x-hub-signature-256.
+- Web: POST intake from web forms to /functions/v1/ingest-web with x-tenant-id or tenant_id in body.
+- Telegram: Set bot webhook target to /functions/v1/ingest-telegram with x-telegram-bot-api-secret-token and x-tenant-id.
+- X/LinkedIn: Initial stubs accept JSON payload and persist to messages for testing flows.
+Notes
+
+- In local typechecking, Deno modules are outside the TS project and may show IDE hints; actual deployment uses Supabase CLI. Repository typecheck passes.
+- Phase 2 reply-send flows (e.g., WhatsApp outbound) can be added next using existing function patterns.
+- Routing applies automatically via process_message_queue_assignment; leverage Queue Rules to direct new channels to queues.
+If you want, I can proceed to add basic outbound send stubs for WhatsApp and Web responses, and surface channel-specific filters and badges in Communications Hub for a fuller Phase 2 experience.
+
+
+
+Phase 2 — Connectors: Implementation and Fixes
+
+- Implemented inbound connectors for WhatsApp, Web, Telegram, X, and LinkedIn.
+- Added Channel Integrations settings page to manage per-tenant channel accounts.
+- Fixed TypeScript diagnostics in all newly added edge function index.ts files.
+Inbound Connectors
+
+- WhatsApp Cloud API webhook:
+  - HMAC verification via x-hub-signature-256 and WHATSAPP_APP_SECRET.
+  - Normalizes payload into messages with channel=whatsapp.
+  - File: ingest-whatsapp/index.ts
+- Web chat/forms intake:
+  - Accepts POST with tenant_id or x-tenant-id header; writes to messages with channel=web.
+  - File: ingest-web/index.ts
+- Telegram bot webhook:
+  - Validates with x-telegram-bot-api-secret-token and TELEGRAM_WEBHOOK_SECRET.
+  - Normalizes text/caption and attachment presence.
+  - File: ingest-telegram/index.ts
+- X and LinkedIn stubs:
+  - Initial ingestion stubs that accept JSON and write text to messages for channel-specific testing.
+  - Files: ingest-x/index.ts , ingest-linkedin/index.ts
+Shared Utilities
+
+- CORS helper and preflight support for all functions:
+  - cors.ts
+- Supabase admin client for Edge Functions:
+  - supabase.ts
+Settings UI
+
+- Channel Integrations page:
+  - Create/update per-tenant channel_accounts with provider and credentials JSON.
+  - Toggle active state.
+  - Files: ChannelIntegrations.tsx , App.tsx route , navigation.ts entry
+Compilation Fixes
+
+- Added ambient type declarations for Deno and remote import modules used by Edge Functions:
+  - types.d.ts
+- Included triple-slash reference in all new index.ts and shared supabase client to satisfy IDE diagnostics.
+- Annotated Request types in serve handlers.
+- Verified TypeScript passes:
+  - npm run typecheck succeeded.
+Configuration
+
+- Set secrets in Supabase:
+  - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+  - WHATSAPP_APP_SECRET (WhatsApp)
+  - TELEGRAM_WEBHOOK_SECRET (Telegram)
+- Webhook endpoints:
+  - /functions/v1/ingest-whatsapp (with x-tenant-id and signature)
+  - /functions/v1/ingest-web (with x-tenant-id or body.tenant_id)
+  - /functions/v1/ingest-telegram (with x-telegram-bot-api-secret-token and x-tenant-id)
+  - /functions/v1/ingest-x, /functions/v1/ingest-linkedin (for testing ingestion)
+Compatibility & Alignment
+
+- Communications Hub continues to be the unified inbox; rules and routing leverage Phase 1 schema.
+- Existing Email Management unaffected; new connectors adhere to current architecture and conventions.
+- Type safety maintained through criteria extensions and UI updates already in place.
+Next Suggested Steps
+
+- Add outbound send stubs for WhatsApp and Web replies following existing send-email patterns.
+- Surface channel filters and badges in Communications Hub list for better triage.
+- Deploy functions to Supabase and configure secrets; verify webhook ingestion end-to-end using test payloads.
+
+
+
+
+outbound Stubs
+tbound Stubs
+
+- Added send-web and send-whatsapp edge functions that create outbound messages aligned with Phase 1 schema.
+  - send-web/index.ts
+  - send-whatsapp/index.ts
+- Pattern matches existing send-email approach at a minimal level:
+  - CORS + preflight via shared helper.
+  - Admin client usage for RLS-safe inserts.
+  - Normalized payload fields: channel, direction, subject, body_text, metadata with to and in_reply_to where applicable.
+Triage UI Enhancements
+
+- Enhanced Communications Hub badges to include channel-specific icons for X, LinkedIn, Telegram, in addition to Email, Web, WhatsApp.
+  - File: CommunicationsHub.tsx
+- Existing channel tabs already provide quick filtering:
+  - All, Email, WhatsApp, X, Telegram, LinkedIn, Web.
+Diagnostics & Verification
+
+- Fixed TypeScript diagnostics for all Phase 2 edge function index.ts files by adding ambient Deno and remote module typings and Request annotations.
+  - types.d.ts
+  - Shared utilities:
+    - cors.ts
+    - supabase.ts
+- Typecheck passes.
+Deploy & Configure
+
+- Link your Supabase project and deploy functions:
+  - supabase login
+  - supabase link --project-ref YOUR_PROJECT_REF
+  - supabase secrets set SUPABASE_URL=" https://YOUR_PROJECT_REF.supabase.co "
+  - supabase secrets set SUPABASE_SERVICE_ROLE_KEY="SERVICE_ROLE_KEY"
+  - supabase secrets set WHATSAPP_APP_SECRET="WHATSAPP_HMAC_SECRET"
+  - supabase secrets set TELEGRAM_WEBHOOK_SECRET="TELEGRAM_WEBHOOK_SECRET"
+  - supabase functions deploy ingest-whatsapp
+  - supabase functions deploy ingest-web
+  - supabase functions deploy ingest-telegram
+  - supabase functions deploy ingest-x
+  - supabase functions deploy ingest-linkedin
+  - supabase functions deploy send-web
+  - supabase functions deploy send-whatsapp
+Webhook Test Payloads
+
+- WhatsApp Ingest:
+  - POST to https://YOUR_PROJECT_REF.supabase.co/functions/v1/ingest-whatsapp
+  - Headers: x-tenant-id: TENANT_UUID, x-hub-signature-256: sha256=HMAC_OF_BODY
+  - Body:
+    {
+    "entry": [{ "changes": [{ "value": { "messages": [{ "text": { "body": "Hello from WhatsApp" } }] } }]}]
+    }
+- Web Ingest:
+  - POST to https://YOUR_PROJECT_REF.supabase.co/functions/v1/ingest-web
+  - Headers: x-tenant-id: TENANT_UUID
+  - Body:
+    { "subject": "Website Chat", "body": "Customer message", "metadata": { "page": "/contact" } }
+- Telegram Ingest:
+  - POST to https://YOUR_PROJECT_REF.supabase.co/functions/v1/ingest-telegram
+  - Headers: x-tenant-id: TENANT_UUID, x-telegram-bot-api-secret-token: TELEGRAM_WEBHOOK_SECRET
+  - Body:
+    { "message": { "text": "Hello from Telegram" } }
+- X/LinkedIn Ingest:
+  - POST to /functions/v1/ingest-x or /functions/v1/ingest-linkedin
+  - Headers: x-tenant-id: TENANT_UUID
+  - Body:
+    { "text": "Incoming message" }
+Reply Stubs (invoke from client or server)
+
+- Web reply:
+  - POST to /functions/v1/send-web with:
+    { "tenant_id": "TENANT_UUID", "to": "web_user_id", "in_reply_to_message_id": "MESSAGE_UUID", "text": "Our reply" }
+- WhatsApp reply:
+  - POST to /functions/v1/send-whatsapp with:
+    { "tenant_id": "TENANT_UUID", "to": "+1234567890", "text": "Our reply" }
+Where To Find Things
+
+- Connectors: supabase/functions/ingest-*
+- Outbound stubs: supabase/functions/send-*
+- Channel Integrations UI: ChannelIntegrations.tsx , App.tsx route , navigation.ts
+- Communications Hub: CommunicationsHub.tsx
+If you share your Supabase project-ref and service role key via a secure channel, I can run the deploy and secrets setup commands for you and perform live webhook tests against your environment.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=========Sarvesh Phase 3 implemenation ==============
+
 

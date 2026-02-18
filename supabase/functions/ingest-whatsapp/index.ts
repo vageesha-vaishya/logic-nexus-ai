@@ -1,3 +1,4 @@
+/// <reference path="../types.d.ts" />
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";
 import { getSupabaseAdmin } from "../_shared/supabase.ts";
@@ -14,7 +15,7 @@ async function verifySignature(body: string, signatureHeader: string | null) {
   return signatureHeader.replace("sha256=", "") === sigHex;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const pre = preflight(req);
   if (pre) return pre;
   try {

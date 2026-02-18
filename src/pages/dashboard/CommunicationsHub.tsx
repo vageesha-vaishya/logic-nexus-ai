@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { Mail, MessageSquare, Globe, Phone } from 'lucide-react';
+import { Mail, MessageSquare, Globe, Phone, Twitter, Linkedin, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Channel = 'all' | 'email' | 'whatsapp' | 'x' | 'telegram' | 'linkedin' | 'web';
@@ -109,6 +109,9 @@ export default function CommunicationsHub() {
     if (c === 'email') return <Badge><Mail className="h-3 w-3 mr-1" />Email</Badge>;
     if (c === 'web') return <Badge><Globe className="h-3 w-3 mr-1" />Web</Badge>;
     if (c === 'whatsapp') return <Badge><Phone className="h-3 w-3 mr-1" />WhatsApp</Badge>;
+    if (c === 'x') return <Badge><Twitter className="h-3 w-3 mr-1" />X</Badge>;
+    if (c === 'linkedin') return <Badge><Linkedin className="h-3 w-3 mr-1" />LinkedIn</Badge>;
+    if (c === 'telegram') return <Badge><Send className="h-3 w-3 mr-1" />Telegram</Badge>;
     return <Badge><MessageSquare className="h-3 w-3 mr-1" />{c}</Badge>;
   };
 
