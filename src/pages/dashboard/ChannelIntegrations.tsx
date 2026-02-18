@@ -32,6 +32,17 @@ export default function ChannelIntegrations() {
   const { roles } = useAuth();
   const { toast } = useToast();
   const { context } = useCRM();
+  const dev = import.meta.env.DEV;
+  const projectUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co').replace(/\/$/, '');
+  const recommendedUrl = useMemo(() => {
+    const name =
+      provider === 'whatsapp' ? 'ingest-whatsapp' :
+      provider === 'telegram' ? 'ingest-telegram' :
+      provider === 'x' ? 'ingest-x' :
+      provider === 'linkedin' ? 'ingest-linkedin' :
+      'ingest-web';
+    return dev ? `/functions/v1/${name}` : `${projectUrl}/functions/v1/${name}`;
+  }, [provider, dev, projectUrl]);
 
   const tenantId = useMemo(() => {
     // Prefer CRM context (supports Platform Admin scope switching)
@@ -133,6 +144,9 @@ export default function ChannelIntegrations() {
                 placeholder='{"api_key":"...", "secret":"..."}'
                 className="mt-2"
               />
+              <div className="text-xs text-muted-foreground mt-2">
+                Webhook URL for this provider: <span className="font-mono">{recommendedUrl}</span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
