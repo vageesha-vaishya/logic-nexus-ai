@@ -698,6 +698,90 @@ Edge Functions
 - escalate-message
   - Uses ai_urgency to move queue to Escalations/Priority/Inbox.
   - File: escalate-message/index.ts
+## 14. Test Use Cases (Phases 1–3)
+
+### 14.1 Prerequisites
+- Project ref and keys configured in environment.
+- Tenant UUID available; at least one active queue exists for the tenant.
+- Phase functions deployed: ingest-*, send-*, ai-message-assistant, escalate-message, moderate-message.
+- Feature flag or navigation entry exposes Communications Hub page.
+
+### 14.2 Phase 1 — Foundation
+- Routing Trigger
+  - Setup: Create a queue rule where channel=web or subject contains “Quote”.
+  - Action: POST to /functions/v1/ingest-web with x-tenant-id and body containing subject “Quote Request”.
+  - Expected: New message appears in Communications Hub with queue assigned per rule.
+- RLS Enforcement
+  - Setup: Two users in different tenants.
+  - Action: User A ingests a message; User B opens Communications Hub.
+  - Expected: User B does not see User A’s tenant message; User A does.
+- Message Detail
+  - Action: Open a message, verify ai_sentiment/ai_intent/ai_urgency fields render (may be null initially).
+  - Expected: Detail dialog shows badges, queue, created_at; search and filters work.
+
+### 14.3 Phase 2 — Connectors
+- WhatsApp Ingest
+  - Setup: Set WHATSAPP_APP_SECRET; point Meta webhook to /functions/v1/ingest-whatsapp with x-tenant-id.
+  - Action: Use “Send Test” in Meta dashboard.
+  - Expected: Function returns { status: "accepted" }; message stored with channel=whatsapp, direction=inbound.
+- Telegram Ingest
+  - Setup: TELEGRAM_WEBHOOK_SECRET set; bot webhook includes x-telegram-bot-api-secret-token.
+  - Action: POST { "message": { "text": "Hello from Telegram" } } with x-tenant-id and secret header.
+  - Expected: Accepted; message stored with channel=telegram, body_text from payload.
+- Web Ingest
+  - Action: POST to /functions/v1/ingest-web with { subject, body, metadata } and x-tenant-id.
+  - Expected: Accepted; message stored with channel=web; metadata persisted.
+- X/LinkedIn Ingest Stubs
+  - Action: POST to /functions/v1/ingest-x or /functions/v1/ingest-linkedin with { text } and x-tenant-id.
+  - Expected: Accepted; message stored with channel=x or linkedin.”
+- Outbound Replies
+  - Web: POST /functions/v1/send-web with { tenant_id, to, text }.
+  - WhatsApp: POST /functions/v1/send-whatsapp with { tenant_id, to: "+123...", text }.
+  - Expected: Returns { status: "queued" }; outbound messages visible in Communications Hub with direction=outbound.
+- UI Triage
+  - Action: Use channel tabs and badges to filter; assign a message to a queue via dropdown.
+  - Expected: Badge icons reflect channel; queue update persists and reflects in list.
+
+### 14.4 Phase 3 — Agentic Workflows
+- AI Draft
+  - Action: In Message Detail, click “Suggest Reply” or POST to ai-message-assistant with { action: "draft", message_id }.
+  - Expected: Returns { draft }; appears in dialog. Audit entry written to ai_audit_logs (model_used, latency, pii redaction).
+- AI Summary
+  - Action: Click “Summarize” or POST to ai-message-assistant with { action: "summarize", message_id }.
+  - Expected: Returns { summary }; messages.ai_summary updated; audit log written.
+- Escalation
+  - Setup: Ensure messages.ai_urgency is set (manual or classification pipeline).
+  - Action: Click “Escalate” or POST to escalate-message with { message_id }.
+  - Expected: Returns { queue }; message.queue updated (critical → Escalations, high → Priority).
+- Moderation/Quarantine
+  - Action: Click “Quarantine” or POST to moderate-message with { message_id }.
+  - Expected: Returns { risky, queue }; risky=true routes to Quarantine; metadata.moderation set with checked_at.
+- End-to-End Verification
+  - Ingest (web/telegram/x/linkedin/whatsapp) → message stored → rule assigns queue → view in Communications Hub.
+  - Apply AI actions (draft/summary) and automation (escalate/quarantine) → verify persisted fields and updated queue.
+  - Confirm RLS by viewing with different tenant users.
+
+### 14.5 Sample cURL Templates
+- Replace PROJECT_REF, TENANT_UUID, and AUTH_TOKEN before running.
+- Web Ingest:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/ingest-web -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -H "x-tenant-id: TENANT_UUID" -d '{"subject":"Website Chat","body":"Customer message","metadata":{"page":"/contact"}}'
+- Telegram Ingest:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/ingest-telegram -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -H "x-tenant-id: TENANT_UUID" -H "x-telegram-bot-api-secret-token: TELEGRAM_WEBHOOK_SECRET" -d '{"message":{"text":"Hello from Telegram"}}'
+- WhatsApp Ingest:
+  - Use Meta “Send Test” for correct signature; otherwise compute HMAC sha256 over raw body and set header x-hub-signature-256: sha256=SIGNATURE
+- Outbound Web:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/send-web -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -d '{"tenant_id":"TENANT_UUID","to":"web_user_01","text":"Thanks for reaching out!"}'
+- Outbound WhatsApp:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/send-whatsapp -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -d '{"tenant_id":"TENANT_UUID","to":"+1234567890","text":"WhatsApp test reply"}'
+- AI Assistant Draft:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/ai-message-assistant -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -d '{"action":"draft","message_id":"MESSAGE_UUID"}'
+- AI Assistant Summary:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/ai-message-assistant -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -d '{"action":"summarize","message_id":"MESSAGE_UUID"}'
+- Escalate:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/escalate-message -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -d '{"message_id":"MESSAGE_UUID"}'
+- Moderate:
+  - curl -X POST https://PROJECT_REF.supabase.co/functions/v1/moderate-message -H "Content-Type: application/json" -H "Authorization: Bearer AUTH_TOKEN" -d '{"message_id":"MESSAGE_UUID"}'
+  - File: escalate-message/index.ts
 - moderate-message
   - Moves risky messages to Quarantine and annotates metadata.moderation.
   - File: moderate-message/index.ts
@@ -719,7 +803,6 @@ Notes
   - Click Escalate to re-queue based on urgency.
   - Click Quarantine to route risky content to Quarantine with metadata.
 - Optional: Replace deprecated lucide icons for X/LinkedIn if desired.
-
 
 
 
