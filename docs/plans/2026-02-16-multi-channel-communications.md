@@ -902,5 +902,45 @@ Where this is used
 If you want, I can prefill provider-specific placeholders in the UI based on your selection to make input easier.
 
 
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
 
 
+=======Sarvesh Telegram configruation===============
+Answer You generate it yourself. It’s a shared secret you choose, store in Supabase as TELEGRAM_WEBHOOK_SECRET, include the same value when you call Telegram’s setWebhook (secret_token), and save it in the Channel Integration credentials.
+
+Steps
+
+- Generate a strong secret
+  - openssl: openssl rand -hex 32
+  - Node: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+- Store in Supabase Edge Function secrets
+  - supabase secrets set TELEGRAM_WEBHOOK_SECRET="<your_secret>"
+- Save in Channel Integrations
+  - webhook_secret: " <the same="" secret="">"</the>
+  - webhook_url:
+    - Dev UI: http://localhost:8081/functions/v1/ingest-telegram
+    - Production: https:// <your-supabase-url>/functions/v1/ingest-telegram</your-supabase-url>
+- Register the webhook with Telegram
+  - curl -X POST " https://api.telegram.org/bot <BOT_TOKEN>/setWebhook"
+     -d "url=https:// <your-supabase-url>/functions/v1/ingest-telegram" 
+    -d "secret_token=<your_secret>"</your-supabase-url>
+Why this works
+
+- The ingest handler validates the header x-telegram-bot-api-secret-token against TELEGRAM_WEBHOOK_SECRET. Telegram will include that header only if you set secret_token when calling setWebhook. See ingest code: ingest-telegram .
+Important
+
+- Use /functions/v1/ingest-telegram, not /edge/ingest-telegram.
+- Telegram requires a publicly reachable HTTPS URL; localhost won’t work for Telegram’s servers.
+- Optional check: getWebhookInfo
+  - curl " https://api.telegram.org/bot <BOT_TOKEN>/getWebhookInfo"
+  - Confirms your webhook URL and that a secret_token is set.
+If you want, I can add a small helper in the UI to generate a secure webhook_secret on click and show the correct /functions/v1 URL for your environment.
