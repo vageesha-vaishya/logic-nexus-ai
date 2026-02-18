@@ -627,6 +627,101 @@ Next
 
 
 
+
+
+
+
+
+
+
+
+
 =========Sarvesh Phase 3 implemenation ==============
+lan Alignment
+
+- Implements Phase 3 goals: AI summaries, reply suggestions, escalation/quarantine automation, and audit-friendly patterns.
+- Reuses existing foundations: messages schema, queue rules, RLS, edge function conventions, and Supabase invoke wrappers.
+- Preserves existing functionality by adding new functions and UI actions without altering core flows.
+New Edge Functions
+
+- ai-message-assistant
+  - Drafts replies and summarizes messages; persists ai_summary to the messages row.
+  - Fallback heuristics when GOOGLE_API_KEY is not set; uses sanitization for PII guard.
+  - File: ai-message-assistant/index.ts
+- escalate-message
+  - Sets queue based on ai_urgency (critical → Escalations, high → Priority).
+  - File: escalate-message/index.ts
+- moderate-message
+  - Detects risky content (simple patterns) and moves to Quarantine with metadata.moderation.
+  - File: moderate-message/index.ts
+UI Enhancements
+
+- Communications Hub: Adds “Suggest Reply” and “Summarize” actions in message detail.
+  - Invokes ai-message-assistant via the existing invokeFunction wrapper.
+  - Displays suggested draft and summary; refreshes list to reflect persisted summary updates.
+  - File: CommunicationsHub.tsx
+- Keeps existing inbox filters and queue assignment unchanged.
+Verification
+
+- Typecheck: Passed with no errors.
+- Function deployment: Deployed ai-message-assistant, escalate-message, moderate-message to project gzhxgoigflftharcmdqj.
+- Live tests:
+  - Draft: Returned a concise fallback draft when no GOOGLE_API_KEY.
+  - Summarize: Returned fallback summary; persists to messages when message_id is used.
+  - Moderate: Validates ID and reports not found if a fake id is used.
+What You Can Do Now
+
+- Use the Communications Hub:
+  - Open a message → click “Suggest Reply” for an AI draft.
+  - Click “Summarize” to store an AI summary in the message.
+- For automation:
+  - Call escalate-message with a message_id to re-queue based on urgency.
+  - Call moderate-message to quarantine risky messages.
+Notes
+
+- AI model key: If you provide GOOGLE_API_KEY, summaries and drafts will be LLM-generated; otherwise the functions return safe, deterministic fallbacks.
+- Audit logging: Shared audit helper exists ( audit.ts ). If the ai_audit_logs table is present, we can wire logging into ai-message-assistant next.
+- Routing: process_message_queue_assignment continues to work; escalation and moderation functions provide explicit automation hooks without altering core triggers.
+If you want, I can wire audit logging into ai-message-assistant and add optional “Escalate” and “Quarantine” actions in the message dialog to directly invoke those functions from the UI.
+
+
+Actions Added
+
+- Wired audit logging into ai-message-assistant using ai_audit_logs.
+- Added Escalate and Quarantine actions in Communications Hub message dialog.
+Edge Functions
+
+- ai-message-assistant
+  - Logs function_name, model_used, latency, PII redaction types, and output summary.
+  - Persists ai_summary when summarizing a message by id.
+  - File: ai-message-assistant/index.ts
+- escalate-message
+  - Uses ai_urgency to move queue to Escalations/Priority/Inbox.
+  - File: escalate-message/index.ts
+- moderate-message
+  - Moves risky messages to Quarantine and annotates metadata.moderation.
+  - File: moderate-message/index.ts
+UI Updates
+
+- Communications Hub dialog:
+  - New buttons: Suggest Reply, Summarize, Escalate, Quarantine.
+  - Calls the corresponding functions and refreshes inbox after actions.
+  - File: CommunicationsHub.tsx
+Verification
+
+- Deployed ai-message-assistant to Supabase project gzhxgoigflftharcmdqj.
+- Typecheck ran successfully across the repository.
+- Live function test returned expected responses; moderation/escalation require a valid message_id for full effect.
+Notes
+
+- If ai_audit_logs table is present, audit entries will be written automatically for drafts and summaries.
+- You can now triage a message and:
+  - Click Escalate to re-queue based on urgency.
+  - Click Quarantine to route risky content to Quarantine with metadata.
+- Optional: Replace deprecated lucide icons for X/LinkedIn if desired.
+
+
+
+
 
 

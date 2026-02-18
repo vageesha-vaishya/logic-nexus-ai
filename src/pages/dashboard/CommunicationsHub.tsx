@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Mail, MessageSquare, Globe, Phone, Twitter, Linkedin, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { invokeFunction as invokeEdge } from '@/lib/supabase-functions';
 
 type Channel = 'all' | 'email' | 'whatsapp' | 'x' | 'telegram' | 'linkedin' | 'web';
 
@@ -39,6 +40,10 @@ export default function CommunicationsHub() {
   const [queues, setQueues] = useState<string[]>([]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [suggestedReply, setSuggestedReply] = useState<string>('');
+  const [summary, setSummary] = useState<string>('');
+  const [aiLoading, setAiLoading] = useState<'none' | 'draft' | 'summary'>('none');
+  const [actionLoading, setActionLoading] = useState<'none' | 'escalate' | 'quarantine'>('none');
   const { toast } = useToast();
   const { roles } = useAuth();
 
@@ -190,6 +195,108 @@ export default function CommunicationsHub() {
                 <div className="text-xs">Intent: {selectedMessage.ai_intent || 'n/a'}</div>
                 <div className="text-xs">Urgency: {selectedMessage.ai_urgency || 'n/a'}</div>
               </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={aiLoading !== 'none'}
+                  onClick={async () => {
+                    try {
+                      setAiLoading('draft');
+                      setSuggestedReply('');
+                      const { data, error } = await invokeEdge<{ draft: string }>('ai-message-assistant', {
+                        body: { action: 'draft', message_id: selectedMessage.id }
+                      });
+                      if (error) throw error;
+                      setSuggestedReply((data as any)?.draft || '');
+                    } catch (e: any) {
+                      toast({ title: 'AI Draft Error', description: e?.message || String(e), variant: 'destructive' });
+                    } finally {
+                      setAiLoading('none');
+                    }
+                  }}
+                >
+                  {aiLoading === 'draft' ? 'Drafting…' : 'Suggest Reply'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={aiLoading !== 'none'}
+                  onClick={async () => {
+                    try {
+                      setAiLoading('summary');
+                      setSummary('');
+                      const { data, error } = await invokeEdge<{ summary: string }>('ai-message-assistant', {
+                        body: { action: 'summarize', message_id: selectedMessage.id }
+                      });
+                      if (error) throw error;
+                      setSummary((data as any)?.summary || '');
+                      // Refresh message list to reflect persisted summary if any
+                      fetchMessages();
+                    } catch (e: any) {
+                      toast({ title: 'AI Summary Error', description: e?.message || String(e), variant: 'destructive' });
+                    } finally {
+                      setAiLoading('none');
+                    }
+                  }}
+                >
+                  {aiLoading === 'summary' ? 'Summarizing…' : 'Summarize'}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={actionLoading !== 'none'}
+                  onClick={async () => {
+                    try {
+                      setActionLoading('escalate');
+                      const { data, error } = await invokeEdge<{ queue: string }>('escalate-message', {
+                        body: { message_id: selectedMessage.id }
+                      });
+                      if (error) throw error;
+                      toast({ title: 'Escalated', description: `Moved to ${String((data as any)?.queue || '')}` });
+                      fetchMessages();
+                    } catch (e: any) {
+                      toast({ title: 'Escalate Error', description: e?.message || String(e), variant: 'destructive' });
+                    } finally {
+                      setActionLoading('none');
+                    }
+                  }}
+                >
+                  {actionLoading === 'escalate' ? 'Escalating…' : 'Escalate'}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={actionLoading !== 'none'}
+                  onClick={async () => {
+                    try {
+                      setActionLoading('quarantine');
+                      const { data, error } = await invokeEdge<{ risky: boolean; queue: string }>('moderate-message', {
+                        body: { message_id: selectedMessage.id }
+                      });
+                      if (error) throw error;
+                      const risky = Boolean((data as any)?.risky);
+                      const q = String((data as any)?.queue || '');
+                      toast({ title: risky ? 'Quarantined' : 'Moderation Passed', description: q ? `Moved to ${q}` : '' });
+                      fetchMessages();
+                    } catch (e: any) {
+                      toast({ title: 'Moderation Error', description: e?.message || String(e), variant: 'destructive' });
+                    } finally {
+                      setActionLoading('none');
+                    }
+                  }}
+                >
+                  {actionLoading === 'quarantine' ? 'Moderating…' : 'Quarantine'}
+                </Button>
+              </div>
+              {!!summary && (
+                <div className="mt-2">
+                  <div className="text-xs font-medium">AI Summary</div>
+                  <div className="text-sm whitespace-pre-wrap">{summary}</div>
+                </div>
+              )}
+              {!!suggestedReply && (
+                <div className="mt-2">
+                  <div className="text-xs font-medium">Suggested Reply</div>
+                  <div className="text-sm whitespace-pre-wrap">{suggestedReply}</div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
