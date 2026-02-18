@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { RoleGuard } from '@/components/auth/RoleGuard';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -47,7 +48,7 @@ export function AppSidebar() {
   // Restore saved scroll position on mount
   useEffect(() => {
     const saved = sessionStorage.getItem('sidebar:scrollTop');
-    const el = scrollRef.current;
+    const el = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
     if (el && saved) {
       el.scrollTop = Number(saved);
     }
@@ -55,7 +56,7 @@ export function AppSidebar() {
 
   // Persist scroll position during scrolling
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
     if (!el) return;
     const handler = () => sessionStorage.setItem('sidebar:scrollTop', String(el.scrollTop));
     el.addEventListener('scroll', handler);
@@ -64,7 +65,7 @@ export function AppSidebar() {
 
   // Ensure active item stays in view after navigation
   useEffect(() => {
-    const container = scrollRef.current;
+    const container = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
     if (!container) return;
     const activeLink = container.querySelector('a[aria-current="page"]') as HTMLElement | null;
     if (activeLink) {
@@ -125,7 +126,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible="icon">
-      <SidebarContent ref={scrollRef}>
+      <ScrollArea ref={scrollRef} className="flex-1">
+        <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
             {collapsed ? (
@@ -257,7 +259,8 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-      </SidebarContent>
+        </SidebarContent>
+      </ScrollArea>
 
       <SidebarFooter className="border-t p-4">
         {!collapsed && profile && (
