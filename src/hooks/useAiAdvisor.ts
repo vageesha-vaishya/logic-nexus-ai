@@ -40,16 +40,13 @@ export function useAiAdvisor() {
         return { data: null, error: new Error("Configuration Error: Missing API Key") };
     }
 
-    const doFetch = async (token: string | null | undefined) => {
-        if (!token) {
-            throw new Error("Missing user session token for AI Advisor");
-        }
-
+    const doFetch = async () => {
+        const tokenToUse = sessionToken || anonKey;
         return fetch(functionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${tokenToUse}`,
                 'apikey': anonKey
             },
             body: JSON.stringify({ action, payload })
@@ -58,11 +55,10 @@ export function useAiAdvisor() {
 
     try {
         if (!sessionToken) {
-            console.warn("[AI-Advisor] No active session. Skipping server-side AI call.");
-            throw new Error("Unauthorized: No active session");
+            console.warn("[AI-Advisor] No active session. Using anon key for AI Advisor.");
         }
 
-        let response = await doFetch(sessionToken);
+        let response = await doFetch();
 
         if (response.status === 401 || response.status === 403) {
             const errorText = await response.text();

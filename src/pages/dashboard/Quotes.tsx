@@ -17,11 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Quote } from '@/pages/dashboard/quotes-data';
-import { FileText, XCircle, Search, Filter, ArrowUpRight, Eye, Pencil, Trash2, MoreHorizontal, Plus, Sparkles } from 'lucide-react';
+import { FileText, XCircle, Search, Filter, ArrowUpRight, Eye, Pencil, Trash2, MoreHorizontal, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
-import { QuickQuoteModal } from '@/components/sales/quick-quote/QuickQuoteModal';
-import { QuoteErrorBoundary } from '@/components/sales/quote-form/QuoteErrorBoundary';
+
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { logger } from "@/lib/logger";
 import { useDebug } from '@/hooks/useDebug';
@@ -372,18 +371,10 @@ export default function Quotes() {
                 <Trash2 className="h-4 w-4 md:mr-2" /> 
                 <span className="hidden md:inline">Purge Drafts</span>
             </Button>
-            <QuoteErrorBoundary>
-              <QuickQuoteModal>
-                  <Button variant="outline" className="gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      Quick Quote
-                  </Button>
-              </QuickQuoteModal>
-            </QuoteErrorBoundary>
             <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20 gap-2 min-w-[140px]">
-                <Plus className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Create Detailed Quote</span>
-                <span className="sm:hidden">Detailed Quote</span>
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">New Quote</span>
+                <span className="sm:hidden">New Quote</span>
             </Button>
           </div>
         </div>

@@ -118,14 +118,15 @@ describe('QuotesPipeline', () => {
     expect(screen.getByText('Quotes Pipeline')).toBeInTheDocument();
   });
 
-  it('renders quick quote button', async () => {
+  it('renders new quote button', async () => {
     render(
       <BrowserRouter>
         <QuotesPipeline />
       </BrowserRouter>
     );
-    
-    expect(screen.getByText('Quick Quote')).toBeInTheDocument();
+
+    const buttons = screen.getAllByText('New Quote');
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('fetches quotes on mount', async () => {

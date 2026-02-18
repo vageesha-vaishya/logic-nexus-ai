@@ -14,7 +14,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Quote, QuoteStatus, statusConfig, stages } from "./quotes-data";
-import { QuickQuoteModal } from "@/components/sales/quick-quote/QuickQuoteModal";
 import { QuotesKanbanBoard } from "@/components/sales/kanban/QuotesKanbanBoard";
 import { QuotesList } from "@/components/sales/QuotesList";
 import { QuoteAnalytics } from "@/components/sales/analytics/QuoteAnalytics";
@@ -629,11 +628,10 @@ export default function QuotesPipeline() {
           </div>
           <div className="flex items-center gap-2">
             <ViewToggle value={viewMode} onChange={setViewMode} modes={['board', 'list', 'analytics']} />
-            <QuickQuoteModal />
             <Button onClick={() => navigate('/dashboard/quotes/new')} className="shadow-lg shadow-primary/20 gap-2 min-w-[140px]">
-                <Plus className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Create Detailed Quote</span>
-                <span className="sm:hidden">Detailed Quote</span>
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">New Quote</span>
+                <span className="sm:hidden">New Quote</span>
             </Button>
           </div>
         </div>

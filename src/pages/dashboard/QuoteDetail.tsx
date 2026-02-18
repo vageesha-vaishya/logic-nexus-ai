@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
-import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
+import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
@@ -180,10 +179,6 @@ export default function QuoteDetail() {
     };
   }, [resolvedId]);
 
-  const handleSuccess = () => {
-    toast.success('Quote updated successfully');
-  };
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -237,11 +232,9 @@ export default function QuoteDetail() {
             </div>
           </div>
         </div>
-        <QuoteForm 
-            quoteId={resolvedId ?? id} 
-            quoteNumber={quoteNumber ?? (resolvedId ?? '')}
+        <UnifiedQuoteComposer
+            quoteId={resolvedId ?? id}
             versionId={versionId || undefined}
-            onSuccess={handleSuccess} 
         />
         <QuotationVersionHistory 
             quoteId={resolvedId ?? id as string} 

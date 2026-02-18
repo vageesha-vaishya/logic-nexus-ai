@@ -1,0 +1,464 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { useContainerRefs } from '@/hooks/useContainerRefs';
+import { useRateFetching, ContainerResolver } from '@/hooks/useRateFetching';
+import { useDraftAutoSave } from '@/hooks/useDraftAutoSave';
+import { useAiAdvisor } from '@/hooks/useAiAdvisor';
+import { PricingService } from '@/services/pricing.service';
+import { QuoteOptionService } from '@/services/QuoteOptionService';
+import { RateOption } from '@/types/quote-breakdown';
+import { logger } from '@/lib/logger';
+
+import { QuoteStoreProvider, useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
+import { FormZone, FormZoneValues, ExtendedFormData } from './FormZone';
+import { ResultsZone } from './ResultsZone';
+import { FinalizeSection } from './FinalizeSection';
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+interface UnifiedQuoteComposerProps {
+  quoteId?: string;
+  versionId?: string;
+  initialData?: any; // Pre-population from QuickQuoteHistory / navigation state
+}
+
+// ---------------------------------------------------------------------------
+// Wrapped export (provides QuoteStoreProvider)
+// ---------------------------------------------------------------------------
+
+export function UnifiedQuoteComposer(props: UnifiedQuoteComposerProps) {
+  return (
+    <QuoteStoreProvider>
+      <UnifiedQuoteComposerContent {...props} />
+    </QuoteStoreProvider>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inner content component
+// ---------------------------------------------------------------------------
+
+function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: UnifiedQuoteComposerProps) {
+  const { scopedDb, context, supabase } = useCRM();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { containerTypes, containerSizes } = useContainerRefs();
+  const { state: storeState, dispatch } = useQuoteStore();
+  const { invokeAiAdvisor } = useAiAdvisor();
+
+  // Rate fetching hook
+  const rateFetching = useRateFetching();
+
+  // Local state
+  const [selectedOption, setSelectedOption] = useState<RateOption | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
+  const [smartMode, setSmartMode] = useState(true);
+  const [lastFormData, setLastFormData] = useState<{ values: FormZoneValues; extended: ExtendedFormData } | null>(null);
+
+  // Edit mode state
+  const [isEditMode] = useState(() => !!quoteId);
+  const [editLoading, setEditLoading] = useState(false);
+  const [initialFormValues, setInitialFormValues] = useState<Partial<FormZoneValues> | undefined>(undefined);
+  const [initialExtended, setInitialExtended] = useState<Partial<ExtendedFormData> | undefined>(undefined);
+
+  // Container resolver for rate fetching
+  const containerResolver: ContainerResolver = useMemo(() => ({
+    resolveContainerInfo: (typeId: string, sizeId: string) => {
+      const typeObj = containerTypes.find(t => t.id === typeId);
+      const sizeObj = containerSizes.find(s => s.id === sizeId);
+      return {
+        type: typeObj?.code || typeObj?.name || typeId,
+        size: sizeObj?.name || sizeId,
+        iso_code: sizeObj?.iso_code,
+      };
+    },
+  }), [containerTypes, containerSizes]);
+
+  // Draft auto-save
+  const getAutoSavePayload = useCallback(() => ({
+    quoteId: storeState.quoteId,
+    versionId: storeState.versionId,
+    optionId: storeState.optionId,
+    tenantId: storeState.tenantId,
+    quoteData: storeState.quoteData,
+    legs: storeState.legs,
+    charges: storeState.charges,
+  }), [storeState]);
+
+  const { lastSaved, isSavingDraft } = useDraftAutoSave(
+    scopedDb,
+    getAutoSavePayload,
+    { enabled: !!storeState.versionId && !!storeState.tenantId }
+  );
+
+  // ---------------------------------------------------------------------------
+  // Edit mode: load existing quote data
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!quoteId || !versionId) return;
+    loadExistingQuote();
+  }, [quoteId, versionId]);
+
+  const loadExistingQuote = async () => {
+    if (!quoteId) return;
+    setEditLoading(true);
+
+    try {
+      const tenantId = context?.tenantId || null;
+
+      // Load quote
+      const { data: quoteRow, error: quoteError } = await scopedDb
+        .from('quotes', true)
+        .select('*, origin_location:origin_port_id(location_name, location_code), destination_location:destination_port_id(location_name, location_code)')
+        .eq('id', quoteId)
+        .maybeSingle();
+
+      if (quoteError || !quoteRow) {
+        toast({ title: 'Error', description: 'Failed to load quote', variant: 'destructive' });
+        setEditLoading(false);
+        return;
+      }
+
+      const raw = quoteRow as any;
+
+      // Initialize store
+      dispatch({
+        type: 'INITIALIZE',
+        payload: {
+          quoteId,
+          versionId: versionId || null,
+          tenantId: raw.tenant_id || tenantId,
+          quoteData: raw,
+        },
+      });
+
+      // Pre-populate form values for edit mode
+      const cargoDetails = typeof raw.cargo_details === 'object' ? raw.cargo_details : null;
+
+      setInitialFormValues({
+        mode: (raw.transport_mode || 'ocean') as any,
+        origin: raw.origin_location?.location_name || raw.origin || '',
+        destination: raw.destination_location?.location_name || raw.destination || '',
+        commodity: cargoDetails?.commodity || raw.commodity || '',
+        weight: String(cargoDetails?.total_weight_kg || raw.total_weight || ''),
+        volume: String(cargoDetails?.total_volume_cbm || raw.total_volume || ''),
+      });
+
+      setInitialExtended({
+        incoterms: raw.incoterms || '',
+        pickupDate: raw.pickup_date ? new Date(raw.pickup_date).toISOString().split('T')[0] : '',
+        deliveryDeadline: raw.delivery_deadline ? new Date(raw.delivery_deadline).toISOString().split('T')[0] : '',
+        htsCode: cargoDetails?.hts_code || '',
+        dangerousGoods: !!raw.dangerous_goods,
+        vehicleType: raw.vehicle_type || 'van',
+      });
+
+      // Load existing option if present
+      if (versionId) {
+        const { data: optionRows } = await scopedDb
+          .from('quotation_version_options', true)
+          .select('id, is_selected, total_amount, currency')
+          .eq('quotation_version_id', versionId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (optionRows && optionRows.length > 0) {
+          dispatch({ type: 'INITIALIZE', payload: { optionId: optionRows[0].id } });
+        }
+      }
+    } catch (err) {
+      logger.error('[UnifiedComposer] Failed to load quote:', err);
+      toast({ title: 'Error', description: 'Failed to load existing quote data', variant: 'destructive' });
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Handle pre-population from navigation state (QuickQuoteHistory)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!initialData) return;
+    setInitialFormValues({
+      mode: (initialData.mode || 'ocean') as any,
+      origin: initialData.origin || '',
+      destination: initialData.destination || '',
+      commodity: initialData.commodity || initialData.commodity_description || '',
+      weight: initialData.weight ? String(initialData.weight) : undefined,
+      volume: initialData.volume ? String(initialData.volume) : undefined,
+      preferredCarriers: initialData.preferredCarriers,
+    });
+
+    if (initialData.containerType || initialData.incoterms || initialData.htsCode) {
+      setInitialExtended({
+        containerType: initialData.containerType || '',
+        containerSize: initialData.containerSize || '',
+        containerQty: initialData.containerQty || '1',
+        incoterms: initialData.incoterms || '',
+        htsCode: initialData.htsCode || '',
+        dangerousGoods: !!initialData.dangerousGoods,
+        vehicleType: initialData.vehicleType || 'van',
+        originDetails: initialData.originDetails || null,
+        destinationDetails: initialData.destinationDetails || null,
+      });
+    }
+  }, [initialData]);
+
+  // ---------------------------------------------------------------------------
+  // Compliance check
+  // ---------------------------------------------------------------------------
+
+  const runComplianceCheck = async (params: FormZoneValues & ExtendedFormData) => {
+    try {
+      const { data, error } = await invokeAiAdvisor({
+        action: 'validate_compliance',
+        payload: {
+          origin: params.origin,
+          destination: params.destination,
+          commodity: params.commodity,
+          mode: params.mode,
+          dangerous_goods: params.dangerousGoods,
+        },
+      });
+      if (!error && data) {
+        setComplianceCheck(data);
+        if (data.compliant === false) {
+          toast({ title: 'Compliance Warning', description: 'Please review compliance issues.', variant: 'destructive' });
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Handle "Get Rates"
+  // ---------------------------------------------------------------------------
+
+  const handleGetRates = async (formValues: FormZoneValues, extendedData: ExtendedFormData, smart: boolean) => {
+    setSmartMode(smart);
+    setSelectedOption(null);
+    setComplianceCheck(null);
+    setLastFormData({ values: formValues, extended: extendedData });
+
+    // Fire compliance in parallel (non-blocking)
+    runComplianceCheck({ ...formValues, ...extendedData } as any);
+
+    await rateFetching.fetchRates(
+      {
+        ...formValues,
+        ...extendedData,
+        smartMode: smart,
+        account_id: storeState.quoteData?.account_id,
+      },
+      containerResolver
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Handle option selection
+  // ---------------------------------------------------------------------------
+
+  const handleSelectOption = (option: RateOption) => {
+    setSelectedOption(prev => (prev?.id === option.id ? null : option));
+  };
+
+  // ---------------------------------------------------------------------------
+  // Handle save quote
+  // ---------------------------------------------------------------------------
+
+  const isUUID = (v: any) =>
+    typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+  const handleSaveQuote = async (charges: any[], marginPercent: number, notes: string) => {
+    setSaving(true);
+
+    try {
+      const tenantId = storeState.tenantId || context?.tenantId;
+      if (!tenantId) {
+        toast({ title: 'Error', description: 'Tenant context not found', variant: 'destructive' });
+        return;
+      }
+
+      // Ensure version exists
+      let currentVersionId = storeState.versionId || versionId;
+      let currentQuoteId = storeState.quoteId || quoteId;
+
+      // Build RPC payload
+      const formData = lastFormData;
+      const quotePayload: any = {
+        id: isUUID(currentQuoteId) ? currentQuoteId : undefined,
+        title: storeState.quoteData?.title || `Quote - ${formData?.values.origin || ''} to ${formData?.values.destination || ''}`,
+        transport_mode: formData?.values.mode || 'ocean',
+        origin: formData?.values.origin || '',
+        destination: formData?.values.destination || '',
+        status: 'draft',
+        tenant_id: tenantId,
+        notes: notes || null,
+        pickup_date: formData?.extended.pickupDate || null,
+        delivery_deadline: formData?.extended.deliveryDeadline || null,
+        incoterms: formData?.extended.incoterms || null,
+        vehicle_type: formData?.extended.vehicleType || null,
+        account_id: storeState.quoteData?.account_id || null,
+        contact_id: storeState.quoteData?.contact_id || null,
+      };
+
+      // Build option with legs/charges from the selected rate
+      const optionLegs = (selectedOption?.legs || []).map((leg: any, idx: number) => ({
+        transport_mode: leg.mode || formData?.values.mode || 'ocean',
+        leg_type: leg.leg_type || leg.bifurcation_role || 'transport',
+        origin_location_name: leg.origin || '',
+        destination_location_name: leg.destination || '',
+        charges: (leg.charges || []).map((c: any) => ({
+          category_id: c.category_id,
+          side: 'sell',
+          unit_price: c.amount || 0,
+          quantity: 1,
+          amount: c.amount || 0,
+        })),
+      }));
+
+      const combinedChargesPayload = charges.map(c => ({
+        side: 'sell',
+        unit_price: c.amount || 0,
+        quantity: 1,
+        amount: c.amount || 0,
+        note: c.name,
+      }));
+
+      const optionPayload = {
+        id: isUUID(storeState.optionId) ? storeState.optionId : undefined,
+        is_selected: true,
+        source: 'unified_composer',
+        source_attribution: selectedOption?.source_attribution || 'manual',
+        ai_generated: selectedOption?.ai_generated || false,
+        legs: optionLegs,
+        combined_charges: combinedChargesPayload,
+      };
+
+      const rpcPayload = {
+        quote: quotePayload,
+        items: [],
+        cargo_configurations: [],
+        options: [optionPayload],
+      };
+
+      const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
+        p_payload: rpcPayload,
+      });
+
+      if (rpcError) {
+        throw new Error(rpcError.message || 'Failed to save quotation');
+      }
+
+      // Update store
+      if (savedId) {
+        dispatch({ type: 'INITIALIZE', payload: { quoteId: savedId } });
+      }
+
+      toast({ title: 'Success', description: 'Quote saved successfully' });
+    } catch (err: any) {
+      logger.error('[UnifiedComposer] Save failed:', err);
+      toast({ title: 'Save Failed', description: err.message || 'An error occurred', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Rerun rates
+  // ---------------------------------------------------------------------------
+
+  const handleRerunRates = () => {
+    if (lastFormData) {
+      handleGetRates(lastFormData.values, lastFormData.extended, smartMode);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Draft save (manual)
+  // ---------------------------------------------------------------------------
+
+  const handleSaveDraft = () => {
+    if (!lastFormData) {
+      toast({ title: 'Nothing to save', description: 'Please fill out the form first.' });
+      return;
+    }
+    toast({ title: 'Draft saved', description: 'Your quote draft has been saved.' });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  if (editLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-3 text-muted-foreground">Loading quote...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Auto-save indicator */}
+      <div className="flex items-center justify-end text-xs text-muted-foreground gap-2">
+        {isSavingDraft ? (
+          <><Cloud className="w-3 h-3 animate-pulse" /> Saving draft...</>
+        ) : lastSaved ? (
+          <><Cloud className="w-3 h-3 text-green-500" /> Saved {lastSaved.toLocaleTimeString()}</>
+        ) : storeState.versionId ? (
+          <><CloudOff className="w-3 h-3" /> Not yet saved</>
+        ) : null}
+      </div>
+
+      {/* Form Zone — always visible */}
+      <FormZone
+        onGetRates={handleGetRates}
+        onSaveDraft={storeState.versionId ? handleSaveDraft : undefined}
+        loading={rateFetching.loading}
+        initialValues={initialFormValues}
+        initialExtended={initialExtended}
+      />
+
+      <Separator />
+
+      {/* Results Zone */}
+      <ResultsZone
+        results={rateFetching.results}
+        loading={rateFetching.loading}
+        smartMode={smartMode}
+        marketAnalysis={rateFetching.marketAnalysis}
+        confidenceScore={rateFetching.confidenceScore}
+        anomalies={rateFetching.anomalies}
+        complianceCheck={complianceCheck}
+        onSelect={handleSelectOption}
+        selectedOptionId={selectedOption?.id}
+        onRerunRates={lastFormData ? handleRerunRates : undefined}
+      />
+
+      {/* Finalize Section — shown when option selected */}
+      {selectedOption && (
+        <>
+          <Separator />
+          <FinalizeSection
+            selectedOption={selectedOption}
+            onSaveQuote={handleSaveQuote}
+            saving={saving}
+          />
+        </>
+      )}
+    </div>
+  );
+}

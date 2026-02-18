@@ -735,7 +735,7 @@ export function useQuoteRepositoryForm(opts: {
     const latestVersion = versionsQuery.data;
 
     // Map Options and Legs (Moved up for progressive loading)
-    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
+        const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
         // Calculate total from leg charges if option total is missing/zero
         const legs = opt.quotation_version_option_legs || [];
         const chargesTotal = legs.reduce((acc: number, leg: any) => {
@@ -756,7 +756,7 @@ export function useQuoteRepositoryForm(opts: {
             is_primary: opt.is_selected,
             total_amount: effectiveTotal,
             currency: opt.quote_currency?.code || 'USD',
-            transit_time_days: opt.total_transit_days,
+            transit_time_days: typeof opt.total_transit_days === 'number' ? opt.total_transit_days : undefined,
             legs: legs.map((leg: any) => ({
                 id: leg.id,
                 sequence_number: leg.sort_order,

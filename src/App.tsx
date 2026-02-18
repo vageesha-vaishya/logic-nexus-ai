@@ -101,7 +101,7 @@ const QuotesPipeline = lazy(() =>
       .then(() => import("./pages/dashboard/QuotesPipeline"));
   })
 );
-const MultiModalQuote = lazy(() => import("./pages/dashboard/MultiModalQuote"));
+
 const Carriers = lazy(() => import("./pages/dashboard/Carriers"));
 const Vendors = lazy(() => import("./pages/dashboard/Vendors"));
 const VendorDetail = lazy(() => import("./pages/dashboard/vendors/VendorDetail"));
@@ -527,14 +527,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <QuoteDetail />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/dashboard/quotes/multi-modal" 
-              element={
-                <ProtectedRoute>
-                  <MultiModalQuote />
                 </ProtectedRoute>
               } 
             />
