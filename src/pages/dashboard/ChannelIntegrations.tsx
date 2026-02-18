@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useCRM } from '@/hooks/useCRM';
 
 type Provider = 'whatsapp' | 'x' | 'telegram' | 'linkedin' | 'web';
 
@@ -30,11 +31,14 @@ export default function ChannelIntegrations() {
   const [saving, setSaving] = useState(false);
   const { roles } = useAuth();
   const { toast } = useToast();
+  const { context } = useCRM();
 
   const tenantId = useMemo(() => {
+    // Prefer CRM context (supports Platform Admin scope switching)
+    if (context.tenantId) return context.tenantId;
     const admin = roles.find(r => r.role === 'tenant_admin' && r.tenant_id);
     return admin?.tenant_id || roles.find(r => r.tenant_id)?.tenant_id || null;
-  }, [roles]);
+  }, [roles, context.tenantId]);
 
   const fetchAccounts = async () => {
     try {
@@ -131,7 +135,16 @@ export default function ChannelIntegrations() {
               />
             </div>
           </div>
-          <Button onClick={createAccount} disabled={saving}>{saving ? 'Saving' : 'Add Integration'}</Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={createAccount} disabled={saving || !tenantId}>
+              {saving ? 'Saving' : 'Add Integration'}
+            </Button>
+            {!tenantId && (
+              <span className="text-xs text-muted-foreground">
+                Select a tenant using the scope switcher (top bar) before adding integrations.
+              </span>
+            )}
+          </div>
         </CardContent>
       </Card>
       <Card className="mt-6">

@@ -808,3 +808,99 @@ Notes
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+========Sarvesh Adding Channels ================
+
+
+- Go to Dashboard → Settings → General.
+- Look for the “Integrations” section and the “Channel Integrations” card.
+- Click “Open” to manage WhatsApp, X, Telegram, LinkedIn, and Web channels.
+Verification
+
+- Typecheck passes: tsc --noEmit.
+- Lint for the updated file passes with no errors.
+Code References
+
+- Settings page update: Settings.tsx
+- Channel Integrations page (already implemented): ChannelIntegrations.tsx
+- Route exists and is permission-protected for admins: App.tsx
+If you still don’t see it:
+
+- Ensure you’re on Dashboard → Settings → General.
+- Confirm your account has admin.settings.manage (Platform Admin should).
+
+
+
+credential JSON Samples Use one of the following JSON samples based on the Provider you select. Paste the JSON into “Credentials (JSON)” exactly as shown, then click Add Integration.
+
+- WhatsApp (Cloud API)
+  {
+  "phone_number_id": "123456789012345",
+  "business_account_id": "1234567890",
+  "access_token": "EAAB...long_token...",
+  "app_secret": "your_app_secret",
+  "verify_token": "your_webhook_verify_token",
+  "webhook_url": " https://yourdomain.com/edge/ingest-whatsapp "
+  }
+- Telegram (Bot API)
+  {
+  "bot_token": "1234567890:AA...bot_token...",
+  "webhook_secret": "your_webhook_secret",
+  "webhook_url": " https://yourdomain.com/edge/ingest-telegram "
+  }
+- X (Twitter)
+  {
+  "api_key": "your_api_key",
+  "api_secret": "your_api_secret",
+  "access_token": "your_access_token",
+  "access_token_secret": "your_access_token_secret",
+  "bearer_token": "your_bearer_token",
+  "webhook_secret": "optional_shared_secret",
+  "webhook_url": " https://yourdomain.com/edge/ingest-x "
+  }
+- LinkedIn
+  {
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "organization_id": "urn:li:organization:123456",
+  "access_token": "AQED...access_token...",
+  "webhook_secret": "optional_shared_secret",
+  "webhook_url": " https://yourdomain.com/edge/ingest-linkedin "
+  }
+- Web (Internal channel)
+  {
+  "webhook_url": " https://yourdomain.com/edge/ingest-web ",
+  "allowed_origins": [" https://yourapp.com "]
+  }
+Notes:
+
+- Keys are examples; replace with your real values.
+- JSON must be valid (double quotes; no trailing commas).
+Why “Add Integration” errored
+
+- If you’re logged in as Platform Admin, the integration needs a tenant context. I updated the Channel Integrations page to use the tenant from the top-bar scope switcher. Set your tenant in the Admin Scope Switcher (top right), then try again.
+- If the JSON is invalid, it will also error. Use the samples above and ensure valid JSON.
+Where this is used
+
+- WhatsApp verifies webhook requests using your app_secret; Telegram uses webhook_secret. The ingest endpoints are:
+  - WhatsApp: /edge/ingest-whatsapp
+  - Telegram: /edge/ingest-telegram
+  - X: /edge/ingest-x
+  - LinkedIn: /edge/ingest-linkedin
+  - Web: /edge/ingest-web
+If you want, I can prefill provider-specific placeholders in the UI based on your selection to make input easier.
+
+
+
+
