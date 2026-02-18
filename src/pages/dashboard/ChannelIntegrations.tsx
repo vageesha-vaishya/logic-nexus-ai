@@ -77,15 +77,27 @@ export default function ChannelIntegrations() {
       } catch {
         throw new Error('Invalid credentials JSON');
       }
-      const { error } = await (supabase as any)
-        .from('channel_accounts')
-        .insert({
-          tenant_id: tenantId,
-          provider,
-          credentials: creds,
-          is_active: true,
-        });
-      if (error) throw error;
+      // Prefer RPC to bypass RLS via security definer function
+      const { data: rpcId, error: rpcError } = await (supabase as any).rpc('create_channel_account', {
+        p_tenant_id: tenantId,
+        p_provider: provider,
+        p_credentials: creds,
+        p_active: true,
+      });
+      if (rpcError) {
+        // Fallback to direct insert; will fail if RLS not updated
+        const { error } = await (supabase as any)
+          .from('channel_accounts')
+          .insert({
+            tenant_id: tenantId,
+            provider,
+            credentials: creds,
+            is_active: true,
+          });
+        if (error) {
+          throw new Error(`${error.message}. Ensure DB migrations are applied (create_channel_account RPC & platform admin policy).`);
+        }
+      }
       setCredentialsText('');
       toast({ title: 'Saved', description: 'Channel account created' });
       fetchAccounts();
