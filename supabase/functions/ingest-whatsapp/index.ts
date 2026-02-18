@@ -11,8 +11,11 @@ async function verifySignature(body: string, signatureHeader: string | null) {
   const msgData = encoder.encode(body);
   const cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
-  const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return signatureHeader.replace("sha256=", "") === sigHex;
+  const arr = new Uint8Array(sig);
+  const sigHex = Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+  const sigBase64 = btoa(String.fromCharCode(...arr));
+  const incoming = signatureHeader.replace("sha256=", "");
+  return incoming === sigHex || incoming === sigBase64;
 }
 
 serve(async (req: Request) => {
