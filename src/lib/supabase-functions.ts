@@ -50,10 +50,15 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
         if (!response.ok) {
             const text = await response.text();
             let errorMsg = text;
-            try { 
-                const json = JSON.parse(text);
-                errorMsg = json.error || json.message || text;
-            } catch {}
+            let parsed: any = null;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                parsed = null;
+            }
+            if (parsed) {
+                errorMsg = parsed.error || parsed.message || text;
+            }
             console.error(`[invokeAnonymous] Failed: ${errorMsg}`);
             updateCircuit(key, false);
             throw new Error(errorMsg);
@@ -105,7 +110,8 @@ export async function invokeFunction<T = any>(
   options: InvokeOptions = {}
 ): Promise<{ data: T | null; error: any }> {
   try {
-    const key = `cb:${functionName}`;
+    const keyBody = options.body ? JSON.stringify({ accountId: (options.body as any)?.accountId ?? null }) : '';
+    const key = `cb:${functionName}:${computeIdempotencyKey(keyBody)}`;
     const now = Date.now();
     const cb = CIRCUIT.get(key) || { state: 'closed', failures: 0, nextTryAt: 0 };
     if (cb.state === 'open' && now < cb.nextTryAt) {
@@ -117,11 +123,13 @@ export async function invokeFunction<T = any>(
     const initialHeaders = token
       ? { ...customHeaders, Authorization: `Bearer ${token}` }
       : customHeaders;
-    let { data, error } = await supabase.functions.invoke(functionName, {
+    const resultInvoke = await supabase.functions.invoke(functionName, {
       body: enrichPayload(options.body),
       headers: initialHeaders,
       method: options.method || 'POST',
     });
+    const data = resultInvoke.data;
+    let error = resultInvoke.error;
 
     if (error) {
       // Check if it's a "Failed to send a request" error (FunctionsFetchError)

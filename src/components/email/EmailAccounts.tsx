@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Mail, Settings, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { invokeFunction } from "@/lib/supabase-functions";
+import { invokeFunction, invokeAnonymous } from "@/lib/supabase-functions";
 import { EmailAccountDialog } from "./EmailAccountDialog";
 import { EmailDelegationDialog } from "./EmailDelegationDialog";
 import { format } from "date-fns";
@@ -137,6 +137,37 @@ export function EmailAccounts() {
         description: error.message ?? "Edge function failed",
         variant: "destructive",
       });
+    }
+  };
+
+  const testImap = async (accountId: string) => {
+    try {
+      const acc = accounts.find(a => a.id === accountId) as any;
+      if (!acc) {
+        toast({ title: "Error", description: "Account not found", variant: "destructive" });
+        return;
+      }
+      if (!acc.imap_host || !acc.imap_username || !acc.imap_password) {
+        toast({ title: "Missing IMAP settings", description: "Please configure IMAP host, username and password.", variant: "destructive" });
+        return;
+      }
+      const result: any = await invokeAnonymous("verify-email-credentials", {
+        imap: {
+          host: acc.imap_host,
+          port: acc.imap_port || 993,
+          username: acc.imap_username || acc.email_address,
+          password: acc.imap_password,
+          secure: acc.imap_use_ssl ?? true
+        }
+      });
+      if (result?.success) {
+        toast({ title: "IMAP OK", description: result?.message || "Connection successful" });
+      } else {
+        const msg = result?.error || "Connection failed";
+        toast({ title: "IMAP Test Failed", description: msg, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "IMAP Test Failed", description: e?.message || "Connection failed", variant: "destructive" });
     }
   };
 
@@ -301,6 +332,16 @@ export function EmailAccounts() {
                     >
                       <RefreshCw className="w-3 h-3 mr-2" />
                       Sync
+                    </Button>
+                  )}
+                  {account.provider === 'smtp_imap' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testImap(account.id)}
+                      title="Test IMAP Connection"
+                    >
+                      Test IMAP
                     </Button>
                   )}
                   <Button

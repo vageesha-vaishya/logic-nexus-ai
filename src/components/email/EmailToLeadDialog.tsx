@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import optionsConfig from "@/config/Options_Transport_Mode.json";
 import interestedConfig from "@/config/Interested_Transport_Mode_checker_config.json";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { sanitizeLeadDataForInsert, extractEmailAddress, parseTransportOptionsJSON, type TransportOption, computeLeadScoreClient } from "./email-to-lead-helpers";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,14 +88,14 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
   const fetchInterestedService = async (forceRefresh = false) => {
     if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
     
-    const CACHE_KEY = `interested_service_${email.id}`;
-    if (!forceRefresh) {
-        const cached = sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
-            console.log("Using cached interested service");
-            setSuggestedService(cached);
-            return;
-        }
+    const hasId = Boolean(email?.id);
+    const CACHE_KEY = hasId ? `interested_service_${email.id}` : null;
+    if (!forceRefresh && CACHE_KEY) {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        setSuggestedService(cached);
+        return;
+      }
     }
 
     setIsSuggestingService(true);
@@ -122,7 +123,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         // Simple validation: ensure it's not too long
         if (text && text.length < 100) {
             setSuggestedService(text);
-            sessionStorage.setItem(CACHE_KEY, text);
+            if (CACHE_KEY) sessionStorage.setItem(CACHE_KEY, text);
         } else {
             console.warn("[InterestedService] Response too long or empty, ignoring.");
         }
@@ -138,21 +139,21 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
   const fetchRecommendedOptions = async (forceRefresh = false) => {
     if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
 
-    const CACHE_KEY = `transport_options_${email.id}`;
-    if (!forceRefresh) {
-        try {
-            const cached = sessionStorage.getItem(CACHE_KEY);
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed)) {
-                    console.log("Using cached transport options");
-                    setTransportOptions(parsed);
-                    return;
-                }
-            }
-        } catch (e) {
-            console.warn("Error reading transport options cache:", e);
+    const hasId = Boolean(email?.id);
+    const CACHE_KEY = hasId ? `transport_options_${email.id}` : null;
+    if (!forceRefresh && CACHE_KEY) {
+      try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setTransportOptions(parsed);
+            return;
+          }
         }
+      } catch {
+        // ignore cache parse errors
+      }
     }
 
     setLoadingOptions(true);
@@ -167,13 +168,53 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         prompt = prompt.replace("<subject>", subject).replace("<content>", content);
 
         const requestId = `req_options_${Date.now()}`;
-        const { data, error } = await supabase.functions.invoke('suggest-transport-mode', {
-            body: { prompt, requestId, responseFormat: 'json' },
-            headers: { 'x-client-info': 'email-to-lead-options' }
+        const { data, error } = await invokeFunction<any>('suggest-transport-mode', {
+          body: { prompt, requestId, responseFormat: 'json' },
+          headers: { 'x-client-info': 'email-to-lead-options' },
         });
 
-        if (error) throw error;
-        if ((data as any)?.error) throw new Error((data as any).error);
+        if (error) {
+          const raw = String((error as any)?.message || "");
+          const status = (error as any)?.context?.status;
+          const isJwtIssue =
+            status === 401 ||
+            /jwt/i.test(raw) ||
+            /unauthorized/i.test(raw) ||
+            /401/.test(raw);
+          const isServiceIssue =
+            (status && status >= 500) ||
+            /failed to fetch/i.test(raw) ||
+            /timeout/i.test(raw) ||
+            /service unavailable/i.test(raw) ||
+            /503/.test(raw);
+
+          let message = "Failed to load recommendations.";
+          if (isJwtIssue) {
+            message =
+              "Your session has expired. Please sign in again and then refresh recommendations.";
+          } else if (isServiceIssue) {
+            message =
+              "AI recommendation service is currently unavailable. Please try again in a few minutes.";
+          } else if (raw) {
+            message = raw;
+          }
+
+          setTransportOptions([]);
+          setSuggestionError(message);
+          return;
+        }
+
+        if ((data as any)?.error) {
+          const raw = String((data as any).error || "");
+          let message = raw || "AI recommendation service returned an error. Please try again.";
+          if (/timeout|unavailable|failed/i.test(message)) {
+            message =
+              "AI recommendation service is currently unavailable. Please try again in a few minutes.";
+          }
+          setTransportOptions([]);
+          setSuggestionError(message);
+          return;
+        }
 
         const buildFallback = (): TransportOption[] => {
           const s = `${subject} ${content}`.toLowerCase();
@@ -237,30 +278,33 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         }
         
         setTransportOptions(options);
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(options));
+        if (CACHE_KEY) sessionStorage.setItem(CACHE_KEY, JSON.stringify(options));
 
-    } catch (err) {
-        console.error(`[RecommendedOptions] Error:`, err);
-        try {
-          const subject = email.subject || "";
-          const content = getBodyText(email);
-          const fallbackOptions: TransportOption[] = [
-            {
-              seqNo: "1",
-              mode: "Road Freight",
-              price: "₹8,000 – ₹15,000",
-              transitTime: "1 – 3 Days",
-              bestFor: "Domestic & Door-to-Door",
-              interchangePoints: "None (Direct)",
-              logic: "Default recommendation when AI is unavailable."
-            }
-          ];
-          setTransportOptions(fallbackOptions);
-          setSuggestionError(null);
-          sessionStorage.setItem(`transport_options_${email.id}`, JSON.stringify(fallbackOptions));
-        } catch {
-          setSuggestionError("Failed to load detailed recommendations.");
+    } catch (err: any) {
+        const raw = String(err?.message || "");
+        const isJwtIssue =
+          /jwt/i.test(raw) ||
+          /unauthorized/i.test(raw) ||
+          /401/.test(raw);
+        const isServiceIssue =
+          /failed to fetch/i.test(raw) ||
+          /timeout/i.test(raw) ||
+          /service unavailable/i.test(raw) ||
+          /503/.test(raw);
+
+        let message = "Failed to load recommendations.";
+        if (isJwtIssue) {
+          message =
+            "Your session has expired. Please sign in again and then refresh recommendations.";
+        } else if (isServiceIssue) {
+          message =
+            "AI recommendation service is currently unavailable. Please try again in a few minutes.";
+        } else if (raw) {
+          message = raw;
         }
+
+        setTransportOptions([]);
+        setSuggestionError(message);
     } finally {
         setLoadingOptions(false);
     }
@@ -277,9 +321,9 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
   useEffect(() => {
     if (open) {
-        // Run both services in parallel
-        fetchInterestedService();
-        fetchRecommendedOptions();
+      // Force refresh on each open or email switch to avoid stale recommendations
+      fetchInterestedService(true);
+      fetchRecommendedOptions(true);
     }
   }, [open, email.id]);
 
