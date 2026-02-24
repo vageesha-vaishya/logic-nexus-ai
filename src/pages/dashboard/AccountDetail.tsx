@@ -13,6 +13,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 
 export default function AccountDetail() {
   const { id } = useParams();
@@ -244,30 +245,57 @@ export default function AccountDetail() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/accounts')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">{account.name}</h1>
-              <p className="text-muted-foreground">Account Details</p>
-            </div>
+      <DetailScreenTemplate
+        title={account.name}
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Accounts', to: '/dashboard/accounts' },
+          { label: account.name },
+        ]}
+        subtitle={
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            {account.industry && (
+              <span className="inline-flex items-center gap-1">
+                <Building2 className="h-4 w-4" />
+                {account.industry}
+              </span>
+            )}
+            {account.website && (
+              <a 
+                href={account.website.startsWith('http') ? account.website : `https://${account.website}`}
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <Globe className="h-4 w-4" />
+                {account.website}
+              </a>
+            )}
+            {account.phone && (
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-4 w-4" />
+                {account.phone}
+              </span>
+            )}
           </div>
-          {!isEditing && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-          )}
-        </div>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {!isEditing && (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      >
 
         {isEditing ? (
           <Card>
@@ -624,7 +652,7 @@ export default function AccountDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </DetailScreenTemplate>
     </DashboardLayout>
   );
 }

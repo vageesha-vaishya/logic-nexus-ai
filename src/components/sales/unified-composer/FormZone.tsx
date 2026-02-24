@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { useFormContext } from 'react-hook-form';
+import { QuoteComposerValues } from './schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,48 +23,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { logger } from '@/lib/logger';
 
-// --- Zod Schema (reused from QuickQuoteModalContent) ---
-
-const baseSchema = z.object({
-  mode: z.enum(['air', 'ocean', 'road', 'rail']),
-  origin: z.string().min(2, 'Origin is required'),
-  destination: z.string().min(2, 'Destination is required'),
-  commodity: z.string().min(2, 'Commodity is required'),
-  preferredCarriers: z.array(z.string()).optional(),
-  weight: z.string().optional().refine((val) => {
-    if (!val) return true;
-    const n = Number(val);
-    return !isNaN(n) && n >= 0;
-  }, { message: 'Weight must be a non-negative number' }),
-  volume: z.string().optional().refine((val) => {
-    if (!val) return true;
-    const n = Number(val);
-    return !isNaN(n) && n >= 0;
-  }, { message: 'Volume must be a non-negative number' }),
-  unit: z.enum(['kg', 'lb', 'cbm']).optional(),
-  containerType: z.string().optional(),
-  containerSize: z.string().optional(),
-  containerQty: z.string().optional(),
-});
-
-export const formZoneSchema = baseSchema.superRefine((data, ctx) => {
-  if (data.mode === 'air') {
-    if (!data.weight || isNaN(Number(data.weight)) || Number(data.weight) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valid weight is required for Air', path: ['weight'] });
-    }
-  }
-  if (data.mode === 'ocean' || data.mode === 'rail') {
-    const qtyNum = Number(data.containerQty || '');
-    if (!data.containerType) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container type is required', path: ['containerType'] });
-    if (!data.containerSize) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container size is required', path: ['containerSize'] });
-    if (isNaN(qtyNum) || qtyNum <= 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container quantity must be > 0', path: ['containerQty'] });
-  }
-  if (data.origin.trim().toLowerCase() === data.destination.trim().toLowerCase()) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Origin and Destination cannot be the same', path: ['destination'] });
-  }
-});
-
-export type FormZoneValues = z.infer<typeof baseSchema>;
+export type FormZoneValues = {
+  mode: 'air' | 'ocean' | 'road' | 'rail';
+  origin: string;
+  destination: string;
+  commodity: string;
+  preferredCarriers?: string[];
+  weight?: string;
+  volume?: string;
+  unit?: 'kg' | 'lb' | 'cbm';
+};
 
 export interface ExtendedFormData {
   containerType: string;
@@ -117,7 +84,6 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
   const [smartMode, setSmartMode] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [carriers, setCarriers] = useState<{ id: string; carrier_name: string; carrier_type: string }[]>([]);
-  const [extendedData, setExtendedData] = useState<ExtendedFormData>({ ...DEFAULT_EXTENDED, ...initialExtended });
 
   const { containerTypes, containerSizes } = useContainerRefs();
   const { incoterms, loading: incLoading } = useIncoterms();
@@ -125,20 +91,26 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
   const { toast } = useToast();
   const { supabase, context } = useCRM();
 
-  const form = useForm<FormZoneValues>({
-    resolver: zodResolver(formZoneSchema),
-    defaultValues: {
-      unit: 'kg',
-      mode: 'ocean',
-      commodity: 'General Cargo',
-      ...initialValues,
-    },
-  });
+  const form = useFormContext<QuoteComposerValues>();
 
   const mode = form.watch('mode');
   const commodity = form.watch('commodity');
   const origin = form.watch('origin');
   const destination = form.watch('destination');
+
+  // Sync initial values to form context
+  useEffect(() => {
+    if (initialValues) {
+      Object.entries(initialValues).forEach(([key, value]) => {
+        if (value !== undefined) form.setValue(key as any, value);
+      });
+    }
+    if (initialExtended) {
+      Object.entries(initialExtended).forEach(([key, value]) => {
+        if (value !== undefined) form.setValue(key as any, value);
+      });
+    }
+  }, [initialValues, initialExtended, form]);
 
   // Auto-expand "More options" if optional fields are populated (edit mode)
   useEffect(() => {
@@ -152,7 +124,7 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
         initialExtended.specialHandling;
       if (hasOptionalData) setMoreOpen(true);
     }
-  }, []);
+  }, [initialExtended]);
 
   // Load carriers
   useEffect(() => {
@@ -212,7 +184,7 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
     if (cargoItem.commodity?.description) {
       form.setValue('commodity', cargoItem.commodity.description);
     }
-    setExtendedData(prev => ({ ...prev, dangerousGoods: !!cargoItem.hazmat }));
+    form.setValue('dangerousGoods', !!cargoItem.hazmat);
 
     if (mode === 'ocean' || mode === 'rail') {
       if (cargoItem.type === 'container') {
@@ -223,26 +195,12 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
           combos = [{ type: cargoItem.containerDetails.typeId, size: cargoItem.containerDetails.sizeId, qty: cargoItem.quantity }];
         }
         if (combos.length > 0) {
-          setExtendedData(prev => ({
-            ...prev,
-            containerType: combos[0].type,
-            containerSize: combos[0].size,
-            containerQty: String(cargoItem.quantity),
-            containerCombos: combos,
-          }));
           form.setValue('containerType', combos[0].type);
           form.setValue('containerSize', combos[0].size);
           form.setValue('containerQty', String(cargoItem.quantity));
         }
       }
     } else {
-      setExtendedData(prev => ({
-        ...prev,
-        weight: String(cargoItem.weight.value),
-        volume: String(cargoItem.volume || 0),
-        containerQty: String(cargoItem.quantity),
-        dims: cargoItem.dimensions ? `${cargoItem.dimensions.l}x${cargoItem.dimensions.w}x${cargoItem.dimensions.h}` : '',
-      }));
       form.setValue('weight', String(cargoItem.weight.value));
       form.setValue('volume', String(cargoItem.volume || 0));
       form.setValue('containerQty', String(cargoItem.quantity));
@@ -251,29 +209,13 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
 
   const handleLocationChange = (field: 'origin' | 'destination', value: string, location?: any) => {
     form.setValue(field, value);
-    if (location) {
-      setExtendedData(prev => ({
-        ...prev,
-        [field === 'origin' ? 'originDetails' : 'destinationDetails']: {
-          name: location.location_name,
-          formatted_address: [location.city, location.state_province, location.country].filter(Boolean).join(', '),
-          code: location.location_code,
-          type: location.location_type,
-          country: location.country,
-          city: location.city,
-        },
-      }));
-    }
+    // Note: originDetails/destinationDetails are not currently in schema but could be added
   };
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
     const displayValue = selection.hts_code ? `${selection.description} - ${selection.hts_code}` : selection.description;
     form.setValue('commodity', displayValue);
-    setExtendedData(prev => ({
-      ...prev,
-      htsCode: selection.hts_code || prev.htsCode,
-      aes_hts_id: selection.aes_hts_id || prev.aes_hts_id,
-    }));
+    if (selection.hts_code) form.setValue('htsCode', selection.hts_code);
   };
 
   const handleAiSuggest = async () => {
@@ -287,7 +229,7 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
         form.setValue('unit', unitRes.data.unit);
       }
       if (classRes.data?.hts) {
-        setExtendedData(prev => ({ ...prev, htsCode: classRes.data.hts, scheduleB: classRes.data.scheduleB || prev.scheduleB }));
+        form.setValue('htsCode', classRes.data.hts);
         toast({ title: 'AI Analysis Complete', description: `Classified as ${classRes.data.type} (HTS: ${classRes.data.hts})` });
       }
     } catch (err) {
@@ -295,8 +237,9 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
     }
   };
 
-  const onSubmit = (data: FormZoneValues) => {
-    onGetRates(data, extendedData, smartMode);
+  const onSubmit = (data: QuoteComposerValues) => {
+    // Pass everything in data to onGetRates
+    onGetRates(data as any, data as any, smartMode);
   };
 
   return (
@@ -378,7 +321,7 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
         {mode === 'road' && (
           <div className="space-y-2 p-3 border rounded-md bg-background">
             <Label className="text-xs">Vehicle Type</Label>
-            <Select value={extendedData.vehicleType} onValueChange={(v) => setExtendedData(prev => ({ ...prev, vehicleType: v }))}>
+            <Select value={form.watch('vehicleType')} onValueChange={(v) => form.setValue('vehicleType', v)}>
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="van">Dry Van</SelectItem>
@@ -447,7 +390,7 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
             {/* Incoterms */}
             <div className="space-y-2">
               <Label className="text-xs">Incoterms</Label>
-              <Select value={extendedData.incoterms} onValueChange={(v) => setExtendedData(prev => ({ ...prev, incoterms: v }))}>
+              <Select value={form.watch('incoterms')} onValueChange={(v) => form.setValue('incoterms', v)}>
                 <SelectTrigger><SelectValue placeholder="Select Incoterms (Optional)" /></SelectTrigger>
                 <SelectContent>
                   {incLoading ? (
@@ -467,11 +410,11 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Pickup Date</Label>
-                <Input type="date" value={extendedData.pickupDate} onChange={(e) => setExtendedData(prev => ({ ...prev, pickupDate: e.target.value }))} className="h-8 text-xs" />
+                <Input type="date" value={form.watch('pickupDate')} onChange={(e) => form.setValue('pickupDate', e.target.value)} className="h-8 text-xs" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Delivery Deadline</Label>
-                <Input type="date" value={extendedData.deliveryDeadline} onChange={(e) => setExtendedData(prev => ({ ...prev, deliveryDeadline: e.target.value }))} className="h-8 text-xs" />
+                <Input type="date" value={form.watch('deliveryDeadline')} onChange={(e) => form.setValue('deliveryDeadline', e.target.value)} className="h-8 text-xs" />
               </div>
             </div>
 
@@ -479,11 +422,14 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">HTS Code</Label>
-                <Input value={extendedData.htsCode} onChange={(e) => setExtendedData(prev => ({ ...prev, htsCode: e.target.value }))} className="h-8 text-xs" placeholder="AI Suggested" />
+                <Input value={form.watch('htsCode')} onChange={(e) => form.setValue('htsCode', e.target.value)} className="h-8 text-xs" placeholder="AI Suggested" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Schedule B</Label>
-                <Input value={extendedData.scheduleB} onChange={(e) => setExtendedData(prev => ({ ...prev, scheduleB: e.target.value }))} className="h-8 text-xs" placeholder="AI Suggested" />
+                <Label className="text-xs">Dangerous Goods</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch checked={form.watch('dangerousGoods')} onCheckedChange={(v) => form.setValue('dangerousGoods', v)} />
+                  <Label className="text-xs font-normal">Yes</Label>
+                </div>
               </div>
             </div>
           </CollapsibleContent>

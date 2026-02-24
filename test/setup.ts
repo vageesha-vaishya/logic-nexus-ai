@@ -1,6 +1,9 @@
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, vi, expect } from 'vitest';
 import '@testing-library/jest-dom';
+import { toHaveNoViolations } from 'jest-axe';
+
+expect.extend(toHaveNoViolations);
 
 // Mock localStorage
 const localStorageMock = (function() {

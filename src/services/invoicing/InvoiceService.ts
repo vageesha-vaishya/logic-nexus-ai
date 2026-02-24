@@ -7,8 +7,15 @@ export const InvoiceService = {
   /**
    * Lists all invoices for the current tenant/franchise scope.
    */
-  async listInvoices(scopedDb: ScopedDataAccess): Promise<Invoice[]> {
-    const { data, error } = await scopedDb
+  async listInvoices(
+    scopedDb: ScopedDataAccess,
+    options?: { pageIndex?: number; pageSize?: number; sortField?: string; sortDirection?: 'asc' | 'desc' }
+  ): Promise<{ data: Invoice[]; totalCount: number }> {
+    const { pageIndex = 1, pageSize = 10, sortField = 'created_at', sortDirection = 'desc' } = options || {};
+    const from = (pageIndex - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const query = scopedDb
       .from('invoices')
       .select(`
         *,
@@ -17,11 +24,14 @@ export const InvoiceService = {
           name,
           email
         )
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' })
+      .order(sortField, { ascending: sortDirection === 'asc' })
+      .range(from, to);
+
+    const { data, error, count } = await query;
 
     if (error) throw error;
-    return data as Invoice[];
+    return { data: data as Invoice[], totalCount: count || 0 };
   },
 
   /**

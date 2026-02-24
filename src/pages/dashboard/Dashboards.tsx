@@ -48,6 +48,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardService } from '@/lib/dashboard-service';
 import { useToast } from '@/components/ui/use-toast';
+import { WidgetSkeleton } from '@/components/dashboard/widgets/WidgetSkeleton';
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'stats-1', type: 'stats', title: 'KPIs', size: 'full', order: 0 },
@@ -364,16 +365,33 @@ export default function Dashboards() {
         >
           <SortableContext items={widgets} strategy={rectSortingStrategy}>
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-min ${!isOwnDashboard ? 'pointer-events-none' : ''}`}>
-              {widgets.map((widget) => (
-                <DraggableWidget
-                  key={widget.id}
-                  config={widget}
-                  onRemove={handleRemoveWidget}
-                  onEdit={handleEditWidget}
-                  onSettings={handleOpenSettings}
-                  isEditMode={isEditMode && isOwnDashboard}
-                />
-              ))}
+              {isLoading ? (
+                // Show skeletons for the default layout while loading
+                DEFAULT_WIDGETS.map((w, i) => (
+                  <div key={`skeleton-${i}`} className={cn(
+                    "h-full",
+                    {
+                      small: 'col-span-1',
+                      medium: 'col-span-1 md:col-span-2 lg:col-span-1', 
+                      large: 'col-span-1 md:col-span-2 lg:col-span-2',
+                      full: 'col-span-1 md:col-span-2 lg:col-span-4',
+                    }[w.size]
+                  )}>
+                    <WidgetSkeleton />
+                  </div>
+                ))
+              ) : (
+                widgets.map((widget) => (
+                  <DraggableWidget
+                    key={widget.id}
+                    config={widget}
+                    onRemove={handleRemoveWidget}
+                    onEdit={handleEditWidget}
+                    onSettings={handleOpenSettings}
+                    isEditMode={isEditMode && isOwnDashboard}
+                  />
+                ))
+              )}
             </div>
           </SortableContext>
           

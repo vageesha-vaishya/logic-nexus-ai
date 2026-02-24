@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useFormContext, useFieldArray } from 'react-hook-form';
+import { QuoteComposerValues } from './schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,7 +85,7 @@ function getModeIcon(mode?: string) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function FinalizeSection({
+export function FinalizeSection({ 
   selectedOption,
   onSaveQuote,
   onGeneratePdf,
@@ -91,9 +93,10 @@ export function FinalizeSection({
   referenceData,
 }: FinalizeSectionProps) {
   const [expanded, setExpanded] = useState(true);
-  const [notes, setNotes] = useState('');
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [activeFilter, setActiveFilter] = useState<{ type: 'category' | 'mode' | 'leg'; value: string } | null>(null);
+
+  const form = useFormContext<QuoteComposerValues>();
 
   const refData = referenceData && referenceData.chargeCategories?.length > 0
     ? referenceData
@@ -115,8 +118,15 @@ export function FinalizeSection({
   } = useChargesManager({
     selectedOption,
     referenceData: refData as UseChargesManagerParams['referenceData'],
-    defaultMarginPercent: 15,
+    defaultMarginPercent: form.getValues('marginPercent') || 15,
   });
+
+  // Sync charges manager state to form
+  useEffect(() => {
+    form.setValue('marginPercent', marginPercent);
+    form.setValue('autoMargin', autoMargin);
+    // Phase 4: Sync allCharges to form.charges if we want to fully migrate
+  }, [marginPercent, autoMargin, form]);
 
   // Build tab keys: one per leg + combined
   const legTabKeys = legs.map((l) => l.id);
@@ -125,7 +135,7 @@ export function FinalizeSection({
 
   const handleSave = () => {
     const { charges: savableCharges, marginPercent: mp } = getChargesForSave();
-    onSaveQuote(savableCharges, mp, notes);
+    onSaveQuote(savableCharges, mp, form.getValues('notes') || '');
   };
 
   // Convert managed charges to TransportLeg[] + Charge[] for visualization
@@ -388,8 +398,7 @@ export function FinalizeSection({
           <div className="space-y-2">
             <Label className="text-sm">Customer Notes</Label>
             <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              {...form.register('notes')}
               placeholder="Additional notes for the customer..."
               rows={3}
               className="text-sm"

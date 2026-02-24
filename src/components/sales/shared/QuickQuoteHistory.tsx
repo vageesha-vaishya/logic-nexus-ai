@@ -199,7 +199,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
         <DialogHeader>
           <div className="flex items-center gap-2">
               {selectedItem && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 -ml-2" onClick={handleBackToList}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 -ml-2" onClick={handleBackToList} aria-label="Back to list">
                       <ArrowLeft className="h-4 w-4" />
                   </Button>
               )}

@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, UserPlus, DollarSign, Filter, TrendingUp, Users as UsersIcon, Trash2, Palette, ArrowLeft, Download } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
@@ -17,14 +16,18 @@ import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
+import { TableSkeleton } from '@/components/system/TableSkeleton';
 import { LeadCard } from '@/components/crm/LeadCard';
+import { DataTable, ColumnDef } from '@/components/system/DataTable';
 import { THEME_PRESETS } from '@/theme/themes';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useLeadsViewState } from '@/hooks/useLeadsViewState';
+import { useDebounce } from '@/hooks/useDebounce';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
+import { useUndo } from '@/hooks/useUndo';
 
 export default function Leads() {
   usePerformanceMonitor('Leads Module');
@@ -68,25 +71,88 @@ export default function Leads() {
     valueMax,
     createdStart,
     createdEnd,
+    page,
+    pageSize,
+    sortField,
+    sortDirection,
   } = viewState.workspace;
+
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Local state for debounced search
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const debouncedSearch = useDebounce(localSearch, 300);
+
+  useEffect(() => {
+    if (debouncedSearch !== searchQuery) {
+      setWorkspace({ searchQuery: debouncedSearch, page: 1 });
+    }
+  }, [debouncedSearch, searchQuery, setWorkspace]);
+
+  // Sync local search when global state changes (e.g. hydration or clear)
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
 
   const viewMode = (viewState.view === 'pipeline' ? 'card' : viewState.view) as ViewMode;
   const selectedIds = new Set(viewState.selection.selectedIds);
   const currentTheme = viewState.theme;
 
-  const setSearchQuery = (val: string) => setWorkspace({ searchQuery: val });
-  const setStatusFilter = (val: string) => setWorkspace({ statusFilter: val });
-  const setScoreFilter = (val: string) => setWorkspace({ scoreFilter: val });
-  const setOwnerFilter = (val: 'any' | 'unassigned' | 'me') => setWorkspace({ ownerFilter: val });
-  const setNameQuery = (val: string) => setWorkspace({ nameQuery: val });
-  const setNameOp = (val: TextOp) => setWorkspace({ nameOp: val });
-  const setValueMin = (val: string) => setWorkspace({ valueMin: val });
-  const setValueMax = (val: string) => setWorkspace({ valueMax: val });
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Sync view state to URL
+  useEffect(() => {
+    if (!viewState.hydrated) return;
+    
+    const params = new URLSearchParams(searchParams);
+    
+    if (searchQuery) params.set('q', searchQuery); else params.delete('q');
+    if (statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
+    if (ownerFilter !== 'any') params.set('owner', ownerFilter); else params.delete('owner');
+    if (page > 1) params.set('page', String(page)); else params.delete('page');
+    
+    // Only update if changed to avoid loops
+    if (params.toString() !== searchParams.toString()) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchQuery, statusFilter, ownerFilter, page, viewState.hydrated]);
+
+  // Sync URL to view state on initial hydration
+  useEffect(() => {
+    if (!viewState.hydrated) return;
+    
+    const q = searchParams.get('q');
+    const status = searchParams.get('status');
+    const owner = searchParams.get('owner');
+    const p = searchParams.get('page');
+    
+    const patch: any = {};
+    if (q !== null && q !== searchQuery) patch.searchQuery = q;
+    if (status !== null && status !== statusFilter) patch.statusFilter = status;
+    if (owner !== null && owner !== ownerFilter) patch.ownerFilter = owner;
+    if (p !== null && Number(p) !== page) patch.page = Number(p);
+    
+    if (Object.keys(patch).length > 0) {
+      setWorkspace(patch);
+    }
+  }, [viewState.hydrated]);
+
+  const setSearchQuery = (val: string) => setWorkspace({ searchQuery: val, page: 1 });
+  const setStatusFilter = (val: string) => setWorkspace({ statusFilter: val, page: 1 });
+  const setScoreFilter = (val: string) => setWorkspace({ scoreFilter: val, page: 1 });
+  const setOwnerFilter = (val: 'any' | 'unassigned' | 'me') => setWorkspace({ ownerFilter: val, page: 1 });
+  const setNameQuery = (val: string) => setWorkspace({ nameQuery: val, page: 1 });
+  const setNameOp = (val: TextOp) => setWorkspace({ nameOp: val, page: 1 });
+  const setValueMin = (val: string) => setWorkspace({ valueMin: val, page: 1 });
+  const setValueMax = (val: string) => setWorkspace({ valueMax: val, page: 1 });
+  const setPage = (val: number) => setWorkspace({ page: val });
+  const setPageSize = (val: number) => setWorkspace({ pageSize: val, page: 1 });
+  const setSorting = (field: string, direction: 'asc' | 'desc') => setWorkspace({ sortField: field, sortDirection: direction });
 
   // KPI Stats
   const stats = {
-    total: leads.length,
-    won: leads.filter(l => l.status === 'won').length,
+    total: totalCount,
+    won: leads.filter(l => l.status === 'won').length, // This only counts visible page, ideally needs a count query
     contacted: leads.filter(l => l.status === 'contacted').length,
     highScore: leads.filter(l => (l.lead_score || 0) >= 70).length
   };
@@ -210,122 +276,111 @@ export default function Leads() {
 
   const fetchLeads = useCallback(async () => {
     try {
-      const { data, error } = await scopedDb
+      setLoading(true);
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = scopedDb
         .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact' });
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      // Apply owner filter
+      if (ownerFilter === 'me' && context?.userId) {
+        query = query.eq('owner_id', context.userId);
+      } else if (ownerFilter === 'unassigned') {
+        query = query.is('owner_id', null);
+      }
+
+      // Apply search query (simple text search)
+      if (searchQuery) {
+        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,company.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+      }
+
+      // Apply sorting
+      query = query.order(sortField, { ascending: sortDirection === 'asc' });
+
+      // Apply range for pagination
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
-
-      // Validate and cast data
-      const safeLeads = (data || []).map((d: any) => ({
-        ...d,
-        status: stages.includes(d.status as LeadStatus) ? (d.status as LeadStatus) : 'new'
-      })) as Lead[];
-
-      setLeads(safeLeads);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error('Failed to load leads');
-      logger.error('Failed to fetch leads (workspace)', {
-        q: searchQuery,
-        statusFilter,
-        scoreFilter,
-        ownerFilter,
-        error: message,
-      });
-      Sentry.captureException(error);
+      setLeads(data || []);
+      setTotalCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      toast.error(t('leads.messages.fetchFailed', 'Failed to fetch leads'));
     } finally {
       setLoading(false);
     }
-  }, [scopedDb, ownerFilter, scoreFilter, searchQuery, statusFilter]);
+  }, [scopedDb, page, pageSize, sortField, sortDirection, statusFilter, ownerFilter, searchQuery, context?.userId, t]);
 
   useEffect(() => {
+    if (!viewState.hydrated) return;
     fetchLeads();
-  }, [fetchLeads]);
-
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-    
-    const matchesScore = scoreFilter === 'all' || 
-      (scoreFilter === 'high' && (lead.lead_score || 0) >= 70) ||
-      (scoreFilter === 'medium' && (lead.lead_score || 0) >= 40 && (lead.lead_score || 0) < 70) ||
-      (scoreFilter === 'low' && (lead.lead_score || 0) < 40);
-    
-    const matchesOwner =
-      ownerFilter === 'any'
-        ? true
-        : ownerFilter === 'unassigned'
-        ? !lead.owner_id
-        : lead.owner_id === (context?.userId || null);
-
-    // Advanced per-column text filters
-    const fullName = `${lead.first_name} ${lead.last_name}`.trim();
-    const matchesName = matchText(fullName, nameQuery, nameOp);
-    const matchesCompany = matchText(lead.company ?? '', companyQuery, companyOp);
-    const matchesEmail = matchText(lead.email ?? '', emailQuery, emailOp);
-    const matchesPhone = matchText(lead.phone ?? '', phoneQuery, phoneOp);
-    const matchesSource = matchText(lead.source ?? '', sourceQuery, sourceOp);
-    const matchesQualification = matchText(lead.qualification_status ?? '', qualificationQuery, qualificationOp);
-
-    // Numeric ranges (inclusive)
-    const scoreVal = lead.lead_score ?? undefined;
-    const sMin = scoreMin ? Number(scoreMin) : undefined;
-    const sMax = scoreMax ? Number(scoreMax) : undefined;
-    const matchesScoreRange = (
-      (sMin === undefined || (scoreVal !== undefined && scoreVal >= sMin)) &&
-      (sMax === undefined || (scoreVal !== undefined && scoreVal <= sMax))
-    );
-
-    const valueVal = lead.estimated_value ?? undefined;
-    const vMin = valueMin ? Number(valueMin) : undefined;
-    const vMax = valueMax ? Number(valueMax) : undefined;
-    const matchesValueRange = (
-      (vMin === undefined || (valueVal !== undefined && valueVal >= vMin)) &&
-      (vMax === undefined || (valueVal !== undefined && valueVal <= vMax))
-    );
-
-    // Date range (created_at)
-    const created = lead.created_at ? new Date(lead.created_at) : null;
-    const cStart = createdStart ? new Date(createdStart) : null;
-    const cEnd = createdEnd ? new Date(createdEnd) : null;
-    const matchesCreatedRange = (
-      (!cStart || (created && created >= cStart)) &&
-      (!cEnd || (created && created <= cEnd))
-    );
-
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesScore &&
-      matchesOwner &&
-      matchesName &&
-      matchesCompany &&
-      matchesEmail &&
-      matchesPhone &&
-      matchesSource &&
-      matchesQualification &&
-      matchesScoreRange &&
-      matchesValueRange &&
-      matchesCreatedRange
-    );
-  });
+  }, [fetchLeads, viewState.hydrated]);
 
   const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      new: 'bg-blue-500/10 text-blue-500',
-      contacted: 'bg-purple-500/10 text-purple-500',
-      qualified: 'bg-teal-500/10 text-teal-500',
-      proposal: 'bg-yellow-500/10 text-yellow-500',
-      negotiation: 'bg-orange-500/10 text-orange-500',
-      won: 'bg-green-500/10 text-green-500',
-      lost: 'bg-red-500/10 text-red-500',
-    };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
+    switch (status) {
+      case 'new': return 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800';
+      case 'contacted': return 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800';
+      case 'qualified': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+      case 'won': return 'bg-green-500/10 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+      case 'lost': return 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+      default: return 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
+    }
   };
+
+  const columns: ColumnDef<Lead>[] = [
+    {
+      key: 'name',
+      header: t('leads.columns.name'),
+      render: (l: Lead) => `${l.first_name} ${l.last_name}`,
+      sortable: true
+    },
+    { key: 'company', header: t('leads.columns.company'), sortable: true },
+    { key: 'email', header: t('leads.columns.email'), sortable: true },
+    { key: 'phone', header: t('leads.columns.phone'), sortable: true },
+    {
+      key: 'status',
+      header: t('leads.columns.status'),
+      render: (l: Lead) => <Badge className={getStatusColor(l.status)}>{l.status}</Badge>,
+      sortable: true
+    },
+    {
+      key: 'source',
+      header: t('leads.columns.source'),
+      render: (l: Lead) => <Badge variant="outline">{l.source}</Badge>,
+      sortable: true
+    },
+    {
+      key: 'lead_score',
+      header: t('leads.columns.score'),
+      render: (l: Lead) => l.lead_score !== null ? (
+        <div className="flex items-center gap-1">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          {l.lead_score}
+        </div>
+      ) : '-',
+      sortable: true
+    },
+    {
+      key: 'estimated_value',
+      header: t('leads.columns.value'),
+      render: (l: Lead) => l.estimated_value ? (
+        <div className="flex items-center gap-1 text-green-600">
+          <DollarSign className="h-4 w-4" />
+          ${l.estimated_value.toLocaleString()}
+        </div>
+      ) : '-',
+      sortable: true
+    },
+  ];
 
   const toggleSelection = (id: string) => {
     const next = new Set(selectedIds);
@@ -334,13 +389,7 @@ export default function Leads() {
     setSelectedIds(Array.from(next));
   };
 
-  const toggleAll = () => {
-    if (selectedIds.size === filteredLeads.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredLeads.map(l => l.id));
-    }
-  };
+  const { performDeleteWithUndo } = useUndo();
 
   const handleBulkDelete = async () => {
     if (!window.confirm(t('leads.messages.deleteConfirm', { count: selectedIds.size }))) return;
@@ -359,19 +408,18 @@ export default function Leads() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t('leads.messages.deleteConfirmSingle', 'Delete this lead?'))) return;
-    
-    try {
-      const { error } = await scopedDb.from('leads').delete().eq('id', id);
-      if (error) throw error;
-      
-      toast.success(t('leads.messages.deleteSuccessSingle', 'Lead deleted'));
-      if (selectedIds.has(id)) toggleSelection(id);
-      fetchLeads();
-    } catch (error) {
-      console.error('Error deleting lead:', error);
-      toast.error(t('leads.messages.deleteError'));
-    }
+    const leadToDelete = leads.find(l => l.id === id);
+    if (!leadToDelete) return;
+
+    await performDeleteWithUndo({
+      table: 'leads',
+      data: leadToDelete,
+      label: 'Lead',
+      onSuccess: () => {
+        if (selectedIds.has(id)) toggleSelection(id);
+        fetchLeads();
+      }
+    });
   };
 
   return (
@@ -488,8 +536,8 @@ export default function Leads() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={t('leads.filters.search')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className="pl-10 bg-background"
               />
             </div>
@@ -580,10 +628,18 @@ export default function Leads() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">{t('leads.messages.loading')}</p>
+          <div className="space-y-4">
+             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map(i => (
+                  <Card key={i} className="h-[120px] animate-pulse">
+                    <CardHeader className="pb-2"><Skeleton className="h-3 w-20" /><Skeleton className="h-6 w-12" /></CardHeader>
+                    <CardContent><Skeleton className="h-4 w-24" /></CardContent>
+                  </Card>
+                ))}
+             </div>
+             <TableSkeleton columns={6} rows={8} />
           </div>
-        ) : filteredLeads.length === 0 ? (
+        ) : leads.length === 0 ? (
           <EmptyState
             icon={<UserPlus className="h-10 w-10" />}
             title={t('leads.messages.noLeads')}
@@ -593,81 +649,40 @@ export default function Leads() {
           />
         ) : viewMode === 'list' ? (
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle>{t('leads.allLeads')}</CardTitle>
-            </CardHeader>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
-                    <Checkbox 
-                      checked={filteredLeads.length > 0 && selectedIds.size === filteredLeads.length}
-                      onCheckedChange={toggleAll}
-                    />
-                  </TableHead>
-                  <TableHead>{t('leads.columns.name')}</TableHead>
-                  <TableHead>{t('leads.columns.company')}</TableHead>
-                  <TableHead>{t('leads.columns.email')}</TableHead>
-                  <TableHead>{t('leads.columns.phone')}</TableHead>
-                  <TableHead>{t('leads.columns.status')}</TableHead>
-                  <TableHead>{t('leads.columns.source')}</TableHead>
-                  <TableHead>{t('leads.columns.score')}</TableHead>
-                  <TableHead>{t('leads.columns.value')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLeads.map((lead) => (
-                  <TableRow
-                    key={lead.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/dashboard/leads/${lead.id}`)}
-                  >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox 
-                        checked={selectedIds.has(lead.id)}
-                        onCheckedChange={() => toggleSelection(lead.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {lead.first_name} {lead.last_name}
-                    </TableCell>
-                    <TableCell>{lead.company || '-'}</TableCell>
-                    <TableCell>{lead.email || '-'}</TableCell>
-                    <TableCell>{lead.phone || '-'}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{lead.source}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {lead.lead_score !== null ? (
-                        <div className="flex items-center gap-1">
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                          {lead.lead_score}
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {lead.estimated_value ? (
-                        <div className="flex items-center gap-1 text-green-600">
-                          <DollarSign className="h-4 w-4" />
-                          ${lead.estimated_value.toLocaleString()}
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <CardContent className="pt-6">
+              <DataTable
+                data={leads}
+                columns={columns as any}
+                isLoading={loading}
+                onRowClick={(lead) => navigate(`/dashboard/leads/${lead.id}`)}
+                selection={{
+                  selectedIds: viewState.selection.selectedIds,
+                  onSelectionChange: setSelectedIds,
+                  rowId: (l) => l.id
+                }}
+                pagination={{
+                  pageIndex: page,
+                  pageSize: pageSize,
+                  totalCount: totalCount,
+                  onPageChange: setPage,
+                  onPageSizeChange: setPageSize
+                }}
+                sorting={{
+                  field: sortField,
+                  direction: sortDirection,
+                  onSort: (field) => {
+                    const dir = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
+                    setSorting(field, dir);
+                  }
+                }}
+                mobileTitleKey="first_name"
+                mobileSubtitleKey="company"
+              />
+            </CardContent>
           </Card>
         ) : viewMode === 'grid' ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {filteredLeads.map((lead) => (
+            {leads.map((lead) => (
               <LeadCard
                 key={lead.id}
                 lead={lead}
@@ -681,7 +696,7 @@ export default function Leads() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {filteredLeads.map((lead) => (
+            {leads.map((lead) => (
               <LeadCard
                 key={lead.id}
                 lead={lead}

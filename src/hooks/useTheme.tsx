@@ -29,6 +29,7 @@ export type SavedTheme = {
 type ThemeContextValue = {
   themes: SavedTheme[];
   activeThemeName: string | null;
+  isDark: boolean;
   scope: 'platform' | 'tenant' | 'franchise' | 'user';
   setScope: (s: 'platform' | 'tenant' | 'franchise' | 'user') => void;
   applyTheme: (t: { start: string; end: string; primary?: string; accent?: string; titleStrip?: string; tableHeaderText?: string; tableHeaderSeparator?: string; tableHeaderBackground?: string; tableBackground?: string; tableForeground?: string; angle?: number; radius?: string; sidebarBackground?: string; sidebarAccent?: string; dark?: boolean; bgStart?: string; bgEnd?: string; bgAngle?: number }) => void;
@@ -46,6 +47,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themes, setThemes] = useState<SavedTheme[]>([]);
   const [activeThemeName, setActiveThemeName] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(false);
   const [scope, setScope] = useState<'platform' | 'tenant' | 'franchise' | 'user'>('user');
   const [themesFetchDisabled, setThemesFetchDisabled] = useState(false);
   const LS_DARK_KEY = 'soslogicpro.darkMode';
@@ -137,6 +139,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       root.classList.remove('dark');
     }
+    setIsDark(enabled);
     localStorage.setItem(LS_DARK_KEY, String(enabled));
   }, [LS_DARK_KEY]);
 
@@ -171,13 +174,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
         }
       }
-      if (darkStored) {
-        toggleDark(darkStored === 'true');
+      if (darkStored !== null) {
+        const enabled = darkStored === 'true';
+        setIsDark(enabled);
+        if (enabled) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else {
+        // Default to light
+        setIsDark(false);
+        document.documentElement.classList.remove('dark');
       }
     } catch {
       // ignore
     }
-  }, []);
+  }, [LS_DARK_KEY])
 
   // Choose default scope based on current context
   useEffect(() => {
@@ -328,7 +341,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   };
 
-  const value = useMemo<ThemeContextValue>(() => ({ themes, activeThemeName, scope, setScope, applyTheme, saveTheme, deleteTheme, setActive, toggleDark }), [themes, activeThemeName, scope, applyTheme, toggleDark]);
+  const value = useMemo<ThemeContextValue>(() => ({ themes, activeThemeName, isDark, scope, setScope, applyTheme, saveTheme, deleteTheme, setActive, toggleDark }), [themes, activeThemeName, isDark, scope, applyTheme, toggleDark]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };

@@ -25,6 +25,7 @@ import { format } from 'date-fns';
 import { Lead, statusConfig } from './leads-data';
 import { exportCsv, exportExcel } from '@/lib/import-export';
 import { getScoreGrade } from '@/utils/leadScoring';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 
 export default function LeadDetail() {
   const { id } = useParams();
@@ -377,12 +378,49 @@ export default function LeadDetail() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <Button variant="ghost" size="icon" aria-label="Back to leads" onClick={() => navigate('/dashboard/leads')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+      <DetailScreenTemplate
+        title={`${lead.first_name} ${lead.last_name}`}
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Leads', to: '/dashboard/leads' },
+          { label: `${lead.first_name} ${lead.last_name}` },
+        ]}
+        subtitle={
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Badge className={stage.color}>{stage.label}</Badge>
+              <Badge className={`${priority.bg} ${priority.color}`}>{priority.label}</Badge>
+              {lead.converted_at && (
+                <Badge className="bg-green-500/10 text-green-700 dark:text-green-300">
+                  Converted {format(new Date(lead.converted_at), 'PPP')}
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              {lead.company && (
+                <span className="inline-flex items-center gap-1">
+                  <Building2 className="h-4 w-4" />
+                  {lead.company}
+                </span>
+              )}
+              {lead.title && <span>{lead.title}</span>}
+              {lead.email && (
+                <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                  <Mail className="h-4 w-4" />
+                  {lead.email}
+                </a>
+              )}
+              {lead.phone && (
+                <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                  <Phone className="h-4 w-4" />
+                  {lead.phone}
+                </a>
+              )}
+            </div>
+          </div>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -391,41 +429,7 @@ export default function LeadDetail() {
             >
               {isLeftPanelOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
             </Button>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-3xl font-bold">{lead.first_name} {lead.last_name}</h1>
-                <Badge className={stage.color}>{stage.label}</Badge>
-                <Badge className={`${priority.bg} ${priority.color}`}>{priority.label}</Badge>
-                {lead.converted_at && (
-                  <Badge className="bg-green-500/10 text-green-700 dark:text-green-300">
-                    Converted {format(new Date(lead.converted_at), 'PPP')}
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                {lead.company ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Building2 className="h-4 w-4" />
-                    {lead.company}
-                  </span>
-                ) : null}
-                {lead.title ? <span>{lead.title}</span> : null}
-                {lead.email ? (
-                  <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                    <Mail className="h-4 w-4" />
-                    {lead.email}
-                  </a>
-                ) : null}
-                {lead.phone ? (
-                  <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                    <Phone className="h-4 w-4" />
-                    {lead.phone}
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+            
             {!isEditing ? (
               <>
                 <Button
@@ -451,31 +455,25 @@ export default function LeadDetail() {
                   <Calendar className="mr-2 h-4 w-4" />
                   Meeting
                 </Button>
-              </>
-            ) : null}
 
-            {!isEditing ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Lead</DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={() => exportLead('csv')}>Export Lead (CSV)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => exportLead('xlsx')}>Export Lead (Excel)</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Activities</DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={() => exportActivities('csv')}>Export Activities (CSV)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => exportActivities('xlsx')}>Export Activities (Excel)</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Lead</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => exportLead('csv')}>Export Lead (CSV)</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => exportLead('xlsx')}>Export Lead (Excel)</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Activities</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => exportActivities('csv')}>Export Activities (CSV)</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => exportActivities('xlsx')}>Export Activities (Excel)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-            {!isEditing && (
-              <>
                 <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
@@ -517,10 +515,10 @@ export default function LeadDetail() {
                   Delete
                 </Button>
               </>
-            )}
+            ) : null}
           </div>
-        </div>
-
+        }
+      >
         {isEditing ? (
           <Card>
             <CardHeader>
@@ -823,7 +821,7 @@ export default function LeadDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </DetailScreenTemplate>
     </DashboardLayout>
   );
 }

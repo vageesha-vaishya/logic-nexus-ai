@@ -11,6 +11,7 @@ import { ArrowLeft, Edit, Trash2, User, Phone, Mail, Building2, Linkedin } from 
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 
 export default function ContactDetail() {
   const { id } = useParams();
@@ -156,31 +157,58 @@ export default function ContactDetail() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/contacts')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">{contact.first_name} {contact.last_name}</h1>
-              <p className="text-muted-foreground">Contact Details</p>
-            </div>
+      <DetailScreenTemplate
+        title={`${contact.first_name} ${contact.last_name}`}
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Contacts', to: '/dashboard/contacts' },
+          { label: `${contact.first_name} ${contact.last_name}` },
+        ]}
+        subtitle={
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            {contact.title && (
+              <span className="inline-flex items-center gap-1">
+                <User className="h-4 w-4" />
+                {contact.title}
+              </span>
+            )}
+            {contact.accounts?.name && (
+              <span className="inline-flex items-center gap-1">
+                <Building2 className="h-4 w-4" />
+                {contact.accounts.name}
+              </span>
+            )}
+            {contact.email && (
+              <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                <Mail className="h-4 w-4" />
+                {contact.email}
+              </a>
+            )}
+            {contact.phone && (
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-4 w-4" />
+                {contact.phone}
+              </span>
+            )}
           </div>
-          {!isEditing && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-          )}
-        </div>
-
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {!isEditing && (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      >
         {isEditing ? (
           <Card>
             <CardHeader>
@@ -387,24 +415,24 @@ export default function ContactDetail() {
             </Card>
           </div>
         )}
+      </DetailScreenTemplate>
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Contact</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this contact? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this contact? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

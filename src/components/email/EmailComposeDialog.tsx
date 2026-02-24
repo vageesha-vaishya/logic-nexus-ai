@@ -1,16 +1,41 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Send, Paperclip, X, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Link as LinkIcon, Eraser, Loader2, Trash2, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { invokeFunction } from "@/lib/supabase-functions";
 import { useCRM } from "@/hooks/useCRM";
-import { useRef } from "react";
+
+const emailComposeSchema = z.object({
+  accountId: z.string().min(1, "Please select an account"),
+  to: z.string().min(1, "Recipient is required").refine(
+    (val) => val.split(",").every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())),
+    { message: "One or more email addresses are invalid" }
+  ),
+  cc: z.string().optional().refine(
+    (val) => !val || val.split(",").every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())),
+    { message: "One or more CC email addresses are invalid" }
+  ),
+  subject: z.string().min(1, "Subject is required"),
+  body: z.string().min(1, "Message body is required"),
+});
+
+type EmailComposeValues = z.infer<typeof emailComposeSchema>;
 
 interface EmailComposeDialogProps {
   open: boolean;
@@ -31,13 +56,7 @@ interface EmailComposeDialogProps {
 
 export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, initialSubject, initialBody, existingActivityId, onSent, entityType, entityId }: EmailComposeDialogProps) {
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState("");
-  const [to, setTo] = useState(replyTo?.to || (initialTo ? initialTo.join(", ") : ""));
-  const [cc, setCc] = useState("");
-  const [subject, setSubject] = useState(replyTo?.subject || initialSubject || "");
-  const [body, setBody] = useState(replyTo?.body || initialBody || "Hi, \n\n This is a test email from Logic Nexus AI.");
-  const [editorHtml, setEditorHtml] = useState<string>("");
-  const editorRef = { current: null as HTMLDivElement | null };
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
   const { context } = useCRM();
@@ -54,62 +73,70 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  const form = useForm<EmailComposeValues>({
+    resolver: zodResolver(emailComposeSchema),
+    defaultValues: {
+      accountId: "",
+      to: replyTo?.to || (initialTo ? initialTo.join(", ") : ""),
+      cc: "",
+      subject: replyTo?.subject || initialSubject || "",
+      body: replyTo?.body || initialBody || "Hi, \n\n This is a test email from Logic Nexus AI.",
+    },
+  });
+
   useEffect(() => {
     if (open) {
       fetchAccounts();
       let contentHtml = "";
 
       if (replyTo) {
-        setTo(replyTo.to);
+        form.setValue("to", replyTo.to);
         
         // Smart subject handling
         let newSubject = replyTo.subject;
         if (!newSubject.toLowerCase().startsWith("re:") && !newSubject.toLowerCase().startsWith("fwd:")) {
            newSubject = `Re: ${newSubject}`;
         }
-        setSubject(newSubject);
+        form.setValue("subject", newSubject);
         
         if (replyTo.body) {
           if (newSubject.toLowerCase().startsWith("fwd:")) {
-             setBody(replyTo.body);
+             form.setValue("body", replyTo.body);
              contentHtml = plainToHtml(replyTo.body);
-             setEditorHtml(contentHtml);
           } else {
              // Reply
              const quoted = `\n\n--- Original Message ---\n${replyTo.body}`;
-             setBody(quoted);
+             form.setValue("body", quoted);
              contentHtml = plainToHtml(quoted);
-             setEditorHtml(contentHtml);
           }
         }
       } else {
         // Handle initial values
-        if (initialSubject) setSubject(initialSubject);
+        if (initialSubject) form.setValue("subject", initialSubject);
         if (initialBody) {
-          setBody(initialBody);
+          form.setValue("body", initialBody);
           contentHtml = plainToHtml(initialBody);
-          setEditorHtml(contentHtml);
-        } else if (!body) {
-          const defaultBody = "Hi, \n\n This is a test email from Logic Nexus AI.";
-          setBody(defaultBody);
+        } else {
+          const defaultBody = form.getValues("body") || "Hi, \n\n This is a test email from Logic Nexus AI.";
+          form.setValue("body", defaultBody);
           contentHtml = plainToHtml(defaultBody);
-          setEditorHtml(contentHtml);
         }
       }
 
       // Initialize editor content
       setTimeout(() => {
         if (editorRef.current) {
-          editorRef.current.innerHTML = contentHtml || editorHtml || plainToHtml(body || "");
+          editorRef.current.innerHTML = contentHtml || plainToHtml(form.getValues("body") || "");
         }
       }, 0);
     }
-  }, [open, replyTo, initialSubject, initialBody]);
+  }, [open, replyTo, initialSubject, initialBody, form]);
 
   useEffect(() => {
     // Apply compose defaults when account changes
+    const selectedAccountId = form.watch("accountId");
     try {
-      const acc = accounts.find((a) => a.id === selectedAccount);
+      const acc = accounts.find((a) => a.id === selectedAccountId);
       const settings = (acc?.settings || {}) as any;
       const nextDefaults = {
         font: settings.compose_default_font || "Calibri, Segoe UI, Arial, sans-serif",
@@ -124,18 +151,18 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
         editorRef.current.style.fontSize = `${nextDefaults.sizePt}pt`;
         // Initialize with signature if empty
         const current = editorRef.current.innerHTML?.trim();
-        if (!current) {
-          const baseHtml = editorHtml || plainToHtml(body || "");
+        if (!current || current === "<br>") {
+          const baseHtml = plainToHtml(form.getValues("body") || "");
           editorRef.current.innerHTML = nextDefaults.signatureHtml
             ? `${baseHtml}${baseHtml ? '<br><br>' : ''}${nextDefaults.signatureHtml}`
             : baseHtml;
-          setEditorHtml(editorRef.current.innerHTML);
+          form.setValue("body", editorRef.current.innerHTML);
         }
       }
     } catch {
       // ignore
     }
-  }, [selectedAccount, accounts]);
+  }, [form.watch("accountId"), accounts]);
 
   const fetchAccounts = async () => {
     try {
@@ -149,7 +176,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
       setAccounts(data || []);
       if (data && data.length > 0) {
         const connected = data.find((a: any) => (a.provider === "gmail" ? (a.access_token || a.refresh_token) : true));
-        setSelectedAccount((connected || data[0])?.id || "");
+        form.setValue("accountId", (connected || data[0])?.id || "");
       }
     } catch (error: any) {
       toast({
@@ -243,7 +270,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
           if (editorRef.current) {
             editorRef.current.focus();
             document.execCommand('insertImage', false, publicUrl);
-            setEditorHtml(editorRef.current.innerHTML);
+            form.setValue("body", editorRef.current.innerHTML);
           }
       } catch (error: any) {
           toast({ title: "Image Upload Failed", description: error.message, variant: "destructive" });
@@ -256,19 +283,10 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSend = async () => {
-    if (!selectedAccount || !to || !subject) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const onSubmit = async (values: EmailComposeValues) => {
     setSending(true);
     try {
-      const selected = accounts.find((a) => a.id === selectedAccount);
+      const selected = accounts.find((a) => a.id === values.accountId);
       if (selected?.provider === "gmail" && !selected?.access_token && !selected?.refresh_token) {
         throw new Error("Selected Gmail account is not connected. Please connect it in Accounts.");
       }
@@ -276,11 +294,11 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
       // Call edge function to send email
       const { data, error } = await invokeFunction("send-email", {
         body: {
-          accountId: selectedAccount,
-          to: to.split(",").map(e => e.trim()),
-          cc: cc ? cc.split(",").map(e => e.trim()) : [],
-          subject,
-          body: editorHtml || plainToHtml(body),
+          accountId: values.accountId,
+          to: values.to.split(",").map(e => e.trim()),
+          cc: values.cc ? values.cc.split(",").map(e => e.trim()) : [],
+          subject: values.subject,
+          body: values.body,
           attachments: attachments.map(a => ({
             filename: a.name,
             path: a.path,
@@ -310,10 +328,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
           } else if (status === 500) {
              description = "Email service error. Please try again later.";
           } else if (status === 401) {
-              console.error("Email send Unauthorized. Full error:", error);
-              if ((error as any)?.context) {
-                  console.error("Debug info (context):", (error as any).context);
-              }
               description = "Session expired. Please log out and log in again.";
            } else {
              description = `Email service unavailable (Status: ${status || 'Unknown'}). Please check your connection.`;
@@ -337,11 +351,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
             contact: 'contacts',
             account: 'accounts',
             opportunity: 'opportunities',
-            // shipment: 'shipments' // Activity table doesn't support shipment_id directly yet
           };
           const tableName = tableMap[entityType];
 
-          // Always try to fetch entity context to ensure activity matches entity scope
           if (tableName) {
             const { data: entityData, error: entityError } = await (supabase as any)
               .from(tableName)
@@ -350,9 +362,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
               .single();
 
             if (entityData) {
-              // Use entity's tenant/franchise to ensure visibility consistency
-              // This is crucial for Tenant Admins (who have null franchiseId in context)
-              // creating activities for Franchise Leads.
               tenantId = entityData.tenant_id;
               franchiseId = entityData.franchise_id;
             } else if (entityError) {
@@ -364,16 +373,16 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
             activity_type: 'email',
             status: 'completed',
             priority: 'medium',
-            subject: subject,
-            description: (editorHtml || body || "").replace(/<[^>]+>/g, "").substring(0, 500), // Plain text preview
+            subject: values.subject,
+            description: values.body.replace(/<[^>]+>/g, "").substring(0, 500), // Plain text preview
             completed_at: new Date().toISOString(),
             tenant_id: tenantId,
             franchise_id: franchiseId,
             created_by: (await supabase.auth.getUser()).data.user?.id,
             custom_fields: {
-              to: to,
-              cc: cc,
-              email_body: editorHtml || body || ""
+              to: values.to,
+              cc: values.cc,
+              email_body: values.body
             }
           };
 
@@ -385,7 +394,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
           if (tenantId) {
              let activityError;
              if (existingActivityId) {
-                // Fetch existing activity to merge custom_fields
                 const { data: existingActivity } = await supabase
                   .from('activities')
                   .select('custom_fields')
@@ -417,16 +425,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
                  variant: "destructive",
                });
              }
-          } else {
-             console.warn("Skipping activity creation: tenantId missing");
           }
         } catch (err) {
           console.error("Error creating activity log:", err);
-          toast({
-             title: "Warning",
-             description: "Email sent, but failed to create activity log.",
-             variant: "destructive",
-           });
         }
       }
 
@@ -437,7 +438,9 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
 
       onSent?.();
       onOpenChange(false);
-      resetForm();
+      form.reset();
+      setAttachments([]);
+      if (editorRef.current) editorRef.current.innerHTML = "";
     } catch (error: any) {
       toast({
         title: "Error",
@@ -447,14 +450,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
     } finally {
       setSending(false);
     }
-  };
-
-  const resetForm = () => {
-    setTo("");
-    setCc("");
-    setSubject("");
-    setBody("Hi, \n\n This is a test email from Logic Nexus AI.");
-    setEditorHtml("");
   };
 
   const exec = (cmd: string, val?: string) => {
@@ -486,122 +481,166 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
           <DialogTitle>Compose Email</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-          <div>
-            <Label>From</Label>
-            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select email account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.display_name || account.email_address}
-                  </SelectItem>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <FormField
+              control={form.control}
+              name="accountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>From</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger aria-label="From account">
+                        <SelectValue placeholder="Select email account" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.display_name || account.email_address}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="to"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>To *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="recipient@example.com (comma separated for multiple)"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="cc"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>CC</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="cc@example.com (comma separated for multiple)"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="subject"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subject *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Email subject"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="body"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel>Message</FormLabel>
+                  {composeDefaults.ribbon && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("bold")} aria-label="Bold"> <Bold className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("italic")} aria-label="Italic"> <Italic className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("underline")} aria-label="Underline"> <Underline className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("insertUnorderedList")} aria-label="Unordered List"> <List className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("insertOrderedList")} aria-label="Ordered List"> <ListOrdered className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyLeft")} aria-label="Align Left"> <AlignLeft className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyCenter")} aria-label="Align Center"> <AlignCenter className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyRight")} aria-label="Align Right"> <AlignRight className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => imageInputRef.current?.click()} aria-label="Insert Image"> <ImageIcon className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={applyLink} aria-label="Insert Link"> <LinkIcon className="w-4 h-4" /> </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={clearFormatting} aria-label="Clear Formatting"> <Eraser className="w-4 h-4" /> </Button>
+                  </div>
+                  )}
+                  <FormControl>
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      className="min-h-[200px] border rounded-md p-3 font-outlook focus:outline-none"
+                      onInput={(e) => field.onChange((e.target as HTMLDivElement).innerHTML)}
+                      style={{ whiteSpace: "pre-wrap" }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((file, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-secondary p-2 rounded-md text-sm">
+                    <span className="max-w-[220px] truncate">{file.name}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAttachment(i)} aria-label={`Remove attachment ${file.name}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>To *</Label>
-            <Input
-              placeholder="recipient@example.com (comma separated for multiple)"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label>CC</Label>
-            <Input
-              placeholder="cc@example.com (comma separated for multiple)"
-              value={cc}
-              onChange={(e) => setCc(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label>Subject *</Label>
-            <Input
-              placeholder="Email subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Message</Label>
-            {composeDefaults.ribbon && (
-            <div className="flex flex-wrap items-center gap-1">
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("bold")}> <Bold className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("italic")}> <Italic className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("underline")}> <Underline className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("insertUnorderedList")}> <List className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("insertOrderedList")}> <ListOrdered className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyLeft")}> <AlignLeft className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyCenter")}> <AlignCenter className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => exec("justifyRight")}> <AlignRight className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => imageInputRef.current?.click()}> <ImageIcon className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={applyLink}> <LinkIcon className="w-4 h-4" /> </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={clearFormatting}> <Eraser className="w-4 h-4" /> </Button>
-            </div>
+              </div>
             )}
-            <div
-              ref={(el) => { editorRef.current = el; }}
-              contentEditable
-              className="min-h-[200px] border rounded-md p-3 font-outlook focus:outline-none"
-              onInput={(e) => setEditorHtml((e.target as HTMLDivElement).innerHTML)}
-              style={{ whiteSpace: "pre-wrap" }}
-            />
-          </div>
 
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {attachments.map((file, i) => (
-                <div key={i} className="flex items-center gap-2 bg-secondary p-2 rounded-md text-sm">
-                  <span className="max-w-[220px] truncate">{file.name}</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAttachment(i)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+            <div className="shrink-0 border-t pt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-background">
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                multiple
+                onChange={handleFileSelect}
+              />
+              <input
+                type="file"
+                ref={imageInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageSelect}
+              />
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                  {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Paperclip className="w-4 h-4 mr-2" />}
+                  Attach File
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={sending}>
+                  <Send className="w-4 h-4 mr-2" />
+                  {sending ? "Sending..." : "Send"}
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
-
-        <div className="shrink-0 border-t pt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-background">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            multiple
-            onChange={handleFileSelect}
-          />
-          <input
-            type="file"
-            ref={imageInputRef}
-            className="hidden"
-            accept="image/*"
-            onChange={handleImageSelect}
-          />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-              {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Paperclip className="w-4 h-4 mr-2" />}
-              Attach File
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSend} disabled={sending}>
-              <Send className="w-4 h-4 mr-2" />
-              {sending ? "Sending..." : "Send"}
-            </Button>
-          </div>
-        </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

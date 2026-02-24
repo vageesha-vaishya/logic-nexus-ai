@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { quoteComposerSchema, QuoteComposerValues } from './schema';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Cloud, CloudOff, Loader2 } from 'lucide-react';
@@ -261,9 +264,10 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       {
         ...formValues,
         ...extendedData,
+        mode: (formValues.mode || 'ocean') as any,
         smartMode: smart,
         account_id: storeState.quoteData?.account_id,
-      },
+      } as any,
       containerResolver
     );
   };
@@ -512,62 +516,76 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     );
   }
 
+  const form = useForm<QuoteComposerValues>({
+    resolver: zodResolver(quoteComposerSchema),
+    defaultValues: {
+      mode: 'ocean',
+      origin: '',
+      destination: '',
+      commodity: '',
+      marginPercent: 15,
+      autoMargin: true,
+    },
+  });
+
   return (
-    <div className="space-y-6">
-      {/* Auto-save indicator */}
-      <div className="flex items-center justify-end text-xs text-muted-foreground gap-2">
-        {isSavingDraft ? (
-          <><Cloud className="w-3 h-3 animate-pulse" /> Saving draft...</>
-        ) : lastSaved ? (
-          <><Cloud className="w-3 h-3 text-green-500" /> Saved {lastSaved.toLocaleTimeString()}</>
-        ) : storeState.versionId ? (
-          <><CloudOff className="w-3 h-3" /> Not yet saved</>
-        ) : null}
+    <FormProvider {...form}>
+      <div className="space-y-6">
+        {/* Auto-save indicator */}
+        <div className="flex items-center justify-end text-xs text-muted-foreground gap-2">
+          {isSavingDraft ? (
+            <><Cloud className="w-3 h-3 animate-pulse" /> Saving draft...</>
+          ) : lastSaved ? (
+            <><Cloud className="w-3 h-3 text-green-500" /> Saved {lastSaved.toLocaleTimeString()}</>
+          ) : storeState.versionId ? (
+            <><CloudOff className="w-3 h-3" /> Not yet saved</>
+          ) : null}
+        </div>
+
+        {/* Form Zone — always visible */}
+        <FormZone
+          onGetRates={handleGetRates}
+          onSaveDraft={storeState.versionId ? handleSaveDraft : undefined}
+          loading={rateFetching.loading}
+          initialValues={initialFormValues}
+          initialExtended={initialExtended}
+        />
+
+        <Separator />
+
+        {/* Results Zone */}
+        <ResultsZone
+          results={rateFetching.results}
+          loading={rateFetching.loading}
+          smartMode={smartMode}
+          marketAnalysis={rateFetching.marketAnalysis}
+          confidenceScore={rateFetching.confidenceScore}
+          anomalies={rateFetching.anomalies}
+          complianceCheck={complianceCheck}
+          onSelect={handleSelectOption}
+          selectedOptionId={selectedOption?.id}
+          onRerunRates={lastFormData ? handleRerunRates : undefined}
+        />
+
+        {/* Finalize Section — shown when option selected */}
+        {selectedOption && (
+          <>
+            <Separator />
+            <FinalizeSection
+              selectedOption={selectedOption}
+              onSaveQuote={handleSaveQuote}
+              onGeneratePdf={handleGeneratePdf}
+              saving={saving}
+              referenceData={{
+                chargeCategories: repoData.chargeCategories || [],
+                chargeBases: repoData.chargeBases || [],
+                currencies: repoData.currencies || [],
+                chargeSides: repoData.chargeSides || [],
+              }}
+            />
+          </>
+        )}
       </div>
-
-      {/* Form Zone — always visible */}
-      <FormZone
-        onGetRates={handleGetRates}
-        onSaveDraft={storeState.versionId ? handleSaveDraft : undefined}
-        loading={rateFetching.loading}
-        initialValues={initialFormValues}
-        initialExtended={initialExtended}
-      />
-
-      <Separator />
-
-      {/* Results Zone */}
-      <ResultsZone
-        results={rateFetching.results}
-        loading={rateFetching.loading}
-        smartMode={smartMode}
-        marketAnalysis={rateFetching.marketAnalysis}
-        confidenceScore={rateFetching.confidenceScore}
-        anomalies={rateFetching.anomalies}
-        complianceCheck={complianceCheck}
-        onSelect={handleSelectOption}
-        selectedOptionId={selectedOption?.id}
-        onRerunRates={lastFormData ? handleRerunRates : undefined}
-      />
-
-      {/* Finalize Section — shown when option selected */}
-      {selectedOption && (
-        <>
-          <Separator />
-          <FinalizeSection
-            selectedOption={selectedOption}
-            onSaveQuote={handleSaveQuote}
-            onGeneratePdf={handleGeneratePdf}
-            saving={saving}
-            referenceData={{
-              chargeCategories: repoData.chargeCategories || [],
-              chargeBases: repoData.chargeBases || [],
-              currencies: repoData.currencies || [],
-              chargeSides: repoData.chargeSides || [],
-            }}
-          />
-        </>
-      )}
-    </div>
+    </FormProvider>
   );
 }
