@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, LayoutList, Columns, Sparkles, AlertTriangle } from 'lucide-react';
+import { Package, LayoutList, Columns, Sparkles, AlertTriangle, HelpCircle } from 'lucide-react';
 import { QuoteResultsList } from '@/components/sales/shared/QuoteResultsList';
 import { QuoteComparisonView } from '@/components/sales/shared/QuoteComparisonView';
 import { RateOption } from '@/types/quote-breakdown';
@@ -64,6 +64,17 @@ export function ResultsZone({
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <Package className="w-12 h-12 mb-4 opacity-20" />
         <p>No rate options available. Try adjusting your search criteria.</p>
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg text-xs max-w-md text-center space-y-2">
+          <div className="flex items-center justify-center gap-1 font-medium text-foreground">
+            <HelpCircle className="w-3.5 h-3.5" /> How to configure new rates and charges
+          </div>
+          <p>
+            To add carrier rate sheets, go to{' '}
+            <a href="/dashboard/rates" className="text-primary underline hover:no-underline">Rate Management</a>.
+            Upload rate sheets, configure carrier contracts, and set up pricing rules.
+            The system will use these rates when generating quotes.
+          </p>
+        </div>
       </div>
     );
   }

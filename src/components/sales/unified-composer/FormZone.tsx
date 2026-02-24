@@ -301,7 +301,12 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
 
   return (
     <div className="bg-muted/30 border rounded-lg p-6">
-      <form onSubmit={form.handleSubmit(onSubmit, (e) => logger.error('Form Errors:', e))} className="space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          logger.error('Form Errors:', errors);
+          const firstError = Object.values(errors)[0];
+          const message = (firstError as any)?.message || 'Please fix the highlighted fields.';
+          toast({ title: 'Validation Error', description: String(message), variant: 'destructive' });
+        })} className="space-y-5">
         {/* Smart Mode Toggle */}
         <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 p-3 rounded-md border border-purple-100 dark:border-purple-900">
           <div className="flex items-center gap-2">

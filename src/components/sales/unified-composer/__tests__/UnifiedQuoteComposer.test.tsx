@@ -55,6 +55,28 @@ vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
   }),
 }));
 
+vi.mock('@/components/sales/quote-form/useQuoteRepository', () => ({
+  useQuoteRepositoryContext: () => ({
+    chargeCategories: [{ id: 'cat-1', code: 'freight', name: 'Freight' }],
+    chargeBases: [{ id: 'basis-1', code: 'shipment', name: 'Per Shipment' }],
+    currencies: [{ id: 'cur-1', code: 'USD', name: 'USD' }],
+    chargeSides: [{ id: 'side-1', code: 'buy', name: 'Buy' }],
+    serviceTypes: [],
+    services: [],
+    carriers: [],
+    ports: [],
+    shippingTerms: [],
+    serviceModes: [],
+    tradeDirections: [],
+    serviceLegCategories: [],
+    containerTypes: [],
+    containerSizes: [],
+    accounts: [],
+    contacts: [],
+    opportunities: [],
+  }),
+}));
+
 vi.mock('@/components/sales/unified-composer/FormZone', () => ({
   FormZone: (props: any) => (
     <div data-testid="form-zone" data-initial-values={JSON.stringify(props.initialValues || null)}>

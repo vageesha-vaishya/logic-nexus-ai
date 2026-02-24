@@ -532,7 +532,20 @@ export function QuoteResultsList({
             )}
 
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold tracking-tight">Rate Options ({results.length})</h3>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold tracking-tight">Rate Options ({results.length})</h3>
+                    {onGenerateSmartOptions && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800"
+                            onClick={onGenerateSmartOptions}
+                        >
+                            <Sparkles className="h-3 w-3" />
+                            Generate Smart Options
+                        </Button>
+                    )}
+                </div>
                 <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
                     <Button 
                         variant={viewMode === 'card' ? 'secondary' : 'ghost'} 

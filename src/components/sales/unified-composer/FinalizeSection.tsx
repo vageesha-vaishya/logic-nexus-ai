@@ -7,108 +7,203 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Save, FileText, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { RateOption } from '@/types/quote-breakdown';
+import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
+import { ChargeRow } from '@/components/sales/composer/ChargeRow';
+import { ChargesAnalysisGraph } from '@/components/sales/common/ChargesAnalysisGraph';
+import { ChargeBreakdown } from '@/components/sales/common/ChargeBreakdown';
+import { useChargesManager, ManagedCharge, UseChargesManagerParams } from '@/hooks/useChargesManager';
 
-interface ChargeEntry {
-  id?: string;
-  category: string;
-  name: string;
-  amount: number;
-  currency: string;
-  unit?: string;
-  note?: string;
-}
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
 
-interface FinalizeSectionProps {
+export interface FinalizeSectionProps {
   selectedOption: RateOption;
-  onSaveQuote: (charges: ChargeEntry[], marginPercent: number, notes: string) => void;
+  onSaveQuote: (charges: ManagedCharge[], marginPercent: number, notes: string) => void;
   onGeneratePdf?: () => void;
   saving?: boolean;
+  referenceData?: {
+    chargeCategories: any[];
+    chargeBases: any[];
+    currencies: any[];
+    chargeSides: any[];
+  };
 }
 
-export function FinalizeSection({ selectedOption, onSaveQuote, onGeneratePdf, saving = false }: FinalizeSectionProps) {
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const DEFAULT_REF_DATA = {
+  chargeCategories: [
+    { id: 'freight', code: 'freight', name: 'Freight' },
+    { id: 'handling', code: 'handling', name: 'Handling' },
+    { id: 'fee', code: 'fee', name: 'Fee' },
+    { id: 'surcharge', code: 'surcharge', name: 'Surcharge' },
+    { id: 'other', code: 'other', name: 'Other' },
+  ],
+  chargeBases: [
+    { id: 'shipment', code: 'shipment', name: 'Per Shipment' },
+    { id: 'kg', code: 'kg', name: 'Per KG' },
+    { id: 'cbm', code: 'cbm', name: 'Per CBM' },
+    { id: 'container', code: 'container', name: 'Per Container' },
+  ],
+  currencies: [
+    { id: 'usd', code: 'USD', name: 'USD' },
+    { id: 'eur', code: 'EUR', name: 'EUR' },
+  ],
+  chargeSides: [
+    { id: 'buy', code: 'buy', name: 'Buy' },
+    { id: 'sell', code: 'sell', name: 'Sell' },
+  ],
+};
+
+function getModeIcon(mode?: string) {
+  switch (mode?.toLowerCase()) {
+    case 'ocean':
+    case 'sea':
+      return <Ship className="w-3.5 h-3.5" />;
+    case 'air':
+      return <Plane className="w-3.5 h-3.5" />;
+    case 'road':
+    case 'truck':
+      return <Truck className="w-3.5 h-3.5" />;
+    case 'rail':
+      return <TrainFront className="w-3.5 h-3.5" />;
+    default:
+      return <Package className="w-3.5 h-3.5" />;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function FinalizeSection({
+  selectedOption,
+  onSaveQuote,
+  onGeneratePdf,
+  saving = false,
+  referenceData,
+}: FinalizeSectionProps) {
   const [expanded, setExpanded] = useState(true);
-  const [marginPercent, setMarginPercent] = useState(15);
-  const [autoMargin, setAutoMargin] = useState(true);
   const [notes, setNotes] = useState('');
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<{ type: 'category' | 'mode' | 'leg'; value: string } | null>(null);
 
-  // Build initial charges from the selected option
-  const [charges, setCharges] = useState<ChargeEntry[]>(() => {
-    const initial: ChargeEntry[] = [];
-    const currency = selectedOption.currency || 'USD';
+  const refData = referenceData && referenceData.chargeCategories?.length > 0
+    ? referenceData
+    : DEFAULT_REF_DATA;
 
-    // Gather charges from legs
-    if (selectedOption.legs) {
-      selectedOption.legs.forEach(leg => {
-        if (leg.charges) {
-          leg.charges.forEach(c => {
-            initial.push({
-              category: c.category || 'Freight',
-              name: c.name || 'Charge',
-              amount: c.amount || 0,
-              currency: c.currency || currency,
-              unit: c.unit,
-              note: c.note,
-            });
-          });
-        }
-      });
-    }
-
-    // Add global charges
-    if (selectedOption.charges) {
-      selectedOption.charges.forEach(c => {
-        initial.push({
-          category: c.category || 'Fee',
-          name: c.name || 'Charge',
-          amount: c.amount || 0,
-          currency: c.currency || currency,
-          unit: c.unit,
-          note: c.note,
-        });
-      });
-    }
-
-    // If no charges found, create one from total
-    if (initial.length === 0 && selectedOption.price > 0) {
-      initial.push({
-        category: 'Freight',
-        name: 'Base Freight',
-        amount: selectedOption.price,
-        currency,
-      });
-    }
-
-    return initial;
+  const {
+    legs,
+    chargesByLeg,
+    allCharges,
+    addCharge,
+    updateCharge,
+    removeCharge,
+    autoMargin,
+    setAutoMargin,
+    marginPercent,
+    setMarginPercent,
+    totals,
+    getChargesForSave,
+  } = useChargesManager({
+    selectedOption,
+    referenceData: refData as UseChargesManagerParams['referenceData'],
+    defaultMarginPercent: 15,
   });
 
-  const totalSell = useMemo(() => charges.reduce((sum, c) => sum + (c.amount || 0), 0), [charges]);
-  const buyPrice = useMemo(() => {
-    if (!autoMargin) return totalSell;
-    return Number((totalSell * (1 - marginPercent / 100)).toFixed(2));
-  }, [totalSell, marginPercent, autoMargin]);
-  const marginAmount = totalSell - buyPrice;
-
-  const handleAddCharge = () => {
-    setCharges(prev => [
-      ...prev,
-      { category: 'Fee', name: '', amount: 0, currency: selectedOption.currency || 'USD' },
-    ]);
-  };
-
-  const handleUpdateCharge = (idx: number, field: keyof ChargeEntry, value: any) => {
-    setCharges(prev => prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
-  };
-
-  const handleRemoveCharge = (idx: number) => {
-    setCharges(prev => prev.filter((_, i) => i !== idx));
-  };
+  // Build tab keys: one per leg + combined
+  const legTabKeys = legs.map((l) => l.id);
+  const hasCombined = (chargesByLeg['combined']?.length || 0) > 0 || legs.length === 0;
+  const defaultTab = legTabKeys[0] || 'combined';
 
   const handleSave = () => {
-    onSaveQuote(charges, marginPercent, notes);
+    const { charges: savableCharges, marginPercent: mp } = getChargesForSave();
+    onSaveQuote(savableCharges, mp, notes);
   };
+
+  // Convert managed charges to TransportLeg[] + Charge[] for visualization
+  const { vizLegs, vizGlobalCharges } = useMemo(() => {
+    const mapCharge = (mc: ManagedCharge): Charge => ({
+      category: mc.categoryName,
+      name: mc.categoryName,
+      amount: mc.sell.amount,
+      currency: mc.currencyCode,
+      basis: mc.basisName,
+      unit: mc.unit,
+      quantity: mc.sell.quantity,
+      rate: mc.sell.rate,
+      note: mc.note,
+      leg_id: mc.legId || undefined,
+    });
+
+    const vLegs: TransportLeg[] = legs.map((leg) => ({
+      ...leg,
+      charges: (chargesByLeg[leg.id] || []).map(mapCharge),
+    }));
+
+    const vGlobal = (chargesByLeg['combined'] || []).map(mapCharge);
+
+    return { vizLegs: vLegs, vizGlobalCharges: vGlobal };
+  }, [legs, chargesByLeg]);
+
+  // Render a charge table for a given set of charges
+  const renderChargeTable = (charges: ManagedCharge[], legId: string | null) => (
+    <div className="space-y-2">
+      {charges.length > 0 ? (
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50 text-muted-foreground text-xs">
+                <th className="text-left p-2 font-medium">Category</th>
+                <th className="text-left p-2 font-medium">Basis</th>
+                <th className="text-left p-2 font-medium">Unit</th>
+                <th className="text-left p-2 font-medium">Currency</th>
+                <th className="text-right p-2 font-medium">Buy Qty</th>
+                <th className="text-right p-2 font-medium">Buy Rate</th>
+                <th className="text-right p-2 font-medium">Buy Amt</th>
+                <th className="text-center p-2 font-medium w-12"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {charges.map((charge) => (
+                <ChargeRow
+                  key={charge.id}
+                  charge={charge}
+                  categories={refData.chargeCategories}
+                  bases={refData.chargeBases}
+                  currencies={refData.currencies}
+                  onUpdate={(field, value) => updateCharge(charge.id, field, value)}
+                  onRemove={() => removeCharge(charge.id)}
+                  onConfigureBasis={() => {/* BasisConfigModal integration deferred */}}
+                  showBuySell={true}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-center py-6 text-muted-foreground text-sm">
+          No charges yet. Click "Add Charge" to start.
+        </div>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => addCharge(legId)}
+        className="mt-1"
+      >
+        <Plus className="w-3 h-3 mr-1" /> Add Charge
+      </Button>
+    </div>
+  );
 
   return (
     <Card className="border-primary/20" data-testid="finalize-section">
@@ -119,7 +214,7 @@ export function FinalizeSection({ selectedOption, onSaveQuote, onGeneratePdf, sa
             Finalize Quote — {selectedOption.carrier || 'Selected Option'}
           </span>
           <div className="flex items-center gap-3">
-            <Badge variant="secondary">{formatCurrency(totalSell, selectedOption.currency || 'USD')}</Badge>
+            <Badge variant="secondary">{formatCurrency(totals.totalSell, selectedOption.currency || 'USD')}</Badge>
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </CardTitle>
@@ -149,51 +244,103 @@ export function FinalizeSection({ selectedOption, onSaveQuote, onGeneratePdf, sa
 
           <Separator />
 
-          {/* Charges Editor */}
+          {/* Per-Leg Charges Editor with Tabs */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">Charges</h4>
-              <Button type="button" variant="outline" size="sm" onClick={handleAddCharge}>
-                <Plus className="w-3 h-3 mr-1" /> Add Charge
-              </Button>
-            </div>
+            <h4 className="text-sm font-semibold">Charges by Leg</h4>
 
-            <div className="space-y-2">
-              {charges.map((charge, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-3">
-                    <Input
-                      value={charge.category}
-                      onChange={(e) => handleUpdateCharge(idx, 'category', e.target.value)}
-                      placeholder="Category"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <Input
-                      value={charge.name}
-                      onChange={(e) => handleUpdateCharge(idx, 'name', e.target.value)}
-                      placeholder="Charge name"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      value={charge.amount}
-                      onChange={(e) => handleUpdateCharge(idx, 'amount', Number(e.target.value))}
-                      className="h-8 text-xs text-right"
-                    />
-                  </div>
-                  <div className="col-span-2 flex justify-end">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCharge(idx)} className="h-7 w-7 p-0">
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
+            {legs.length > 0 ? (
+              <Tabs defaultValue={defaultTab} className="w-full">
+                <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-transparent p-0">
+                  {legs.map((leg) => (
+                    <TabsTrigger
+                      key={leg.id}
+                      value={leg.id}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md border"
+                    >
+                      {getModeIcon(leg.mode)}
+                      <span className="truncate max-w-[120px]">
+                        {leg.origin} → {leg.destination}
+                      </span>
+                      <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">
+                        {chargesByLeg[leg.id]?.length || 0}
+                      </Badge>
+                    </TabsTrigger>
+                  ))}
+                  {hasCombined && (
+                    <TabsTrigger
+                      value="combined"
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md border"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      Combined
+                      <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">
+                        {chargesByLeg['combined']?.length || 0}
+                      </Badge>
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+
+                {legs.map((leg) => (
+                  <TabsContent key={leg.id} value={leg.id} className="mt-3">
+                    <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      {getModeIcon(leg.mode)}
+                      <span className="capitalize">{leg.mode}</span> — {leg.origin} → {leg.destination}
+                      {leg.carrier && <span className="ml-1">({leg.carrier})</span>}
+                    </div>
+                    {renderChargeTable(chargesByLeg[leg.id] || [], leg.id)}
+                  </TabsContent>
+                ))}
+
+                {hasCombined && (
+                  <TabsContent value="combined" className="mt-3">
+                    <div className="text-xs text-muted-foreground mb-2">
+                      Global charges not tied to a specific transport leg
+                    </div>
+                    {renderChargeTable(chargesByLeg['combined'] || [], null)}
+                  </TabsContent>
+                )}
+              </Tabs>
+            ) : (
+              // No legs — single combined view
+              <div>
+                <div className="text-xs text-muted-foreground mb-2">
+                  All charges
                 </div>
-              ))}
-            </div>
+                {renderChargeTable(allCharges, null)}
+              </div>
+            )}
           </div>
+
+          {/* Charge Analysis Visualization */}
+          {allCharges.length > 0 && (
+            <Collapsible open={showAnalysis} onOpenChange={setShowAnalysis}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full" data-testid="toggle-analysis">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  {showAnalysis ? 'Hide' : 'Show'} Charge Analysis
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4" data-testid="charge-analysis">
+                  <ChargesAnalysisGraph
+                    legs={vizLegs}
+                    globalCharges={vizGlobalCharges}
+                    currency={selectedOption.currency || 'USD'}
+                    onSegmentClick={(type, value) => setActiveFilter({ type, value })}
+                  />
+                  <ChargeBreakdown
+                    legs={vizLegs}
+                    globalCharges={vizGlobalCharges}
+                    currency={selectedOption.currency || 'USD'}
+                    activeFilter={activeFilter}
+                    onClearFilter={() => setActiveFilter(null)}
+                    enableAdvancedFeatures={false}
+                    containerHeight="400px"
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           <Separator />
 
@@ -222,15 +369,15 @@ export function FinalizeSection({ selectedOption, onSaveQuote, onGeneratePdf, sa
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Sell Price</span>
-                <p className="font-semibold">{formatCurrency(totalSell, selectedOption.currency || 'USD')}</p>
+                <p className="font-semibold">{formatCurrency(totals.totalSell, selectedOption.currency || 'USD')}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Buy Price</span>
-                <p className="font-semibold">{formatCurrency(buyPrice, selectedOption.currency || 'USD')}</p>
+                <p className="font-semibold">{formatCurrency(totals.totalBuy, selectedOption.currency || 'USD')}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Margin</span>
-                <p className="font-semibold text-green-600">{formatCurrency(marginAmount, selectedOption.currency || 'USD')}</p>
+                <p className="font-semibold text-green-600">{formatCurrency(totals.marginAmount, selectedOption.currency || 'USD')}</p>
               </div>
             </div>
           </div>

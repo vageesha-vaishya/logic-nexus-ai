@@ -12,9 +12,11 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { PricingService } from '@/services/pricing.service';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
 import { RateOption } from '@/types/quote-breakdown';
+import { invokeAnonymous, enrichPayload } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
 
 import { QuoteStoreProvider, useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
+import { useQuoteRepositoryContext } from '@/components/sales/quote-form/useQuoteRepository';
 import { FormZone, FormZoneValues, ExtendedFormData } from './FormZone';
 import { ResultsZone } from './ResultsZone';
 import { FinalizeSection } from './FinalizeSection';
@@ -52,6 +54,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const { containerTypes, containerSizes } = useContainerRefs();
   const { state: storeState, dispatch } = useQuoteStore();
   const { invokeAiAdvisor } = useAiAdvisor();
+  const repoData = useQuoteRepositoryContext();
 
   // Rate fetching hook
   const rateFetching = useRateFetching();
@@ -313,27 +316,52 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         contact_id: storeState.quoteData?.contact_id || null,
       };
 
-      // Build option with legs/charges from the selected rate
-      const optionLegs = (selectedOption?.legs || []).map((leg: any, idx: number) => ({
+      // Build option with per-leg charges from useChargesManager
+      // Group managed charges by legId
+      const chargesByLegId: Record<string, any[]> = {};
+      const combinedCharges: any[] = [];
+      for (const c of charges) {
+        const legKey = c.legId || 'combined';
+        if (legKey === 'combined' || !c.legId) {
+          combinedCharges.push(c);
+        } else {
+          if (!chargesByLegId[legKey]) chargesByLegId[legKey] = [];
+          chargesByLegId[legKey].push(c);
+        }
+      }
+
+      const optionLegs = (selectedOption?.legs || []).map((leg: any) => ({
         transport_mode: leg.mode || formData?.values.mode || 'ocean',
         leg_type: leg.leg_type || leg.bifurcation_role || 'transport',
         origin_location_name: leg.origin || '',
         destination_location_name: leg.destination || '',
-        charges: (leg.charges || []).map((c: any) => ({
-          category_id: c.category_id,
-          side: 'sell',
-          unit_price: c.amount || 0,
-          quantity: 1,
-          amount: c.amount || 0,
+        charges: (chargesByLegId[leg.id] || []).map((c: any) => ({
+          category_id: c.category_id || null,
+          basis_id: c.basis_id || null,
+          currency_id: c.currency_id || null,
+          side: 'buy',
+          unit_price: c.buy?.rate || 0,
+          quantity: c.buy?.quantity || 1,
+          amount: c.buy?.amount || 0,
+          sell_unit_price: c.sell?.rate || 0,
+          sell_quantity: c.sell?.quantity || 1,
+          sell_amount: c.sell?.amount || 0,
+          note: c.note || null,
         })),
       }));
 
-      const combinedChargesPayload = charges.map(c => ({
-        side: 'sell',
-        unit_price: c.amount || 0,
-        quantity: 1,
-        amount: c.amount || 0,
-        note: c.name,
+      const combinedChargesPayload = combinedCharges.map((c: any) => ({
+        category_id: c.category_id || null,
+        basis_id: c.basis_id || null,
+        currency_id: c.currency_id || null,
+        side: 'buy',
+        unit_price: c.buy?.rate || 0,
+        quantity: c.buy?.quantity || 1,
+        amount: c.buy?.amount || 0,
+        sell_unit_price: c.sell?.rate || 0,
+        sell_quantity: c.sell?.quantity || 1,
+        sell_amount: c.sell?.amount || 0,
+        note: c.note || c.categoryName || null,
       }));
 
       const optionPayload = {
@@ -342,6 +370,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         source: 'unified_composer',
         source_attribution: selectedOption?.source_attribution || 'manual',
         ai_generated: selectedOption?.ai_generated || false,
+        margin_percent: marginPercent,
         legs: optionLegs,
         combined_charges: combinedChargesPayload,
       };
@@ -389,12 +418,85 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Draft save (manual)
   // ---------------------------------------------------------------------------
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!lastFormData) {
       toast({ title: 'Nothing to save', description: 'Please fill out the form first.' });
       return;
     }
-    toast({ title: 'Draft saved', description: 'Your quote draft has been saved.' });
+
+    const tenantId = storeState.tenantId || context?.tenantId;
+    if (!tenantId) {
+      toast({ title: 'Error', description: 'Tenant context not found', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const formData = lastFormData;
+      const quotePayload: any = {
+        id: isUUID(storeState.quoteId) ? storeState.quoteId : (isUUID(quoteId) ? quoteId : undefined),
+        title: storeState.quoteData?.title || `Draft - ${formData.values.origin || ''} to ${formData.values.destination || ''}`,
+        transport_mode: formData.values.mode || 'ocean',
+        origin: formData.values.origin || '',
+        destination: formData.values.destination || '',
+        status: 'draft',
+        tenant_id: tenantId,
+        pickup_date: formData.extended.pickupDate || null,
+        delivery_deadline: formData.extended.deliveryDeadline || null,
+        incoterms: formData.extended.incoterms || null,
+        account_id: storeState.quoteData?.account_id || null,
+        contact_id: storeState.quoteData?.contact_id || null,
+      };
+
+      const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
+        p_payload: { quote: quotePayload, items: [], cargo_configurations: [], options: [] },
+      });
+
+      if (rpcError) throw new Error(rpcError.message || 'Failed to save draft');
+
+      if (savedId) {
+        dispatch({ type: 'INITIALIZE', payload: { quoteId: savedId } });
+      }
+
+      toast({ title: 'Draft saved', description: 'Your quote draft has been saved.' });
+    } catch (err: any) {
+      logger.error('[UnifiedComposer] Draft save failed:', err);
+      toast({ title: 'Save Failed', description: err.message || 'Could not save draft', variant: 'destructive' });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // PDF Generation
+  // ---------------------------------------------------------------------------
+
+  const handleGeneratePdf = async () => {
+    const currentQuoteId = storeState.quoteId || quoteId;
+    const currentVersionId = storeState.versionId || versionId;
+    if (!currentQuoteId) {
+      toast({ title: 'Save First', description: 'Please save the quote before generating a PDF.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const payload = { quoteId: currentQuoteId, versionId: currentVersionId, engine_v2: true, source: 'unified_composer', action: 'generate-pdf' };
+      const response = await invokeAnonymous('generate-quote-pdf', enrichPayload(payload));
+      if (!response?.content) {
+        const issues = Array.isArray(response?.issues) ? response.issues.join('; ') : null;
+        throw new Error(issues || 'Received empty content from PDF service');
+      }
+      const binaryString = window.atob(response.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Quote-${currentQuoteId.slice(0, 8)}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'PDF Generated', description: 'PDF has been downloaded.' });
+    } catch (err: any) {
+      logger.error('[UnifiedComposer] PDF generation failed:', err);
+      toast({ title: 'PDF Failed', description: err.message || 'Could not generate PDF', variant: 'destructive' });
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -455,7 +557,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           <FinalizeSection
             selectedOption={selectedOption}
             onSaveQuote={handleSaveQuote}
+            onGeneratePdf={handleGeneratePdf}
             saving={saving}
+            referenceData={{
+              chargeCategories: repoData.chargeCategories || [],
+              chargeBases: repoData.chargeBases || [],
+              currencies: repoData.currencies || [],
+              chargeSides: repoData.chargeSides || [],
+            }}
           />
         </>
       )}
