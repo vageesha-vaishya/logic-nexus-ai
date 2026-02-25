@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, ArrowRightLeft, Mail, Loader2, Activity, ChevronDown, ChevronRight, CreditCard, DollarSign } from 'lucide-react';
+import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, ArrowRightLeft, Mail, Loader2, Activity, ChevronDown, ChevronRight, CreditCard, DollarSign, Menu } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,15 +16,27 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   useSidebar,
+  SidebarHeader,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CommandCenterButton } from '@/components/navigation/CommandCenterButton';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpen, isMobile, setOpenMobile } = useSidebar();
   const { signOut, profile } = useAuth();
+  
+  // Force collapsed state on initial load
+  useEffect(() => {
+    // Ensure we start collapsed
+    if (state !== 'collapsed' && !isMobile) {
+      setOpen(false);
+    }
+  }, []);
+
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -133,18 +145,41 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible="icon">
-      <div className="flex h-16 items-center border-b px-4 shrink-0">
-        {collapsed ? (
-          <div className="flex w-full justify-center">
-            <Logo size={28} />
-          </div>
-        ) : (
-          <Logo size={32} showWordmark wordmarkClassName="hidden sm:block" />
-        )}
-      </div>
+    <>
+      <CommandCenterButton />
+      
+      {/* Semi-transparent backdrop for mobile/expanded state */}
+      {!collapsed && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
+        />
+      )}
 
-      <SidebarContent ref={scrollRef} className="py-2">
+      <Sidebar 
+        className={cn(
+          "border-r transition-all duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)] z-50",
+          collapsed ? 'w-0 -translate-x-full lg:w-[60px] lg:translate-x-0 overflow-hidden' : 'w-[280px] translate-x-0'
+        )} 
+        collapsible="icon"
+      >
+        <SidebarHeader className="h-16 flex items-center justify-between px-4 border-b">
+          {!collapsed && (
+             <div className="flex items-center gap-2">
+               <Logo size={32} showWordmark wordmarkClassName="hidden sm:block" />
+             </div>
+          )}
+          {collapsed && (
+            <div className="flex w-full justify-center">
+              <Logo size={24} />
+            </div>
+          )}
+        </SidebarHeader>
+
+        <SidebarContent ref={scrollRef} className="py-2">
         {/* Core Sales & CRM Group - Always Visible */}
         <SidebarGroup>
           <SidebarGroupLabel className={collapsed ? 'hidden' : ''}>CRM & Sales</SidebarGroupLabel>
@@ -257,5 +292,6 @@ export function AppSidebar() {
         </Button>
       </SidebarFooter>
     </Sidebar>
+    </>
   );
 }
