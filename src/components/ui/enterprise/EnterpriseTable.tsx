@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 
 export interface Column<T> {
-  key: keyof T;
+  key: string;
   label: string;
   sortable?: boolean;
-  render?: (value: T[keyof T], row: T) => React.ReactNode;
+  render?: (value: any, row: T, index: number) => React.ReactNode;
   className?: string;
   headerClassName?: string;
 }
@@ -125,11 +125,11 @@ export function EnterpriseTable<T extends Record<string, any>>({
     }
 
     if (currentSortConfig.direction === 'asc') {
-      return <ChevronUp className="h-4 w-4 text-[#714B67]" />;
+      return <ChevronUp className="h-4 w-4 text-primary" />;
     }
 
     if (currentSortConfig.direction === 'desc') {
-      return <ChevronDown className="h-4 w-4 text-[#714B67]" />;
+      return <ChevronDown className="h-4 w-4 text-primary" />;
     }
 
     return <ChevronsUpDown className="h-4 w-4 text-gray-400" />;
@@ -233,7 +233,7 @@ export function EnterpriseTable<T extends Record<string, any>>({
                   )}
                 >
                   {col.render
-                    ? col.render(row[col.key], row)
+                    ? col.render(row[col.key], row, index)
                     : String(row[col.key] ?? '-')}
                 </td>
               ))}
