@@ -18,6 +18,12 @@ export interface EnterpriseCardProps {
   variant?: 'default' | 'outlined' | 'elevated';
 }
 
+const variantClasses = {
+  default: 'bg-white border border-gray-200 shadow-[0_1px_4px_rgba(0,0,0,0.05)]',
+  outlined: 'bg-white border border-gray-200',
+  elevated: 'bg-white border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.08)]',
+};
+
 export function EnterpriseCard({
   title,
   description,
@@ -33,17 +39,12 @@ export function EnterpriseCard({
   onClick,
   variant = 'default',
 }: EnterpriseCardProps) {
-  const variantClasses = {
-    default: 'bg-white border border-gray-200 shadow-[0_1px_4px_rgba(0,0,0,0.05)]',
-    outlined: 'bg-white border border-gray-200',
-    elevated: 'bg-white border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.08)]',
-  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
       onClick={onClick}
       className={cn(
         'rounded-sm overflow-hidden transition-all',
@@ -54,7 +55,7 @@ export function EnterpriseCard({
     >
       {/* Header */}
       {(title || description || actions) && (
-        <div
+        <header
           className={cn(
             'px-4 py-3 border-b border-gray-200 bg-gray-50/50 flex items-start justify-between',
             headerClassName
@@ -70,24 +71,24 @@ export function EnterpriseCard({
             </div>
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
-        </div>
+        </header>
       )}
 
       {/* Body */}
-      <div className={cn('p-4', bodyClassName)}>
+      <section className={cn('p-4', bodyClassName)}>
         {children}
-      </div>
+      </section>
 
       {/* Footer */}
       {footer && (
-        <div
+        <footer
           className={cn(
             'px-4 py-3 border-t border-gray-200 bg-gray-50/50',
             footerClassName
           )}
         >
           {footer}
-        </div>
+        </footer>
       )}
     </motion.div>
   );
