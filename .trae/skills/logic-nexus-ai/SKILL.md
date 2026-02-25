@@ -126,11 +126,113 @@ Before finalizing a skill:
 2.  **Validation**: Verify the output against expected success criteria.
 3.  **Adoption**: If successful, mark as "active".
 
-# UI/UX Standardization Framework
+# Odoo-Style Design Rules (Enterprise UX)
 
-This framework ensures consistency across the Logic Nexus-AI platform, aligning with enterprise-grade standards (referencing Odoo CRM/Logistics).
+This framework ensures consistency across the Logic Nexus-AI platform, aligning with enterprise-grade standards inspired by Odoo's modular interface.
 
-## Kanban Board & Card Standards
+## 1. Unified Layout (The "Control Panel" Pattern)
+Every module must have a standard top-bar "Control Panel" containing:
+- **Breadcrumbs:** Path to the current record (e.g., Accounts / Acme Corp).
+- **Primary Actions:** Large buttons (New, Save, Discard) on the left.
+- **Search View:** A search bar on the right with "Filters", "Group By", and "Favorites" dropdowns.
+
+## 2. Standard Views
+Implement four core view types for every data module:
+- **List (Tree) View:** A striped table with a "select all" checkbox.
+- **Kanban View:** Draggable cards for pipeline-based data.
+- **Form View:** A "Sheet" look with a Status Bar (Progress tracker) at the top right.
+- **Activity View:** A sidebar for logging notes and scheduling tasks.
+
+## 3. The "Sheet" Look & Feel
+- **Background:** Use a light gray background (`#f8f9fa`) with a white "Sheet" (`#ffffff`) centered for forms.
+- **Typography:** Sans-serif (Inter or Roboto), 14px base size.
+- **Buttons:** 
+  - `btn-primary`: Odoo Purple (`#714B67`) or Teal (`#00A09D`).
+  - `btn-secondary`: White with a light border.
+
+## 4. Supabase Implementation Rules
+- Always use `camelCase` for React props and `snake_case` for Supabase database columns.
+- Implement "Real-time" indicators using Supabase subscriptions for any "Status" changes.
+- Wrap all data-fetching in a `useModuleData` custom hook to ensure standardized loading states (Odoo-style skeleton screens).
+
+## 5. Component Structure
+- Place all UI atoms in `src/components/ui`.
+- Use `src/modules/[module_name]` for specific CRM logic.
+
+## 6. Component Library (`src/components/ui/enterprise`)
+
+### `EnterpriseFormLayout`
+The main wrapper for detail pages.
+- **Features**: 
+  - Global purple header (`bg-[#714B67]`) with app navigation.
+  - White action bar with "New" button, breadcrumbs, search, and pagination.
+- **Props**: `title`, `breadcrumbs`, `status`.
+
+### `EnterpriseSheet`
+The central "paper" element containing the record's data.
+- **Features**:
+  - **Smart Buttons**: A dedicated row *above* the sheet for high-level stats (e.g., Opportunities, Sales).
+  - **Header**: Logo, Title, Address block (Left), Metadata block (Right).
+  - **Tabs**: Clean, underlined tab navigation.
+
+### `EnterpriseField`
+Standardized key-value display.
+- **Style**: 
+  - Label: `text-[13px] font-semibold text-gray-900`.
+  - Value: `text-[13px] text-gray-700`.
+  - Layout: Label above value, tight spacing (`mb-3`).
+
+### `EnterpriseStatButton` (Smart Button)
+Quick access stats in the header.
+- **Style**: Boxed button with icon and count, positioned above the sheet content.
+- **Interaction**: Navigates to related list views.
+
+### `EnterpriseActivityFeed`
+Right-hand sidebar for history and communication.
+- **Features**: Log notes, send messages, view audit trail.
+- **Style**: Gray background (`bg-muted/10`), border-left.
+
+## 7. Spacing & Layout
+- **Page Padding**: `p-4` or `p-6` depending on viewport.
+- **Gap**: Standard gap is `gap-6` (1.5rem).
+- **Grid**: Use `grid-cols-1 md:grid-cols-2` for form fields.
+
+## 8. Implementation Guide
+
+To migrate a module to this system:
+
+1.  **Import Components**:
+    ```typescript
+    import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
+    import { EnterpriseSheet, EnterpriseField, EnterpriseStatButton } from '@/components/ui/enterprise/EnterpriseComponents';
+    ```
+
+2.  **Structure**:
+    ```tsx
+    <EnterpriseFormLayout title="...">
+      <EnterpriseSheet 
+        smartButtons={
+          <>
+            <EnterpriseStatButton ... />
+          </>
+        }
+        header={...}
+      >
+        <EnterpriseNotebook>
+           <EnterpriseTab label="Tab 1">...</EnterpriseTab>
+        </EnterpriseNotebook>
+      </EnterpriseSheet>
+      <EnterpriseActivityFeed />
+    </EnterpriseFormLayout>
+    ```
+
+3.  **Data Binding**: Ensure `ScopedDataAccess` is used for all data fetching.
+
+## 9. Responsiveness
+- **Desktop (xl)**: Sheet (Left) + Activity Feed (Right).
+- **Tablet/Mobile (<xl)**: Activity Feed hides or stacks.
+
+# Kanban Board & Card Standards
 
 ### 1. Card Specifications
 - **Dimensions**: 

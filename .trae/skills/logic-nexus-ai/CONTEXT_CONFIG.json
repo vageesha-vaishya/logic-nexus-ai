@@ -50,9 +50,11 @@
         "src/components/auth/RoleGuard.tsx",
         "src/config/permissions.ts",
         "src/lib/db/access.ts",
-        "src/integrations/supabase/client.ts"
+        "src/integrations/supabase/client.ts",
+        "src/components/ui/enterprise/EnterpriseFormLayout.tsx",
+        "src/components/ui/enterprise/EnterpriseComponents.tsx"
       ],
-      "prompt_instructions": "Focus on security, role-based access control (RBAC), and tenant isolation. Ensure ScopedDataAccess is used for all DB operations."
+      "prompt_instructions": "Focus on security, role-based access control (RBAC), and tenant isolation. Ensure ScopedDataAccess is used for all DB operations. Use Enterprise components for all UI."
     },
     "skill_management": {
       "name": "Adaptive Skill Management",
@@ -65,5 +67,18 @@
       "prompt_instructions": "Analyze user intent to identify missing capabilities. Follow the 'Discovery & Analysis Protocol' in SKILL.md. Ensure all config updates are valid JSON."
     }
   },
-  "emergent_skills": []
+  "emergent_skills": [
+    {
+      "id": "odoo-ux-design",
+      "name": "Odoo-Style UX Design",
+      "description": "Enforces Odoo-style CRM UI/UX patterns across React components and Supabase interactions.",
+      "trigger_patterns": ["odoo", "enterprise ui", "control panel", "sheet view", "kanban view"],
+      "related_files": [
+        "src/components/ui/enterprise/EnterpriseFormLayout.tsx",
+        "src/components/ui/enterprise/EnterpriseComponents.tsx",
+        "src/components/kanban/KanbanBoard.tsx"
+      ],
+      "performance_metrics": { "success_rate": 0, "usage_count": 0 }
+    }
+  ]
 }

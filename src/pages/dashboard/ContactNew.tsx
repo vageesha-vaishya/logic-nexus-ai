@@ -1,15 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ContactForm } from '@/components/crm/ContactForm';
-import { ArrowLeft } from 'lucide-react';
+import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
+import { EnterpriseSheet } from '@/components/ui/enterprise/EnterpriseComponents';
 
 export default function ContactNew() {
   const navigate = useNavigate();
-  const { supabase, context, scopedDb } = useCRM();
+  const { context, scopedDb } = useCRM();
 
   const handleCreate = async (formData: any) => {
     try {
@@ -19,14 +18,17 @@ export default function ContactNew() {
         return;
       }
 
+      const contactData = {
+        ...formData,
+        // ScopedDataAccess will automatically inject tenant_id and franchise_id from context
+        // for non-platform admins. Platform admins must provide them in formData.
+        account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
+        type: undefined // Remove form-specific type field
+      };
+
       const { data, error } = await scopedDb
         .from('contacts')
-        .insert({
-          ...formData,
-          // ScopedDataAccess will automatically inject tenant_id and franchise_id from context
-          // for non-platform admins. Platform admins must provide them in formData.
-          account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
-        })
+        .insert(contactData)
         .select()
         .single();
 
@@ -41,30 +43,37 @@ export default function ContactNew() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/contacts')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">New Contact</h1>
-            <p className="text-muted-foreground">Add a new contact to your CRM</p>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ContactForm
-              onSubmit={handleCreate}
-              onCancel={() => navigate('/dashboard/contacts')}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </DashboardLayout>
+    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+        <EnterpriseFormLayout 
+            title="New Contact"
+            breadcrumbs={[
+                { label: 'Contacts', to: '/dashboard/contacts' },
+                { label: 'New' },
+            ]}
+            status="Draft"
+            actions={
+                <div className="flex items-center gap-2">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => navigate('/dashboard/contacts')}
+                    >
+                        Cancel
+                    </Button>
+                </div>
+            }
+        >
+            <EnterpriseSheet>
+                <div className="p-6">
+                    <UnifiedPartnerForm
+                        entityType="contact"
+                        mode="create"
+                        onSubmit={handleCreate}
+                        onCancel={() => navigate('/dashboard/contacts')}
+                    />
+                </div>
+            </EnterpriseSheet>
+        </EnterpriseFormLayout>
+    </div>
   );
 }

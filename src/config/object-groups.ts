@@ -22,6 +22,7 @@ export const OBJECT_GROUPS: ObjectGroup[] = [
       { name: 'Contacts', to: '/dashboard/contacts', icon: Users, description: 'People tied to accounts' },
       { name: 'Leads', to: '/dashboard/leads', icon: UserPlus, description: 'Prospects to qualify' },
       { name: 'Opportunities', to: '/dashboard/opportunities', icon: TrendingUp, description: 'Deals and pipeline' },
+      { name: 'Quotes', to: '/dashboard/quotes/pipeline', icon: FileText, description: 'Sales quotes and proposals' },
       { name: 'Activities', to: '/dashboard/activities', icon: CheckSquare, description: 'Tasks, calls, meetings' },
     ],
   },

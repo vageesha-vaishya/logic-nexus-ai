@@ -110,7 +110,7 @@ export function AppSidebar() {
     icon: i.icon,
     roles: (i as any).roles,
     permissions: (i as any).permissions,
-  })).filter(i => !['Dashboards', 'Reports', 'Quotes'].includes(i.title));
+  })).filter(i => !['Dashboards', 'Reports'].includes(i.title));
 
   const logisticsItems = (APP_MENU.find((m) => m.label === 'Logistics')?.items ?? []).map((i) => ({
     title: i.name,
@@ -121,9 +121,6 @@ export function AppSidebar() {
   }));
 
   const financialItems = [
-    ...(APP_MENU.find((m) => m.label === 'Sales')?.items ?? [])
-      .filter(i => i.name === 'Quotes')
-      .map(i => ({ title: i.name, url: i.path, icon: i.icon, roles: (i as any).roles, permissions: (i as any).permissions })),
     ...(APP_MENU.find((m) => m.label === 'Finance')?.items ?? []).map((i) => ({
       title: i.name,
       url: i.path,
