@@ -12,3 +12,6 @@ export type { EnterpriseHeaderProps } from './EnterpriseHeader';
 
 export { EnterpriseButton } from './EnterpriseButton';
 export type { EnterpriseButtonProps } from './EnterpriseButton';
+
+export { EnterpriseForm, EnterpriseFormSection, EnterpriseFormRow, EnterpriseFormField } from './EnterpriseForm';
+export type { EnterpriseFormProps, EnterpriseFormSectionProps, EnterpriseFormRowProps, EnterpriseFormFieldProps } from './EnterpriseForm';
